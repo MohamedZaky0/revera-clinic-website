@@ -100,7 +100,7 @@ export default function PatientsDirectoryView({
               </button>
 
               {showCustomerMoreMenu && (
-                <div className="absolute end-0 top-11 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-2xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 dropdown-action-menu">
+                <div className="absolute end-0 top-11 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-2xl border border-[#414E36]/15 text-xs dropdown-action-menu">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -301,7 +301,7 @@ export default function PatientsDirectoryView({
                       </button>
 
                       {activeCustomerRowMenuId === uniqueKey && (
-                        <div className="absolute end-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-start dropdown-action-menu">
+                        <div className="absolute end-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu">
                           {hasPermission("customers.edit") && (
                             <button
                               type="button"

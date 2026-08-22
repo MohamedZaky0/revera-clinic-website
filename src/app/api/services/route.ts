@@ -33,6 +33,8 @@ function mapServiceRow(r: any) {
     visible: r.visible,
     active: r.active,
     createdAt: fmtCreatedAt(r.created_at),
+    rawCreatedAt: r.created_at,
+    created_at: r.created_at,
   };
 }
 

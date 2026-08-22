@@ -493,7 +493,7 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                             </button>
 
                             {activeRowMenuId === dev.id && (
-                              <div className="absolute end-0 top-9 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-start">
+                              <div className="absolute end-0 top-9 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu">
                                 {canManage && (
                                   <button
                                     type="button"

@@ -27,6 +27,7 @@ import { getAuthHeaders } from "../utils";
 
 export interface AdditionalServiceItem {
   id: string | number;
+  serviceId?: number | string;
   name: string;
   price: number;
   deviceId?: string;
@@ -179,19 +180,79 @@ export default function DoctorOngoingSessionTab({
     fetchServiceDevices();
   }, [selectedServiceIdToAdd]);
 
+  // Preload any existing additional services from session booking notes
+  useEffect(() => {
+    if (!activeSessionBooking?.notes) return;
+    const notesStr = String(activeSessionBooking.notes);
+    const addSvcBlockMatch = notesStr.match(/\[Additional Services(?: Used)?(?: During Session)?\]:\s*([^\n\[]+)/i);
+    if (addSvcBlockMatch) {
+      const rawBlock = addSvcBlockMatch[1];
+      const items = rawBlock.split(/,(?![^(]*\))/);
+      const parsed: AdditionalServiceItem[] = [];
+      for (const item of items) {
+        const trimmed = item.trim();
+        if (!trimmed) continue;
+        const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+        if (m1) {
+          const srvName = m1[1].trim();
+          const srvPrice = Number(m1[3]) || 0;
+          parsed.push({
+            id: Date.now() + Math.random(),
+            name: srvName,
+            price: srvPrice,
+            pulses: 0
+          });
+        }
+      }
+      if (parsed.length > 0 && additionalServices.length === 0) {
+        setAdditionalServices(parsed);
+        onAdditionalServicesChange?.(parsed);
+      }
+    }
+  }, [activeSessionBooking?.id]);
+
+  // Helper to persist updated services to DB reservation notes & amountLeft immediately
+  const autoSyncServicesToBooking = (updated: AdditionalServiceItem[]) => {
+    const bookingId = activeSessionBooking?.id || (activeSessionBooking as any)?.booking_id;
+    if (!bookingId) return;
+
+    const addSvcString = updated.length > 0
+      ? `\n[Additional Services Used]: ${updated.map(s => `${s.name} (Qty: 1 x ${s.price} EGP = ${s.price} EGP)`).join(", ")}`
+      : "";
+    
+    let currentNotes = String(activeSessionBooking?.notes || "");
+    currentNotes = currentNotes.replace(/\[Additional Services(?: Used)?(?: During Session)?\]:[^\n\[]*/gi, "").trim();
+    const newNotes = currentNotes ? `${currentNotes}${addSvcString}` : addSvcString.trim();
+
+    const addSubtotal = updated.reduce((sum, s) => sum + s.price, 0);
+    const newAmountLeft = Math.max(0, (baseBookingPrice + addSubtotal + productsSubtotal + extraPulsesSubtotal) - Number(activeSessionBooking?.amountPaid || 0));
+
+    getAuthHeaders().then(headers => {
+      fetch(`/api/reservations?id=${encodeURIComponent(bookingId)}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          notes: newNotes,
+          amountLeft: newAmountLeft
+        })
+      }).catch(err => console.error("Error auto-syncing additional services to session:", err));
+    });
+  };
+
   // Handler to add an additional service to the session
   const handleAddServiceToSession = () => {
     if (!selectedServiceIdToAdd) return;
     const srv = servicesList.find((s) => String(s.id) === String(selectedServiceIdToAdd));
     if (!srv) return;
 
-    const srvName = srv.en || srv.name || "Clinical Service";
+    const srvName = srv.en || srv.name || srv.title || "Clinical Service";
     const srvPrice = Number(srv.price || 0);
 
     const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceForService));
 
     const newItem: AdditionalServiceItem = {
       id: Date.now(),
+      serviceId: srv.id,
       name: srvName,
       price: srvPrice,
       deviceId: devObj?.id,
@@ -202,6 +263,7 @@ export default function DoctorOngoingSessionTab({
     const updated = [...additionalServices, newItem];
     setAdditionalServices(updated);
     onAdditionalServicesChange?.(updated);
+    autoSyncServicesToBooking(updated);
     setSelectedServiceIdToAdd("");
     setSelectedDeviceForService("");
     setPulsesCountForService(0);
@@ -211,6 +273,7 @@ export default function DoctorOngoingSessionTab({
     const updated = additionalServices.filter((item) => item.id !== id);
     setAdditionalServices(updated);
     onAdditionalServicesChange?.(updated);
+    autoSyncServicesToBooking(updated);
   };
 
   // Inline prescription creation handler
@@ -222,10 +285,15 @@ export default function DoctorOngoingSessionTab({
       const headers = await getAuthHeaders();
       const payload = {
         booking_id: activeSessionBooking.id,
-        customer_name: activeSessionBooking.name || activeSessionBooking.customer_name,
+        customer_id: activeSessionBooking.customerId || (activeSessionBooking as any).customer_id || null,
+        patient_name: activeSessionBooking.name || (activeSessionBooking as any).customer_name || "Patient",
+        customer_name: activeSessionBooking.name || (activeSessionBooking as any).customer_name || "Patient",
+        doctor_name: activeSessionBooking.doctorName || null,
         diagnosis: rxDiagnosis,
         medications: rxMedications.filter((m) => m.name.trim()),
-        instructions: rxGeneralNotes
+        instructions: rxGeneralNotes,
+        general_notes: rxGeneralNotes,
+        date: activeSessionBooking.date || new Date().toISOString().slice(0, 10),
       };
 
       const res = await fetch("/api/prescriptions", {

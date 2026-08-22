@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   Upload,
   Plus,
@@ -284,29 +285,102 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
       {/* Category Accordions */}
       <div className="flex flex-col gap-4">
-        {localCategories.map((cat) => {
-          const catServicesRaw = (groupedServices[cat.key] ?? []).filter((svc) => {
-            const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
-            if (!toggles.visible) return false;
-            if (serviceFilterStatus === "Active" && !toggles.active) return false;
-            if (serviceFilterStatus === "Inactive" && toggles.active) return false;
-            return true;
-          });
-          const catServices = [...catServicesRaw].sort((a, b) => {
-            if (serviceSortBy === "name_asc") return (a.en || "").localeCompare(b.en || "");
-            if (serviceSortBy === "name_desc") return (b.en || "").localeCompare(a.en || "");
-            if (serviceSortBy === "price_asc") return (a.price ?? 0) - (b.price ?? 0);
-            if (serviceSortBy === "price_desc") return (b.price ?? 0) - (a.price ?? 0);
-            if (serviceSortBy === "newest") {
-              const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-              const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-              return tB - tA;
+        {(() => {
+          const isRTL = lang === "ar";
+
+          const getServicePrice = (s: ServiceItem): number => {
+            if (typeof s.price === "number" && !isNaN(s.price)) return s.price;
+            if (Array.isArray(s.branchPricing) && s.branchPricing.length > 0) {
+              const defaultBp = s.branchPricing.find((bp: any) => bp.isDefault) || s.branchPricing[0];
+              if (defaultBp && typeof defaultBp.price === "number" && !isNaN(defaultBp.price)) return defaultBp.price;
             }
-            return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+            return 0;
+          };
+
+          const getServiceName = (s: ServiceItem): string => {
+            if (isRTL) {
+              return (s.ar || s.en || (s as any).name_ar || (s as any).name_en || (s as any).name || "").trim();
+            }
+            return (s.en || s.ar || (s as any).name_en || (s as any).name_ar || (s as any).name || "").trim();
+          };
+
+          const getServiceTimestamp = (s: ServiceItem): number => {
+            const raw = (s as any).rawCreatedAt || (s as any).created_at;
+            if (raw) {
+              const t = new Date(String(raw)).getTime();
+              if (!isNaN(t) && t > 0) return t;
+            }
+            if (s.createdAt) {
+              const t = new Date(String(s.createdAt)).getTime();
+              if (!isNaN(t) && t > 0) return t;
+            }
+            return Number(s.id) || 0;
+          };
+
+          const sortedCategories = [...localCategories].sort((catA, catB) => {
+            if (serviceSortBy === "custom") return 0;
+            const servicesA = (groupedServices[catA.key] ?? []).map(getServicePrice);
+            const servicesB = (groupedServices[catB.key] ?? []).map(getServicePrice);
+
+            if (serviceSortBy === "name_asc") {
+              const nameA = (isRTL ? (catA.ar || catA.en || catA.key) : (catA.en || catA.ar || catA.key)).trim();
+              const nameB = (isRTL ? (catB.ar || catB.en || catB.key) : (catB.en || catB.ar || catB.key)).trim();
+              return nameA.localeCompare(nameB, isRTL ? "ar" : "en", { sensitivity: "base" });
+            }
+            if (serviceSortBy === "name_desc") {
+              const nameA = (isRTL ? (catA.ar || catA.en || catA.key) : (catA.en || catA.ar || catA.key)).trim();
+              const nameB = (isRTL ? (catB.ar || catB.en || catB.key) : (catB.en || catB.ar || catB.key)).trim();
+              return nameB.localeCompare(nameA, isRTL ? "ar" : "en", { sensitivity: "base" });
+            }
+            if (serviceSortBy === "price_asc") {
+              const minA = servicesA.length > 0 ? Math.min(...servicesA) : Infinity;
+              const minB = servicesB.length > 0 ? Math.min(...servicesB) : Infinity;
+              return minA - minB;
+            }
+            if (serviceSortBy === "price_desc") {
+              const maxA = servicesA.length > 0 ? Math.max(...servicesA) : -Infinity;
+              const maxB = servicesB.length > 0 ? Math.max(...servicesB) : -Infinity;
+              return maxB - maxA;
+            }
+            if (serviceSortBy === "newest") {
+              const timesA = (groupedServices[catA.key] ?? []).map(getServiceTimestamp);
+              const timesB = (groupedServices[catB.key] ?? []).map(getServiceTimestamp);
+              const latestA = timesA.length > 0 ? Math.max(...timesA) : 0;
+              const latestB = timesB.length > 0 ? Math.max(...timesB) : 0;
+              return latestB - latestA;
+            }
+            return 0;
           });
-          const isExpanded = expandedCategories[cat.key] ?? true;
-          const hasMatch = catServices.length > 0;
-          if (serviceSearch.trim() && !hasMatch) return null;
+
+          return sortedCategories.map((cat) => {
+            const catServicesRaw = (groupedServices[cat.key] ?? []).filter((svc) => {
+              const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
+              if (!toggles.visible) return false;
+              if (serviceFilterStatus === "Active" && !toggles.active) return false;
+              if (serviceFilterStatus === "Inactive" && toggles.active) return false;
+              return true;
+            });
+            const catServices = [...catServicesRaw].sort((a, b) => {
+              if (serviceSortBy === "name_asc") {
+                return getServiceName(a).localeCompare(getServiceName(b), isRTL ? "ar" : "en", { sensitivity: "base" });
+              }
+              if (serviceSortBy === "name_desc") {
+                return getServiceName(b).localeCompare(getServiceName(a), isRTL ? "ar" : "en", { sensitivity: "base" });
+              }
+              if (serviceSortBy === "price_asc") {
+                return getServicePrice(a) - getServicePrice(b);
+              }
+              if (serviceSortBy === "price_desc") {
+                return getServicePrice(b) - getServicePrice(a);
+              }
+              if (serviceSortBy === "newest") {
+                return getServiceTimestamp(b) - getServiceTimestamp(a);
+              }
+              return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+            });
+            const isExpanded = expandedCategories[cat.key] ?? true;
+            const hasMatch = catServices.length > 0;
+            if (serviceSearch.trim() && !hasMatch) return null;
 
           return (
             <div
@@ -559,7 +633,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                     </button>
 
                                     {activeServiceRowMenuId === svc.id && (
-                                      <div className="absolute end-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-start dropdown-action-menu">
+                                      <div className="absolute end-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu">
                                         {hasPermission("services.edit") && (
                                           <>
                                             <button
@@ -623,7 +697,8 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
               )}
             </div>
           );
-        })}
+        });
+      })()}
       </div>
 
       {/* Summary bar */}

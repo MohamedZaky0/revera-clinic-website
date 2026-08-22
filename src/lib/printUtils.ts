@@ -37,6 +37,17 @@ export function printInvoice(
   const invoiceNo = `INV-${booking.id.slice(0, 8).toUpperCase()}`;
 
   const serviceRows = servicesList
+    .filter((s) => {
+      const name = String(s.name || '').toLowerCase();
+      const isPulse = name.includes('pulse') || name.includes('device —') || name.includes('device -');
+      const qty = Number(s.qty) || 1;
+      const uPrice = Number(s.unitPrice !== undefined ? s.unitPrice : (s.price !== undefined ? s.price : 0));
+      const itemTotal = Number(s.total !== undefined ? s.total : (qty * uPrice));
+      if (isPulse && (itemTotal === 0 || uPrice === 0)) {
+        return false;
+      }
+      return true;
+    })
     .map(
       (s) => {
         const qty = Number(s.qty) || 1;
@@ -273,22 +284,36 @@ export function printInvoice(
 }
 
 /** Standardized cross-browser prescription printer */
-export function printPrescription(rx: any) {
+export function printPrescription(rx: any, booking?: any) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
     alert('Please allow popups to print prescriptions.');
     return;
   }
 
-  const items = Array.isArray(rx.items) ? rx.items : [];
-  const itemRows = items
+  const patientName = rx.patient_name || rx.customer_name || booking?.name || 'Patient';
+  const patientPhone = rx.patient_phone || rx.phone || booking?.phone || '—';
+  const doctorName = rx.doctor_name || booking?.doctorName || 'Treating Doctor';
+  const rxDate = rx.date ? String(rx.date).slice(0, 10) : (rx.created_at ? new Date(rx.created_at).toLocaleDateString() : new Date().toLocaleDateString());
+  const rxId = rx.id ? `RX-${String(rx.id).slice(0, 8).toUpperCase()}` : '—';
+  const diagnosis = rx.diagnosis || 'Clinical Consultation & Treatment';
+  const notes = rx.general_notes || rx.instructions || rx.doctor_notes || rx.notes || '';
+
+  const medsList: any[] = Array.isArray(rx.medications) && rx.medications.length > 0
+    ? rx.medications
+    : (Array.isArray(rx.items) ? rx.items : []);
+
+  const itemRows = medsList
     .map(
       (it: any, idx: number) => `
     <tr>
-      <td style="padding: 10px; border-bottom: 1px solid #E5E7EB; font-weight: bold;">${idx + 1}. ${it.medicine_name || it.name || 'Medication'}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #E5E7EB;">${it.dosage || '—'}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #E5E7EB;">${it.frequency || '—'}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #E5E7EB;">${it.duration || '—'}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: center; color: #5A6A51; font-weight: bold; width: 40px;">${idx + 1}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: left; color: #111827; font-weight: 700; font-size: 14px;">
+        ${it.name || it.medicine_name || it.medicine || 'Medication'}
+        ${it.dosage ? `<span style="color: #414E36; font-size: 12px; font-weight: 600; display: block; margin-top: 2px;">(${it.dosage})</span>` : ''}
+      </td>
+      <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: left; color: #374151; font-weight: 500;">${it.frequency || 'As directed'}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: left; color: #374151; font-weight: 500;">${it.duration || 'As needed'}</td>
     </tr>
   `
     )
@@ -298,50 +323,90 @@ export function printPrescription(rx: any) {
     <!DOCTYPE html>
     <html>
       <head>
-        <title>Prescription - ${rx.patient_name || 'Patient'}</title>
+        <title>Prescription - ${patientName}</title>
         <meta charset="utf-8" />
         <style>
           @page { size: A4 portrait; margin: 15mm; }
           * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          body { font-family: sans-serif; padding: 20px; color: #111827; }
-          .header { border-bottom: 2px solid #414E36; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; }
-          h1 { color: #414E36; margin: 0; font-size: 22px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
-          th { background: #F3F4F6; padding: 8px; text-align: left; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; color: #111827; background: #fff; line-height: 1.5; }
+          .header { border-bottom: 2px solid #414E36; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+          .logo-title { color: #414E36; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+          .subtitle { margin: 2px 0 0 0; font-size: 12px; color: #5A6A51; font-weight: 600; }
+          .contact { font-size: 11px; color: #6B7280; margin-top: 2px; }
+          .rx-badge { text-align: right; }
+          .rx-badge h2 { margin: 0; color: #C4AE7C; font-size: 26px; font-weight: 800; letter-spacing: 0.05em; }
+          .rx-badge p { margin: 2px 0 0 0; font-size: 12px; color: #4B5563; }
+          .patient-card { display: flex; justify-content: space-between; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-size: 13px; }
+          .patient-card p { margin: 3px 0; }
+          .rx-symbol { font-family: serif; font-size: 32px; font-weight: bold; color: #414E36; margin-bottom: 8px; line-height: 1; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; }
+          th { background: #EDF1EC; color: #414E36; font-weight: 700; padding: 10px 12px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; border-bottom: 1px solid #E5E7EB; }
+          .instructions-box { margin-top: 20px; font-size: 12px; background: #FAF5EB; border: 1px solid #C4AE7C; padding: 14px 18px; border-radius: 10px; color: #414E36; }
+          .instructions-box strong { color: #1F251A; display: block; margin-bottom: 4px; font-size: 13px; }
+          .footer { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px dashed #D1D5DB; padding-top: 20px; font-size: 12px; color: #6B7280; }
+          .doctor-sig { text-align: right; width: 200px; }
+          .sig-line { border-bottom: 1px solid #374151; margin-bottom: 6px; height: 40px; }
         </style>
       </head>
       <body>
         <div class="header">
           <div>
-            <h1>${CLIENT.name}</h1>
-            <p style="margin:2px 0; font-size:12px; color:#6B7280;">Medical Prescription</p>
+            <h1 class="logo-title">${CLIENT.name}</h1>
+            <p class="subtitle">Sheikh Zayed / New Cairo Clinics</p>
+            <p class="contact">Phone: (+20) 01035595691 | Email: inquiries@reveraclinics.com</p>
           </div>
-          <div style="text-align:right; font-size:12px;">
-            <p style="margin:2px 0;"><strong>Date:</strong> ${rx.created_at ? new Date(rx.created_at).toLocaleDateString() : new Date().toLocaleDateString()}</p>
-            <p style="margin:2px 0;"><strong>Rx ID:</strong> ${rx.id ? rx.id.slice(0, 8) : '—'}</p>
+          <div class="rx-badge">
+            <h2>PRESCRIPTION</h2>
+            <p><strong>No:</strong> ${rxId}</p>
+            <p><strong>Date:</strong> ${rxDate}</p>
           </div>
         </div>
 
-        <div style="margin-bottom: 20px; font-size: 13px;">
-          <p><strong>Patient:</strong> ${rx.patient_name || '—'}</p>
-          <p><strong>Doctor:</strong> ${rx.doctor_name || '—'}</p>
+        <div class="patient-card">
+          <div>
+            <p><strong>Patient Name:</strong> ${patientName}</p>
+            <p><strong>Phone Number:</strong> ${patientPhone}</p>
+          </div>
+          <div style="text-align: right;">
+            <p><strong>Treating Doctor:</strong> ${doctorName}</p>
+            <p><strong>Diagnosis:</strong> ${diagnosis}</p>
+          </div>
         </div>
+
+        <div class="rx-symbol">℞</div>
 
         <table>
           <thead>
             <tr>
-              <th>Medicine</th>
-              <th>Dosage</th>
-              <th>Frequency</th>
+              <th style="width: 40px; text-align: center;">#</th>
+              <th>Medication & Strength</th>
+              <th>Dosage / Frequency</th>
               <th>Duration</th>
             </tr>
           </thead>
           <tbody>
-            ${itemRows || '<tr><td colspan="4" style="padding:10px;">No medications listed.</td></tr>'}
+            ${itemRows || '<tr><td colspan="4" style="padding: 16px; text-align: center; color: #6B7280;">No medications prescribed.</td></tr>'}
           </tbody>
         </table>
 
-        ${rx.notes ? `<div style="margin-top:20px; font-size:12px; background:#F9FAFB; padding:12px; border-radius:6px;"><strong>Notes / Instructions:</strong> ${rx.notes}</div>` : ''}
+        ${notes ? `
+          <div class="instructions-box">
+            <strong>Doctor Instructions & Advice / تعليمات الطبيب:</strong>
+            ${notes}
+          </div>
+        ` : ''}
+
+        <div class="footer">
+          <div>
+            <p>✨ Revera Clinics wishes you a swift recovery and radiant health.</p>
+            <p style="font-size: 10px; color: #9CA3AF; margin-top: 4px;">Electronic Medical Record - Valid without physical stamp.</p>
+          </div>
+          <div class="doctor-sig">
+            <div class="sig-line"></div>
+            <p style="margin: 0; font-weight: 700; color: #1F251A;">${doctorName}</p>
+            <p style="margin: 0; font-size: 11px;">Specialist Physician</p>
+          </div>
+        </div>
 
         <script>
           window.onload = function() {

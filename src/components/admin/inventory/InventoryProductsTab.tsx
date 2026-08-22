@@ -426,14 +426,14 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
         {/* Main Container */}
         <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB] space-y-6">
           {/* Sub-tabs for Catalog vs Sales History */}
-          <div className="flex items-center gap-4 border-b border-[#E6E9EB] pb-3 mb-6">
+          <div className="flex items-center gap-1.5 p-1 bg-[#F2EFE9] rounded-xl w-fit mb-6">
             <button
               type="button"
               onClick={() => setProductSubTab("catalog")}
-              className={`text-xs font-bold transition pb-2 border-b-2 ${
+              className={`text-xs font-bold transition px-3.5 py-1.5 rounded-lg ${
                 productSubTab === "catalog"
-                  ? "border-[#414E36] text-[#414E36]"
-                  : "border-transparent text-[#5A6A51] hover:text-[#1F251A]"
+                  ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
+                  : "text-[#5A6A51] hover:text-[#414E36]"
               }`}
             >
               {t.catalogTab(filteredInventoryProducts.length)}
@@ -441,10 +441,10 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
             <button
               type="button"
               onClick={() => setProductSubTab("sales_history")}
-              className={`text-xs font-bold transition pb-2 border-b-2 flex items-center gap-1.5 ${
+              className={`text-xs font-bold transition px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 ${
                 productSubTab === "sales_history"
-                  ? "border-[#414E36] text-[#414E36]"
-                  : "border-transparent text-[#5A6A51] hover:text-[#1F251A]"
+                  ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
+                  : "text-[#5A6A51] hover:text-[#414E36]"
               }`}
             >
               <Receipt size={14} /> {t.salesHistoryTab(productSalesHistory.length)}

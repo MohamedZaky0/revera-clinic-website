@@ -36,6 +36,8 @@ function mapReservationProduct(p: Record<string, any>) {
     unitPrice: Number(p.unit_price) || 0,
     total: Number(p.total) || 0,
     addedBy: p.added_by_role === 'doctor_session' ? 'Doctor Session' : 'Receptionist',
+    lineType: p.line_type || (p.service_id ? 'additional_service' : 'product'),
+    serviceId: p.service_id ?? null,
   };
 }
 
@@ -863,7 +865,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId, consumptionOverrides, redeemedServiceIds, date: newDate, followUpDate } = body;
+    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId, consumptionOverrides, redeemedServiceIds, date: newDate, followUpDate, customerId: explicitCustomerId } = body;
 
     const id = (rawUrlId && rawUrlId !== 'undefined' && rawUrlId !== 'null') ? rawUrlId : (body.id || body.booking_id || body.reservation_id);
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
@@ -1360,17 +1362,40 @@ export async function PATCH(req: Request) {
 
       // Settle customer balances when the booking is being completed, or when money
       // fields change on one that is already completed (paying down an outstanding
-      // balance later).
+      // balance later), or when explicit wallet movements are supplied.
       const isSettlement =
         status === 'completed' ||
-        (target.status === 'completed' && (amountPaid !== undefined || amountLeft !== undefined));
+        (target.status === 'completed' && (amountPaid !== undefined || amountLeft !== undefined)) ||
+        (walletDeposit !== undefined && Number(walletDeposit) > 0) ||
+        (walletWithdrawal !== undefined && Number(walletWithdrawal) > 0);
 
-      if (isSettlement && target.customer_id) {
+      let resolvedCustomerId = explicitCustomerId || target.customer_id;
+      if (!resolvedCustomerId && (target.phone || target.customer_phone)) {
+        const rawPhone = (target.phone || target.customer_phone || '').trim();
+        const cleanPhone = rawPhone.replace(/\D/g, '');
+        if (cleanPhone.length >= 9) {
+          const { data: matchedCust } = await supabaseServer
+            .from('customers')
+            .select('id')
+            .or(`phone.eq.${rawPhone},phone.eq.${cleanPhone}`)
+            .limit(1)
+            .maybeSingle();
+          if (matchedCust?.id) {
+            resolvedCustomerId = matchedCust.id;
+            await supabaseServer
+              .from('reservations')
+              .update({ customer_id: resolvedCustomerId })
+              .eq('id', id);
+          }
+        }
+      }
+
+      if (isSettlement && resolvedCustomerId) {
         try {
           const { data: customer, error: fetchCustErr } = await supabaseServer
             .from('customers')
-            .select('wallet_balance, spent_amount, outstanding')
-            .eq('id', target.customer_id)
+            .select('id, wallet_balance, spent_amount, outstanding')
+            .eq('id', resolvedCustomerId)
             .single();
 
           if (!fetchCustErr && customer) {
@@ -1402,29 +1427,34 @@ export async function PATCH(req: Request) {
             });
 
             if (settled.clamped) {
-              console.warn('Customer balance clamped at 0:', target.customer_id, '| reservation:', id);
-            }
-            if (settled.walletIgnored) {
-              console.warn(
-                'Wallet movement ignored on an already-completed reservation:', id,
-                '| deposit:', walletDeposit, 'withdrawal:', walletWithdrawal
-              );
+              console.warn('Customer balance clamped at 0:', resolvedCustomerId, '| reservation:', id);
             }
 
             // Write a wallet_txns ledger row if the wallet actually moved
-            const walletDelta = settled.wallet - Number(customer.wallet_balance || 0);
+            const currentWalletVal = Number(customer.wallet_balance || 0);
+            const walletDelta = settled.wallet - currentWalletVal;
             if (walletDelta !== 0) {
-              await recordWalletMovement({
-                customerId: target.customer_id,
-                direction: walletDelta > 0 ? 'in' : 'out',
-                amount: Math.abs(walletDelta),
-                reason: walletDelta > 0 ? 'wallet deposit on settlement' : 'wallet withdrawal on settlement',
-                newBalance: settled.wallet,
-              });
+              try {
+                await recordWalletMovement({
+                  customerId: resolvedCustomerId,
+                  direction: walletDelta > 0 ? 'in' : 'out',
+                  amount: Math.abs(walletDelta),
+                  reason: walletDelta > 0 ? 'Change deposited into wallet from settlement' : 'Wallet balance applied to settlement',
+                  newBalance: settled.wallet,
+                });
+              } catch (wmErr) {
+                console.warn('recordWalletMovement ledger write failed, applying direct balance update:', wmErr);
+                await supabaseServer
+                  .from('customers')
+                  .update({
+                    wallet_balance: settled.wallet,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', resolvedCustomerId);
+              }
             }
 
-            // Update remaining scalars (spent, outstanding) — wallet_balance was
-            // already set by recordWalletMovement when the delta was non-zero.
+            // Update remaining scalars (spent, outstanding, and guarantee wallet_balance)
             await supabaseServer
               .from('customers')
               .update({
@@ -1432,7 +1462,7 @@ export async function PATCH(req: Request) {
                 spent_amount: settled.spent,
                 outstanding: settled.outstanding
               })
-              .eq('id', target.customer_id);
+              .eq('id', resolvedCustomerId);
           }
         } catch (custErr) {
           console.error("Failed to update customer wallet balance:", custErr);

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { buildInvoiceLine } from '@/lib/ledger';
+import { deductInventoryStock } from '@/app/api/inventory/products/route';
 
 /**
  * DEC-042: creates a real reservation_products row for a product/additional-service/device-pulses
@@ -71,6 +72,15 @@ export async function POST(req: Request) {
       .select()
       .single();
     if (insertError) throw insertError;
+
+    // Deduct stock from inventory for products/consumables attached to this reservation
+    if (lineType === 'product' && (productId || description)) {
+      try {
+        await deductInventoryStock(productId || description, qtyNum);
+      } catch (stockDeductErr) {
+        console.error('Error deducting inventory stock for reservation product:', stockDeductErr);
+      }
+    }
 
     // A line added to a reservation that's already completed and invoiced (e.g. reception editing
     // a settled booking) has no future completion event to be picked up by — writeCheckoutInvoice

@@ -110,6 +110,87 @@ function normalizeTimeSlot(t: string): string {
   return formatSlotTo12h(t).trim().toUpperCase();
 }
 
+function isSlotInPast(tSlot: string, bookingDateStr: string): boolean {
+  if (!bookingDateStr) return false;
+
+  const now = new Date();
+  const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  if (bookingDateStr < todayISO) return true;
+  if (bookingDateStr > todayISO) return false;
+
+  // Same day: compare hour and minute with current time
+  const formatted = formatSlotTo12h(tSlot);
+  const match = formatted.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return false;
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const ampm = match[3].toUpperCase();
+
+  if (ampm === "PM" && hours < 12) hours += 12;
+  if (ampm === "AM" && hours === 12) hours = 0;
+
+  const curHours = now.getHours();
+  const curMinutes = now.getMinutes();
+
+  if (hours < curHours) return true;
+  if (hours === curHours && minutes <= curMinutes) return true;
+
+  return false;
+}
+
+function isDoctorAvailableForService(doctor: any, service: any): boolean {
+  if (!doctor || !service) return true;
+
+  const serviceIdStr = String(service.id);
+  const serviceNameEn = (service.en || service.name || service.title || service.name_en || service.title_en || "").toLowerCase().trim();
+  const serviceNameAr = (service.ar || "").toLowerCase().trim();
+  const serviceCategory = (service.category || service.cat || "").toLowerCase().trim();
+
+  // 1. Check provider.service_ids / provider.serviceIds / provider.services_ids
+  const serviceIds = doctor.service_ids || doctor.serviceIds || doctor.services_ids;
+  if (Array.isArray(serviceIds) && serviceIds.length > 0) {
+    if (serviceIds.some((id: any) => String(id) === serviceIdStr)) {
+      return true;
+    }
+  }
+
+  // 2. Check provider.services array (can contain service names, titles, or IDs)
+  const providerServices = doctor.services || doctor.services_provided;
+  if (Array.isArray(providerServices) && providerServices.length > 0) {
+    const matches = providerServices.some((s: any) => {
+      if (s === null || s === undefined) return false;
+      const sStr = String(s).toLowerCase().trim();
+      if (!sStr) return false;
+
+      if (sStr === serviceIdStr) return true;
+      if (serviceNameEn && (sStr.includes(serviceNameEn) || serviceNameEn.includes(sStr))) return true;
+      if (serviceNameAr && (sStr.includes(serviceNameAr) || serviceNameAr.includes(sStr))) return true;
+      if (serviceCategory && (sStr.includes(serviceCategory) || serviceCategory.includes(sStr))) return true;
+
+      return false;
+    });
+
+    if (matches) return true;
+  }
+
+  // 3. Check provider.specialty or provider.department matching category or service name
+  const specialty = (doctor.specialty || doctor.department || doctor.sub_specialty || "").toLowerCase().trim();
+  if (specialty) {
+    if (serviceCategory && (specialty.includes(serviceCategory) || serviceCategory.includes(specialty))) return true;
+    if (serviceNameEn && (specialty.includes(serviceNameEn) || serviceNameEn.includes(specialty))) return true;
+  }
+
+  // If doctor has no services or specialties configured at all, consider available by default
+  const hasConfiguredServices = (Array.isArray(providerServices) && providerServices.length > 0) || (Array.isArray(serviceIds) && serviceIds.length > 0);
+  if (!hasConfiguredServices && !specialty) {
+    return true;
+  }
+
+  return false;
+}
+
 export default function AdminNewBookingView({
   onClose,
   onBookingCreated,
@@ -258,6 +339,28 @@ export default function AdminNewBookingView({
     }
   }, [activeBranchId, dbBranches, dbServices, dbDoctors]);
 
+  // Selected service object for doctor filtering
+  const currentServiceObj = useMemo(() => {
+    return dbServices.find(s => String(s.id) === String(selectedServiceId));
+  }, [dbServices, selectedServiceId]);
+
+  // Filter doctors by selected service availability
+  const filteredDoctors = useMemo(() => {
+    if (!currentServiceObj) return dbDoctors;
+    const matched = dbDoctors.filter(d => isDoctorAvailableForService(d, currentServiceObj));
+    return matched.length > 0 ? matched : dbDoctors;
+  }, [dbDoctors, currentServiceObj]);
+
+  // Sync selectedDoctorId when filteredDoctors list changes
+  useEffect(() => {
+    if (filteredDoctors.length > 0) {
+      const isStillAvailable = filteredDoctors.some(d => String(d.id) === String(selectedDoctorId));
+      if (!isStillAvailable) {
+        setSelectedDoctorId(String(filteredDoctors[0].id));
+      }
+    }
+  }, [filteredDoctors, selectedDoctorId]);
+
   // Filter rooms by selected branch
   const filteredRooms = useMemo(() => {
     if (!selectedBranchId) return dbRooms;
@@ -271,17 +374,22 @@ export default function AdminNewBookingView({
     }
   }, [sameAsPhone, phone]);
 
+  const [showTimeDropdown, setShowTimeDropdown] = useState(false);
   const phoneDropdownRef = useRef<HTMLDivElement>(null);
+  const timeDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close customer dropdown on click outside
+  // Close customer dropdown & time dropdown on click outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (phoneDropdownRef.current && !phoneDropdownRef.current.contains(e.target as Node)) {
         setShowCustomerDropdown(false);
       }
+      if (timeDropdownRef.current && !timeDropdownRef.current.contains(e.target as Node)) {
+        setShowTimeDropdown(false);
+      }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
   }, []);
 
   // 2. Real-time Customer Search & Filter based on Phone Number field
@@ -300,6 +408,9 @@ export default function AdminNewBookingView({
     });
 
     setCustomerList(filtered);
+    if (filtered.length === 0) {
+      setShowCustomerDropdown(false);
+    }
   }, [phone, allCustomers]);
 
   // Handle Select Customer from List
@@ -323,17 +434,23 @@ export default function AdminNewBookingView({
     try {
       const { data: pkgData } = await supabase
         .from("customer_packages")
-        .select("*, packages(name)")
+        .select("*, customer_package_items(*)")
         .eq("customer_id", cust.id)
-        .gt("remaining_sessions", 0)
-        .maybeSingle();
+        .eq("status", "active");
 
-      if (pkgData) {
-        setActivePackage({
-          name: pkgData.packages?.name || "Laser Hair Removal (Session Package)",
-          remaining: pkgData.remaining_sessions || 4,
-          expiresOn: pkgData.expires_at ? new Date(pkgData.expires_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "12 Dec 2026"
-        });
+      if (pkgData && pkgData.length > 0) {
+        const firstPkg = pkgData[0];
+        const items = firstPkg.customer_package_items || [];
+        const totalRemaining = items.reduce((sum: number, it: any) => sum + (it.qty_remaining || 0), 0);
+        if (totalRemaining > 0) {
+          setActivePackage({
+            name: firstPkg.package_name || "Session Package",
+            remaining: totalRemaining,
+            expiresOn: firstPkg.expires_at ? new Date(firstPkg.expires_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"
+          });
+        } else {
+          setActivePackage(null);
+        }
       } else {
         setActivePackage(null);
       }
@@ -352,9 +469,10 @@ export default function AdminNewBookingView({
         if (bookingDate) {
           let qRes = supabase
             .from("reservations")
-            .select("start_time, status, date, doctor_name, provider_id")
+            .select("*")
             .eq("date", bookingDate)
-            .neq("status", "cancelled");
+            .neq("status", "cancelled")
+            .neq("status", "rejected");
 
           if (selectedDoctorId) {
             qRes = qRes.eq("provider_id", selectedDoctorId);
@@ -362,7 +480,9 @@ export default function AdminNewBookingView({
 
           const { data: resData } = await qRes;
           if (resData) {
-            booked = resData.map((r: any) => normalizeTimeSlot(r.start_time || r.time)).filter(Boolean);
+            booked = resData
+              .map((r: any) => normalizeTimeSlot(r.time_slot || r.requested_time || r.start_time || r.time || r.timeSlot))
+              .filter(Boolean);
           }
         }
         setBookedTimeSlots(booked);
@@ -427,6 +547,24 @@ export default function AdminNewBookingView({
 
     fetchActualTimeSlots();
   }, [bookingDate, selectedDoctorId, selectedServiceId, selectedBranchId]);
+
+  // Auto-select the first valid (non-booked & non-past) slot
+  useEffect(() => {
+    if (availableTimeSlots.length > 0) {
+      const firstValid = availableTimeSlots.find((slot) => {
+        const norm = normalizeTimeSlot(slot);
+        const isBooked = bookedTimeSlots.includes(norm);
+        const isPast = isSlotInPast(slot, bookingDate);
+        return !isBooked && !isPast;
+      });
+
+      if (firstValid) {
+        setSelectedTime(firstValid);
+      } else if (!availableTimeSlots.includes(selectedTime)) {
+        setSelectedTime(availableTimeSlots[0]);
+      }
+    }
+  }, [availableTimeSlots, bookedTimeSlots, bookingDate]);
 
   const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
   const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
@@ -589,7 +727,14 @@ export default function AdminNewBookingView({
                   <label className="block font-bold text-[#1F251A]">{tr.phoneLabel}</label>
                   <button
                     type="button"
-                    onClick={() => setShowCustomerDropdown(prev => !prev)}
+                    onClick={() => {
+                      if (showCustomerDropdown) {
+                        setShowCustomerDropdown(false);
+                      } else {
+                        setCustomerList(allCustomers);
+                        setShowCustomerDropdown(true);
+                      }
+                    }}
                     className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
                   >
                     <Users size={13} />
@@ -616,10 +761,12 @@ export default function AdminNewBookingView({
                     type="tel"
                     required
                     value={phone}
-                    onFocus={() => setShowCustomerDropdown(true)}
+                    onFocus={() => {
+                      if (customerList.length > 0) setShowCustomerDropdown(true);
+                    }}
                     onChange={(e) => {
                       setPhone(e.target.value);
-                      setShowCustomerDropdown(true);
+                      if (customerList.length > 0) setShowCustomerDropdown(true);
                     }}
                     placeholder={tr.phonePlaceholder}
                     className="w-full px-3.5 py-2.5 font-mono text-[#1F251A] outline-none font-bold placeholder:text-gray-400 placeholder:font-sans"
@@ -631,7 +778,7 @@ export default function AdminNewBookingView({
                         setPhone("");
                         setFoundCustomer(null);
                         setPatientFound(null);
-                        setShowCustomerDropdown(true);
+                        setShowCustomerDropdown(false);
                       }}
                       className="pe-3 text-[#5A6A51] hover:text-[#1F251A]"
                     >
@@ -641,7 +788,7 @@ export default function AdminNewBookingView({
                 </div>
 
                 {/* Scrollable Floating Customer List Dropdown */}
-                {showCustomerDropdown && (
+                {showCustomerDropdown && customerList.length > 0 && (
                   <div className="absolute start-0 end-0 top-full mt-1 z-[100] max-h-64 overflow-y-auto bg-white rounded-2xl border border-[#414E36]/20 shadow-2xl p-2 space-y-1">
                     <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#5A6A51] bg-[#FBFBF9] rounded-xl flex justify-between items-center mb-1">
                       <span>{tr.databasePatientsPrefix} ({customerList.length})</span>
@@ -788,7 +935,7 @@ export default function AdminNewBookingView({
                     onChange={(e) => setSelectedDoctorId(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
                   >
-                    {dbDoctors.map(d => (
+                    {filteredDoctors.map(d => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                   </select>
@@ -806,10 +953,10 @@ export default function AdminNewBookingView({
                 </div>
               </div>
 
-              {/* REAL DYNAMIC TIME SLOTS */}
+              {/* REAL DYNAMIC TIME SLOTS DROPDOWN */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="font-bold text-[#1F251A]">{tr.availableTimeLabel}</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block font-bold text-[#1F251A]">{tr.availableTimeLabel}</label>
                   {loadingSlots && (
                     <span className="flex items-center gap-1 text-[11px] text-[#5A6A51]">
                       <Loader2 size={12} className="animate-spin text-emerald-700" /> {tr.fetchingSlotsLabel}
@@ -817,31 +964,45 @@ export default function AdminNewBookingView({
                   )}
                 </div>
 
-                <div className="flex flex-wrap gap-2.5">
-                  {availableTimeSlots.map((tSlot) => {
-                    const normalized = normalizeTimeSlot(tSlot);
-                    const isBooked = bookedTimeSlots.includes(normalized);
-                    const isSelected = selectedTime === tSlot;
+                <div className="relative">
+                  <select
+                    value={selectedTime}
+                    onChange={(e) => setSelectedTime(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white ps-10 pe-10 py-3 font-extrabold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 shadow-xs appearance-none"
+                  >
+                    {availableTimeSlots.map((tSlot) => {
+                      const normalized = normalizeTimeSlot(tSlot);
+                      const isBooked = bookedTimeSlots.includes(normalized);
+                      const isPast = isSlotInPast(tSlot, bookingDate);
+                      const isDisabled = isBooked || isPast;
 
-                    return (
-                      <button
-                        key={tSlot}
-                        type="button"
-                        disabled={isBooked}
-                        onClick={() => setSelectedTime(tSlot)}
-                        className={`rounded-2xl px-4 py-2.5 text-xs font-bold transition ${
-                          isBooked
-                            ? "bg-rose-50 text-rose-400 border border-rose-200 line-through cursor-not-allowed opacity-60"
-                            : isSelected
-                            ? "bg-[#1E3A2B] text-white shadow-md scale-105"
-                            : "bg-[#FBFBF9] text-[#1F251A] border border-[#414E36]/15 hover:border-[#1E3A2B]"
-                        }`}
-                        title={isBooked ? tr.slotBookedTitle : `${tr.selectSlotTitlePrefix} ${tSlot}`}
-                      >
-                        {tSlot} {isBooked ? tr.bookedSuffix : ""}
-                      </button>
-                    );
-                  })}
+                      let statusText = "";
+                      if (isBooked) {
+                        statusText = ` ${tr.bookedSuffix || "(Booked)"}`;
+                      } else if (isPast) {
+                        statusText = ` ${tr.pastSuffix || "(Past)"}`;
+                      }
+
+                      return (
+                        <option
+                          key={tSlot}
+                          value={tSlot}
+                          disabled={isDisabled}
+                          className={isDisabled ? "text-gray-400 font-normal bg-gray-100" : "font-extrabold text-[#1F251A]"}
+                        >
+                          {tSlot}{statusText}
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  <div className="absolute start-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-700">
+                    <Clock size={16} />
+                  </div>
+
+                  <div className="absolute end-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#5A6A51]">
+                    <ChevronDown size={16} />
+                  </div>
                 </div>
               </div>
 
@@ -987,7 +1148,7 @@ export default function AdminNewBookingView({
 
       {/* ── BOOKING SUMMARY CONFIRMATION POPUP MODAL ── */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-[#414E36]/15 space-y-6 relative">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">

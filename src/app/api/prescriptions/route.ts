@@ -42,6 +42,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get('customerId') || searchParams.get('customer_id');
     const bookingId = searchParams.get('bookingId') || searchParams.get('booking_id');
+    const patientName = searchParams.get('patientName') || searchParams.get('patient_name');
 
     try {
       let query = supabaseServer
@@ -49,11 +50,12 @@ export async function GET(req: Request) {
         .select('*')
         .order('date', { ascending: false });
 
-      if (customerId && customerId !== 'all') {
-        query = query.eq('customer_id', customerId);
-      }
-      if (bookingId && bookingId !== 'undefined' && bookingId !== 'null') {
+      if (bookingId && bookingId !== 'all') {
         query = query.eq('booking_id', bookingId);
+      } else if (customerId && customerId !== 'all') {
+        query = query.eq('customer_id', customerId);
+      } else if (patientName) {
+        query = query.ilike('patient_name', `%${patientName}%`);
       }
 
       let { data, error } = await query;
@@ -63,7 +65,9 @@ export async function GET(req: Request) {
           .from('prescriptions')
           .select('*')
           .order('date', { ascending: false });
-        if (customerId && customerId !== 'all') {
+        if (bookingId && bookingId !== 'all') {
+          fallbackQuery = fallbackQuery.eq('booking_id', bookingId);
+        } else if (customerId && customerId !== 'all') {
           fallbackQuery = fallbackQuery.eq('customer_id', customerId);
         }
         const fallbackRes = await fallbackQuery;
@@ -76,11 +80,12 @@ export async function GET(req: Request) {
         if (error.code === 'PGRST205') {
           console.warn('prescriptions table not found in Supabase. Falling back to local data/prescriptions.json');
           let local = readLocalPrescriptions();
-          if (customerId && customerId !== 'all') {
-            local = local.filter((p: any) => String(p.customer_id) === String(customerId));
-          }
-          if (bookingId) {
+          if (bookingId && bookingId !== 'all') {
             local = local.filter((p: any) => String(p.booking_id) === String(bookingId));
+          } else if (customerId && customerId !== 'all') {
+            local = local.filter((p: any) => String(p.customer_id) === String(customerId));
+          } else if (patientName) {
+            local = local.filter((p: any) => String(p.patient_name || '').toLowerCase().includes(patientName.toLowerCase()));
           }
           return NextResponse.json(local);
         }
@@ -91,11 +96,12 @@ export async function GET(req: Request) {
       if (dbErr.code === 'PGRST205' || dbErr.message?.includes('relation "public.prescriptions" does not exist')) {
         console.warn('prescriptions table not found in Supabase. Falling back to local data/prescriptions.json');
         let local = readLocalPrescriptions();
-        if (customerId && customerId !== 'all') {
-          local = local.filter((p: any) => String(p.customer_id) === String(customerId));
-        }
-        if (bookingId) {
+        if (bookingId && bookingId !== 'all') {
           local = local.filter((p: any) => String(p.booking_id) === String(bookingId));
+        } else if (customerId && customerId !== 'all') {
+          local = local.filter((p: any) => String(p.customer_id) === String(customerId));
+        } else if (patientName) {
+          local = local.filter((p: any) => String(p.patient_name || '').toLowerCase().includes(patientName.toLowerCase()));
         }
         return NextResponse.json(local);
       }

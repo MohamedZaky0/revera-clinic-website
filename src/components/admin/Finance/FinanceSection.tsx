@@ -104,15 +104,15 @@ export function FinanceSection({ accessToken, branches = [] }: FinanceSectionPro
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-[var(--cr-divider)] pb-2">
+      <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`inline-flex items-center gap-2 rounded-t-xl px-4 py-2.5 text-sm font-semibold transition ${
+            className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-150 shrink-0 ${
               activeTab === tab.id
-                ? "border-b-2 border-[var(--cr-accent)] text-[var(--cr-dark)]"
-                : "text-muted-foreground hover:text-[var(--cr-dark)]"
+                ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+                : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
             }`}
           >
             {tab.icon}

@@ -13,7 +13,7 @@ import {
   LocalCategory 
 } from "@/lib/serviceStore";
 import { compressImage } from "@/lib/image";
-import { printInvoice } from "@/lib/printUtils";
+import { printInvoice, printPrescription } from "@/lib/printUtils";
 import { Branch } from "@/types";
 import { translations } from "@/lib/translations";
 import { CLIENT } from "@/config/client";
@@ -1392,33 +1392,90 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (viewingBooking) {
-      const custId = viewingBooking.customerId || viewingBooking.id;
-      if (custId) {
-        fetch(`/api/prescriptions?customerId=${encodeURIComponent(custId)}`, { headers: authenticatedJsonHeaders })
-          .then((res) => (res.ok ? res.json() : []))
-          .then((data) => setDrawerPrescriptions(Array.isArray(data) ? data : []))
-          .catch((err) => console.warn("Error fetching drawer prescriptions:", err));
+      const bookId = viewingBooking.id || "";
+      const params = new URLSearchParams();
+      if (bookId) {
+        params.set("bookingId", String(bookId));
       }
+
+      fetch(`/api/prescriptions?${params.toString()}`, { headers: authenticatedJsonHeaders })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => setDrawerPrescriptions(Array.isArray(data) ? data : []))
+        .catch((err) => console.warn("Error fetching drawer prescriptions:", err));
     } else {
       setDrawerPrescriptions([]);
     }
-  }, [viewingBooking]);
+  }, [viewingBooking?.id]);
+
+  function handleSendPrescriptionWhatsApp(rx: any, booking: any) {
+    const rawPhone = String(booking?.phone || rx?.patient_phone || rx?.phone || '').trim();
+    if (!rawPhone) {
+      alert("No phone number found for this patient.");
+      return;
+    }
+    let cleanPhone = rawPhone.replace(/\D/g, '');
+    if (cleanPhone.startsWith('01')) {
+      cleanPhone = '20' + cleanPhone.slice(1);
+    } else if (cleanPhone.startsWith('00')) {
+      cleanPhone = cleanPhone.slice(2);
+    } else if (!cleanPhone.startsWith('20') && cleanPhone.length === 10) {
+      cleanPhone = '20' + cleanPhone;
+    }
+
+    const patientName = rx.patient_name || rx.customer_name || booking?.name || 'Patient';
+    const doctorName = rx.doctor_name || booking?.doctorName || 'Treating Doctor';
+    const rxDate = rx.date ? String(rx.date).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const diagnosis = rx.diagnosis || 'Clinical Consultation';
+    const notes = rx.general_notes || rx.instructions || rx.doctor_notes || rx.notes || '';
+
+    const medsList: any[] = Array.isArray(rx.medications) && rx.medications.length > 0
+      ? rx.medications
+      : (Array.isArray(rx.items) ? rx.items : []);
+
+    const medsText = medsList.length > 0
+      ? medsList.map((m: any, idx: number) => 
+          `${idx + 1}. *${m.name || m.medicine_name || m.medicine || 'Medication'}* ${m.dosage ? `(${m.dosage})` : ''}\n   ⏱️ التكرار / Frequency: ${m.frequency || 'حسب الإرشادات'}\n   ⏳ المدة / Duration: ${m.duration || 'حسب الحاجة'}`
+        ).join('\n\n')
+      : 'لا توجد أدوية مسجلة';
+
+    const msg = 
+`*REVERA CLINICS | روشتة طبية إلكترونية*
+━━━━━━━━━━━━━━━━━━━━
+👤 *المريض / Patient:* ${patientName}
+📅 *التاريخ / Date:* ${rxDate}
+👨‍⚕️ *الطبيب / Doctor:* ${doctorName}
+${diagnosis ? `🩺 *التشخيص / Diagnosis:* ${diagnosis}\n` : ''}━━━━━━━━━━━━━━━━━━━━
+💊 *الأدوية الموصوفة / Prescribed Medications:*
+
+${medsText}
+━━━━━━━━━━━━━━━━━━━━
+${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n━━━━━━━━━━━━━━━━━━━━\n` : ''}✨ مع تمنياتنا لكم بالشفاء العاجل ودوام الصحة والعافية.
+📍 *Revera Clinics* — Sheikh Zayed & New Cairo
+📞 (+20) 01035595691`;
+
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  }
 
   const handleSaveDrawerPrescription = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!viewingBooking) return;
     setSavingDrawerRx(true);
     try {
-      const custId = viewingBooking.customerId || viewingBooking.id;
+      const custId = viewingBooking.customerId || (viewingBooking as any).customer_id || null;
       const res = await fetch("/api/prescriptions", {
         method: "POST",
         headers: authenticatedJsonHeaders,
         body: JSON.stringify({
-          customer_id: String(custId),
+          booking_id: viewingBooking.id,
+          customer_id: custId ? String(custId) : null,
           patient_name: viewingBooking.name || "Patient",
-          date: new Date().toISOString().slice(0, 10),
+          customer_name: viewingBooking.name || "Patient",
+          doctor_name: viewingBooking.doctorName || null,
+          date: viewingBooking.date || new Date().toISOString().slice(0, 10),
           diagnosis: drawerRxDiagnosis,
           medications: drawerRxMeds.filter((m) => m.name.trim() !== ""),
+          instructions: drawerRxNotes,
           general_notes: drawerRxNotes,
           doctor_notes: viewingBooking.notes || ""
         })
@@ -1431,7 +1488,10 @@ export default function AdminPage() {
         setDrawerRxMeds([{ name: "", dosage: "", frequency: "", duration: "" }]);
         setDrawerRxNotes("");
 
-        const rxRes = await fetch(`/api/prescriptions?customerId=${encodeURIComponent(custId)}`, { headers: authenticatedJsonHeaders });
+        const params = new URLSearchParams();
+        if (viewingBooking.id) params.set("bookingId", String(viewingBooking.id));
+
+        const rxRes = await fetch(`/api/prescriptions?${params.toString()}`, { headers: authenticatedJsonHeaders });
         if (rxRes.ok) {
           const rxData = await rxRes.json();
           setDrawerPrescriptions(Array.isArray(rxData) ? rxData : []);
@@ -1533,6 +1593,7 @@ export default function AdminPage() {
         setSelectedDrawerProductId("");
         setSelectedDrawerProductQty(1);
         fetchAllReservations();
+        fetchInventoryProducts();
         alert(`Product "${prod.name}" added to booking invoice!`);
       }
     } catch (err) {
@@ -1542,6 +1603,38 @@ export default function AdminPage() {
   const [isEditingService, setIsEditingService] = useState(false);
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
+
+  // Sync real-time reservation_products (products, additional services, pulses) on modal opens
+  useEffect(() => {
+    const activeId = viewingBooking?.id;
+    if (!activeId) return;
+
+    supabase
+      .from('reservation_products')
+      .select('*')
+      .eq('reservation_id', activeId)
+      .then((res: any) => {
+        const { data, error } = res || {};
+        if (!error && data && data.length > 0) {
+          const mapped = data.map((p: any) => ({
+            id: p.id,
+            name: p.description,
+            qty: Number(p.qty) || 1,
+            unitPrice: Number(p.unit_price) || 0,
+            total: Number(p.total) || (Number(p.qty || 1) * Number(p.unit_price || 0)),
+            addedBy: p.added_by_role === 'doctor_session' ? 'Doctor Session' : 'Receptionist',
+            lineType: p.line_type || (p.service_id ? 'additional_service' : 'product'),
+            serviceId: p.service_id ?? null,
+          }));
+          setViewingBooking((prev: any) => {
+            if (prev && String(prev.id) === String(activeId)) {
+              return { ...prev, attachedProducts: mapped };
+            }
+            return prev;
+          });
+        }
+      });
+  }, [viewingBooking?.id]);
   const [dayBookingsSelector, setDayBookingsSelector] = useState<{
     open: boolean;
     date: string;
@@ -1627,6 +1720,37 @@ export default function AdminPage() {
   const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(false);
   const [savingCheckout, setSavingCheckout] = useState<boolean>(false);
   const [invoiceBooking, setInvoiceBooking] = useState<any>(null);
+
+  useEffect(() => {
+    const activeId = invoiceBooking?.id;
+    if (!activeId) return;
+
+    supabase
+      .from('reservation_products')
+      .select('*')
+      .eq('reservation_id', activeId)
+      .then((res: any) => {
+        const { data, error } = res || {};
+        if (!error && data && data.length > 0) {
+          const mapped = data.map((p: any) => ({
+            id: p.id,
+            name: p.description,
+            qty: Number(p.qty) || 1,
+            unitPrice: Number(p.unit_price) || 0,
+            total: Number(p.total) || (Number(p.qty || 1) * Number(p.unit_price || 0)),
+            addedBy: p.added_by_role === 'doctor_session' ? 'Doctor Session' : 'Receptionist',
+            lineType: p.line_type || (p.service_id ? 'additional_service' : 'product'),
+            serviceId: p.service_id ?? null,
+          }));
+          setInvoiceBooking((prev: any) => {
+            if (prev && String(prev.id) === String(activeId)) {
+              return { ...prev, attachedProducts: mapped };
+            }
+            return prev;
+          });
+        }
+      });
+  }, [invoiceBooking?.id]);
 
   // Postpone modal state (RISK-029 follow-up) — two modes: reschedule now (real date/time known)
   // or follow-up later (status becomes 'postponed', no date/time change yet).
@@ -3349,7 +3473,9 @@ export default function AdminPage() {
     { id: 'TC-028', name: 'Doctor Portal Right Session Drawer & Notes Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Right Slide-Over Session Drawer, clean doctor-written notes isolation, and structured payment/consumables callout cards.', status: 'idle' },
     { id: 'TC-029', name: 'Doctor Portal Patient Full Visit History Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Patient Full Visit History Right Drawer, listing all historical visits, dates, services, and doctor clinical notes.', status: 'idle' },
     { id: 'TC-030', name: 'Admin Bookings View & Schedule UI Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies the redesigned Admin Bookings View, 4 analytic cards (without percentages), mini calendar date grid, and today schedule table.', status: 'idle' },
-    { id: 'TC-031', name: 'Reception Dashboard & Shift Metrics Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies receptionist shift tracking, personal target calculations, and today bookings summary.', status: 'idle' }
+    { id: 'TC-031', name: 'Reception Dashboard & Shift Metrics Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies receptionist shift tracking, personal target calculations, and today bookings summary.', status: 'idle' },
+    { id: 'TC-032', name: 'Employee Shift Start & Geofence Verification Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies employee shift start geolocation verification, branch radius check, and attendance clock-in.', status: 'idle' },
+    { id: 'TC-033', name: 'Dashboard Notifications & Inventory Alerts Engine', category: 'Inventory & Equipment', endpoint: '/api/reception/dashboard', description: 'Verifies real-time system alerts for low stock, expired items, maintenance due, and overdue devices.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -3666,21 +3792,23 @@ export default function AdminPage() {
   }, [activeNav, viewingCustomerProfile, fetchInventoryProducts]);
 
   useEffect(() => {
-    if (viewingBooking?.customerId) {
-      fetchCustomerPackagesInto(viewingBooking.customerId, setBookingCustomerPackages);
+    const custId = viewingBooking?.customerId || (viewingBooking as any)?.customer_id || (viewingBooking?.phone ? dbCustomers.find(c => c.phone && c.phone.trim().replace(/\D/g, '') === (viewingBooking.phone || '').trim().replace(/\D/g, ''))?.id : null);
+    if (custId) {
+      fetchCustomerPackagesInto(custId, setBookingCustomerPackages);
     } else {
       setBookingCustomerPackages([]);
     }
-  }, [viewingBooking?.customerId, fetchCustomerPackagesInto]);
+  }, [viewingBooking?.customerId, (viewingBooking as any)?.customer_id, viewingBooking?.phone, dbCustomers, fetchCustomerPackagesInto]);
 
   useEffect(() => {
-    if (checkoutBooking?.customerId) {
-      fetchCustomerPackagesInto(checkoutBooking.customerId, setCheckoutCustomerPackages);
+    const custId = checkoutBooking?.customerId || (checkoutBooking as any)?.customer_id || (checkoutBooking?.phone ? dbCustomers.find(c => c.phone && c.phone.trim().replace(/\D/g, '') === (checkoutBooking.phone || '').trim().replace(/\D/g, ''))?.id : null);
+    if (custId) {
+      fetchCustomerPackagesInto(custId, setCheckoutCustomerPackages);
     } else {
       setCheckoutCustomerPackages([]);
       setRedeemedPackageItems({});
     }
-  }, [checkoutBooking?.customerId, fetchCustomerPackagesInto]);
+  }, [checkoutBooking?.customerId, (checkoutBooking as any)?.customer_id, checkoutBooking?.phone, dbCustomers, fetchCustomerPackagesInto]);
 
   useEffect(() => {
     if (matchedCustomerId) {
@@ -6219,9 +6347,9 @@ export default function AdminPage() {
 
   if (authChecking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F2EFE9] text-[#414E36]">
+      <div id="admin-root" className="admin-view flex min-h-screen items-center justify-center bg-[#F2EFE9] text-[#414E36]">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#C4AE7C] border-t-transparent"></div>
+          <div className="h-10 w-10 rounded-full border-4 border-[#C4AE7C] border-t-transparent"></div>
           <p className="text-sm font-semibold tracking-wider">Verifying administrator session...</p>
         </div>
       </div>
@@ -6230,8 +6358,8 @@ export default function AdminPage() {
 
   if (!session || !adminRole) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F2EFE9] px-4">
-        <div className="w-full max-w-md rounded-[32px] bg-[#FBFBF9] p-8 shadow-[0_20px_60px_rgba(31,37,26,0.15)] animate-fadeIn">
+      <div id="admin-root" className="admin-view flex min-h-screen items-center justify-center bg-[#F2EFE9] px-4">
+        <div className="w-full max-w-md rounded-[32px] bg-[#FBFBF9] p-8 shadow-[0_20px_60px_rgba(31,37,26,0.15)]">
           <div className="mb-8 flex flex-col items-center">
             <div className="mb-4 relative h-16 w-16 overflow-hidden rounded-2xl bg-[#414E36] p-2.5 shadow-md">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -6285,7 +6413,7 @@ export default function AdminPage() {
             <button
               type="submit"
               disabled={loginLoading}
-              className="w-full rounded-2xl bg-[#414E36] py-3.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full rounded-2xl bg-[#414E36] py-3.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loginLoading ? "Authenticating..." : "Access Dashboard"}
             </button>
@@ -6333,25 +6461,27 @@ export default function AdminPage() {
 
   if (isDoctorUserAccount && !forceAdminView) {
     return (
-      <DoctorAccountView
-        doctorDbId={loggedEmpAccount?.id || adminDbId}
-        doctorName={loggedEmpAccount?.name || adminEmail || "Doctor"}
-        doctorEmail={adminEmail}
-        doctorBranch={
-          branches.find((b) => b.id === loggedEmpAccount?.branch_id)?.name_en ||
-          loggedEmpAccount?.branch_id ||
-          "Main Branch"
-        }
-        branches={branches}
-        initialReservations={allReservations}
-        onLogout={handleLogout}
-        onSwitchToAdmin={(adminRole === "superadmin" || adminRole === "admin") ? () => setForceAdminView(true) : undefined}
-      />
+      <div id="admin-root" className="admin-view flex-1 min-h-screen">
+        <DoctorAccountView
+          doctorDbId={loggedEmpAccount?.id || adminDbId}
+          doctorName={loggedEmpAccount?.name || adminEmail || "Doctor"}
+          doctorEmail={adminEmail}
+          doctorBranch={
+            branches.find((b) => b.id === loggedEmpAccount?.branch_id)?.name_en ||
+            loggedEmpAccount?.branch_id ||
+            "Main Branch"
+          }
+          branches={branches}
+          initialReservations={allReservations}
+          onLogout={handleLogout}
+          onSwitchToAdmin={(adminRole === "superadmin" || adminRole === "admin") ? () => setForceAdminView(true) : undefined}
+        />
+      </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F2EFE9] text-[#1F251A]">
+    <div id="admin-root" className="admin-view min-h-screen bg-[#F2EFE9] text-[#1F251A]">
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[220px_1fr]">
         {/* Backdrop for mobile sidebar */}
         {sidebarOpen && (
@@ -8798,19 +8928,19 @@ export default function AdminPage() {
                     </div>
 
                     {/* Language Tab Switcher */}
-                    <div className="flex border-b border-[#F2EFE9] bg-white px-8 pt-4 rounded-t-[40px] shadow-[0_10px_30px_rgba(47,61,41,0.02)]">
+                    <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs w-fit">
                       <button
                         onClick={() => setPageSettingsLangTab("en")}
-                        className={`pb-4 px-6 text-sm font-bold transition-all duration-200 border-b-2 ${
-                          pageSettingsLangTab === "en" ? "border-[#414E36] text-[#414E36]" : "border-transparent text-[#5A6A51]/70 hover:text-[#414E36]"
+                        className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all duration-150 ${
+                          pageSettingsLangTab === "en" ? "bg-[#414E36] text-[#FBFBF9] shadow-xs" : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
                         }`}
                       >
                         English Version
                       </button>
                       <button
                         onClick={() => setPageSettingsLangTab("ar")}
-                        className={`pb-4 px-6 text-sm font-bold transition-all duration-200 border-b-2 ${
-                          pageSettingsLangTab === "ar" ? "border-[#414E36] text-[#414E36]" : "border-transparent text-[#5A6A51]/70 hover:text-[#414E36]"
+                        className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all duration-150 ${
+                          pageSettingsLangTab === "ar" ? "bg-[#414E36] text-[#FBFBF9] shadow-xs" : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
                         }`}
                       >
                         Arabic Version (العربية)
@@ -13901,7 +14031,7 @@ export default function AdminPage() {
                   </div>
 
                   {/* Profile Sub-navigation Tabs */}
-                  <div className="flex border-b border-[#414E36]/10 gap-6 overflow-x-auto pb-px scrollbar-none shrink-0">
+                  <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar shrink-0">
                     {([
                       { id: "basic", label: "Basic Info" },
                       { id: "work", label: "Work Details" },
@@ -13914,10 +14044,10 @@ export default function AdminPage() {
                       <button
                         key={tab.id}
                         onClick={() => setEmployeeProfileActiveTab(tab.id)}
-                        className={`pb-3 text-sm font-bold capitalize transition-all border-b-2 -mb-[2px] outline-none whitespace-nowrap ${
+                        className={`px-4 py-2 text-xs sm:text-sm font-semibold capitalize transition-all rounded-xl outline-none whitespace-nowrap ${
                           employeeProfileActiveTab === tab.id
-                            ? "border-[#414E36] text-[#414E36]"
-                            : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                            ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+                            : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
                         }`}
                       >
                         {tab.label}
@@ -14700,15 +14830,15 @@ export default function AdminPage() {
               </div>
 
               {/* Sub-navigation Tabs */}
-              <div className="flex border-b border-[#414E36]/10 gap-6">
+              <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar">
                 {(["overview", "payroll", "doctor-payroll", "leaves", "performance", "attendance", "targets"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setHrActiveSubTab(tab)}
-                    className={`pb-3 text-sm font-bold capitalize transition-all border-b-2 -mb-[2px] ${
+                    className={`px-4 py-2 text-xs sm:text-sm font-semibold capitalize transition-all rounded-xl outline-none whitespace-nowrap ${
                       hrActiveSubTab === tab
-                        ? "border-[#414E36] text-[#414E36]"
-                        : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                        ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+                        : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
                     }`}
                   >
                     {tab === "doctor-payroll" ? "Doctor Payroll" : tab === "targets" ? "Targets" : tab}
@@ -16316,8 +16446,8 @@ export default function AdminPage() {
           {/* ── RECEPTION DASHBOARD VIEW ── */}
           {activeNav === "Dashboard" && (
             <ReceptionDashboardView
-              receptionistName={loggedEmpAccount?.name || adminEmail || "Zaki Mohamed"}
-              receptionistRole={loggedEmpAccount?.role_name || adminRole || "Receptionist"}
+              receptionistName={loggedEmpAccount?.name || (adminEmail ? adminEmail.split("@")[0] : "Employee")}
+              receptionistRole={loggedEmpAccount?.role_name || adminRole || "Staff"}
               employeeId={loggedEmpAccount?.id || adminDbId}
               email={adminEmail}
               accessToken={session?.access_token}
@@ -16628,68 +16758,214 @@ export default function AdminPage() {
         const serviceNames = bookingServices.map(bs => bs.name).join(", ");
         const servicesCost = bookingServices.reduce((sum, bs) => sum + bs.price, 0);
 
-        // Compute products cost from attachedProducts and notes
-        const drawerAttachedList: any[] = Array.isArray((viewingBooking as any).attachedProducts)
+        // Compute attached products and additional services from attachedProducts and notes
+        const rawAttached: any[] = Array.isArray((viewingBooking as any).attachedProducts)
           ? [...(viewingBooking as any).attachedProducts]
           : [];
-        const drawerExistingNames = new Set(drawerAttachedList.map((p: any) => (p.name || '').trim().toLowerCase()));
 
-        if (viewingBooking.notes) {
-          const notesStr = viewingBooking.notes;
-          const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
-          for (const match of doctorMatches) {
-            const name = match[1].trim();
-            const qty = Number(match[2]);
-            const unitPrice = Number(match[3]);
-            if (!drawerExistingNames.has(name.toLowerCase())) {
-              drawerExistingNames.add(name.toLowerCase());
-              drawerAttachedList.push({ name, qty, unitPrice, total: qty * unitPrice });
-            }
-          }
-          const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)\s+\(x(\d+)\)\s+-\s+(\d+(?:\.\d+)?)\s+EGP/g);
-          for (const match of receptionistMatches) {
-            const name = match[1].trim();
-            const qty = Number(match[2]);
-            const total = Number(match[3]);
-            const unitPrice = qty > 0 ? total / qty : total;
-            if (!drawerExistingNames.has(name.toLowerCase())) {
-              drawerExistingNames.add(name.toLowerCase());
-              drawerAttachedList.push({ name, qty, unitPrice, total });
-            }
+        const additionalServicesList: Array<{ name: string; qty: number; unitPrice: number; total: number; lineType: string }> = [];
+        const productsConsumablesList: Array<{ name: string; qty: number; unitPrice: number; total: number; lineType: string; addedBy?: string }> = [];
+        const existingNames = new Set<string>();
+
+        // 1. Process structured attachedProducts
+        for (const item of rawAttached) {
+          const name = String(item.name || 'Item').replace(/^[,\s-]+/, '').trim();
+          const qty = Number(item.qty) || 1;
+          const unitPrice = Number(item.unitPrice || item.price || 0);
+          const total = Number(item.total) || (qty * unitPrice);
+          const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
+
+          // Skip zero-cost device pulse counter tracking from billing products list
+          const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
+          if (isPulse && (total === 0 || unitPrice === 0)) {
+            continue;
           }
 
-          // RISK-057: DoctorAccountView writes "[Products Used During Session]: Name (Qty: N x
-          // UnitPrice EGP = Total EGP), ..." — neither pattern above matches it, so a product a
-          // doctor added during the session never showed up here ("No products added") even
-          // though amountPaid/amountLeft already reflected it correctly.
-          const doctorSessionMatches = notesStr.matchAll(
-            /(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
-          );
-          for (const match of doctorSessionMatches) {
-            const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
-            const qty = Number(match[2]);
-            const unitPrice = Number(match[3]);
-            const total = Number(match[4]);
-            if (!drawerExistingNames.has(name.toLowerCase())) {
-              drawerExistingNames.add(name.toLowerCase());
-              drawerAttachedList.push({ name, qty, unitPrice, total });
+          if (!existingNames.has(name.toLowerCase())) {
+            existingNames.add(name.toLowerCase());
+            if (lineType === 'additional_service') {
+              additionalServicesList.push({ name, qty, unitPrice, total, lineType });
+            } else {
+              productsConsumablesList.push({
+                name,
+                qty,
+                unitPrice,
+                total,
+                lineType,
+                addedBy: item.addedBy || (item.added_by_role === 'doctor_session' ? 'Doctor Session' : 'Receptionist')
+              });
             }
           }
         }
 
-        const productsCost = drawerAttachedList.reduce((sum, p) => sum + (Number(p.total) || (Number(p.qty || 1) * Number(p.unitPrice || p.price || 0))), 0);
-        const totalPrice = servicesCost + productsCost;
+        // 2. Parse from notes (safety net & historical support)
+        if (viewingBooking.notes) {
+          const notesStr = String(viewingBooking.notes);
 
-        const sessionPaid = Number(viewingBooking.amountPaid || 0);
-        const rawLeft = viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null
-          ? Number(viewingBooking.amountLeft)
-          : ((viewingBooking as any).amount_left !== undefined && (viewingBooking as any).amount_left !== null
-              ? Number((viewingBooking as any).amount_left)
-              : null);
+          // a) Check for [Additional Services Used] or [Additional Services]
+          const addSvcBlockMatch = notesStr.match(/\[(?:Additional Services|Extra Services|Services Used|Added Services)(?: Used)?(?: During Session)?\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
+          if (addSvcBlockMatch) {
+            const rawBlock = addSvcBlockMatch[1];
+            // Split by comma or newline outside parentheses
+            const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
+            for (const item of items) {
+              const trimmed = item.trim();
+              if (!trimmed || trimmed.startsWith("[")) continue;
+              // Format 1: Name (Qty: 1 x 200 EGP = 200 EGP)
+              const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+              if (m1) {
+                const name = m1[1].replace(/^[,\s-]+/, '').trim();
+                const qty = Number(m1[2]) || 1;
+                const unitPrice = Number(m1[3]) || 0;
+                const total = Number(m1[4]) || (qty * unitPrice);
+                if (!existingNames.has(name.toLowerCase())) {
+                  existingNames.add(name.toLowerCase());
+                  additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                }
+                continue;
+              }
+              // Format 2: Name (Qty: 1 x 200 EGP)
+              const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+              if (m2) {
+                const name = m2[1].replace(/^[,\s-]+/, '').trim();
+                const qty = Number(m2[2]) || 1;
+                const unitPrice = Number(m2[3]) || 0;
+                const total = qty * unitPrice;
+                if (!existingNames.has(name.toLowerCase())) {
+                  existingNames.add(name.toLowerCase());
+                  additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                }
+                continue;
+              }
+              // Format 3: Name - 200 EGP or Name (200 EGP) or Name: 200 EGP or Name @ 200 EGP
+              const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+              if (m3) {
+                const name = m3[1].replace(/^[,\s-]+/, '').trim();
+                const qty = m3[2] ? Number(m3[2]) : 1;
+                const total = Number(m3[3]) || 0;
+                const unitPrice = qty > 0 ? total / qty : total;
+                if (!existingNames.has(name.toLowerCase())) {
+                  existingNames.add(name.toLowerCase());
+                  additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                }
+                continue;
+              }
+            }
+          }
 
-        const sessionLeft = (rawLeft !== null && rawLeft > 0)
-          ? rawLeft
-          : Math.max(0, totalPrice - sessionPaid);
+          // b) Added Service format: [Added Service]: Name - 350 EGP or [Additional Service]: Name - 200 EGP
+          const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service|Extra Service)\]:\s+(.*?)(?=\n|$)/gi);
+          for (const match of addedServiceMatches) {
+            const rawLine = match[1].trim();
+            const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+            if (m1) {
+              const name = m1[1].replace(/^[,\s-]+/, '').trim();
+              const qty = Number(m1[2]) || 1;
+              const unitPrice = Number(m1[3]) || 0;
+              const total = Number(m1[4]) || (qty * unitPrice);
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+              }
+              continue;
+            }
+            const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+            if (m2) {
+              const name = m2[1].replace(/^[,\s-]+/, '').trim();
+              const qty = m2[2] ? Number(m2[2]) : 1;
+              const total = Number(m2[3]);
+              const unitPrice = qty > 0 ? total / qty : total;
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+              }
+              continue;
+            }
+          }
+
+          // c) Products Used in notes
+          const prodBlockMatch = notesStr.match(/\[Products Used During Session\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
+          if (prodBlockMatch) {
+            const rawProdBlock = prodBlockMatch[1];
+            const items = rawProdBlock.split(/(?:,|\n)(?![^(]*\))/);
+            for (const item of items) {
+              const trimmed = item.trim();
+              if (!trimmed || trimmed.startsWith("[")) continue;
+              const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+              if (m1) {
+                const name = m1[1].replace(/^[,\s-]+/, '').trim();
+                const qty = Number(m1[2]) || 1;
+                const unitPrice = Number(m1[3]) || 0;
+                const total = Number(m1[4]) || (qty * unitPrice);
+                if (!existingNames.has(name.toLowerCase())) {
+                  existingNames.add(name.toLowerCase());
+                  productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product', addedBy: 'Doctor Session' });
+                }
+                continue;
+              }
+            }
+          }
+
+          // d) Receptionist Added Product: [Added Product]: Name (x2) - 1400 EGP
+          const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/gi);
+          for (const match of receptionistMatches) {
+            const name = match[1].replace(/^[,\s-]+/, '').trim();
+            const qty = match[2] ? Number(match[2]) : 1;
+            const total = Number(match[3]);
+            const unitPrice = qty > 0 ? total / qty : total;
+            if (!existingNames.has(name.toLowerCase())) {
+              existingNames.add(name.toLowerCase());
+              productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product', addedBy: 'Receptionist' });
+            }
+          }
+
+          // e) Extra Device Pulses matches
+          const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
+          for (const match of pulseMatches) {
+            const name = "Extra Device Pulses";
+            const total = parseFloat(match[2]) || 0;
+            if (total > 0 && !existingNames.has(name.toLowerCase())) {
+              existingNames.add(name.toLowerCase());
+              productsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses', addedBy: 'Doctor Session' });
+            }
+          }
+
+          // f) Generic format: - Name (x2) @ 700 EGP
+          const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/gi);
+          for (const match of doctorMatches) {
+            const name = match[1].replace(/^[,\s-]+/, '').trim();
+            const qty = Number(match[2]);
+            const unitPrice = Number(match[3]);
+            const total = qty * unitPrice;
+            if (!existingNames.has(name.toLowerCase())) {
+              existingNames.add(name.toLowerCase());
+              productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product', addedBy: 'Doctor Session' });
+            }
+          }
+        }
+
+        // 3. Fallback reconciliation: If notes or booking balance recorded a higher invoice total than the sum of parsed lines,
+        // recover the missing additional services / session adjustments difference!
+        const baseAndAttachedTotal = servicesCost + additionalServicesList.reduce((sum, s) => sum + s.total, 0) + productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
+        let targetInvoiceTotal = baseAndAttachedTotal;
+
+        if (viewingBooking.notes) {
+          const invMatch = String(viewingBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+          if (invMatch) {
+            const notedTotal = Number(invMatch[1]);
+            if (notedTotal > targetInvoiceTotal) {
+              targetInvoiceTotal = notedTotal;
+            }
+          }
+        }
+
+        const rawPaid = Number(viewingBooking.amountPaid || (viewingBooking as any).amount_paid || 0);
+        const additionalServicesCost = additionalServicesList.reduce((sum, s) => sum + s.total, 0);
+        const productsCost = productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
+        const totalPrice = servicesCost + additionalServicesCost + productsCost;
+
+        const sessionPaid = rawPaid;
+        const sessionLeft = Math.max(0, totalPrice - sessionPaid);
 
         const isInvoicePaid = sessionLeft <= 0 || (sessionPaid >= totalPrice && totalPrice > 0);
 
@@ -16742,40 +17018,31 @@ export default function AdminPage() {
                 {/* Left Column */}
                 <div className="space-y-6">
                   
-                  {/* Service & Date & Session Type */}
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICE</p>
-                      <p className="mt-1 text-base font-semibold text-[#1F251A]">{serviceNames}</p>
-                    </div>
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">BOOKING DATE</p>
-                      <p className="mt-1 text-base font-semibold text-[#1F251A]">
-                        {viewingBooking.date} {viewingBooking.timeSlot ? ` @ ${viewingBooking.timeSlot}` : viewingBooking.requestedTime ? ` @ ${viewingBooking.requestedTime}` : ""}
+                  {/* Compact Booking Info Header: Service, Date & Session Type */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-xl border border-[#414E36]/10 bg-white p-3.5 shadow-2xs">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#5A6A51]">SERVICE</p>
+                      <p className="mt-1 text-xs sm:text-sm font-bold text-[#1F251A] leading-snug line-clamp-2" title={serviceNames}>
+                        {serviceNames}
                       </p>
                     </div>
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 flex flex-col justify-between">
-                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-1">SESSION TYPE</p>
-                       <select
-                         value={viewingBooking.sessionType || "in_person"}
-                         disabled={!hasPermission("bookings.edit") || viewingBooking.status === 'completed'}
-                         onChange={async (e) => {
-                           const newType = e.target.value;
-                           await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                             method: "PATCH",
-                             headers: authenticatedJsonHeaders,
-                             body: JSON.stringify({ sessionType: newType })
-                           });
-                           setViewingBooking(prev => prev ? { ...prev, sessionType: newType } : null);
-                           fetchAllReservations();
-                         }}
-                         className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                       >
-                         <option value="in_person">In Person / في العيادة</option>
-                         <option value="online">Online / أونلاين</option>
-                       </select>
-                     </div>
-                     
+
+                    <div className="rounded-xl border border-[#414E36]/10 bg-white p-3.5 shadow-2xs">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#5A6A51]">BOOKING DATE</p>
+                      <p className="mt-1 text-xs sm:text-sm font-bold text-[#1F251A] leading-snug">
+                        {viewingBooking.date} {viewingBooking.timeSlot ? `@ ${viewingBooking.timeSlot}` : viewingBooking.requestedTime ? `@ ${viewingBooking.requestedTime}` : ""}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-[#414E36]/10 bg-white p-3.5 shadow-2xs flex flex-col justify-between">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#5A6A51]">SESSION TYPE</p>
+                      <div className="mt-1">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#EDF1EC] px-2.5 py-1 text-xs font-bold text-[#414E36]">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#414E36]"></span>
+                          {viewingBooking.sessionType === 'online' ? "Online Consultation / أونلاين" : "In Person / في العيادة"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Price Details */}
@@ -16790,6 +17057,12 @@ export default function AdminPage() {
                         <span>Service Cost</span>
                         <span>{servicesCost} EGP</span>
                       </div>
+                      {additionalServicesCost > 0 && (
+                        <div className="flex justify-between font-semibold text-[#1F251A]">
+                          <span>Additional Services</span>
+                          <span>+{additionalServicesCost} EGP</span>
+                        </div>
+                      )}
                       {productsCost > 0 && (
                         <div className="flex justify-between font-semibold text-[#414E36]">
                           <span>Products & Consumables</span>
@@ -16834,7 +17107,7 @@ export default function AdminPage() {
 
                     <div className="flex flex-wrap gap-2">
                       {bookingServices.map((bs, index) => (
-                        <div key={`${bs.id}-${index}`} className="flex items-center gap-2 bg-[#EDF1EC] rounded-xl px-3 py-1.5 text-sm font-semibold text-[#1F251A] shadow-sm">
+                        <div key={`base-${bs.id}-${index}`} className="flex items-center gap-2 bg-[#EDF1EC] rounded-xl px-3 py-1.5 text-sm font-semibold text-[#1F251A] shadow-sm">
                           <span>{bs.name}</span>
                           <span className="text-xs font-medium text-[#5A6A51]">({bs.price} EGP)</span>
                           {bookingServices.length > 1 && hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
@@ -16926,33 +17199,7 @@ export default function AdminPage() {
                    * - Technical Caveat / Gap: Requires strict role permission audit checks (e.g. only 'finance' or 'superadmin' roles can apply adjustments).
                    *   All changes must write an audit trail log in a ledger table.
                    * - Last Updated: July 5, 2026 2:45 PM
-                   * - Milestone: Postponed / Phase 2
-                   * - Module: Bookings / Billing
-                   * - Parent Feature: Billing System
-                   * - Place: Booking Details drawer / Extra Adjustment Section
-                   * - End Dev: Pending DB Schema
-                   * - Priority: Medium
-                   * - Started Dev: July 5, 2026 2:00 PM
-                   * - Status: Locked
-                   * - Sub-Features: Empty
-                   * - User Role: Finance Manager / Superadmin
-                   * - What: Allows adding positive or negative financial adjustments to the base price of a booking.
-                   * - Where: Located inside the booking details drawer under 'Extra Adjustment'.
-                   * - Why: Handles manual discounts, on-the-fly custom service adjustments, or refunds without altering core service pricing.
-                   */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">EXTRA ADJUSTMENT</p>
-                      <p className="text-sm text-[#1F251A] mt-1 font-semibold">0.00 EGP</p>
-                    </div>
-                    <button
-                      disabled={true}
-                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-gray-400 bg-gray-50 cursor-not-allowed opacity-50 flex items-center gap-1"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                      Adjustment
-                    </button>
-                  </div>
+
 
 
 
@@ -16979,87 +17226,74 @@ export default function AdminPage() {
                    */}
                   {/* Products Card */}
                   {(() => {
-                    const list: any[] = Array.isArray((viewingBooking as any).attachedProducts)
-                      ? [...(viewingBooking as any).attachedProducts]
-                      : [];
-                    const existingNames = new Set(list.map((p: any) => (p.name || '').trim().toLowerCase()));
-
-                    if (viewingBooking.notes) {
-                      const notesStr = viewingBooking.notes;
-
-                      // Doctor session notes pattern: "- Product Name (xQty) @ Price EGP = Total EGP"
-                      const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
-                      for (const match of doctorMatches) {
-                        const name = match[1].trim();
-                        const qty = Number(match[2]);
-                        const unitPrice = Number(match[3]);
-                        if (!existingNames.has(name.toLowerCase())) {
-                          existingNames.add(name.toLowerCase());
-                          list.push({
-                            id: name,
-                            name,
-                            qty,
-                            unitPrice,
-                            total: qty * unitPrice,
-                            addedBy: 'Doctor Session'
-                          });
-                        }
+                    // Filter out zero-cost device pulses and additional services from retail & procedure products card
+                    const filteredProductsList = productsConsumablesList.filter((prod: any) => {
+                      const nameLower = String(prod.name || '').toLowerCase();
+                      const isPulse = (prod.lineType === 'device_pulses') || nameLower.includes('pulse') || nameLower.includes('device —') || nameLower.includes('device -');
+                      if (isPulse && (Number(prod.total || 0) === 0 || Number(prod.unitPrice || prod.price || 0) === 0)) {
+                        return false;
                       }
-
-                      // Receptionist notes pattern: "[Added Product]: Product Name (xQty) - Total EGP"
-                      const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)\s+\(x(\d+)\)\s+-\s+(\d+(?:\.\d+)?)\s+EGP/g);
-                      for (const match of receptionistMatches) {
-                        const name = match[1].trim();
-                        const qty = Number(match[2]);
-                        const total = Number(match[3]);
-                        const unitPrice = qty > 0 ? total / qty : total;
-                        if (!existingNames.has(name.toLowerCase())) {
-                          existingNames.add(name.toLowerCase());
-                          list.push({
-                            id: name,
-                            name,
-                            qty,
-                            unitPrice,
-                            total,
-                            addedBy: 'Receptionist'
-                          });
-                        }
+                      if (prod.lineType === 'additional_service' || nameLower.includes('additional clinical services') || nameLower.includes('additional service')) {
+                        return false;
                       }
-
-                      // RISK-057: DoctorAccountView actually writes "[Products Used During
-                      // Session]: Name (Qty: N x UnitPrice EGP = Total EGP), ..." — a third,
-                      // independent copy of this same regex-reconstruction (this panel) missed the
-                      // same fix already applied to drawerAttachedList/invoiceAttachedList above.
-                      const doctorSessionMatches = notesStr.matchAll(
-                        /(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
-                      );
-                      for (const match of doctorSessionMatches) {
-                        const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
-                        const qty = Number(match[2]);
-                        const unitPrice = Number(match[3]);
-                        const total = Number(match[4]);
-                        if (!existingNames.has(name.toLowerCase())) {
-                          existingNames.add(name.toLowerCase());
-                          list.push({
-                            id: name,
-                            name,
-                            qty,
-                            unitPrice,
-                            total,
-                            addedBy: 'Doctor Session'
-                          });
-                        }
-                      }
-                    }
+                      return true;
+                    });
 
                     return (
-                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS & SESSION CONSUMABLES</p>
+                      <>
+                        {/* Additional Clinical Services & Extra Adjustments Card */}
+                        {additionalServicesList.length > 0 && (
+                          <div className="rounded-2xl border border-[#C4AE7C]/30 bg-white p-5 space-y-3 shadow-xs">
+                            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#C4AE7C]">
+                                  ADDITIONAL SERVICES & EXTRA ADJUSTMENTS
+                                </p>
+                                <p className="text-sm font-bold text-[#1F251A] mt-0.5">
+                                  {additionalServicesList.length} Additional Service{additionalServicesList.length > 1 ? "s" : ""} Added in Session
+                                </p>
+                              </div>
+                              <span className="rounded-full bg-[#FAF5EB] px-3 py-1 text-xs font-bold text-[#C4AE7C] border border-[#C4AE7C]/40">
+                                Total: {additionalServicesCost} EGP
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                              {additionalServicesList.map((as, asIdx) => (
+                                <div
+                                  key={`add-card-${asIdx}`}
+                                  className="flex flex-col justify-between p-3.5 rounded-2xl bg-[#FAF5EB]/60 border border-[#C4AE7C]/30 hover:border-[#C4AE7C] transition shadow-2xs space-y-2"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <span className="font-bold text-sm text-[#1F251A] leading-snug">
+                                      {as.name}
+                                    </span>
+                                    <span className="rounded-full bg-[#C4AE7C]/20 px-2 py-0.5 text-[10px] font-bold text-[#414E36] shrink-0">
+                                      Additional Service
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center justify-between pt-2 border-t border-[#C4AE7C]/20 text-xs">
+                                    <span className="text-[#5A6A51] font-medium">
+                                      Qty: {as.qty} {as.qty > 1 ? `x ${as.unitPrice} EGP` : ""}
+                                    </span>
+                                    <span className="text-sm font-extrabold text-[#414E36]">
+                                      {as.total || (as.qty * as.unitPrice)} EGP
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS & SESSION CONSUMABLES</p>
                             <p className="text-sm font-bold text-[#1F251A] mt-0.5">
-                              {list.length > 0
-                                ? `${list.length} Product(s) Attached`
+                              {filteredProductsList.length > 0
+                                ? `${filteredProductsList.length} Product(s) Attached`
                                 : "No products added"}
                             </p>
                           </div>
@@ -17077,9 +17311,9 @@ export default function AdminPage() {
                           </button>
                         </div>
 
-                        {list.length > 0 ? (
+                        {filteredProductsList.length > 0 ? (
                           <div className="space-y-2">
-                            {list.map((prod: any, pIdx: number) => (
+                            {filteredProductsList.map((prod: any, pIdx: number) => (
                               <div key={pIdx} className="flex items-center justify-between p-2.5 rounded-xl bg-[#FBFBF9] border border-[#414E36]/10 text-xs">
                                 <div>
                                   <div className="flex items-center gap-2">
@@ -17102,49 +17336,121 @@ export default function AdminPage() {
                           <p className="text-xs text-[#5A6A51]">No retail or procedure products linked to this booking yet.</p>
                         )}
                       </div>
+                    </>
                     );
                   })()}
 
                   {/* Prescriptions Card */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-1 border-b border-[#414E36]/10 pb-3">
                       <div>
-                        <p className="text-sm font-bold text-[#1F251A]">Prescriptions</p>
-                        <p className="text-xs text-[#5A6A51]">Patient digital prescriptions record</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Prescriptions</p>
+                        <p className="text-sm font-bold text-[#1F251A] mt-0.5">
+                          {drawerPrescriptions.length > 0
+                            ? `${drawerPrescriptions.length} Digital Prescription(s)`
+                            : "Patient digital prescriptions record"}
+                        </p>
                       </div>
-                      <button
-                        onClick={() => setShowDrawerPrescriptionModal(true)}
-                        className="rounded-2xl bg-[#414E36] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center gap-1.5 shadow-sm"
-                      >
-                        + Add Prescription
-                      </button>
+                      {drawerPrescriptions.length > 0 && (
+                        <span className="rounded-full bg-[#EDF1EC] px-2.5 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
+                          Recorded in Session
+                        </span>
+                      )}
                     </div>
 
                     {drawerPrescriptions.length > 0 ? (
-                      <div className="space-y-3 pt-2">
-                        {drawerPrescriptions.map((rx: any, rxIdx: number) => (
-                          <div key={rx.id || rxIdx} className="rounded-xl bg-[#FBFBF9] border border-[#414E36]/10 p-3 text-xs space-y-1.5">
-                            <div className="flex justify-between items-center font-bold text-[#1F251A]">
-                              <span>Diagnosis: {rx.diagnosis || "Medical Prescription"}</span>
-                              <span className="text-[10px] text-[#5A6A51] font-mono">{rx.date ? String(rx.date).slice(0, 10) : "Today"}</span>
-                            </div>
-                            {rx.medications && Array.isArray(rx.medications) && (
-                              <div className="space-y-1 pt-1 border-t border-[#414E36]/10">
-                                {rx.medications.map((m: any, mIdx: number) => (
-                                  <div key={mIdx} className="flex justify-between text-[11px] text-[#5A6A51]">
-                                    <span className="font-semibold text-[#1F251A]">• {m.name || m.medicine} ({m.dosage})</span>
-                                    <span>{m.frequency} - {m.duration}</span>
-                                  </div>
-                                ))}
+                      <div className="space-y-4 pt-1">
+                        {drawerPrescriptions.map((rx: any, rxIdx: number) => {
+                          const medsList: any[] = Array.isArray(rx.medications) && rx.medications.length > 0
+                            ? rx.medications
+                            : (Array.isArray(rx.items) ? rx.items : []);
+                          const rxDate = rx.date ? String(rx.date).slice(0, 10) : (rx.created_at ? new Date(rx.created_at).toLocaleDateString() : "Today");
+                          const docName = rx.doctor_name || viewingBooking.doctorName || "Treating Doctor";
+                          const notes = rx.general_notes || rx.instructions || rx.doctor_notes || rx.notes;
+
+                          return (
+                            <div key={rx.id || rxIdx} className="rounded-2xl bg-[#FBFBF9] border border-[#414E36]/15 p-4 text-xs space-y-3 shadow-sm">
+                              {/* Top Prescription Header */}
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#414E36]/10 pb-2.5">
+                                <div>
+                                  <span className="font-extrabold text-sm text-[#1F251A]">
+                                    {rx.diagnosis ? `Diagnosis: ${rx.diagnosis}` : "Clinical Prescription"}
+                                  </span>
+                                  <p className="text-[11px] text-[#5A6A51] mt-0.5">
+                                    <strong>Doctor:</strong> {docName}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <span className="rounded-full bg-[#EDF1EC] px-2.5 py-0.5 text-[10px] font-bold text-[#414E36]">
+                                    {rxDate}
+                                  </span>
+                                </div>
                               </div>
-                            )}
-                            {rx.general_notes && (
-                              <p className="text-[11px] text-[#5A6A51] italic pt-1 font-sans">
-                                Notes: {rx.general_notes}
-                              </p>
-                            )}
-                          </div>
-                        ))}
+
+                              {/* Medications Table */}
+                              {medsList.length > 0 && (
+                                <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+                                  <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                      <tr className="bg-[#EDF1EC] text-[#414E36] font-bold border-b border-gray-200 text-[11px]">
+                                        <th className="p-2 text-left">Medication</th>
+                                        <th className="p-2 text-left">Dosage</th>
+                                        <th className="p-2 text-left">Frequency</th>
+                                        <th className="p-2 text-left">Duration</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                      {medsList.map((m: any, mIdx: number) => (
+                                        <tr key={mIdx} className="hover:bg-gray-50/50">
+                                          <td className="p-2 font-bold text-[#1F251A]">{m.name || m.medicine_name || m.medicine || "—"}</td>
+                                          <td className="p-2 text-[#5A6A51] font-medium">{m.dosage || "—"}</td>
+                                          <td className="p-2 text-[#5A6A51]">{m.frequency || "—"}</td>
+                                          <td className="p-2 text-[#5A6A51]">{m.duration || "—"}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+
+                              {/* Doctor Instructions */}
+                              {notes && (
+                                <div className="rounded-xl bg-[#FAF5EB] border border-[#C4AE7C]/30 p-2.5 text-[11px] text-[#414E36]">
+                                  <strong className="block font-bold mb-0.5 text-[#1F251A]">Instructions / تعليمات:</strong>
+                                  <p className="whitespace-pre-line leading-relaxed">{notes}</p>
+                                </div>
+                              )}
+
+                              {/* Action Buttons: WhatsApp & Print */}
+                              <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-[#414E36]/10">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendPrescriptionWhatsApp(rx, viewingBooking)}
+                                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white px-3 py-1.5 text-xs font-bold transition shadow-sm"
+                                  title={`Send prescription to ${viewingBooking.phone || 'patient'} via WhatsApp`}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.632.062-1.954-.476-1.579-.643-2.617-2.26-2.696-2.366-.079-.105-.644-.858-.644-1.636 0-.777.407-1.16.552-1.317.145-.157.316-.197.422-.197.105 0 .211.002.302.007.098.005.23-.037.36.275.144.348.492 1.2.535 1.288.043.088.072.19.014.307-.058.117-.087.19-.174.292-.087.102-.183.228-.261.306-.087.087-.179.182-.077.357.102.175.454.748.974 1.211.671.597 1.236.782 1.411.87.175.088.277.073.38-.044.103-.117.437-.509.554-.684.116-.175.233-.146.393-.088.16.059 1.018.48 1.193.568.175.088.291.131.334.205.044.073.044.423-.1.828z"/>
+                                  </svg>
+                                  Send via WhatsApp
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => printPrescription(rx, viewingBooking)}
+                                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] hover:bg-[#323D2A] text-white px-3 py-1.5 text-xs font-bold transition shadow-sm"
+                                  title="Print or Save PDF of this prescription"
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="6 9 6 2 18 2 18 9" />
+                                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                                    <rect x="6" y="14" width="12" height="8" />
+                                  </svg>
+                                  Print / Save PDF
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
@@ -17155,89 +17461,9 @@ export default function AdminPage() {
                           <line x1="16" y1="17" x2="8" y2="17" />
                           <polyline points="10 9 9 9 8 9" />
                         </svg>
-                        <p className="text-xs font-semibold text-[#1F251A]">No prescriptions recorded yet</p>
-                        <button
-                          onClick={() => setShowDrawerPrescriptionModal(true)}
-                          className="mt-2 text-xs font-bold text-[#414E36] hover:underline flex items-center gap-1"
-                        >
-                          + Create First Prescription
-                        </button>
+                        <p className="text-xs font-semibold text-[#1F251A]">No prescription recorded yet</p>
+                        <p className="text-[11px] text-[#5A6A51] mt-0.5">No prescription was written by the doctor for this session.</p>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Notes */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
-                    {isEditingNotes ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-bold text-[#1F251A]">Edit Notes</p>
-                        </div>
-                        <textarea
-                          value={notesDraft}
-                          onChange={(e) => setNotesDraft(e.target.value)}
-                          placeholder="Enter notes about this booking..."
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition min-h-[100px]"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => setIsEditingNotes(false)}
-                            className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={async () => {
-                              await saveNotes(notesDraft);
-                              setViewingBooking(prev => prev ? { ...prev, notes: notesDraft } : null);
-                              setIsEditingNotes(false);
-                            }}
-                            className="rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
-                          >
-                            Save Note
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between mb-4">
-                          <p className="text-sm font-bold text-[#1F251A]">Notes</p>
-                          {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
-                            <button
-                              onClick={() => {
-                                setNotesDraft(viewingBooking.notes || "");
-                                setIsEditingNotes(true);
-                              }}
-                              className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
-                            >
-                              {viewingBooking.notes ? "Edit Note" : "+ Add Note"}
-                            </button>
-                          )}
-                        </div>
-                        {viewingBooking.notes ? (
-                          <div className="rounded-xl bg-[#F7F7F3] p-4 text-sm text-[#414E36]">
-                            {viewingBooking.notes}
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-60">
-                              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                            </svg>
-                            <p className="text-xs font-semibold">no notes yet</p>
-                            {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
-                              <button
-                                onClick={() => {
-                                  setNotesDraft("");
-                                  setIsEditingNotes(true);
-                                }}
-                                className="mt-2 text-xs font-bold text-[#414E36] hover:underline"
-                              >
-                                Add your first note about this customer
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </>
                     )}
                   </div>
 
@@ -17799,41 +18025,106 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                                    {/* Service Status */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 text-sm">
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-2">Service status</p>
-                    <p className="text-[#5A6A51] italic font-semibold">No reviews</p>
-                  </div>
+                  {/* Doctor Clinical Notes */}
+                  {(() => {
+                    const cleanDoctorNotes = (() => {
+                      if (!viewingBooking?.notes) return "";
+                      let text = String(viewingBooking.notes);
+                      text = text.replace(/\[Products Used During Session\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Additional Services(?: Used)?(?: During Session)?\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Device Pulses Deducted\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Extra Device Pulses\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Invoice Total Updated\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Total Invoice\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Added Product\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Added Service\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/-\s+[\s\S]*?\(x\d+\)\s+@\s+\d+[\s\S]*?EGP/gi, "");
+                      return text.trim();
+                    })();
 
-                  {/* Invoice */}
-                  {viewingBooking.status === 'completed' && (
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 bg-gray-100 rounded-lg text-[#5A6A51]">
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                            <line x1="16" y1="2" x2="16" y2="6" />
-                            <line x1="8" y1="2" x2="8" y2="6" />
-                            <line x1="3" y1="10" x2="21" y2="10" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-[#1F251A]">Booking Invoice</p>
-                          <p className="text-xs text-[#5A6A51] mt-0.5">Generate and download invoice for this booking.</p>
-                        </div>
+                    return (
+                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
+                        {isEditingNotes ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-bold text-[#1F251A]">Edit Doctor Clinical Notes</p>
+                            </div>
+                            <textarea
+                              value={notesDraft}
+                              onChange={(e) => setNotesDraft(e.target.value)}
+                              placeholder="Enter clinical notes or session observations..."
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition min-h-[100px]"
+                            />
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => setIsEditingNotes(false)}
+                                className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  const raw = String(viewingBooking.notes || "");
+                                  const matches = raw.match(/(\[(?:Products Used|Additional Services|Device Pulses|Extra Device|Invoice Total|Total Invoice|Added Product|Added Service)[^\]]*\]:[^\n\[]*)/gi);
+                                  const systemTags = matches ? "\n" + matches.join("\n") : "";
+                                  const finalNotes = notesDraft.trim() + systemTags;
+                                  await saveNotes(finalNotes);
+                                  setViewingBooking(prev => prev ? { ...prev, notes: finalNotes } : null);
+                                  setIsEditingNotes(false);
+                                }}
+                                className="rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                              >
+                                Save Note
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Doctor Clinical Notes</p>
+                                <p className="text-sm font-bold text-[#1F251A] mt-0.5">Session Clinical Observations</p>
+                              </div>
+                              {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
+                                <button
+                                  onClick={() => {
+                                    setNotesDraft(cleanDoctorNotes);
+                                    setIsEditingNotes(true);
+                                  }}
+                                  className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                                >
+                                  {cleanDoctorNotes ? "Edit Note" : "+ Add Note"}
+                                </button>
+                              )}
+                            </div>
+                            {cleanDoctorNotes ? (
+                              <div className="rounded-xl bg-[#F7F7F3] border border-[#414E36]/10 p-4 text-xs text-[#1F251A] whitespace-pre-line leading-relaxed">
+                                {cleanDoctorNotes}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-60">
+                                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                </svg>
+                                <p className="text-xs font-semibold text-[#1F251A]">No clinical notes recorded for this session yet</p>
+                                {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
+                                  <button
+                                    onClick={() => {
+                                      setNotesDraft("");
+                                      setIsEditingNotes(true);
+                                    }}
+                                    className="mt-2 text-xs font-bold text-[#414E36] hover:underline"
+                                  >
+                                    + Add doctor note
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
-                      <button
-                        onClick={() => {
-                          const b = viewingBooking;
-                          setViewingBooking(null);
-                          setInvoiceBooking(b);
-                        }}
-                        className="mt-4 w-full rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
-                      >
-                        Download Invoice
-                      </button>
-                    </div>
-                  )}
+                    );
+                  })()}
 
 
 
@@ -17947,6 +18238,155 @@ export default function AdminPage() {
                 Add to Invoice
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Prescription Modal for Booking Drawer */}
+      {showDrawerPrescriptionModal && viewingBooking && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn overflow-y-auto">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 my-8 border border-[#414E36]/10">
+            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Digital Rx</span>
+                <h3 className="text-base font-bold text-[#1F251A] mt-0.5">Add Prescription for {viewingBooking.name}</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowDrawerPrescriptionModal(false);
+                  setDrawerRxDiagnosis("");
+                  setDrawerRxMeds([{ name: "", dosage: "", frequency: "", duration: "" }]);
+                  setDrawerRxNotes("");
+                }}
+                className="rounded-full bg-gray-100 p-1.5 text-gray-500 hover:bg-gray-200 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDrawerPrescription} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-[#1F251A] mb-1">Clinical Diagnosis / التشخيص</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Skin rejuvenation, Acne treatment, Post-laser care"
+                  value={drawerRxDiagnosis}
+                  onChange={(e) => setDrawerRxDiagnosis(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 p-2.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#414E36]"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block font-bold text-[#1F251A]">Prescribed Medications / الأدوية</label>
+                  <button
+                    type="button"
+                    onClick={() => setDrawerRxMeds(prev => [...prev, { name: "", dosage: "", frequency: "", duration: "" }])}
+                    className="text-[11px] font-bold text-[#414E36] hover:underline"
+                  >
+                    + Add Medication
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {drawerRxMeds.map((med, mIdx) => (
+                    <div key={mIdx} className="p-2.5 rounded-xl bg-[#FBFBF9] border border-gray-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[11px] text-[#5A6A51]">Medication #{mIdx + 1}</span>
+                        {drawerRxMeds.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setDrawerRxMeds(prev => prev.filter((_, i) => i !== mIdx))}
+                            className="text-red-500 hover:text-red-700 font-bold text-xs"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          required
+                          placeholder="Medication Name"
+                          value={med.name}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDrawerRxMeds(prev => prev.map((item, i) => i === mIdx ? { ...item, name: val } : item));
+                          }}
+                          className="rounded-lg border border-gray-300 p-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#414E36]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Dosage (e.g. 500mg, 1 tab)"
+                          value={med.dosage}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDrawerRxMeds(prev => prev.map((item, i) => i === mIdx ? { ...item, dosage: val } : item));
+                          }}
+                          className="rounded-lg border border-gray-300 p-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Frequency (e.g. Twice daily)"
+                          value={med.frequency}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDrawerRxMeds(prev => prev.map((item, i) => i === mIdx ? { ...item, frequency: val } : item));
+                          }}
+                          className="rounded-lg border border-gray-300 p-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Duration (e.g. 7 days)"
+                          value={med.duration}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDrawerRxMeds(prev => prev.map((item, i) => i === mIdx ? { ...item, duration: val } : item));
+                          }}
+                          className="rounded-lg border border-gray-300 p-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#1F251A] mb-1">Doctor Instructions & Advice / تعليمات الطبيب</label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Avoid direct sunlight, apply sunscreen every 2 hours, drink plenty of water."
+                  value={drawerRxNotes}
+                  onChange={(e) => setDrawerRxNotes(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 p-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDrawerPrescriptionModal(false);
+                    setDrawerRxDiagnosis("");
+                    setDrawerRxMeds([{ name: "", dosage: "", frequency: "", duration: "" }]);
+                    setDrawerRxNotes("");
+                  }}
+                  className="w-1/2 rounded-xl border border-gray-300 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingDrawerRx}
+                  className="w-1/2 rounded-xl bg-[#414E36] py-2.5 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 shadow-sm"
+                >
+                  {savingDrawerRx ? "Saving..." : "Save Prescription"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -19279,24 +19719,14 @@ export default function AdminPage() {
           // is already stored on the booking as amountPaid — checkout must charge only what's
           // left of the service price, not the full price again. RISK-029.
           const depositAlreadyPaid = Number(checkoutBooking.amountPaid) || 0;
-          // Package redemption is disabled once a deposit has been collected on this booking:
-          // deposits are booking-level, not per-service, so waiving a service's price after cash
-          // was already taken against it would need refund/reversal logic this feature doesn't
-          // build. Staff can still redeem on any booking with no deposit collected.
-          const redemptionAllowed = depositAlreadyPaid === 0;
           const activeCustomerPackageItems = checkoutCustomerPackages
             .filter((pkg: any) => pkg.status === "active" && (!pkg.expiresAt || new Date(pkg.expiresAt) >= new Date()))
             .flatMap((pkg: any) => (pkg.items || []).map((it: any) => ({ ...it, packageName: pkg.packageName })));
           const bookingServicesList = svcIds.map((id: number) => {
             const s = localServices.find(srv => srv.id === id);
             const details = s ? getServicePriceDetails(s, checkoutBooking.branchId, branches) : null;
-            // Number(...) on both sides — service_id is a bigint column and Supabase/PostgREST
-            // does not consistently return bigint values as JS numbers across every query shape
-            // (flat select vs. embedded/joined select); packages/route.ts already established
-            // this defensive-coercion pattern for the same column.
-            const redeemableItem = redemptionAllowed
-              ? activeCustomerPackageItems.find((it: any) => Number(it.serviceId) === Number(id) && it.qtyRemaining > 0) || null
-              : null;
+            // Match service with active package item
+            const redeemableItem = activeCustomerPackageItems.find((it: any) => Number(it.serviceId) === Number(id) && it.qtyRemaining > 0) || null;
             return {
               serviceId: id,
               name: s?.en || `Service #${id}`,
@@ -19311,19 +19741,206 @@ export default function AdminPage() {
             0
           );
 
-          // Calculate extra session add-ons (products added during doctor session / extra pulses / custom products)
-          let extraAddonsCost = 0;
-          const leftVal = Number(checkoutBooking.amountLeft !== undefined ? checkoutBooking.amountLeft : (checkoutBooking.amount_left || 0));
-          const totalExpectedOnBooking = leftVal + depositAlreadyPaid;
-          if (totalExpectedOnBooking > baseServicesTotal) {
-            extraAddonsCost = totalExpectedOnBooking - baseServicesTotal;
+          // Compute attached products and additional services from attachedProducts and notes
+          const rawAttached: any[] = Array.isArray((checkoutBooking as any).attachedProducts)
+            ? [...(checkoutBooking as any).attachedProducts]
+            : [];
+
+          const checkoutAdditionalServicesList: Array<{ name: string; qty: number; unitPrice: number; total: number; lineType: string }> = [];
+          const checkoutProductsConsumablesList: Array<{ name: string; qty: number; unitPrice: number; total: number; lineType: string }> = [];
+          const existingCheckoutNames = new Set<string>();
+
+          // 1. Process structured attachedProducts
+          for (const item of rawAttached) {
+            const name = String(item.name || 'Item').trim();
+            const qty = Number(item.qty) || 1;
+            const unitPrice = Number(item.unitPrice || item.price || 0);
+            const total = Number(item.total) || (qty * unitPrice);
+            const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
+
+            const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
+            if (isPulse && (total === 0 || unitPrice === 0)) {
+              continue;
+            }
+
+            if (!existingCheckoutNames.has(name.toLowerCase())) {
+              existingCheckoutNames.add(name.toLowerCase());
+              if (lineType === 'additional_service') {
+                checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType });
+              } else {
+                checkoutProductsConsumablesList.push({ name, qty, unitPrice, total, lineType });
+              }
+            }
           }
 
-          const totalCost = baseServicesTotal + extraAddonsCost;
+          // 2. Parse from notes (safety net & historical support)
+          if (checkoutBooking.notes) {
+            const notesStr = String(checkoutBooking.notes);
+
+            // a) [Additional Services Used] / [Additional Services]
+            const addSvcBlockMatch = notesStr.match(/\[(?:Additional Services|Extra Services|Services Used|Added Services)(?: Used)?(?: During Session)?\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
+            if (addSvcBlockMatch) {
+              const rawBlock = addSvcBlockMatch[1];
+              const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
+              for (const item of items) {
+                const trimmed = item.trim();
+                if (!trimmed || trimmed.startsWith("[")) continue;
+                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m1) {
+                  const name = m1[1].trim();
+                  const qty = Number(m1[2]) || 1;
+                  const unitPrice = Number(m1[3]) || 0;
+                  const total = Number(m1[4]) || (qty * unitPrice);
+                  if (!existingCheckoutNames.has(name.toLowerCase())) {
+                    existingCheckoutNames.add(name.toLowerCase());
+                    checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                  }
+                  continue;
+                }
+                const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m2) {
+                  const name = m2[1].trim();
+                  const qty = Number(m2[2]) || 1;
+                  const unitPrice = Number(m2[3]) || 0;
+                  const total = qty * unitPrice;
+                  if (!existingCheckoutNames.has(name.toLowerCase())) {
+                    existingCheckoutNames.add(name.toLowerCase());
+                    checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                  }
+                  continue;
+                }
+                const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+                if (m3) {
+                  const name = m3[1].trim();
+                  const qty = m3[2] ? Number(m3[2]) : 1;
+                  const total = Number(m3[3]) || 0;
+                  const unitPrice = qty > 0 ? total / qty : total;
+                  if (!existingCheckoutNames.has(name.toLowerCase())) {
+                    existingCheckoutNames.add(name.toLowerCase());
+                    checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                  }
+                  continue;
+                }
+              }
+            }
+
+            // b) Added Service matches
+            const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service|Extra Service)\]:\s+(.*?)(?=\n|$)/gi);
+            for (const match of addedServiceMatches) {
+              const rawLine = match[1].trim();
+              const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+              if (m1) {
+                const name = m1[1].trim();
+                const qty = Number(m1[2]) || 1;
+                const unitPrice = Number(m1[3]) || 0;
+                const total = Number(m1[4]) || (qty * unitPrice);
+                if (!existingCheckoutNames.has(name.toLowerCase())) {
+                  existingCheckoutNames.add(name.toLowerCase());
+                  checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                }
+                continue;
+              }
+              const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+              if (m2) {
+                const name = m2[1].trim();
+                const qty = m2[2] ? Number(m2[2]) : 1;
+                const total = Number(m2[3]);
+                const unitPrice = qty > 0 ? total / qty : total;
+                if (!existingCheckoutNames.has(name.toLowerCase())) {
+                  existingCheckoutNames.add(name.toLowerCase());
+                  checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                }
+                continue;
+              }
+            }
+
+            // c) Products Used in notes
+            const prodBlockMatch = notesStr.match(/\[Products Used During Session\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
+            if (prodBlockMatch) {
+              const rawProdBlock = prodBlockMatch[1];
+              const items = rawProdBlock.split(/(?:,|\n)(?![^(]*\))/);
+              for (const item of items) {
+                const trimmed = item.trim();
+                if (!trimmed || trimmed.startsWith("[")) continue;
+                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m1) {
+                  const name = m1[1].trim();
+                  const qty = Number(m1[2]) || 1;
+                  const unitPrice = Number(m1[3]) || 0;
+                  const total = Number(m1[4]) || (qty * unitPrice);
+                  if (!existingCheckoutNames.has(name.toLowerCase())) {
+                    existingCheckoutNames.add(name.toLowerCase());
+                    checkoutProductsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+                  }
+                  continue;
+                }
+              }
+            }
+
+            // d) Added Product matches
+            const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/gi);
+            for (const match of receptionistMatches) {
+              const name = match[1].trim();
+              const qty = match[2] ? Number(match[2]) : 1;
+              const total = Number(match[3]);
+              const unitPrice = qty > 0 ? total / qty : total;
+              if (!existingCheckoutNames.has(name.toLowerCase())) {
+                existingCheckoutNames.add(name.toLowerCase());
+                checkoutProductsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+              }
+            }
+
+            // e) Extra Device Pulses matches
+            const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
+            for (const match of pulseMatches) {
+              const name = "Extra Device Pulses";
+              const total = parseFloat(match[2]) || 0;
+              if (total > 0 && !existingCheckoutNames.has(name.toLowerCase())) {
+                existingCheckoutNames.add(name.toLowerCase());
+                checkoutProductsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses' });
+              }
+            }
+
+            // f) Generic format: - Name (x2) @ 700 EGP
+            const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/gi);
+            for (const match of doctorMatches) {
+              const name = match[1].trim();
+              const qty = Number(match[2]);
+              const unitPrice = Number(match[3]);
+              const total = qty * unitPrice;
+              if (!existingCheckoutNames.has(name.toLowerCase())) {
+                existingCheckoutNames.add(name.toLowerCase());
+                checkoutProductsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+              }
+            }
+          }
+
+          // 3. Fallback reconciliation if note or DB has higher total
+          const baseAndAttachedTotal = baseServicesTotal + checkoutAdditionalServicesList.reduce((sum, s) => sum + s.total, 0) + checkoutProductsConsumablesList.reduce((sum, p) => sum + p.total, 0);
+          let targetCheckoutTotal = baseAndAttachedTotal;
+
+          if (checkoutBooking.notes) {
+            const invMatch = String(checkoutBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+            if (invMatch) {
+              const notedTotal = Number(invMatch[1]);
+              if (notedTotal > targetCheckoutTotal) {
+                targetCheckoutTotal = notedTotal;
+              }
+            }
+          }
+
+          const checkoutAdditionalServicesCost = checkoutAdditionalServicesList.reduce((sum, s) => sum + s.total, 0);
+          const checkoutProductsCost = checkoutProductsConsumablesList.reduce((sum, p) => sum + p.total, 0);
+          const totalCost = baseServicesTotal + checkoutAdditionalServicesCost + checkoutProductsCost;
           const balanceDue = Math.max(0, totalCost - depositAlreadyPaid);
 
           // 2. Fetch customer details
-          const customerRecord = dbCustomers.find(c => c.id === checkoutBooking.customerId || c.phone === checkoutBooking.phone);
+          const targetCustId = checkoutBooking.customerId || (checkoutBooking as any).customer_id;
+          const rawCustPhone = (checkoutBooking.phone || checkoutBooking.customer_phone || '').trim().replace(/\D/g, '');
+          const customerRecord = dbCustomers.find(c => 
+            (targetCustId && c.id === targetCustId) ||
+            (rawCustPhone && c.phone && c.phone.trim().replace(/\D/g, '') === rawCustPhone)
+          );
           const walletBalance = customerRecord ? Number(customerRecord.wallet || customerRecord.wallet_balance || 0) : 0;
 
           // 3. Math calculation
@@ -19336,10 +19953,8 @@ export default function AdminPage() {
           const changeAmount = diff > 0 ? diff : 0;
           const remainingAmount = diff < 0 ? -diff : 0;
 
-          // computeSettledBalances (src/lib/billing.ts) treats amountPaid on the completing PATCH
-          // as the booking's final total paid, not a delta for just this step — it must include
-          // the deposit already collected, or that deposit silently never reaches
-          const totalPaidIncludingDeposit = depositAlreadyPaid + amountPaidNum;
+          // Total paid on this reservation is the previous deposit + cash/card paid now + wallet balance applied!
+          const totalPaidIncludingDeposit = depositAlreadyPaid + amountPaidNum + walletDeduction;
 
           const handleConfirmCheckout = async () => {
             setSavingCheckout(true);
@@ -19353,6 +19968,7 @@ export default function AdminPage() {
                   amountLeft: remainingAmount,
                   walletWithdrawal: walletDeduction,
                   walletDeposit: changeAmount > 0 && depositChangeToWallet ? changeAmount : 0,
+                  customerId: customerRecord?.id || (checkoutBooking as any).customerId || (checkoutBooking as any).customer_id,
                   redeemedServiceIds: Object.keys(redeemedPackageItems).map(Number)
                 })
               });
@@ -19482,118 +20098,53 @@ export default function AdminPage() {
                         </div>
                       );
                     })}
-                    {!redemptionAllowed && activeCustomerPackageItems.length > 0 && (
-                      <p className="text-[11px] text-amber-700 italic">
-                        Package redemption is unavailable — a deposit was already paid on this booking.
-                      </p>
-                    )}
-                    {(() => {
-                      if (extraAddonsCost <= 0) return null;
 
-                      const attached = Array.isArray((checkoutBooking as any).attachedProducts) ? (checkoutBooking as any).attachedProducts : [];
-                      const notesStr = String(checkoutBooking.notes || "");
-
-                      const parsedItems: Array<{ title: string; subtitle?: string; cost?: number; icon: string }> = [];
-                      let accountedCost = 0;
-
-                      attached.forEach((prod: any) => {
-                        const qty = Number(prod.qty) || 1;
-                        const price = Number(prod.unitPrice || prod.price || 0);
-                        const itemCost = Number(prod.total) || (qty * price);
-                        parsedItems.push({
-                          title: prod.name || "Product Consumable",
-                          subtitle: `Qty: ${qty}${price ? ` × ${price} EGP` : ''}`,
-                          cost: itemCost,
-                          icon: "📦"
-                        });
-                        accountedCost += itemCost;
-                      });
-
-                      if (notesStr) {
-                        const lines = notesStr.split('\n');
-                        lines.forEach(l => {
-                          const trimmed = l.trim();
-                          if (!trimmed) return;
-
-                          if (trimmed.includes('[Extra Device Pulses]:')) {
-                            const pulseMatch = trimmed.match(/\[Extra Device Pulses\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/i);
-                            if (pulseMatch) {
-                              const detailText = pulseMatch[1].trim();
-                              const itemCost = parseFloat(pulseMatch[2]) || 0;
-                              if (!parsedItems.some(i => i.title === "Extra Device Pulses")) {
-                                parsedItems.push({
-                                  title: "Extra Device Pulses",
-                                  subtitle: detailText,
-                                  cost: itemCost,
-                                  icon: "⚡"
-                                });
-                                accountedCost += itemCost;
-                              }
-                            } else if (!parsedItems.some(i => i.title === "Extra Device Pulses")) {
-                              parsedItems.push({
-                                title: "Extra Device Pulses",
-                                subtitle: trimmed.replace('[Extra Device Pulses]:', '').trim(),
-                                icon: "⚡"
-                              });
-                            }
-                          } else if (trimmed.includes('[Added Product]:')) {
-                            const prodMatch = trimmed.match(/\[Added Product\]:\s*(.*?)(?:\s*\(x(\d+)\))?\s*-\s*(\d+(?:\.\d+)?)\s*EGP/i);
-                            if (prodMatch) {
-                              const pName = prodMatch[1].trim();
-                              const pQty = prodMatch[2] || "1";
-                              const itemCost = parseFloat(prodMatch[3]) || 0;
-                              if (!parsedItems.some(i => i.title.toLowerCase().includes(pName.toLowerCase()))) {
-                                parsedItems.push({
-                                  title: pName,
-                                  subtitle: `Qty: ${pQty}`,
-                                  cost: itemCost,
-                                  icon: "📦"
-                                });
-                                accountedCost += itemCost;
-                              }
-                            }
-                          }
-                        });
-                      }
-
-                      // 3. Fallback or remaining unaccounted amount
-                      const remainingCost = Math.max(0, extraAddonsCost - accountedCost);
-
-                      return (
-                        <div className="mt-2.5 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 space-y-2 text-xs">
-                          <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-1.5">
-                            <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                              <span>✨</span> Session Add-ons & Consumables / المستلزمات والإضافات
-                            </span>
-                            <span className="font-bold text-[#414E36]">+{extraAddonsCost} EGP</span>
-                          </div>
-
-                          <div className="space-y-1.5 pt-0.5">
-                            {parsedItems.map((item, iIdx) => (
-                              <div key={iIdx} className="flex items-start justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 shadow-2xs">
-                                <div className="flex items-start gap-2">
-                                  <span className="text-sm mt-0.5">{item.icon}</span>
-                                  <div>
-                                    <p className="font-bold text-[#1F251A]">{item.title}</p>
-                                    {item.subtitle && <p className="text-[11px] text-[#5A6A51]">{item.subtitle}</p>}
-                                  </div>
-                                </div>
-                                {item.cost !== undefined && item.cost > 0 && (
-                                  <span className="font-extrabold text-[#414E36] mt-0.5">+{item.cost} EGP</span>
-                                )}
-                              </div>
-                            ))}
-
-                            {remainingCost > 0 && parsedItems.length > 0 && (
-                              <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 text-[11px] text-[#5A6A51]">
-                                <span>Other Session Add-ons / إضافات أخرى</span>
-                                <span className="font-bold text-[#414E36]">+{remainingCost} EGP</span>
-                              </div>
-                            )}
-                          </div>
+                    {/* Additional Services */}
+                    {checkoutAdditionalServicesList.length > 0 && (
+                      <div className="mt-2.5 rounded-xl border border-[#C4AE7C]/30 bg-[#FAF5EB]/50 p-3 space-y-2 text-xs">
+                        <div className="flex items-center justify-between border-b border-[#C4AE7C]/20 pb-1.5">
+                          <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                            <span>✨</span> Additional Services / الخدمات الإضافية
+                          </span>
+                          <span className="font-bold text-[#C4AE7C]">+{checkoutAdditionalServicesCost} EGP</span>
                         </div>
-                      );
-                    })()}
+                        <div className="space-y-1.5 pt-0.5">
+                          {checkoutAdditionalServicesList.map((item, iIdx) => (
+                            <div key={`chk-as-${iIdx}`} className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#C4AE7C]/20 shadow-2xs">
+                              <div>
+                                <p className="font-bold text-[#1F251A]">{item.name}</p>
+                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `× ${item.unitPrice} EGP` : ''}</p>
+                              </div>
+                              <span className="font-extrabold text-[#414E36]">+{item.total} EGP</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Products & Session Consumables */}
+                    {checkoutProductsConsumablesList.length > 0 && (
+                      <div className="mt-2.5 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 space-y-2 text-xs">
+                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-1.5">
+                          <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                            <span>📦</span> Session Consumables & Products / المستلزمات والمنتجات
+                          </span>
+                          <span className="font-bold text-[#414E36]">+{checkoutProductsCost} EGP</span>
+                        </div>
+                        <div className="space-y-1.5 pt-0.5">
+                          {checkoutProductsConsumablesList.map((item, iIdx) => (
+                            <div key={`chk-p-${iIdx}`} className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 shadow-2xs">
+                              <div>
+                                <p className="font-bold text-[#1F251A]">{item.name}</p>
+                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `× ${item.unitPrice} EGP` : ''}</p>
+                              </div>
+                              <span className="font-extrabold text-[#414E36]">+{item.total} EGP</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
                       <span>Total Cost / الإجمالي</span>
                       <span>{totalCost} EGP</span>
@@ -19748,39 +20299,201 @@ export default function AdminPage() {
             };
           });
 
-          // Extract attached products/consumables/add-ons
-          const invoiceAttachedList: Array<{ name: string; qty: number; unitPrice: number; total: number }> = [];
+          // Extract attached products/consumables/add-ons and additional services
+          const rawAttached: any[] = Array.isArray(invoiceBooking.attachedProducts)
+            ? [...invoiceBooking.attachedProducts]
+            : [];
+
+          const invoiceAdditionalServicesList: Array<{ name: string; nameAr: string; qty: number; unitPrice: number; price: number; total: number }> = [];
+          const invoiceProductsList: Array<{ name: string; nameAr: string; qty: number; unitPrice: number; price: number; total: number }> = [];
           const existingNames = new Set<string>();
 
-          if (Array.isArray(invoiceBooking.attachedProducts)) {
-            for (const prod of invoiceBooking.attachedProducts) {
-              const name = String(prod.name || 'Product / Consumable').trim();
-              const qty = Number(prod.qty) || 1;
-              const unitPrice = Number(prod.unitPrice || prod.price || (prod.total && qty ? prod.total / qty : 0));
-              const total = Number(prod.total) || (qty * unitPrice);
-              if (!existingNames.has(name.toLowerCase())) {
-                existingNames.add(name.toLowerCase());
-                invoiceAttachedList.push({ name, qty, unitPrice, total });
+          // 1. Process structured attachedProducts
+          for (const item of rawAttached) {
+            const name = String(item.name || 'Item').trim();
+            const qty = Number(item.qty) || 1;
+            const unitPrice = Number(item.unitPrice || item.price || 0);
+            const total = Number(item.total) || (qty * unitPrice);
+            const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
+
+            // Skip device pulses counters from customer invoice
+            const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
+            if (isPulse && (total === 0 || unitPrice === 0)) {
+              continue;
+            }
+
+            if (!existingNames.has(name.toLowerCase())) {
+              existingNames.add(name.toLowerCase());
+              if (lineType === 'additional_service') {
+                invoiceAdditionalServicesList.push({
+                  name: `${name} (Additional Service)`,
+                  nameAr: `${name} (خدمة إضافية)`,
+                  qty,
+                  unitPrice,
+                  price: unitPrice,
+                  total
+                });
+              } else {
+                invoiceProductsList.push({
+                  name: `${name} (Add-on)`,
+                  nameAr: `${name} (إضافة)`,
+                  qty,
+                  unitPrice,
+                  price: unitPrice,
+                  total
+                });
               }
             }
           }
 
+          // 2. Parse from notes (safety net & historical support)
           if (invoiceBooking.notes) {
             const notesStr = String(invoiceBooking.notes);
 
-            const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
-            for (const match of doctorMatches) {
-              const name = match[1].trim();
-              const qty = Number(match[2]);
-              const unitPrice = Number(match[3]);
-              const total = qty * unitPrice;
-              if (!existingNames.has(name.toLowerCase())) {
-                existingNames.add(name.toLowerCase());
-                invoiceAttachedList.push({ name, qty, unitPrice, total });
+            // a) Check for [Additional Services Used] or [Additional Services]
+            const addSvcBlockMatch = notesStr.match(/\[(?:Additional Services|Extra Services|Services Used|Added Services)(?: Used)?(?: During Session)?\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
+            if (addSvcBlockMatch) {
+              const rawBlock = addSvcBlockMatch[1];
+              const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
+              for (const item of items) {
+                const trimmed = item.trim();
+                if (!trimmed || trimmed.startsWith("[")) continue;
+                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m1) {
+                  const name = m1[1].trim();
+                  const qty = Number(m1[2]) || 1;
+                  const unitPrice = Number(m1[3]) || 0;
+                  const total = Number(m1[4]) || (qty * unitPrice);
+                  if (!existingNames.has(name.toLowerCase())) {
+                    existingNames.add(name.toLowerCase());
+                    invoiceAdditionalServicesList.push({
+                      name: `${name} (Additional Service)`,
+                      nameAr: `${name} (خدمة إضافية)`,
+                      qty,
+                      unitPrice,
+                      price: unitPrice,
+                      total
+                    });
+                  }
+                  continue;
+                }
+                const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m2) {
+                  const name = m2[1].trim();
+                  const qty = Number(m2[2]) || 1;
+                  const unitPrice = Number(m2[3]) || 0;
+                  const total = qty * unitPrice;
+                  if (!existingNames.has(name.toLowerCase())) {
+                    existingNames.add(name.toLowerCase());
+                    invoiceAdditionalServicesList.push({
+                      name: `${name} (Additional Service)`,
+                      nameAr: `${name} (خدمة إضافية)`,
+                      qty,
+                      unitPrice,
+                      price: unitPrice,
+                      total
+                    });
+                  }
+                  continue;
+                }
+                const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+                if (m3) {
+                  const name = m3[1].trim();
+                  const qty = m3[2] ? Number(m3[2]) : 1;
+                  const total = Number(m3[3]) || 0;
+                  const unitPrice = qty > 0 ? total / qty : total;
+                  if (!existingNames.has(name.toLowerCase())) {
+                    existingNames.add(name.toLowerCase());
+                    invoiceAdditionalServicesList.push({
+                      name: `${name} (Additional Service)`,
+                      nameAr: `${name} (خدمة إضافية)`,
+                      qty,
+                      unitPrice,
+                      price: unitPrice,
+                      total
+                    });
+                  }
+                  continue;
+                }
               }
             }
 
-            const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+            // b) Added Service format: [Added Service]: Name - 350 EGP or [Additional Service]: Name - 200 EGP
+            const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service|Extra Service)\]:\s+(.*?)(?=\n|$)/gi);
+            for (const match of addedServiceMatches) {
+              const rawLine = match[1].trim();
+              const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+              if (m1) {
+                const name = m1[1].trim();
+                const qty = Number(m1[2]) || 1;
+                const unitPrice = Number(m1[3]) || 0;
+                const total = Number(m1[4]) || (qty * unitPrice);
+                if (!existingNames.has(name.toLowerCase())) {
+                  existingNames.add(name.toLowerCase());
+                  invoiceAdditionalServicesList.push({
+                    name: `${name} (Additional Service)`,
+                    nameAr: `${name} (خدمة إضافية)`,
+                    qty,
+                    unitPrice,
+                    price: unitPrice,
+                    total
+                  });
+                }
+                continue;
+              }
+              const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+              if (m2) {
+                const name = m2[1].trim();
+                const qty = m2[2] ? Number(m2[2]) : 1;
+                const total = Number(m2[3]);
+                const unitPrice = qty > 0 ? total / qty : total;
+                if (!existingNames.has(name.toLowerCase())) {
+                  existingNames.add(name.toLowerCase());
+                  invoiceAdditionalServicesList.push({
+                    name: `${name} (Additional Service)`,
+                    nameAr: `${name} (خدمة إضافية)`,
+                    qty,
+                    unitPrice,
+                    price: unitPrice,
+                    total
+                  });
+                }
+                continue;
+              }
+            }
+
+            // c) Products Used in notes
+            const prodBlockMatch = notesStr.match(/\[Products Used During Session\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
+            if (prodBlockMatch) {
+              const rawProdBlock = prodBlockMatch[1];
+              const items = rawProdBlock.split(/(?:,|\n)(?![^(]*\))/);
+              for (const item of items) {
+                const trimmed = item.trim();
+                if (!trimmed || trimmed.startsWith("[")) continue;
+                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m1) {
+                  const name = m1[1].trim();
+                  const qty = Number(m1[2]) || 1;
+                  const unitPrice = Number(m1[3]) || 0;
+                  const total = Number(m1[4]) || (qty * unitPrice);
+                  if (!existingNames.has(name.toLowerCase())) {
+                    existingNames.add(name.toLowerCase());
+                    invoiceProductsList.push({
+                      name: `${name} (Add-on)`,
+                      nameAr: `${name} (إضافة)`,
+                      qty,
+                      unitPrice,
+                      price: unitPrice,
+                      total
+                    });
+                  }
+                  continue;
+                }
+              }
+            }
+
+            // d) Receptionist Added Product: [Added Product]: Name (x2) - 1400 EGP
+            const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/gi);
             for (const match of receptionistMatches) {
               const name = match[1].trim();
               const qty = match[2] ? Number(match[2]) : 1;
@@ -19788,106 +20501,130 @@ export default function AdminPage() {
               const unitPrice = qty > 0 ? total / qty : total;
               if (!existingNames.has(name.toLowerCase())) {
                 existingNames.add(name.toLowerCase());
-                invoiceAttachedList.push({ name, qty, unitPrice, total });
+                invoiceProductsList.push({
+                  name: `${name} (Add-on)`,
+                  nameAr: `${name} (إضافة)`,
+                  qty,
+                  unitPrice,
+                  price: unitPrice,
+                  total
+                });
               }
             }
 
-            const pulseMatches = notesStr.matchAll(/\[Extra Device Pulses\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
-            for (const match of pulseMatches) {
-              const detail = match[1].trim();
-              const total = Number(match[2]);
-              const name = `Extra Device Pulses (${detail})`;
-              if (!existingNames.has(name.toLowerCase())) {
-                existingNames.add(name.toLowerCase());
-                invoiceAttachedList.push({ name, qty: 1, unitPrice: total, total });
-              }
-            }
-
-            // RISK-057: DoctorAccountView.handleCompleteTreatment/handleSaveClinicalNote write
-            // "[Products Used During Session]: Name (Qty: N x UnitPrice EGP = Total EGP), ..." —
-            // a fourth note format distinct from the three parsed above (none of which match it).
-            // Because it was never parsed, a doctor-added product correctly reached amountPaid/
-            // amountLeft (RISK-038) but never appeared as a line item on the printed invoice —
-            // the PDF showed only the base service subtotal while "Amount Paid" silently included
-            // the product cost, with nothing on the document explaining the difference.
-            const doctorSessionProductMatches = notesStr.matchAll(
-              /(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
-            );
-            for (const match of doctorSessionProductMatches) {
-              const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
+            // e) Generic format: - Name (x2) @ 700 EGP
+            const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/gi);
+            for (const match of doctorMatches) {
+              const name = match[1].trim();
               const qty = Number(match[2]);
               const unitPrice = Number(match[3]);
-              const total = Number(match[4]);
+              const total = qty * unitPrice;
               if (!existingNames.has(name.toLowerCase())) {
                 existingNames.add(name.toLowerCase());
-                invoiceAttachedList.push({ name, qty, unitPrice, total });
+                invoiceProductsList.push({
+                  name: `${name} (Add-on)`,
+                  nameAr: `${name} (إضافة)`,
+                  qty,
+                  unitPrice,
+                  price: unitPrice,
+                  total
+                });
               }
             }
           }
 
-          const invoiceProductsList = invoiceAttachedList.map((p) => ({
-            name: `${p.name} (Add-on)`,
-            nameAr: `${p.name} (إضافة)`,
-            qty: p.qty,
-            unitPrice: p.unitPrice,
-            price: p.unitPrice,
-            total: p.total
-          }));
+          // 3. Fallback reconciliation: If notes or booking balance recorded a higher invoice total than the sum of parsed lines,
+          // recover the missing additional services / session adjustments difference!
+          const baseCost = baseServicesList.reduce((sum: number, s: any) => sum + s.total, 0);
+          const currentAttachedTotal = baseCost + invoiceAdditionalServicesList.reduce((sum: number, s: any) => sum + s.total, 0) + invoiceProductsList.reduce((sum: number, p: any) => sum + p.total, 0);
+          let targetInvoiceTotal = currentAttachedTotal;
 
-          const allInvoiceItems = [...baseServicesList, ...invoiceProductsList];
-          const totalCost = allInvoiceItems.reduce((sum: number, item: any) => sum + item.total, 0);
+          if (invoiceBooking.notes) {
+            const invMatch = String(invoiceBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+            if (invMatch) {
+              const notedTotal = Number(invMatch[1]);
+              if (notedTotal > targetInvoiceTotal) {
+                targetInvoiceTotal = notedTotal;
+              }
+            }
+          }
+
+          const rawPaid = Number(invoiceBooking.amountPaid || (invoiceBooking as any).amount_paid || 0);
+          const rawLeft = (invoiceBooking as any).amountLeft !== undefined && (invoiceBooking as any).amountLeft !== null && (invoiceBooking as any).amountLeft !== ""
+            ? Number((invoiceBooking as any).amountLeft)
+            : ((invoiceBooking as any).amount_left !== undefined && (invoiceBooking as any).amount_left !== null && (invoiceBooking as any).amount_left !== ""
+                ? Number((invoiceBooking as any).amount_left)
+                : null);
+
+          const allInvoiceItems = [...baseServicesList, ...invoiceAdditionalServicesList, ...invoiceProductsList].filter((item: any) => {
+            const nameLower = String(item.name || '').toLowerCase();
+            const isPulse = nameLower.includes('pulse') || nameLower.includes('device —') || nameLower.includes('device -');
+            if (isPulse && (Number(item.total) === 0 || Number(item.unitPrice) === 0 || Number(item.price) === 0)) {
+              return false;
+            }
+            return true;
+          });
+          const totalCost = allInvoiceItems.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0);
 
           // 2. Fetch customer and branch details
-          const walletUsed = Math.max(0, totalCost - (invoiceBooking.amountPaid ?? 0) - (invoiceBooking.amountLeft ?? 0));
+          const finalPaid = rawPaid;
+          const finalLeft = rawLeft ?? 0;
+          const walletUsed = Math.max(0, totalCost - finalPaid - finalLeft);
           const branch = branches.find(b => b.id === invoiceBooking.branchId);
           const branchName = branch ? (isRTL ? branch.name_ar : branch.name_en) : "Revera Zayed Clinic";
-          const invoiceNo = `REV-INV-${invoiceBooking.id.slice(0, 8).toUpperCase()}`;
+          const invoiceNo = `REV-INV-${String(invoiceBooking.id || '').slice(0, 8).toUpperCase()}`;
 
           return (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-              <div className="w-full max-w-3xl rounded-[32px] bg-white p-8 shadow-2xl border border-[#414E36]/10 my-8">
+            <div 
+              className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto"
+              onClick={() => setInvoiceBooking(null)}
+            >
+              <div 
+                className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl bg-white p-5 sm:p-6 shadow-2xl border border-[#414E36]/10 my-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
                 
                 {/* Header Actions */}
-                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4 mb-6">
+                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 mb-3 shrink-0">
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#C4AE7C]">Invoice Preview</span>
-                    <h3 className="text-lg font-bold text-[#1F251A] mt-0.5 font-sans">Booking Invoice Details</h3>
+                    <h3 className="text-base font-bold text-[#1F251A] mt-0.5 font-sans">Booking Invoice Details</h3>
                   </div>
                   <button
                     onClick={() => setInvoiceBooking(null)}
-                    className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200 transition"
+                    className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200 transition cursor-pointer"
                   >
                     <X size={18} />
                   </button>
                 </div>
 
-                {/* Printable Invoice Container */}
-                <div className="border border-gray-100 rounded-3xl p-6 sm:p-8 bg-[#FBFBF9]/30">
+                {/* Printable Invoice Container (Scrollable) */}
+                <div className="overflow-y-auto pr-1.5 flex-1 border border-gray-100 rounded-2xl p-4 sm:p-5 bg-[#FBFBF9]/40 space-y-4">
                   {/* Top Header */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-[#414E36]/20">
+                  <div className="flex justify-between items-start gap-4 pb-3.5 border-b border-[#414E36]/20">
                     <div>
-                      <h1 className="text-xl font-bold tracking-wider text-[#414E36]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
-                      <p className="text-xs text-[#5A6A51] mt-1 font-semibold">Sheikh Zayed / New Cairo</p>
+                      <h1 className="text-lg sm:text-xl font-bold tracking-wider text-[#414E36]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
+                      <p className="text-xs text-[#5A6A51] mt-0.5 font-semibold">Sheikh Zayed / New Cairo</p>
                       <p className="text-[11px] text-gray-400 mt-0.5">Phone: (+20) 01035595691</p>
                       <p className="text-[11px] text-gray-400">Email: inquiries@reveraclinics.com</p>
                     </div>
-                    <div className="sm:text-right">
-                      <h2 className="text-2xl font-bold tracking-wide text-[#C4AE7C]" style={{ fontFamily: "Marcellus, serif" }}>INVOICE</h2>
-                      <p className="text-xs text-[#1F251A] mt-1.5 font-bold">No: {invoiceNo}</p>
-                      <p className="text-[11px] text-[#5A6A51] mt-0.5">Date: {invoiceBooking.date}</p>
+                    <div className="text-right">
+                      <h2 className="text-xl sm:text-2xl font-bold tracking-wide text-[#C4AE7C]" style={{ fontFamily: "Marcellus, serif" }}>INVOICE</h2>
+                      <p className="text-xs text-[#1F251A] mt-1 font-bold">No: {invoiceNo}</p>
+                      <p className="text-[11px] text-[#5A6A51] mt-0.5">Date: {invoiceBooking.date || new Date().toISOString().slice(0, 10)}</p>
                     </div>
                   </div>
 
                   {/* Customer / Billing Info */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 my-6 text-xs leading-relaxed">
-                    <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2 border-b pb-1">Billed To</p>
-                      <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name}</p>
-                      <p className="text-[#5A6A51] mt-1"><strong>Phone:</strong> {invoiceBooking.phone}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs leading-relaxed">
+                    <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Billed To</p>
+                      <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name || "Patient"}</p>
+                      <p className="text-[#5A6A51] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone || "—"}</p>
                       <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
                     </div>
-                    <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2 border-b pb-1">Booking Details</p>
+                    <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Booking Details</p>
                       <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
                       <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
                       <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
@@ -19895,23 +20632,23 @@ export default function AdminPage() {
                   </div>
 
                   {/* Table of Services & Add-ons */}
-                  <div className="overflow-x-auto my-6 border border-gray-100 rounded-2xl bg-white">
+                  <div className="overflow-x-auto border border-gray-100 rounded-xl bg-white shadow-sm">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="bg-[#EDF1EC] text-[#414E36] font-bold border-b border-gray-100">
-                          <th className="p-3 text-left">Service / Item Rendered</th>
-                          <th className="p-3 text-center w-16">Qty</th>
-                          <th className="p-3 text-right w-24">Unit Price</th>
-                          <th className="p-3 text-right w-24">Total</th>
+                          <th className="p-2.5 text-left">Service / Item Rendered</th>
+                          <th className="p-2.5 text-center w-14">Qty</th>
+                          <th className="p-2.5 text-right w-24">Unit Price</th>
+                          <th className="p-2.5 text-right w-24">Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {allInvoiceItems.map((item: any, idx: number) => (
                           <tr key={idx} className="hover:bg-gray-50/50">
-                            <td className="p-3 font-semibold text-[#1F251A]">{item.name}</td>
-                            <td className="p-3 text-center text-gray-500">{item.qty}</td>
-                            <td className="p-3 text-right text-gray-600">EGP {item.unitPrice.toLocaleString()}</td>
-                            <td className="p-3 text-right font-bold text-[#1F251A]">EGP {item.total.toLocaleString()}</td>
+                            <td className="p-2.5 font-semibold text-[#1F251A]">{item.name}</td>
+                            <td className="p-2.5 text-center text-gray-500">{item.qty || 1}</td>
+                            <td className="p-2.5 text-right text-gray-600">EGP {(Number(item.unitPrice || item.price) || 0).toLocaleString()}</td>
+                            <td className="p-2.5 text-right font-bold text-[#1F251A]">EGP {(Number(item.total) || 0).toLocaleString()}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -19919,48 +20656,48 @@ export default function AdminPage() {
                   </div>
 
                   {/* Pricing Summary */}
-                  <div className="flex justify-end text-xs my-6">
-                    <div className="w-64 space-y-2.5">
+                  <div className="flex justify-end text-xs">
+                    <div className="w-60 space-y-1.5">
                       <div className="flex justify-between text-gray-500">
                         <span>Subtotal:</span>
                         <span className="font-semibold text-[#1F251A]">EGP {totalCost.toLocaleString()}</span>
                       </div>
                       {walletUsed > 0 && (
-                        <div className="flex justify-between text-green-700">
+                        <div className="flex justify-between text-green-700 font-medium">
                           <span>Paid from Wallet:</span>
                           <span className="font-bold">- EGP {walletUsed.toLocaleString()}</span>
                         </div>
                       )}
-                      <div className="flex justify-between border-t border-[#414E36] pt-2 text-sm font-bold text-[#414E36]">
+                      <div className="flex justify-between border-t border-[#414E36] pt-1.5 text-sm font-bold text-[#414E36]">
                         <span>Amount Paid:</span>
-                        <span>EGP {invoiceBooking.amountPaid.toLocaleString()}</span>
+                        <span>EGP {finalPaid.toLocaleString()}</span>
                       </div>
-                      {invoiceBooking.amountLeft > 0 && (
+                      {finalLeft > 0 && (
                         <div className="flex justify-between font-bold text-red-600">
                           <span>Outstanding Due:</span>
-                          <span>EGP {invoiceBooking.amountLeft.toLocaleString()}</span>
+                          <span>EGP {finalLeft.toLocaleString()}</span>
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* Thank you */}
-                  <div className="text-center text-[10px] text-gray-400 mt-6 pt-4 border-t border-dashed border-gray-200">
+                  <div className="text-center text-[10px] text-gray-400 pt-2 border-t border-dashed border-gray-200">
                     <p>Thank you for choosing Revera Clinics!</p>
                   </div>
                 </div>
 
                 {/* Bottom Buttons */}
-                <div className="flex items-center justify-end gap-3 mt-6 border-t border-gray-100 pt-4">
+                <div className="flex items-center justify-end gap-3 mt-3 border-t border-gray-100 pt-3 shrink-0">
                   <button
                     onClick={() => setInvoiceBooking(null)}
-                    className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
+                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition cursor-pointer"
                   >
                     Close
                   </button>
                   <button
                     onClick={() => handlePrintInvoice(invoiceBooking, allInvoiceItems, totalCost, walletUsed, branchName)}
-                    className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md"
+                    className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md cursor-pointer"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="6 9 6 2 18 2 18 9" />
@@ -19979,7 +20716,7 @@ export default function AdminPage() {
 
       {editingTargetEmployee && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-full max-w-md rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
             <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Set Monthly Target</p>
@@ -20130,8 +20867,8 @@ export default function AdminPage() {
       )}
 
       {activeInfoFeature && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/60 backdrop-blur-sm p-4 transition-opacity duration-300">
-          <div className="bg-[#FBFBF9] rounded-[32px] border border-[#414E36]/10 p-6 max-w-md w-full shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/60 backdrop-blur-sm p-4">
+          <div className="bg-[#FBFBF9] rounded-[32px] border border-[#414E36]/10 p-6 max-w-md w-full shadow-2xl relative">
             <h4 className="text-lg font-bold text-[#1F251A] pr-8 mb-2 flex items-center gap-2">
               <Info className="text-[#C4AE7C] shrink-0" size={20} />
               {activeInfoFeature.title}

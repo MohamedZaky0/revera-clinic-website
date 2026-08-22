@@ -738,6 +738,9 @@ export default function DoctorAccountView({
 
     setSavingNote(true);
     let sessionAddonsSummary = "";
+    if (additionalServices.length > 0) {
+      sessionAddonsSummary += `\n[Additional Services Used]: ${additionalServices.map((s) => `${s.name} (Qty: 1 x ${s.price} EGP = ${s.price} EGP)`).join(", ")}`;
+    }
     if (usedProducts.length > 0) {
       sessionAddonsSummary += `\n[Products Used During Session]: ${usedProducts.map((p) => `${p.name} (Qty: ${p.qty} x ${p.unitPrice} EGP = ${p.total} EGP)`).join(", ")}`;
     }
@@ -745,8 +748,8 @@ export default function DoctorAccountView({
       const devObj = devicesList.find((d) => d.id === selectedDeviceId);
       sessionAddonsSummary += `\n[Extra Device Pulses]: ${devObj?.name || 'Device'} — ${extraPulsesCount} pulses @ ${pricePerPulse} EGP/pulse (+${extraPulsesSubtotal} EGP)`;
     }
-    if (productsSubtotal + extraPulsesSubtotal > 0) {
-      sessionAddonsSummary += `\n[Invoice Total Updated]: ${updatedInvoiceTotal} EGP (Base: ${baseBookingPrice} EGP + Consumables: ${productsSubtotal + extraPulsesSubtotal} EGP)`;
+    if (additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal > 0) {
+      sessionAddonsSummary += `\n[Invoice Total Updated]: ${updatedInvoiceTotal} EGP (Base: ${baseBookingPrice} EGP + Services: ${additionalServicesSubtotal} EGP + Consumables: ${productsSubtotal + extraPulsesSubtotal} EGP)`;
     }
 
     const fullNotes = (clinicalNote || "") + sessionAddonsSummary;
@@ -810,6 +813,7 @@ export default function DoctorAccountView({
       );
     }
     for (const s of additionalServices) {
+      const realServiceId = s.serviceId || (typeof s.id === 'number' && s.id < 1000000 ? s.id : null);
       writes.push(
         fetch("/api/reservation-products", {
           method: "POST",
@@ -817,7 +821,7 @@ export default function DoctorAccountView({
           body: JSON.stringify({
             reservationId,
             lineType: "additional_service",
-            serviceId: s.id,
+            serviceId: realServiceId ? Number(realServiceId) : null,
             description: s.name,
             qty: 1,
             unitPrice: s.price,
@@ -935,6 +939,9 @@ export default function DoctorAccountView({
     }
 
     let sessionAddonsSummary = "";
+    if (additionalServices.length > 0) {
+      sessionAddonsSummary += `\n[Additional Services Used]: ${additionalServices.map((s) => `${s.name} (Qty: 1 x ${s.price} EGP = ${s.price} EGP)`).join(", ")}`;
+    }
     if (usedProducts.length > 0) {
       sessionAddonsSummary += `\n[Products Used During Session]: ${usedProducts.map((p) => `${p.name} (Qty: ${p.qty} x ${p.unitPrice} EGP = ${p.total} EGP)`).join(", ")}`;
     }
@@ -942,8 +949,8 @@ export default function DoctorAccountView({
       const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceId));
       sessionAddonsSummary += `\n[Device Pulses Deducted]: ${devObj?.name || 'Device'} — ${pulsesToDeduct} total session pulses deducted`;
     }
-    if (productsSubtotal + extraPulsesSubtotal > 0) {
-      sessionAddonsSummary += `\n[Invoice Total Updated]: ${updatedInvoiceTotal} EGP (Base: ${baseBookingPrice} EGP + Consumables: ${productsSubtotal + extraPulsesSubtotal} EGP)`;
+    if (additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal > 0) {
+      sessionAddonsSummary += `\n[Invoice Total Updated]: ${updatedInvoiceTotal} EGP (Base: ${baseBookingPrice} EGP + Services: ${additionalServicesSubtotal} EGP + Consumables: ${productsSubtotal + extraPulsesSubtotal} EGP)`;
     }
 
     const finalNotes = (clinicalNote || "") + sessionAddonsSummary;

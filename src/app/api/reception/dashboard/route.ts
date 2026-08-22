@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { requireStaffAccess } from "@/lib/access";
+import { getDistanceInMeters, resolveBranchCoordinates } from "@/lib/geo";
 
 const ALLOWED_ROLES = ["receptionist", "hr", "admin", "superadmin"];
 
@@ -16,6 +17,27 @@ async function requireReceptionAccess(req: Request) {
     return { error: "Forbidden: Reception or HR access required.", status: 403 as const };
   }
   return result;
+}
+
+function formatRelativeTime(dateInput: string | Date | undefined): string {
+  if (!dateInput) return "Recently";
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return "Recently";
+  const now = Date.now();
+  const diffSec = Math.floor((now - d.getTime()) / 1000);
+
+  if (diffSec < 0) return "Just now";
+  if (diffSec < 60) return "Just now";
+  if (diffSec < 3600) {
+    const mins = Math.max(1, Math.floor(diffSec / 60));
+    return `${mins} min ago`;
+  }
+  if (diffSec < 86400) {
+    const hours = Math.floor(diffSec / 3600);
+    return `${hours} ${hours === 1 ? "hr" : "hrs"} ago`;
+  }
+  if (diffSec < 172800) return "Yesterday";
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export async function GET(req: Request) {
@@ -44,10 +66,10 @@ export async function GET(req: Request) {
     const { data: employeeData } = await employeeQuery.limit(1);
     const emp = Array.isArray(employeeData) && employeeData.length > 0 ? employeeData[0] : null;
 
-    const receptionistName = emp?.name || emp?.email || "Receptionist";
+    const receptionistName = emp?.name || emp?.email || "Employee";
     const receptionistRole = emp?.role_name || emp?.department || "Receptionist";
     const empId = emp?.id || null;
-    const shiftSchedule = emp?.shift || "09:00 AM – 05:00 PM";
+    const shiftSchedule = emp?.shift || "—";
     const targetAmount = emp?.required_target_amount !== null && emp?.required_target_amount !== undefined
       ? Number(emp.required_target_amount)
       : 0;
@@ -65,13 +87,14 @@ export async function GET(req: Request) {
     }
 
     let actualStartingTime = "--:--";
-    let elapsedTime = "0h 0m";
+    let elapsedTime = "00h 00m";
     let elapsedSeconds = 0;
     let shiftStatus: "not_started" | "started" | "ended" = "not_started";
 
     if (attendanceRecord?.check_in_time) {
       const checkInDate = new Date(attendanceRecord.check_in_time);
       actualStartingTime = checkInDate.toLocaleTimeString("en-US", {
+        timeZone: "Africa/Cairo",
         hour: "2-digit",
         minute: "2-digit",
         hour12: true
@@ -84,7 +107,9 @@ export async function GET(req: Request) {
       elapsedSeconds = Math.max(0, Math.floor((endDate.getTime() - checkInDate.getTime()) / 1000));
       const hours = Math.floor(elapsedSeconds / 3600);
       const mins = Math.floor((elapsedSeconds % 3600) / 60);
-      elapsedTime = `${hours}h ${mins}m`;
+      const paddedHours = hours.toString().padStart(2, "0");
+      const paddedMins = mins.toString().padStart(2, "0");
+      elapsedTime = `${paddedHours}h ${paddedMins}m`;
 
       if (attendanceRecord.check_out_time) {
         shiftStatus = "ended";
@@ -172,6 +197,116 @@ export async function GET(req: Request) {
       };
     });
 
+    // 6. Fetch Real Inventory Products and Equipment Devices for Live Notifications & Alerts
+    const notifications: any[] = [];
+
+    try {
+      const { data: productsData } = await supabaseServer
+        .from("inventory_products")
+        .select("id, name, stock_quantity, min_stock_level, expiry_date, unit, updated_at")
+        .is("deleted_at", null);
+
+      const products = Array.isArray(productsData) ? productsData : [];
+      
+      // Check real low stock & expired items
+      products.forEach((p: any) => {
+        const stock = Number(p.stock_quantity ?? 0);
+        const minStock = Number(p.min_stock_level ?? 5);
+        if (stock <= minStock) {
+          notifications.push({
+            id: `alert-low-${p.id}`,
+            type: "low_stock",
+            title: "Low Stock",
+            message: `${p.name} – Only ${stock} ${p.unit || "units"} remaining`,
+            time: formatRelativeTime(p.updated_at),
+            severity: "danger",
+            status: "active",
+            targetTab: "Inventory",
+            createdAt: p.updated_at || new Date().toISOString()
+          });
+        }
+
+        if (p.expiry_date) {
+          const expDate = new Date(p.expiry_date);
+          if (!isNaN(expDate.getTime()) && expDate.getTime() <= Date.now()) {
+            const formattedExp = expDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+            notifications.push({
+              id: `alert-exp-${p.id}`,
+              type: "expired_item",
+              title: "Expired Item",
+              message: `${p.name} expired on ${formattedExp}`,
+              time: formatRelativeTime(p.expiry_date || p.updated_at),
+              severity: "danger",
+              status: "active",
+              targetTab: "Inventory",
+              createdAt: p.updated_at || new Date().toISOString()
+            });
+          }
+        }
+      });
+
+      // Query devices from page_settings
+      const { data: devSettings } = await supabaseServer
+        .from("page_settings")
+        .select("value")
+        .eq("key", "inventory_devices")
+        .maybeSingle();
+
+      const devices = Array.isArray(devSettings?.value?.devices) ? devSettings.value.devices : [];
+      const devHistory = Array.isArray(devSettings?.value?.history) ? devSettings.value.history : [];
+
+      devices.forEach((d: any) => {
+        const current = Number(d.current_pulse_count || 0);
+        const warn = Number(d.warning_threshold_1 || 80000);
+        const maint = Number(d.maintenance_threshold_2 || 100000);
+
+        if (current >= maint || d.status === "Maintenance Overdue") {
+          notifications.push({
+            id: `alert-maint-overdue-${d.id}`,
+            type: "maintenance_overdue",
+            title: "Maintenance Overdue",
+            message: `${d.name} maintenance is overdue (${current.toLocaleString()} pulses)`,
+            time: formatRelativeTime(d.updated_at || d.last_maintenance_date),
+            severity: "danger",
+            status: "active",
+            targetTab: "Inventory",
+            createdAt: d.updated_at || new Date().toISOString()
+          });
+        } else if (current >= warn || d.status === "Maintenance Due" || d.status === "Warning") {
+          notifications.push({
+            id: `alert-maint-${d.id}`,
+            type: "maintenance_due",
+            title: "Maintenance Due",
+            message: `${d.name} requires maintenance`,
+            time: formatRelativeTime(d.updated_at || d.last_maintenance_date),
+            severity: "warning",
+            status: "active",
+            targetTab: "Inventory",
+            createdAt: d.updated_at || new Date().toISOString()
+          });
+        }
+      });
+
+      // Recent completed maintenance (strictly from real records)
+      devHistory.slice(0, 3).forEach((h: any) => {
+        if (h.device_name || h.reason) {
+          notifications.push({
+            id: `alert-maint-done-${h.id}`,
+            type: "maintenance_completed",
+            title: "Maintenance Completed",
+            message: `${h.device_name || "Equipment"} maintenance completed${h.reason ? ` (${h.reason})` : ""}`,
+            time: formatRelativeTime(h.reset_date || h.created_at),
+            severity: "success",
+            status: "resolved",
+            targetTab: "Inventory",
+            createdAt: h.created_at || h.reset_date || new Date().toISOString()
+          });
+        }
+      });
+    } catch (e) {
+      console.warn("Failed to aggregate dynamic alerts:", e);
+    }
+
     return NextResponse.json({
       success: true,
       receptionist: {
@@ -200,7 +335,8 @@ export async function GET(req: Request) {
         todayCount: todayBookingsCount,
         pendingCount: pendingApprovalCount,
         list: formattedBookings
-      }
+      },
+      notifications
     });
   } catch (error: any) {
     console.error("Reception Dashboard API Error:", error);
@@ -219,7 +355,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, employeeId } = body;
+    const { action, employeeId, latitude, longitude, accuracy } = body;
 
     if (!action || (action !== "start_shift" && action !== "end_shift")) {
       return NextResponse.json(
@@ -228,10 +364,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Resolve the employee from the authenticated session, never by guessing a Reception-dept
-    // row — with more than one receptionist on shift that guess can silently record the wrong
-    // person's attendance (RISK-059). A receptionist can only clock themselves in/out; HR/admin/
-    // superadmin may pass an explicit target `employeeId` to act on another employee's behalf.
     const role = auth.access.role;
     let empId: string | null = auth.access.employee.id;
     if (role !== "receptionist" && employeeId) {
@@ -244,6 +376,15 @@ export async function POST(req: Request) {
         { status: 404 }
       );
     }
+
+    // Fetch employee details to check role and branch assignment
+    const { data: employeeRecord } = await supabaseServer
+      .from("employee_accounts")
+      .select("id, branch_id, role_name")
+      .eq("id", empId)
+      .maybeSingle();
+
+    const isSuperadmin = (employeeRecord?.role_name || role || "").toLowerCase() === "superadmin";
 
     const todayStr = new Date().toISOString().split("T")[0];
     const nowIso = new Date().toISOString();
@@ -258,8 +399,6 @@ export async function POST(req: Request) {
 
       if (fetchError) throw fetchError;
 
-      // Idempotency (RISK-059/F-3): re-firing start_shift after today's shift already ended must
-      // not wipe check_out_time and reopen it. A start while already in progress is a no-op.
       if (existing?.check_out_time) {
         return NextResponse.json(
           { success: false, error: "Today's shift has already ended and cannot be restarted." },
@@ -270,6 +409,81 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, action: "start_shift", attendance: existing });
       }
 
+      let parsedLat: number | null = null;
+      let parsedLng: number | null = null;
+
+      // Superadmin without branch bypasses location check
+      if (!isSuperadmin || employeeRecord?.branch_id) {
+        if (latitude === undefined || longitude === undefined || latitude === null || longitude === null) {
+          return NextResponse.json(
+            { success: false, error: "location_permission_denied", message: "Location permission is required to start your shift." },
+            { status: 400 }
+          );
+        }
+
+        parsedLat = Number(latitude);
+        parsedLng = Number(longitude);
+
+        if (
+          !Number.isFinite(parsedLat) ||
+          !Number.isFinite(parsedLng) ||
+          parsedLat < -90 ||
+          parsedLat > 90 ||
+          parsedLng < -180 ||
+          parsedLng > 180
+        ) {
+          return NextResponse.json(
+            { success: false, error: "invalid_coordinates", message: "Location permission is required to start your shift." },
+            { status: 400 }
+          );
+        }
+
+        // Fetch clinic branch(es) to check distance
+        let branchesQuery = supabaseServer.from("branches").select("id, name_en, latitude, longitude, maps_embed, maps_link");
+        if (employeeRecord?.branch_id) {
+          branchesQuery = branchesQuery.eq("id", employeeRecord.branch_id);
+        }
+
+        const { data: branchRows } = await branchesQuery;
+        const validBranches = Array.isArray(branchRows) && branchRows.length > 0 ? branchRows : [];
+
+        // If no specific branch matched, try all branches
+        let candidateBranches = validBranches;
+        if (candidateBranches.length === 0) {
+          const { data: allBranches } = await supabaseServer
+            .from("branches")
+            .select("id, name_en, latitude, longitude, maps_embed, maps_link");
+          if (Array.isArray(allBranches)) candidateBranches = allBranches;
+        }
+
+        let isInsideLocation = false;
+        let minimumDistance = Infinity;
+
+        for (const branch of candidateBranches) {
+          const coords = await resolveBranchCoordinates(branch);
+          if (coords) {
+            const dist = getDistanceInMeters(parsedLat, parsedLng, coords.latitude, coords.longitude);
+            if (dist < minimumDistance) minimumDistance = dist;
+            if (dist <= 800) {
+              isInsideLocation = true;
+              break;
+            }
+          }
+        }
+
+        // If clinic branches exist and employee is outside allowed 800m working location:
+        if (candidateBranches.length > 0 && !isInsideLocation && minimumDistance !== Infinity) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "out_of_location",
+              message: "You must be in a working location to start your shift."
+            },
+            { status: 400 }
+          );
+        }
+      }
+
       const { data, error } = await supabaseServer
         .from("hr_attendance")
         .upsert(
@@ -278,6 +492,8 @@ export async function POST(req: Request) {
             date: todayStr,
             check_in_time: nowIso,
             check_out_time: null,
+            latitude: parsedLat,
+            longitude: parsedLng,
             status: "Present"
           },
           { onConflict: "employee_id,date" }
