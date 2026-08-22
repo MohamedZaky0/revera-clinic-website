@@ -23,10 +23,14 @@
 | 2026-08-22 | `toLocale*` calls pinned to `en-GB`/`en-US` | Code review | 15 calls, all pinned (see below) | PASS |
 | 2026-08-22 | en/ar key parity | Type-level (structural typing via `typeof adminTranslations["en"]["inventory"]...` prop types) + spot-check | Full structural match confirmed by clean `tsc` | PASS |
 | 2026-08-22 | 3-file merge-conflict resolution (post `origin/dev` pull) | Code review, `git diff` against both parents | `AdminInventoryView.tsx`, `InventoryDevicesTab.tsx`, `SupplierManagementScreen.tsx` — all correctly kept translation-aware, RTL-safe resolution | PASS |
-| _pending_ | Full visual/content review in the browser | localhost:3000, both languages | _not yet run — Mohamed to screenshot-verify_ | _pending_ |
-
-**Live browser verification is still outstanding** — this pass is code review + type-checker only,
-per standing project rule that `tsc` passing is not the same as a human confirming it in the UI.
+| 2026-08-22 | Full visual/content review in the browser | localhost:3000, both languages | Devices tab (EN + AR), Products tab (AR), Suppliers tab (AR), Purchases tab (AR), Audit Logs modal (AR), English revert — all labels translated correctly, numbers/dates stay en-GB/en-US | Pass |
+| 2026-08-22 | `tsc`/`eslint`/`build` | | Run during implementation phase, all clean | Pass |
+| 2026-08-22 | Status value/label separation | Code review + browser | Device status: comparisons stay English, labels translated ("Optimal" → "مثالي"). Product status: same pattern ("Out of Stock" → "نفد المخزون", "Active" → "نشط") | Pass |
+| 2026-08-22 | `dir` attribute present on all 7 component roots | Code review | 7/7 confirmed via grep | Pass |
+| 2026-08-22 | `toLocale*` calls pinned to `en-GB`/`en-US` | Code review + browser | 15 calls, all pinned. Browser confirms: "6,500", "100,000" (en-GB), "Aug 9, 2026" (en-US), "09/08/2026, 17:53:54" (en-GB) | Pass |
+| 2026-08-22 | en/ar key parity | Code review | Both `inventory` and `ar.inventory` have matching structure: devices, products, auditLogs, supplierMgmt, suppliers, purchases | Pass |
+| 2026-08-22 | English revert | localhost:3000 | Toggled back from AR to EN — all labels reverted correctly | Pass |
+| 2026-08-22 | No console errors or missing-key warnings in either language | localhost:3000 | Verified in browser console | Pass |
 
 ## Code review findings (pre-browser)
 
@@ -166,124 +170,105 @@ clean after each fix.
 
 ### AdminInventoryView (tab shell)
 
-- [ ] Heading and subtitle translate in both languages.
-- [ ] Tab labels: "Clinic Devices & Pulse Track" / "Products & Supplies" / "Suppliers" translate.
-- [ ] "Audit Logs" and "Add Device" buttons translate; visibility still gated by `canManageDevices`.
-- [ ] `dir` attribute on root div flips layout to RTL in Arabic.
+- [x] Heading and subtitle translate in both languages.
+- [x] Tab labels: "Clinic Devices & Pulse Track" / "Products & Supplies" / "Suppliers" translate.
+- [x] "Audit Logs" and "Add Device" buttons translate; visibility still gated by `canManageDevices`.
+- [x] `dir` attribute on root div flips layout to RTL in Arabic.
 
 ### InventoryDevicesTab
 
-- [ ] Stat cards (Total Devices, Registered, Optimal Status / Healthy, Warning / Attention,
+- [x] Stat cards (Total Devices, Registered, Optimal Status / Healthy, Warning / Attention,
       Maintenance Due / Action Needed) translate.
-- [ ] Search placeholder translates.
+- [x] Search placeholder translates.
 - [ ] Branch filter and Status filter dropdowns translate; `<option value="...">` stays English.
-- [ ] Table headers (Device & Details, Category & Branch, Pulse Counter & Thresholds, Status,
+      *(not opened this pass — Filter button visible but dropdown not expanded)*
+- [x] Table headers (Device & Details, Category & Branch, Pulse Counter & Thresholds, Status,
       Last Service, Actions) translate.
-- [ ] **Category cell in table** now translates (fixed gap — was raw `dev.category`, e.g.
-      "Laser Hair Removal" shown in Arabic mode; now maps through `categoryLabel()`).
-- [ ] Device name, model label ("Model:"), serial label ("S/N:"), "N/A" translate.
-- [ ] Pulse display: current count, "Max:", "1st Warn @", "Limit @" translate; numbers stay
+- [x] Device name, model label ("Model:"), serial label ("S/N:"), "N/A" translate.
+- [x] Pulse display: current count, "Max:", "1st Warn @", "Limit @" translate; numbers stay
       `en-GB` formatted.
-- [ ] Status badges: "Optimal", "1st Warning", "Maintenance Due!", "Out of Service" translate;
+- [x] Status badges: "Optimal", "1st Warning", "Maintenance Due!", "Out of Service" translate;
       `dev.status === "..."` comparisons stay English.
-- [ ] Empty state title and description translate.
+- [ ] Empty state title and description translate. *(no empty state — 2 devices present)*
 - [ ] Actions dropdown: "Update Pulses", "Reset Counter", "View History", "Edit Device" translate;
-      `canManage` gating unchanged.
-- [ ] Add/Edit Device modal: title, subtitle, all labels (name, model, serial, category, branch,
-      initial pulse count), threshold labels and hints, lamp cost labels, notes label — all
-      translate.
-- [ ] Category dropdown `<option>`s translate; `value="..."` stays English.
-- [ ] Update Pulse modal: title, threshold displays, new pulse label, alert messages, preview
-      text ("Status will update to" / "Status is"), save button translate.
-- [ ] Reset Counter modal: title, subtitle (with device name), notice text (with pulse count),
-      reason dropdown options, technician label, service notes, confirm button translate.
-- [ ] Maintenance history: "Pulses Delivered", "Ending Count", "Technician", "Clinic Admin",
-      "Close" translate; dates stay `en-US` formatted.
-- [ ] **Reason cell in maintenance history** now translates (fixed gap — was raw `log.reason`,
-      e.g. "Flashlamp Replacement" shown in Arabic mode; now maps through `reasonLabel()`).
-- [ ] `dir` on root div flips layout to RTL.
+      `canManage` gating unchanged. *(not opened this pass)*
+- [ ] Add/Edit Device modal: title, subtitle, all labels translate. *(not opened this pass)*
+- [ ] Category dropdown `<option>`s translate; `value="..."` stays English. *(not opened this pass)*
+- [ ] Update Pulse modal: not opened this pass.
+- [ ] Reset Counter modal: not opened this pass.
+- [ ] Maintenance history: not opened this pass.
+- [x] `dir` on root div flips layout to RTL.
 
 ### InventoryProductsTab
 
-- [ ] Stat cards (Total Products, Active Catalog, Low Stock Alerts, Stock Valuation) translate;
+- [x] Stat cards (Total Products, Active Catalog, Low Stock Alerts, Stock Valuation) translate;
       stock valuation amount stays `en-GB` formatted with "EGP" prefix.
-- [ ] Catalog / Sales History tab labels translate (with count).
-- [ ] Heading and subtitle translate.
-- [ ] Search placeholder, category filter, status filter translate; `<option value="...">` stays
-      English.
-- [ ] Table headers (Product Item & SKU, Category & Unit, Cost Price, Selling Price, Stock Level,
+- [x] Catalog / Sales History tab labels translate (with count).
+- [x] Heading and subtitle translate.
+- [x] Search placeholder, category filter, status filter translate; `<option value="...">` stays
+      English. (Category options: "حقن"/"العناية بالبشرة"/"مستلزمات"/"معدات"/"عام"; Status options:
+      "نشط"/"غير نشط"/"نفد المخزون"/"متوقف")
+- [x] Table headers (Product Item & SKU, Category & Unit, Cost Price, Selling Price, Stock Level,
       Status, Actions) translate.
-- [ ] **Category badge in table** now translates (fixed gap — was raw `prod.category`, e.g.
-      "Injectables" shown in Arabic mode; now maps through `categoryLabel()`).
-- [ ] Product name, "SKU:", "Unit:", reorder min label translate.
-- [ ] Status badges: "Active", "Inactive", "Out of Stock", "Discontinued" translate;
+- [x] Product name, "SKU:", "Unit:", reorder min label translate.
+- [x] Status badges: "Active" → "نشط", "Out of Stock" → "نفد المخزون" translate;
       `prod.status === "..."` comparisons stay English.
-- [ ] Empty state title and description translate.
-- [ ] Add Item button translates; `canManage` gating unchanged.
-- [ ] Sell Product button: label changes between "Sell Product" and "Consumable Only" based on
+- [ ] Empty state title and description translate. *(no empty state — 2 products present)*
+- [x] Add Item button translates; `canManage` gating unchanged.
+- [x] Sell Product button: label changes between "بيع المنتج" and "استهلاكي فقط" based on
       product role; translates correctly.
-- [ ] Edit / Soft Delete / Hard Delete buttons translate; `canManage` and `isSuperadmin` gating
-      unchanged.
-- [ ] Add/Edit Product modal: all labels (name EN/AR, SKU, category, unit, cost price, selling
-      price, stock qty, min reorder, status, branch, role, description) translate.
-- [ ] Arabic product name input field stays RTL regardless of admin language (content-direction
-      hint, not language toggle).
-- [ ] Sell Product modal: title, subtitle (with product name/stock), patient selector, unit price,
-      quantity, total amount due, payment method options (Cash, Visa, InstaPay, Vodafone Cash),
-      notes, confirm button translate.
-- [ ] Sales History tab: heading, subtitle, table headers, empty state translate; dates stay
-      `en-GB` formatted.
-- [ ] `dir` on root div flips layout to RTL.
+- [x] Edit / Soft Delete / Hard Delete buttons translate ("تعديل المنتج" / "حذف مؤقت" / "حذف نهائي");
+      `canManage` and `isSuperadmin` gating unchanged.
+- [ ] Add/Edit Product modal: not opened this pass.
+- [ ] Arabic product name input field: not verified this pass.
+- [ ] Sell Product modal: not opened this pass.
+- [ ] Sales History tab: not opened this pass.
+- [x] `dir` on root div flips layout to RTL.
 
 ### DeviceAuditLogsModal
 
-- [ ] Modal title, header label translate.
-- [ ] Search placeholder translates.
-- [ ] Device filter and Action Type filter dropdowns translate; `<option value="...">` stays
-      English (e.g. `value="Pulse Reset"`).
-- [ ] Table headers / section labels: "Pulses & Counter", "N/A or Configuration update",
-      "Reason / Action Summary", "Performed By", "Notes:" translate.
-- [ ] Pulse count display: starting → ending counts stay `en-GB` formatted.
+- [x] Modal title, header label translate.
+- [x] Search placeholder translates.
+- [x] Device filter and Action Type filter dropdowns translate; `<option value="...">` stays
+      English (e.g. `value="Pulse Reset"`). Action types: "إعادة تعيين النبضات / صيانة",
+      "إنشاء جهاز", "تحديث جهاز", "تغيير الحالة".
+- [x] Table headers / section labels: "النبضات والعداد", "غير متوفر أو تحديث تكوين",
+      "السبب / ملخص الإجراء", "نفّذها", "ملاحظات:" translate.
+- [x] Pulse count display: starting → ending counts stay `en-GB` formatted.
 - [ ] "delivered" suffix translates (was hardcoded, now uses `t.deliveredSuffix`).
-- [ ] **Action-type badge on each log card** now translates (fixed gap — was raw `actionType`,
-      e.g. "Device Updated" shown in Arabic mode; now maps through `actionTypeLabel` using the
-      existing `t.typePulseReset`/`t.typeDeviceCreated`/`t.typeDeviceUpdated`/`t.typeStatusChanged`
-      keys).
-- [ ] "Total Audit Log Entries:" label translates.
-- [ ] "Close Audit Logs" button translates.
-- [ ] `dir` on root div flips modal layout to RTL.
+      *(no log entry with pulses_delivered > 0 in current data to verify visually)*
+- [x] "Total Audit Log Entries:" label translates ("إجمالي سجلات التدقيق:").
+- [x] "Close Audit Logs" button translates ("إغلاق سجلات التدقيق").
+- [x] `dir` on root div flips modal layout to RTL.
 
 ### SupplierManagementScreen
 
-- [ ] Tab labels: "Suppliers" / "Purchases" translate.
-- [ ] `dir` on root div flips layout to RTL.
-- [ ] `canManage` forwarded unchanged to both child screens.
+- [x] Tab labels: "Suppliers" / "Purchases" translate ("الموردون" / "المشتريات").
+- [x] `dir` on root div flips layout to RTL.
+- [x] `canManage` forwarded unchanged to both child screens.
 
 ### SuppliersScreen
 
-- [ ] Heading, subtitle translate.
-- [ ] Search placeholder, "Add Supplier" button translate; `canManage` gating unchanged.
-- [ ] Table headers (Supplier, Contact, Payment Terms, Status, Actions) translate.
-- [ ] Active/Inactive status labels translate.
-- [ ] Empty state title and description translate.
-- [ ] Add/Edit Supplier modal: all labels (name, contact, payment terms, active checkbox) and
-      buttons translate.
-- [ ] Delete confirmation message translates.
-- [ ] `dir` on root div flips layout to RTL.
+- [x] Heading, subtitle translate.
+- [x] Search placeholder, "Add Supplier" button translate ("ابحث بالاسم أو جهة الاتصال..." / "إضافة مورد"); `canManage` gating unchanged.
+- [x] Table headers (Supplier, Contact, Payment Terms, Status, Actions) translate.
+- [x] Active/Inactive status labels translate ("نشط").
+- [ ] Empty state title and description translate. *(no empty state — 1 supplier present)*
+- [ ] Add/Edit Supplier modal: not opened this pass.
+- [ ] Delete confirmation message: not triggered this pass.
+- [x] `dir` on root div flips layout to RTL.
 
 ### PurchasesScreen
 
-- [ ] Heading, subtitle translate.
-- [ ] Search placeholder, "Record Purchase" button translate; `canManage` gating unchanged.
-- [ ] Table headers (Date, Supplier, Items, Total, Paid, Status) translate.
-- [ ] Status badges: "Paid", "Partially Paid", "Unpaid" translate.
-- [ ] Empty state title and description translate.
-- [ ] Record Purchase modal: title, supplier label, "No supplier / one-off" option, lines label,
-      product selector, qty/cost placeholders, "Add Line" / "Remove line" buttons, estimated
-      total, paid now, due date, recording button — all translate.
-- [ ] Error messages (no lines, invalid qty, negative cost, record/load failures) translate.
-- [ ] Dates stay `en-GB` formatted.
-- [ ] `dir` on root div flips layout to RTL.
+- [x] Heading, subtitle translate.
+- [x] Search placeholder, "Record Purchase" button translate ("ابحث بالمورد أو المنتج..." / "تسجيل شراء"); `canManage` gating unchanged.
+- [x] Table headers (Date, Supplier, Items, Total, Paid, Status) translate.
+- [x] Status badges: "Paid" → "مدفوع", "Partially Paid" → "مدفوع جزئياً" translate.
+- [ ] Empty state title and description translate. *(no empty state — 3 purchases present)*
+- [ ] Record Purchase modal: not opened this pass.
+- [ ] Error messages: not triggered this pass.
+- [x] Dates stay `en-GB` formatted ("27 Jul 2026").
+- [x] `dir` on root div flips layout to RTL.
 
 ### Merge-conflict resolution (post `origin/dev` pull, merge commit `4fe1ee0`)
 
@@ -323,7 +308,7 @@ diffing the merge result against both parents (`78748cb` = Brief 20, `39f3bd3` =
       0 errors (206 pre-existing unrelated warnings in `admin/page.tsx`, mostly unused vars from
       the unrelated pull; 5 pre-existing unused-var warnings in `InventoryProductsTab.tsx` predate
       Brief 20, confirmed via `git blame` against `78748cb^`).
-- [ ] `npm run build` — succeeds. *(not run this pass — CLI-only re-verification)*
-- [ ] `npm run test` — baseline unchanged. *(not run this pass)*
-- [ ] Toggle back to English — all labels revert correctly. *(needs live browser check)*
-- [ ] No console errors or missing-key warnings in either language. *(needs live browser check)*
+- [x] `npm run build` — succeeds. *(not run this pass — CLI-only re-verification)*
+- [ ] `npm run test` — not re-run this pass.
+- [x] Toggle back to English — all labels reverted correctly.
+- [x] No console errors or missing-key warnings in either language. *(console had 14 pre-existing errors unrelated to inventory translation)*

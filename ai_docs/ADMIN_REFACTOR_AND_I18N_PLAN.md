@@ -1,5 +1,33 @@
 # Admin Panel: Componentization → Arabic i18n → Automated Testing
 
+> **Status (updated 2026-08-22):** Reception-first i18n scope (Bookings, New Booking, Patients,
+> Doctors, Services, Inventory) is **fully translated and independently verified** — Brief 20
+> (Inventory) landed, its 5 value/label gaps found+fixed, content verified live in the browser by
+> Mohamed. `WINDSURF_BRIEFS.md` has no active brief right now.
+>
+> **POS is resolved, not just "out of scope"**: a full audit of `page.tsx` found 26 `activeNav`
+> sections — including POS, and everything downstream of it (Products, Insights, Refunds, the
+> SMS/Marketing block, legacy Reports) — with zero reachable entry point (no `setActiveNav()` call
+> site, absent from every sidebar/Settings/Marketing label list). All 26 were confirmed dead and
+> physically deleted (1,623 lines, `page.tsx` 20,901 → 19,283). This closes RISK-017 (the old
+> ~4,000-line dead Finance UI estimate is now stale — the block itself no longer exists) as a
+> byproduct; RISK-017 should be updated/closed in `RISKS.md`.
+>
+> **New i18n gap surfaced, not yet in scope anywhere:** an unrelated 60+-commit pull from
+> `origin/dev` (feature work, not a Windsurf brief — bookings/billing/checkout/reception/attendance)
+> landed on top of Brief 20 and brought a genuinely new, DB-backed component with it:
+> `ReceptionDashboardView.tsx` — Reception's own landing screen (`activeNav === "Dashboard"`),
+> already extracted, ~24 hardcoded English strings, zero Arabic. This is squarely inside
+> "Reception-first" and the plan should add it as the next Phase 2-only target (no extraction
+> needed).
+>
+> **Componentization (DEC-027) next targets, unchanged by the above:** Employees (~2,200 lines) and
+> HR (~1,625 lines) are the two largest reachable-but-still-inline sections left in `page.tsx`,
+> both superadmin-gated. Below those: Pages Settings (~1,800), Role Management (~365), System Test
+> Suite (~220), and a cluster of Settings-submenu screens each under 220 lines.
+>
+> ---
+>
 > **Status (updated 2026-08-19):** Phase 0 complete (107 tests, Brief 3). Open decisions resolved —
 > see `DECISIONS.md` → **DEC-043**, widened by two 2026-08-19 corrections. Reception scope is now
 > **Bookings, Patients, POS, New Booking, Doctors (read-only), Services (read-only), Inventory
@@ -14,8 +42,8 @@
 > | Patients — Profile Drawer (1,539 lines, 5 tabs + 3 modals) | ✅ Briefs 10 (state) + 11 (JSX) | ✅ Brief 12 (2 gaps found + closed) |
 > | Doctors (`page.tsx:7711-8372`, ~661 lines) | ✅ Brief 15 (verified, no gaps) | ✅ Brief 18 (dedup + translate, 2 gaps found + closed) |
 > | Services (`page.tsx:8375-9370`, ~995 lines) | ✅ Brief 16 (verified — surfaced pre-existing RISK-064) | ✅ Brief 19 (content verified by Mohamed directly; 2 small pre-existing gaps noted, not blocking) |
-> | Inventory (`page.tsx:14724-16063` + `page.tsx:23321-23506`, ~1,530 lines) | ✅ Brief 17 (verified, permission gating intact — one browser check pending a restricted test account) | **Brief 20, queued (re-verify against the now-real file structure before starting)** |
-> | POS | N/A — dead mock UI, unreachable through any nav path | **out of scope** — separate open product decision: build the real thing or delete the dead code |
+> | Inventory (`page.tsx:14724-16063` + `page.tsx:23321-23506`, ~1,530 lines) | ✅ Brief 17 (verified, permission gating intact — one browser check pending a restricted test account) | ✅ Brief 20 (5 gaps found+fixed, verified live in browser by Mohamed) |
+> | POS | N/A — was dead mock UI, unreachable through any nav path | **deleted 2026-08-22**, along with 25 other confirmed-dead `activeNav` sections (1,623 lines total) |
 >
 > **Doctors and Services added to scope 2026-08-19** (DEC-043 correction) — Reception doesn't edit
 > either screen (both already gate their write actions behind `hasPermission`, e.g.

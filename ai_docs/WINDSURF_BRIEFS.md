@@ -10,57 +10,7 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 20 — Phase 2: translate the Inventory ecosystem to Arabic
-
-**Brief 17 landed and was independently verified 2026-08-20** — this brief is now rewritten against
-the real files, not the prediction that used to sit here.
-
-**Targets — 6 files:** `src/components/admin/inventory/{AdminInventoryView,InventoryDevicesTab,
-InventoryProductsTab,DeviceAuditLogsModal}.tsx` (all new, from Brief 17), plus
-`SupplierManagementScreen.tsx`/`SuppliersScreen.tsx`/`PurchasesScreen.tsx` (pre-existing, not
-exempt — they need the same `lang`/`dir` wiring as everything else). None currently take a `lang`
-prop. Re-measure hardcoded-string/placeholder/RTL-class counts before starting — none were taken
-for this brief yet.
-
-**Permission-gating interaction — verified, not predicted, this time.** `page.tsx` computes 3
-booleans once (`hasPermission("inventory.manage_devices")` etc.) and passes them down as a single
-generically-named `canManage` prop into each tab (`InventoryDevicesTab`/`InventoryProductsTab`
-receive `canManage={canManageDevices}`/`canManage={canManageProducts}`;
-`SupplierManagementScreen` receives `canManage={canManageSuppliers}` and forwards it to its 2
-children unchanged). Every write button in these files already reads `canManage`, not
-`hasPermission(...)` directly — **do not touch the `canManage` conditionals** when adding `t.*`
-lookups to the same buttons; label and permission gate must stay independent. Browser-verify in
-Arabic with the full-access account at minimum (a genuinely restricted-account browser check is
-still outstanding from Brief 17 itself, tracked in
-`ai_docs/manual_tests/BRIEF_17_INVENTORY_PERMISSIONS_AND_EXTRACTION_MANUAL_TESTS.md` — pick that up
-too if a restricted test account becomes available).
-
-**Value/label separation — confirmed real sites, not predictions:**
-- Device status, 3 canonical values used in both comparisons and a filter dropdown:
-  `"Optimal"`/`"Warning"`/`"Maintenance Due"` (`InventoryDevicesTab.tsx` — stat-card counts ~line
-  218/236/254, filter `<option>`s ~line 317-318, badge rendering ~line 422+). Translate the
-  displayed label only; `dev.status === "..."` comparisons and the `value=` attributes must stay
-  English.
-- Product status, 4 canonical values, same shape: `"Active"`/`"Inactive"`/`"Out of Stock"`/
-  `"Discontinued"` (`InventoryProductsTab.tsx` — the `prodStatus` form state at line 88, filter
-  `<option>`s ~line 489-492, badge rendering ~line 593+). Same rule — label only, never the stored
-  value or the `<option value="...">`.
-- Devices and products still don't share state with each other (re-confirmed against the real
-  files, matching what Brief 17's pre-extraction analysis predicted) — no cross-file duplicate-field
-  risk to chase here, unlike Brief 18's Doctors situation.
-
-**Dates:** check for `toLocale*` calls across all 6 files and confirm each is pinned to
-`en-GB`/`en-US` per DEC-043 — or fix it the way Brief 18 fixed `DoctorAuditLogsModal.tsx`'s
-unpinned `toLocaleString()` if the same gap exists here (worth checking specifically, since that
-exact bug already turned up once in this rollout).
-
-**Also found during Brief 17, not this brief's job to fix but worth knowing:**
-`InventoryProductsTab.tsx` has a dead `handleSearchPatientByPhone` function with zero call sites,
-pre-existing from before Brief 17. Don't accidentally give it real UI while translating nearby code
-— if it stays dead, it stays dead; reviving it is a feature decision, not a translation task.
-
-**Method / exit criteria:** identical shape to every prior Phase 2 brief. Manual test checklist
-written per CLAUDE.md.
+_None — Brief 21 queued below, not yet handed to Windsurf._
 
 ---
 ---
@@ -492,3 +442,39 @@ an array) both remain untranslated. Confirmed via diff against the pre-Brief-19 
 already existed before this brief touched the file — not a regression. Low impact, not blocking;
 worth a follow-up pass whenever this table is next touched. Manual test checklist:
 `ai_docs/manual_tests/BRIEF_19_SERVICES_I18N_MANUAL_TESTS.md`.
+
+### Brief 20 — Phase 2: translate the Inventory ecosystem to Arabic (completed 2026-08-22)
+
+Landed as 1 commit (`78748cb`) covering all 6 target files. Independently re-verified after an
+unrelated 60+-commit pull from `origin/dev` landed on top of it and produced 3 merge conflicts
+inside Brief 20's own files (`AdminInventoryView.tsx`, `InventoryDevicesTab.tsx`,
+`SupplierManagementScreen.tsx`) — all 3 hand-resolved keeping the translation-aware, RTL-safe side
+while adopting the unrelated commits' newer pill-style tab UI and a `dropdown-action-menu` CSS fix;
+resolution independently re-reviewed and confirmed clean.
+
+Review outcome: `tsc`/`eslint` clean (0 errors) on all 9 touched files, `canManage`/`lang`/`t` prop
+wiring intact end-to-end post-merge, dir attribute present on all 7 component roots, `toLocale*`
+calls pinned, en/ar key parity structurally proven (props typed as
+`typeof adminTranslations["en"]["inventory"]...`, so a missing key is a compile error).
+
+**5 gaps found and fixed, same recurring value/label-in-an-interpolated-expression pattern as
+Brief 18's day-names bug** — invisible to `grep '>[A-Z][a-z]'` because none of these are literal
+JSX text:
+1. Device category shown raw in the devices table (`{dev.category}` → e.g. "Laser Hair Removal" in
+   Arabic mode). Fixed with a `categoryLabel()` mapping helper in `InventoryDevicesTab.tsx`.
+2. Product category shown raw in the catalog table — same fix pattern in `InventoryProductsTab.tsx`.
+3. Maintenance reason shown raw in the reset-history modal (`{log.reason}`) — fixed with a
+   `reasonLabel()` helper, `InventoryDevicesTab.tsx`.
+4. `DeviceAuditLogsModal.tsx`'s action-type badge rendered the raw `actionType` string instead of
+   the already-translated `t.typeXxx` keys — fixed by deriving the label from the existing
+   `isReset`/`isCreated`/`isStatus` flags.
+5. Hardcoded English word `"delivered"` in a parenthetical pulse-count suffix (Windsurf's own
+   self-caught gap, already listed in its draft checklist) — fixed by adding a `deliveredSuffix`
+   key to both `en`/`ar`.
+
+All 5 fixes preserve canonical-English stored/compared values — only display sites changed.
+Committed separately as `d36753c`. Content and translation quality verified directly by Mohamed in
+the browser. Manual test checklist: `ai_docs/manual_tests/BRIEF_20_INVENTORY_I18N_MANUAL_TESTS.md`.
+
+**Reception-first scope is now fully translated** (Bookings, New Booking, Patients, Doctors,
+Services, Inventory) — see `ADMIN_REFACTOR_AND_I18N_PLAN.md` for what's next.
