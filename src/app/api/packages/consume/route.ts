@@ -98,6 +98,9 @@ export async function POST(req: Request) {
         hasService = true;
       }
     }
+    if (!hasService) {
+      return NextResponse.json({ error: 'Reservation does not include this package service.' }, { status: 409 });
+    }
 
     let consumptionData = null;
     const { data, error } = await supabaseServer.rpc('consume_customer_package_session', {

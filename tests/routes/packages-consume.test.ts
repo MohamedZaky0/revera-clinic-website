@@ -280,19 +280,12 @@ describe('service must be on the reservation', () => {
     expect(currentItem()!.qty_remaining).toBe(2);
   });
 
-  // REGRESSION, introduced by e79a691 (2026-08-21), src/app/api/packages/consume/route.ts:90-100.
-  // The original guard (added with the feature in bcb4c0a) was an early return:
-  //     if (!reservationServiceIds.includes(Number(item.service_id))) return 409
-  // e79a691 refactored it into a `hasService` flag so a `reservation_products` fallback could be
-  // added — but never restored the return. `hasService` is now computed, the fallback query runs,
-  // and the result is discarded: the route consumes a session for ANY service, including one the
-  // patient never received on this booking. The fallback lookup that commit added is itself dead
-  // code as a result, which is the clearest evidence the drop was accidental rather than intended.
-  //
-  // Impact: a pre-paid session the clinic already took money for is burned against the wrong
-  // visit, and nothing in the product can give it back.
-  // Fix is one line — restore `if (!hasService) return 409` after the fallback block.
-  it.fails('refuses to burn a session for a service that is not on the booking at all', async () => {
+  // RISK-065, fixed 2026-08-22. e79a691 (2026-08-21) had refactored the original early-return
+  // guard into a `hasService` flag (to make room for the reservation_products fallback above) but
+  // never restored the return, so the route fell through and consumed a session for any service
+  // regardless of whether it was on the booking. Restored as
+  // `if (!hasService) return 409` right after the fallback block.
+  it('refuses to burn a session for a service that is not on the booking at all', async () => {
     seedPackage();
     seedReservation({ service_ids: [SERVICE_FACIAL] });
     // Nothing in reservation_products either — the laser session simply was not delivered here.

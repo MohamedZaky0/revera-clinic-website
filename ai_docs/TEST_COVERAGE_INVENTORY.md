@@ -25,8 +25,9 @@ against it surfaced 7 hard failures. What that pass changed:
   the live UI calls. 5 real tests added + 2 `it.fails` gaps pinned (see module 2).
 - **`/api/packages/consume`** endpoint wiring covered for the first time (15 tests), which is how
   **RISK-065** was found — `e79a691` silently dropped the "service must be on the booking" guard.
-- 4 new `it.fails` markers total, all naming a RISK id and source line. Suite: **617 passing,
-  10 expected fail, 0 failures.**
+  Fixed the same day, approved by Mohamed.
+- 4 new `it.fails` markers landed with this pass; RISK-065's has since been fixed, leaving 3 open.
+  Suite: **618 passing, 9 expected fail, 0 failures.**
 
 ## How to read this
 
@@ -297,8 +298,9 @@ and notes; the money is settled by Reception.
   `customer_id` backfill, the RPC-succeeds branch (asserting it does *not* also apply the fallback
   and double-spend), and the `reservation_products` fallback for mid-visit additional services.
   `/api/packages/sell` and `/api/packages/extend` remain uncovered.
-- **RISK-065 (found by the above):** `e79a691` dropped the "service must be on the booking" guard —
-  a session can be burned for a service never delivered on that visit. Pinned as `it.fails`.
+- **RISK-065 (found by the above), fixed 2026-08-22:** `e79a691` dropped the "service must be on
+  the booking" guard — a session could be burned for a service never delivered on that visit.
+  Restored; the test that was `it.fails` now passes for real.
 - Extending expiry does not change remaining session counts or recognised revenue.
 
 ---

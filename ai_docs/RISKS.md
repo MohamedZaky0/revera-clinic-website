@@ -2613,7 +2613,7 @@ are missing.
 **Severity:** High · **Type:** Financial data integrity / patient entitlement
 **Found:** 2026-08-22, while writing the endpoint-wiring tests
 `TEST_COVERAGE_INVENTORY.md` module 4 had flagged as missing — not user-reported.
-**Status:** Open. One-line fix identified, deliberately not applied (see below).
+**Status:** RESOLVED 2026-08-22 — Mohamed approved applying the fix.
 
 **What it is:** the guard that required a package's service to actually be part of the reservation
 was added with the feature (`bcb4c0a`) as an early return:
@@ -2642,15 +2642,15 @@ wrong-service within one patient's own history, which is exactly the kind of err
 weeks later as a disputed balance.
 
 **Test:** `tests/routes/packages-consume.test.ts` → *"refuses to burn a session for a service that
-is not on the booking at all"*, marked `it.fails` per the repo's testing convention. Its sibling
-test (*"accepts a service attached to the booking as an additional service"*) passes and pins the
-legitimate behaviour `e79a691` was actually trying to add, so restoring the guard must not break it.
+is not on the booking at all"*. Originally landed as `it.fails` per the repo's testing convention,
+now a normal passing assertion. Its sibling test (*"accepts a service attached to the booking as an
+additional service"*) still passes and pins the legitimate behaviour `e79a691` was actually trying
+to add — restoring the guard did not break it.
 
-**Fix:** restore the guard after the fallback block —
+**Fix, applied 2026-08-22:** restored the guard after the fallback block, `route.ts:100-103` —
 `if (!hasService) return NextResponse.json({ error: 'Reservation does not include this package service.' }, { status: 409 });`
-Not applied in the same pass that found it: this changes money-adjacent behaviour on a live flow,
-and the deliberate call on 2026-08-22 was to surface it as a visible failing spec first rather than
-silently re-tighten a rule while the surrounding redemption logic is still being reworked.
+Initially deferred (money-adjacent behaviour on a live flow) so the gap would surface as a visible
+failing spec rather than being silently re-tightened. Mohamed reviewed and approved applying it.
 
 ---
 
