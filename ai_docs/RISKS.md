@@ -191,6 +191,22 @@ The distance-vs-800m check in `POST /api/hr/attendance` is already computed serv
 - Require a tamper-resistant/signed check-in token or device attestation, since server-side distance math alone can't detect spoofed input coordinates.
 - Consider IP/network-based corroboration as a secondary signal (not a full fix, but raises the spoofing bar).
 
+**2026-08-22 finding — the route this risk describes is no longer the one receptionists actually
+use.** A new geofenced Start Shift flow (`POST /api/reception/dashboard`, action `start_shift`,
+added by commit `e5e788a` in the same 58-commit non-Windsurf pull) is now the only call site wired
+into the live UI (`ReceptionDashboardView.tsx`, the receptionist's own landing screen) — the
+original `POST /api/hr/attendance` this risk documents is called from nowhere in the current
+frontend (only its `GET`/`PATCH` are still used, for reading records and end-of-session checkout).
+The new route reimplements the same 800m distance check independently but **destructures
+`accuracy` from the request body and never validates or uses it anywhere**
+(`src/app/api/reception/dashboard/route.ts:358`) — weaker than the original route, which at least
+requires the field to be present. Separately, and predating this merge entirely (confirmed via
+`git log` — not a regression from today's pull): the original `/api/hr/attendance` route's own
+`parsedAccuracy` value (`route.ts:262`) is computed but **never actually compared against any
+threshold** — this risk's "100 meters or better" claim does not match what the code does today, on
+either route. Needs a product/security decision on the real intended threshold and whether to
+enforce it in the route that's actually live before treating this mitigation as real again.
+
 ---
 
 ## RISK-007: Client-Side PDF Invoice Printing Is Browser-Dependent
@@ -320,6 +336,19 @@ scalar (`:578-589`), so top-ups, spends and change deposits are indistinguishabl
 **Additional:** the PATCH endpoint trusts client-supplied `amountPaid`, `amountLeft`,
 `walletDeposit`, `walletWithdrawal` verbatim with no idempotency (`:541-542, 575-576`).
 Re-firing the same completed PATCH double-counts `spent_amount` and `outstanding`.
+
+**Regressed 2026-08-20, re-fixed 2026-08-22.** Commit `05c5136` ("ensure change deposited into
+customer wallet is credited and saved on settlement", part of a 58-commit non-Windsurf pull merged
+into `dev` on 2026-08-22) removed the `wasCompleted` guard around wallet deposit/withdrawal
+application in `computeSettledBalances()`, reintroducing exactly this risk's double-counting shape
+for wallet movements specifically: the checkout modal's only caller
+(`admin/page.tsx:18341-18356`) always bundles `walletDeposit`/`walletWithdrawal` with
+`status: "completed"` in one PATCH, so a resubmitted/retried checkout against an already-completed
+reservation would silently re-apply the same wallet delta and write a duplicate `wallet_txns` row.
+`tests/lib/billing.test.ts`'s existing `wallet ignored when already completed` case caught it
+immediately on re-running the suite — it was never updated to match the regression, meaning this
+landed outside the project's own test-net discipline. Fixed by restoring the guard (commit
+`8f8c2dd`); `walletIgnored` now correctly reflects when a movement was dropped.
 
 ---
 
@@ -1289,6 +1318,24 @@ it predated DEC-027 and hadn't been touched yet; it's now been touched, and extr
 **The original subject of this risk — the customer-profile "Packages" tab, `PatientPackagePromoBanner`,
 and the checkout modal's redemption logic — is still unextracted and still open.**
 
+**2026-08-22 finding, still unextracted so still living in `page.tsx`, but now also a money-risk,
+not just tech debt.** Commit `e79a691` (same 58-commit non-Windsurf pull as the RISK-012/RISK-006
+regressions above) removed the `redemptionAllowed = depositAlreadyPaid === 0` guard that RISK-035's
+original fix depended on — its own removed comment explained why: *"deposits are booking-level,
+not per-service, so waiving a service's price after cash was already taken against it would need
+refund/reversal logic this feature doesn't build."* No such refund/reversal logic was added in
+that commit or `eaee305` alongside it (checked both diffs directly). `baseServicesTotal`
+(`page.tsx:18121-18124`) does correctly exclude a redeemed service from `totalCost`, so the
+arithmetic still resolves — a deposit already collected against a since-redeemed service surfaces
+as `changeAmount`, which the checkout UI can hand back as cash or credit to wallet
+(`depositChangeToWallet`) — but there is no explicit reconciliation record or forced acknowledgment
+that this happened, and it depends entirely on staff noticing and handling it correctly in the
+moment. Not proven broken (unlike RISK-012 above, this isn't independently testable from
+`billing.ts` alone — it depends on live checkout UI behavior), but the safety gate that existed
+specifically to avoid this scenario is gone with nothing replacing it. Needs either a live
+walkthrough (redeem a package on a booking with an existing deposit, confirm the change/wallet
+credit path is unambiguous to staff) or reinstating the guard until the reconciliation UX is built.
+
 ---
 
 ## RISK-032: An Untrimmed/Differently-Formatted Phone Number Silently Forked A Duplicate Customer (RESOLVED)
@@ -1377,6 +1424,14 @@ local-only) — so "Show on Website" and Arabic package names have likely never 
 changes; new-row creation is unaffected either way (still auto-generates when `id` is omitted).
 **Must be applied** (`npx supabase db push`, which also picks up the still-pending 3B.13 packages
 migration) before Promotions or any Services edit will actually persist.
+
+**2026-08-22: could not confirm application status.** Attempted to check via the Supabase MCP
+connector; the only project it returns is named "elevate-os", which doesn't obviously match this
+clinic platform — did not proceed with a live query against a project that might be the wrong one.
+Mohamed should confirm directly (`npx supabase migration list` against the real linked project, or
+just try editing an existing service/promotion in the browser and see if it persists) — if this is
+still unapplied, every Services/Promotions edit is still silently failing exactly as originally
+found.
 
 ---
 
