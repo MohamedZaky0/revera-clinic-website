@@ -62,8 +62,9 @@ export function computeSettledBalances(input: SettlementInput): SettlementResult
   const outstandingDelta = wasCompleted ? newLeft - oldLeft : newLeft;
   const spentDelta = wasCompleted ? newPaid - oldPaid : newPaid;
 
-  const deposit = Number(walletDeposit || 0);
-  const withdrawal = Number(walletWithdrawal || 0);
+  const walletIgnored = wasCompleted && (Number(walletDeposit) !== 0 || Number(walletWithdrawal) !== 0);
+  const deposit = wasCompleted ? 0 : Number(walletDeposit || 0);
+  const withdrawal = wasCompleted ? 0 : Number(walletWithdrawal || 0);
 
   const rawWallet = current.wallet + deposit - withdrawal;
   const rawSpent = current.spent + spentDelta + withdrawal;
@@ -74,6 +75,6 @@ export function computeSettledBalances(input: SettlementInput): SettlementResult
     spent: Math.max(0, rawSpent),
     outstanding: Math.max(0, rawOutstanding),
     clamped: rawWallet < 0 || rawSpent < 0 || rawOutstanding < 0,
-    walletIgnored: false,
+    walletIgnored,
   };
 }

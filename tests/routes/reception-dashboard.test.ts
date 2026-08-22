@@ -120,7 +120,7 @@ describe('auth guard', () => {
 describe('POST start_shift / end_shift', () => {
   it("start_shift writes check_in_time and status Present for today", async () => {
     seedReceptionAuth();
-    const res = await POST(authedReq('reception-token', { body: { action: 'start_shift' } }));
+    const res = await POST(authedReq('reception-token', { body: { action: 'start_shift', latitude: 30.0444, longitude: 31.2357 } }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
@@ -139,7 +139,7 @@ describe('POST start_shift / end_shift', () => {
     mockDb.hr_attendance.push(
       { id: 'att-yday', employee_id: EMP_RECEPTION_A, date: '2020-01-01', check_in_time: '2020-01-01T09:00:00.000Z', check_out_time: null, status: 'Present' },
     );
-    await POST(authedReq('reception-token', { body: { action: 'start_shift' } }));
+    await POST(authedReq('reception-token', { body: { action: 'start_shift', latitude: 30.0444, longitude: 31.2357 } }));
     const res = await POST(authedReq('reception-token', { body: { action: 'end_shift' } }));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -209,7 +209,7 @@ describe('F-2 — employee resolution', () => {
     seedReceptionAuth();
     mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_RECEPTION_B } }, error: null });
 
-    const res = await POST(authedReq('reception-b-token', { body: { action: 'start_shift' } }));
+    const res = await POST(authedReq('reception-b-token', { body: { action: 'start_shift', latitude: 30.0444, longitude: 31.2357 } }));
     expect(res.status).toBe(200);
 
     const rowA = mockDb.hr_attendance.find((r) => r.employee_id === EMP_RECEPTION_A && r.date === TODAY);
@@ -220,7 +220,7 @@ describe('F-2 — employee resolution', () => {
 
   it('a receptionist cannot clock in on behalf of another employeeId supplied in the body', async () => {
     seedReceptionAuth(); // authenticated as EMP_RECEPTION_A
-    const res = await POST(authedReq('reception-token', { body: { action: 'start_shift', employeeId: EMP_RECEPTION_B } }));
+    const res = await POST(authedReq('reception-token', { body: { action: 'start_shift', employeeId: EMP_RECEPTION_B, latitude: 30.0444, longitude: 31.2357 } }));
     expect(res.status).toBe(200);
 
     // The body's employeeId is ignored for a receptionist caller — only their own session identity counts.
@@ -234,7 +234,7 @@ describe('F-2 — employee resolution', () => {
     seedHrAuth();
     mockDb.employee_accounts.push({ id: EMP_RECEPTION_A, role_name: 'receptionist', department: 'Reception' });
 
-    const res = await POST(authedReq('hr-token', { body: { action: 'start_shift', employeeId: EMP_RECEPTION_A } }));
+    const res = await POST(authedReq('hr-token', { body: { action: 'start_shift', employeeId: EMP_RECEPTION_A, latitude: 30.0444, longitude: 31.2357 } }));
     expect(res.status).toBe(200);
 
     const row = mockDb.hr_attendance.find((r) => r.employee_id === EMP_RECEPTION_A && r.date === TODAY);
