@@ -162,20 +162,23 @@ export async function POST(req: Request) {
     } else {
       // Upsert Medical Intake Form
       const now = new Date().toISOString();
+      const responsesData = recordData.responses || recordData.template_responses || {};
       const updatedForm = {
         customer_id: String(customerId),
-        skin_type: recordData.skin_type || 'Normal',
+        template_id: recordData.template_id || recordData.templateId || null,
+        responses: responsesData,
+        skin_type: recordData.skin_type || responsesData.skin_type || responsesData.fitzpatrick_scale || 'Normal',
         main_concerns: Array.isArray(recordData.main_concerns) ? recordData.main_concerns : [],
         other_concerns_details: recordData.other_concerns_details || '',
-        has_previous_treatments: Boolean(recordData.has_previous_treatments),
-        previous_treatments_details: recordData.previous_treatments_details || '',
-        has_medical_conditions: Boolean(recordData.has_medical_conditions),
-        medical_conditions_details: recordData.medical_conditions_details || '',
-        is_taking_medication: Boolean(recordData.is_taking_medication),
-        medication_details: recordData.medication_details || '',
-        allergies: recordData.allergies || '',
+        has_previous_treatments: Boolean(recordData.has_previous_treatments || responsesData.previous_treatments || responsesData.previous_injectables),
+        previous_treatments_details: recordData.previous_treatments_details || responsesData.previous_treatments || responsesData.previous_injectables || '',
+        has_medical_conditions: Boolean(recordData.has_medical_conditions || responsesData.medical_conditions || responsesData.bleeding_disorders),
+        medical_conditions_details: recordData.medical_conditions_details || responsesData.medical_conditions || responsesData.bleeding_disorders || '',
+        is_taking_medication: Boolean(recordData.is_taking_medication || responsesData.medications || responsesData.photosensitizing_drugs),
+        medication_details: recordData.medication_details || responsesData.medications || responsesData.photosensitizing_drugs || '',
+        allergies: recordData.allergies || responsesData.allergies || '',
         updated_at: now,
-        created_by_role: recordData.created_by_role || 'Receptionist',
+        created_by_role: recordData.created_by_role || 'Staff',
         created_by_name: recordData.created_by_name || 'Staff',
       };
 

@@ -464,7 +464,7 @@ export default function DoctorAccountView({
         const res = await fetch(`/api/medical-records?customerId=${encodeURIComponent(custId)}`, { headers });
         if (res.ok) {
           const data = await res.json();
-          const record = data.medicalRecord || (Array.isArray(data) ? data[0] : null);
+          const record = data.form || data.medicalRecord || (Array.isArray(data) ? data[0] : null);
           setMedicalRecord(record);
 
           if (record) {
@@ -473,6 +473,7 @@ export default function DoctorAccountView({
             setFormMedicationDetails(record.medication_details || "");
             setFormMedicalConditionsDetails(record.medical_conditions_details || "");
             setFormPreviousTreatmentsDetails(record.previous_treatments_details || "");
+            setShowMedicalForm(false);
           }
         }
       } catch (err) {
@@ -691,9 +692,9 @@ export default function DoctorAccountView({
   };
 
   // Save Medical Record Intake
-  const handleSaveMedicalRecord = async (e?: React.FormEvent) => {
-    if (e && typeof e.preventDefault === "function") {
-      e.preventDefault();
+  const handleSaveMedicalRecord = async (customData?: any) => {
+    if (customData && typeof customData.preventDefault === "function") {
+      customData.preventDefault();
     }
     const targetBooking = activeSessionBooking || scheduleModalBooking;
     if (!targetBooking) return;
@@ -702,18 +703,25 @@ export default function DoctorAccountView({
     setSavingMedicalRecord(true);
     try {
       const headers = await getAuthHeaders();
+      const payload: any = {
+        customer_id: custId,
+        patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
+        skin_type: customData?.skin_type || formSkinType,
+        allergies: customData?.allergies || formAllergies,
+        medication_details: customData?.medication_details || formMedicationDetails,
+        medical_conditions_details: customData?.medical_conditions_details || formMedicalConditionsDetails,
+        previous_treatments_details: customData?.previous_treatments_details || formPreviousTreatmentsDetails
+      };
+
+      if (customData && typeof customData === "object" && !customData.nativeEvent) {
+        if (customData.template_id) payload.template_id = customData.template_id;
+        if (customData.responses) payload.responses = customData.responses;
+      }
+
       const res = await fetch("/api/medical-records", {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          customer_id: custId,
-          patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
-          skin_type: formSkinType,
-          allergies: formAllergies,
-          medication_details: formMedicationDetails,
-          medical_conditions_details: formMedicalConditionsDetails,
-          previous_treatments_details: formPreviousTreatmentsDetails
-        })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
@@ -859,29 +867,63 @@ export default function DoctorAccountView({
   const handleCompleteTreatment = async (targetBooking: any, overrideSessionPulses?: number) => {
     if (!targetBooking) return;
 
-    if (!medicalRecord && (formAllergies || formMedicationDetails || formMedicalConditionsDetails || formPreviousTreatmentsDetails)) {
-      try {
-        const custId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
-        const headers = await getAuthHeaders();
-        const medRes = await fetch("/api/medical-records", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            customer_id: custId,
-            patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
-            skin_type: formSkinType,
-            allergies: formAllergies,
-            medication_details: formMedicationDetails,
-            medical_conditions_details: formMedicalConditionsDetails,
-            previous_treatments_details: formPreviousTreatmentsDetails
-          })
-        });
-        if (medRes.ok) {
-          const mData = await medRes.json();
-          setMedicalRecord(mData.medicalRecord || mData);
+    const custId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
+    const phone = targetBooking.phone || targetBooking.customer_phone;
+    const name = (targetBooking.name || targetBooking.customer_name || "").toLowerCase().trim();
+
+    // Verify if patient is a first-visit patient without prior medical record
+    const pastCompletedVisits = reservations.filter((r) => {
+      if (String(r.id) === String(targetBooking.id)) return false;
+      const isFinished = r.status === "completed" || r.status === "done";
+      if (!isFinished) return false;
+
+      const rCustId = r.customer_id || r.customerId;
+      const rPhone = r.phone || r.customer_phone;
+      const rName = (r.name || r.customer_name || "").toLowerCase().trim();
+
+      if (custId && rCustId && String(custId) === String(rCustId)) return true;
+      if (phone && rPhone && phone === rPhone) return true;
+      if (name && rName && name === rName) return true;
+      return false;
+    });
+
+    const isFirstVisitPatient = !medicalRecord && pastCompletedVisits.length === 0;
+
+    // Strict guard: Block completion if first visit patient has no medical record intake
+    if (isFirstVisitPatient && !medicalRecord) {
+      if (formSkinType || formAllergies || formMedicationDetails || formMedicalConditionsDetails || formPreviousTreatmentsDetails) {
+        try {
+          const headers = await getAuthHeaders();
+          const medRes = await fetch("/api/medical-records", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              customer_id: custId,
+              patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
+              skin_type: formSkinType || "Normal",
+              allergies: formAllergies,
+              medication_details: formMedicationDetails,
+              medical_conditions_details: formMedicalConditionsDetails,
+              previous_treatments_details: formPreviousTreatmentsDetails
+            })
+          });
+          if (medRes.ok) {
+            const mData = await medRes.json();
+            setMedicalRecord(mData.form || mData.medicalRecord || mData);
+          } else {
+            alert("Cannot complete treatment: Medical record intake is strictly required for first-visit patients. Please complete and save the intake form.");
+            setShowMedicalForm(true);
+            return;
+          }
+        } catch (e) {
+          alert("Cannot complete treatment: Medical record intake is required for first-visit patients. Please save the intake form first.");
+          setShowMedicalForm(true);
+          return;
         }
-      } catch (e) {
-        console.error("Auto-save medical record error:", e);
+      } else {
+        alert("Cannot complete treatment: Medical record intake is strictly required for first-visit patients. Please complete and save the intake form before ending the session.");
+        setShowMedicalForm(true);
+        return;
       }
     }
 
@@ -983,13 +1025,27 @@ export default function DoctorAccountView({
 
       if (res.ok) {
         alert("Session completed successfully! Product stock & device pulses deducted.");
+        setReservations((prev) =>
+          prev.map((r) =>
+            String(r.id) === String(bookingTargetId)
+              ? {
+                  ...r,
+                  status: "completed",
+                  notes: finalNotes,
+                  amountLeft: updatedInvoiceTotal - Number(targetBooking.amountPaid ?? 0)
+                }
+              : r
+          )
+        );
         setActiveSessionBooking(null);
+        setScheduleModalBooking(null);
         setUsedProducts([]);
         setAdditionalServices([]);
         setExtraPulsesCount(0);
         setSelectedDeviceId("");
         setClinicalNote("");
-        fetchDoctorReservations();
+        setActiveTab("schedule");
+        await fetchDoctorReservations(true);
       } else {
         const err = await res.json().catch(() => ({}));
         alert(err.error || err.message || "Failed to complete treatment session.");
@@ -1199,6 +1255,9 @@ export default function DoctorAccountView({
           setSelectedPatientHistory={setSelectedPatientHistory}
           handleOpenScheduleModal={handleOpenScheduleModal}
           t={t}
+          lang={lang}
+          doctorName={doctorName}
+          adminRole="doctor"
         />
       )}
     </div>

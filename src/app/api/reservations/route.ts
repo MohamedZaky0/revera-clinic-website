@@ -580,6 +580,37 @@ export async function GET(req: Request) {
   }
 }
 
+function isPastDateTime(dateStr: string, timeStr: string): boolean {
+  if (!dateStr || !timeStr) return false;
+  try {
+    const nowCairo = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
+    const todayStr = `${nowCairo.getFullYear()}-${String(nowCairo.getMonth() + 1).padStart(2, "0")}-${String(nowCairo.getDate()).padStart(2, "0")}`;
+
+    if (dateStr < todayStr) return true;
+    if (dateStr > todayStr) return false;
+
+    // Same day: compare hours & minutes
+    const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+    if (!match) return false;
+
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const ampm = match[3]?.toUpperCase();
+
+    if (ampm === "PM" && hours < 12) hours += 12;
+    if (ampm === "AM" && hours === 12) hours = 0;
+
+    const curHours = nowCairo.getHours();
+    const curMinutes = nowCairo.getMinutes();
+
+    if (hours < curHours) return true;
+    if (hours === curHours && minutes <= curMinutes) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -589,44 +620,74 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Reject a booking on a day the clinic (branch) is marked closed. The client already
-    // filters these out in BookingModal, but this route has no server-side auth (CLAUDE.md
-    // rule 3) — a client bug (one was found live: a doctor's same-weekday schedule entry could
-    // silently reopen a day the branch itself had marked closed) or a direct API call must not
-    // be able to create a real booking on a closed day. Manual/staff bookings can override this,
-    // since staff sometimes need to schedule a deliberate one-off exception.
-    if (!body.isManual) {
+    // 1. Reject past dates / times
+    if (requestedTime && isPastDateTime(date, requestedTime)) {
+      return NextResponse.json(
+        { error: 'The requested appointment time has already passed. Please choose an upcoming time slot.' },
+        { status: 400 }
+      );
+    }
+
+    // 2. Reject a booking on a day the clinic (branch) is marked closed.
+    try {
+      let serviceHoursForBranch: any[] = [];
+      if (branchId) {
+        const { data: bData } = await supabaseServer
+          .from('branches')
+          .select('service_hours')
+          .eq('id', branchId)
+          .maybeSingle();
+        if (bData && Array.isArray(bData.service_hours) && bData.service_hours.length > 0) {
+          serviceHoursForBranch = bData.service_hours;
+        }
+      }
+      if (serviceHoursForBranch.length === 0) {
+        const { data: pageSet } = await supabaseServer
+          .from('page_settings')
+          .select('value')
+          .eq('key', 'home')
+          .maybeSingle();
+        serviceHoursForBranch = pageSet?.value?.footer?.serviceHours || [];
+      }
+      const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const weekdayName = weekdays[new Date(date).getDay()];
+      const clinicDay = serviceHoursForBranch.find((sh: any) => sh.day?.toLowerCase() === weekdayName.toLowerCase());
+      if (clinicDay && clinicDay.isOpen === false) {
+        return NextResponse.json(
+          { error: `The clinic is closed on ${weekdayName}s. Please choose another available date.` },
+          { status: 400 }
+        );
+      }
+    } catch (e) {
+      console.error('Could not validate clinic hours for requested date:', e);
+    }
+
+    // 3. Reject double booking on the same time slot for that doctor
+    if (requestedTime && body.doctorId) {
       try {
-        let serviceHoursForBranch: any[] = [];
-        if (branchId) {
-          const { data: bData } = await supabaseServer
-            .from('branches')
-            .select('service_hours')
-            .eq('id', branchId)
-            .maybeSingle();
-          if (bData && Array.isArray(bData.service_hours) && bData.service_hours.length > 0) {
-            serviceHoursForBranch = bData.service_hours;
+        const { data: existingSlots } = await supabaseServer
+          .from('reservations')
+          .select('id, time_slot, requested_time')
+          .eq('date', date)
+          .eq('provider_id', body.doctorId)
+          .neq('status', 'cancelled')
+          .neq('status', 'rejected');
+
+        if (existingSlots && existingSlots.length > 0) {
+          const normReq = requestedTime.trim().toUpperCase();
+          const hasConflict = existingSlots.some((s: any) => {
+            const t = (s.time_slot || s.requested_time || '').trim().toUpperCase();
+            return t === normReq;
+          });
+          if (hasConflict) {
+            return NextResponse.json(
+              { error: 'This time slot is already booked for the selected doctor. Please choose another available slot.' },
+              { status: 400 }
+            );
           }
         }
-        if (serviceHoursForBranch.length === 0) {
-          const { data: pageSet } = await supabaseServer
-            .from('page_settings')
-            .select('value')
-            .eq('key', 'home')
-            .maybeSingle();
-          serviceHoursForBranch = pageSet?.value?.footer?.serviceHours || [];
-        }
-        const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const weekdayName = weekdays[new Date(date).getDay()];
-        const clinicDay = serviceHoursForBranch.find((sh: any) => sh.day?.toLowerCase() === weekdayName.toLowerCase());
-        if (clinicDay && clinicDay.isOpen === false) {
-          return NextResponse.json(
-            { error: `The clinic is closed on ${weekdayName}s. Please choose another available date.` },
-            { status: 400 }
-          );
-        }
       } catch (e) {
-        console.error('Could not validate clinic hours for requested date:', e);
+        console.error('Error checking double booking conflict:', e);
       }
     }
 

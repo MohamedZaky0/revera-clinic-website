@@ -20,6 +20,7 @@ import { CLIENT } from "@/config/client";
 import { adminTranslations } from "@/components/admin/translations";
 import UserProfileView from "@/components/admin/UserProfileView";
 import ClinicProfileSettingsView from "@/components/admin/settings/ClinicProfileSettingsView";
+import MedicalRecordsSettingsView from "@/components/admin/settings/MedicalRecordsSettingsView";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import CustomerFormModal from "@/components/admin/patients/CustomerFormModal";
@@ -115,8 +116,9 @@ import {
   ListOrdered,
   DoorOpen,
   MapPin,
-  Stethoscope,
   Loader2,
+  Copy,
+  Wallet,
 } from "lucide-react";
 import RoomsManagerView from "@/components/RoomsManagerView";
 import SupplierManagementScreen from "@/components/admin/inventory/SupplierManagementScreen";
@@ -502,6 +504,7 @@ const PERMISSION_STRUCTURE = [
       { key: "settings.notification", label: "Manage Notification Settings" },
       { key: "settings.queue", label: "Manage Queue Settings" },
       { key: "settings.pages", label: "Manage Pages Settings (CMS)" },
+      { key: "settings.medical_records", label: "Manage Medical Records Intake Templates" },
       { key: "settings.test_suite", label: "Run System Test Suite" }
     ]
   },
@@ -1354,6 +1357,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(false);
   const [savingCheckout, setSavingCheckout] = useState<boolean>(false);
   const [invoiceBooking, setInvoiceBooking] = useState<any>(null);
+  const [copiedBookingRef, setCopiedBookingRef] = useState<boolean>(false);
 
   useEffect(() => {
     const activeId = invoiceBooking?.id;
@@ -1901,6 +1905,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           "Notification Settings": "settings.notification",
           "Queue Settings": "settings.queue",
           "Pages Settings": "settings.pages",
+          "Medical Records": "settings.medical_records",
           "Role Management": "settings.roles",
           "System Test Suite": "settings.test_suite"
         };
@@ -2573,6 +2578,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       "Notification Settings": "settings.notification",
       "Queue Settings": "settings.queue",
       "Pages Settings": "settings.pages",
+      "Medical Records": "settings.medical_records",
       "Role Management": "settings.roles",
       "System Test Suite": "settings.test_suite"
     };
@@ -2751,7 +2757,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-030', name: 'Admin Bookings View & Schedule UI Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies the redesigned Admin Bookings View, 4 analytic cards (without percentages), mini calendar date grid, and today schedule table.', status: 'idle' },
     { id: 'TC-031', name: 'Reception Dashboard & Shift Metrics Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies receptionist shift tracking, personal target calculations, and today bookings summary.', status: 'idle' },
     { id: 'TC-032', name: 'Employee Shift Start & Geofence Verification Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies employee shift start geolocation verification, branch radius check, and attendance clock-in.', status: 'idle' },
-    { id: 'TC-033', name: 'Dashboard Notifications & Inventory Alerts Engine', category: 'Inventory & Equipment', endpoint: '/api/reception/dashboard', description: 'Verifies real-time system alerts for low stock, expired items, maintenance due, and overdue devices.', status: 'idle' }
+    { id: 'TC-033', name: 'Dashboard Notifications & Inventory Alerts Engine', category: 'Inventory & Equipment', endpoint: '/api/reception/dashboard', description: 'Verifies real-time system alerts for low stock, expired items, maintenance due, and overdue devices.', status: 'idle' },
+    { id: 'TC-034', name: 'Medical Record Intake Templates Engine', category: 'Medical & Patients', endpoint: '/api/medical-records/templates', description: 'Verifies customizable medical record intake templates, multi-service assignments, and dynamic field schema.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -5884,6 +5891,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           { label: "Notification Settings", icon: Bell, perm: "settings.notification" },
                           { label: "Queue Settings", icon: ListOrdered, perm: "settings.queue" },
                           { label: "Pages Settings", icon: FileText, perm: "settings.pages" },
+                          { label: "Medical Records", icon: ClipboardList, perm: "settings.medical_records" },
                           { label: "Role Management", icon: Shield, perm: "settings.roles" },
                           { label: "System Test Suite", icon: FlaskConical, perm: "settings.test_suite" }
                         ].filter(sub => {
@@ -9637,6 +9645,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
 
 
+          {activeNav === "Medical Records" && (
+            <MedicalRecordsSettingsView services={SERVICES as any[]} lang={lang} authenticatedJsonHeaders={authenticatedJsonHeaders} />
+          )}
+
           {activeNav === "Role Management" && adminRole === "superadmin" && (
             <div className="space-y-8 animate-fadeIn">
               <div className="mb-6">
@@ -10959,686 +10971,598 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const isInvoicePaid = sessionLeft <= 0 || (sessionPaid >= totalPrice && totalPrice > 0);
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4">
-            <div className="w-full max-w-5xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 sm:p-5 animate-fadeIn">
+            <div className="w-full max-w-6xl rounded-[32px] bg-[#FBFBF9] p-6 sm:p-8 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[92vh] overflow-y-auto custom-scrollbar border border-[#414E36]/15 space-y-6">
               
-              {/* Header */}
-              <div className="mb-6 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">
+              {/* ── HEADER ── */}
+              <div className="flex items-start justify-between border-b border-[#414E36]/10 pb-5">
+                <div className="space-y-1.5">
+                  <h2 className="text-2xl sm:text-3xl font-black text-[#1F251A] tracking-tight">
                     Booking Details
-                  </p>
-                  <div className="mt-1 flex items-center gap-3">
-                    <h3 className="text-xl font-semibold text-[#1F251A]">
-                      Reference Id: #{viewingBooking.id}
-                    </h3>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
-                      viewingBooking.status === 'approved' 
-                        ? 'bg-green-100 text-green-800' 
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs">
+                    <span className="font-semibold text-[#5A6A51] flex items-center gap-1.5">
+                      <span>Reference ID:</span>
+                      <span className="font-mono font-bold text-[#1F251A]">{viewingBooking.id}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(String(viewingBooking.id));
+                          setCopiedBookingRef(true);
+                          setTimeout(() => setCopiedBookingRef(false), 2000);
+                        }}
+                        title="Copy Reference ID"
+                        className="text-[#5A6A51] hover:text-[#1F251A] transition p-0.5 rounded cursor-pointer"
+                      >
+                        {copiedBookingRef ? <Check size={13} className="text-emerald-700 font-bold" /> : <Copy size={13} />}
+                      </button>
+                    </span>
+
+                    {/* Status Badge */}
+                    <span className={`rounded-full px-3 py-0.5 text-[11px] font-extrabold uppercase tracking-wider ${
+                      viewingBooking.status === 'approved' || viewingBooking.status === 'confirmed'
+                        ? 'bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB]' 
                         : viewingBooking.status === 'rejected' 
                           ? 'bg-red-100 text-red-800' 
-                          : 'bg-amber-100 text-amber-800'
+                          : viewingBooking.status === 'completed'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : viewingBooking.status === 'started'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : 'bg-amber-50 text-amber-800 border border-amber-200'
                     }`}>
-                      {viewingBooking.status}
+                      {viewingBooking.status === 'approved' ? 'CONFIRMED' : viewingBooking.status.toUpperCase()}
                     </span>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider ${
+
+                    {/* Source Badge */}
+                    <span className={`rounded-full px-3 py-0.5 text-[11px] font-extrabold uppercase tracking-wider ${
                       viewingBooking.isManual 
-                        ? 'bg-gray-100 text-gray-700 border border-gray-200' 
-                        : 'bg-[#C4AE7C]/20 text-[#414E36]'
+                        ? 'bg-[#E8F0FE] text-[#1967D2]' 
+                        : 'bg-[#FAF5EB] text-[#C4AE7C]'
                     }`}>
-                      {viewingBooking.isManual ? "Manual Booking" : "Website Booking"}
+                      {viewingBooking.isManual ? "MANUAL BOOKING" : "WEBSITE BOOKING"}
                     </span>
                   </div>
                 </div>
+
                 <button
+                  type="button"
                   onClick={() => {
                     setViewingBooking(null);
                     setIsEditingService(false);
                   }}
-                  className="rounded-full bg-[#F2EFE9] p-2 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                  className="h-9 w-9 rounded-full bg-gray-100/90 text-gray-500 hover:bg-gray-200 hover:text-gray-800 flex items-center justify-center transition cursor-pointer shrink-0"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
 
-              {/* Grid content */}
-              <div className="grid gap-6 md:grid-cols-[1.8fr_1fr]">
+              {/* ── 2-COLUMN MAIN GRID ── */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 
-                {/* Left Column */}
-                <div className="space-y-6">
+                {/* ── LEFT COLUMN (2/3 width) ── */}
+                <div className="lg:col-span-2 space-y-4">
                   
-                  {/* Compact Booking Info Header: Service, Date & Session Type */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="rounded-xl border border-[#414E36]/10 bg-white p-3.5 shadow-2xs">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#5A6A51]">SERVICE</p>
-                      <p className="mt-1 text-xs sm:text-sm font-bold text-[#1F251A] leading-snug line-clamp-2" title={serviceNames}>
-                        {serviceNames}
-                      </p>
+                  {/* 1. PATIENT INFORMATION CARD */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[11px] uppercase tracking-wider">
+                        <User size={14} className="text-[#0F3826]" />
+                        <span>PATIENT INFORMATION</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cleanBookingPhone = (viewingBooking.phone || "").replace(/\D/g, "");
+                          const customerRecord = dbCustomers.find(c => {
+                            if (viewingBooking.customerId && c.id === viewingBooking.customerId) return true;
+                            const cPhone = (c.mobile || c.phone || "").replace(/\D/g, "");
+                            if (cPhone && cleanBookingPhone && (cPhone === cleanBookingPhone || cPhone.endsWith(cleanBookingPhone) || cleanBookingPhone.endsWith(cPhone))) {
+                              return true;
+                            }
+                            if (c.name && viewingBooking.name && c.name.toLowerCase().trim() === viewingBooking.name.toLowerCase().trim()) {
+                              return true;
+                            }
+                            return false;
+                          });
+
+                          const targetCustomer: any = customerRecord || {
+                            id: viewingBooking.customerId || `cust_${Date.now()}`,
+                            name: viewingBooking.name,
+                            first_name: viewingBooking.name?.split(" ")[0] || "",
+                            last_name: viewingBooking.name?.split(" ").slice(1).join(" ") || "",
+                            mobile: viewingBooking.phone,
+                            phone: viewingBooking.phone,
+                            email: viewingBooking.email || ""
+                          };
+
+                          setViewingBooking(null);
+                          setActiveNav("Patients");
+                          setViewingCustomerProfile(targetCustomer);
+                        }}
+                        className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                      >
+                        <Eye size={13} />
+                        <span>View Patient</span>
+                      </button>
                     </div>
 
-                    <div className="rounded-xl border border-[#414E36]/10 bg-white p-3.5 shadow-2xs">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#5A6A51]">BOOKING DATE</p>
-                      <p className="mt-1 text-xs sm:text-sm font-bold text-[#1F251A] leading-snug">
-                        {viewingBooking.date} {viewingBooking.timeSlot ? `@ ${viewingBooking.timeSlot}` : viewingBooking.requestedTime ? `@ ${viewingBooking.requestedTime}` : ""}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-[#414E36]/10 bg-white p-3.5 shadow-2xs flex flex-col justify-between">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#5A6A51]">SESSION TYPE</p>
-                      <div className="mt-1">
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#EDF1EC] px-2.5 py-1 text-xs font-bold text-[#414E36]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#414E36]"></span>
-                          {viewingBooking.sessionType === 'online' ? "Online Consultation / أونلاين" : "In Person / في العيادة"}
+                    <div>
+                      <h3 className="text-xl font-black text-[#1F251A]">
+                        {viewingBooking.name}
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-[#5A6A51] font-medium mt-1">
+                        <span className="flex items-center gap-1">
+                          <Phone size={13} className="text-[#5A6A51]" />
+                          <span className="font-mono font-bold text-[#1F251A]">{viewingBooking.phone}</span>
+                        </span>
+                        <span>|</span>
+                        <span className="flex items-center gap-1">
+                          <FileText size={13} className="text-[#5A6A51]" />
+                          <span>{viewingBooking.email || "No email provided"}</span>
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Price Details */}
-                  <div className="rounded-2xl border-2 border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-5">
-                    <p className="text-sm font-bold text-[#1F251A] mb-4">Price Details</p>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between text-[#5A6A51]">
-                        <span>Base Price</span>
-                        <span>-</span>
+                  {/* 2. 3-METRICS ROW: SERVICE, DATE & TIME, SESSION TYPE */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Card A: SERVICE */}
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
+                      <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
+                        <ShoppingBag size={13} className="text-[#0F3826]" />
+                        <span>SERVICE</span>
                       </div>
-                      <div className="flex justify-between font-semibold text-[#1F251A]">
-                        <span>Service Cost</span>
-                        <span>{servicesCost} EGP</span>
+                      <p className="font-black text-sm text-[#1F251A] leading-snug line-clamp-1 pt-0.5" title={serviceNames}>
+                        {bookingServices[0]?.name || serviceNames || "Clinic Service"}
+                      </p>
+                      <p className="text-xs text-[#5A6A51] font-medium line-clamp-1">
+                        {bookingServices[0]?.name && bookingServices.length > 1 ? `+${bookingServices.length - 1} more service(s)` : "(Standard Procedure)"}
+                      </p>
+                    </div>
+
+                    {/* Card B: DATE & TIME */}
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
+                      <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
+                        <Calendar size={13} className="text-[#0F3826]" />
+                        <span>DATE &amp; TIME</span>
                       </div>
-                      {additionalServicesCost > 0 && (
-                        <div className="flex justify-between font-semibold text-[#1F251A]">
-                          <span>Additional Services</span>
-                          <span>+{additionalServicesCost} EGP</span>
-                        </div>
-                      )}
-                      {productsCost > 0 && (
-                        <div className="flex justify-between font-semibold text-[#414E36]">
-                          <span>Products & Consumables</span>
-                          <span>+{productsCost} EGP</span>
-                        </div>
-                      )}
-                      <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
-                        <span>Total Price</span>
-                        <span>{totalPrice} EGP</span>
+                      <p className="font-bold text-xs text-[#1F251A] flex items-center gap-1.5 pt-0.5">
+                        <Clock size={12} className="text-[#5A6A51]" />
+                        <span>
+                          {(() => {
+                            if (!viewingBooking.date) return "—";
+                            try {
+                              const d = new Date(viewingBooking.date);
+                              const day = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+                              const weekday = d.toLocaleDateString("en-GB", { weekday: "short" });
+                              return `${day} (${weekday})`;
+                            } catch {
+                              return viewingBooking.date;
+                            }
+                          })()}
+                        </span>
+                      </p>
+                      <p className="font-bold text-xs text-[#1F251A] flex items-center gap-1.5">
+                        <Clock size={12} className="text-[#5A6A51]" />
+                        <span>{viewingBooking.timeSlot || viewingBooking.requestedTime || "09:00 AM"}</span>
+                      </p>
+                    </div>
+
+                    {/* Card C: SESSION TYPE */}
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
+                      <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
+                        <User size={13} className="text-[#0F3826]" />
+                        <span>SESSION TYPE</span>
                       </div>
-                      <div className="border-t border-[#414E36]/10 pt-2 grid grid-cols-2 gap-2 text-xs font-semibold">
-                        <div className="flex flex-col">
-                          <span className="text-[#5A6A51]">Session Paid</span>
-                          <span className="text-green-600 font-bold text-sm">EGP {sessionPaid.toFixed(0)}</span>
-                        </div>
-                        <div className="flex flex-col text-right">
-                          <span className="text-[#5A6A51]">Session Outstanding</span>
-                          <span className={sessionLeft > 0 ? "text-red-600 font-bold text-sm" : "text-green-600 font-bold text-sm"}>
-                            EGP {sessionLeft.toFixed(0)}
-                          </span>
-                        </div>
-                      </div>
+                      <p className="font-black text-xs text-[#1F251A] pt-0.5">
+                        {viewingBooking.sessionType === 'online' ? "Online Consultation" : "In Person"}
+                      </p>
+                      <p className="text-xs text-[#5A6A51] font-medium flex items-center gap-1.5">
+                        <span className={`h-2 w-2 rounded-full ${viewingBooking.sessionType === 'online' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                        <span>{viewingBooking.sessionType === 'online' ? "Virtual Consultation" : "In Clinic Visit"}</span>
+                      </p>
                     </div>
                   </div>
 
-                  {/* Services & Adjustments */}
-                  <div className="flex flex-col gap-3 border-b border-[#414E36]/10 pb-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICES</p>
+                  {/* 3. 2-METRICS ROW: DOCTOR & LOCATION */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Card A: DOCTOR */}
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
+                      <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
+                        <User size={13} className="text-[#0F3826]" />
+                        <span>DOCTOR</span>
                       </div>
-                      {!isEditingService && (
+                      <p className="font-black text-sm text-[#1F251A] pt-0.5">
+                        {viewingBooking.doctorName || "Treating Doctor"}
+                      </p>
+                      <div className="flex items-center gap-1 text-amber-500 text-xs font-bold">
+                        {"★".repeat(5)}
+                        <span className="text-[#5A6A51] text-[11px] font-semibold ml-0.5">5.0</span>
+                      </div>
+                    </div>
+
+                    {/* Card B: LOCATION */}
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
+                      <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
+                        <MapPin size={13} className="text-[#0F3826]" />
+                        <span>LOCATION</span>
+                      </div>
+                      <p className="font-black text-sm text-[#1F251A] pt-0.5">
+                        {(() => {
+                          const r = rooms.find(rm => rm.id === viewingBooking.roomId);
+                          return r ? r.name : "Clinical Room";
+                        })()}
+                      </p>
+                      <p className="text-xs text-[#5A6A51] font-medium">
+                        {(() => {
+                          const r = rooms.find(rm => rm.id === viewingBooking.roomId);
+                          const b = branches.find(br => br.id === viewingBooking.branchId);
+                          const roomType = r ? `${r.type.charAt(0).toUpperCase() + r.type.slice(1)} Room` : "Clinical Room";
+                          const branchName = b ? (isRTL ? b.name_ar : b.name_en) : "Main Branch";
+                          return `${roomType} • ${branchName}`;
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 4. SERVICE DETAILS CARD */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[11px] uppercase tracking-wider">
+                        <Box size={14} className="text-[#0F3826]" />
+                        <span>SERVICE DETAILS</span>
+                      </div>
+                      {!isEditingService && hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
                         <button
+                          type="button"
                           onClick={() => setIsEditingService(true)}
-                          disabled={!hasPermission("bookings.edit") || viewingBooking.status === 'completed'}
-                          className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="rounded-xl border border-gray-200 bg-white px-3 py-1 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1 shadow-2xs cursor-pointer"
                         >
-                          Add Service
+                          <Plus size={12} />
+                          <span>Add Service</span>
                         </button>
                       )}
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    {/* Services List */}
+                    <div className="space-y-2 text-xs">
                       {bookingServices.map((bs, index) => (
-                        <div key={`base-${bs.id}-${index}`} className="flex items-center gap-2 bg-[#EDF1EC] rounded-xl px-3 py-1.5 text-sm font-semibold text-[#1F251A] shadow-sm">
-                          <span>{bs.name}</span>
-                          <span className="text-xs font-medium text-[#5A6A51]">({bs.price} EGP)</span>
-                          {bookingServices.length > 1 && hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
-                            <button
-                              onClick={async () => {
-                                const updatedIds = selectedServiceIds.filter((_, i) => i !== index);
-                                try {
-                                  const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                                    method: "PATCH",
-                                    headers: authenticatedJsonHeaders,
-                                    body: JSON.stringify({ serviceIds: updatedIds }),
-                                  });
-                                  if (res.ok) {
-                                    const updated = await res.json();
-                                    setViewingBooking(updated);
-                                    fetchAllReservations();
-                                  } else {
-                                    const err = await res.json();
-                                    alert(err.error || "Failed to remove service");
+                        <div key={`bs-${bs.id}-${index}`} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
+                          <span className="font-semibold text-[#1F251A]">
+                            {index + 1}. {bs.name}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-[#1F251A]">{bs.price} EGP</span>
+                            {bookingServices.length > 1 && hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const updatedIds = selectedServiceIds.filter((_, i) => i !== index);
+                                  try {
+                                    const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                      method: "PATCH",
+                                      headers: authenticatedJsonHeaders,
+                                      body: JSON.stringify({ serviceIds: updatedIds }),
+                                    });
+                                    if (res.ok) {
+                                      const updated = await res.json();
+                                      setViewingBooking(updated);
+                                      fetchAllReservations();
+                                    }
+                                  } catch (err) {
+                                    console.error(err);
                                   }
-                                } catch (err) {
-                                  console.error(err);
-                                  alert("Error removing service");
-                                }
-                              }}
-                              className="text-red-600 hover:text-red-800 ml-1 font-bold text-lg leading-none"
-                              title="Remove service"
-                            >
-                              &times;
-                            </button>
-                          )}
+                                }}
+                                className="text-red-500 hover:text-red-700 font-bold px-1"
+                                title="Remove Service"
+                              >
+                                &times;
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))}
-                    </div>
 
-                    {isEditingService && (
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <select
-                          value=""
-                          onChange={async (e) => {
-                            const newServiceId = Number(e.target.value);
-                            if (!newServiceId) return;
-                            const updatedServiceIds = [...selectedServiceIds, newServiceId];
-                            try {
-                              const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                                method: "PATCH",
-                                headers: authenticatedJsonHeaders,
-                                body: JSON.stringify({ serviceIds: updatedServiceIds }),
-                              });
-                              if (res.ok) {
-                                const updated = await res.json();
-                                setViewingBooking(updated);
-                                fetchAllReservations();
-                                setIsEditingService(false);
-                              } else {
-                                const err = await res.json();
-                                alert(err.error || "Failed to add service");
+                      {/* Additional Services from session */}
+                      {additionalServicesList.map((as, asIdx) => (
+                        <div key={`as-${asIdx}`} className="flex items-center justify-between py-1 border-b border-gray-50">
+                          <span className="font-semibold text-[#1F251A]">
+                            {bookingServices.length + asIdx + 1}. {as.name} <span className="text-[10px] text-[#5A6A51]">(x{as.qty})</span>
+                          </span>
+                          <span className="font-extrabold text-[#1F251A]">{as.total} EGP</span>
+                        </div>
+                      ))}
+
+                      {/* Add Service Inline Selector */}
+                      {isEditingService && (
+                        <div className="pt-2 flex items-center gap-2">
+                          <select
+                            value=""
+                            onChange={async (e) => {
+                              const newServiceId = Number(e.target.value);
+                              if (!newServiceId) return;
+                              const updatedServiceIds = [...selectedServiceIds, newServiceId];
+                              try {
+                                const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                  method: "PATCH",
+                                  headers: authenticatedJsonHeaders,
+                                  body: JSON.stringify({ serviceIds: updatedServiceIds }),
+                                });
+                                if (res.ok) {
+                                  const updated = await res.json();
+                                  setViewingBooking(updated);
+                                  fetchAllReservations();
+                                  setIsEditingService(false);
+                                }
+                              } catch (err) {
+                                console.error(err);
                               }
-                            } catch (err) {
-                              console.error(err);
-                              alert("Error adding service");
-                            }
-                          }}
-                          className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-sm text-[#1F251A] outline-none font-semibold focus:border-[#C4AE7C]"
-                        >
-                          <option value="" disabled>Select a service to add</option>
-                          {localServices
-                            .filter(svc => !selectedServiceIds.includes(svc.id))
-                            .map((svc) => (
-                              <option key={svc.id} value={svc.id}>
-                                {svc.en}
-                              </option>
-                            ))}
-                        </select>
-                        <button
-                          onClick={() => setIsEditingService(false)}
-                          className="text-xs font-semibold text-[#5A6A51] hover:underline"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/*
-                   * Dev Notes:
-                   * - Implementation: Will require an 'adjustments' table or a JSON column in reservations to store reasons and positive/negative values.
-                   *   The frontend will show a form modal allowing reception/finance staff to add credits/debits.
-                   * - Technical Caveat / Gap: Requires strict role permission audit checks (e.g. only 'finance' or 'superadmin' roles can apply adjustments).
-                   *   All changes must write an audit trail log in a ledger table.
-                   * - Last Updated: July 5, 2026 2:45 PM
-
-
-
-
-                  {/* Products */}
-                  {/*
-                   * Dev Notes:
-                   * - Implementation: Needs a 'products' table for catalog inventory and a 'reservation_products' junction table.
-                   *   The frontend should use an inventory picker modal showing live stock count.
-                   * - Technical Caveat / Gap: Inventory sync is critical. Real-time depletion check on checkout prevents overselling.
-                   * - Last Updated: July 5, 2026 2:45 PM
-                   * - Milestone: Postponed / Phase 2
-                   * - Module: Inventory / Products
-                   * - Parent Feature: Products System
-                   * - Place: Booking Details drawer / Products Section
-                   * - End Dev: Pending DB Schema
-                   * - Priority: Medium
-                   * - Started Dev: July 5, 2026 2:00 PM
-                   * - Status: Locked
-                   * - Sub-Features: Live Inventory Picker, Stock Reconciliation
-                   * - User Role: Pharmacist / Receptionist
-                   * - What: Allows prescribing/linking retail skincare or medical products to a patient's booking invoice.
-                   * - Where: Located inside the booking details drawer under 'Products'.
-                   * - Why: Consolidates clinical services and related products into a single final invoice for the patient.
-                   */}
-                  {/* Products Card */}
-                  {(() => {
-                    // Filter out zero-cost device pulses and additional services from retail & procedure products card
-                    const filteredProductsList = productsConsumablesList.filter((prod: any) => {
-                      const nameLower = String(prod.name || '').toLowerCase();
-                      const isPulse = (prod.lineType === 'device_pulses') || nameLower.includes('pulse') || nameLower.includes('device —') || nameLower.includes('device -');
-                      if (isPulse && (Number(prod.total || 0) === 0 || Number(prod.unitPrice || prod.price || 0) === 0)) {
-                        return false;
-                      }
-                      if (prod.lineType === 'additional_service' || nameLower.includes('additional clinical services') || nameLower.includes('additional service')) {
-                        return false;
-                      }
-                      return true;
-                    });
-
-                    return (
-                      <>
-                        {/* Additional Clinical Services & Extra Adjustments Card */}
-                        {additionalServicesList.length > 0 && (
-                          <div className="rounded-2xl border border-[#C4AE7C]/30 bg-white p-5 space-y-3 shadow-xs">
-                            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3">
-                              <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#C4AE7C]">
-                                  ADDITIONAL SERVICES & EXTRA ADJUSTMENTS
-                                </p>
-                                <p className="text-sm font-bold text-[#1F251A] mt-0.5">
-                                  {additionalServicesList.length} Additional Service{additionalServicesList.length > 1 ? "s" : ""} Added in Session
-                                </p>
-                              </div>
-                              <span className="rounded-full bg-[#FAF5EB] px-3 py-1 text-xs font-bold text-[#C4AE7C] border border-[#C4AE7C]/40">
-                                Total: {additionalServicesCost} EGP
-                              </span>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                              {additionalServicesList.map((as, asIdx) => (
-                                <div
-                                  key={`add-card-${asIdx}`}
-                                  className="flex flex-col justify-between p-3.5 rounded-2xl bg-[#FAF5EB]/60 border border-[#C4AE7C]/30 hover:border-[#C4AE7C] transition shadow-2xs space-y-2"
-                                >
-                                  <div className="flex items-start justify-between gap-2">
-                                    <span className="font-bold text-sm text-[#1F251A] leading-snug">
-                                      {as.name}
-                                    </span>
-                                    <span className="rounded-full bg-[#C4AE7C]/20 px-2 py-0.5 text-[10px] font-bold text-[#414E36] shrink-0">
-                                      Additional Service
-                                    </span>
-                                  </div>
-
-                                  <div className="flex items-center justify-between pt-2 border-t border-[#C4AE7C]/20 text-xs">
-                                    <span className="text-[#5A6A51] font-medium">
-                                      Qty: {as.qty} {as.qty > 1 ? `x ${as.unitPrice} EGP` : ""}
-                                    </span>
-                                    <span className="text-sm font-extrabold text-[#414E36]">
-                                      {as.total || (as.qty * as.unitPrice)} EGP
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
-                          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3">
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS & SESSION CONSUMABLES</p>
-                            <p className="text-sm font-bold text-[#1F251A] mt-0.5">
-                              {filteredProductsList.length > 0
-                                ? `${filteredProductsList.length} Product(s) Attached`
-                                : "No products added"}
-                            </p>
-                          </div>
-                          <button
-                            disabled={isInvoicePaid}
-                            onClick={() => !isInvoicePaid && setShowDrawerProductModal(true)}
-                            title={isInvoicePaid ? "Session is already paid and settled" : "Add retail product to booking"}
-                            className={`rounded-2xl border border-[#414E36]/20 px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 shadow-sm ${
-                              isInvoicePaid
-                                ? "bg-gray-200 text-gray-400 cursor-not-allowed border-gray-300"
-                                : "bg-[#414E36] text-white hover:bg-[#343F2B]"
-                            }`}
+                            }}
+                            className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none font-bold"
                           >
-                            + Add Product
+                            <option value="" disabled>Select service to add...</option>
+                            {localServices
+                              .filter(svc => !selectedServiceIds.includes(svc.id))
+                              .map((svc) => (
+                                <option key={svc.id} value={svc.id}>
+                                  {svc.en}
+                                </option>
+                              ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingService(false)}
+                            className="text-xs font-semibold text-[#5A6A51] hover:underline"
+                          >
+                            Cancel
                           </button>
                         </div>
-
-                        {filteredProductsList.length > 0 ? (
-                          <div className="space-y-2">
-                            {filteredProductsList.map((prod: any, pIdx: number) => (
-                              <div key={pIdx} className="flex items-center justify-between p-2.5 rounded-xl bg-[#FBFBF9] border border-[#414E36]/10 text-xs">
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-[#1F251A]">{prod.name}</span>
-                                    {prod.addedBy && (
-                                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
-                                        {prod.addedBy}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-[11px] text-[#5A6A51] block mt-0.5">
-                                    Qty: {prod.qty} x {prod.unitPrice || prod.price} EGP
-                                  </span>
-                                </div>
-                                <span className="font-extrabold text-[#414E36]">{(prod.total || (prod.qty * (prod.unitPrice || prod.price))) || 0} EGP</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-[#5A6A51]">No retail or procedure products linked to this booking yet.</p>
-                        )}
-                      </div>
-                    </>
-                    );
-                  })()}
-
-                  {/* Prescriptions Card */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
-                    <div className="flex items-center justify-between mb-1 border-b border-[#414E36]/10 pb-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Prescriptions</p>
-                        <p className="text-sm font-bold text-[#1F251A] mt-0.5">
-                          {drawerPrescriptions.length > 0
-                            ? `${drawerPrescriptions.length} Digital Prescription(s)`
-                            : "Patient digital prescriptions record"}
-                        </p>
-                      </div>
-                      {drawerPrescriptions.length > 0 && (
-                        <span className="rounded-full bg-[#EDF1EC] px-2.5 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
-                          Recorded in Session
-                        </span>
                       )}
                     </div>
 
-                    {drawerPrescriptions.length > 0 ? (
-                      <div className="space-y-4 pt-1">
-                        {drawerPrescriptions.map((rx: any, rxIdx: number) => {
-                          const medsList: any[] = Array.isArray(rx.medications) && rx.medications.length > 0
-                            ? rx.medications
-                            : (Array.isArray(rx.items) ? rx.items : []);
-                          const rxDate = rx.date ? String(rx.date).slice(0, 10) : (rx.created_at ? new Date(rx.created_at).toLocaleDateString() : "Today");
-                          const docName = rx.doctor_name || viewingBooking.doctorName || "Treating Doctor";
-                          const notes = rx.general_notes || rx.instructions || rx.doctor_notes || rx.notes;
+                    {/* Total Price Row */}
+                    <div className="pt-3 border-t border-[#414E36]/10 flex items-center justify-between">
+                      <span className="font-black text-sm text-[#1F251A]">Total Price</span>
+                      <span className="font-black text-base text-[#1F251A]">{totalPrice} EGP</span>
+                    </div>
+                  </div>
 
-                          return (
-                            <div key={rx.id || rxIdx} className="rounded-2xl bg-[#FBFBF9] border border-[#414E36]/15 p-4 text-xs space-y-3 shadow-sm">
-                              {/* Top Prescription Header */}
-                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#414E36]/10 pb-2.5">
-                                <div>
-                                  <span className="font-extrabold text-sm text-[#1F251A]">
-                                    {rx.diagnosis ? `Diagnosis: ${rx.diagnosis}` : "Clinical Prescription"}
-                                  </span>
-                                  <p className="text-[11px] text-[#5A6A51] mt-0.5">
-                                    <strong>Doctor:</strong> {docName}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <span className="rounded-full bg-[#EDF1EC] px-2.5 py-0.5 text-[10px] font-bold text-[#414E36]">
-                                    {rxDate}
-                                  </span>
-                                </div>
-                              </div>
+                  {/* 5. 2-METRICS ROW: PRODUCTS & CONSUMABLES and PRESCRIPTION */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Card A: PRODUCTS & CONSUMABLES */}
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
+                          <Box size={13} className="text-[#0F3826]" />
+                          <span>PRODUCTS &amp; CONSUMABLES</span>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isInvoicePaid}
+                          onClick={() => !isInvoicePaid && setShowDrawerProductModal(true)}
+                          className="rounded-xl border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-2xs"
+                        >
+                          <Plus size={11} />
+                          <span>Add Product</span>
+                        </button>
+                      </div>
 
-                              {/* Medications Table */}
-                              {medsList.length > 0 && (
-                                <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-                                  <table className="w-full text-left text-xs border-collapse">
-                                    <thead>
-                                      <tr className="bg-[#EDF1EC] text-[#414E36] font-bold border-b border-gray-200 text-[11px]">
-                                        <th className="p-2 text-left">Medication</th>
-                                        <th className="p-2 text-left">Dosage</th>
-                                        <th className="p-2 text-left">Frequency</th>
-                                        <th className="p-2 text-left">Duration</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                      {medsList.map((m: any, mIdx: number) => (
-                                        <tr key={mIdx} className="hover:bg-gray-50/50">
-                                          <td className="p-2 font-bold text-[#1F251A]">{m.name || m.medicine_name || m.medicine || "—"}</td>
-                                          <td className="p-2 text-[#5A6A51] font-medium">{m.dosage || "—"}</td>
-                                          <td className="p-2 text-[#5A6A51]">{m.frequency || "—"}</td>
-                                          <td className="p-2 text-[#5A6A51]">{m.duration || "—"}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
-
-                              {/* Doctor Instructions */}
-                              {notes && (
-                                <div className="rounded-xl bg-[#FAF5EB] border border-[#C4AE7C]/30 p-2.5 text-[11px] text-[#414E36]">
-                                  <strong className="block font-bold mb-0.5 text-[#1F251A]">Instructions / تعليمات:</strong>
-                                  <p className="whitespace-pre-line leading-relaxed">{notes}</p>
-                                </div>
-                              )}
-
-                              {/* Action Buttons: WhatsApp & Print */}
-                              <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-[#414E36]/10">
-                                <button
-                                  type="button"
-                                  onClick={() => handleSendPrescriptionWhatsApp(rx, viewingBooking)}
-                                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white px-3 py-1.5 text-xs font-bold transition shadow-sm"
-                                  title={`Send prescription to ${viewingBooking.phone || 'patient'} via WhatsApp`}
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.632.062-1.954-.476-1.579-.643-2.617-2.26-2.696-2.366-.079-.105-.644-.858-.644-1.636 0-.777.407-1.16.552-1.317.145-.157.316-.197.422-.197.105 0 .211.002.302.007.098.005.23-.037.36.275.144.348.492 1.2.535 1.288.043.088.072.19.014.307-.058.117-.087.19-.174.292-.087.102-.183.228-.261.306-.087.087-.179.182-.077.357.102.175.454.748.974 1.211.671.597 1.236.782 1.411.87.175.088.277.073.38-.044.103-.117.437-.509.554-.684.116-.175.233-.146.393-.088.16.059 1.018.48 1.193.568.175.088.291.131.334.205.044.073.044.423-.1.828z"/>
-                                  </svg>
-                                  Send via WhatsApp
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => printPrescription(rx, viewingBooking)}
-                                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] hover:bg-[#323D2A] text-white px-3 py-1.5 text-xs font-bold transition shadow-sm"
-                                  title="Print or Save PDF of this prescription"
-                                >
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="6 9 6 2 18 2 18 9" />
-                                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                                    <rect x="6" y="14" width="12" height="8" />
-                                  </svg>
-                                  Print / Save PDF
-                                </button>
-                              </div>
+                      {productsConsumablesList.length > 0 ? (
+                        <div className="space-y-1.5 pt-1">
+                          {productsConsumablesList.map((prod, pIdx) => (
+                            <div key={pIdx} className="flex items-center justify-between text-xs py-1 border-b border-gray-50 last:border-0">
+                              <span className="font-semibold text-[#1F251A] truncate">{prod.name} (x{prod.qty})</span>
+                              <span className="font-extrabold text-[#1F251A]">{prod.total} EGP</span>
                             </div>
-                          );
-                        })}
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[#5A6A51] font-medium pt-1">No products added</p>
+                      )}
+                    </div>
+
+                    {/* Card B: PRESCRIPTION */}
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2.5 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
+                          <FileText size={13} className="text-[#0F3826]" />
+                          <span>PRESCRIPTION</span>
+                        </div>
+                        {drawerPrescriptions.length > 0 && (
+                          <span className="text-[10px] font-bold text-[#5A6A51] bg-gray-100 px-2 py-0.5 rounded-full">
+                            {drawerPrescriptions[0].date ? new Date(drawerPrescriptions[0].date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "Recorded"}
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-60">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                          <polyline points="14 2 14 8 20 8" />
-                          <line x1="16" y1="13" x2="8" y2="13" />
-                          <line x1="16" y1="17" x2="8" y2="17" />
-                          <polyline points="10 9 9 9 8 9" />
-                        </svg>
-                        <p className="text-xs font-semibold text-[#1F251A]">No prescription recorded yet</p>
-                        <p className="text-[11px] text-[#5A6A51] mt-0.5">No prescription was written by the doctor for this session.</p>
+
+                      {drawerPrescriptions.length > 0 ? (() => {
+                        const rx = drawerPrescriptions[0];
+                        const medsList: any[] = Array.isArray(rx.medications) && rx.medications.length > 0
+                          ? rx.medications
+                          : (Array.isArray(rx.items) ? rx.items : []);
+                        const rxNotes = rx.general_notes || rx.instructions || rx.doctor_notes || rx.notes;
+
+                        return (
+                          <div className="space-y-2.5">
+                            {/* Diagnosis Box */}
+                            {rx.diagnosis && (
+                              <div className="rounded-xl bg-[#F4F5F1] p-2.5 border border-[#414E36]/10">
+                                <span className="text-[10px] font-extrabold text-[#5A6A51] uppercase tracking-wider block">
+                                  Diagnosis
+                                </span>
+                                <p className="font-bold text-xs text-[#1F251A] mt-0.5">
+                                  {rx.diagnosis}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Itemized Medications */}
+                            {medsList.length > 0 ? (
+                              <div className="space-y-1.5">
+                                <span className="text-[10px] font-extrabold text-[#5A6A51] uppercase tracking-wider block">
+                                  Prescribed Medications ({medsList.length})
+                                </span>
+                                <div className="space-y-1.5 max-h-40 overflow-y-auto pe-1">
+                                  {medsList.map((med: any, mIdx: number) => (
+                                    <div
+                                      key={mIdx}
+                                      className="rounded-xl border border-gray-100 bg-[#FAFAFA] p-2 text-xs space-y-1"
+                                    >
+                                      <div className="flex items-center justify-between gap-1">
+                                        <span className="font-extrabold text-[#1F251A] flex items-center gap-1.5 truncate">
+                                          <span className="h-4 w-4 rounded-full bg-[#0F3826]/10 text-[#0F3826] flex items-center justify-center text-[10px] font-bold shrink-0">
+                                            {mIdx + 1}
+                                          </span>
+                                          <span className="truncate">{med.name || med.medicine_name || med.medicine || "Medication"}</span>
+                                        </span>
+                                        {med.dosage && (
+                                          <span className="text-[10px] font-bold text-[#0F3826] bg-[#EBF7EE] px-1.5 py-0.5 rounded shrink-0">
+                                            {med.dosage}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {(med.frequency || med.duration) && (
+                                        <div className="flex items-center gap-2 text-[11px] text-[#5A6A51] ps-5">
+                                          {med.frequency && <span><strong>Freq:</strong> {med.frequency}</span>}
+                                          {med.frequency && med.duration && <span>•</span>}
+                                          {med.duration && <span><strong>Duration:</strong> {med.duration}</span>}
+                                        </div>
+                                      )}
+
+                                      {med.instructions && (
+                                        <p className="text-[11px] text-[#7A8A71] italic ps-5">
+                                          ↳ {med.instructions}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : !rx.diagnosis && (
+                              <p className="text-xs text-[#1F251A] font-bold">Prescription recorded</p>
+                            )}
+
+                            {/* Doctor Clinical Instructions */}
+                            {rxNotes && (
+                              <div className="rounded-xl bg-[#FBFBF9] p-2 border border-[#414E36]/10 text-xs">
+                                <span className="text-[10px] font-extrabold text-[#5A6A51] uppercase tracking-wider block">
+                                  Instructions
+                                </span>
+                                <p className="text-[11px] text-[#1F251A] mt-0.5 whitespace-pre-line leading-relaxed">
+                                  {rxNotes}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                              <button
+                                type="button"
+                                onClick={() => handleSendPrescriptionWhatsApp(rx, viewingBooking)}
+                                className="flex-1 rounded-xl bg-[#25D366] text-white py-1.5 px-2.5 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-[#1EBE5D] transition shadow-2xs cursor-pointer"
+                              >
+                                <MessageSquare size={12} />
+                                <span>WhatsApp</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => printPrescription(rx, viewingBooking)}
+                                className="flex-1 rounded-xl bg-[#0F3826] text-white py-1.5 px-2.5 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-[#0A271A] transition shadow-2xs cursor-pointer"
+                              >
+                                <Printer size={12} />
+                                <span>Print Rx</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })() : (
+                        <div className="py-2">
+                          <p className="font-bold text-xs text-[#1F251A]">No prescription recorded</p>
+                          <p className="text-[11px] text-[#5A6A51] font-medium mt-0.5">No prescription was written for this session.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 6. BOOKING INFORMATION CARD */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3 shadow-2xs">
+                    <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
+                      <Info size={13} className="text-[#0F3826]" />
+                      <span>BOOKING INFORMATION</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                      <div>
+                        <span className="text-[#5A6A51] font-medium block">Booked By</span>
+                        <span className="font-bold text-[#1F251A] mt-0.5 block">
+                          {(() => {
+                            const creator = employeesList.find(emp => emp.id === viewingBooking.createdByEmployeeId);
+                            return creator ? creator.name : (viewingBooking.isManual ? "Employee" : "Patient");
+                          })()}
+                        </span>
                       </div>
-                    )}
+
+                      <div>
+                        <span className="text-[#5A6A51] font-medium block">Booking Source</span>
+                        <span className="font-bold text-[#1F251A] mt-0.5 block">
+                          {viewingBooking.isManual ? "Manual Booking" : "Website Booking"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[#5A6A51] font-medium block">Created At</span>
+                        <span className="font-bold text-[#1F251A] mt-0.5 block">
+                          {(() => {
+                            const dateVal = (viewingBooking as any).created_at || viewingBooking.createdAt || viewingBooking.date;
+                            if (!dateVal) return "—";
+                            try {
+                              const d = new Date(dateVal);
+                              const day = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+                              const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+                              return `${day} • ${time}`;
+                            } catch {
+                              return dateVal;
+                            }
+                          })()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
                 </div>
 
-                {/* Right Column */}
-                <div className="space-y-6">
-
-                  {/* Workflow Action Flow Section */}
-                  {viewingBooking.status === 'pending_deposit' && (
-                    <div className="rounded-2xl border-2 border-purple-300 bg-purple-50 p-5 space-y-4">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-2.5 w-2.5 rounded-full bg-purple-600 animate-pulse"></span>
-                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-purple-900">Pending Deposit</p>
+                {/* ── RIGHT COLUMN (1/3 width) ── */}
+                <div className="lg:col-span-1 space-y-4">
+                  
+                  {/* 1. SESSION FLOW CARD */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-4 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-2xl bg-[#EBF7EE] text-[#1E7E34] flex items-center justify-center shrink-0">
+                        <Calendar size={20} />
                       </div>
-                      <p className="text-xs text-purple-700 leading-relaxed">
-                        This website booking requires a reservation deposit. The patient has not yet paid the deposit online. You can manually register the payment if they paid via cash/bank transfer.
-                      </p>
-                      {(() => {
-                        const svc = localServices.find(s => s.id === viewingBooking.serviceId);
-                        const svcPrice = getEffectiveServicePrice(svc, viewingBooking.branchId, branches);
-                        const depVal = Math.round(svcPrice * (bookingDepositPercentage / 100));
-                        return (
-                          <div className="rounded-xl bg-white p-3 text-xs space-y-1 text-purple-900 font-semibold border border-purple-200">
-                            <div className="flex justify-between">
-                              <span>Service Price:</span>
-                              <span>EGP {svcPrice}</span>
-                            </div>
-                            <div className="flex justify-between text-purple-700">
-                              <span>Deposit Amount ({bookingDepositPercentage}%):</span>
-                              <span>EGP {depVal}</span>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                      <button
-                        onClick={async () => {
-                          const svc = localServices.find(s => s.id === viewingBooking.serviceId);
-                          const svcPrice = getEffectiveServicePrice(svc, viewingBooking.branchId, branches);
-                          const depVal = Math.round(svcPrice * (bookingDepositPercentage / 100));
-                          const remaining = svcPrice - depVal;
-
-                          if (await showConfirm(`Mark deposit of EGP ${depVal} as paid? This will move the booking to Pending.`)) {
-                            const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                              method: 'PATCH',
-                              headers: authenticatedJsonHeaders,
-                              body: JSON.stringify({
-                                status: 'pending',
-                                amountPaid: depVal,
-                                amountLeft: remaining
-                              }),
-                            });
-                            if (res.ok) {
-                              setViewingBooking(null);
-                              fetchRequests();
-                              fetchAllReservations();
-                            }
-                          }
-                        }}
-                        className="w-full rounded-2xl bg-purple-700 py-2.5 text-xs font-bold text-white hover:bg-purple-800 transition flex items-center justify-center gap-1.5"
-                      >
-                        Mark Deposit as Paid
-                      </button>
-                    </div>
-                  )}
-
-                  {viewingBooking.status === 'pending' && hasPermission("bookings.approve_reject") && (
-                    <div className="rounded-2xl border-2 border-[#C4AE7C]/30 bg-[#EDF1EC] p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Workflow Actions</p>
-                      <p className="text-xs text-[#5A6A51] mb-4">This booking is pending approval. Assign a doctor and confirm details.</p>
-                      <div className="flex gap-3">
-                        <button
-                          disabled={loadingApproveId === viewingBooking.id}
-                          onClick={async () => {
-                            await openApprove(viewingBooking);
-                            setViewingBooking(null);
-                          }}
-                          className="flex-1 rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-60 flex items-center justify-center gap-1.5"
-                        >
-                          {loadingApproveId === viewingBooking.id ? (
-                            <>
-                              <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
-                              Loading...
-                            </>
-                          ) : (
-                            "Approve"
-                          )}
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (await showConfirm("Are you sure you want to reject this request?")) {
-                              await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                                method: 'PATCH',
-                                headers: authenticatedJsonHeaders,
-                                body: JSON.stringify({ action: 'reject' }),
-                              });
-                              setViewingBooking(null);
-                              fetchRequests();
-                              fetchAllReservations();
-                            }
-                          }}
-                          className="flex-1 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
-                        >
-                          Reject
-                        </button>
+                      <div>
+                        <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0F3826]">
+                          SESSION FLOW
+                        </h4>
+                        <p className="text-xs text-[#5A6A51] font-medium leading-tight mt-0.5">
+                          {viewingBooking.status === 'completed'
+                            ? (isInvoicePaid ? "Session completed and invoice fully settled." : "Treatment completed. Ready for invoice settlement.")
+                            : viewingBooking.status === 'started'
+                              ? "Treatment currently active with treating doctor."
+                              : viewingBooking.status === 'checked_in'
+                                ? "Customer is checked in and ready to start session."
+                                : "The customer has arrived at the clinic and is ready for check-in."}
+                        </p>
                       </div>
                     </div>
-                  )}
 
-                  {/* WhatsApp confirmation step for website bookings in 'approved' status */}
-                  {viewingBooking.status === 'approved' && !viewingBooking.isManual && (
-                    (() => {
-                      // Clean phone: if it starts with 0, prepend 2. If it doesn't have 20 prefix, add it.
-                      let whatsappPhone = viewingBooking.phone.trim().replace(/\s+/g, '');
-                      if (whatsappPhone.startsWith('0')) {
-                        whatsappPhone = '2' + whatsappPhone;
-                      } else if (!whatsappPhone.startsWith('2') && whatsappPhone.length === 10) {
-                        whatsappPhone = '2' + whatsappPhone;
-                      }
-                      if (!whatsappPhone.startsWith('+') && !whatsappPhone.startsWith('2') && whatsappPhone.length === 11) {
-                        whatsappPhone = '2' + whatsappPhone.slice(1);
-                      }
-
-                      const branch = branches.find(b => b.id === viewingBooking.branchId);
-                      const branchNameForMsg = branch ? (isRTL ? branch.name_ar : branch.name_en) : "Revera Clinics";
-                      const timeSlotForMsg = viewingBooking.timeSlot || viewingBooking.requestedTime || "scheduled time";
-
-                      const textMessage = `Hello ${viewingBooking.name}! This is Revera Clinics. We are pleased to confirm your booking for ${serviceNames} on ${viewingBooking.date} at ${timeSlotForMsg} at our ${branchNameForMsg} branch. Looking forward to seeing you!`;
-
-                      const whatsappLink = `https://api.whatsapp.com/send/?phone=${whatsappPhone}&text=${encodeURIComponent(textMessage)}&type=phone_number&app_absent=0`;
-
-                      return (
-                        <div className="rounded-2xl border border-[#C4AE7C]/40 bg-[#FBFBF9] p-5 space-y-4 shadow-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="flex h-2.5 w-2.5 rounded-full bg-[#25D366] animate-pulse"></span>
-                            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A]">WhatsApp Confirmation</p>
-                          </div>
-                          <p className="text-xs text-[#5A6A51] leading-relaxed">
-                            This is a website booking. Please send the booking details confirmation message to the patient on WhatsApp, then mark it as Confirmed.
-                          </p>
-                          <div className="flex flex-col gap-2">
-                            <a
-                              href={whatsappLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="w-full rounded-2xl bg-[#25D366] hover:bg-[#20ba56] text-white py-2.5 text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm"
-                            >
-                              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.403.002 9.794-4.382 9.797-9.77.001-2.61-1.01-5.063-2.85-6.907-1.838-1.842-4.284-2.858-6.892-2.858-5.406 0-9.798 4.382-9.802 9.77-.001 1.5.395 2.964 1.15 4.3l-.986 3.6 3.689-.968.389.232zm12.534-7.143c-.303-.151-1.792-.883-2.07-.984-.277-.101-.48-.151-.68.151-.2.302-.777.984-.952 1.185-.175.201-.35.226-.653.076-1.517-.759-2.661-1.286-3.715-3.102-.28-.48.28-.446.802-1.49.088-.176.044-.328-.022-.48-.066-.151-.577-1.39-.79-1.897-.208-.5-.436-.433-.598-.441-.155-.008-.332-.01-.508-.01-.176 0-.464.066-.707.328-.242.261-.927.905-.927 2.203 0 1.298.944 2.548 1.076 2.724.131.176 1.859 2.839 4.502 3.98.629.271 1.12.433 1.503.554.632.201 1.208.173 1.663.105.507-.076 1.792-.733 2.048-1.439.256-.707.256-1.314.18-1.44-.076-.127-.278-.201-.58-.352z"/>
-                              </svg>
-                              Confirm on WhatsApp
-                            </a>
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                                    method: 'PATCH',
-                                    headers: authenticatedJsonHeaders,
-                                    body: JSON.stringify({ status: 'confirmed' })
-                                  });
-                                  if (res.ok) {
-                                    const updated = await res.json();
-                                    setViewingBooking(updated);
-                                    fetchAllReservations();
-                                  }
-                                } catch (err) {
-                                  console.error(err);
-                                }
-                              }}
-                              className="w-full rounded-2xl bg-[#414E36] hover:bg-[#2e3a26] text-white py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-md"
-                            >
-                              Mark as Confirmed
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })()
-                  )}
-
-                  {(viewingBooking.status === 'confirmed' || viewingBooking.status === 'approved') && hasPermission("bookings.edit") && (
-                    <div className="rounded-2xl border border-[#C4AE7C]/30 bg-white p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Session Flow</p>
-                      <p className="text-xs text-[#5A6A51] mb-4">The customer has arrived at the clinic and is ready for check-in.</p>
-                      <div className="flex gap-3">
-                        {viewingBooking.status === 'approved' && (
+                    {/* Action Flow Buttons */}
+                    <div className="space-y-2 pt-1">
+                      {viewingBooking.status === 'approved' && (
+                        <div className="grid grid-cols-2 gap-2.5">
                           <button
+                            type="button"
                             onClick={async () => {
                               try {
                                 const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
@@ -11656,56 +11580,74 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 console.error(err);
                               }
                             }}
-                            className="flex-1 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                            className="w-full rounded-2xl border border-[#414E36]/20 bg-white py-3 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
                           >
-                            Confirm
+                            <Check size={14} className="text-[#0F3826]" />
+                            <span>Confirm</span>
                           </button>
-                        )}
-                        <button
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                                   method: 'PATCH',
                                   headers: authenticatedJsonHeaders,
                                   body: JSON.stringify({ status: 'checked_in' })
-                              });
-                              if (res.ok) {
-                                const updated = await res.json();
-                                // RISK-046: trust the status the server actually stored rather than
-                                // forcing 'checked_in' locally — the two could disagree, and the UI
-                                // would silently revert on the next refetch.
-                                setViewingBooking(prev => prev ? { ...prev, ...updated } : null);
-                                if (updated?.warning) alert(updated.warning);
-                                fetchRequests();
-                                fetchAllReservations();
-                              } else {
-                                alert("Failed to check in booking.");
+                                });
+                                if (res.ok) {
+                                  const updated = await res.json();
+                                  setViewingBooking(prev => prev ? { ...prev, ...updated } : null);
+                                  fetchRequests();
+                                  fetchAllReservations();
+                                }
+                              } catch (err) {
+                                console.error(err);
                               }
-                            } catch (err) {
-                              console.error(err);
-                              alert("Error checking in booking.");
-                            }
-                          }}
-                          className="flex-1 rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center justify-center gap-1.5"
-                        >
-                          Check In
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                            }}
+                            className="w-full rounded-2xl bg-[#0F3826] text-white py-3 text-xs font-bold hover:bg-[#0A271A] transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                          >
+                            <User size={14} />
+                            <span>Check In</span>
+                          </button>
+                        </div>
+                      )}
 
-                  {viewingBooking.status === 'checked_in' && hasPermission("bookings.edit") && (
-                    <div className="rounded-2xl border border-[#C4AE7C]/30 bg-white p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Session Flow</p>
-                      <p className="text-xs text-[#5A6A51] mb-4">The customer is checked in and ready to begin their clinical session.</p>
-                      <div className="flex gap-3">
+                      {viewingBooking.status === 'confirmed' && (
                         <button
+                          type="button"
                           onClick={async () => {
                             try {
                               const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                                  method: 'PATCH',
-                                  headers: authenticatedJsonHeaders,
-                                  body: JSON.stringify({ status: 'started' })
+                                method: 'PATCH',
+                                headers: authenticatedJsonHeaders,
+                                body: JSON.stringify({ status: 'checked_in' })
+                              });
+                              if (res.ok) {
+                                const updated = await res.json();
+                                setViewingBooking(prev => prev ? { ...prev, ...updated } : null);
+                                fetchRequests();
+                                fetchAllReservations();
+                              }
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          className="w-full rounded-2xl bg-[#0F3826] text-white py-3 text-xs font-bold hover:bg-[#0A271A] transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                        >
+                          <User size={14} />
+                          <span>Check In</span>
+                        </button>
+                      )}
+
+                      {viewingBooking.status === 'checked_in' && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                method: 'PATCH',
+                                headers: authenticatedJsonHeaders,
+                                body: JSON.stringify({ status: 'started' })
                               });
                               if (res.ok) {
                                 const updated = await res.json();
@@ -11717,87 +11659,51 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               console.error(err);
                             }
                           }}
-                          className="flex-1 rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center justify-center gap-1.5"
+                          className="w-full rounded-2xl bg-[#0F3826] text-white py-3 text-xs font-bold hover:bg-[#0A271A] transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
                         >
-                          Start Session
+                          <Play size={14} />
+                          <span>Start Session</span>
                         </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {viewingBooking.status === 'started' && (
-                    <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/60 p-5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-900">Session Flow</p>
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/80 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-900 animate-pulse">
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-600"></span>
-                          Treatment In Session
-                        </span>
-                      </div>
-                      <p className="text-xs text-amber-800 leading-relaxed">
-                        Treatment is currently active. The assigned doctor will complete the session upon finishing the procedure.
-                      </p>
-                    </div>
-                  )}
-
-                  {viewingBooking.status === 'completed' && hasPermission("bookings.edit") && (
-                    !isInvoicePaid ? (
-                      <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/60 p-5 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-900">Treatment Completed</p>
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/80 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-900">
-                            Ready for Payment
-                          </span>
-                        </div>
-                        <p className="text-xs text-emerald-800 leading-relaxed">
-                          The doctor has completed the treatment. Settle invoice and collect remaining payment from patient.
-                        </p>
-                        <button
-                          onClick={() => {
-                            const b = viewingBooking;
-                            setViewingBooking(null);
-                            setCheckoutBooking(b);
-                          }}
-                          className="w-full rounded-2xl bg-[#414E36] py-3 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center justify-center gap-2 shadow-md"
-                        >
-                          Pay &amp; Settle Invoice
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-100/70 p-5 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-950">Treatment Completed</p>
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-300 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-950">
-                            ✓ Invoice Settled &amp; Paid
-                          </span>
-                        </div>
-                        <p className="text-xs text-emerald-900 leading-relaxed font-medium">
-                          The invoice for this treatment session has been fully paid and settled.
-                        </p>
-                        <button
-                          onClick={() => {
-                            const b = viewingBooking;
-                            setViewingBooking(null);
-                            setInvoiceBooking(b);
-                          }}
-                          className="w-full rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center justify-center gap-2 shadow-sm"
-                        >
-                          View Invoice &amp; Print PDF
-                        </button>
-                      </div>
-                    )
-                  )}
-
-                  {!['completed', 'cancelled', 'rejected', 'no_show', 'started'].includes(viewingBooking.status) && hasPermission("bookings.edit") && (
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Other Actions</p>
-                      {viewingBooking.status === 'postponed' && viewingBooking.followUpDate && (
-                        <p className="text-xs text-[#5A6A51] mb-3">
-                          Follow up around <strong>{viewingBooking.followUpDate}</strong> to reschedule.
-                        </p>
                       )}
-                      <div className="flex gap-2">
+
+                      {viewingBooking.status === 'started' && (
+                        <div className="w-full rounded-2xl bg-amber-50 border border-amber-200 p-3 text-center text-xs font-extrabold text-amber-900 flex items-center justify-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                          <span>Treatment In Session</span>
+                        </div>
+                      )}
+
+                      {viewingBooking.status === 'completed' && (
+                        !isInvoicePaid ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const b = viewingBooking;
+                              setViewingBooking(null);
+                              setCheckoutBooking(b);
+                            }}
+                            className="w-full rounded-2xl bg-[#0F3826] text-white py-3 text-xs font-bold hover:bg-[#0A271A] transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                          >
+                            <Receipt size={14} />
+                            <span>Pay &amp; Settle Invoice</span>
+                          </button>
+                        ) : (
+                          <div className="w-full rounded-2xl bg-[#EBF7EE] border border-[#C3E6CB] p-3 text-center text-xs font-extrabold text-[#1E7E34]">
+                            ✓ Invoice Settled &amp; Paid
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 2. OTHER ACTIONS CARD */}
+                  {!['completed', 'cancelled', 'rejected', 'no_show', 'started'].includes(viewingBooking.status) && hasPermission("bookings.edit") && (
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3 shadow-2xs">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#5A6A51]">OTHER ACTIONS</p>
+                      
+                      <div className="grid grid-cols-3 gap-2">
                         <button
+                          type="button"
                           onClick={() => {
                             setPostponeBooking(viewingBooking);
                             setPostponeMode("reschedule");
@@ -11805,11 +11711,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             setPostponeNewTime(viewingBooking.timeSlot || "");
                             setPostponeFollowUpDate("");
                           }}
-                          className="flex-1 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] py-2 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                          className="rounded-2xl border border-[#414E36]/20 bg-white py-2.5 px-2 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer"
                         >
-                          Postpone
+                          <Clock size={13} className="text-[#5A6A51]" />
+                          <span>Postpone</span>
                         </button>
+                        
                         <button
+                          type="button"
                           onClick={async () => {
                             if (!(await showConfirm("Cancel this booking? Any deposit paid will be refunded to the patient's wallet."))) return;
                             const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
@@ -11821,16 +11730,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               setViewingBooking(null);
                               fetchAllReservations();
                               fetchCustomers();
-                            } else {
-                              const err = await res.json();
-                              alert(err.error || "Failed to cancel booking.");
                             }
                           }}
-                          className="flex-1 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] py-2 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                          className="rounded-2xl border border-[#414E36]/20 bg-white py-2.5 px-2 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer"
                         >
-                          Cancel
+                          <XCircle size={13} className="text-[#5A6A51]" />
+                          <span>Cancel</span>
                         </button>
+
                         <button
+                          type="button"
                           onClick={async () => {
                             if (!(await showConfirm("Mark this booking as a no-show? Any deposit paid will be forfeited as a cancellation fee, not refunded."))) return;
                             const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
@@ -11842,181 +11751,94 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               setViewingBooking(null);
                               fetchAllReservations();
                               fetchCustomers();
-                            } else {
-                              const err = await res.json();
-                              alert(err.error || "Failed to mark booking as no-show.");
                             }
                           }}
-                          className="flex-1 rounded-xl border border-rose-200 bg-rose-50 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
+                          className="rounded-2xl border border-[#FDE8E8] bg-[#FDF2F2] py-2.5 px-2 text-xs font-bold text-[#9B1C1C] hover:bg-rose-100 transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer"
                         >
-                          No Show
+                          <UserX size={13} className="text-[#9B1C1C]" />
+                          <span>No Show</span>
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {/* Customer Information */}
-                  {(() => {
-                    const customerRecord = dbCustomers.find(c => c.id === viewingBooking.customerId || c.phone === viewingBooking.phone);
-                    const walletBalance = customerRecord ? Number(customerRecord.wallet || customerRecord.wallet_balance || 0) : 0;
-                    const customerHistorySpent = customerRecord ? Number(customerRecord.spent_amount || customerRecord.spent || (customerRecord as any).total_spent || 0) : 0;
-                    const customerHistoryOutstanding = customerRecord ? Number(customerRecord.outstanding || 0) : 0;
+                  {/* 3. PAYMENT SUMMARY CARD */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-4 shadow-2xs">
+                    <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[11px] uppercase tracking-wider">
+                      <Wallet size={14} className="text-[#0F3826]" />
+                      <span>PAYMENT SUMMARY</span>
+                    </div>
 
-                    return (
-                      <div className="overflow-hidden rounded-2xl border border-[#414E36]/10 bg-white">
-                        <div className="bg-[#414E36] px-5 py-4 text-[#FBFBF9]">
-                          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#C4AE7C]/90">Customer Information</p>
-                          <h4 className="mt-1 text-lg font-bold text-[#FBFBF9]">{viewingBooking.name}</h4>
-                        </div>
-                        <div className="p-5 space-y-4 text-sm text-[#414E36]">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Email</p>
-                              <p className="mt-0.5 break-all font-semibold">{viewingBooking.email || "—"}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Phone</p>
-                              <p className="mt-0.5 font-semibold">{viewingBooking.phone}</p>
-                            </div>
-                          </div>
-
-                          <div className="border-t border-[#414E36]/10 pt-4 grid grid-cols-3 gap-2">
-                            <div>
-                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Wallet Balance</p>
-                              <p className="mt-0.5 font-bold text-[#C4AE7C]">EGP {walletBalance.toFixed(0)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold" title="Total spent by this customer across all completed visits">Total Spent</p>
-                              <p className="mt-0.5 font-bold text-green-600">EGP {customerHistorySpent.toFixed(0)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold" title="Total outstanding balance owed by this customer across all visits">Outstanding</p>
-                              <p className="mt-0.5 font-bold text-red-600">EGP {customerHistoryOutstanding.toFixed(0)}</p>
-                            </div>
-                          </div>
-                        </div>
+                    <div className="space-y-2.5 text-xs">
+                      <div className="flex justify-between items-center text-[#1F251A]">
+                        <span className="font-semibold text-[#5A6A51]">Service Price</span>
+                        <span className="font-bold">{totalPrice} EGP</span>
                       </div>
-                    );
-                  })()}
 
-                  {(() => {
-                    const svcIds = Array.isArray(viewingBooking.serviceIds)
-                      ? viewingBooking.serviceIds
-                      : (viewingBooking.serviceId ? [viewingBooking.serviceId] : []);
-                    const promos = svcIds
-                      .map((id: number) => localServices.find((s) => s.id === id))
-                      .filter(Boolean)
-                      .map((s: any) => ({ service: s, details: getServicePriceDetails(s, viewingBooking.branchId, branches) }))
-                      .filter((x: any) => x.details.hasPromotion)
-                      .map((x: any) => ({ serviceName: x.service.en, promotionText: x.details.promotionText || "" }));
-                    return <PatientPackagePromoBanner packages={bookingCustomerPackages} promotions={promos} />;
-                  })()}
-
-                  {/* Provider */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Provider</p>
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-[#C4AE7C]/20 flex items-center justify-center text-[#414E36] font-bold">
-                        {(viewingBooking.doctorName || "—").split(' ').map((n: string) => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()}
+                      <div className="flex justify-between items-center text-[#1F251A]">
+                        <span className="font-semibold text-[#5A6A51]">Paid Amount</span>
+                        <span className="font-bold text-emerald-700">{sessionPaid} EGP</span>
                       </div>
-                      <div>
-                        <p className="font-bold text-[#1F251A] text-sm">
-                          {viewingBooking.doctorName || "No Doctor Assigned"}
-                        </p>
-                        {viewingBooking.doctorName && (
-                          <div className="flex items-center gap-1 text-[#C4AE7C] mt-0.5">
-                            {"★".repeat(5)}
-                            <span className="text-xs text-[#5A6A51] ml-1">(5.0)</span>
-                          </div>
-                        )}
+
+                      <div className="flex justify-between items-center text-[#1F251A]">
+                        <span className="font-semibold text-[#5A6A51]">Outstanding</span>
+                        <span className={`font-bold ${sessionLeft > 0 ? 'text-[#9B1C1C]' : 'text-emerald-700'}`}>
+                          {sessionLeft} EGP
+                        </span>
+                      </div>
+
+                      <div className="pt-2 border-t border-[#414E36]/10 flex justify-between items-center">
+                        <span className="font-semibold text-[#5A6A51]">Payment Status</span>
+                        <span className={`rounded-full px-3 py-0.5 text-xs font-extrabold ${
+                          isInvoicePaid 
+                            ? 'bg-[#EBF7EE] text-[#1E7E34]' 
+                            : 'bg-amber-50 text-amber-800'
+                        }`}>
+                          {isInvoicePaid ? "Paid" : "Unpaid"}
+                        </span>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Assigned Room or Compatible Rooms */}
-                  {viewingBooking.roomId ? (
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Assigned Room</p>
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-[#414E36]/10 flex items-center justify-center text-[#414E36]">
-                          <DoorOpen size={18} />
-                        </div>
-                        <div>
-                          <p className="font-bold text-[#1F251A]">
-                            {(() => {
-                              const r = rooms.find(rm => rm.id === viewingBooking.roomId);
-                              return r ? r.name : "Loading...";
-                            })()}
-                          </p>
-                          <p className="text-xs text-[#5A6A51] capitalize">
-                            {(() => {
-                              const r = rooms.find(rm => rm.id === viewingBooking.roomId);
-                              return r ? `${r.type} Room` : "";
-                            })()}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Compatible Rooms</p>
-                      <div className="flex flex-wrap gap-2">
-                        {(() => {
-                          const compatibleList = rooms.filter(rm => viewingBooking.rooms?.includes(rm.id));
-                          if (compatibleList.length === 0) {
-                            return <p className="text-xs text-[#5A6A51] italic">No compatible clinical rooms configured for this service.</p>;
+                    {/* Action Buttons */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const b = viewingBooking;
+                          setViewingBooking(null);
+                          setInvoiceBooking(b);
+                        }}
+                        className="rounded-2xl border border-gray-200 bg-white py-2.5 px-2 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                      >
+                        <FileText size={13} className="text-[#5A6A51]" />
+                        <span>View Invoice</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (viewingBooking) {
+                            const branchObj = branches.find(br => br.id === viewingBooking.branchId);
+                            const bName = branchObj ? (isRTL ? branchObj.name_ar : branchObj.name_en) : "Revera Clinics";
+                            const allInvoiceItems = [
+                              ...bookingServices,
+                              ...additionalServicesList.map(s => ({ id: s.name, name: s.name, price: s.total })),
+                              ...productsConsumablesList.map(p => ({ id: p.name, name: `${p.name} (x${p.qty})`, price: p.total }))
+                            ];
+                            printInvoice(viewingBooking as any, allInvoiceItems, totalPrice, 0, bName);
                           }
-                          return compatibleList.map(rm => (
-                            <span 
-                              key={rm.id} 
-                              className="inline-flex items-center gap-1.5 rounded-full border border-[#414E36]/10 bg-[#EDF1EC] px-3 py-1 text-xs font-semibold text-[#414E36]"
-                            >
-                              <DoorOpen size={12} />
-                              {rm.name}
-                            </span>
-                          ));
-                        })()}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Booked By */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Booked By</p>
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-[#C4AE7C]/20 flex items-center justify-center text-[#414E36] font-bold">
-                        {(() => {
-                          const creator = employeesList.find(emp => emp.id === viewingBooking.createdByEmployeeId);
-                          const name = creator ? creator.name : (viewingBooking.isManual ? "Employee" : "Website (Patient)");
-                          return name.split(' ').map((n: string) => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase();
-                        })()}
-                      </div>
-                      <div>
-                        <p className="font-bold text-[#1F251A] text-sm">
-                          {(() => {
-                            const creator = employeesList.find(emp => emp.id === viewingBooking.createdByEmployeeId);
-                            if (creator) {
-                              return creator.name;
-                            }
-                            return viewingBooking.isManual ? "Employee" : "Website (Patient)";
-                          })()}
-                        </p>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">
-                          {(() => {
-                            const creator = employeesList.find(emp => emp.id === viewingBooking.createdByEmployeeId);
-                            if (creator) {
-                              return creator.role;
-                            }
-                            return viewingBooking.isManual ? "Clinic Staff" : "Online Patient";
-                          })()}
-                        </p>
-                      </div>
+                        }}
+                        className="rounded-2xl border border-gray-200 bg-white py-2.5 px-2 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                      >
+                        <Printer size={13} className="text-[#5A6A51]" />
+                        <span>Print Invoice</span>
+                      </button>
                     </div>
                   </div>
 
-                  {/* Doctor Clinical Notes */}
+                  {/* 4. NOTES CARD (Under Payment Summary) */}
                   {(() => {
-                    const cleanDoctorNotes = (() => {
+                    const cleanBookingNotes = (() => {
                       if (!viewingBooking?.notes) return "";
                       let text = String(viewingBooking.notes);
                       text = text.replace(/\[Products Used During Session\]:[\s\S]*?(?=\[|$)/gi, "");
@@ -12032,92 +11854,73 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     })();
 
                     return (
-                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
+                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3 shadow-2xs">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[11px] uppercase tracking-wider">
+                            <FileText size={14} className="text-[#0F3826]" />
+                            <span>NOTES</span>
+                          </div>
+                          {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && !isEditingNotes && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNotesDraft(cleanBookingNotes);
+                                setIsEditingNotes(true);
+                              }}
+                              className="rounded-xl border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                            >
+                              <Pencil size={11} />
+                              <span>{cleanBookingNotes ? "Edit Note" : "+ Add Note"}</span>
+                            </button>
+                          )}
+                        </div>
+
                         {isEditingNotes ? (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-bold text-[#1F251A]">Edit Doctor Clinical Notes</p>
-                            </div>
+                          <div className="space-y-2 pt-1">
                             <textarea
+                              rows={3}
                               value={notesDraft}
                               onChange={(e) => setNotesDraft(e.target.value)}
-                              placeholder="Enter clinical notes or session observations..."
-                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition min-h-[100px]"
+                              placeholder="Enter notes, observations, or instructions..."
+                              className="w-full rounded-xl border border-[#414E36]/20 bg-[#FBFBF9] p-2.5 text-xs text-[#1F251A] outline-none focus:border-[#0F3826]"
                             />
-                            <div className="flex justify-end gap-2">
+                            <div className="flex items-center justify-end gap-2">
                               <button
+                                type="button"
                                 onClick={() => setIsEditingNotes(false)}
-                                className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
+                                className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 cursor-pointer"
                               >
                                 Cancel
                               </button>
                               <button
+                                type="button"
                                 onClick={async () => {
                                   const raw = String(viewingBooking.notes || "");
                                   const matches = raw.match(/(\[(?:Products Used|Additional Services|Device Pulses|Extra Device|Invoice Total|Total Invoice|Added Product|Added Service)[^\]]*\]:[^\n\[]*)/gi);
                                   const systemTags = matches ? "\n" + matches.join("\n") : "";
                                   const finalNotes = notesDraft.trim() + systemTags;
                                   await saveNotes(finalNotes);
-                                  setViewingBooking(prev => prev ? { ...prev, notes: finalNotes } : null);
+                                  setViewingBooking((prev: any) => prev ? { ...prev, notes: finalNotes } : null);
                                   setIsEditingNotes(false);
                                 }}
-                                className="rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                                className="px-3.5 py-1.5 rounded-xl bg-[#0F3826] text-white text-xs font-bold hover:bg-[#0A271A] transition shadow-xs cursor-pointer"
                               >
                                 Save Note
                               </button>
                             </div>
                           </div>
+                        ) : cleanBookingNotes ? (
+                          <div className="rounded-xl bg-[#F7F7F3] border border-[#414E36]/10 p-3 text-xs text-[#1F251A] whitespace-pre-line leading-relaxed">
+                            {cleanBookingNotes}
+                          </div>
                         ) : (
-                          <>
-                            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-                              <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Doctor Clinical Notes</p>
-                                <p className="text-sm font-bold text-[#1F251A] mt-0.5">Session Clinical Observations</p>
-                              </div>
-                              {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
-                                <button
-                                  onClick={() => {
-                                    setNotesDraft(cleanDoctorNotes);
-                                    setIsEditingNotes(true);
-                                  }}
-                                  className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
-                                >
-                                  {cleanDoctorNotes ? "Edit Note" : "+ Add Note"}
-                                </button>
-                              )}
-                            </div>
-                            {cleanDoctorNotes ? (
-                              <div className="rounded-xl bg-[#F7F7F3] border border-[#414E36]/10 p-4 text-xs text-[#1F251A] whitespace-pre-line leading-relaxed">
-                                {cleanDoctorNotes}
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-60">
-                                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                                </svg>
-                                <p className="text-xs font-semibold text-[#1F251A]">No clinical notes recorded for this session yet</p>
-                                {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
-                                  <button
-                                    onClick={() => {
-                                      setNotesDraft("");
-                                      setIsEditingNotes(true);
-                                    }}
-                                    className="mt-2 text-xs font-bold text-[#414E36] hover:underline"
-                                  >
-                                    + Add doctor note
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                          </>
+                          <p className="text-xs text-[#5A6A51] font-medium pt-0.5">
+                            No notes recorded for this booking.
+                          </p>
                         )}
                       </div>
                     );
                   })()}
-
-
-
-
 
                 </div>
 

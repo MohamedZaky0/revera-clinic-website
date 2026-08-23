@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Clock, CheckCircle2, Play, ChevronRight, Pill, FileText, Package, AlertCircle, User, Phone, Mail, Calendar, ShieldAlert, MapPin, Hash, Sparkles, Plus } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, Play, ChevronRight, Pill, FileText, Package, AlertCircle, User, Phone, Mail, Calendar, ShieldAlert, MapPin, Hash, Sparkles, Plus, Trash2, Loader2, Download, ExternalLink } from "lucide-react";
 import { DoctorPatient } from "../types";
 import { parseBookingNotes, getAuthHeaders } from "../utils";
+import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
+import { adminTranslations } from "@/components/admin/translations";
 
 interface DoctorPatientHistoryDrawerProps {
   selectedPatientHistory: DoctorPatient | null;
@@ -12,6 +14,9 @@ interface DoctorPatientHistoryDrawerProps {
   medicalRecordsMap?: Record<string, any>;
   prescriptionsMap?: Record<string, any[]>;
   t: any;
+  lang?: "en" | "ar";
+  doctorName?: string;
+  adminRole?: string | null;
 }
 
 export default function DoctorPatientHistoryDrawer({
@@ -20,13 +25,23 @@ export default function DoctorPatientHistoryDrawer({
   handleOpenScheduleModal,
   medicalRecordsMap = {},
   prescriptionsMap = {},
-  t
+  t,
+  lang = "en",
+  doctorName = "Doctor",
+  adminRole = "doctor"
 }: DoctorPatientHistoryDrawerProps) {
   const [patientRxList, setPatientRxList] = useState<any[]>([]);
   const [medicalRecordData, setMedicalRecordData] = useState<any | null>(null);
+  const [medicalReports, setMedicalReports] = useState<any[]>([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [showMedicalReportModal, setShowMedicalReportModal] = useState(false);
   const [customerFullData, setCustomerFullData] = useState<any | null>(null);
   const [loadingCustomerData, setLoadingCustomerData] = useState(false);
-  const [activeTab, setActiveTab] = useState<"history" | "medical" | "personal">("history");
+  const [activeTab, setActiveTab] = useState<"history" | "medical" | "reports" | "personal">("history");
+  const [authHeadersObj, setAuthHeadersObj] = useState<{ "Content-Type": string; Authorization: string }>({
+    "Content-Type": "application/json",
+    Authorization: ""
+  });
 
   const validBookings = useMemo(() => {
     if (!selectedPatientHistory?.bookings) return [];
@@ -37,9 +52,19 @@ export default function DoctorPatientHistoryDrawer({
   }, [selectedPatientHistory]);
 
   useEffect(() => {
+    getAuthHeaders().then((h: any) => {
+      setAuthHeadersObj({
+        "Content-Type": "application/json",
+        Authorization: h.Authorization || ""
+      });
+    });
+  }, []);
+
+  useEffect(() => {
     if (!selectedPatientHistory) {
       setPatientRxList([]);
       setMedicalRecordData(null);
+      setMedicalReports([]);
       setCustomerFullData(null);
       return;
     }
@@ -71,25 +96,27 @@ export default function DoctorPatientHistoryDrawer({
     };
     fetchFullCustomer();
 
-    // 2. Check cached medical record or fetch from API
-    if (medicalRecordsMap[custId]) {
-      setMedicalRecordData(medicalRecordsMap[custId]);
-    } else {
-      const fetchMedicalRecord = async () => {
-        try {
-          const headers = await getAuthHeaders();
-          const res = await fetch(`/api/medical-records?customerId=${encodeURIComponent(custId)}`, { headers });
-          if (res.ok) {
-            const data = await res.json();
-            const record = data.medicalRecord || (Array.isArray(data) ? data[0] : null);
-            if (record) setMedicalRecordData(record);
+    // 2. Fetch medical records & uploaded reports from /api/medical-records
+    const fetchMedicalRecordAndReports = async () => {
+      setLoadingReports(true);
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/medical-records?customerId=${encodeURIComponent(custId)}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const record = data.form || data.medicalRecord || (Array.isArray(data) ? data[0] : null);
+          if (record) setMedicalRecordData(record);
+          if (Array.isArray(data.reports)) {
+            setMedicalReports(data.reports);
           }
-        } catch (err) {
-          console.error("Error loading patient medical record:", err);
         }
-      };
-      fetchMedicalRecord();
-    }
+      } catch (err) {
+        console.error("Error loading patient medical record & reports:", err);
+      } finally {
+        setLoadingReports(false);
+      }
+    };
+    fetchMedicalRecordAndReports();
 
     // 3. Check cached prescriptions or fetch from API
     if (prescriptionsMap[custId]) {
@@ -110,6 +137,25 @@ export default function DoctorPatientHistoryDrawer({
       fetchRx();
     }
   }, [selectedPatientHistory, medicalRecordsMap, prescriptionsMap]);
+
+  const handleDeleteMedicalReport = async (reportId: string) => {
+    if (!confirm("Are you sure you want to delete this report?")) return;
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/medical-records?reportId=${encodeURIComponent(reportId)}`, {
+        method: "DELETE",
+        headers
+      });
+      if (res.ok) {
+        setMedicalReports((prev) => prev.filter((r) => r.id !== reportId));
+      } else {
+        alert("Failed to delete medical report.");
+      }
+    } catch (err) {
+      console.error("Error deleting medical report:", err);
+      alert("Error deleting medical report.");
+    }
+  };
 
   if (!selectedPatientHistory) return null;
 
@@ -191,25 +237,25 @@ export default function DoctorPatientHistoryDrawer({
           </div>
         </div>
 
-        {/* 3 Sub-Navigation Tabs Bar */}
-        <div className="flex items-center bg-white rounded-3xl p-2 border border-[#414E36]/12 shadow-xs gap-2">
+        {/* 4 Sub-Navigation Tabs Bar */}
+        <div className="flex items-center bg-white rounded-3xl p-2 border border-[#414E36]/12 shadow-xs gap-2 overflow-x-auto no-scrollbar w-full">
           <button
             type="button"
             onClick={() => setActiveTab("history")}
-            className={`flex-1 py-3.5 px-5 text-sm font-extrabold rounded-2xl transition flex items-center justify-center gap-2.5 ${
+            className={`flex-1 py-3.5 px-4 text-xs sm:text-sm font-extrabold rounded-2xl transition flex items-center justify-center gap-2 min-w-max ${
               activeTab === "history"
                 ? "bg-[#414E36] text-white shadow-sm"
                 : "text-[#5A6A51] hover:text-[#1F251A] hover:bg-[#F4F5F1]"
             }`}
           >
             <Clock size={16} />
-            <span>Clinical History & Visits ({selectedPatientHistory.bookings.length})</span>
+            <span>Clinical History & Visits ({validBookings.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("medical")}
-            className={`flex-1 py-3.5 px-5 text-sm font-extrabold rounded-2xl transition flex items-center justify-center gap-2.5 ${
+            className={`flex-1 py-3.5 px-4 text-xs sm:text-sm font-extrabold rounded-2xl transition flex items-center justify-center gap-2 min-w-max ${
               activeTab === "medical"
                 ? "bg-[#414E36] text-white shadow-sm"
                 : "text-[#5A6A51] hover:text-[#1F251A] hover:bg-[#F4F5F1]"
@@ -224,8 +270,21 @@ export default function DoctorPatientHistoryDrawer({
 
           <button
             type="button"
+            onClick={() => setActiveTab("reports")}
+            className={`flex-1 py-3.5 px-4 text-xs sm:text-sm font-extrabold rounded-2xl transition flex items-center justify-center gap-2 min-w-max ${
+              activeTab === "reports"
+                ? "bg-[#414E36] text-white shadow-sm"
+                : "text-[#5A6A51] hover:text-[#1F251A] hover:bg-[#F4F5F1]"
+            }`}
+          >
+            <FileText size={16} />
+            <span>Reports & Documents ({medicalReports.length})</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab("personal")}
-            className={`flex-1 py-3.5 px-5 text-sm font-extrabold rounded-2xl transition flex items-center justify-center gap-2.5 ${
+            className={`flex-1 py-3.5 px-4 text-xs sm:text-sm font-extrabold rounded-2xl transition flex items-center justify-center gap-2 min-w-max ${
               activeTab === "personal"
                 ? "bg-[#414E36] text-white shadow-sm"
                 : "text-[#5A6A51] hover:text-[#1F251A] hover:bg-[#F4F5F1]"
@@ -399,6 +458,20 @@ export default function DoctorPatientHistoryDrawer({
                   <span className="text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-2">{t.previousTreatmentsLabel || "Previous Treatments & Procedures"}</span>
                   <span className="font-semibold text-[#1F251A] text-base leading-relaxed">{medicalRecordData?.previous_treatments_details || 'None reported'}</span>
                 </div>
+
+                {medicalRecordData?.responses && Object.keys(medicalRecordData.responses).length > 0 && (
+                  <div className="bg-[#FBFBF9] p-6 rounded-2xl border border-[#414E36]/10 col-span-1 md:col-span-2 space-y-3">
+                    <span className="text-xs font-bold text-[#5A6A51] uppercase tracking-wider block">Specialized Intake Questionnaire Responses</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {Object.entries(medicalRecordData.responses).map(([key, val]) => (
+                        <div key={key} className="bg-white p-3.5 rounded-xl border border-[#414E36]/8 space-y-0.5">
+                          <span className="text-[11px] font-bold text-[#5A6A51] capitalize block">{key.replace(/_/g, ' ')}</span>
+                          <span className="text-xs font-bold text-[#1F251A] block">{typeof val === 'boolean' ? (val ? 'Yes / Confirmed' : 'No') : String(val || 'None')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -485,7 +558,134 @@ export default function DoctorPatientHistoryDrawer({
           </div>
         )}
 
+        {/* Tab 4: Reports & Documents */}
+        {activeTab === "reports" && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Header / Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#414E36]/12 shadow-sm">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-extrabold text-[#1F251A]">Reports & Documents ({medicalReports.length})</h3>
+                  <span className="bg-[#EDF1EC] text-[#414E36] text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                    {medicalReports.length} {medicalReports.length === 1 ? "Document" : "Documents"}
+                  </span>
+                </div>
+                <p className="text-xs text-[#5A6A51]">
+                  Lab results, diagnostic scan reports, and external clinical documents uploaded by receptionists or doctors.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowMedicalReportModal(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#414E36] px-5 py-3 text-xs font-bold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm shrink-0 cursor-pointer"
+              >
+                <Plus size={16} /> Upload Report
+              </button>
+            </div>
+
+            {/* Reports List */}
+            {loadingReports ? (
+              <div className="p-12 text-center text-sm text-[#5A6A51] bg-white rounded-3xl border border-[#414E36]/12 flex items-center justify-center gap-2">
+                <Loader2 size={18} className="animate-spin text-[#414E36]" /> Loading medical reports...
+              </div>
+            ) : medicalReports.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-3xl border border-[#414E36]/12 shadow-sm space-y-4">
+                <div className="h-16 w-16 mx-auto rounded-3xl bg-[#EDF1EC] text-[#414E36] flex items-center justify-center">
+                  <FileText size={32} />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-extrabold text-[#1F251A]">No medical reports uploaded yet</h3>
+                  <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
+                    Upload lab results, scan reports, or external clinical documents for this patient.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMedicalReportModal(true)}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-3 text-xs font-bold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm cursor-pointer"
+                >
+                  <Plus size={16} /> Upload Report
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {medicalReports.map((report) => (
+                  <div
+                    key={report.id}
+                    className="bg-white rounded-3xl border border-[#414E36]/12 p-5 space-y-3.5 relative shadow-xs hover:border-[#414E36]/25 transition flex flex-col justify-between"
+                  >
+                    <div className="space-y-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-2xl bg-[#EDF1EC] text-[#414E36] flex items-center justify-center shrink-0">
+                            <FileText size={20} />
+                          </div>
+                          <div>
+                            <h5 className="font-extrabold text-[#1F251A] text-sm">
+                              {report.title || report.report_title || "Medical Document"}
+                            </h5>
+                            <span className="text-[10px] font-bold text-[#5A6A51] uppercase bg-[#F4F5F1] px-2 py-0.5 rounded-md inline-block mt-0.5">
+                              {report.doctor_name ? `Uploaded by ${report.doctor_name}` : report.report_type || "Clinical Report"}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMedicalReport(report.id)}
+                          className="text-gray-400 hover:text-red-600 p-1.5 rounded-xl hover:bg-red-50 transition cursor-pointer"
+                          title="Delete Report"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+
+                      {(report.description || report.notes) && (
+                        <p className="text-xs text-[#5A6A51] bg-[#FBFBF9] p-3 rounded-xl border border-[#414E36]/8 leading-relaxed">
+                          {report.description || report.notes}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2.5 border-t border-[#414E36]/8 text-xs text-[#8A9A81]">
+                      <span className="font-medium">
+                        {report.date || (report.created_at ? new Date(report.created_at).toLocaleDateString() : "Recent")}
+                      </span>
+                      {report.file_url ? (
+                        <a
+                          href={report.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[#414E36] font-bold hover:underline bg-[#EDF1EC] px-3 py-1.5 rounded-xl transition hover:bg-[#414E36] hover:text-white"
+                        >
+                          <span>View Document</span>
+                          <ExternalLink size={12} />
+                        </a>
+                      ) : (
+                        <span className="text-[11px] text-gray-400 italic">No file attached</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
+
+      {/* ── Medical Report Upload Modal ── */}
+      {showMedicalReportModal && (
+        <MedicalReportModal
+          setShowMedicalReportModal={setShowMedicalReportModal}
+          viewingCustomerProfile={customerFullData || selectedPatientHistory}
+          adminRole={doctorName || adminRole || "Doctor"}
+          authenticatedJsonHeaders={authHeadersObj}
+          setMedicalReports={setMedicalReports}
+          lang={lang}
+          t={adminTranslations[lang].patients.medicalReportModal}
+        />
+      )}
     </div>
   );
 }

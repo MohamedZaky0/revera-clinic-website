@@ -18,7 +18,11 @@ import {
   Users,
   Check,
   Building2,
-  DoorOpen
+  DoorOpen,
+  AlertCircle,
+  MapPin,
+  Wallet,
+  ShieldCheck
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { adminTranslations } from "@/components/admin/translations";
@@ -39,7 +43,14 @@ interface ProviderItem {
   id: string | number;
   name: string;
   specialty?: string;
+  department?: string;
+  sub_specialty?: string;
   image?: string;
+  schedule?: any;
+  working_days?: string[];
+  service_ids?: any[];
+  serviceIds?: any[];
+  services?: any[];
 }
 
 interface CustomerItem {
@@ -59,6 +70,7 @@ interface BranchItem {
   name_en?: string;
   name_ar?: string;
   name?: string;
+  service_hours?: any[];
 }
 
 interface RoomItem {
@@ -224,6 +236,29 @@ export default function AdminNewBookingView({
   const [foundCustomer, setFoundCustomer] = useState<CustomerItem | null>(null);
   const [activePackage, setActivePackage] = useState<any>(null);
   const [usePackageMode, setUsePackageMode] = useState(false);
+
+  // Patient Account Auto-Detection Modal & Additional Fields
+  const [showPatientAccountModal, setShowPatientAccountModal] = useState(false);
+  const [showAdditionalPatientFields, setShowAdditionalPatientFields] = useState(false);
+  const promptedPhoneRef = useRef<string>("");
+
+  // Additional Personal Information (Photos 2 & 3)
+  const [gender, setGender] = useState("");
+  const [nationalId, setNationalId] = useState("");
+  const [age, setAge] = useState("");
+  const [occupation, setOccupation] = useState("");
+  const [referralSource, setReferralSource] = useState("");
+
+  // Address Information
+  const [city, setCity] = useState("");
+  const [street, setStreet] = useState("");
+  const [building, setBuilding] = useState("");
+  const [floorApt, setFloorApt] = useState("");
+
+  // Financial Information (Optional)
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [totalSpent, setTotalSpent] = useState<number>(0);
+  const [outstandingBalance, setOutstandingBalance] = useState<number>(0);
 
   // Appointment Details State
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
@@ -395,6 +430,8 @@ export default function AdminNewBookingView({
   // 2. Real-time Customer Search & Filter based on Phone Number field
   useEffect(() => {
     const q = phone.trim().toLowerCase();
+    const cleanDigits = phone.replace(/\D/g, "");
+
     if (!q) {
       setCustomerList(allCustomers);
       return;
@@ -402,7 +439,7 @@ export default function AdminNewBookingView({
 
     const filtered = allCustomers.filter(c => {
       const nameMatch = (c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`).toLowerCase().includes(q);
-      const phoneMatch = (c.mobile || c.phone || "").toLowerCase().includes(q);
+      const phoneMatch = (c.mobile || c.phone || "").replace(/\D/g, "").includes(cleanDigits);
       const emailMatch = (c.email || "").toLowerCase().includes(q);
       return nameMatch || phoneMatch || emailMatch;
     });
@@ -411,14 +448,33 @@ export default function AdminNewBookingView({
     if (filtered.length === 0) {
       setShowCustomerDropdown(false);
     }
+
+    // Auto-prompt Patient Account Modal if phone number length is >= 10 and not found in database
+    if (cleanDigits.length >= 10) {
+      const exactMatch = allCustomers.find(c => {
+        const cPhone = (c.mobile || c.phone || "").replace(/\D/g, "");
+        return cPhone && (cPhone === cleanDigits || cPhone.endsWith(cleanDigits) || cleanDigits.endsWith(cPhone));
+      });
+
+      if (!exactMatch && promptedPhoneRef.current !== cleanDigits) {
+        promptedPhoneRef.current = cleanDigits;
+        setFoundCustomer(null);
+        setPatientFound(false);
+        setShowPatientAccountModal(true);
+      } else if (exactMatch && !foundCustomer) {
+        handleSelectCustomer(exactMatch);
+      }
+    }
   }, [phone, allCustomers]);
 
   // Handle Select Customer from List
-  const handleSelectCustomer = async (cust: CustomerItem) => {
+  const handleSelectCustomer = async (cust: any) => {
     setFoundCustomer(cust);
     setPatientFound(true);
     const p = cust.mobile || cust.phone || "";
     setPhone(p);
+    promptedPhoneRef.current = p.replace(/\D/g, "");
+    setShowPatientAccountModal(false);
 
     const fName = cust.first_name || cust.name?.split(" ")[0] || cust.full_name?.split(" ")[0] || "";
     const lName = cust.last_name || cust.name?.split(" ").slice(1).join(" ") || cust.full_name?.split(" ").slice(1).join(" ") || "";
@@ -429,6 +485,24 @@ export default function AdminNewBookingView({
     setWhatsapp(cust.whatsapp || p);
     setPatientSearchQuery(`${cust.name || cust.full_name || `${fName} ${lName}`}`.trim());
     setShowCustomerDropdown(false);
+
+    // Populate additional fields if present on customer object
+    if (cust.gender) setGender(cust.gender);
+    if (cust.national_id) setNationalId(cust.national_id);
+    if (cust.age) setAge(String(cust.age));
+    if (cust.occupation) setOccupation(cust.occupation);
+    if (cust.referral || cust.referral_source) setReferralSource(cust.referral || cust.referral_source);
+    if (cust.area || cust.city || cust.location_name) setCity(cust.area || cust.city || cust.location_name);
+    if (cust.street_name || cust.street) setStreet(cust.street_name || cust.street);
+    if (cust.building_no || cust.building) setBuilding(cust.building_no || cust.building);
+    if (cust.floor_no || cust.floor_apt) setFloorApt(cust.floor_no || cust.floor_apt);
+    if (cust.wallet_balance !== undefined) setWalletBalance(Number(cust.wallet_balance) || 0);
+    if (cust.spent_amount !== undefined || cust.total_spent !== undefined) setTotalSpent(Number(cust.spent_amount ?? cust.total_spent) || 0);
+    if (cust.outstanding !== undefined || cust.outstanding_balance !== undefined) setOutstandingBalance(Number(cust.outstanding ?? cust.outstanding_balance) || 0);
+
+    if (cust.gender || cust.national_id || cust.age || cust.occupation || cust.area || cust.street_name) {
+      setShowAdditionalPatientFields(true);
+    }
 
     // Fetch active packages for this customer
     try {
@@ -459,17 +533,59 @@ export default function AdminNewBookingView({
     }
   };
 
+  const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
+  const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
+  const selectedBranchObj = dbBranches.find(b => String(b.id) === String(selectedBranchId)) || dbBranches[0];
+  const selectedRoomObj = dbRooms.find(r => String(r.id) === String(selectedRoomId));
+
+  const weekdayName = useMemo(() => {
+    if (!bookingDate) return "";
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return weekdays[new Date(bookingDate).getDay()];
+  }, [bookingDate]);
+
+  // Check if branch is closed on the selected weekday
+  const isBranchClosedToday = useMemo(() => {
+    if (!weekdayName || !selectedBranchObj?.service_hours) return false;
+    const sh = selectedBranchObj.service_hours.find((s: any) => s.day?.toLowerCase() === weekdayName.toLowerCase());
+    return sh ? sh.isOpen === false : false;
+  }, [selectedBranchObj, weekdayName]);
+
+  // Check if doctor is closed on the selected weekday
+  const isDoctorClosedToday = useMemo(() => {
+    if (!weekdayName || !selectedDoctorObj) return false;
+    if (selectedDoctorObj.schedule) {
+      const dDay = selectedDoctorObj.schedule[weekdayName] || selectedDoctorObj.schedule[weekdayName.toLowerCase()];
+      if (dDay && dDay.isOpen === false) return true;
+    }
+    if (Array.isArray(selectedDoctorObj.working_days) && selectedDoctorObj.working_days.length > 0) {
+      const works = selectedDoctorObj.working_days.some((wd: string) => wd.toLowerCase() === weekdayName.toLowerCase());
+      if (!works) return true;
+    }
+    return false;
+  }, [selectedDoctorObj, weekdayName]);
+
   // 3. Dynamic Real Time Slots Calculation (Combining API & Provider Working Hours + Booked Slots)
   useEffect(() => {
     async function fetchActualTimeSlots() {
       setLoadingSlots(true);
+
+      // If branch or doctor is closed on this day, no available slots
+      if (isBranchClosedToday || isDoctorClosedToday) {
+        setAvailableTimeSlots([]);
+        setSelectedTime("");
+        setBookedTimeSlots([]);
+        setLoadingSlots(false);
+        return;
+      }
+
+      let booked: string[] = [];
       try {
         // Query existing reservations for selected date & doctor to calculate booked slots
-        let booked: string[] = [];
         if (bookingDate) {
           let qRes = supabase
             .from("reservations")
-            .select("*")
+            .select("time_slot, requested_time, start_time")
             .eq("date", bookingDate)
             .neq("status", "cancelled")
             .neq("status", "rejected");
@@ -481,7 +597,7 @@ export default function AdminNewBookingView({
           const { data: resData } = await qRes;
           if (resData) {
             booked = resData
-              .map((r: any) => normalizeTimeSlot(r.time_slot || r.requested_time || r.start_time || r.time || r.timeSlot))
+              .map((r: any) => normalizeTimeSlot(r.time_slot || r.requested_time || r.start_time || ""))
               .filter(Boolean);
           }
         }
@@ -492,84 +608,79 @@ export default function AdminNewBookingView({
         if (selectedServiceId) params.append("serviceId", String(selectedServiceId));
         if (bookingDate) params.append("date", bookingDate);
         if (selectedBranchId) params.append("branchId", String(selectedBranchId));
+        if (selectedDoctorId) params.append("doctorId", String(selectedDoctorId));
 
         const res = await fetch(`/api/availability?${params.toString()}`);
         if (res.ok) {
           const apiData = await res.json();
-          let slotsList: string[] = [];
+          let rawList: string[] = [];
           if (Array.isArray(apiData)) {
-            slotsList = apiData.map(formatSlotTo12h);
+            rawList = apiData.map(formatSlotTo12h);
           } else if (apiData && typeof apiData === "object") {
             const list = apiData[bookingDate] || apiData.slots || apiData.availableSlots;
-            if (Array.isArray(list) && list.length > 0) {
-              slotsList = list.map(formatSlotTo12h);
+            if (Array.isArray(list)) {
+              rawList = list.map(formatSlotTo12h);
             }
           }
 
-          if (slotsList.length > 0) {
-            setAvailableTimeSlots(slotsList);
-            if (!slotsList.includes(selectedTime)) {
-              setSelectedTime(slotsList[0]);
+          const validFutureSlots = rawList.filter((slot) => {
+            const isPast = isSlotInPast(slot, bookingDate);
+            const isBooked = booked.includes(normalizeTimeSlot(slot));
+            return !isPast && !isBooked;
+          });
+
+          setAvailableTimeSlots(validFutureSlots);
+          if (validFutureSlots.length > 0) {
+            if (!validFutureSlots.includes(selectedTime)) {
+              setSelectedTime(validFutureSlots[0]);
             }
-            setLoadingSlots(false);
-            return;
+          } else {
+            setSelectedTime("");
           }
+          setLoadingSlots(false);
+          return;
         }
       } catch (e) {
         console.warn("API availability fetch fallback:", e);
       }
 
-      // Generate standard clinic multi-shift slots: 09:00 AM – 02:00 PM & 05:00 PM – 09:00 PM
+      // Standard doctor shifts fallback with strict past and booked filtering
       const generated: string[] = [];
       const shiftRanges = [
-        { start: 9, end: 14 },  // Morning Shift: 09:00 AM - 02:00 PM
-        { start: 17, end: 21 }  // Evening Shift: 05:00 PM - 09:00 PM
+        { start: 9, end: 14 },
+        { start: 17, end: 21 }
       ];
 
-      shiftRanges.forEach(range => {
+      shiftRanges.forEach((range) => {
         for (let hour = range.start; hour < range.end; hour++) {
           for (const min of [0, 30]) {
             const hour12 = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
             const ampm = hour >= 12 ? "PM" : "AM";
             const hh = String(hour12).padStart(2, "0");
             const mm = String(min).padStart(2, "0");
-            generated.push(`${hh}:${mm} ${ampm}`);
+            const slotStr = `${hh}:${mm} ${ampm}`;
+            const isPast = isSlotInPast(slotStr, bookingDate);
+            const isBooked = booked.includes(normalizeTimeSlot(slotStr));
+            if (!isPast && !isBooked) {
+              generated.push(slotStr);
+            }
           }
         }
       });
 
       setAvailableTimeSlots(generated);
-      if (!generated.includes(selectedTime)) {
-        setSelectedTime(generated[0]);
+      if (generated.length > 0) {
+        if (!generated.includes(selectedTime)) {
+          setSelectedTime(generated[0]);
+        }
+      } else {
+        setSelectedTime("");
       }
       setLoadingSlots(false);
     }
 
     fetchActualTimeSlots();
-  }, [bookingDate, selectedDoctorId, selectedServiceId, selectedBranchId]);
-
-  // Auto-select the first valid (non-booked & non-past) slot
-  useEffect(() => {
-    if (availableTimeSlots.length > 0) {
-      const firstValid = availableTimeSlots.find((slot) => {
-        const norm = normalizeTimeSlot(slot);
-        const isBooked = bookedTimeSlots.includes(norm);
-        const isPast = isSlotInPast(slot, bookingDate);
-        return !isBooked && !isPast;
-      });
-
-      if (firstValid) {
-        setSelectedTime(firstValid);
-      } else if (!availableTimeSlots.includes(selectedTime)) {
-        setSelectedTime(availableTimeSlots[0]);
-      }
-    }
-  }, [availableTimeSlots, bookedTimeSlots, bookingDate]);
-
-  const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
-  const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
-  const selectedBranchObj = dbBranches.find(b => String(b.id) === String(selectedBranchId)) || dbBranches[0];
-  const selectedRoomObj = dbRooms.find(r => String(r.id) === String(selectedRoomId));
+  }, [bookingDate, selectedDoctorId, selectedServiceId, selectedBranchId, isBranchClosedToday, isDoctorClosedToday]);
 
   const selectedServiceName = getServiceName(selectedServiceObj, lang);
   const selectedDoctorName = selectedDoctorObj?.name || "Doctor";
@@ -603,8 +714,24 @@ export default function AdminNewBookingView({
       alert(tr.selectDoctorAlert);
       return;
     }
+    if (isBranchClosedToday) {
+      alert(tr.branchClosedAlert || `The branch is closed on ${weekdayName}s. Please choose an open date.`);
+      return;
+    }
+    if (isDoctorClosedToday) {
+      alert(tr.doctorUnavailableAlert || `${selectedDoctorName} is not available on ${weekdayName}s. Please choose another date or doctor.`);
+      return;
+    }
     if (!selectedTime) {
-      alert(tr.selectTimeAlert);
+      alert(tr.selectTimeAlert || "Please select an available time slot.");
+      return;
+    }
+    if (isSlotInPast(selectedTime, bookingDate)) {
+      alert(tr.slotInPastAlert || "The selected time slot has already passed. Please select a future time slot.");
+      return;
+    }
+    if (bookedTimeSlots.includes(normalizeTimeSlot(selectedTime))) {
+      alert(tr.slotAlreadyBookedAlert || "The selected time slot is already booked. Please choose another slot.");
       return;
     }
     setShowConfirmModal(true);
@@ -619,6 +746,48 @@ export default function AdminNewBookingView({
 
     setSubmitting(true);
     try {
+      let resolvedCustomerId = foundCustomer?.id || null;
+
+      // If customer is not found in DB, auto-create customer profile with all collected fields
+      if (!resolvedCustomerId && (firstName || phone)) {
+        try {
+          const custPayload = {
+            name: fullPatientName,
+            first_name: firstName,
+            last_name: lastName,
+            mobile: phone,
+            email: email || null,
+            gender: gender || null,
+            national_id: nationalId || null,
+            age: age ? Number(age) : null,
+            occupation: occupation || null,
+            referral: referralSource || null,
+            area: city || null,
+            street_name: street || null,
+            building_no: building || null,
+            floor_no: floorApt || null,
+            wallet_balance: Number(walletBalance || 0),
+            spent_amount: Number(totalSpent || 0),
+            outstanding: Number(outstandingBalance || 0)
+          };
+
+          const createCustRes = await fetch("/api/customers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(custPayload)
+          });
+
+          if (createCustRes.ok) {
+            const newCust = await createCustRes.json();
+            if (newCust && newCust.id) {
+              resolvedCustomerId = newCust.id;
+            }
+          }
+        } catch (custErr) {
+          console.warn("Auto-create customer error (non-fatal):", custErr);
+        }
+      }
+
       const payload = {
         name: fullPatientName,
         phone: phone,
@@ -633,7 +802,7 @@ export default function AdminNewBookingView({
         notes: notes || null,
         isManual: true,
         status: "approved",
-        explicitCustomerId: foundCustomer?.id || null,
+        explicitCustomerId: resolvedCustomerId,
         amountPaid: amountPaidNow,
         amountLeft: Number(selectedServiceObj?.price || 0) - amountPaidNow
       };
@@ -707,17 +876,27 @@ export default function AdminNewBookingView({
                 </h2>
               </div>
 
-              {/* Patient Status Indicator */}
-              {patientFound === true && (
-                <span className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 text-xs font-bold text-emerald-700">
-                  <CheckCircle2 size={15} className="text-emerald-600" /> {tr.patientFoundBadge}
-                </span>
-              )}
-              {patientFound === false && (
-                <span className="inline-flex items-center gap-1.5 rounded-2xl bg-blue-50 border border-blue-200 px-3.5 py-1.5 text-xs font-bold text-blue-700">
-                  {tr.newPatientBadge}
-                </span>
-              )}
+              {/* Patient Status Indicator & Toggle Button */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {patientFound === true && (
+                  <span className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 text-xs font-bold text-emerald-700">
+                    <CheckCircle2 size={15} className="text-emerald-600" /> {tr.patientFoundBadge}
+                  </span>
+                )}
+                {patientFound === false && (
+                  <span className="inline-flex items-center gap-1.5 rounded-2xl bg-blue-50 border border-blue-200 px-3.5 py-1.5 text-xs font-bold text-blue-700">
+                    {tr.newPatientBadge}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowAdditionalPatientFields(!showAdditionalPatientFields)}
+                  className="text-xs font-bold text-[#0F3826] hover:underline bg-[#EBF2EB] px-3 py-1.5 rounded-xl flex items-center gap-1 transition cursor-pointer"
+                >
+                  <User size={13} />
+                  <span>{showAdditionalPatientFields ? "Hide Account Details" : "+ Patient Account Details"}</span>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4 text-xs md:text-sm">
@@ -894,6 +1073,188 @@ export default function AdminNewBookingView({
                   </div>
                 </div>
               </div>
+
+              {/* ── ADDITIONAL PATIENT INTAKE DATA (Photos 2 & 3) ── */}
+              {showAdditionalPatientFields && (
+                <div className="space-y-4 pt-4 border-t border-[#414E36]/10 animate-fadeIn">
+                  {/* Row 1: Gender & National ID */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">Gender</label>
+                      <div className="relative">
+                        <select
+                          value={gender}
+                          onChange={(e) => setGender(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 appearance-none text-xs"
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="Female">Female</option>
+                          <option value="Male">Male</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute end-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">National ID</label>
+                      <input
+                        type="text"
+                        value={nationalId}
+                        onChange={(e) => setNationalId(e.target.value)}
+                        placeholder="Enter 14-digit National ID"
+                        maxLength={14}
+                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Referral Source & Occupation */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">Referral Source</label>
+                      <div className="relative">
+                        <select
+                          value={referralSource}
+                          onChange={(e) => setReferralSource(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 appearance-none text-xs"
+                        >
+                          <option value="">Select Referral Source...</option>
+                          <option value="Instagram">Instagram</option>
+                          <option value="Facebook">Facebook</option>
+                          <option value="Friend/Family">Friend / Family</option>
+                          <option value="TikTok">TikTok</option>
+                          <option value="Google Search">Google Search</option>
+                          <option value="Walk-in">Walk-in</option>
+                          <option value="Doctor Referral">Doctor Referral</option>
+                          <option value="Other">Other</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute end-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">Occupation</label>
+                      <input
+                        type="text"
+                        value={occupation}
+                        onChange={(e) => setOccupation(e.target.value)}
+                        placeholder="e.g. Engineer, Doctor"
+                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3: Age (Photo 3) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">Age</label>
+                      <input
+                        type="number"
+                        value={age}
+                        onChange={(e) => setAge(e.target.value)}
+                        placeholder="e.g. 28"
+                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* ADDRESS INFORMATION SECTION (Photo 2) */}
+                  <div className="pt-3 space-y-3">
+                    <div className="flex items-center gap-2 text-[#0F3826] font-black text-xs uppercase tracking-wider">
+                      <div className="h-6 w-6 rounded-full bg-[#EBF2EB] flex items-center justify-center text-[#0F3826]">
+                        <MapPin size={13} />
+                      </div>
+                      <span>ADDRESS INFORMATION</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">City / Area</label>
+                        <input
+                          type="text"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          placeholder="e.g. New Cairo"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Street</label>
+                        <input
+                          type="text"
+                          value={street}
+                          onChange={(e) => setStreet(e.target.value)}
+                          placeholder="e.g. 90th Street"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Building</label>
+                        <input
+                          type="text"
+                          value={building}
+                          onChange={(e) => setBuilding(e.target.value)}
+                          placeholder="e.g. Building 14"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Floor / Apt</label>
+                        <input
+                          type="text"
+                          value={floorApt}
+                          onChange={(e) => setFloorApt(e.target.value)}
+                          placeholder="e.g. Floor 3, Apt 6"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* FINANCIAL INFORMATION SECTION (OPTIONAL - Photo 2) */}
+                  <div className="pt-3 space-y-3">
+                    <div className="flex items-center gap-2 text-[#0F3826] font-bold text-xs">
+                      <div className="h-6 w-6 rounded-full bg-[#EBF2EB] flex items-center justify-center text-[#0F3826]">
+                        <Wallet size={13} />
+                      </div>
+                      <span>Financial Information (Optional)</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Wallet Balance (EGP)</label>
+                        <input
+                          type="number"
+                          value={walletBalance}
+                          onChange={(e) => setWalletBalance(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Total Spent (EGP)</label>
+                        <input
+                          type="number"
+                          value={totalSpent}
+                          onChange={(e) => setTotalSpent(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Outstanding Balance (EGP)</label>
+                        <input
+                          type="number"
+                          value={outstandingBalance}
+                          onChange={(e) => setOutstandingBalance(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -967,33 +1328,25 @@ export default function AdminNewBookingView({
                 <div className="relative">
                   <select
                     value={selectedTime}
+                    disabled={isBranchClosedToday || isDoctorClosedToday || availableTimeSlots.length === 0}
                     onChange={(e) => setSelectedTime(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white ps-10 pe-10 py-3 font-extrabold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 shadow-xs appearance-none"
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white ps-10 pe-10 py-3 font-extrabold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 shadow-xs appearance-none disabled:bg-gray-50 disabled:text-gray-400"
                   >
-                    {availableTimeSlots.map((tSlot) => {
-                      const normalized = normalizeTimeSlot(tSlot);
-                      const isBooked = bookedTimeSlots.includes(normalized);
-                      const isPast = isSlotInPast(tSlot, bookingDate);
-                      const isDisabled = isBooked || isPast;
-
-                      let statusText = "";
-                      if (isBooked) {
-                        statusText = ` ${tr.bookedSuffix || "(Booked)"}`;
-                      } else if (isPast) {
-                        statusText = ` ${tr.pastSuffix || "(Past)"}`;
-                      }
-
-                      return (
-                        <option
-                          key={tSlot}
-                          value={tSlot}
-                          disabled={isDisabled}
-                          className={isDisabled ? "text-gray-400 font-normal bg-gray-100" : "font-extrabold text-[#1F251A]"}
-                        >
-                          {tSlot}{statusText}
+                    {availableTimeSlots.length === 0 ? (
+                      <option value="" disabled>
+                        {isBranchClosedToday
+                          ? `${selectedBranchName} is closed on this day`
+                          : isDoctorClosedToday
+                          ? `${selectedDoctorName} is not available on this day`
+                          : (tr.noSlotsAvailableWarning || "No available slots on this date")}
+                      </option>
+                    ) : (
+                      availableTimeSlots.map((tSlot) => (
+                        <option key={tSlot} value={tSlot} className="font-extrabold text-[#1F251A]">
+                          {tSlot}
                         </option>
-                      );
-                    })}
+                      ))
+                    )}
                   </select>
 
                   <div className="absolute start-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-700">
@@ -1004,6 +1357,20 @@ export default function AdminNewBookingView({
                     <ChevronDown size={16} />
                   </div>
                 </div>
+
+                {/* Banner alert if closed day or 0 slots available */}
+                {(isBranchClosedToday || isDoctorClosedToday || (!loadingSlots && availableTimeSlots.length === 0)) && (
+                  <div className="rounded-2xl bg-amber-50 border border-amber-200/80 p-3.5 flex items-start gap-2.5 text-xs text-amber-900 mt-2.5">
+                    <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                    <span className="font-bold">
+                      {isBranchClosedToday
+                        ? (tr.branchClosedAlert || `${selectedBranchName} is closed on ${weekdayName}s. Please choose an open date.`)
+                        : isDoctorClosedToday
+                        ? (tr.doctorUnavailableAlert || `${selectedDoctorName} is not available on ${weekdayName}s. Please choose another date or doctor.`)
+                        : (tr.noSlotsAvailableWarning || "No available time slots on this date (clinic is closed or all slots are booked/past). Please choose another date.")}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Session Type (In Person vs Online) */}
@@ -1137,7 +1504,7 @@ export default function AdminNewBookingView({
         {/* Single Full Create Booking Button */}
         <button
           type="button"
-          disabled={submitting}
+          disabled={submitting || !selectedTime || isBranchClosedToday || isDoctorClosedToday || availableTimeSlots.length === 0}
           onClick={handleOpenSummaryModal}
           className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[#1E3A2B] text-white font-extrabold text-xs hover:bg-[#162C20] transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs cursor-pointer"
         >
@@ -1255,6 +1622,51 @@ export default function AdminNewBookingView({
               >
                 {submitting ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                 <span>{submitting ? tr.creatingBtn : tr.confirmCreateBookingBtn}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PATIENT ACCOUNT AUTO-POPUP MODAL (Photo 1) ── */}
+      {showPatientAccountModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-6 animate-scaleIn border border-[#414E36]/15">
+            {/* Top Avatar Icon */}
+            <div className="h-20 w-20 rounded-full bg-[#EBF2EB] mx-auto flex items-center justify-center text-[#1E4D38] shadow-inner">
+              <ShieldCheck size={38} className="text-[#0F3826]" />
+            </div>
+
+            {/* Title & Question */}
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-[#1F251A]">Patient Account</h3>
+              <p className="text-sm font-medium text-[#5A6A51]">
+                Does the patient already have an account?
+              </p>
+            </div>
+
+            <div className="w-full border-b border-gray-100" />
+
+            {/* Actions: No / Yes */}
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPatientAccountModal(false);
+                }}
+                className="flex-1 py-3 px-5 rounded-2xl border border-[#414E36]/30 text-[#1F251A] font-bold text-sm hover:bg-gray-50 transition cursor-pointer"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdditionalPatientFields(true);
+                  setShowPatientAccountModal(false);
+                }}
+                className="flex-1 py-3 px-5 rounded-2xl bg-[#0F3826] text-white font-bold text-sm hover:bg-[#0A271A] transition shadow-md cursor-pointer"
+              >
+                Yes
               </button>
             </div>
           </div>
