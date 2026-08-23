@@ -6609,6 +6609,8 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                   const key = profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile";
                   if (key) handleAvatarRemove(key);
                 }}
+                lang={lang}
+                t={adminTranslations[lang].userProfile}
               />
             );
           })()}
@@ -7277,6 +7279,8 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
               accessToken={session?.access_token}
               onNavigateTab={(tabName) => setActiveNav(tabName)}
               onLogout={handleLogout}
+              lang={lang}
+              t={adminTranslations[lang].reception.dashboard}
             />
           )}
 

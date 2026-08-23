@@ -53,6 +53,76 @@ export interface UserProfileData {
   status?: string;
 }
 
+export interface UserProfileViewTranslations {
+  personalProfile: string;
+  active: string;
+  uploadProfilePicture: string;
+  jobTitle: string;
+  currentBranch: string;
+  status: string;
+  employeeId: string;
+  employmentType: string;
+  joiningDate: string;
+  fullTime: string;
+  personalInformation: string;
+  edit: string;
+  firstName: string;
+  lastName: string;
+  address: string;
+  phoneNumber: string;
+  email: string;
+  workInformation: string;
+  department: string;
+  shiftType: string;
+  assignedBranches: string;
+  workingDays: string;
+  workingHours: string;
+  attendanceSummary: string;
+  presentDays: string;
+  absentDays: string;
+  lateArrivals: string;
+  earlyLeaves: string;
+  overtime: string;
+  totalWorkingHours: string;
+  viewAttendanceHistory: string;
+  attendanceStatus: Record<string, string>;
+  payrollSummary: string;
+  doctorPayrollSummary: string;
+  fixedBasicSalary: string;
+  bonuses: string;
+  commissionsAndBonuses: string;
+  deductions: string;
+  monthlyTarget: string;
+  targetProgress: string;
+  netSalary: string;
+  changePassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+  enterNewPassword: string;
+  confirmNewPasswordPlaceholder: string;
+  passwordTooShort: string;
+  passwordsDoNotMatch: string;
+  passwordUpdated: string;
+  passwordUpdateFailed: string;
+  updating: string;
+  cancel: string;
+  updatePassword: string;
+  editContactInformation: string;
+  emailAddress: string;
+  homeAddress: string;
+  saveChanges: string;
+  saving: string;
+  attendanceHistory: string;
+  noAttendanceRecords: string;
+  close: string;
+  thisMonth: string;
+  lastMonth: string;
+  thisYear: string;
+  doctor: string;
+  receptionist: string;
+  staff: string;
+}
+
 interface UserProfileViewProps {
   user: UserProfileData;
   onUpdateUser?: (updatedData: Partial<UserProfileData>) => Promise<void> | void;
@@ -60,6 +130,8 @@ interface UserProfileViewProps {
   onAvatarUpload?: (file: File) => Promise<void> | void;
   onAvatarRemove?: () => Promise<void> | void;
   isDoctorView?: boolean;
+  lang?: "en" | "ar";
+  t?: UserProfileViewTranslations;
 }
 
 interface AttendanceRecord {
@@ -77,8 +149,11 @@ export default function UserProfileView({
   onUpdatePassword,
   onAvatarUpload,
   onAvatarRemove,
-  isDoctorView = false
+  isDoctorView = false,
+  lang = "en",
+  t
 }: UserProfileViewProps) {
+  const tr = t;
   // Local edit states
   const [showEditPersonalModal, setShowEditPersonalModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -147,12 +222,12 @@ export default function UserProfileView({
   const lastName = user.lastName || nameParts.slice(1).join(" ") || "Account";
   const displayName = user.name || `${firstName} ${lastName}`.trim();
 
-  const displayRole = user.role || (isDoctorView ? "Doctor" : "Staff");
+  const displayRole = user.role || (isDoctorView ? (tr?.doctor ?? "Doctor") : (tr?.staff ?? "Staff"));
   const displayEmployeeId = user.employeeId || (isDoctorView ? "DOC-001" : "EMP-001");
   const displayJoiningDate = user.joiningDate || "—";
   
   // Department logic: Strictly from database record or Doctor/Receptionist
-  const displayDepartment = user.department || (isDoctorView ? "Doctor" : "Receptionist");
+  const displayDepartment = user.department || (isDoctorView ? (tr?.doctor ?? "Doctor") : (tr?.receptionist ?? "Receptionist"));
 
   // Formatted Multi-Branch Display (Normalizing raw "home", "main", or resolving database branches)
   const displayBranches = useMemo(() => {
@@ -310,8 +385,8 @@ export default function UserProfileView({
             return {
               id: rec.id,
               date: rec.date,
-              check_in_time: rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—",
-              check_out_time: rec.check_out_time ? new Date(rec.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—",
+              check_in_time: rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' }) : "—",
+              check_out_time: rec.check_out_time ? new Date(rec.check_out_time).toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' }) : "—",
               status: st,
               hours: rowHours
             };
@@ -492,11 +567,11 @@ export default function UserProfileView({
     setPasswordSuccess("");
 
     if (!newPassword || newPassword.length < 6) {
-      setPasswordError("Password must be at least 6 characters long.");
+      setPasswordError(tr?.passwordTooShort ?? "Password must be at least 6 characters long.");
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError("Passwords do not match.");
+      setPasswordError(tr?.passwordsDoNotMatch ?? "Passwords do not match.");
       return;
     }
 
@@ -505,7 +580,7 @@ export default function UserProfileView({
       if (onUpdatePassword) {
         await onUpdatePassword(newPassword);
       }
-      setPasswordSuccess("Password updated successfully!");
+      setPasswordSuccess(tr?.passwordUpdated ?? "Password updated successfully!");
       setNewPassword("");
       setConfirmPassword("");
       setTimeout(() => {
@@ -513,14 +588,16 @@ export default function UserProfileView({
         setPasswordSuccess("");
       }, 1500);
     } catch (err: any) {
-      setPasswordError(err.message || "Failed to update password.");
+      setPasswordError(err.message || (tr?.passwordUpdateFailed ?? "Failed to update password."));
     } finally {
       setUpdatingPassword(false);
     }
   };
 
+  const dir = lang === "ar" ? "rtl" : "ltr";
+
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-6 pb-12 animate-fadeIn text-[#1F251A] print:p-0 print:m-0 print:max-w-none">
+    <div dir={dir} className="w-full max-w-5xl mx-auto space-y-6 pb-12 animate-fadeIn text-[#1F251A] print:p-0 print:m-0 print:max-w-none">
       
       {/* ── HEADER USER PROFILE CARD ── */}
       <div className="rounded-[32px] border border-[#414E36]/12 bg-[#F9F9F7] p-6 md:p-8 shadow-xs space-y-6">
@@ -538,7 +615,7 @@ export default function UserProfileView({
               {onAvatarUpload && (
                 <label
                   className="absolute bottom-0 right-0 p-2 rounded-full bg-[#414E36] text-white cursor-pointer shadow-lg hover:scale-105 hover:bg-[#2e3a26] transition flex items-center justify-center border-2 border-white"
-                  title="Upload Profile Picture"
+                  title={tr?.uploadProfilePicture ?? "Upload Profile Picture"}
                 >
                   <Camera size={14} />
                   <input
@@ -555,18 +632,18 @@ export default function UserProfileView({
             </div>
 
             {/* Main Info */}
-            <div className="text-center sm:text-left space-y-1.5">
+            <div className="text-center sm:text-start space-y-1.5">
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
                 <h1 className="text-2xl md:text-3xl font-black text-[#1F251A] tracking-tight">{displayName}</h1>
                 <span className="rounded-xl bg-[#EDE4C8] px-3 py-1 text-xs font-bold text-[#414E36] border border-[#C4AE7C]/30 capitalize">
                   {displayRole}
                 </span>
               </div>
-              <p className="text-xs md:text-sm font-semibold text-[#5A6A51]">Personal Profile & Staff Details</p>
+              <p className="text-xs md:text-sm font-semibold text-[#5A6A51]">{tr?.personalProfile ?? "Personal Profile & Staff Details"}</p>
               <div className="flex justify-center sm:justify-start pt-0.5">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-0.5 text-xs font-bold text-emerald-700">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Active
+                  {tr?.active ?? "Active"}
                 </span>
               </div>
             </div>
@@ -580,7 +657,7 @@ export default function UserProfileView({
               <Briefcase size={16} />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">Job Title</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">{tr?.jobTitle ?? "Job Title"}</span>
               <span className="font-extrabold text-[#1F251A]">{displayRole}</span>
             </div>
           </div>
@@ -590,7 +667,7 @@ export default function UserProfileView({
               <MapPin size={16} />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">Current Branch</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">{tr?.currentBranch ?? "Current Branch"}</span>
               <span className="font-extrabold text-[#1F251A]">{displayBranches}</span>
             </div>
           </div>
@@ -600,9 +677,9 @@ export default function UserProfileView({
               <CheckCircle2 size={16} />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">Status</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">{tr?.status ?? "Status"}</span>
               <span className="font-extrabold text-emerald-700 flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> {tr?.active ?? "Active"}
               </span>
             </div>
           </div>
@@ -612,7 +689,7 @@ export default function UserProfileView({
               <User size={16} />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">Employee ID</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">{tr?.employeeId ?? "Employee ID"}</span>
               <span className="font-extrabold text-[#1F251A] font-mono">{displayEmployeeId}</span>
             </div>
           </div>
@@ -622,8 +699,8 @@ export default function UserProfileView({
               <Briefcase size={16} />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">Employment Type</span>
-              <span className="font-extrabold text-[#1F251A]">{user.employmentType || "Full Time"}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">{tr?.employmentType ?? "Employment Type"}</span>
+              <span className="font-extrabold text-[#1F251A]">{user.employmentType || (tr?.fullTime ?? "Full Time")}</span>
             </div>
           </div>
 
@@ -632,7 +709,7 @@ export default function UserProfileView({
               <Calendar size={16} />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">Joining Date</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">{tr?.joiningDate ?? "Joining Date"}</span>
               <span className="font-extrabold text-[#1F251A]">{displayJoiningDate}</span>
             </div>
           </div>
@@ -647,7 +724,7 @@ export default function UserProfileView({
               1
             </span>
             <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[#C4AE7C]">
-              Personal Information
+              {tr?.personalInformation ?? "Personal Information"}
             </h2>
           </div>
           <button
@@ -656,7 +733,7 @@ export default function UserProfileView({
             className="flex items-center gap-1.5 rounded-xl border border-[#414E36]/20 bg-white px-3.5 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-xs"
           >
             <Edit2 size={13} />
-            <span>Edit</span>
+            <span>{tr?.edit ?? "Edit"}</span>
           </button>
         </div>
 
@@ -664,7 +741,7 @@ export default function UserProfileView({
           <div className="flex items-start gap-3">
             <User size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">First Name</span>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.firstName ?? "First Name"}</span>
               <span className="font-extrabold text-[#1F251A]">{firstName}</span>
             </div>
           </div>
@@ -672,7 +749,7 @@ export default function UserProfileView({
           <div className="flex items-start gap-3">
             <MapPin size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Address</span>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.address ?? "Address"}</span>
               <span className="font-extrabold text-[#1F251A]">{user.address || "—"}</span>
             </div>
           </div>
@@ -680,7 +757,7 @@ export default function UserProfileView({
           <div className="flex items-start gap-3">
             <User size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Last Name</span>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.lastName ?? "Last Name"}</span>
               <span className="font-extrabold text-[#1F251A]">{lastName}</span>
             </div>
           </div>
@@ -688,7 +765,7 @@ export default function UserProfileView({
           <div className="flex items-start gap-3">
             <Phone size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Phone Number</span>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.phoneNumber ?? "Phone Number"}</span>
               <span className="font-extrabold text-[#1F251A] font-mono">{user.phone || "—"}</span>
             </div>
           </div>
@@ -696,7 +773,7 @@ export default function UserProfileView({
           <div className="flex items-start gap-3">
             <Mail size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Email</span>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.email ?? "Email"}</span>
               <span className="font-extrabold text-[#1F251A] break-all">{user.email || "—"}</span>
             </div>
           </div>
@@ -711,7 +788,7 @@ export default function UserProfileView({
               2
             </span>
             <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[#C4AE7C]">
-              Work Information
+              {tr?.workInformation ?? "Work Information"}
             </h2>
           </div>
         </div>
@@ -720,7 +797,7 @@ export default function UserProfileView({
           <div className="flex items-start gap-3">
             <Briefcase size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Department</span>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.department ?? "Department"}</span>
               <span className="font-extrabold text-[#1F251A]">{displayDepartment}</span>
             </div>
           </div>
@@ -728,7 +805,7 @@ export default function UserProfileView({
           <div className="flex items-start gap-3">
             <Clock size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Shift Type</span>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.shiftType ?? "Shift Type"}</span>
               <span className="font-extrabold text-[#1F251A]">{displayWorkingSchedule.shiftType}</span>
             </div>
           </div>
@@ -736,7 +813,7 @@ export default function UserProfileView({
           <div className="flex items-start gap-3">
             <MapPin size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Assigned Branches</span>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.assignedBranches ?? "Assigned Branches"}</span>
               <span className="font-extrabold text-[#1F251A]">{displayBranches}</span>
             </div>
           </div>
@@ -744,7 +821,7 @@ export default function UserProfileView({
           <div className="flex items-start gap-3">
             <Calendar size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Working Days</span>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.workingDays ?? "Working Days"}</span>
               <span className="font-extrabold text-[#1F251A]">{displayWorkingSchedule.days}</span>
             </div>
           </div>
@@ -752,15 +829,15 @@ export default function UserProfileView({
           <div className="flex items-start gap-3">
             <Briefcase size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Employment Type</span>
-              <span className="font-extrabold text-[#1F251A]">{user.employmentType || "Full Time"}</span>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.employmentType ?? "Employment Type"}</span>
+              <span className="font-extrabold text-[#1F251A]">{user.employmentType || (tr?.fullTime ?? "Full Time")}</span>
             </div>
           </div>
 
           <div className="flex items-start gap-3">
             <Clock size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Working Hours</span>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.workingHours ?? "Working Hours"}</span>
               <span className="font-extrabold text-[#1F251A]">{displayWorkingSchedule.hours}</span>
             </div>
           </div>
@@ -775,7 +852,7 @@ export default function UserProfileView({
               3
             </span>
             <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[#C4AE7C]">
-              Attendance Summary
+              {tr?.attendanceSummary ?? "Attendance Summary"}
             </h2>
             {loadingAttendance && <Loader2 size={14} className="animate-spin text-[#C4AE7C]" />}
           </div>
@@ -785,9 +862,9 @@ export default function UserProfileView({
             onChange={(e) => setAttendancePeriod(e.target.value)}
             className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none cursor-pointer hover:border-[#C4AE7C]"
           >
-            <option value="This Month">This Month</option>
-            <option value="Last Month">Last Month</option>
-            <option value="This Year">This Year</option>
+            <option value="This Month">{tr?.thisMonth ?? "This Month"}</option>
+            <option value="Last Month">{tr?.lastMonth ?? "Last Month"}</option>
+            <option value="This Year">{tr?.thisYear ?? "This Year"}</option>
           </select>
         </div>
 
@@ -797,7 +874,7 @@ export default function UserProfileView({
             <div className="h-9 w-9 mx-auto flex items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
               <CalendarCheck size={18} />
             </div>
-            <span className="text-[10px] font-bold text-[#5A6A51] block">Present Days</span>
+            <span className="text-[10px] font-bold text-[#5A6A51] block">{tr?.presentDays ?? "Present Days"}</span>
             <span className="text-xl font-black text-[#1F251A]">{attendanceMetrics.presentDays}</span>
           </div>
 
@@ -805,7 +882,7 @@ export default function UserProfileView({
             <div className="h-9 w-9 mx-auto flex items-center justify-center rounded-xl bg-rose-50 text-rose-700">
               <CalendarX size={18} />
             </div>
-            <span className="text-[10px] font-bold text-[#5A6A51] block">Absent Days</span>
+            <span className="text-[10px] font-bold text-[#5A6A51] block">{tr?.absentDays ?? "Absent Days"}</span>
             <span className="text-xl font-black text-[#1F251A]">{attendanceMetrics.absentDays}</span>
           </div>
 
@@ -813,7 +890,7 @@ export default function UserProfileView({
             <div className="h-9 w-9 mx-auto flex items-center justify-center rounded-xl bg-amber-50 text-amber-700">
               <Clock3 size={18} />
             </div>
-            <span className="text-[10px] font-bold text-[#5A6A51] block">Late Arrivals</span>
+            <span className="text-[10px] font-bold text-[#5A6A51] block">{tr?.lateArrivals ?? "Late Arrivals"}</span>
             <span className="text-xl font-black text-[#1F251A]">{attendanceMetrics.lateArrivals}</span>
           </div>
 
@@ -821,7 +898,7 @@ export default function UserProfileView({
             <div className="h-9 w-9 mx-auto flex items-center justify-center rounded-xl bg-purple-50 text-purple-700">
               <LogOut size={18} />
             </div>
-            <span className="text-[10px] font-bold text-[#5A6A51] block">Early Leaves</span>
+            <span className="text-[10px] font-bold text-[#5A6A51] block">{tr?.earlyLeaves ?? "Early Leaves"}</span>
             <span className="text-xl font-black text-[#1F251A]">{attendanceMetrics.earlyLeaves}</span>
           </div>
 
@@ -829,7 +906,7 @@ export default function UserProfileView({
             <div className="h-9 w-9 mx-auto flex items-center justify-center rounded-xl bg-blue-50 text-blue-700">
               <Timer size={18} />
             </div>
-            <span className="text-[10px] font-bold text-[#5A6A51] block">Overtime</span>
+            <span className="text-[10px] font-bold text-[#5A6A51] block">{tr?.overtime ?? "Overtime"}</span>
             <span className="text-xl font-black text-[#1F251A]">{attendanceMetrics.overtimeHours}</span>
           </div>
 
@@ -837,7 +914,7 @@ export default function UserProfileView({
             <div className="h-9 w-9 mx-auto flex items-center justify-center rounded-xl bg-teal-50 text-teal-700">
               <Briefcase size={18} />
             </div>
-            <span className="text-[10px] font-bold text-[#5A6A51] block">Total Working Hours</span>
+            <span className="text-[10px] font-bold text-[#5A6A51] block">{tr?.totalWorkingHours ?? "Total Working Hours"}</span>
             <span className="text-xl font-black text-[#1F251A]">{attendanceMetrics.totalWorkingHours}</span>
           </div>
         </div>
@@ -849,7 +926,7 @@ export default function UserProfileView({
           className="w-full flex items-center justify-center gap-2.5 rounded-2xl border border-[#414E36]/20 bg-white py-3 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-xs"
         >
           <Calendar size={16} />
-          <span>View Attendance History</span>
+          <span>{tr?.viewAttendanceHistory ?? "View Attendance History"}</span>
         </button>
       </div>
 
@@ -861,7 +938,7 @@ export default function UserProfileView({
               4
             </span>
             <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[#C4AE7C]">
-              {isDoctorView ? "Doctor Payroll Summary" : "Payroll Summary"}
+              {isDoctorView ? (tr?.doctorPayrollSummary ?? "Doctor Payroll Summary") : (tr?.payrollSummary ?? "Payroll Summary")}
             </h2>
             {loadingPayroll && <Loader2 size={14} className="animate-spin text-[#C4AE7C]" />}
           </div>
@@ -871,9 +948,9 @@ export default function UserProfileView({
             onChange={(e) => setPayrollPeriod(e.target.value)}
             className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none cursor-pointer hover:border-[#C4AE7C]"
           >
-            <option value="This Month">This Month</option>
-            <option value="Last Month">Last Month</option>
-            <option value="This Year">This Year</option>
+            <option value="This Month">{tr?.thisMonth ?? "This Month"}</option>
+            <option value="Last Month">{tr?.lastMonth ?? "Last Month"}</option>
+            <option value="This Year">{tr?.thisYear ?? "This Year"}</option>
           </select>
         </div>
 
@@ -881,30 +958,30 @@ export default function UserProfileView({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs md:text-sm">
           <div className="space-y-3 bg-[#FBFBF9] p-5 rounded-2xl border border-[#414E36]/10">
             <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
-              <span className="font-bold text-[#5A6A51]">Fixed / Basic Salary</span>
+              <span className="font-bold text-[#5A6A51]">{tr?.fixedBasicSalary ?? "Fixed / Basic Salary"}</span>
               <span className="font-black text-[#1F251A]">{basicSalary.toLocaleString()} EGP</span>
             </div>
 
             <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
-              <span className="font-bold text-[#5A6A51]">{isDoctorView ? "Commissions & Bonuses" : "Bonuses"}</span>
+              <span className="font-bold text-[#5A6A51]">{isDoctorView ? (tr?.commissionsAndBonuses ?? "Commissions & Bonuses") : (tr?.bonuses ?? "Bonuses")}</span>
               <span className="font-black text-emerald-600">+{bonuses.toLocaleString()} EGP</span>
             </div>
 
             <div className="flex justify-between items-center">
-              <span className="font-bold text-[#5A6A51]">Deductions</span>
+              <span className="font-bold text-[#5A6A51]">{tr?.deductions ?? "Deductions"}</span>
               <span className="font-black text-rose-600">-{deductions.toLocaleString()} EGP</span>
             </div>
           </div>
 
           <div className="space-y-3 bg-[#FBFBF9] p-5 rounded-2xl border border-[#414E36]/10">
             <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
-              <span className="font-bold text-[#5A6A51]">Monthly Target</span>
+              <span className="font-bold text-[#5A6A51]">{tr?.monthlyTarget ?? "Monthly Target"}</span>
               <span className="font-black text-[#1F251A]">{monthlyTarget.toLocaleString()} EGP</span>
             </div>
 
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs font-bold">
-                <span className="text-[#5A6A51]">Target Progress</span>
+                <span className="text-[#5A6A51]">{tr?.targetProgress ?? "Target Progress"}</span>
                 <span className="text-[#414E36]">{targetProgressAmount.toLocaleString()} / {monthlyTarget.toLocaleString()} EGP ({targetPct}%)</span>
               </div>
               <div className="h-2.5 w-full rounded-full bg-[#414E36]/15 overflow-hidden">
@@ -916,7 +993,7 @@ export default function UserProfileView({
 
         {/* Net Salary Highlight Card */}
         <div className="rounded-2xl bg-[#EDE4C8]/40 border border-[#C4AE7C]/40 p-5 flex items-center justify-between">
-          <span className="text-sm font-extrabold text-[#414E36]">Net Salary</span>
+          <span className="text-sm font-extrabold text-[#414E36]">{tr?.netSalary ?? "Net Salary"}</span>
           <span className="text-xl md:text-2xl font-black text-[#414E36]">{netSalary.toLocaleString()} EGP</span>
         </div>
       </div>
@@ -929,7 +1006,7 @@ export default function UserProfileView({
           className="w-full flex items-center justify-center gap-2.5 rounded-2xl border border-[#414E36]/20 bg-white py-3.5 text-xs font-bold text-[#1F251A] hover:bg-[#F9F9F7] transition shadow-xs"
         >
           <Lock size={16} className="text-[#414E36]" />
-          <span>Change Password</span>
+          <span>{tr?.changePassword ?? "Change Password"}</span>
         </button>
       </div>
 
@@ -938,7 +1015,7 @@ export default function UserProfileView({
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
           <div className="relative w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl space-y-5 border border-[#414E36]/15">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-              <h3 className="text-sm font-black uppercase tracking-wider text-[#1F251A]">Edit Contact Information</h3>
+              <h3 className="text-sm font-black uppercase tracking-wider text-[#1F251A]">{tr?.editContactInformation ?? "Edit Contact Information"}</h3>
               <button onClick={() => setShowEditPersonalModal(false)} className="p-2 rounded-xl text-[#5A6A51] hover:bg-[#FBFBF9]">
                 <X size={18} />
               </button>
@@ -948,18 +1025,18 @@ export default function UserProfileView({
               {/* Display Read-Only Name */}
               <div className="grid grid-cols-2 gap-3 bg-[#FBFBF9] p-3 rounded-2xl border border-[#414E36]/10">
                 <div>
-                  <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">First Name</span>
+                  <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{tr?.firstName ?? "First Name"}</span>
                   <span className="font-extrabold text-[#1F251A]">{firstName}</span>
                 </div>
                 <div>
-                  <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Last Name</span>
+                  <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{tr?.lastName ?? "Last Name"}</span>
                   <span className="font-extrabold text-[#1F251A]">{lastName}</span>
                 </div>
               </div>
 
               {/* Editable Fields: Email, Phone, Address */}
               <div>
-                <label className="block font-bold text-[#5A6A51] mb-1">Email Address *</label>
+                <label className="block font-bold text-[#5A6A51] mb-1">{tr?.emailAddress ?? "Email Address *"}</label>
                 <input
                   type="email"
                   required
@@ -970,7 +1047,7 @@ export default function UserProfileView({
               </div>
 
               <div>
-                <label className="block font-bold text-[#5A6A51] mb-1">Phone Number</label>
+                <label className="block font-bold text-[#5A6A51] mb-1">{tr?.phoneNumber ?? "Phone Number"}</label>
                 <input
                   type="text"
                   value={editPhone}
@@ -981,7 +1058,7 @@ export default function UserProfileView({
               </div>
 
               <div>
-                <label className="block font-bold text-[#5A6A51] mb-1">Home Address</label>
+                <label className="block font-bold text-[#5A6A51] mb-1">{tr?.homeAddress ?? "Home Address"}</label>
                 <input
                   type="text"
                   value={editAddress}
@@ -997,14 +1074,14 @@ export default function UserProfileView({
                   onClick={() => setShowEditPersonalModal(false)}
                   className="rounded-xl border border-[#414E36]/20 bg-white px-4 py-2 font-bold text-[#414E36]"
                 >
-                  Cancel
+                  {tr?.cancel ?? "Cancel"}
                 </button>
                 <button
                   type="submit"
                   disabled={savingUser}
                   className="rounded-xl bg-[#414E36] px-5 py-2 font-bold text-white hover:bg-[#2e3a26] transition disabled:opacity-50"
                 >
-                  {savingUser ? "Saving..." : "Save Changes"}
+                  {savingUser ? (tr?.saving ?? "Saving...") : (tr?.saveChanges ?? "Save Changes")}
                 </button>
               </div>
             </form>
@@ -1018,7 +1095,7 @@ export default function UserProfileView({
           <div className="relative w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-[#414E36]/15">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
               <h3 className="text-sm font-black uppercase tracking-wider text-[#1F251A] flex items-center gap-2">
-                <Lock size={16} className="text-[#414E36]" /> Change Password
+                <Lock size={16} className="text-[#414E36]" /> {tr?.changePassword ?? "Change Password"}
               </h3>
               <button onClick={() => setShowPasswordModal(false)} className="p-2 rounded-xl text-[#5A6A51] hover:bg-[#FBFBF9]">
                 <X size={18} />
@@ -1027,25 +1104,25 @@ export default function UserProfileView({
 
             <form onSubmit={handlePasswordSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-[#5A6A51] mb-1">New Password</label>
+                <label className="block font-bold text-[#5A6A51] mb-1">{tr?.newPassword ?? "New Password"}</label>
                 <input
                   type="password"
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password"
+                  placeholder={tr?.enterNewPassword ?? "Enter new password"}
                   className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 text-xs text-[#1F251A] outline-none"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-[#5A6A51] mb-1">Confirm New Password</label>
+                <label className="block font-bold text-[#5A6A51] mb-1">{tr?.confirmNewPassword ?? "Confirm New Password"}</label>
                 <input
                   type="password"
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm new password"
+                  placeholder={tr?.confirmNewPasswordPlaceholder ?? "Confirm new password"}
                   className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 text-xs text-[#1F251A] outline-none"
                 />
               </div>
@@ -1068,14 +1145,14 @@ export default function UserProfileView({
                   onClick={() => setShowPasswordModal(false)}
                   className="rounded-xl border border-[#414E36]/20 bg-white px-4 py-2 font-bold text-[#414E36]"
                 >
-                  Cancel
+                  {tr?.cancel ?? "Cancel"}
                 </button>
                 <button
                   type="submit"
                   disabled={updatingPassword}
                   className="rounded-xl bg-[#414E36] px-5 py-2 font-bold text-white hover:bg-[#2e3a26]"
                 >
-                  {updatingPassword ? "Updating..." : "Update Password"}
+                  {updatingPassword ? (tr?.updating ?? "Updating...") : (tr?.updatePassword ?? "Update Password")}
                 </button>
               </div>
             </form>
@@ -1089,7 +1166,7 @@ export default function UserProfileView({
           <div className="relative w-full max-w-2xl bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-[#414E36]/15 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
               <h3 className="text-sm font-black uppercase tracking-wider text-[#1F251A] flex items-center gap-2">
-                <Calendar size={18} className="text-[#414E36]" /> Attendance History ({attendancePeriod})
+                <Calendar size={18} className="text-[#414E36]" /> {tr?.attendanceHistory ?? "Attendance History"} ({attendancePeriod})
               </h3>
               <button onClick={() => setShowAttendanceHistoryModal(false)} className="p-2 rounded-xl text-[#5A6A51] hover:bg-[#FBFBF9]">
                 <X size={18} />
@@ -1103,7 +1180,7 @@ export default function UserProfileView({
                 </div>
               ) : attendanceLogs.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 font-medium">
-                  No attendance records logged in database for {attendancePeriod}.
+                  {tr?.noAttendanceRecords ?? "No attendance records logged in database for"} {attendancePeriod}.
                 </div>
               ) : (
                 attendanceLogs.map((log, idx) => (
@@ -1119,7 +1196,7 @@ export default function UserProfileView({
                         log.status === "Late" ? "bg-amber-100 text-amber-800" :
                         log.status === "Overtime" ? "bg-blue-100 text-blue-800" : "bg-rose-100 text-rose-800"
                       }`}>
-                        {log.status}
+                        {tr?.attendanceStatus?.[log.status] ?? log.status}
                       </span>
                     </div>
                   </div>
@@ -1133,7 +1210,7 @@ export default function UserProfileView({
                 onClick={() => setShowAttendanceHistoryModal(false)}
                 className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white"
               >
-                Close
+                <span>{tr?.close ?? "Close"}</span>
               </button>
             </div>
           </div>

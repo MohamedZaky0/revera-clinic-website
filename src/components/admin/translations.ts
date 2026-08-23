@@ -1966,6 +1966,191 @@ export const adminTranslations = {
         minutes: "minutes",
       },
     },
+    reception: {
+      dashboard: {
+        // Today's Shift
+        shiftTitle: "Today's Shift",
+        shiftSubtitle: "Your scheduled working hours",
+        startShift: "Start Shift",
+        endShift: "End Shift",
+        updating: "Updating...",
+        collapseSection: "Collapse section",
+        expandSection: "Expand section",
+        actualStartingTime: "Actual Starting Time",
+        elapsedTime: "Elapsed Time",
+        status: "Status",
+        shiftStarted: "Shift Started",
+        shiftEnded: "Shift Ended",
+        notStarted: "Not Started",
+
+        // Notifications & Alerts
+        notificationsTitle: "Notifications & Alerts",
+        notificationsSubtitle: "Important updates that require your attention",
+        viewAllAlerts: "View All Alerts",
+        noActiveAlerts: "No active notifications or alerts.",
+
+        // Bookings
+        bookingsTitle: "Bookings",
+        bookingsSubtitle: "Quick overview of today's bookings",
+        viewAllBookings: "View All Bookings",
+        totalBookings: "Total Bookings",
+        pendingApproval: "Pending Approval",
+        confirmed: "Confirmed",
+        completed: "Completed",
+        cancelled: "Cancelled",
+        time: "Time",
+        patient: "Patient",
+        doctor: "Doctor",
+        service: "Service",
+        confirmedBadge: "Confirmed",
+        pendingBadge: "Pending Approval",
+        noBookingsToday: "No bookings scheduled for today.",
+
+        // Today's Summary
+        summaryTitle: "Today's Summary",
+        summarySubtitle: "Overview of your daily performance",
+        scheduledToday: "Scheduled Today",
+        confirmedRate: "Confirmed Rate",
+        currentStatus: "Current Status",
+        active: "Active",
+        idle: "Idle",
+
+        // Recent Activities
+        activitiesTitle: "Recent Activities",
+        activitiesSubtitle: "Your latest actions and updates",
+        noRecentActivities: "No recent actions recorded today.",
+
+        // Start Shift Popup
+        startShiftGreeting: "Hi,",
+        startShiftPrompt: "Start your shift now to track your work and stay organized.",
+        verifyingLocation: "Verifying Location...",
+        cancel: "Cancel",
+
+        // Location errors (resolved at render from error codes)
+        errors: {
+          permission_denied: "Location permission is required to start your shift.",
+          out_of_location: "You must be in a working location to start your shift.",
+          generic: "You must be in a working location to start your shift.",
+        },
+
+        // Alert type titles (mapped client-side from alert.type)
+        alerts: {
+          low_stock: { title: "Low Stock" },
+          expired_item: { title: "Expired Item" },
+          maintenance_overdue: { title: "Maintenance Overdue" },
+          maintenance_due: { title: "Maintenance Due" },
+          maintenance_completed: { title: "Maintenance Completed" },
+        },
+
+        // All Alerts Modal
+        allAlertsTitle: "All Notifications & Alerts",
+        allAlertsSubtitle: "System alerts for inventory, maintenance, and clinical updates",
+        filterAll: "All Alerts",
+        filterLowStock: "Low Stock",
+        filterMaintenance: "Maintenance",
+        filterExpired: "Expired Items",
+        noAlertsInCategory: "No alerts in this category.",
+        resolve: "Resolve",
+        close: "Close",
+      },
+    },
+    userProfile: {
+      // Header
+      personalProfile: "Personal Profile & Staff Details",
+      active: "Active",
+      uploadProfilePicture: "Upload Profile Picture",
+
+      // Quick Details Grid
+      jobTitle: "Job Title",
+      currentBranch: "Current Branch",
+      status: "Status",
+      employeeId: "Employee ID",
+      employmentType: "Employment Type",
+      joiningDate: "Joining Date",
+      fullTime: "Full Time",
+
+      // Section 1: Personal Information
+      personalInformation: "Personal Information",
+      edit: "Edit",
+      firstName: "First Name",
+      lastName: "Last Name",
+      address: "Address",
+      phoneNumber: "Phone Number",
+      email: "Email",
+
+      // Section 2: Work Information
+      workInformation: "Work Information",
+      department: "Department",
+      shiftType: "Shift Type",
+      assignedBranches: "Assigned Branches",
+      workingDays: "Working Days",
+      workingHours: "Working Hours",
+
+      // Section 3: Attendance Summary
+      attendanceSummary: "Attendance Summary",
+      presentDays: "Present Days",
+      absentDays: "Absent Days",
+      lateArrivals: "Late Arrivals",
+      earlyLeaves: "Early Leaves",
+      overtime: "Overtime",
+      totalWorkingHours: "Total Working Hours",
+      viewAttendanceHistory: "View Attendance History",
+
+      // Attendance status lookup
+      attendanceStatus: {
+        Present: "Present",
+        Absent: "Absent",
+        Late: "Late",
+        Overtime: "Overtime",
+      } as Record<string, string>,
+
+      // Section 4: Payroll Summary
+      payrollSummary: "Payroll Summary",
+      doctorPayrollSummary: "Doctor Payroll Summary",
+      fixedBasicSalary: "Fixed / Basic Salary",
+      bonuses: "Bonuses",
+      commissionsAndBonuses: "Commissions & Bonuses",
+      deductions: "Deductions",
+      monthlyTarget: "Monthly Target",
+      targetProgress: "Target Progress",
+      netSalary: "Net Salary",
+
+      // Change Password
+      changePassword: "Change Password",
+      newPassword: "New Password",
+      confirmNewPassword: "Confirm New Password",
+      enterNewPassword: "Enter new password",
+      confirmNewPasswordPlaceholder: "Confirm new password",
+      passwordTooShort: "Password must be at least 6 characters long.",
+      passwordsDoNotMatch: "Passwords do not match.",
+      passwordUpdated: "Password updated successfully!",
+      passwordUpdateFailed: "Failed to update password.",
+      updating: "Updating...",
+      cancel: "Cancel",
+      updatePassword: "Update Password",
+
+      // Edit Contact Modal
+      editContactInformation: "Edit Contact Information",
+      emailAddress: "Email Address *",
+      homeAddress: "Home Address",
+      saveChanges: "Save Changes",
+      saving: "Saving...",
+
+      // Attendance History Modal
+      attendanceHistory: "Attendance History",
+      noAttendanceRecords: "No attendance records logged in database for",
+      close: "Close",
+
+      // Period options (display labels only, values stay English)
+      thisMonth: "This Month",
+      lastMonth: "Last Month",
+      thisYear: "This Year",
+
+      // Fallbacks for isDoctorView conditional labels
+      doctor: "Doctor",
+      receptionist: "Receptionist",
+      staff: "Staff",
+    },
   },
   ar: {
     patients: {
@@ -3933,6 +4118,170 @@ export const adminTranslations = {
         toRespond: "للاستجابة",
         minutes: "دقائق",
       },
+    },
+    reception: {
+      dashboard: {
+        shiftTitle: "وردية اليوم",
+        shiftSubtitle: "ساعات عملك المجدولة",
+        startShift: "بدء الوردية",
+        endShift: "إنهاء الوردية",
+        updating: "جارٍ التحديث...",
+        collapseSection: "طي القسم",
+        expandSection: "توسيع القسم",
+        actualStartingTime: "وقت البدء الفعلي",
+        elapsedTime: "الوقت المنقضي",
+        status: "الحالة",
+        shiftStarted: "الوردية بدأت",
+        shiftEnded: "الوردية انتهت",
+        notStarted: "لم تبدأ",
+
+        notificationsTitle: "الإشعارات والتنبيهات",
+        notificationsSubtitle: "تحديثات مهمة تتطلب انتباهك",
+        viewAllAlerts: "عرض كل التنبيهات",
+        noActiveAlerts: "لا توجد إشعارات أو تنبيهات نشطة.",
+
+        bookingsTitle: "الحجوزات",
+        bookingsSubtitle: "نظرة سريعة على حجوزات اليوم",
+        viewAllBookings: "عرض كل الحجوزات",
+        totalBookings: "إجمالي الحجوزات",
+        pendingApproval: "بانتظار الموافقة",
+        confirmed: "مؤكد",
+        completed: "مكتمل",
+        cancelled: "ملغي",
+        time: "الوقت",
+        patient: "المريض",
+        doctor: "الطبيب",
+        service: "الخدمة",
+        confirmedBadge: "مؤكد",
+        pendingBadge: "بانتظار الموافقة",
+        noBookingsToday: "لا توجد حجوزات مجدولة اليوم.",
+
+        summaryTitle: "ملخص اليوم",
+        summarySubtitle: "نظرة عامة على أدائك اليومي",
+        scheduledToday: "مجدول اليوم",
+        confirmedRate: "معدل التأكيد",
+        currentStatus: "الحالة الحالية",
+        active: "نشط",
+        idle: "خامل",
+
+        activitiesTitle: "الأنشطة الأخيرة",
+        activitiesSubtitle: "آخر إجراءاتك وتحديثاتك",
+        noRecentActivities: "لا توجد إجراءات حديثة مسجلة اليوم.",
+
+        startShiftGreeting: "مرحباً،",
+        startShiftPrompt: "ابدأ ورديتك الآن لتتبع عملك وتبقى منظماً.",
+        verifyingLocation: "جارٍ التحقق من الموقع...",
+        cancel: "إلغاء",
+
+        errors: {
+          permission_denied: "يجب السماح بالوصول إلى الموقع لبدء ورديتك.",
+          out_of_location: "يجب أن تكون في موقع العمل لبدء ورديتك.",
+          generic: "يجب أن تكون في موقع العمل لبدء ورديتك.",
+        },
+
+        alerts: {
+          low_stock: { title: "مخزون منخفض" },
+          expired_item: { title: "عنصر منتهي الصلاحية" },
+          maintenance_overdue: { title: "صيانة متأخرة" },
+          maintenance_due: { title: "صيانة مستحقة" },
+          maintenance_completed: { title: "صيانة مكتملة" },
+        },
+
+        allAlertsTitle: "كل الإشعارات والتنبيهات",
+        allAlertsSubtitle: "تنبيهات النظام للمخزون والصيانة والتحديثات السريرية",
+        filterAll: "كل التنبيهات",
+        filterLowStock: "مخزون منخفض",
+        filterMaintenance: "صيانة",
+        filterExpired: "عناصر منتهية الصلاحية",
+        noAlertsInCategory: "لا توجد تنبيهات في هذه الفئة.",
+        resolve: "معالجة",
+        close: "إغلاق",
+      },
+    },
+    userProfile: {
+      personalProfile: "الملف الشخصي وبيانات الموظف",
+      active: "نشط",
+      uploadProfilePicture: "رفع صورة الملف الشخصي",
+
+      jobTitle: "المسمى الوظيفي",
+      currentBranch: "الفرع الحالي",
+      status: "الحالة",
+      employeeId: "رقم الموظف",
+      employmentType: "نوع التوظيف",
+      joiningDate: "تاريخ الالتحاق",
+      fullTime: "دوام كامل",
+
+      personalInformation: "المعلومات الشخصية",
+      edit: "تعديل",
+      firstName: "الاسم الأول",
+      lastName: "اسم العائلة",
+      address: "العنوان",
+      phoneNumber: "رقم الهاتف",
+      email: "البريد الإلكتروني",
+
+      workInformation: "معلومات العمل",
+      department: "القسم",
+      shiftType: "نوع الوردية",
+      assignedBranches: "الفروع المعينة",
+      workingDays: "أيام العمل",
+      workingHours: "ساعات العمل",
+
+      attendanceSummary: "ملخص الحضور",
+      presentDays: "أيام الحضور",
+      absentDays: "أيام الغياب",
+      lateArrivals: "تأخرات",
+      earlyLeaves: "مغادرات مبكرة",
+      overtime: "ساعات إضافية",
+      totalWorkingHours: "إجمالي ساعات العمل",
+      viewAttendanceHistory: "عرض سجل الحضور",
+
+      attendanceStatus: {
+        Present: "حاضر",
+        Absent: "غائب",
+        Late: "متأخر",
+        Overtime: "إضافي",
+      } as Record<string, string>,
+
+      payrollSummary: "ملخص الراتب",
+      doctorPayrollSummary: "ملخص راتب الطبيب",
+      fixedBasicSalary: "الراتب الثابت / الأساسي",
+      bonuses: "مكافآت",
+      commissionsAndBonuses: "عمولات ومكافآت",
+      deductions: "خصومات",
+      monthlyTarget: "الهدف الشهري",
+      targetProgress: "تقدم الهدف",
+      netSalary: "صافي الراتب",
+
+      changePassword: "تغيير كلمة المرور",
+      newPassword: "كلمة المرور الجديدة",
+      confirmNewPassword: "تأكيد كلمة المرور الجديدة",
+      enterNewPassword: "أدخل كلمة المرور الجديدة",
+      confirmNewPasswordPlaceholder: "تأكيد كلمة المرور الجديدة",
+      passwordTooShort: "يجب أن تكون كلمة المرور 6 أحرف على الأقل.",
+      passwordsDoNotMatch: "كلمتا المرور غير متطابقتين.",
+      passwordUpdated: "تم تحديث كلمة المرور بنجاح!",
+      passwordUpdateFailed: "فشل تحديث كلمة المرور.",
+      updating: "جارٍ التحديث...",
+      cancel: "إلغاء",
+      updatePassword: "تحديث كلمة المرور",
+
+      editContactInformation: "تعديل معلومات الاتصال",
+      emailAddress: "البريد الإلكتروني *",
+      homeAddress: "عنوان المنزل",
+      saveChanges: "حفظ التغييرات",
+      saving: "جارٍ الحفظ...",
+
+      attendanceHistory: "سجل الحضور",
+      noAttendanceRecords: "لا توجد سجلات حضور في قاعدة البيانات لـ",
+      close: "إغلاق",
+
+      thisMonth: "هذا الشهر",
+      lastMonth: "الشهر الماضي",
+      thisYear: "هذا العام",
+
+      doctor: "طبيب",
+      receptionist: "موظف استقبال",
+      staff: "موظف",
     },
   },
 };

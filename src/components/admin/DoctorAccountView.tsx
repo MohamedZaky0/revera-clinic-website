@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { DoctorAccountViewProps, DoctorTab, DoctorPatient, UsedProduct } from "./doctor/types";
 import { doctorTranslations } from "./doctor/translations";
+import { adminTranslations } from "./translations";
 import { parseBookingNotes, getAuthHeaders } from "./doctor/utils";
 import DoctorSidebar from "./doctor/DoctorSidebar";
 import DoctorScheduleTab from "./doctor/tabs/DoctorScheduleTab";
@@ -1210,6 +1211,8 @@ export default function DoctorAccountView({
               monthlyTarget: Number(providerRecord?.target_amount || providerRecord?.required_target_amount || 0)
             }}
             isDoctorView={true}
+            lang={lang}
+            t={adminTranslations[lang].userProfile as any}
           />
         )}
       </main>
