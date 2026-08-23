@@ -52,7 +52,7 @@ export default function NotificationSettingsView({
   t,
 }: NotificationSettingsViewProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-4xl font-semibold text-[#1F251A]">{t.title}</h2>

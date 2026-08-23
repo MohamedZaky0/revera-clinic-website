@@ -48,7 +48,7 @@ export default function DepositSettingsView({
   t,
 }: DepositSettingsViewProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-4xl font-semibold text-[#1F251A]">{t.title}</h2>
@@ -123,7 +123,7 @@ export default function DepositSettingsView({
             </label>
 
             {walletEnabled && (
-              <div className="space-y-4 pl-3 border-l-2 border-[#414E36]/15 mt-3">
+              <div className="space-y-4 ps-3 border-s-2 border-[#414E36]/15 mt-3">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">{t.walletName}</label>
                   <input
