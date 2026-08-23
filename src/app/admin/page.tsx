@@ -543,30 +543,30 @@ const DEFAULT_HERO_SLIDES = [
 
 const DEFAULT_HERO_SLIDES_AR = [
   {
-    welcome: "Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒÙ… ÙÙŠ Ø¹ÙŠØ§Ø¯Ø§Øª Ø±ÙŠÙÙŠØ±Ø§",
-    heading: "Ø­ÙˆÙ‘Ù„ Ø¬Ù…Ø§Ù„Ùƒ Ø¨Ø´ÙƒÙ„ Ø·Ø¨ÙŠØ¹ÙŠ!",
-    description: "Ø®Ø¯Ù…Ø§Øª Ù…ØªØ®ØµØµØ© ÙÙŠ Ø·Ø¨ Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„Ø¬Ø±Ø§Ø­Ø© Ø§Ù„ØªØ¬Ù…ÙŠÙ„ÙŠØ© Ù…Ø¹ Ø±Ø¹Ø§ÙŠØ© Ø´Ø®ØµÙŠØ© Ù…ØµÙ…Ù…Ø© Ù„Ù…Ø³Ø§Ø¹Ø¯ØªÙƒ Ø¹Ù„Ù‰ ØªØ­Ù‚ÙŠÙ‚ Ø£Ù‡Ø¯Ø§ÙÙƒ ÙÙŠ Ø§Ù„Ø¬Ù…Ø§Ù„ ÙˆØ§Ù„ØµØ­Ø© Ù…Ù† Ø®Ù„Ø§Ù„ ØªÙ‚Ù†ÙŠØ§Øª Ø·Ø¨ÙŠØ© Ù…ØªÙ‚Ø¯Ù…Ø©.",
-    bookBtn: "Ø§Ø­Ø¬Ø² Ù…ÙˆØ¹Ø¯Ù‹Ø§",
+    welcome: "مرحباً بكم في عيادات ريفيرا",
+    heading: "حوّل جمالك بشكل طبيعي!",
+    description: "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية مصممة لمساعدتك على تحقيق أهدافك في الجمال والصحة من خلال تقنيات طبية متقدمة.",
+    bookBtn: "احجز موعدًا",
     rating: "4.5",
-    reviewCount: "(1000+ ØªÙ‚ÙŠÙŠÙ…)",
+    reviewCount: "(1000+ تقييم)",
     image: "/images/hero/slide-1.jpg"
   },
   {
-    welcome: "Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒÙ… ÙÙŠ Ø¹ÙŠØ§Ø¯Ø§Øª Ø±ÙŠÙÙŠØ±Ø§",
-    heading: "Ø±Ø¹Ø§ÙŠØ© Ø·Ø¨ÙŠØ© Ù…ØªÙ‚Ø¯Ù…Ø© ÙŠÙ…ÙƒÙ†Ùƒ Ø§Ù„ÙˆØ«ÙˆÙ‚ Ø¨Ù‡Ø§!",
-    description: "Ø§ÙƒØªØ´Ù Ø®Ø¯Ù…Ø§Øª Ø´Ø§Ù…Ù„Ø© ÙÙŠ Ø·Ø¨ Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„Ø¬Ø±Ø§Ø­Ø© Ø§Ù„ØªØ¬Ù…ÙŠÙ„ÙŠØ© ÙˆØ¹Ù„Ø§Ø¬Ø§Øª Ø§Ù„Ù„ÙŠØ²Ø± ÙˆØ·Ø¨ Ø§Ù„Ø£Ø³Ù†Ø§Ù† Ø§Ù„Ù…ØµÙ…Ù…Ø© Ù„Ø§Ø­ØªÙŠØ§Ø¬Ø§ØªÙƒ Ø§Ù„ÙØ±ÙŠØ¯Ø©. Ù…Ø¹ Ø£ÙƒØ«Ø± Ù…Ù† 15 Ø¹Ø§Ù…Ø§Ù‹ Ù…Ù† Ø§Ù„Ø®Ø¨Ø±Ø© Ø§Ù„Ù…Ù‡Ù†ÙŠØ©ØŒ Ù†Ø­Ù† Ù‡Ù†Ø§ Ù„Ø¥Ø±Ø´Ø§Ø¯Ùƒ Ù†Ø­Ùˆ Ø§Ù„Ø¬Ù…Ø§Ù„ Ø§Ù„Ø¯Ø§Ø¦Ù… ÙˆØ§Ù„Ø¹Ø§ÙÙŠØ©.",
-    bookBtn: "Ø§Ø­Ø¬Ø² Ù…ÙˆØ¹Ø¯Ù‹Ø§",
+    welcome: "مرحباً بكم في عيادات ريفيرا",
+    heading: "رعاية طبية متقدمة يمكنك الوثوق بها!",
+    description: "اكتشف خدمات شاملة في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان المصممة لاحتياجاتك الفريدة. مع أكثر من 15 عاماً من الخبرة المهنية، نحن هنا لإرشادك نحو الجمال الدائم والعافية.",
+    bookBtn: "احجز موعدًا",
     rating: "4.5",
-    reviewCount: "(1000+ ØªÙ‚ÙŠÙŠÙ…)",
+    reviewCount: "(1000+ تقييم)",
     image: "/images/hero/slide-2.jpg"
   },
   {
-    welcome: "Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒÙ… ÙÙŠ Ø¹ÙŠØ§Ø¯Ø§Øª Ø±ÙŠÙÙŠØ±Ø§",
-    heading: "Ø±Ø­Ù„ØªÙƒ Ù†Ø­Ùˆ Ø§Ù„Ø¬Ù…Ø§Ù„ ÙˆØ§Ù„ØµØ­Ø© ØªØ¨Ø¯Ø£ Ù‡Ù†Ø§!",
-    description: "Ø¹ÙŠØ§Ø¯Ø§Øª Ù…ØªØ®ØµØµØ© ØªØ­Øª Ø¥Ø´Ø±Ø§Ù Ø·Ø¨ÙŠ ÙƒØ§Ù…Ù„ ØªÙ‚Ø¯Ù… Ø®Ø¯Ù…Ø§Øª ÙÙŠ Ø·Ø¨ Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„Ø¬Ø±Ø§Ø­Ø© Ø§Ù„ØªØ¬Ù…ÙŠÙ„ÙŠØ© ÙˆØ¹Ù„Ø§Ø¬Ø§Øª Ø§Ù„Ù„ÙŠØ²Ø± ÙˆØ·Ø¨ Ø§Ù„Ø£Ø³Ù†Ø§Ù† Ù„Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø£Ø¹Ù…Ø§Ø±.",
-    bookBtn: "Ø§Ø­Ø¬Ø² Ù…ÙˆØ¹Ø¯Ù‹Ø§",
+    welcome: "مرحباً بكم في عيادات ريفيرا",
+    heading: "رحلتك نحو الجمال والصحة تبدأ هنا!",
+    description: "عيادات متخصصة تحت إشراف طبي كامل تقدم خدمات في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان لجميع الأعمار.",
+    bookBtn: "احجز موعدًا",
     rating: "4.5",
-    reviewCount: "(1000+ ØªÙ‚ÙŠÙŠÙ…)",
+    reviewCount: "(1000+ تقييم)",
     image: "/images/hero/slide-3.jpg"
   }
 ];
@@ -945,22 +945,22 @@ export default function AdminPage() {
 
     const medsText = medsList.length > 0
       ? medsList.map((m: any, idx: number) => 
-          `${idx + 1}. *${m.name || m.medicine_name || m.medicine || 'Medication'}* ${m.dosage ? `(${m.dosage})` : ''}\n   â±ï¸ Ø§Ù„ØªÙƒØ±Ø§Ø± / Frequency: ${m.frequency || 'Ø­Ø³Ø¨ Ø§Ù„Ø¥Ø±Ø´Ø§Ø¯Ø§Øª'}\n   â³ Ø§Ù„Ù…Ø¯Ø© / Duration: ${m.duration || 'Ø­Ø³Ø¨ Ø§Ù„Ø­Ø§Ø¬Ø©'}`
+          `${idx + 1}. *${m.name || m.medicine_name || m.medicine || 'Medication'}* ${m.dosage ? `(${m.dosage})` : ''}\n   ⏱️ التكرار / Frequency: ${m.frequency || 'حسب الإرشادات'}\n   ⏳ المدة / Duration: ${m.duration || 'حسب الحاجة'}`
         ).join('\n\n')
-      : 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£Ø¯ÙˆÙŠØ© Ù…Ø³Ø¬Ù„Ø©';
+      : 'لا توجد أدوية مسجلة';
 
     const msg = 
-`*REVERA CLINICS | Ø±ÙˆØ´ØªØ© Ø·Ø¨ÙŠØ© Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠØ©*
+`*REVERA CLINICS | روشتة طبية إلكترونية*
 â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ‘¤ *Ø§Ù„Ù…Ø±ÙŠØ¶ / Patient:* ${patientName}
-ðŸ“… *Ø§Ù„ØªØ§Ø±ÙŠØ® / Date:* ${rxDate}
-ðŸ‘¨â€âš•ï¸ *Ø§Ù„Ø·Ø¨ÙŠØ¨ / Doctor:* ${doctorName}
-${diagnosis ? `ðŸ©º *Ø§Ù„ØªØ´Ø®ÙŠØµ / Diagnosis:* ${diagnosis}\n` : ''}â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ’Š *Ø§Ù„Ø£Ø¯ÙˆÙŠØ© Ø§Ù„Ù…ÙˆØµÙˆÙØ© / Prescribed Medications:*
+👤 *المريض / Patient:* ${patientName}
+📅 *التاريخ / Date:* ${rxDate}
+👨‍⚕️ *الطبيب / Doctor:* ${doctorName}
+${diagnosis ? `🩺 *التشخيص / Diagnosis:* ${diagnosis}\n` : ''}━━━━━━━━━━━━━━━━━━━━
+💊 *الأدوية الموصوفة / Prescribed Medications:*
 
 ${medsText}
 â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ / Doctor Instructions:*\n${notes}\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n` : ''}âœ¨ Ù…Ø¹ ØªÙ…Ù†ÙŠØ§ØªÙ†Ø§ Ù„ÙƒÙ… Ø¨Ø§Ù„Ø´ÙØ§Ø¡ Ø§Ù„Ø¹Ø§Ø¬Ù„ ÙˆØ¯ÙˆØ§Ù… Ø§Ù„ØµØ­Ø© ÙˆØ§Ù„Ø¹Ø§ÙÙŠØ©.
+${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n━━━━━━━━━━━━━━━━━━━━\n` : ''}✨ مع تمنياتنا لكم بالشفاء العاجل ودوام الصحة والعافية.
 ðŸ“ *Revera Clinics* â€” Sheikh Zayed & New Cairo
 ðŸ“ž (+20) 01035595691`;
 
@@ -3155,13 +3155,13 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
   const [savingPageSettings, setSavingPageSettings] = useState(false);
 
   const [serviceHours, setServiceHours] = useState<Array<{ day: string; dayAr: string; isOpen: boolean; openTime: string; closeTime: string }>>([
-    { day: "Sunday", dayAr: "Ø§Ù„Ø£Ø­Ø¯", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Monday", dayAr: "Ø§Ù„Ø¥Ø«Ù†ÙŠÙ†", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Tuesday", dayAr: "Ø§Ù„Ø«Ù„Ø§Ø«Ø§Ø¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Wednesday", dayAr: "Ø§Ù„Ø£Ø±Ø¨Ø¹Ø§Ø¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Thursday", dayAr: "Ø§Ù„Ø®Ù…ÙŠØ³", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Friday", dayAr: "Ø§Ù„Ø¬Ù…Ø¹Ø©", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Saturday", dayAr: "Ø§Ù„Ø³Ø¨Øª", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Friday", dayAr: "الجمعة", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
   ]);  const [pageSettingsLangTab, setPageSettingsLangTab] = useState<"en" | "ar">("en");
   const [aboutImage1, setAboutImage1] = useState<string>("");
   const [aboutImage2, setAboutImage2] = useState<string>("");
@@ -3234,7 +3234,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
   const [notifWhatsApp, setNotifWhatsApp] = useState(true);
   const [notifEmailConfirm, setNotifEmailConfirm] = useState(false);
   const [notifSmsTemplate, setNotifSmsTemplate] = useState("Hello {name}, your appointment for {service} is confirmed on {date} at {time}. See you at Revera Clinics!");
-  const [notifSmsTemplateAr, setNotifSmsTemplateAr] = useState("Ù…Ø±Ø­Ø¨Ø§Ù‹ {name}ØŒ ØªÙ… ØªØ£ÙƒÙŠØ¯ Ù…ÙˆØ¹Ø¯Ùƒ Ù„Ø®Ø¯Ù…Ø© {service} Ø¨ØªØ§Ø±ÙŠØ® {date} Ø§Ù„Ø³Ø§Ø¹Ø© {time}. Ù†Ø±Ø§Ùƒ ÙÙŠ Ø±ÙŠÙÙŠØ±Ø§ ÙƒÙ„ÙŠÙ†ÙŠÙƒ!");
+  const [notifSmsTemplateAr, setNotifSmsTemplateAr] = useState("مرحباً {name}، تم تأكيد موعدك لخدمة {service} بتاريخ {date} الساعة {time}. نراك في ريفيرا كلينيك!");
   const [notifReminderHours, setNotifReminderHours] = useState(24);
   const [notifStaffEmail, setNotifStaffEmail] = useState("admin@reveraclinics.com");
   const [savingNotificationSettings, setSavingNotificationSettings] = useState(false);
@@ -3751,13 +3751,13 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
       setServiceHours(branchRecord.service_hours);
     } else {
       setServiceHours([
-        { day: "Sunday", dayAr: "Ø§Ù„Ø£Ø­Ø¯", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Monday", dayAr: "Ø§Ù„Ø¥Ø«Ù†ÙŠÙ†", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Tuesday", dayAr: "Ø§Ù„Ø«Ù„Ø§Ø«Ø§Ø¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Wednesday", dayAr: "Ø§Ù„Ø£Ø±Ø¨Ø¹Ø§Ø¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Thursday", dayAr: "Ø§Ù„Ø®Ù…ÙŠØ³", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Friday", dayAr: "Ø§Ù„Ø¬Ù…Ø¹Ø©", isOpen: false, openTime: "09:00", closeTime: "20:00" },
-        { day: "Saturday", dayAr: "Ø§Ù„Ø³Ø¨Øª", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "09:00", closeTime: "20:00" },
+        { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
       ]);
     }
   }, [selectedBranchForHoursId, branches]);
@@ -3915,17 +3915,17 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
             "Osteopathy & Therapeutic Nutrition",
           ]);
           setWhatWeDoListAr(data.aboutPage?.whatWeDoListAr || [
-            "Ø¹Ù„Ø§Ø¬Ø§Øª Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„ØªØ¬Ù…ÙŠÙ„",
-            "Ø§Ù„Ù†Ø³Ø§Ø¡ ÙˆØ§Ù„ØªÙˆÙ„ÙŠØ¯ ÙˆØµØ­Ø© Ø§Ù„Ù…Ø±Ø£Ø©",
-            "Ø§Ù„Ø¹Ù„Ø§Ø¬ Ø§Ù„Ø·Ø¨ÙŠØ¹ÙŠ ÙˆØ¥Ø¹Ø§Ø¯Ø© Ø§Ù„ØªØ£Ù‡ÙŠÙ„",
-            "ØªÙ‚ÙˆÙŠÙ… Ø§Ù„Ø¹Ø¸Ø§Ù… ÙˆØ§Ù„ØªØºØ°ÙŠØ© Ø§Ù„Ø¹Ù„Ø§Ø¬ÙŠØ©",
+            "علاجات الجلدية والتجميل",
+            "النساء والتوليد وصحة المرأة",
+            "العلاج الطبيعي وإعادة التأهيل",
+            "تقويم العظام والتغذية العلاجية",
           ]);
 
           // Load FAQ Section Settings
           setFaqTag(data.aboutPage?.faqTag || "frequently asked questions");
-          setFaqTagAr(data.aboutPage?.faqTagAr || "Ø£Ø³Ø¦Ù„Ø© Ø´Ø§Ø¦Ø¹Ø©");
+          setFaqTagAr(data.aboutPage?.faqTagAr || "أسئلة شائعة");
           setFaqHeading(data.aboutPage?.faqHeading || "Questions? We have answers.");
-          setFaqHeadingAr(data.aboutPage?.faqHeadingAr || "Ø£Ø³Ø¦Ù„Ø©ØŸ Ù„Ø¯ÙŠÙ†Ø§ Ø¥Ø¬Ø§Ø¨Ø§Øª.");
+          setFaqHeadingAr(data.aboutPage?.faqHeadingAr || "أسئلة؟ لدينا إجابات.");
           setFaqImage1(data.aboutPage?.faqImage1 || "");
           setFaqImage2(data.aboutPage?.faqImage2 || "");
           setFaqs(data.aboutPage?.faqs || [
@@ -3948,26 +3948,26 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
           ]);
           setFaqsAr(data.aboutPage?.faqsAr || [
             {
-              question: "Ù¡. Ù…Ø§ Ø§Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„ØªÙŠ ØªÙ‚Ø¯Ù…Ù‡Ø§ Ø±ÙŠÙÙŠØ±Ø§ØŸ",
-              answer: "Ø±ÙŠÙÙŠØ±Ø§ Ø¹ÙŠØ§Ø¯Ø© Ù…ØªÙ…ÙŠØ²Ø© Ù…ØªØ®ØµØµØ© ÙÙŠ Ø¹Ù„Ø§Ø¬Ø§Øª Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„ØªØ¬Ù…ÙŠÙ„ØŒ ÙˆØµØ­Ø© Ø§Ù„Ù…Ø±Ø£Ø© ÙˆØ§Ù„Ù†Ø³Ø§Ø¡ ÙˆØ§Ù„ØªÙˆÙ„ÙŠØ¯ØŒ ÙˆØ§Ù„Ø¹Ù„Ø§Ø¬ Ø§Ù„Ø·Ø¨ÙŠØ¹ÙŠ ÙˆØ¥Ø¹Ø§Ø¯Ø© Ø§Ù„ØªØ£Ù‡ÙŠÙ„ØŒ ÙˆØªÙ‚ÙˆÙŠÙ… Ø§Ù„Ø¹Ø¸Ø§Ù… ÙˆØ§Ù„ØªØºØ°ÙŠØ© Ø§Ù„Ø¹Ù„Ø§Ø¬ÙŠØ©. ÙƒÙ„ Ø®Ø¯Ù…Ø© ØªÙÙ‚Ø¯ÙŽÙ‘Ù… Ø¨Ø¯Ù‚Ø© Ø·Ø¨ÙŠØ© ÙˆØªØ¬Ø±Ø¨Ø© ÙØ§Ø®Ø±Ø© Ù…ØµÙ…Ù…Ø© Ù„ÙƒÙ."
+              question: "١. ما الخدمات التي تقدمها ريفيرا؟",
+              answer: "ريفيرا عيادة متميزة متخصصة في علاجات الجلدية والتجميل، وصحة المرأة والنساء والتوليد، والعلاج الطبيعي وإعادة التأهيل، وتقويم العظام والتغذية العلاجية. كل خدمة تُقدَّم بدقة طبية وتجربة فاخرة مصممة لكِ."
             },
             {
-              question: "Ù¢. Ù„Ù…Ù† ØµÙÙ…ÙÙ‘Ù…Øª Ø±ÙŠÙÙŠØ±Ø§ØŸ",
-              answer: "Ø±ÙŠÙÙŠØ±Ø§ Ù…ØµÙ…Ù…Ø© Ù„Ù„Ù…Ø±Ø£Ø© Ø§Ù„ØªÙŠ ØªÙ‚Ø¯Ù‘Ø± Ø§Ù„Ø£Ù†Ø§Ù‚Ø© ÙˆØ§Ù„Ø®ØµÙˆØµÙŠØ© ÙˆØ§Ù„Ù†ØªØ§Ø¦Ø¬ Ø§Ù„Ø­Ù‚ÙŠÙ‚ÙŠØ©. Ø¹Ù…ÙŠÙ„Ø§ØªÙ†Ø§ ÙŠØ¨Ø­Ø«Ù† Ø¹Ù† Ø§Ù„Ø£ÙØ¶Ù„ â€” Ù„Ø§ Ø§Ù„Ø£Ø±Ø®Øµ â€” ÙˆÙŠØªÙˆÙ‚Ø¹Ù† ØªØ¬Ø±Ø¨Ø© Ø·Ø¨ÙŠØ© ØªÙ„ÙŠÙ‚ Ø¨Ù…Ø¹Ø§ÙŠÙŠØ±Ù‡Ù†."
+              question: "٢. لمن صُمِّمت ريفيرا؟",
+              answer: "ريفيرا مصممة للمرأة التي تقدّر الأناقة والخصوصية والنتائج الحقيقية. عميلاتنا يبحثن عن الأفضل — لا الأرخص — ويتوقعن تجربة طبية تليق بمعاييرهن."
             },
             {
-              question: "Ù£. ÙƒÙŠÙ ØªØ¹Ù…Ù„ Ø®Ø·Ø© Ø¹Ù„Ø§Ø¬ÙŠØŸ",
-              answer: "ØªØ¨Ø¯Ø£ Ø±Ø­Ù„ØªÙƒÙ Ø¨Ø§Ø³ØªØ´Ø§Ø±Ø© Ø´Ø§Ù…Ù„Ø© Ù†ÙÙ‚ÙŠÙ‘Ù… ÙÙŠÙ‡Ø§ ØµØ­ØªÙƒÙ ÙˆØ£Ù‡Ø¯Ø§ÙÙƒÙ Ø§Ù„Ø¬Ù…Ø§Ù„ÙŠØ© ÙˆØ£Ø³Ù„ÙˆØ¨ Ø­ÙŠØ§ØªÙƒÙ. Ø¨Ù†Ø§Ø¡Ù‹ Ø¹Ù„Ù‰ Ø°Ù„ÙƒØŒ ÙŠØ¶Ø¹ Ø£Ø·Ø¨Ø§Ø¤Ù†Ø§ Ø®Ø·Ø© Ø¹Ù„Ø§Ø¬ Ø´Ø®ØµÙŠØ© Ù…ØªÙƒØ§Ù…Ù„Ø© â€” Ù„Ø§ Ù†Ù…ÙˆØ°Ø¬Ø§Ù‹ Ø¬Ø§Ù‡Ø²Ø§Ù‹ â€” ØªØªØ·ÙˆØ± Ù…Ø¹ ØªÙ‚Ø¯Ù…ÙƒÙ ÙˆØ§Ø­ØªÙŠØ§Ø¬Ø§ØªÙƒÙ."
+              question: "٣. كيف تعمل خطة علاجي؟",
+              answer: "تبدأ رحلتكِ باستشارة شاملة نُقيّم فيها صحتكِ وأهدافكِ الجمالية وأسلوب حياتكِ. بناءً على ذلك، يضع أطباؤنا خطة علاج شخصية متكاملة — لا نموذجاً جاهزاً — تتطور مع تقدمكِ واحتياجاتكِ."
             },
             {
-              question: "Ù¤. Ù…Ø§ Ø§Ù„Ø°ÙŠ ÙŠØ¬Ø¹Ù„ Ø±ÙŠÙÙŠØ±Ø§ Ù…Ø®ØªÙ„ÙØ©ØŸ",
-              answer: "Ø±ÙŠÙÙŠØ±Ø§ ÙˆØ¬Ù‡Ø©ØŒ Ù„Ø§ Ù…Ø¬Ø±Ø¯ Ø¹ÙŠØ§Ø¯Ø©. Ø§Ù„ÙØ±Ù‚ ÙÙŠ Ø§Ù„Ø¥Ø­Ø³Ø§Ø³: Ø¨ÙŠØ¦Ø© Ø®Ø§ØµØ© ÙˆÙ‡Ø§Ø¯Ø¦Ø©ØŒ ÙˆØ£Ø·Ø¨Ø§Ø¡ ÙŠØ³ØªÙ…Ø¹ÙˆÙ†ØŒ ÙˆÙ…Ø³ØªÙˆÙ‰ Ø±Ø¹Ø§ÙŠØ© ÙŠÙ…ÙƒÙ†ÙƒÙ Ø±Ø¤ÙŠØªÙ‡ ÙˆØ§Ù„Ø´Ø¹ÙˆØ± Ø¨Ù‡ ÙÙŠ ÙƒÙ„ Ù„Ø­Ø¸Ø© â€” Ù…Ù† Ù…ÙˆØ¹Ø¯ÙƒÙ Ø§Ù„Ø£ÙˆÙ„ Ø¥Ù„Ù‰ Ù…ØªØ§Ø¨Ø¹ØªÙƒÙ Ø§Ù„Ø£Ø®ÙŠØ±Ø©."
+              question: "٤. ما الذي يجعل ريفيرا مختلفة؟",
+              answer: "ريفيرا وجهة، لا مجرد عيادة. الفرق في الإحساس: بيئة خاصة وهادئة، وأطباء يستمعون، ومستوى رعاية يمكنكِ رؤيته والشعور به في كل لحظة — من موعدكِ الأول إلى متابعتكِ الأخيرة."
             }
           ]);
           setHowItWorksHeading(data.howItWorks?.heading || "Simple steps to beauty transformations");
           setHowItWorksDescription(data.howItWorks?.description || "Discover a seamless process designed to enhance your beauty and health through personalized consultations, customized treatment plans, and dedicated medical support. We guide you every step toward achieving your beauty and wellness goals.");
-          setHowItWorksHeadingAr(data.howItWorks?.headingAr || "Ø®Ø·ÙˆØ§Øª Ø¨Ø³ÙŠØ·Ø© Ù„ØªØ­ÙˆÙ„Ø§Øª Ø§Ù„Ø¬Ù…Ø§Ù„");
-          setHowItWorksDescriptionAr(data.howItWorks?.descriptionAr || "Ø§ÙƒØªØ´Ù Ø¹Ù…Ù„ÙŠØ© Ø³Ù„Ø³Ø© Ù…ØµÙ…Ù…Ø© Ù„ØªØ¹Ø²ÙŠØ² Ø¬Ù…Ø§Ù„Ùƒ ÙˆØµØ­ØªÙƒ Ù…Ù† Ø®Ù„Ø§Ù„ Ø§Ø³ØªØ´Ø§Ø±Ø§Øª Ø´Ø®ØµÙŠØ© ÙˆØ®Ø·Ø· Ø¹Ù„Ø§Ø¬ÙŠØ© Ù…Ø®ØµØµØ© ÙˆØ¯Ø¹Ù… Ø·Ø¨ÙŠ Ù…ØªØ®ØµØµ. Ù†Ø±Ø´Ø¯Ùƒ ÙÙŠ ÙƒÙ„ Ø®Ø·ÙˆØ© Ù†Ø­Ùˆ ØªØ­Ù‚ÙŠÙ‚ Ø£Ù‡Ø¯Ø§Ù Ø§Ù„Ø¬Ù…Ø§Ù„ ÙˆØ§Ù„Ø¹Ø§ÙÙŠØ©.");
+          setHowItWorksHeadingAr(data.howItWorks?.headingAr || "خطوات بسيطة لتحولات الجمال");
+          setHowItWorksDescriptionAr(data.howItWorks?.descriptionAr || "اكتشف عملية سلسة مصممة لتعزيز جمالك وصحتك من خلال استشارات شخصية وخطط علاجية مخصصة ودعم طبي متخصص. نرشدك في كل خطوة نحو تحقيق أهداف الجمال والعافية.");
 
           // Load Why Choose Us Settings
           setWcuYearsLabel(data.whyChooseUs?.yearsLabel || "15+ years excellence");
@@ -3977,11 +3977,11 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
           setWcuContactLabel(data.whyChooseUs?.contactLabel || "Reach us:");
           setWcuPhone(data.whyChooseUs?.phone || "(+20) 01035595691");
 
-          setWcuYearsLabelAr(data.whyChooseUs?.yearsLabelAr || "Ù¡Ù¥+ Ø¹Ø§Ù…Ø§Ù‹ Ù…Ù† Ø§Ù„ØªÙ…ÙŠØ²");
-          setWcuHeadingAr(data.whyChooseUs?.headingAr || "Ø­ÙŠØ« ØªÙ„ØªÙ‚ÙŠ Ø§Ù„Ø®Ø¨Ø±Ø© Ø§Ù„Ø·Ø¨ÙŠØ© Ø¨ØªØ¬Ø±Ø¨Ø© ÙØ§Ø®Ø±Ø©");
-          setWcuDescriptionAr(data.whyChooseUs?.descriptionAr || "ÙÙŠ Ø±ÙŠÙÙŠØ±Ø§ØŒ ÙƒÙ„ ØªÙØµÙŠÙ„ Ù…Ù‚ØµÙˆØ¯ â€” Ø¨Ø¯Ø¡Ø§Ù‹ Ù…Ù† Ø§Ø³ØªØ´Ø§Ø±ØªÙƒ Ø§Ù„Ø£ÙˆÙ„Ù‰ ÙˆØ­ØªÙ‰ Ù„Ø­Ø¸Ø© Ø®Ø±ÙˆØ¬Ùƒ Ù…ØªØ­ÙˆÙ‘Ù„Ø©. Ù†Ù‚Ø¯Ù… Ø±Ø¹Ø§ÙŠØ© Ù…Ø¯Ø¹ÙˆÙ…Ø© Ø¨Ø§Ù„Ø¹Ù„Ù… Ù…Ø¹ Ø§Ù„Ø«Ù‚Ø© Ø§Ù„Ù‡Ø§Ø¯Ø¦Ø© Ù„ÙˆØ¬Ù‡Ø© Ø·Ø¨ÙŠØ© Ø®Ø§ØµØ©.");
-          setWcuQuoteAr(data.whyChooseUs?.quoteAr || '"Ù†Ø­Ù† Ù„Ø§ Ù†Ø¹Ø§Ù„Ø¬ ÙÙ‚Ø· â€” Ø¨Ù„ Ù†ÙØ­ÙˆÙ‘Ù„ Ø§Ù„Ø«Ù‚Ø©. ÙƒÙ„ Ø¬Ù„Ø³Ø© ÙÙŠ Ø±ÙŠÙÙŠØ±Ø§ Ù…ØµÙ…Ù…Ø© Ø­ÙˆÙ„ÙƒÙ: Ø£Ù‡Ø¯Ø§ÙÙƒÙØŒ Ø¨Ø´Ø±ØªÙƒÙØŒ Ø±Ø­Ù„ØªÙƒÙ."');
-          setWcuContactLabelAr(data.whyChooseUs?.contactLabelAr || "ØªÙˆØ§ØµÙ„ÙŠ Ù…Ø¹Ù†Ø§:");
+          setWcuYearsLabelAr(data.whyChooseUs?.yearsLabelAr || "١٥+ عاماً من التميز");
+          setWcuHeadingAr(data.whyChooseUs?.headingAr || "حيث تلتقي الخبرة الطبية بتجربة فاخرة");
+          setWcuDescriptionAr(data.whyChooseUs?.descriptionAr || "في ريفيرا، كل تفصيل مقصود — بدءاً من استشارتك الأولى وحتى لحظة خروجك متحوّلة. نقدم رعاية مدعومة بالعلم مع الثقة الهادئة لوجهة طبية خاصة.");
+          setWcuQuoteAr(data.whyChooseUs?.quoteAr || '"نحن لا نعالج فقط — بل نُحوّل الثقة. كل جلسة في ريفيرا مصممة حولكِ: أهدافكِ، بشرتكِ، رحلتكِ."');
+          setWcuContactLabelAr(data.whyChooseUs?.contactLabelAr || "تواصلي معنا:");
           setWcuPhoneAr(data.whyChooseUs?.phoneAr || "(+20) 01035595691");
 
           setWcuImage1(data.whyChooseUs?.image1 || "");
@@ -4491,12 +4491,12 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
       image: "/images/hero/slide-1.jpg"
     };
     const newArSlide = {
-      welcome: "Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒÙ… ÙÙŠ Ø¹ÙŠØ§Ø¯Ø§Øª Ø±ÙŠÙÙŠØ±Ø§",
-      heading: "Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø´Ø±ÙŠØ­Ø© Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©",
-      description: "Ø®Ø¯Ù…Ø§Øª Ù…ØªØ®ØµØµØ© ÙÙŠ Ø·Ø¨ Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„Ø¬Ø±Ø§Ø­Ø© Ø§Ù„ØªØ¬Ù…ÙŠÙ„ÙŠØ© Ù…Ø¹ Ø±Ø¹Ø§ÙŠØ© Ø´Ø®ØµÙŠØ©.",
-      bookBtn: "Ø§Ø­Ø¬Ø² Ù…ÙˆØ¹Ø¯Ù‹Ø§",
+      welcome: "مرحباً بكم في عيادات ريفيرا",
+      heading: "عنوان الشريحة الجديدة",
+      description: "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية.",
+      bookBtn: "احجز موعدًا",
       rating: "4.5",
-      reviewCount: "(1000+ ØªÙ‚ÙŠÙŠÙ…)",
+      reviewCount: "(1000+ تقييم)",
       image: "/images/hero/slide-1.jpg"
     };
     setHomeHeroSlides([...homeHeroSlides, newEnSlide]);
@@ -5587,7 +5587,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                   : "text-[#FBFBF9]/70 hover:text-white hover:bg-white/10"
               }`}
             >
-              Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©
+              العربية
             </button>
           </div>
 
@@ -8885,7 +8885,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
 
             <form onSubmit={handleSaveDrawerPrescription} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-[#1F251A] mb-1">Clinical Diagnosis / Ø§Ù„ØªØ´Ø®ÙŠØµ</label>
+                <label className="block font-bold text-[#1F251A] mb-1">Clinical Diagnosis / التشخيص</label>
                 <input
                   type="text"
                   required
@@ -8898,7 +8898,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block font-bold text-[#1F251A]">Prescribed Medications / Ø§Ù„Ø£Ø¯ÙˆÙŠØ©</label>
+                  <label className="block font-bold text-[#1F251A]">Prescribed Medications / الأدوية</label>
                   <button
                     type="button"
                     onClick={() => setDrawerRxMeds(prev => [...prev, { name: "", dosage: "", frequency: "", duration: "" }])}
@@ -8974,7 +8974,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
               </div>
 
               <div>
-                <label className="block font-bold text-[#1F251A] mb-1">Doctor Instructions & Advice / ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨</label>
+                <label className="block font-bold text-[#1F251A] mb-1">Doctor Instructions & Advice / تعليمات الطبيب</label>
                 <textarea
                   rows={3}
                   placeholder="e.g. Avoid direct sunlight, apply sunscreen every 2 hours, drink plenty of water."
@@ -9551,8 +9551,8 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                       const showOnline = allowedType === "both" || allowedType === "online";
                       return (
                         <>
-                          {showInClinic && <option value="in_person">In Person / ÙÙŠ Ø§Ù„Ø¹ÙŠØ§Ø¯Ø©</option>}
-                          {showOnline && <option value="online">Online / Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†</option>}
+                          {showInClinic && <option value="in_person">In Person / في العيادة</option>}
+                          {showOnline && <option value="online">Online / أونلاين</option>}
                         </>
                       );
                     })()}
@@ -10666,14 +10666,14 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                 <div className="space-y-4 text-sm text-[#414E36]">
                   {/* Customer Information */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">Customer / Ø§Ù„Ù…Ø±ÙŠØ¶</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">Customer / المريض</p>
                     <p className="font-bold text-[#1F251A]">{checkoutBooking.name}</p>
                     <p className="text-xs text-[#5A6A51] mt-0.5">{checkoutBooking.phone}</p>
                   </div>
 
                   {/* Services Invoice details */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Services List / Ø§Ù„Ø®Ø¯Ù…Ø§Øª</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Services List / الخدمات</p>
                     {bookingServicesList.map((svc: any) => {
                       const isRedeemed = !!redeemedPackageItems[svc.serviceId];
                       return (
@@ -10723,7 +10723,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                       <div className="mt-2.5 rounded-xl border border-[#C4AE7C]/30 bg-[#FAF5EB]/50 p-3 space-y-2 text-xs">
                         <div className="flex items-center justify-between border-b border-[#C4AE7C]/20 pb-1.5">
                           <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                            <span>âœ¨</span> Additional Services / Ø§Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„Ø¥Ø¶Ø§ÙÙŠØ©
+                            <span>✨</span> Additional Services / الخدمات الإضافية
                           </span>
                           <span className="font-bold text-[#C4AE7C]">+{checkoutAdditionalServicesCost} EGP</span>
                         </div>
@@ -10746,7 +10746,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                       <div className="mt-2.5 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 space-y-2 text-xs">
                         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-1.5">
                           <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                            <span>ðŸ“¦</span> Session Consumables & Products / Ø§Ù„Ù…Ø³ØªÙ„Ø²Ù…Ø§Øª ÙˆØ§Ù„Ù…Ù†ØªØ¬Ø§Øª
+                            <span>📦</span> Session Consumables & Products / المستلزمات والمنتجات
                           </span>
                           <span className="font-bold text-[#414E36]">+{checkoutProductsCost} EGP</span>
                         </div>
@@ -10765,17 +10765,17 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                     )}
 
                     <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
-                      <span>Total Cost / Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ</span>
+                      <span>Total Cost / الإجمالي</span>
                       <span>{totalCost} EGP</span>
                     </div>
                     {depositAlreadyPaid > 0 && (
                       <>
                         <div className="flex justify-between text-xs text-[#5A6A51]">
-                          <span>Deposit already paid / Ø§Ù„Ø¹Ø±Ø¨ÙˆÙ† Ø§Ù„Ù…Ø¯ÙÙˆØ¹</span>
+                          <span>Deposit already paid / العربون المدفوع</span>
                           <span>-{depositAlreadyPaid} EGP</span>
                         </div>
                         <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#414E36] text-base">
-                          <span>Balance Due / Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ</span>
+                          <span>Balance Due / المتبقي</span>
                           <span>{balanceDue} EGP</span>
                         </div>
                       </>
@@ -10788,7 +10788,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                       <div>
                         <p className="font-bold text-[#1F251A] flex items-center gap-1.5">
                           <span className="inline-block h-2 w-2 rounded-full bg-[#C4AE7C]"></span>
-                          Use Customer Wallet / Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…Ø­ÙØ¸Ø©
+                          Use Customer Wallet / استخدام المحفظة
                         </p>
                         <p className="text-xs text-[#5A6A51] mt-0.5">Available balance: {walletBalance} EGP</p>
                       </div>
@@ -10807,7 +10807,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-[#5A6A51] mb-1">
-                        Net Due / Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø³ØªØ­Ù‚
+                        Net Due / المبلغ المستحق
                       </label>
                       <div className="relative">
                         <input
@@ -10820,7 +10820,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-[#5A6A51] mb-1">
-                        Amount Paid / Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹
+                        Amount Paid / المبلغ المدفوع
                       </label>
                       <div className="relative">
                         <input
@@ -10840,7 +10840,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                   {changeAmount > 0 && (
                     <div className="rounded-2xl border border-green-200 bg-green-50/50 p-4 space-y-3">
                       <div className="flex justify-between font-bold text-green-800 text-sm">
-                        <span>Change / Ø§Ù„Ø¨Ø§Ù‚ÙŠ</span>
+                        <span>Change / الباقي</span>
                         <span>{changeAmount} EGP</span>
                       </div>
                       <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -10851,7 +10851,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                           className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
                         />
                         <span className="text-xs font-semibold text-[#1F251A]">
-                          Put change in customer's wallet / Ø£Ø¶Ù Ø§Ù„Ø¨Ø§Ù‚ÙŠ Ø¥Ù„Ù‰ Ù…Ø­ÙØ¸Ø© Ø§Ù„Ù…Ø±ÙŠØ¶
+                          Put change in customer's wallet / أضف الباقي إلى محفظة المريض
                         </span>
                       </label>
                     </div>
@@ -10859,7 +10859,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
 
                   {remainingAmount > 0 && (
                     <div className="rounded-2xl border border-red-200 bg-red-50/50 p-4 flex justify-between font-bold text-red-800 text-sm">
-                      <span>Outstanding Balance / Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ù…Ø³ØªØ­Ù‚</span>
+                      <span>Outstanding Balance / الرصيد المستحق</span>
                       <span>{remainingAmount} EGP</span>
                     </div>
                   )}
@@ -10910,7 +10910,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
             const price = s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500;
             return {
               name: s?.en || `Service #${id}`,
-              nameAr: s?.ar || `Ø®Ø¯Ù…Ø© #${id}`,
+              nameAr: s?.ar || `خدمة #${id}`,
               qty: 1,
               unitPrice: price,
               price: price,
@@ -10946,7 +10946,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
               if (lineType === 'additional_service') {
                 invoiceAdditionalServicesList.push({
                   name: `${name} (Additional Service)`,
-                  nameAr: `${name} (Ø®Ø¯Ù…Ø© Ø¥Ø¶Ø§ÙÙŠØ©)`,
+                  nameAr: `${name} (خدمة إضافية)`,
                   qty,
                   unitPrice,
                   price: unitPrice,
@@ -10955,7 +10955,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
               } else {
                 invoiceProductsList.push({
                   name: `${name} (Add-on)`,
-                  nameAr: `${name} (Ø¥Ø¶Ø§ÙØ©)`,
+                  nameAr: `${name} (إضافة)`,
                   qty,
                   unitPrice,
                   price: unitPrice,
@@ -10987,7 +10987,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                     existingNames.add(name.toLowerCase());
                     invoiceAdditionalServicesList.push({
                       name: `${name} (Additional Service)`,
-                      nameAr: `${name} (Ø®Ø¯Ù…Ø© Ø¥Ø¶Ø§ÙÙŠØ©)`,
+                      nameAr: `${name} (خدمة إضافية)`,
                       qty,
                       unitPrice,
                       price: unitPrice,
@@ -11006,7 +11006,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                     existingNames.add(name.toLowerCase());
                     invoiceAdditionalServicesList.push({
                       name: `${name} (Additional Service)`,
-                      nameAr: `${name} (Ø®Ø¯Ù…Ø© Ø¥Ø¶Ø§ÙÙŠØ©)`,
+                      nameAr: `${name} (خدمة إضافية)`,
                       qty,
                       unitPrice,
                       price: unitPrice,
@@ -11025,7 +11025,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                     existingNames.add(name.toLowerCase());
                     invoiceAdditionalServicesList.push({
                       name: `${name} (Additional Service)`,
-                      nameAr: `${name} (Ø®Ø¯Ù…Ø© Ø¥Ø¶Ø§ÙÙŠØ©)`,
+                      nameAr: `${name} (خدمة إضافية)`,
                       qty,
                       unitPrice,
                       price: unitPrice,
@@ -11051,7 +11051,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                   existingNames.add(name.toLowerCase());
                   invoiceAdditionalServicesList.push({
                     name: `${name} (Additional Service)`,
-                    nameAr: `${name} (Ø®Ø¯Ù…Ø© Ø¥Ø¶Ø§ÙÙŠØ©)`,
+                    nameAr: `${name} (خدمة إضافية)`,
                     qty,
                     unitPrice,
                     price: unitPrice,
@@ -11070,7 +11070,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                   existingNames.add(name.toLowerCase());
                   invoiceAdditionalServicesList.push({
                     name: `${name} (Additional Service)`,
-                    nameAr: `${name} (Ø®Ø¯Ù…Ø© Ø¥Ø¶Ø§ÙÙŠØ©)`,
+                    nameAr: `${name} (خدمة إضافية)`,
                     qty,
                     unitPrice,
                     price: unitPrice,
@@ -11099,7 +11099,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                     existingNames.add(name.toLowerCase());
                     invoiceProductsList.push({
                       name: `${name} (Add-on)`,
-                      nameAr: `${name} (Ø¥Ø¶Ø§ÙØ©)`,
+                      nameAr: `${name} (إضافة)`,
                       qty,
                       unitPrice,
                       price: unitPrice,
@@ -11122,7 +11122,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                 existingNames.add(name.toLowerCase());
                 invoiceProductsList.push({
                   name: `${name} (Add-on)`,
-                  nameAr: `${name} (Ø¥Ø¶Ø§ÙØ©)`,
+                  nameAr: `${name} (إضافة)`,
                   qty,
                   unitPrice,
                   price: unitPrice,
@@ -11142,7 +11142,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                 existingNames.add(name.toLowerCase());
                 invoiceProductsList.push({
                   name: `${name} (Add-on)`,
-                  nameAr: `${name} (Ø¥Ø¶Ø§ÙØ©)`,
+                  nameAr: `${name} (إضافة)`,
                   qty,
                   unitPrice,
                   price: unitPrice,
