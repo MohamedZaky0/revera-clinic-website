@@ -19,7 +19,10 @@ import {
   Check,
   Building2,
   DoorOpen,
-  AlertCircle
+  AlertCircle,
+  MapPin,
+  Wallet,
+  ShieldCheck
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { adminTranslations } from "@/components/admin/translations";
@@ -234,6 +237,29 @@ export default function AdminNewBookingView({
   const [activePackage, setActivePackage] = useState<any>(null);
   const [usePackageMode, setUsePackageMode] = useState(false);
 
+  // Patient Account Auto-Detection Modal & Additional Fields
+  const [showPatientAccountModal, setShowPatientAccountModal] = useState(false);
+  const [showAdditionalPatientFields, setShowAdditionalPatientFields] = useState(false);
+  const promptedPhoneRef = useRef<string>("");
+
+  // Additional Personal Information (Photos 2 & 3)
+  const [gender, setGender] = useState("");
+  const [nationalId, setNationalId] = useState("");
+  const [age, setAge] = useState("");
+  const [occupation, setOccupation] = useState("");
+  const [referralSource, setReferralSource] = useState("");
+
+  // Address Information
+  const [city, setCity] = useState("");
+  const [street, setStreet] = useState("");
+  const [building, setBuilding] = useState("");
+  const [floorApt, setFloorApt] = useState("");
+
+  // Financial Information (Optional)
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [totalSpent, setTotalSpent] = useState<number>(0);
+  const [outstandingBalance, setOutstandingBalance] = useState<number>(0);
+
   // Appointment Details State
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
@@ -404,6 +430,8 @@ export default function AdminNewBookingView({
   // 2. Real-time Customer Search & Filter based on Phone Number field
   useEffect(() => {
     const q = phone.trim().toLowerCase();
+    const cleanDigits = phone.replace(/\D/g, "");
+
     if (!q) {
       setCustomerList(allCustomers);
       return;
@@ -411,7 +439,7 @@ export default function AdminNewBookingView({
 
     const filtered = allCustomers.filter(c => {
       const nameMatch = (c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`).toLowerCase().includes(q);
-      const phoneMatch = (c.mobile || c.phone || "").toLowerCase().includes(q);
+      const phoneMatch = (c.mobile || c.phone || "").replace(/\D/g, "").includes(cleanDigits);
       const emailMatch = (c.email || "").toLowerCase().includes(q);
       return nameMatch || phoneMatch || emailMatch;
     });
@@ -420,14 +448,33 @@ export default function AdminNewBookingView({
     if (filtered.length === 0) {
       setShowCustomerDropdown(false);
     }
+
+    // Auto-prompt Patient Account Modal if phone number length is >= 10 and not found in database
+    if (cleanDigits.length >= 10) {
+      const exactMatch = allCustomers.find(c => {
+        const cPhone = (c.mobile || c.phone || "").replace(/\D/g, "");
+        return cPhone && (cPhone === cleanDigits || cPhone.endsWith(cleanDigits) || cleanDigits.endsWith(cPhone));
+      });
+
+      if (!exactMatch && promptedPhoneRef.current !== cleanDigits) {
+        promptedPhoneRef.current = cleanDigits;
+        setFoundCustomer(null);
+        setPatientFound(false);
+        setShowPatientAccountModal(true);
+      } else if (exactMatch && !foundCustomer) {
+        handleSelectCustomer(exactMatch);
+      }
+    }
   }, [phone, allCustomers]);
 
   // Handle Select Customer from List
-  const handleSelectCustomer = async (cust: CustomerItem) => {
+  const handleSelectCustomer = async (cust: any) => {
     setFoundCustomer(cust);
     setPatientFound(true);
     const p = cust.mobile || cust.phone || "";
     setPhone(p);
+    promptedPhoneRef.current = p.replace(/\D/g, "");
+    setShowPatientAccountModal(false);
 
     const fName = cust.first_name || cust.name?.split(" ")[0] || cust.full_name?.split(" ")[0] || "";
     const lName = cust.last_name || cust.name?.split(" ").slice(1).join(" ") || cust.full_name?.split(" ").slice(1).join(" ") || "";
@@ -438,6 +485,24 @@ export default function AdminNewBookingView({
     setWhatsapp(cust.whatsapp || p);
     setPatientSearchQuery(`${cust.name || cust.full_name || `${fName} ${lName}`}`.trim());
     setShowCustomerDropdown(false);
+
+    // Populate additional fields if present on customer object
+    if (cust.gender) setGender(cust.gender);
+    if (cust.national_id) setNationalId(cust.national_id);
+    if (cust.age) setAge(String(cust.age));
+    if (cust.occupation) setOccupation(cust.occupation);
+    if (cust.referral || cust.referral_source) setReferralSource(cust.referral || cust.referral_source);
+    if (cust.area || cust.city || cust.location_name) setCity(cust.area || cust.city || cust.location_name);
+    if (cust.street_name || cust.street) setStreet(cust.street_name || cust.street);
+    if (cust.building_no || cust.building) setBuilding(cust.building_no || cust.building);
+    if (cust.floor_no || cust.floor_apt) setFloorApt(cust.floor_no || cust.floor_apt);
+    if (cust.wallet_balance !== undefined) setWalletBalance(Number(cust.wallet_balance) || 0);
+    if (cust.spent_amount !== undefined || cust.total_spent !== undefined) setTotalSpent(Number(cust.spent_amount ?? cust.total_spent) || 0);
+    if (cust.outstanding !== undefined || cust.outstanding_balance !== undefined) setOutstandingBalance(Number(cust.outstanding ?? cust.outstanding_balance) || 0);
+
+    if (cust.gender || cust.national_id || cust.age || cust.occupation || cust.area || cust.street_name) {
+      setShowAdditionalPatientFields(true);
+    }
 
     // Fetch active packages for this customer
     try {
@@ -681,6 +746,48 @@ export default function AdminNewBookingView({
 
     setSubmitting(true);
     try {
+      let resolvedCustomerId = foundCustomer?.id || null;
+
+      // If customer is not found in DB, auto-create customer profile with all collected fields
+      if (!resolvedCustomerId && (firstName || phone)) {
+        try {
+          const custPayload = {
+            name: fullPatientName,
+            first_name: firstName,
+            last_name: lastName,
+            mobile: phone,
+            email: email || null,
+            gender: gender || null,
+            national_id: nationalId || null,
+            age: age ? Number(age) : null,
+            occupation: occupation || null,
+            referral: referralSource || null,
+            area: city || null,
+            street_name: street || null,
+            building_no: building || null,
+            floor_no: floorApt || null,
+            wallet_balance: Number(walletBalance || 0),
+            spent_amount: Number(totalSpent || 0),
+            outstanding: Number(outstandingBalance || 0)
+          };
+
+          const createCustRes = await fetch("/api/customers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(custPayload)
+          });
+
+          if (createCustRes.ok) {
+            const newCust = await createCustRes.json();
+            if (newCust && newCust.id) {
+              resolvedCustomerId = newCust.id;
+            }
+          }
+        } catch (custErr) {
+          console.warn("Auto-create customer error (non-fatal):", custErr);
+        }
+      }
+
       const payload = {
         name: fullPatientName,
         phone: phone,
@@ -695,7 +802,7 @@ export default function AdminNewBookingView({
         notes: notes || null,
         isManual: true,
         status: "approved",
-        explicitCustomerId: foundCustomer?.id || null,
+        explicitCustomerId: resolvedCustomerId,
         amountPaid: amountPaidNow,
         amountLeft: Number(selectedServiceObj?.price || 0) - amountPaidNow
       };
@@ -769,17 +876,27 @@ export default function AdminNewBookingView({
                 </h2>
               </div>
 
-              {/* Patient Status Indicator */}
-              {patientFound === true && (
-                <span className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 text-xs font-bold text-emerald-700">
-                  <CheckCircle2 size={15} className="text-emerald-600" /> {tr.patientFoundBadge}
-                </span>
-              )}
-              {patientFound === false && (
-                <span className="inline-flex items-center gap-1.5 rounded-2xl bg-blue-50 border border-blue-200 px-3.5 py-1.5 text-xs font-bold text-blue-700">
-                  {tr.newPatientBadge}
-                </span>
-              )}
+              {/* Patient Status Indicator & Toggle Button */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {patientFound === true && (
+                  <span className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 text-xs font-bold text-emerald-700">
+                    <CheckCircle2 size={15} className="text-emerald-600" /> {tr.patientFoundBadge}
+                  </span>
+                )}
+                {patientFound === false && (
+                  <span className="inline-flex items-center gap-1.5 rounded-2xl bg-blue-50 border border-blue-200 px-3.5 py-1.5 text-xs font-bold text-blue-700">
+                    {tr.newPatientBadge}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowAdditionalPatientFields(!showAdditionalPatientFields)}
+                  className="text-xs font-bold text-[#0F3826] hover:underline bg-[#EBF2EB] px-3 py-1.5 rounded-xl flex items-center gap-1 transition cursor-pointer"
+                >
+                  <User size={13} />
+                  <span>{showAdditionalPatientFields ? "Hide Account Details" : "+ Patient Account Details"}</span>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4 text-xs md:text-sm">
@@ -956,6 +1073,188 @@ export default function AdminNewBookingView({
                   </div>
                 </div>
               </div>
+
+              {/* ── ADDITIONAL PATIENT INTAKE DATA (Photos 2 & 3) ── */}
+              {showAdditionalPatientFields && (
+                <div className="space-y-4 pt-4 border-t border-[#414E36]/10 animate-fadeIn">
+                  {/* Row 1: Gender & National ID */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">Gender</label>
+                      <div className="relative">
+                        <select
+                          value={gender}
+                          onChange={(e) => setGender(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 appearance-none text-xs"
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="Female">Female</option>
+                          <option value="Male">Male</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute end-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">National ID</label>
+                      <input
+                        type="text"
+                        value={nationalId}
+                        onChange={(e) => setNationalId(e.target.value)}
+                        placeholder="Enter 14-digit National ID"
+                        maxLength={14}
+                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Referral Source & Occupation */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">Referral Source</label>
+                      <div className="relative">
+                        <select
+                          value={referralSource}
+                          onChange={(e) => setReferralSource(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 appearance-none text-xs"
+                        >
+                          <option value="">Select Referral Source...</option>
+                          <option value="Instagram">Instagram</option>
+                          <option value="Facebook">Facebook</option>
+                          <option value="Friend/Family">Friend / Family</option>
+                          <option value="TikTok">TikTok</option>
+                          <option value="Google Search">Google Search</option>
+                          <option value="Walk-in">Walk-in</option>
+                          <option value="Doctor Referral">Doctor Referral</option>
+                          <option value="Other">Other</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute end-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">Occupation</label>
+                      <input
+                        type="text"
+                        value={occupation}
+                        onChange={(e) => setOccupation(e.target.value)}
+                        placeholder="e.g. Engineer, Doctor"
+                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3: Age (Photo 3) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">Age</label>
+                      <input
+                        type="number"
+                        value={age}
+                        onChange={(e) => setAge(e.target.value)}
+                        placeholder="e.g. 28"
+                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* ADDRESS INFORMATION SECTION (Photo 2) */}
+                  <div className="pt-3 space-y-3">
+                    <div className="flex items-center gap-2 text-[#0F3826] font-black text-xs uppercase tracking-wider">
+                      <div className="h-6 w-6 rounded-full bg-[#EBF2EB] flex items-center justify-center text-[#0F3826]">
+                        <MapPin size={13} />
+                      </div>
+                      <span>ADDRESS INFORMATION</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">City / Area</label>
+                        <input
+                          type="text"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          placeholder="e.g. New Cairo"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Street</label>
+                        <input
+                          type="text"
+                          value={street}
+                          onChange={(e) => setStreet(e.target.value)}
+                          placeholder="e.g. 90th Street"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Building</label>
+                        <input
+                          type="text"
+                          value={building}
+                          onChange={(e) => setBuilding(e.target.value)}
+                          placeholder="e.g. Building 14"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Floor / Apt</label>
+                        <input
+                          type="text"
+                          value={floorApt}
+                          onChange={(e) => setFloorApt(e.target.value)}
+                          placeholder="e.g. Floor 3, Apt 6"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* FINANCIAL INFORMATION SECTION (OPTIONAL - Photo 2) */}
+                  <div className="pt-3 space-y-3">
+                    <div className="flex items-center gap-2 text-[#0F3826] font-bold text-xs">
+                      <div className="h-6 w-6 rounded-full bg-[#EBF2EB] flex items-center justify-center text-[#0F3826]">
+                        <Wallet size={13} />
+                      </div>
+                      <span>Financial Information (Optional)</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Wallet Balance (EGP)</label>
+                        <input
+                          type="number"
+                          value={walletBalance}
+                          onChange={(e) => setWalletBalance(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Total Spent (EGP)</label>
+                        <input
+                          type="number"
+                          value={totalSpent}
+                          onChange={(e) => setTotalSpent(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Outstanding Balance (EGP)</label>
+                        <input
+                          type="number"
+                          value={outstandingBalance}
+                          onChange={(e) => setOutstandingBalance(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1323,6 +1622,51 @@ export default function AdminNewBookingView({
               >
                 {submitting ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                 <span>{submitting ? tr.creatingBtn : tr.confirmCreateBookingBtn}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PATIENT ACCOUNT AUTO-POPUP MODAL (Photo 1) ── */}
+      {showPatientAccountModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-6 animate-scaleIn border border-[#414E36]/15">
+            {/* Top Avatar Icon */}
+            <div className="h-20 w-20 rounded-full bg-[#EBF2EB] mx-auto flex items-center justify-center text-[#1E4D38] shadow-inner">
+              <ShieldCheck size={38} className="text-[#0F3826]" />
+            </div>
+
+            {/* Title & Question */}
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-[#1F251A]">Patient Account</h3>
+              <p className="text-sm font-medium text-[#5A6A51]">
+                Does the patient already have an account?
+              </p>
+            </div>
+
+            <div className="w-full border-b border-gray-100" />
+
+            {/* Actions: No / Yes */}
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPatientAccountModal(false);
+                }}
+                className="flex-1 py-3 px-5 rounded-2xl border border-[#414E36]/30 text-[#1F251A] font-bold text-sm hover:bg-gray-50 transition cursor-pointer"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdditionalPatientFields(true);
+                  setShowPatientAccountModal(false);
+                }}
+                className="flex-1 py-3 px-5 rounded-2xl bg-[#0F3826] text-white font-bold text-sm hover:bg-[#0A271A] transition shadow-md cursor-pointer"
+              >
+                Yes
               </button>
             </div>
           </div>
