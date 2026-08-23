@@ -2654,6 +2654,101 @@ failing spec rather than being silently re-tightened. Mohamed reviewed and appro
 
 ---
 
+## RISK-066: System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate
+
+**Severity:** Critical · **Type:** PII exposure / access control
+**Found:** 2026-08-22, while investigating the "System Test Suite" admin section for a possible
+extraction/translation brief — not user-reported.
+**Status:** Open.
+
+**What it is:** the diagnostics runner at `page.tsx:2707-2841`/`10006-10222` ("System Test Suite" in
+Settings) fires 33 hardcoded GET requests against real endpoints — including
+`/api/medical-records`, `/api/prescriptions`, `/api/customers/products`, `/api/customers/reconcile`,
+`/api/employees`, `/api/hr/payroll`, `/api/hr/doctor-payroll` — using the operator's own bearer
+token, and stores the **full raw JSON response body** in component state
+(`responseDetails: data`, `page.tsx:2789-2795`). It is then dumped verbatim:
+```jsx
+{tc.responseDetails && (
+  <pre>{JSON.stringify(tc.responseDetails, null, 2)}</pre>
+)}
+```
+(`page.tsx:10207-10208`). Whoever runs this test suite sees another patient's medical records,
+prescriptions, and staff salary figures rendered on their own screen — not because they queried for
+that patient, but because a diagnostics button happened to fetch them.
+
+**Confirmed, not assumed:** independently verified both parts directly — the `responseDetails: data`
+assignment at line 2789-2795 and the unfiltered `<pre>{JSON.stringify(...)}}</pre>` render at
+10207-10208, and confirmed `grep -n "NODE_ENV" page.tsx` returns **zero matches** anywhere in the
+file. There is no environment gate at all.
+
+**Reachable in production, not dev-only:** it's a normal Settings submenu item (`page.tsx:5888`),
+gated only by `hasPermission("settings.test_suite")` **or** superadmin — a real, grantable
+`PERMISSION_STRUCTURE` key (`page.tsx:505`), not a superadmin-only screen. Any admin role holding
+that one permission can trigger the full PII dump.
+
+**Additional quality problem, not the security issue but worth noting alongside:** 9 of the 33
+"tests" are duplicates pointing at the same endpoint under different names (6× `/api/reservations`
+as TC-025…030, 3× `/api/reception/dashboard` as TC-031…033), and "pass" means only HTTP 200 — no
+response-shape assertion. `tests/routes/auth-sweep.test.ts` already covers the same 33 endpoints
+with real assertions, in CI, for free — this screen adds risk without adding real coverage.
+
+**Mitigation, not yet applied:**
+1. Stop rendering `responseDetails` raw — show only pass/fail, status code, and duration; drop the
+   `<pre>` block entirely, or truncate/redact before display.
+2. Either gate the whole section behind `process.env.NODE_ENV !== 'production'`, or at minimum
+   tighten its permission requirement to `adminRole === "superadmin"` only (remove the
+   `settings.test_suite` grantable-permission path).
+3. Given `auth-sweep.test.ts` already covers these endpoints with real assertions in CI, consider
+   deleting this screen outright rather than fixing it — see `WINDSURF_BRIEFS.md` Brief-25-adjacent
+   investigation notes (Group D) for the full recommendation.
+
+---
+
+## RISK-067: `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data
+
+**Severity:** High · **Type:** Data exposure / access control
+**Found:** 2026-08-22, while investigating the Settings-submenu screens for extraction/translation
+briefs — not user-reported.
+**Status:** Open.
+
+**What it is:** `src/app/api/page-settings/route.ts`'s `GET()` (line 85) has **no auth check at
+all** — confirmed directly: `requireAdministratorAccess` is imported but only invoked inside `POST`
+(line 129), never in `GET`. This is deliberate and correct for its original purpose — the public
+booking site's `BookingModal.tsx:312` calls this same endpoint unauthenticated to read public
+booking-flow config.
+
+**The problem:** the same settings blob this route serves now also holds operationally sensitive
+data that has nothing to do with the public booking flow, added by later Settings screens that
+reused the shared `page_settings` blob without revisiting the route's auth model:
+- `deposit.instapayAddress` / `deposit.walletNumber` — the clinic's payment-destination details
+  (Deposit Settings, `page.tsx:8965-9111`).
+- `notifications.staffEmail` — an internal staff contact address (Notification Settings,
+  `page.tsx:9270-9468`).
+- The `departments` list (Department Management, `page.tsx:9947-10001`, written via
+  `handleSaveDepartments`).
+
+All of these are readable by anyone who calls `GET /api/page-settings` directly, with no session,
+no token, no rate limit beyond whatever sits in front of the deployment.
+
+**Consequence:** payment-destination data (where InstaPay transfers land) and internal staff contact
+info are exposed on an endpoint that was never intended to serve them — an unrelated feature reused
+a shared storage blob without re-checking who could read it.
+
+**Compounding factor, same root cause:** `POST /api/page-settings` requires only
+`requireAdministratorAccess` with **no per-key permission check** — any administrator can rewrite
+CMS content, InstaPay payment destinations, and the departments list regardless of whether they hold
+`settings.pages`, `settings.booking_settings`, or `settings.roles` specifically. The granular
+`PERMISSION_STRUCTURE` model (RISK-025-adjacent, see Role Management) exists only client-side for
+this route.
+
+**Mitigation, not yet applied:** split the `page_settings` blob's genuinely-public keys (whatever
+`BookingModal.tsx` actually needs) from the operationally sensitive ones, and either move the
+sensitive keys to an authenticated-only table/route, or add field-level filtering to `GET` so the
+public response never includes `deposit.*`/`notifications.staffEmail`/`departments`. Separately,
+add per-key permission checks to `POST` matching the relevant `PERMISSION_STRUCTURE` prefix.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:

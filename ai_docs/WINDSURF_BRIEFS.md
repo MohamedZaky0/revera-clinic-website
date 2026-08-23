@@ -216,6 +216,276 @@ sub-tabs in both languages, and explicitly including the Edit Target modal in Ar
 second `dir` was applied.
 
 ---
+
+## Brief 25 — Role Management: extract, then translate, then test (3 parts, 3 commits)
+
+**Target: `page.tsx:9640–10004`, 365 lines** (verified 2026-08-22 at `page.tsx` = 14,735 lines,
+post-Brief-22 — re-measure). Extract to `src/components/admin/settings/RoleManagementView.tsx`.
+
+Unlike Briefs 21/22 this one is **three ordered parts in three separate commits**: Part 1
+extraction (zero behaviour change), Part 2 translation, Part 3 tests. Do not combine them — the
+project's whole review discipline depends on a mechanical move being reviewable on its own.
+
+### Part 1 — extraction
+
+**Permission gate: `activeNav === "Role Management" && adminRole === "superadmin"` (line 9640), and
+it is the only gate — zero `hasPermission()` calls inside the block. Preserve verbatim.**
+
+**Known defect, preserve and log, do NOT fix:** three layers disagree about who can see this screen.
+The sidebar (5887) shows it for `hasPermission("settings.roles")` **or** superadmin; the nav guards
+(1900, 2575) map `"Role Management" → "settings.roles"` and let a non-superadmin through; but the
+content gate (9640) demands superadmin. So an admin holding `settings.roles` sees the menu item,
+clicks it, and gets a **completely blank content area** — no message, no fallback. Real UX defect,
+out of scope for a mechanical move.
+
+**Three sub-cards, all in one grid (9648–10002):**
+
+| Card | Lines | Handlers (all defined outside the block) | API |
+|---|---|---|---|
+| Define System Roles | 9650–9788 | `handleCreateRole` (2362), `handleDeleteRole` (2393) | `POST /api/roles`, `DELETE /api/roles?name=` |
+| Provision Employee Credentials | 9791–9944 | `handleCreateEmployee` (2413), `handleUpdateEmployeeRole` (2498), `handleDeleteEmployee` (2455), `handleResendInvitation` (2474) | `POST`/`DELETE`/`PATCH ×2 /api/employees` |
+| Department Management | 9947–10001 | `handleSaveDepartments` (4260) | **`POST /api/page-settings`** (4263) |
+
+**Moves in (Role-Management-exclusive), but note it is NOT one contiguous cluster** — same trap
+Brief 22 hit: `newRoleName` (920), `newRolePermissions` (921), `roleCreateError` (925),
+`roleCreateSuccess` (926) sit together at 917–928, but **`newDeptInput` is declared ~2,400 lines
+away at 3366**, next to `departmentsList` (3365). Grep for both sites; don't assume contiguity.
+
+`handleCreateEmployee`, `handleUpdateEmployeeRole` and `handleSaveDepartments` each have exactly
+**one** call site and it is inside this block — Brief 21 left them behind as out of scope, and they
+are now genuinely exclusive to Role Management, so they move in. **Exception:**
+`handleSaveDepartments` mutates `departmentsList`, which `AdminEmployeesView` and `AdminHrView` both
+consume as a prop — move the handler, keep `departmentsList`/`setDepartmentsList` lifted in
+`page.tsx`, exactly the pattern Brief 21 used for `viewingEmployee`.
+
+**Stay props (shared, do not fork):** `employeesList` (918), `rolesList` (917), `departmentsList`
+(3365), `loadingRolesAndEmployees` (919), `newEmployeeName`/`Email`/`Role` (923/922/924 — shared
+with the Employees component's own form), `employeeCreateError`/`Success` (927/928),
+`handleDeleteEmployee`, `handleResendInvitation`, `fetchRolesAndEmployees` (2044), and `adminRole`
+(read a second time *inside* the block at 9890 as a redundant re-check — **pass it down, do not
+"simplify" the redundancy away**).
+
+**Keep in `page.tsx`:** the load effect at 2021–2024, keyed on
+`activeNav === "Role Management"` alongside `"Profile"`/`"Employees"` — same call Brief 22 made for
+`fetchHrData`.
+
+### Part 2 — translation
+
+Wiring identical to Brief 23 (`lang` + `t: typeof adminTranslations["en"]["roleManagement"]`, new
+namespace mirrored under `en`/`ar`). **Zero `dir=` and zero `toLocale*` in the whole block** — no
+Arabic content anywhere, so exactly one new `dir` on the component root, and nothing to pin.
+
+**`PERMISSION_STRUCTURE` (`page.tsx:391–521`, 131 lines) is the whole game here.** 12 category
+groups, 57 permission keys, shape `{ category, prefix, items: [{ key, label }] }`. That is
+**69 hardcoded English display strings** (12 `category` + 57 `label`) rendered at `{group.category}`
+(9698) and `{item.label}` (9719) — and the grep floor of ~50 for the block **does not include any of
+them**, because they live in a constant, not in JSX. Total real scope is ~119 strings, not 50.
+- Every `label` is pure display — nothing compares or stores one. Safe to translate.
+- Every `key` (`inventory.manage_devices`, …) is **stored in the DB and compared** by
+  `hasPermission` (834), `POST /api/roles` (2375), and the `settingsSubsections` maps (1893–1905,
+  2566–2577). **Never translate a key.**
+- **The bug this brief exists to catch:** `page.tsx:9767` renders the canonical key string *raw* as
+  the "Allowed Modules" chips —
+  `{r.permissions.map((p: string) => <span key={p}>{p}</span>)}` — with no lookup into
+  `PERMISSION_STRUCTURE.label` at all. It is an interpolated expression, **invisible to
+  `grep '>[A-Z][a-z]'`** — the exact failure class behind Brief 18's day-names bug and all five
+  Brief 20 gaps. Build a `key → label` map from `PERMISSION_STRUCTURE` and render the label, while
+  keeping `p` as the React `key` and as the stored value.
+
+**Value/label sites — one is genuinely dangerous:**
+- **`page.tsx:9984` — `dept !== "Doctors" && dept !== "Receptionist"`** decides whether a
+  department's delete button renders. These two hardcoded English names are the protected system
+  departments (seeded at 3365 and 4252). **Translating either literal silently makes both
+  deletable.** Highest-risk single line in the section after 9767.
+- 9772/9781 `r.name !== 'superadmin'` → `"System Locked"`; 9890/9915/9937
+  `emp.employee_id !== 'superadmin'` → `"System Owner"` — canonical values, translate the labels
+  only.
+- Role names (9763, 9838, 9898) and `{emp.role_name}` (9903) are user-created free text from the DB
+  — leave untranslated, and note it so nobody "fixes" it later.
+- 9908–9911 `"✓ Active"` / `"⏳ Invite Pending"` — pure labels, safe.
+- **Two imperative-string sites a JSX grep will miss:** `alert("Department already exists!")` (9957)
+  and the `confirm(...)` template at 9988.
+
+**RTL:** `text-left` on `<th>` at 9747, 9748, 9869, 9870, 9871 → `text-start`; `ml-1` at 9992 → `ms-1`.
+
+### Part 3 — tests (two, both permission-critical, neither is CRUD noise)
+
+Today `/api/roles` and `/api/employees` have **auth-shape assertions only** (`auth-sweep.test.ts`
+209 and 162) — zero behaviour coverage.
+
+1. **`PATCH /api/employees` role change — privilege escalation. Write this one first.**
+   `handleUpdateEmployeeRole` (2498) fires `PATCH /api/employees` (2500) from a `<select>` (9893)
+   whose only guard is a **client-side** `adminRole === "superadmin"` check at 9890. Server-side
+   the route requires only `requireAdministratorAccess`. Assert that a non-superadmin administrator
+   cannot PATCH another account's `role_name`. **Read the PATCH handler body first** — this is
+   stated as "assert this", not as a confirmed defect; the investigation did not read it. If the
+   route does allow it, that is a real privilege-escalation finding: stop, log it in `RISKS.md`,
+   and raise it rather than quietly fixing it inside a translation brief.
+2. **`POST /api/roles` — permission-key validation.** The route validates only
+   `Array.isArray(permissions)` (`src/app/api/roles/route.ts:30`); nothing checks the strings are
+   real `PERMISSION_STRUCTURE` keys. A typo'd key is stored silently and then never matches in
+   `hasPermission` — a role that looks configured in the UI but grants nothing. Assert unknown keys
+   are rejected; if current behaviour is permissive, assert that with `it.fails` per the repo
+   convention so a future tightening shows up.
+
+Follow `tests/routes/packages-consume.test.ts` for structure (supabase fake, seeded auth, the
+`it.fails` convention). **Do not** write round-trip tests for the settings blobs — see Brief 26.
+
+---
+
+## Brief 26 — the 7 small Settings screens: extract behind shared hooks, then translate, then one test
+
+**Do not write seven separate components with seven copies of the same load/save logic.** These
+screens are ~1,114 lines total and they already share their persistence layer — the investigation
+confirmed it rather than assumed it.
+
+| Screen | Range | Size | Endpoint |
+|---|---|---|---|
+| Booking Settings | 8744–8954 | 211 | `POST /api/page-settings` key `booking` |
+| Notification Settings | 9270–9468 | 199 | `POST /api/page-settings` key `notifications` |
+| Queue Settings | 9470–9636 | 167 | `POST /api/page-settings` key `queue` |
+| Inactivity Settings | 9113–9268 | 156 | `POST /api/page-settings` key `inactivity` |
+| Branches | 8581–8736 | 156 | `POST /api/branches`, `DELETE /api/branches?id=` |
+| Deposit Settings | 8965–9111 | 147 | `POST /api/page-settings` key `deposit` |
+| Service Hours | 8502–8579 | 78 | `POST /api/branches` (writes `service_hours`) |
+
+Five share `POST /api/page-settings` with a partial payload keyed on one top-level property, and all
+five hydrate from the **same** loader `fetchPageSettings()` (4089–4258). The other two share
+`POST /api/branches` and the same `branches`/`setBranches` state — **Service Hours is really a
+sub-view of Branches**, selecting one via `selectedBranchForHoursId` (3225, dropdown 8512–8520).
+
+**Structure:** `src/components/admin/settings/` with a `usePageSettings()` hook (one loader, one
+`savePartial(key, payload)` writer) behind the five, and Branches + Service Hours sharing branch
+state. Extract first (Part 1), translate second (Part 2), one test (Part 3).
+
+**State is in FOUR clusters, not one** — assuming contiguity will lose fields:
+`811–817` (inactivity + `bookingStaleSessionHours`, which sits ~2,600 lines from the rest of Booking
+Settings' own state), `3099–3100` (`pagesSettingsTab`, `termsText`), `3217–3226` + `3372–3380`
+(branches + service hours), `3425–3463` (the booking/deposit/notification/queue block).
+
+**Cross-component coupling — `handleSaveBookingSettings` (4445) must NOT move into a Booking
+Settings component.** The already-extracted `TermsManagerView` receives it as a prop at 8959–8961,
+and both write the same `booking` key. Keep it lifted.
+
+**Also coupled:** Role Management's `handleSaveDepartments` writes the same `/api/page-settings`
+blob (Brief 25). Whichever of the two lands second must not fork the writer.
+
+### Defects found — preserve verbatim in Part 1, log them, fix none of them here
+
+1. **Notification Settings and Queue Settings never hydrate.** `fetchPageSettings` has no
+   `data.notifications` or `data.queue` branch; every `setNotif*`/`setQueue*` setter is called only
+   from its own `onChange`. Both screens are **write-only** — reload the panel and saved values
+   silently revert to the `useState` defaults. Same class as RISK-058.
+2. **`POST /api/page-settings` merges shallowly** (`{ ...existing?.value, ...body }`), so a partial
+   write that omits a sibling field inside a key **destroys it**. Live instance: `savePageSettings()`
+   (Pages Settings, Brief 27) sends a `booking` block at 4632–4641 that omits `staleSessionHours`,
+   so saving any CMS section wipes it. `handleSaveBookingSettings` includes it, so Booking Settings
+   is the safe writer and Pages Settings is the destructive one.
+3. **Booking, Notification and Queue saves are fire-and-forget** — they `await fetch(...)` and never
+   check `res.ok`, never alert, never `clearFetchCache()`, never re-fetch (4448, 4475, 4492). A
+   failed save is completely silent. Deposit (4386) and Inactivity (4420) do check.
+4. **Hardcoded client values, CLAUDE.md rule-2 / RISK-001 shape**, densest in Deposit Settings:
+   `"Revera Clinic"`, `"revera@instapay"`, `"https://www.instapay.eg"`, `"Revera Clinics Cash"`,
+   `"01012345678"` appear as `useState` defaults (3436–3442) **and again** as fallbacks in
+   `fetchPageSettings` (4216–4233); Notification adds `"Revera Clinics"` / `"ريفيرا كلينيك"`
+   (3451–3452) and `"admin@reveraclinics.com"` (3454). Name them in the PR; fix under PROPOSAL-001.
+
+### Part 2 — translation notes per screen
+
+- **Branches and Notification Settings edit bilingual *content*** — Branches has a field descriptor
+  array (8691–8698) with `dir: "rtl"` on the two Arabic rows applied via `dir={dir}` at 8705;
+  Notification has a hardcoded `dir="rtl"` at 9406 on the Arabic SMS-template textarea. **These are
+  content-direction hints, not the language toggle — leave every one untouched**, same call Brief 19
+  made for `AdminServicesView`.
+- **Service Hours: `{sh.day}` at 8534 renders the raw English weekday** — interpolated, invisible to
+  string greps, identical to the Brief 18 day-names bug. **But before adding a lookup:** the
+  `serviceHours` type already carries a `dayAr` field (3372) that every seed row populates
+  (`"الأحد"` …, 3373–3379 and 3969–3975) and **nothing ever renders**. Wire the existing field
+  rather than inventing a parallel lookup.
+- **Branches value/label:** `<option value="active">Active</option>` / `"inactive"` (8720–8721) with
+  `br.status === "active"` comparisons at 8613, 8620 driving badge class *and* label. Canonical
+  lowercase values; label-only translation.
+- **A display decision to make explicitly, not by accident:** the branch card renders `{br.name_en}`
+  as heading (8611) and `{br.name_ar}` as subtitle (8615) **regardless of `lang`**. Decide whether
+  Arabic mode swaps them or keeps both, and say which in the PR. Same question for the
+  `{b.name_en} ({b.name_ar})` cramped-bilingual `<option>` at 8518.
+- Booking/Queue/Notification `<select>`s are all **numeric** values with English suffix labels
+  (8783, 8808, 8833, 8884; 9600–9604; 9434–9438) — safe, translate labels only.
+- **Inactivity Settings is the cleanest of the seven** (no options, no placeholders, no `dir`, no
+  `toLocale*`, no value/label sites) — but its two values feed the **global** presence-monitoring
+  effect at 2232–2248 that runs for every logged-in staff role, so its state must stay lifted in
+  `page.tsx`; pass values + setters down.
+- **`toLocale*`: zero across all seven.** Nothing to pin.
+
+### Part 3 — exactly one test, and it is not a round-trip
+
+**Write the `POST /api/page-settings` shallow-merge test.** Seed a row with
+`booking: { minAdvance: 2, staleSessionHours: 6, termsText: "X" }`, POST the exact payload
+`savePageSettings()` builds at 4585–4643 (which omits `staleSessionHours`), assert the stored value.
+It will show the field destroyed — a real, currently-reproducible data-loss bug, and the single
+highest-value test in this whole survey. Land it as `it.fails` per repo convention (or fix + assert,
+but the test is required either way).
+
+**Do NOT write** round-trip tests for the individual Deposit/Inactivity/Booking/Notification/Queue
+payloads. They assert that a config blob echoes itself. The merge semantics are the thing worth
+testing; the individual payloads are not. If you want the never-hydrate bug covered, add a one-line
+assertion inside the same test rather than five new files.
+
+---
+
+## Brief 27 — Pages Settings: extract in 3 ordered sub-PRs (translation deferred)
+
+**`page.tsx:6640–8426`, 1,787 lines — the largest remaining block by 5×. Do not attempt this as one
+brief.** Split by tab, smallest first, the same shape that worked for Briefs 5/10/11:
+
+| Sub-PR | Tab | Range | Size | Sub-sections |
+|---|---|---|---|---|
+| 27.1 | Services | 7989–8424 | 436 | How It Works (7994), Why Choose Us (8108) |
+| 27.2 | Home | 6666–7148 | 483 | Hero Slider (6672), Before/After Results (6962) |
+| 27.3 | About Us | 7150–7987 | 838 | About Photos (7154), What We Do (7344), FAQ (7591) |
+
+Plus a shared `usePageSettings` hook holding `savePageSettings` (4532–4664), `handleAutoTranslate`
+(4506–4531) and the ~50 content state vars (roughly 3380–3424 plus scattered
+`wcu*`/`faq*`/`howItWorks*` declarations — **enumerate these before starting; the investigation
+deliberately did not, and the enumeration is mechanical but load-bearing**).
+
+**This is a bilingual content editor, not a UI needing its own chrome translated — and the two must
+not be conflated.** It already has its own content-language tab, `pageSettingsLangTab`
+(declared 3380, typed `"en" | "ar"`, toggle at 6693–6710, driving
+`const slidesList = pageSettingsLangTab === "en" ? homeHeroSlides : homeHeroSlidesAr` at 6667).
+**That is orthogonal to the admin `lang` state and must never be merged with it.** Likewise:
+- **21 hardcoded `dir=` attributes** on Arabic content inputs (7535, 7537, 7765, 7766, 7786, 7787,
+  7905, 7921, 7945, 8050, 8051, 8071, 8072, 8324, 8325, 8345, 8346, 8366, 8367, 8388, 8389) — content
+  hints, leave untouched.
+- **32 lines containing Arabic literals** are **default content values, not UI copy** — do not move
+  them into `translations.ts`.
+- `_ar` field pairs throughout (`homeHeroSlidesAr`, `whatWeDoListAr`, `faqsAr`, `wcuQuoteAr`, …).
+
+**Real auto-translate feature, not dead code:** `POST /api/translate` via `handleAutoTranslate`, 16
+call sites plus a 5-use per-slide wrapper in the Hero editor. Preserve it exactly.
+
+**Payload concern worth flagging (not fixing):** there is no image-upload endpoint — every image is
+`compressImage()`d and stored **inline as base64 in the settings JSON blob** (6784, 7036, 7098,
+7190, 7247, 7304, 7380, 7437, …), and every one of the 8 in-block `savePageSettings()` calls
+re-POSTs the entire blob including every embedded image.
+
+**Also carries defect #2 from Brief 26:** `savePageSettings()`'s `booking` block (4632–4641) omits
+`staleSessionHours` and the shallow merge therefore destroys it on every CMS save.
+
+**Chrome string count ~163** (91 JSX text nodes + 38 placeholders + 4 `title=` + headings + ~5
+`alert()` messages at 4653/4656/4660) — a floor, since the Translate buttons build labels by
+interpolation (`` `Translate to ${...} ➜` `` at 6821, 6842, 6863, 6884). **`toLocale*`: zero. No
+`<option>` elements at all.**
+
+**Pre-existing encoding corruption, found not caused:** lines 6821, 6842, 6863, 6884, 6916 contain
+`âž"` — a mojibake'd `➜`. Confirm with `git log -S` before touching; **do not "fix" it inside an
+extraction PR.**
+
+**Translation is deliberately deferred** to a later brief — extract all three sub-PRs first. The
+chrome/content distinction above is subtle enough that mixing it with a mechanical move is how this
+one goes wrong.
+
+---
 ---
 
 # ARCHIVE — completed briefs
