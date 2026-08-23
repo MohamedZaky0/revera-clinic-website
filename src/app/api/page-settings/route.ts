@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { requireAdministratorAccess } from '@/lib/access';
+import { requireAdministratorAccess, requireStaffAccess } from '@/lib/access';
 import fs from 'fs';
 import path from 'path';
 
@@ -82,7 +82,28 @@ const DEFAULT_SETTINGS = {
   }
 };
 
-export async function GET() {
+// RISK-067: this route is intentionally unauthenticated — the public booking site (BookingModal,
+// LanguageContext) reads it without a session. `deposit.*` is legitimately public (patients need
+// the InstaPay/wallet destination to pay their deposit). `notifications.staffEmail` and
+// `departments` are internal-only and have no public reader — strip them before responding.
+function stripInternalFields(value: any) {
+  if (!value || typeof value !== 'object') return value;
+  const { notifications, departments, ...rest } = value;
+  if (notifications && typeof notifications === 'object') {
+    const { staffEmail, ...restNotifications } = notifications;
+    return { ...rest, notifications: restNotifications };
+  }
+  return rest;
+}
+
+export async function GET(req?: Request) {
+  // Authenticated staff (the admin panel) get the full blob — Department Management reads
+  // `departments` from this same response. Anyone else (the public booking site) gets the
+  // internal-only fields stripped.
+  const staffAccess = req ? await requireStaffAccess(req) : { error: 'No request', status: 401 as const };
+  const isStaff = 'access' in staffAccess;
+  const filter = isStaff ? (v: any) => v : stripInternalFields;
+
   try {
     const { data, error } = await supabaseServer
       .from('page_settings')
@@ -91,15 +112,15 @@ export async function GET() {
       .maybeSingle();
 
     if (!error && data) {
-      return NextResponse.json(data.value);
+      return NextResponse.json(filter(data.value));
     } else if (!data) {
       // Seed default row in Supabase
       const { error: insertError } = await supabaseServer
         .from('page_settings')
         .insert({ key: 'home', value: DEFAULT_SETTINGS.home });
-      
+
       if (!insertError) {
-        return NextResponse.json(DEFAULT_SETTINGS.home);
+        return NextResponse.json(filter(DEFAULT_SETTINGS.home));
       } else {
         console.warn("Failed to seed default settings to Supabase, falling back to JSON:", insertError);
       }
@@ -115,13 +136,13 @@ export async function GET() {
     if (!fs.existsSync(JSON_FILE_PATH)) {
       fs.mkdirSync(path.dirname(JSON_FILE_PATH), { recursive: true });
       fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(DEFAULT_SETTINGS.home, null, 2));
-      return NextResponse.json(DEFAULT_SETTINGS.home);
+      return NextResponse.json(filter(DEFAULT_SETTINGS.home));
     }
     const fileContent = fs.readFileSync(JSON_FILE_PATH, 'utf-8');
-    return NextResponse.json(JSON.parse(fileContent));
+    return NextResponse.json(filter(JSON.parse(fileContent)));
   } catch (err) {
     console.error("JSON fallback load error:", err);
-    return NextResponse.json(DEFAULT_SETTINGS.home);
+    return NextResponse.json(filter(DEFAULT_SETTINGS.home));
   }
 }
 

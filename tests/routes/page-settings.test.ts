@@ -42,7 +42,7 @@ vi.mock('@/lib/supabaseServer', () => ({
   },
 }));
 
-import { POST } from '@/app/api/page-settings/route';
+import { POST, GET } from '@/app/api/page-settings/route';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -54,6 +54,12 @@ function pageSettingsReq(body: any, token: string | null = 'admin-token'): Reque
     headers,
     body: JSON.stringify(body),
   });
+}
+
+function pageSettingsGetReq(token: string | null): Request {
+  const headers = new Headers();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  return new Request('http://localhost:3000/api/page-settings', { headers });
 }
 
 /** Seed an admin caller so `requireAdministratorAccess` passes. */
@@ -199,5 +205,62 @@ describe('POST /api/page-settings — shallow-merge data-loss (staleSessionHours
     expect(upserted.value.booking.minAdvance).toBe(2);
     // …but staleSessionHours is still there because we didn't touch booking.
     expect(upserted.value.booking.staleSessionHours).toBe(6);
+  });
+});
+
+// ── Test: GET strips internal-only fields for unauthenticated callers (RISK-067) ──────────────
+
+describe('GET /api/page-settings — internal-field filtering (RISK-067)', () => {
+  function seedSettingsWithInternalFields() {
+    fake.seed('page_settings', [
+      {
+        key: 'home',
+        value: {
+          hero: { slides: [], slides_ar: [] },
+          deposit: { instapayAddress: 'clinic@instapay', walletNumber: '01012345678' },
+          notifications: { staffEmail: 'staff@clinic.test', smsOtp: true },
+          departments: ['Receptionist', 'Doctors'],
+        },
+        updated_at: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+  }
+
+  it('strips notifications.staffEmail and departments for an unauthenticated request', async () => {
+    seedSettingsWithInternalFields();
+
+    const res = await GET(pageSettingsGetReq(null));
+    const data = await res.json();
+
+    // deposit stays public — BookingModal needs it to show patients where to pay.
+    expect(data.deposit.instapayAddress).toBe('clinic@instapay');
+    expect(data.deposit.walletNumber).toBe('01012345678');
+    // internal-only fields are gone.
+    expect(data.departments).toBeUndefined();
+    expect(data.notifications.staffEmail).toBeUndefined();
+    // sibling notification fields survive the strip.
+    expect(data.notifications.smsOtp).toBe(true);
+  });
+
+  it('returns the full blob, including departments and staffEmail, for an authenticated staff caller', async () => {
+    seedSettingsWithInternalFields();
+    seedAdminAuth();
+
+    const res = await GET(pageSettingsGetReq('admin-token'));
+    const data = await res.json();
+
+    expect(data.departments).toEqual(['Receptionist', 'Doctors']);
+    expect(data.notifications.staffEmail).toBe('staff@clinic.test');
+  });
+
+  it('strips internal fields for a request bearing an invalid/unrecognized token', async () => {
+    seedSettingsWithInternalFields();
+    mockAuthGetUser.mockResolvedValue({ data: { user: null }, error: { message: 'invalid token' } });
+
+    const res = await GET(pageSettingsGetReq('garbage-token'));
+    const data = await res.json();
+
+    expect(data.departments).toBeUndefined();
+    expect(data.notifications.staffEmail).toBeUndefined();
   });
 });

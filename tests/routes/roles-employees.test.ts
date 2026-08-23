@@ -119,7 +119,7 @@ describe('PATCH /api/employees role change — privilege escalation (RISK-069)',
    * reject role changes from non-superadmin callers.
    */
 
-  it.fails('a non-superadmin admin cannot change another account\'s role_name', async () => {
+  it('a non-superadmin admin cannot change another account\'s role_name', async () => {
     seedAdminAuth();
     seedTargetEmployee();
     // The target role must exist in the roles table for the route to accept it.

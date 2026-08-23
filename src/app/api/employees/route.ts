@@ -245,6 +245,9 @@ export async function PATCH(req: Request) {
         if (employee.employee_id === 'superadmin') {
           return NextResponse.json({ error: 'Cannot modify the role of the system owner account.' }, { status: 400 });
         }
+        if (access.access.role !== 'superadmin') {
+          return NextResponse.json({ error: 'Only the superadmin can change an account\'s role.' }, { status: 403 });
+        }
         const { data: roleExists, error: roleCheckError } = await supabaseServer
           .from('roles')
           .select('name')

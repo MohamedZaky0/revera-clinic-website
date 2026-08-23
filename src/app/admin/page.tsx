@@ -2527,6 +2527,22 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
   const [testSuiteSearch, setTestSuiteSearch] = useState<string>('');
   const [expandedDiagnosticId, setExpandedDiagnosticId] = useState<string | null>(null);
 
+  // RISK-066: shape-only summary (top-level key names, item count) — never field values, so a
+  // diagnostics run never displays another patient's/staff member's actual data.
+  function summarizeDiagnosticResponse(data: any): any {
+    if (Array.isArray(data)) {
+      return {
+        type: 'array',
+        itemCount: data.length,
+        sampleItemKeys: data[0] && typeof data[0] === 'object' ? Object.keys(data[0]) : []
+      };
+    }
+    if (data && typeof data === 'object') {
+      return { type: 'object', keys: Object.keys(data) };
+    }
+    return { type: typeof data };
+  }
+
   const runSingleDiagnosticTest = async (testId: string) => {
     setSystemTestSuites((prev) =>
       prev.map((t) => (t.id === testId ? { ...t, status: 'running', errorMsg: undefined } : t))
@@ -2559,7 +2575,10 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                   status: 'pass',
                   durationMs,
                   statusCode: res.status,
-                  responseDetails: data
+                  // RISK-066: never store the raw response body — it can contain other
+                  // patients'/staff's medical records, prescriptions, or payroll data.
+                  // Keep only a shape summary (no field values) for diagnostic purposes.
+                  responseDetails: summarizeDiagnosticResponse(data)
                 }
               : t
           )
@@ -3854,7 +3873,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
 
   function fetchPageSettings() {
     setLoadingPageSettings(true);
-    cachedFetch("/api/page-settings", 15000)
+    cachedFetch("/api/page-settings", 15000, authenticatedJsonHeaders)
       .then((data) => {
         if (data) {
           setHomeHeroSlides(
@@ -5638,6 +5657,10 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                           { label: "Role Management", icon: Shield, perm: "settings.roles" },
                           { label: "System Test Suite", icon: FlaskConical, perm: "settings.test_suite" }
                         ].filter(sub => {
+                          // RISK-066: System Test Suite can fetch and display other patients'/
+                          // staff's raw PII across every endpoint — superadmin only, no
+                          // grantable-permission path, unlike every other Settings item.
+                          if (sub.label === "System Test Suite") return adminRole === 'superadmin';
                           if (!sub.perm) return true;
                           if (adminRole === 'superadmin') return true;
                           return hasPermission(sub.perm);
@@ -6815,7 +6838,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
             />
           )}
 
-          {activeNav === "System Test Suite" && (
+          {activeNav === "System Test Suite" && adminRole === "superadmin" && (
             <div className="space-y-8 animate-fadeIn">
               <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
                 <div>
@@ -7010,7 +7033,7 @@ ${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ /
                                   <td colSpan={6} className="px-6 py-4">
                                     <div className="rounded-2xl bg-[#1F251A] p-4 text-emerald-400 font-mono text-[11px] overflow-x-auto shadow-inner">
                                       <div className="mb-2 flex items-center justify-between text-slate-400 border-b border-slate-700 pb-2">
-                                        <span>Diagnostic Result Output ({tc.id})</span>
+                                        <span>Response Shape Summary ({tc.id}) — field values redacted</span>
                                         <span>Status Code: {tc.statusCode || 'N/A'}</span>
                                       </div>
                                       {tc.errorMsg && (

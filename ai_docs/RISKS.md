@@ -1,7 +1,7 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-23 (reorganized by status — see summary below; RISK-073 is the newest
-> entry)
+> **Last Updated:** 2026-08-23 (reorganized by status — see summary below; RISK-066/067/069 were
+> resolved same-day and moved to the Resolved section)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -15,7 +15,7 @@
 
 ## Status summary
 
-**16 open** · **12 partially resolved** · **42 resolved** · 70 tracked total.
+**13 open** · **12 partially resolved** · **45 resolved** · 70 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -31,9 +31,6 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 - [RISK-058](#risk-058) — Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
 - [RISK-063](#risk-063) — Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff
 - [RISK-064](#risk-064) — "Add New Category" (Services) Has No Arabic Name Field — Every Category Created There Gets A Permanently Blank `ar`
-- [RISK-066](#risk-066) — System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate
-- [RISK-067](#risk-067) — `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data
-- [RISK-069](#risk-069) — Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees
 - [RISK-070](#risk-070) — Some Roles' "Allowed Modules" Chips Show Untranslated Category Names Instead Of Permission Labels
 - [RISK-071](#risk-071) — Notification Settings and Queue Settings Never Hydrate From Saved Data
 - [RISK-072](#risk-072) — `POST /api/page-settings` Shallow-Merge Destroys Sibling Fields Within A Key
@@ -408,126 +405,6 @@ not a mechanical move. Fix is a second input in the same modal ("Category Name (
 `newCategoryNameAr`, and changing the save handler's `ar: ""` to `ar: newCategoryNameAr.trim()` —
 the state and prop plumbing to do this already exist, only the JSX and the one save-handler field
 are missing.
-
----
-
-## RISK-066: System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate
-
-**Severity:** Critical · **Type:** PII exposure / access control
-**Found:** 2026-08-22, while investigating the "System Test Suite" admin section for a possible
-extraction/translation brief — not user-reported.
-**Status:** Open.
-
-**What it is:** the diagnostics runner at `page.tsx:2707-2841`/`10006-10222` ("System Test Suite" in
-Settings) fires 33 hardcoded GET requests against real endpoints — including
-`/api/medical-records`, `/api/prescriptions`, `/api/customers/products`, `/api/customers/reconcile`,
-`/api/employees`, `/api/hr/payroll`, `/api/hr/doctor-payroll` — using the operator's own bearer
-token, and stores the **full raw JSON response body** in component state
-(`responseDetails: data`, `page.tsx:2789-2795`). It is then dumped verbatim:
-```jsx
-{tc.responseDetails && (
-  <pre>{JSON.stringify(tc.responseDetails, null, 2)}</pre>
-)}
-```
-(`page.tsx:10207-10208`). Whoever runs this test suite sees another patient's medical records,
-prescriptions, and staff salary figures rendered on their own screen — not because they queried for
-that patient, but because a diagnostics button happened to fetch them.
-
-**Confirmed, not assumed:** independently verified both parts directly — the `responseDetails: data`
-assignment at line 2789-2795 and the unfiltered `<pre>{JSON.stringify(...)}}</pre>` render at
-10207-10208, and confirmed `grep -n "NODE_ENV" page.tsx` returns **zero matches** anywhere in the
-file. There is no environment gate at all.
-
-**Reachable in production, not dev-only:** it's a normal Settings submenu item (`page.tsx:5888`),
-gated only by `hasPermission("settings.test_suite")` **or** superadmin — a real, grantable
-`PERMISSION_STRUCTURE` key (`page.tsx:505`), not a superadmin-only screen. Any admin role holding
-that one permission can trigger the full PII dump.
-
-**Additional quality problem, not the security issue but worth noting alongside:** 9 of the 33
-"tests" are duplicates pointing at the same endpoint under different names (6× `/api/reservations`
-as TC-025…030, 3× `/api/reception/dashboard` as TC-031…033), and "pass" means only HTTP 200 — no
-response-shape assertion. `tests/routes/auth-sweep.test.ts` already covers the same 33 endpoints
-with real assertions, in CI, for free — this screen adds risk without adding real coverage.
-
-**Mitigation, not yet applied:**
-1. Stop rendering `responseDetails` raw — show only pass/fail, status code, and duration; drop the
-   `<pre>` block entirely, or truncate/redact before display.
-2. Either gate the whole section behind `process.env.NODE_ENV !== 'production'`, or at minimum
-   tighten its permission requirement to `adminRole === "superadmin"` only (remove the
-   `settings.test_suite` grantable-permission path).
-3. Given `auth-sweep.test.ts` already covers these endpoints with real assertions in CI, consider
-   deleting this screen outright rather than fixing it — see `WINDSURF_BRIEFS.md` Brief-25-adjacent
-   investigation notes (Group D) for the full recommendation.
-
----
-
-## RISK-067: `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data
-
-**Severity:** High · **Type:** Data exposure / access control
-**Found:** 2026-08-22, while investigating the Settings-submenu screens for extraction/translation
-briefs — not user-reported.
-**Status:** Open.
-
-**What it is:** `src/app/api/page-settings/route.ts`'s `GET()` (line 85) has **no auth check at
-all** — confirmed directly: `requireAdministratorAccess` is imported but only invoked inside `POST`
-(line 129), never in `GET`. This is deliberate and correct for its original purpose — the public
-booking site's `BookingModal.tsx:312` calls this same endpoint unauthenticated to read public
-booking-flow config.
-
-**The problem:** the same settings blob this route serves now also holds operationally sensitive
-data that has nothing to do with the public booking flow, added by later Settings screens that
-reused the shared `page_settings` blob without revisiting the route's auth model:
-- `deposit.instapayAddress` / `deposit.walletNumber` — the clinic's payment-destination details
-  (Deposit Settings, `page.tsx:8965-9111`).
-- `notifications.staffEmail` — an internal staff contact address (Notification Settings,
-  `page.tsx:9270-9468`).
-- The `departments` list (Department Management, `page.tsx:9947-10001`, written via
-  `handleSaveDepartments`).
-
-All of these are readable by anyone who calls `GET /api/page-settings` directly, with no session,
-no token, no rate limit beyond whatever sits in front of the deployment.
-
-**Consequence:** payment-destination data (where InstaPay transfers land) and internal staff contact
-info are exposed on an endpoint that was never intended to serve them — an unrelated feature reused
-a shared storage blob without re-checking who could read it.
-
-**Compounding factor, same root cause:** `POST /api/page-settings` requires only
-`requireAdministratorAccess` with **no per-key permission check** — any administrator can rewrite
-CMS content, InstaPay payment destinations, and the departments list regardless of whether they hold
-`settings.pages`, `settings.booking_settings`, or `settings.roles` specifically. The granular
-`PERMISSION_STRUCTURE` model (RISK-025-adjacent, see Role Management) exists only client-side for
-this route.
-
-**Mitigation, not yet applied:** split the `page_settings` blob's genuinely-public keys (whatever
-`BookingModal.tsx` actually needs) from the operationally sensitive ones, and either move the
-sensitive keys to an authenticated-only table/route, or add field-level filtering to `GET` so the
-public response never includes `deposit.*`/`notifications.staffEmail`/`departments`. Separately,
-add per-key permission checks to `POST` matching the relevant `PERMISSION_STRUCTURE` prefix.
-
----
-
-## RISK-069: Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees
-
-**Severity:** Critical · **Type:** Security / Privilege escalation
-**Found:** 2026-08-23, writing Brief 25 Part 3 tests. **Status:** OPEN (not fixed — needs a product decision on whether admins should manage roles at all).
-
-**Description:**
-`PATCH /api/employees` (`src/app/api/employees/route.ts:219`) uses `requireAdministratorAccess`, which admits both `admin` and `superadmin` roles. The only role-change guard is `employee.employee_id === 'superadmin'` (line 245) — this protects the superadmin account from being changed, but does **not** prevent a non-superadmin admin from escalating another account's `role_name` to `superadmin`.
-
-The UI (`RoleManagementView.tsx`) gates the role-change `<select>` with a client-side `adminRole === "superadmin"` check, but that is bypassable. The server has no equivalent check.
-
-**Consequence:** Any admin can grant themselves or a colleague superadmin privileges, bypassing the entire RBAC system.
-
-**Fix:** Add a server-side check in the PATCH handler: if `roleName` is provided and the caller's role is not `superadmin`, return 403. This is a one-line guard. Not fixed in this brief because the brief scope is translation, not security fixes.
-
-**Test:** `tests/routes/roles-employees.test.ts` — `it.fails('a non-superadmin admin cannot change another account\'s role_name')` confirms the current (vulnerable) behaviour. The test will go green the moment the fix is applied.
-
-**Independently re-verified, 2026-08-23 (Brief 25 review).** Read `PATCH /api/employees` and
-`requireAdministratorAccess` (`src/lib/access.ts:81-88`) directly rather than trusting this note —
-confirmed the finding is exactly as described: `requireAdministratorAccess` explicitly admits
-`role !== "superadmin" && role !== "admin"` → reject, i.e. lets both through, and the handler's
-only role-change guard checks the *target's* `employee_id`, never the *caller's* role. Real,
-reproducible, not a false positive.
 
 ---
 
@@ -1221,6 +1098,9 @@ cannot reproduce for new sessions again.
 - [RISK-059](#risk-059) — `/api/reception/dashboard` Had No Auth, Could Clock In The Wrong Receptionist, And Could Silently Reopen An Ended Shift (RESOLVED)
 - [RISK-065](#risk-065) — `POST /api/packages/consume` Burns A Pre-Paid Session For A Service That Isn't On The Booking
 - [RISK-068](#risk-068) — First-Visit Medical Intake Guard Fired For Every Patient — `reservations` Prop Never Passed
+- [RISK-066](#risk-066) — System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate (RESOLVED)
+- [RISK-067](#risk-067) — `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data (RESOLVED)
+- [RISK-069](#risk-069) — Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees (RESOLVED)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -3012,6 +2892,107 @@ it and confirming both test files pass. Also added a dedicated test,
 *"blocks completion for a first-visit patient with no medical record and no prior completed
 visit"*, so the guard itself has real coverage going forward rather than only being an incidental
 side effect of the checkout tests passing.
+
+---
+
+## RISK-066: System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate (RESOLVED)
+
+**Severity:** Critical · **Type:** PII exposure / access control
+**Found:** 2026-08-22. **Status:** Resolved 2026-08-23.
+
+**What it was:** the diagnostics runner (`page.tsx`, "System Test Suite" in Settings) fired 33
+hardcoded GET requests against real endpoints — including `/api/medical-records`,
+`/api/prescriptions`, `/api/customers/products`, `/api/hr/payroll`, `/api/hr/doctor-payroll` — using
+the operator's own bearer token, stored the **full raw JSON response body** in component state, and
+dumped it verbatim via `<pre>{JSON.stringify(tc.responseDetails, null, 2)}</pre>`. Reachable by any
+role holding the grantable `settings.test_suite` permission, not superadmin-only, with no
+`NODE_ENV` gate.
+
+**Fix, both parts of the original mitigation applied:**
+1. **Stopped storing/rendering raw response bodies.** Added `summarizeDiagnosticResponse()` — for
+   an object response, keeps only `Object.keys(data)`; for an array, keeps `itemCount` and the
+   first item's keys; never a field value. `responseDetails` is now populated from this summary,
+   not the raw `data`, so the redaction happens at the point of storage — the render code
+   (`<pre>{JSON.stringify(tc.responseDetails, ...)}</pre>`) needed no change, since what it now
+   receives is already safe. Relabeled the panel "Response Shape Summary — field values redacted"
+   so it doesn't read as a full dump.
+2. **Tightened the permission gate to superadmin-only**, two layers: the Settings submenu no longer
+   falls through to `hasPermission("settings.test_suite")` for this one item (every other Settings
+   item still does); the content-render gate itself now also checks
+   `activeNav === "System Test Suite" && adminRole === "superadmin"`, matching the same
+   defense-in-depth pattern already used for Role Management.
+
+**Not done:** deleting the screen outright (mitigation option 3, since `auth-sweep.test.ts` already
+covers the same 33 endpoints with real assertions) — that's a product decision about removing a
+tool, not a security fix, left for a separate conversation. The duplicate-test-case quality issue
+(9 of 33 pointing at the same endpoint) is also unchanged — cosmetic, not a security concern.
+
+**Verified:** `tsc`/`eslint` clean, full test suite unaffected (this screen has no existing test
+coverage of its own to break).
+
+---
+
+## RISK-067: `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data (RESOLVED)
+
+**Severity:** High · **Type:** Data exposure / access control
+**Found:** 2026-08-22. **Status:** Resolved 2026-08-23.
+
+**What it was:** `GET /api/page-settings` had no auth check at all (deliberate — the public booking
+site reads it unauthenticated), but the same blob had accumulated `notifications.staffEmail` and
+the `departments` list, neither of which the public booking flow needs.
+
+**Correction to the original framing:** `deposit.instapayAddress`/`deposit.walletNumber`/etc were
+listed alongside those two as "leaked," but investigation before fixing found `BookingModal.tsx`
+(the public checkout widget) genuinely reads and displays the *entire* `deposit.*` block to every
+patient at checkout — it's how they know where to send their InstaPay/wallet deposit. That's not a
+leak, it's the intended public function of the field; stripping it would have broken checkout.
+Narrowed the fix to the two fields with **no public reader anywhere** (confirmed by grep across
+`BookingModal.tsx` and `LanguageContext.tsx`, the only two public callers): `notifications.staffEmail`
+and `departments`.
+
+**Complication found mid-fix:** the admin panel's own `fetchPageSettings()` reads `data.departments`
+from this exact same unauthenticated `GET` (Department Management hydration) — sending no auth
+header at all. A naive unconditional strip would have broken Department Management for every admin
+session. Fixed by making `GET` auth-aware instead of blanket-stripping: it now calls
+`requireStaffAccess(req)`; an authenticated staff caller gets the full blob, everyone else gets
+`stripInternalFields()` applied (`notifications.staffEmail` and `departments` removed,
+`notifications`'s other keys preserved). `page.tsx`'s `fetchPageSettings()` and the still-unused
+`usePageSettings.ts` hook were both updated to send `authenticatedJsonHeaders` on this call so the
+admin panel keeps getting the full response. `auth-sweep.test.ts`'s existing `noArgs: true` check
+for this route (which calls `GET()` with no request object) still passes — the handler treats a
+missing `req` as unauthenticated rather than throwing.
+
+**Not fixed — separate, larger issue:** `POST /api/page-settings` still has no per-key permission
+check (any administrator can rewrite any Settings screen's data regardless of which specific
+`PERMISSION_STRUCTURE` key they hold). Left open; a bigger change touching every Settings screen's
+save flow, needs its own careful pass rather than being bundled into this fix.
+
+**Test:** `tests/routes/page-settings.test.ts` — 3 new tests: unauthenticated GET strips
+`departments`/`notifications.staffEmail` while `deposit.*` and other `notifications` fields survive;
+authenticated staff GET returns the full blob including both fields; an invalid/unrecognized bearer
+token is treated as unauthenticated (also stripped). Verified by inverting the fix (`filter = (v) =>
+v` unconditionally) and confirming both stripping tests go red, then restoring and confirming green.
+
+---
+
+## RISK-069: Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees (RESOLVED)
+
+**Severity:** Critical · **Type:** Security / Privilege escalation
+**Found:** 2026-08-23. **Status:** Resolved 2026-08-23.
+
+**What it was:** `PATCH /api/employees` used `requireAdministratorAccess`, which admits both `admin`
+and `superadmin`. The only role-change guard checked the *target's* `employee_id !== 'superadmin'`
+— never the *caller's* own role — so any `admin`-role account could PATCH another account's
+`role_name` to `"superadmin"`, a full RBAC bypass.
+
+**Fix:** one guard added in the `roleName` branch of the PATCH handler, immediately after the
+existing target-protection check: `if (access.access.role !== 'superadmin') return 403`. Exactly
+the one-line fix the risk entry itself specified.
+
+**Test:** `tests/routes/roles-employees.test.ts` already had this exact scenario written as
+`it.fails('a non-superadmin admin cannot change another account\'s role_name')` from the Brief 25
+Part 3 investigation. Flipped to a plain `it` now that it genuinely passes — ran it standalone to
+confirm (6 passed, 1 unrelated expected-fail for a separate `POST /api/roles` gap).
 
 ---
 
