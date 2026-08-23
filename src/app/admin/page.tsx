@@ -20,6 +20,7 @@ import { CLIENT } from "@/config/client";
 import { adminTranslations } from "@/components/admin/translations";
 import UserProfileView from "@/components/admin/UserProfileView";
 import ClinicProfileSettingsView from "@/components/admin/settings/ClinicProfileSettingsView";
+import MedicalRecordsSettingsView from "@/components/admin/settings/MedicalRecordsSettingsView";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import CustomerFormModal from "@/components/admin/patients/CustomerFormModal";
@@ -502,6 +503,7 @@ const PERMISSION_STRUCTURE = [
       { key: "settings.notification", label: "Manage Notification Settings" },
       { key: "settings.queue", label: "Manage Queue Settings" },
       { key: "settings.pages", label: "Manage Pages Settings (CMS)" },
+      { key: "settings.medical_records", label: "Manage Medical Records Intake Templates" },
       { key: "settings.test_suite", label: "Run System Test Suite" }
     ]
   },
@@ -1901,6 +1903,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           "Notification Settings": "settings.notification",
           "Queue Settings": "settings.queue",
           "Pages Settings": "settings.pages",
+          "Medical Records": "settings.medical_records",
           "Role Management": "settings.roles",
           "System Test Suite": "settings.test_suite"
         };
@@ -2573,6 +2576,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       "Notification Settings": "settings.notification",
       "Queue Settings": "settings.queue",
       "Pages Settings": "settings.pages",
+      "Medical Records": "settings.medical_records",
       "Role Management": "settings.roles",
       "System Test Suite": "settings.test_suite"
     };
@@ -2751,7 +2755,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-030', name: 'Admin Bookings View & Schedule UI Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies the redesigned Admin Bookings View, 4 analytic cards (without percentages), mini calendar date grid, and today schedule table.', status: 'idle' },
     { id: 'TC-031', name: 'Reception Dashboard & Shift Metrics Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies receptionist shift tracking, personal target calculations, and today bookings summary.', status: 'idle' },
     { id: 'TC-032', name: 'Employee Shift Start & Geofence Verification Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies employee shift start geolocation verification, branch radius check, and attendance clock-in.', status: 'idle' },
-    { id: 'TC-033', name: 'Dashboard Notifications & Inventory Alerts Engine', category: 'Inventory & Equipment', endpoint: '/api/reception/dashboard', description: 'Verifies real-time system alerts for low stock, expired items, maintenance due, and overdue devices.', status: 'idle' }
+    { id: 'TC-033', name: 'Dashboard Notifications & Inventory Alerts Engine', category: 'Inventory & Equipment', endpoint: '/api/reception/dashboard', description: 'Verifies real-time system alerts for low stock, expired items, maintenance due, and overdue devices.', status: 'idle' },
+    { id: 'TC-034', name: 'Medical Record Intake Templates Engine', category: 'Medical & Patients', endpoint: '/api/medical-records/templates', description: 'Verifies customizable medical record intake templates, multi-service assignments, and dynamic field schema.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -5884,6 +5889,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           { label: "Notification Settings", icon: Bell, perm: "settings.notification" },
                           { label: "Queue Settings", icon: ListOrdered, perm: "settings.queue" },
                           { label: "Pages Settings", icon: FileText, perm: "settings.pages" },
+                          { label: "Medical Records", icon: ClipboardList, perm: "settings.medical_records" },
                           { label: "Role Management", icon: Shield, perm: "settings.roles" },
                           { label: "System Test Suite", icon: FlaskConical, perm: "settings.test_suite" }
                         ].filter(sub => {
@@ -9636,6 +9642,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           )}
 
 
+
+          {activeNav === "Medical Records" && (
+            <MedicalRecordsSettingsView services={SERVICES as any[]} lang={lang} />
+          )}
 
           {activeNav === "Role Management" && adminRole === "superadmin" && (
             <div className="space-y-8 animate-fadeIn">

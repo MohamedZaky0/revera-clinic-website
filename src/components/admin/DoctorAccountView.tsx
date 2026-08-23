@@ -691,9 +691,9 @@ export default function DoctorAccountView({
   };
 
   // Save Medical Record Intake
-  const handleSaveMedicalRecord = async (e?: React.FormEvent) => {
-    if (e && typeof e.preventDefault === "function") {
-      e.preventDefault();
+  const handleSaveMedicalRecord = async (customData?: any) => {
+    if (customData && typeof customData.preventDefault === "function") {
+      customData.preventDefault();
     }
     const targetBooking = activeSessionBooking || scheduleModalBooking;
     if (!targetBooking) return;
@@ -702,18 +702,25 @@ export default function DoctorAccountView({
     setSavingMedicalRecord(true);
     try {
       const headers = await getAuthHeaders();
+      const payload: any = {
+        customer_id: custId,
+        patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
+        skin_type: customData?.skin_type || formSkinType,
+        allergies: customData?.allergies || formAllergies,
+        medication_details: customData?.medication_details || formMedicationDetails,
+        medical_conditions_details: customData?.medical_conditions_details || formMedicalConditionsDetails,
+        previous_treatments_details: customData?.previous_treatments_details || formPreviousTreatmentsDetails
+      };
+
+      if (customData && typeof customData === "object" && !customData.nativeEvent) {
+        if (customData.template_id) payload.template_id = customData.template_id;
+        if (customData.responses) payload.responses = customData.responses;
+      }
+
       const res = await fetch("/api/medical-records", {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          customer_id: custId,
-          patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
-          skin_type: formSkinType,
-          allergies: formAllergies,
-          medication_details: formMedicationDetails,
-          medical_conditions_details: formMedicalConditionsDetails,
-          previous_treatments_details: formPreviousTreatmentsDetails
-        })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {

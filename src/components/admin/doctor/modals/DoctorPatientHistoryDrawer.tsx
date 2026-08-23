@@ -458,6 +458,20 @@ export default function DoctorPatientHistoryDrawer({
                   <span className="text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-2">{t.previousTreatmentsLabel || "Previous Treatments & Procedures"}</span>
                   <span className="font-semibold text-[#1F251A] text-base leading-relaxed">{medicalRecordData?.previous_treatments_details || 'None reported'}</span>
                 </div>
+
+                {medicalRecordData?.responses && Object.keys(medicalRecordData.responses).length > 0 && (
+                  <div className="bg-[#FBFBF9] p-6 rounded-2xl border border-[#414E36]/10 col-span-1 md:col-span-2 space-y-3">
+                    <span className="text-xs font-bold text-[#5A6A51] uppercase tracking-wider block">Specialized Intake Questionnaire Responses</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {Object.entries(medicalRecordData.responses).map(([key, val]) => (
+                        <div key={key} className="bg-white p-3.5 rounded-xl border border-[#414E36]/8 space-y-0.5">
+                          <span className="text-[11px] font-bold text-[#5A6A51] capitalize block">{key.replace(/_/g, ' ')}</span>
+                          <span className="text-xs font-bold text-[#1F251A] block">{typeof val === 'boolean' ? (val ? 'Yes / Confirmed' : 'No') : String(val || 'None')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
