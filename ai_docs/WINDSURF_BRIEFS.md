@@ -10,7 +10,74 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-_(none currently active)_
+## Brief 29 — Public site: `<html dir>` is never set server-side, so Arabic always flashes LTR first (Navbar included)
+
+**Scope: the public marketing site (`src/components/Navbar.tsx`, `src/contexts/LanguageContext.tsx`,
+`src/app/layout.tsx`) — not the admin panel.** Mohamed reported the Navbar doesn't visually go RTL
+when the site is set to Arabic. Investigated directly (couldn't get a live repro — the dev
+environment's port 3000 is currently claimed by an unrelated Docker container, Chatwoot, not the
+Next.js app — so this is grounded in reading the actual mechanism end to end, not a screenshot;
+**reproduce this first**, per the note below, before assuming the diagnosis below is complete).
+
+**Root cause, traced precisely:**
+1. `src/app/layout.tsx:39-44` — `<html lang="en" ... suppressHydrationWarning>` is **hardcoded**,
+   no `dir` attribute at all (defaults to `ltr`). `<body suppressHydrationWarning ...>` likewise has
+   no server-rendered class.
+2. `src/contexts/LanguageContext.tsx:24-32` — `getInitialLanguage()` explicitly returns `"en"`
+   whenever `typeof window === "undefined"`, i.e. **every server render, unconditionally**, before
+   ever checking the `?lang=` query param or the stored preference — both of which only exist
+   client-side.
+3. `src/contexts/LanguageContext.tsx:68-78` — `document.documentElement.dir` / `document.body.className`
+   are set **only inside a `useEffect`**, i.e. only after the client mounts and this effect runs.
+4. Persistence is `localStorage.setItem("cr-language", ...)` (line 73) — server-inaccessible by
+   design, so there is no way for step 1 to know the visitor's language even in principle without a
+   change.
+
+**Consequence:** on every fresh load / hard refresh — even with `?lang=ar` in the URL, even with
+`cr-language=ar` already in `localStorage` from a previous visit — the server always renders
+English/LTR first. The whole page, Navbar included, is briefly LTR, then snaps to RTL once React
+hydrates and the effect runs. The `suppressHydrationWarning` on both `<html>` and `<body>` exists
+specifically to silence the console warning this mismatch would otherwise throw — a strong signal
+this was a known, accepted tradeoff at the time, not an oversight introduced since. This is the
+classic "flash of wrong direction" SSR anti-pattern, not a CSS bug.
+
+**What's *not* the problem, checked and ruled out:** `body.rtl { direction: rtl; text-align: right;
+}` (`globals.css:100-103`) is real and correctly wired — once `dir`/`className` actually get set,
+`Navbar.tsx`'s three `flex-row` containers (`<nav>` line 138, desktop `<ul>` line 148, right-controls
+`<div>` line 218) should mirror automatically, since CSS `flex-direction: row` is direction-relative
+per spec — no `row-reverse` needed. Grepped `globals.css` for any rule that resets `direction` back
+to `ltr` broadly: the only such rule (`direction: ltr !important`, line 347) is narrowly scoped to
+`[dir="rtl"] a[href^="tel:"] / .phone-number / .ltr-num / .ltr-text / input[type=tel] / input[type=number]`
+— phone numbers and numeric inputs staying LTR in RTL mode is intentional, not the bug. **Confirm
+this live once the fix lands** — the reasoning holds on paper but was not visually verified.
+
+**Fix — make the server aware of the language before first paint:**
+1. In `LanguageContext.tsx`, alongside the existing `localStorage.setItem("cr-language", language)`
+   (line 73), also write a cookie (`document.cookie = "cr-language=" + language + "; path=/;
+   max-age=31536000"`) so the value is readable server-side too.
+2. In `layout.tsx` (already a Server Component — no `"use client"` at the top, can call `cookies()`
+   from `next/headers` directly), read that cookie and render `<html lang={lang} dir={dir}>`
+   accordingly for the initial response, instead of the hardcoded `lang="en"`.
+3. Keep `getInitialLanguage()`'s existing client-side logic as-is for the `?lang=` query-param
+   override and first-ever-visit fallback (no cookie yet) — this is additive, not a replacement.
+4. `src/middleware.ts` currently only matches `/api/:path*` (line 54) — this fix does **not** need
+   middleware; `cookies()` in a Server Component is enough. Don't widen the middleware matcher for
+   this.
+
+**Minor, unrelated cleanup found alongside — low priority, don't block the main fix on it:**
+`Navbar.tsx` has 4 hardcoded Arabic/English ternaries instead of going through `t.nav` like every
+other label in the file: `isRTL ? "إكمال الملف" : "Complete Profile"` (430), `isRTL ? "خروج" :
+"Logout"` (459), `isRTL ? "إكمال الملف الشخصي" : "Complete Profile"` (741), `isRTL ? "تسجيل الخروج" :
+"Logout"` (767). `t.nav.logout` already exists in both languages (`src/lib/translations.ts:14`,
+`:379`-adjacent) and could directly replace 459/767 (note: 459 and 767 use *different* Arabic
+phrasing for "Logout" at desktop vs. mobile — check `t.nav.logout`'s exact Arabic wording matches
+the intended UX before swapping either in). `completeProfile` has no existing key in either `nav`
+namespace — would need adding to `src/lib/translations.ts` if fixed. This is a chrome-string
+consistency nit, not a functional bug — output is already correct in both languages, just bypasses
+the shared translation object.
+
+---
+---
 
 ---
 ---
