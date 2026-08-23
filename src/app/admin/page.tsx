@@ -573,7 +573,7 @@ const DEFAULT_HERO_SLIDES_AR = [
 
 // Shows staff, wherever a patient is in view for booking/checkout, whether that patient owns
 // active packages (with remaining sessions) and/or is eligible for an active promotion on a
-// specific service â€” informational only here; redemption itself only happens at checkout
+// specific service — informational only here; redemption itself only happens at checkout
 // (see the Payment Settlement modal), since a package session can only be consumed against a
 // real completed reservation (DEC-023's deferred-revenue model).
 function PatientPackagePromoBanner({
@@ -633,7 +633,7 @@ export default function AdminPage() {
     "Authorization": `Bearer ${session?.access_token || ""}`
   };
 
-  // Service CRUD helpers â€” services are now database-primary, not localStorage (RISK-025)
+  // Service CRUD helpers — services are now database-primary, not localStorage (RISK-025)
   const loadServicesFromApi = useCallback(async () => {
     if (!session?.access_token) return;
     try {
@@ -951,7 +951,7 @@ export default function AdminPage() {
 
     const msg = 
 `*REVERA CLINICS | روشتة طبية إلكترونية*
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+━━━━━━━━━━━━━━━━━━━━
 👤 *المريض / Patient:* ${patientName}
 📅 *التاريخ / Date:* ${rxDate}
 👨‍⚕️ *الطبيب / Doctor:* ${doctorName}
@@ -959,10 +959,10 @@ ${diagnosis ? `🩺 *التشخيص / Diagnosis:* ${diagnosis}\n` : ''}━━━
 💊 *الأدوية الموصوفة / Prescribed Medications:*
 
 ${medsText}
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+━━━━━━━━━━━━━━━━━━━━
 ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n━━━━━━━━━━━━━━━━━━━━\n` : ''}✨ مع تمنياتنا لكم بالشفاء العاجل ودوام الصحة والعافية.
-ðŸ“ *Revera Clinics* â€” Sheikh Zayed & New Cairo
-ðŸ“ž (+20) 01035595691`;
+📍 *Revera Clinics* — Sheikh Zayed & New Cairo
+📞 (+20) 01035595691`;
 
     const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
@@ -1264,7 +1264,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       });
   }, [invoiceBooking?.id]);
 
-  // Postpone modal state (RISK-029 follow-up) â€” two modes: reschedule now (real date/time known)
+  // Postpone modal state (RISK-029 follow-up) — two modes: reschedule now (real date/time known)
   // or follow-up later (status becomes 'postponed', no date/time change yet).
   const [postponeBooking, setPostponeBooking] = useState<any>(null);
   const [postponeMode, setPostponeMode] = useState<"reschedule" | "followup">("reschedule");
@@ -1597,7 +1597,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
     filteredReservations.forEach((reservation) => {
       if (!reservation.date || !['approved', 'confirmed', 'started', 'completed'].includes(reservation.status)) return;
-      // Slice directly â€” avoids UTC conversion that shifts dates for non-UTC timezones
+      // Slice directly — avoids UTC conversion that shifts dates for non-UTC timezones
       const normalizedDate = String(reservation.date).slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) return;
       const [year, month] = normalizedDate.split('-');
@@ -2399,7 +2399,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const totalServicePages = Math.ceil(filteredServices.length / SERVICE_PAGE_SIZE);
   const pagedServices = filteredServices.slice((servicePage - 1) * SERVICE_PAGE_SIZE, servicePage * SERVICE_PAGE_SIZE);
 
-  // Grouped services: category key â†’ filtered services in that category
+  // Grouped services: category key → filtered services in that category
   const groupedServices = useMemo(() => {
     const groups: Record<string, typeof localServices> = {};
     localCategories.forEach(cat => { groups[cat.key] = []; });
@@ -2467,10 +2467,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
 
 
-  // Inventory Products State â€” productsTabRef stays in page.tsx for useCustomerProfile's refreshProductSalesHistory wrapper
+  // Inventory Products State — productsTabRef stays in page.tsx for useCustomerProfile's refreshProductSalesHistory wrapper
   const productsTabRef = useRef<InventoryProductsTabRef>(null);
 
-  // â”€â”€ System Test Suite State & Diagnostics Engine â”€â”€
+  // ── System Test Suite State & Diagnostics Engine ──
   interface SystemTestCase {
     id: string;
     name: string;
@@ -2645,14 +2645,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     }
   }, [session]);
 
-  // Also load once session is ready regardless of tab â€” the notification bell's low-stock
+  // Also load once session is ready regardless of tab — the notification bell's low-stock
   // alerts need inventoryProducts populated even if the admin never visits the Inventory tab.
   useEffect(() => {
     fetchInventoryProducts();
   }, [fetchInventoryProducts]);
 
   // Synchronize dynamic bookings and low-stock alerts into the notifications list.
-  // No early-return guard on reservations alone â€” a clinic with stock but no bookings yet still
+  // No early-return guard on reservations alone — a clinic with stock but no bookings yet still
   // needs to see low-stock alerts, so this must run even when allReservations is empty.
   useEffect(() => {
     const latestReservations = [...(allReservations || [])]
@@ -2677,7 +2677,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       };
     });
 
-    // Low-stock alerts, worst-depleted first â€” same list the Inventory page's "Low Stock Alerts"
+    // Low-stock alerts, worst-depleted first — same list the Inventory page's "Low Stock Alerts"
     // card counts, just surfaced somewhere staff will actually see it without visiting that page.
     const lowStockNotifications = (inventoryProducts || [])
       .filter((p) => Number(p.stock_quantity) <= Number(p.min_reorder_quantity))
@@ -2707,7 +2707,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   }, [allReservations, localServices, inventoryProducts]);
 
   // Shared fetch for a customer's purchased packages (customer_packages + items), reused across
-  // the profile's Packages tab, the booking detail drawer, checkout, and manual booking creation â€”
+  // the profile's Packages tab, the booking detail drawer, checkout, and manual booking creation —
   // each keeps its own state so switching which booking/profile is in view never shows stale data.
   const fetchCustomerPackagesInto = useCallback(async (customerId: string, setter: (data: any[]) => void) => {
     try {
@@ -2724,7 +2724,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     }
   }, [session]);
 
-  // Product sales history â€” kept here because CustomerProfileDrawer needs it as a prop.
+  // Product sales history — kept here because CustomerProfileDrawer needs it as a prop.
   // InventoryProductsTab owns its own copy; this one feeds the customer profile drawer.
   const [productSalesHistory, setProductSalesHistory] = useState<any[]>([]);
   const [productSalesLoading, setProductSalesLoading] = useState(false);
@@ -3000,7 +3000,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     return !hasOverlap;
   }, [localServices, allReservations]);
 
-  // â”€â”€ Branches state (moved before provider hook so hook can use branches) â”€â”€
+  // ── Branches state (moved before provider hook so hook can use branches) ──
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [branchModal, setBranchModal] = useState<{ open: boolean; mode: "add" | "edit"; branch: Partial<Branch> }>({
@@ -3011,7 +3011,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const [selectedBranchForHoursId, setSelectedBranchForHoursId] = useState<string>("");
   const [savingBranchHours, setSavingBranchHours] = useState(false);
 
-  // â”€â”€ Provider form hook (extracted from inline state â€” see Brief 15 Sub-PR 2) â”€â”€
+  // ── Provider form hook (extracted from inline state — see Brief 15 Sub-PR 2) ──
   const providerForm = useProviderForm({
     branches,
     session,
@@ -3229,7 +3229,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
 
 
-  // â”€â”€ Notification Settings State â”€â”€
+  // ── Notification Settings State ──
   const [notifSmsOtp, setNotifSmsOtp] = useState(true);
   const [notifWhatsApp, setNotifWhatsApp] = useState(true);
   const [notifEmailConfirm, setNotifEmailConfirm] = useState(false);
@@ -3239,7 +3239,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const [notifStaffEmail, setNotifStaffEmail] = useState("admin@reveraclinics.com");
   const [savingNotificationSettings, setSavingNotificationSettings] = useState(false);
 
-  // â”€â”€ Queue Settings State â”€â”€
+  // ── Queue Settings State ──
   const [queueVirtualRoom, setQueueVirtualRoom] = useState(false);
   const [queueShowOnScreens, setQueueShowOnScreens] = useState(true);
   const [queueAutoCheckIn, setQueueAutoCheckIn] = useState(false);
@@ -3817,7 +3817,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   // (background refresh, or simply resolving async after `branch` was already set), the poll
   // keeps sending the stale token forever, every 401 ("Invalid or expired session") lands in
   // fetchRequests'/fetchAllReservations' .catch and overwrites requests/allReservations with []
-  // â€” wiping Pending Approvals and every patient's Booking History even though a fully valid
+  // — wiping Pending Approvals and every patient's Booking History even though a fully valid
   // session exists in state and localStorage. Re-creating the poll when the token value changes
   // keeps it on the live token going forward.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3935,15 +3935,15 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             },
             {
               question: "2. Who is Revera designed for?",
-              answer: "Revera is designed for women who value elegance, privacy, and visible results. Our clients seek the best â€” not the cheapest â€” and expect a medical experience that matches their standards."
+              answer: "Revera is designed for women who value elegance, privacy, and visible results. Our clients seek the best — not the cheapest — and expect a medical experience that matches their standards."
             },
             {
               question: "3. How does my treatment plan work?",
-              answer: "Your journey begins with a comprehensive consultation where we assess your health, aesthetic goals, and lifestyle. From this, our doctors build a fully personalized treatment plan â€” never a template â€” that evolves with your progress and needs."
+              answer: "Your journey begins with a comprehensive consultation where we assess your health, aesthetic goals, and lifestyle. From this, our doctors build a fully personalized treatment plan — never a template — that evolves with your progress and needs."
             },
             {
               question: "4. What makes Revera different from other clinics?",
-              answer: "Revera is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint â€” from your first appointment to your last follow-up."
+              answer: "Revera is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint — from your first appointment to your last follow-up."
             }
           ]);
           setFaqsAr(data.aboutPage?.faqsAr || [
@@ -3972,8 +3972,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           // Load Why Choose Us Settings
           setWcuYearsLabel(data.whyChooseUs?.yearsLabel || "15+ years excellence");
           setWcuHeading(data.whyChooseUs?.heading || "Where medical expertise meets a luxury experience");
-          setWcuDescription(data.whyChooseUs?.description || "At Revera, every detail is intentional â€” from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.");
-          setWcuQuote(data.whyChooseUs?.quote || '"We don\'t treat conditions â€” we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey."');
+          setWcuDescription(data.whyChooseUs?.description || "At Revera, every detail is intentional — from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.");
+          setWcuQuote(data.whyChooseUs?.quote || '"We don\'t treat conditions — we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey."');
           setWcuContactLabel(data.whyChooseUs?.contactLabel || "Reach us:");
           setWcuPhone(data.whyChooseUs?.phone || "(+20) 01035595691");
 
@@ -4686,12 +4686,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   }
 
   // useCallback keyed on [session]: Supabase's session resolves asynchronously, so a plain
-  // mount-only effect calling this raced it â€” if the session wasn't ready yet the fetch bailed
+  // mount-only effect calling this raced it — if the session wasn't ready yet the fetch bailed
   // out silently and nothing ever retried, leaving the patient list empty for the rest of the
   // session (surfaced as "Select Patient" showing nothing in the Sell Product modal). Giving this
   // a stable identity per session, paired with the effect below that depends on it, means the
   // moment `session` actually resolves, this function's identity changes and the effect re-fires
-  // automatically â€” same pattern already used by fetchInventoryProducts/fetchInventoryDevices.
+  // automatically — same pattern already used by fetchInventoryProducts/fetchInventoryDevices.
   const fetchCustomers = useCallback(() => {
     setLoadingCustomers(true);
     fetchCustomerAvatars();
@@ -5058,7 +5058,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
   // Defaults to bypassing the cache. Nearly every caller here runs immediately after a write
   // (approve, reject, cancel, check-in, start/complete session, add product, new booking), and
-  // cachedFetch has a 2s TTL with no write-invalidation â€” so the default of "reuse the cached
+  // cachedFetch has a 2s TTL with no write-invalidation — so the default of "reuse the cached
   // array" reliably returned a list that predated the change that had just been made, which is
   // why new bookings only appeared after a full page reload. Pass useCache=true only where a
   // slightly stale list is genuinely acceptable.
@@ -5134,9 +5134,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     return unavailable;
   }
 
-  // Shared by the initial open and by changing the date inside the approve modal â€” recomputes
+  // Shared by the initial open and by changing the date inside the approve modal — recomputes
   // which time slots are actually pickable for whichever date is currently selected there.
-  // Returns the freshly-computed availability rather than relying on the state it sets â€”
+  // Returns the freshly-computed availability rather than relying on the state it sets —
   // setApproveUnavailableSlots() does not update the caller's closure within the same tick, so a
   // caller that read the state variable straight after awaiting this would see the *previous*
   // booking's list (or [] on first open) and make its decision on stale data.
@@ -5163,7 +5163,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       const { unavailable, start, end } = await refreshApproveAvailability(r, r.date);
 
       // Always show the time the patient actually asked for. If it is not bookable, select it
-      // anyway and warn â€” silently substituting the first free slot (09:00) is how approvals were
+      // anyway and warn — silently substituting the first free slot (09:00) is how approvals were
       // being confirmed at a time nobody requested.
       const requestedSlot = r.requestedTime || r.timeSlot || "";
       if (requestedSlot) {
@@ -5172,9 +5172,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const taken = unavailable.includes(requestedSlot);
         setSlot(requestedSlot);
         if (taken) {
-          setApproveTimeWarning(`Requested time ${requestedSlot} is already taken â€” pick another slot.`);
+          setApproveTimeWarning(`Requested time ${requestedSlot} is already taken — pick another slot.`);
         } else if (outsideHours) {
-          setApproveTimeWarning(`Requested time ${requestedSlot} is outside opening hours â€” pick another slot.`);
+          setApproveTimeWarning(`Requested time ${requestedSlot} is outside opening hours — pick another slot.`);
         }
       }
 
@@ -5192,11 +5192,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   }
 
   // Staff picking a different date than originally requested (e.g. the requested day turned out
-  // to be a closed day, or is already fully booked) â€” re-derives available slots for that date
+  // to be a closed day, or is already fully booked) — re-derives available slots for that date
   // instead of forcing staff to reject the request just to change the date.
   async function handleApproveDateChange(newDateStr: string) {
     setApproveDate(newDateStr);
-    // Staff deliberately moved off the requested date â€” the requested-time warning no longer
+    // Staff deliberately moved off the requested date — the requested-time warning no longer
     // applies, and refreshApproveAvailability picks a fresh slot for the new date.
     setApproveTimeWarning("");
     if (!selected) return;
@@ -5293,7 +5293,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       email: newPatientEmail,
       phone: newPatientPhone,
       // When staff explicitly picked an existing patient (search picker or a resolved phone
-      // match), link the reservation to that exact customer id directly â€” bypasses the
+      // match), link the reservation to that exact customer id directly — bypasses the
       // phone-string-matching path entirely, so a typo/formatting difference in the phone field
       // can never fork off a duplicate customer for a patient staff already identified.
       customerId: matchedCustomerId || undefined,
@@ -5451,7 +5451,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
             {loginError && (
               <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-xl p-3">
-                âš ï¸ {loginError}
+                ⚠️ {loginError}
               </p>
             )}
 
@@ -5561,7 +5561,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               className="md:hidden flex h-7 w-7 items-center justify-center rounded-full hover:bg-white/10 text-[#FBFBF9]/80 hover:text-[#FBFBF9] transition text-lg font-bold"
               title="Close sidebar"
             >
-              Ã—
+              ×
             </button>
           </div>
 
@@ -6029,7 +6029,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     className="flex items-center justify-between gap-4 rounded-3xl border border-rose-200 bg-rose-50 px-6 py-4 text-rose-800 shadow-sm animate-pulse"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">âš ï¸</span>
+                      <span className="text-xl">⚠️</span>
                       <p className="text-sm font-semibold">
                         Alert: Employee <strong>{alertItem.employee_accounts?.name}</strong> ({alertItem.employee_accounts?.role_name}) went missing at {new Date(alertItem.timestamp).toLocaleTimeString()}!
                       </p>
@@ -6074,7 +6074,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             ) : (
               <>
 
-          {/* â”€â”€ PROVIDERS VIEW â”€â”€ */}
+          {/* ── PROVIDERS VIEW ── */}
           {activeNav === "Doctors" && (
             <AdminDoctorsView
               providerForm={providerForm}
@@ -6099,7 +6099,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {/* â”€â”€ SERVICES VIEW â”€â”€ */}
+          {/* ── SERVICES VIEW ── */}
           {activeNav === "Services" && (
             <AdminServicesView
               localServices={localServices}
@@ -6200,7 +6200,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {/* â”€â”€ PROMOTIONS VIEW â”€â”€ */}
+          {/* ── PROMOTIONS VIEW ── */}
           {activeNav === "Promotions" && (
             <PromotionsAdminPanel
               localServices={localServices}
@@ -6210,12 +6210,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {/* â”€â”€ PACKAGES VIEW â”€â”€ */}
+          {/* ── PACKAGES VIEW ── */}
           {activeNav === "Packages" && (
             <PackageAdminPanel session={session} />
           )}
 
-          {/* â”€â”€ FINANCE VIEW â”€â”€ */}
+          {/* ── FINANCE VIEW ── */}
           {activeNav === "Finance" && (
             <FinanceSection
               accessToken={session?.access_token}
@@ -6223,33 +6223,33 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {/* â”€â”€ ALL PRESCRIPTIONS VIEW â”€â”€ */}
+          {/* ── ALL PRESCRIPTIONS VIEW ── */}
 
-          {/* â”€â”€ MEDICINE LIBRARY VIEW â”€â”€ */}
+          {/* ── MEDICINE LIBRARY VIEW ── */}
 
-          {/* â”€â”€ PRODUCTS VIEW â”€â”€ */}
+          {/* ── PRODUCTS VIEW ── */}
 
-          {/* â”€â”€ PRODUCT CATEGORIES VIEW â”€â”€ */}
+          {/* ── PRODUCT CATEGORIES VIEW ── */}
 
-          {/* â”€â”€ POINT OF SALE VIEW â”€â”€ */}
+          {/* ── POINT OF SALE VIEW ── */}
 
-          {/* â”€â”€ INSIGHTS VIEW â”€â”€ */}
+          {/* ── INSIGHTS VIEW ── */}
 
-          {/* â”€â”€ SALES DASHBOARD VIEW â”€â”€ */}
+          {/* ── SALES DASHBOARD VIEW ── */}
 
-          {/* â”€â”€ REFUNDS VIEW â”€â”€ */}
+          {/* ── REFUNDS VIEW ── */}
 
-          {/* â”€â”€ SHIPPING METHODS VIEW â”€â”€ */}
+          {/* ── SHIPPING METHODS VIEW ── */}
 
-          {/* â”€â”€ TARGET BONUSES VIEW â”€â”€ */}
+          {/* ── TARGET BONUSES VIEW ── */}
 
-          {/* â”€â”€ COUPONS VIEW â”€â”€ */}
+          {/* ── COUPONS VIEW ── */}
 
-          {/* â”€â”€ CUSTOMERS VIEW â”€â”€ */}
+          {/* ── CUSTOMERS VIEW ── */}
           {activeNav === "Patients" && (
             <div>
 
-              {/* â”€â”€ INLINE: View Customer Profile â”€â”€ */}
+              {/* ── INLINE: View Customer Profile ── */}
               {viewingCustomerProfile && (
                 <CustomerProfileDrawer
                   viewingCustomerProfile={viewingCustomerProfile}
@@ -6353,7 +6353,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 />
               )}
 
-              {/* â”€â”€ INLINE: Add/Edit Customer Form â”€â”€ */}
+              {/* ── INLINE: Add/Edit Customer Form ── */}
               {showCustomerFormModal && !viewingCustomerProfile && (
                 <CustomerFormModal
                   setShowCustomerFormModal={setShowCustomerFormModal}
@@ -6365,7 +6365,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 />
               )}
 
-              {/* â”€â”€ CUSTOMER TABLE (only when no inline view is active) â”€â”€ */}
+              {/* ── CUSTOMER TABLE (only when no inline view is active) ── */}
               {!viewingCustomerProfile && !showCustomerFormModal && (
               <PatientsDirectoryView
                 filteredCustomers={filteredCustomers}
@@ -6402,7 +6402,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
 
 
-          {/* â”€â”€ SMS MANAGEMENT VIEWS â”€â”€ */}
+          {/* ── SMS MANAGEMENT VIEWS ── */}
 
 
 
@@ -6410,7 +6410,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
 
 
-          {/* â”€â”€ PAGES SETTINGS VIEW â”€â”€ */}
+          {/* ── PAGES SETTINGS VIEW ── */}
           {activeNav === "Pages Settings" && (
             <div className="space-y-6">
               <div className="mb-2">
@@ -6543,7 +6543,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             </div>
           )}
 
-          {/* â”€â”€ SETTINGS VIEWS â”€â”€ */}
+          {/* ── SETTINGS VIEWS ── */}
           {activeNav === "Profile" && (() => {
             const isSuperadminBypass = adminRole === "superadmin";
             const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
@@ -7005,7 +7005,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                   )}
                                 </td>
                                 <td className="px-6 py-4 text-center font-mono text-xs font-bold text-[#5A6A51]">
-                                  {tc.durationMs !== undefined ? `${tc.durationMs}ms` : 'â€”'}
+                                  {tc.durationMs !== undefined ? `${tc.durationMs}ms` : '—'}
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                   <div className="flex items-center justify-end gap-2">
@@ -7058,7 +7058,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             </div>
           )}
 
-          {/* â”€â”€ INVENTORY VIEW â”€â”€ */}
+          {/* ── INVENTORY VIEW ── */}
           {activeNav === "Inventory" && (
             <AdminInventoryView
               authHeaders={authenticatedJsonHeaders}
@@ -7131,7 +7131,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
 
 
-          {/* â”€â”€ HUMAN RESOURCES (HR) VIEW â”€â”€ */}
+          {/* ── HUMAN RESOURCES (HR) VIEW ── */}
           {activeNav === "HR" && (
             <AdminHrView
               hrActiveSubTab={hrActiveSubTab}
@@ -7235,7 +7235,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   onClick={() => setPresenceModalOpen(false)}
                   className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
                 >
-                  âœ“ I am Present &amp; Working
+                  ✓ I am Present &amp; Working
                 </button>
               </div>
             </div>
@@ -7269,7 +7269,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             </div>
           )}
 
-          {/* â”€â”€ RECEPTION DASHBOARD VIEW â”€â”€ */}
+          {/* ── RECEPTION DASHBOARD VIEW ── */}
           {activeNav === "Dashboard" && (
             <ReceptionDashboardView
               receptionistName={loggedEmpAccount?.name || (adminEmail ? adminEmail.split("@")[0] : "Employee")}
@@ -7284,7 +7284,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {/* â”€â”€ BOOKINGS & NEW BOOKING FULL VIEW â”€â”€ */}
+          {/* ── BOOKINGS & NEW BOOKING FULL VIEW ── */}
           {activeNav === "Bookings" && (
             showFullViewNewBooking ? (
               <AdminNewBookingView
@@ -7337,7 +7337,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   // RISK-047/052: must go through openApprove() so the modal is pre-filled from
                   // the actual booking (requested time, requested doctor, availability) instead
                   // of opening with whatever `slot`/`doctorName` state happened to be left over
-                  // from a previous modal use â€” which is how this button independently
+                  // from a previous modal use — which is how this button independently
                   // reintroduced the hardcoded-doctor/wrong-time bug openApprove() itself fixed.
                   openApprove(booking as any);
                 }}
@@ -7399,7 +7399,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               </button>
             </div>
             <p className="mb-4 text-sm text-[#5A6A51]">
-              Requested for {selected.date}. Confirm the date and time slot below â€” change the
+              Requested for {selected.date}. Confirm the date and time slot below — change the
               date if the requested one isn't available (e.g. a closed day).
             </p>
             <label className="mb-2 block text-sm font-semibold text-[#414E36]">
@@ -7434,12 +7434,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   );
                 });
                 // The patient's requested time may fall outside opening hours, in which case it is
-                // not in filteredSlots and the select would render blank â€” hiding what was asked
+                // not in filteredSlots and the select would render blank — hiding what was asked
                 // for. Surface it explicitly instead.
                 if (slot && !filteredSlots.includes(slot)) {
                   options.unshift(
                     <option key={`requested-${slot}`} value={slot}>
-                      {slot} (Requested â€” outside opening hours)
+                      {slot} (Requested — outside opening hours)
                     </option>
                   );
                 }
@@ -7460,7 +7460,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               if (hasSlots) return null;
               return (
                 <p className="-mt-2 mb-4 text-xs font-semibold text-rose-600">
-                  No time slots available on this date â€” it may be a closed day for this branch,
+                  No time slots available on this date — it may be a closed day for this branch,
                   or fully booked. Pick a different date above.
                 </p>
               );
@@ -7801,7 +7801,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 sm:p-5 animate-fadeIn">
             <div className="w-full max-w-6xl rounded-[32px] bg-[#FBFBF9] p-6 sm:p-8 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[92vh] overflow-y-auto custom-scrollbar border border-[#414E36]/15 space-y-6">
               
-              {/* â”€â”€ HEADER â”€â”€ */}
+              {/* ── HEADER ── */}
               <div className="flex items-start justify-between border-b border-[#414E36]/10 pb-5">
                 <div className="space-y-1.5">
                   <h2 className="text-2xl sm:text-3xl font-black text-[#1F251A] tracking-tight">
@@ -7863,10 +7863,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 </button>
               </div>
 
-              {/* â”€â”€ 2-COLUMN MAIN GRID â”€â”€ */}
+              {/* ── 2-COLUMN MAIN GRID ── */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 
-                {/* â”€â”€ LEFT COLUMN (2/3 width) â”€â”€ */}
+                {/* ── LEFT COLUMN (2/3 width) ── */}
                 <div className="lg:col-span-2 space-y-4">
                   
                   {/* 1. PATIENT INFORMATION CARD */}
@@ -7957,7 +7957,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <Clock size={12} className="text-[#5A6A51]" />
                         <span>
                           {(() => {
-                            if (!viewingBooking.date) return "â€”";
+                            if (!viewingBooking.date) return "—";
                             try {
                               const d = new Date(viewingBooking.date);
                               const day = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
@@ -8003,7 +8003,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         {viewingBooking.doctorName || "Treating Doctor"}
                       </p>
                       <div className="flex items-center gap-1 text-amber-500 text-xs font-bold">
-                        {"â˜…".repeat(5)}
+                        {"★".repeat(5)}
                         <span className="text-[#5A6A51] text-[11px] font-semibold ml-0.5">5.0</span>
                       </div>
                     </div>
@@ -8026,7 +8026,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           const b = branches.find(br => br.id === viewingBooking.branchId);
                           const roomType = r ? `${r.type.charAt(0).toUpperCase() + r.type.slice(1)} Room` : "Clinical Room";
                           const branchName = b ? (isRTL ? b.name_ar : b.name_en) : "Main Branch";
-                          return `${roomType} â€¢ ${branchName}`;
+                          return `${roomType} • ${branchName}`;
                         })()}
                       </p>
                     </div>
@@ -8252,14 +8252,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                       {(med.frequency || med.duration) && (
                                         <div className="flex items-center gap-2 text-[11px] text-[#5A6A51] ps-5">
                                           {med.frequency && <span><strong>Freq:</strong> {med.frequency}</span>}
-                                          {med.frequency && med.duration && <span>â€¢</span>}
+                                          {med.frequency && med.duration && <span>•</span>}
                                           {med.duration && <span><strong>Duration:</strong> {med.duration}</span>}
                                         </div>
                                       )}
 
                                       {med.instructions && (
                                         <p className="text-[11px] text-[#7A8A71] italic ps-5">
-                                          â†³ {med.instructions}
+                                          ↳ {med.instructions}
                                         </p>
                                       )}
                                     </div>
@@ -8342,12 +8342,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <span className="font-bold text-[#1F251A] mt-0.5 block">
                           {(() => {
                             const dateVal = (viewingBooking as any).created_at || viewingBooking.createdAt || viewingBooking.date;
-                            if (!dateVal) return "â€”";
+                            if (!dateVal) return "—";
                             try {
                               const d = new Date(dateVal);
                               const day = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
                               const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
-                              return `${day} â€¢ ${time}`;
+                              return `${day} • ${time}`;
                             } catch {
                               return dateVal;
                             }
@@ -8359,7 +8359,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                 </div>
 
-                {/* â”€â”€ RIGHT COLUMN (1/3 width) â”€â”€ */}
+                {/* ── RIGHT COLUMN (1/3 width) ── */}
                 <div className="lg:col-span-1 space-y-4">
                   
                   {/* 1. SESSION FLOW CARD */}
@@ -8516,7 +8516,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           </button>
                         ) : (
                           <div className="w-full rounded-2xl bg-[#EBF7EE] border border-[#C3E6CB] p-3 text-center text-xs font-extrabold text-[#1E7E34]">
-                            âœ“ Invoice Settled &amp; Paid
+                            ✓ Invoice Settled &amp; Paid
                           </div>
                         )
                       )}
@@ -8789,7 +8789,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     .filter((p: any) => p.role !== 'consumable')
                     .map((p: any) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} â€” EGP {p.price || p.unit_price || p.selling_price || 0} (Stock: {p.stock ?? p.quantity ?? p.stock_quantity ?? 'N/A'})
+                        {p.name} — EGP {p.price || p.unit_price || p.selling_price || 0} (Stock: {p.stock ?? p.quantity ?? p.stock_quantity ?? 'N/A'})
                       </option>
                   ))}
                 </select>
@@ -9086,7 +9086,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               <div>
                 <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Quick actions</p>
                 <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">
-                  Today's Bookings â€¢ {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  Today's Bookings • {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </h3>
               </div>
               <button
@@ -9132,7 +9132,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <div>
                           <p className="font-bold text-[#1F251A]">{r.name}</p>
                           <p className="text-xs text-[#5A6A51] mt-1">
-                            {service ? service.en : `Service #${r.serviceId}`} â€¢ {r.timeSlot ? `@ ${r.timeSlot}` : 'Time not specified'}
+                            {service ? service.en : `Service #${r.serviceId}`} • {r.timeSlot ? `@ ${r.timeSlot}` : 'Time not specified'}
                           </p>
                         </div>
                         <span className="rounded-full bg-[#C4AE7C]/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.1em] text-[#414E36]">
@@ -9367,7 +9367,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 />
                 {matchedCustomerId && (
                   <p className="mt-1.5 flex items-center gap-2 text-[11px] font-semibold text-emerald-700">
-                    âœ“ Existing patient found{newPatientName ? `: ${newPatientName}` : ""}
+                    ✓ Existing patient found{newPatientName ? `: ${newPatientName}` : ""}
                     <button
                       type="button"
                       onClick={() => setMatchedCustomerId(null)}
@@ -9388,7 +9388,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   return (
                     <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-2xl border border-[#414E36]/15 bg-white shadow-lg">
                       {matches.length === 0 ? (
-                        <p className="px-4 py-3 text-xs text-[#8A9A81] italic">No matching patients â€” filling in the fields below will create a new one.</p>
+                        <p className="px-4 py-3 text-xs text-[#8A9A81] italic">No matching patients — filling in the fields below will create a new one.</p>
                       ) : (
                         matches.map((c: any) => (
                           <button
@@ -9726,7 +9726,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <div>
                           <p className="font-bold text-[#1F251A]">{r.name}</p>
                           <p className="text-xs text-[#5A6A51] mt-1">
-                            {service ? service.en : `Service #${r.serviceId}`} â€¢ {r.date} {r.timeSlot ? `@ ${r.timeSlot}` : r.requestedTime ? `@ ${r.requestedTime}` : ""} â€¢ <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === r.branchId)?.name_en || "Default/All"}</span>
+                            {service ? service.en : `Service #${r.serviceId}`} • {r.date} {r.timeSlot ? `@ ${r.timeSlot}` : r.requestedTime ? `@ ${r.requestedTime}` : ""} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === r.branchId)?.name_en || "Default/All"}</span>
                           </p>
                           {r.doctorName && (
                             <p className="text-xs text-[#C4AE7C] mt-0.5 font-semibold">
@@ -9774,7 +9774,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         />
       )}
 
-      {/* â”€â”€ EXPORT CUSTOMERS MODAL â”€â”€ */}
+      {/* ── EXPORT CUSTOMERS MODAL ── */}
       {showExportCustomersModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
@@ -9862,7 +9862,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         </div>
       )}
 
-      {/* â”€â”€ IMPORT CUSTOMERS MODAL â”€â”€ */}
+      {/* ── IMPORT CUSTOMERS MODAL ── */}
       {showImportCustomersModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto"
@@ -9917,7 +9917,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       <div>
                         <p className="text-sm font-semibold text-[#1F251A]">{importFile.name}</p>
                         <p className="text-xs text-[#5A6A51]">
-                          {(importFile.size / 1024).toFixed(1)} KB â€¢ {importRows.length} rows found
+                          {(importFile.size / 1024).toFixed(1)} KB • {importRows.length} rows found
                         </p>
                       </div>
                     </div>
@@ -10064,7 +10064,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       )}
 
 
-      {/* â”€â”€ DELETE CUSTOMER CONFIRMATION MODAL â”€â”€ */}
+      {/* ── DELETE CUSTOMER CONFIRMATION MODAL ── */}
       {deleteCustomerTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fadeIn">
           <div className="w-full max-w-md rounded-2xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
@@ -10104,7 +10104,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       )}
 
 
-      {/* â”€â”€ Setup Password Modal (shown after accepting invite or password reset) â”€â”€ */}
+      {/* ── Setup Password Modal (shown after accepting invite or password reset) ── */}
       {showSetupPasswordModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="relative w-full max-w-md mx-4 rounded-3xl bg-white shadow-2xl overflow-hidden">
@@ -10132,7 +10132,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </svg>
                   </div>
                   <p className="text-green-700 font-semibold text-base">{setupSuccess}</p>
-                  <p className="text-sm text-[#5A6A51]">You will be redirected automaticallyâ€¦</p>
+                  <p className="text-sm text-[#5A6A51]">You will be redirected automatically…</p>
                 </div>
               ) : (
                 <form onSubmit={handleSetupPassword} className="space-y-5">
@@ -10153,22 +10153,22 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   <div className="mt-2 text-xs space-y-1 font-semibold text-gray-500">
                     <div className="flex items-center gap-1.5">
                       <span className={setupPassword.length >= 8 ? "text-green-600" : ""}>
-                        {setupPassword.length >= 8 ? "âœ“" : "â—‹"} At least 8 characters
+                        {setupPassword.length >= 8 ? "✓" : "○"} At least 8 characters
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "text-green-600" : ""}>
-                        {/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "âœ“" : "â—‹"} Uppercase & lowercase letters
+                        {/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "✓" : "○"} Uppercase & lowercase letters
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/\d/.test(setupPassword) ? "text-green-600" : ""}>
-                        {/\d/.test(setupPassword) ? "âœ“" : "â—‹"} At least one number
+                        {/\d/.test(setupPassword) ? "✓" : "○"} At least one number
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/[^A-Za-z0-9]/.test(setupPassword) ? "text-green-600" : ""}>
-                        {/[^A-Za-z0-9]/.test(setupPassword) ? "âœ“" : "â—‹"} At least one special character (e.g. @$!%*?&#)
+                        {/[^A-Za-z0-9]/.test(setupPassword) ? "✓" : "○"} At least one special character (e.g. @$!%*?&#)
                       </span>
                     </div>
                   </div>
@@ -10205,7 +10205,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                         </svg>
-                        Setting passwordâ€¦
+                        Setting password…
                       </span>
                     ) : "Confirm & Access Dashboard"}
                   </button>
@@ -10216,7 +10216,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         </div>
       )}
 
-      {/* â”€â”€ POSTPONE BOOKING MODAL â”€â”€ */}
+      {/* ── POSTPONE BOOKING MODAL ── */}
       {postponeBooking && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
@@ -10329,13 +10329,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         </div>
       )}
 
-      {/* â”€â”€ PAYMENT SETTLEMENT MODAL â”€â”€ */}
+      {/* ── PAYMENT SETTLEMENT MODAL ── */}
       {checkoutBooking && (
         (() => {
           // 1. Calculate service cost
           const svcIds = Array.isArray(checkoutBooking.serviceIds) ? checkoutBooking.serviceIds : [checkoutBooking.serviceId];
           // A deposit collected at reservation time (BookingModal's "declare deposit paid" step)
-          // is already stored on the booking as amountPaid â€” checkout must charge only what's
+          // is already stored on the booking as amountPaid — checkout must charge only what's
           // left of the service price, not the full price again. RISK-029.
           const depositAlreadyPaid = Number(checkoutBooking.amountPaid) || 0;
           const activeCustomerPackageItems = checkoutCustomerPackages
@@ -10732,7 +10732,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             <div key={`chk-as-${iIdx}`} className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#C4AE7C]/20 shadow-2xs">
                               <div>
                                 <p className="font-bold text-[#1F251A]">{item.name}</p>
-                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `Ã— ${item.unitPrice} EGP` : ''}</p>
+                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `× ${item.unitPrice} EGP` : ''}</p>
                               </div>
                               <span className="font-extrabold text-[#414E36]">+{item.total} EGP</span>
                             </div>
@@ -10755,7 +10755,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             <div key={`chk-p-${iIdx}`} className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 shadow-2xs">
                               <div>
                                 <p className="font-bold text-[#1F251A]">{item.name}</p>
-                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `Ã— ${item.unitPrice} EGP` : ''}</p>
+                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `× ${item.unitPrice} EGP` : ''}</p>
                               </div>
                               <span className="font-extrabold text-[#414E36]">+{item.total} EGP</span>
                             </div>
@@ -10900,7 +10900,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         })()
       )}
 
-      {/* â”€â”€ BOOKING INVOICE MODAL â”€â”€ */}
+      {/* ── BOOKING INVOICE MODAL ── */}
       {invoiceBooking && (
         (() => {
           // 1. Calculate service cost
@@ -11177,7 +11177,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
           const allInvoiceItems = [...baseServicesList, ...invoiceAdditionalServicesList, ...invoiceProductsList].filter((item: any) => {
             const nameLower = String(item.name || '').toLowerCase();
-            const isPulse = nameLower.includes('pulse') || nameLower.includes('device â€”') || nameLower.includes('device -');
+            const isPulse = nameLower.includes('pulse') || nameLower.includes('device —') || nameLower.includes('device -');
             if (isPulse && (Number(item.total) === 0 || Number(item.unitPrice) === 0 || Number(item.price) === 0)) {
               return false;
             }
@@ -11239,13 +11239,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Billed To</p>
                       <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name || "Patient"}</p>
-                      <p className="text-[#5A6A51] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone || "â€”"}</p>
-                      <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "â€”"}</p>
+                      <p className="text-[#5A6A51] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone || "—"}</p>
+                      <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
                     </div>
                     <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Booking Details</p>
-                      <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "â€”"}</p>
-                      <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "â€”"}</p>
+                      <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
+                      <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
                       <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
                     </div>
                   </div>
