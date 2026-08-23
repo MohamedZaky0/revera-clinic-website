@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Marcellus, Sora } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
@@ -30,18 +31,24 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const langCookie = cookieStore.get("cr-language")?.value;
+  const lang = langCookie === "ar" ? "ar" : "en";
+  const dir = lang === "ar" ? "rtl" : "ltr";
+
   return (
     <html
-      lang="en"
+      lang={lang}
+      dir={dir}
       className={`${marcellus.variable} ${sora.variable}`}
       suppressHydrationWarning
     >
-      <body suppressHydrationWarning spellCheck={false}>
+      <body className={dir} suppressHydrationWarning spellCheck={false}>
         <LanguageProvider>
           <AlertConfirmProvider>
             {children}
