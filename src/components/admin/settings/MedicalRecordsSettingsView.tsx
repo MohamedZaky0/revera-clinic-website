@@ -271,7 +271,10 @@ export default function MedicalRecordsSettingsView({
         (s.name && s.name.toLowerCase().includes(q)) ||
         (s.title && s.title.toLowerCase().includes(q)) ||
         (s.category && s.category.toLowerCase().includes(q)) ||
-        (s.title_en && s.title_en.toLowerCase().includes(q))
+        (s.title_en && s.title_en.toLowerCase().includes(q)) ||
+        (s.name_en && s.name_en.toLowerCase().includes(q)) ||
+        (s.en && s.en.toLowerCase().includes(q)) ||
+        (s.ar && s.ar.toLowerCase().includes(q))
     );
   }, [allServices, serviceSearch]);
 
@@ -636,27 +639,27 @@ export default function MedicalRecordsSettingsView({
                 </div>
 
                 {/* Services Checkbox Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1 no-scrollbar">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-56 overflow-y-auto p-1 custom-scrollbar">
                   {filteredModalServices.map((srv: any) => {
                     const isSelected = modalServiceIds.some((id) => String(id) === String(srv.id));
                     return (
-                      <label
+                      <button
+                        type="button"
                         key={srv.id}
                         onClick={() => handleToggleService(srv.id)}
-                        className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition select-none ${
+                        className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition select-none text-left w-full ${
                           isSelected
-                            ? "border-emerald-700 bg-emerald-50/70 font-bold text-emerald-950 shadow-2xs"
+                            ? "border-emerald-700 bg-emerald-50 font-bold text-emerald-950 shadow-2xs"
                             : "border-[#414E36]/10 bg-white font-medium text-[#1F251A] hover:bg-[#F4F5F1]"
                         }`}
                       >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => {}}
-                          className="h-3.5 w-3.5 rounded accent-[#414E36] pointer-events-none"
-                        />
+                        <span className={`h-4 w-4 rounded flex items-center justify-center border transition shrink-0 ${
+                          isSelected ? "bg-emerald-700 border-emerald-700 text-white" : "border-gray-300 bg-white"
+                        }`}>
+                          {isSelected && <Check size={11} className="stroke-[3]" />}
+                        </span>
                         <span className="truncate">{getServiceName(srv)}</span>
-                      </label>
+                      </button>
                     );
                   })}
                 </div>
