@@ -1,15 +1,39 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-17 (RISK-058)
+> **Last Updated:** 2026-08-23 (reorganized by status — see summary below; RISK-069 is the newest
+> entry)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
 >
-> **RISK-020 is the one to read first.** The `supabase/migrations/` folder does not describe any
-> live database, and the two databases in use have diverged. Verify schema against the live DB
-> before relying on any statement in `DB_SCHEMA.md`, including the ones marked "verified".
+> **RISK-020 is the one to read first among the open items.** The `supabase/migrations/` folder
+> does not describe any live database, and the two databases in use have diverged. Verify schema
+> against the live DB before relying on any statement in `DB_SCHEMA.md`, including the ones marked
+> "verified".
 
 ---
+
+## Status summary
+
+**12 open** · **12 partially resolved** · **42 resolved** · 66 tracked total.
+Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
+
+---
+
+# 🔴 Open — Not Yet Resolved
+
+- [RISK-001](#risk-001) — Duplication Friction (hardcoded Revera-specific values)
+- [RISK-005](#risk-005) — Single 550KB Admin Page File
+- [RISK-010](#risk-010) — No Gross Price Is Ever Persisted On A Reservation
+- [RISK-016](#risk-016) — Two Conflicting Definitions Of "Revenue" Already Exist
+- [RISK-020](#risk-020) — Migrations Are Not Tracked As Applied, And Two Databases Have Diverged
+- [RISK-053](#risk-053) — New Cairo Branch's Working Hours Were Never Actually Configured
+- [RISK-058](#risk-058) — Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
+- [RISK-063](#risk-063) — Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff
+- [RISK-064](#risk-064) — "Add New Category" (Services) Has No Arabic Name Field — Every Category Created There Gets A Permanently Blank `ar`
+- [RISK-066](#risk-066) — System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate
+- [RISK-067](#risk-067) — `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data
+- [RISK-069](#risk-069) — Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees
 
 ## RISK-001: Duplication Friction (hardcoded Revera-specific values)
 
@@ -98,57 +122,6 @@ Correctly stored in env vars (`.env.local`):
 
 ---
 
-## RISK-002: Admin Auth Is Client-Side Only (Partially Resolved)
-
-**Severity:** Medium (was Critical)
-**Type:** Security
-**Status:** Partially mitigated as of 2026-07-06
-
-**What changed:**
-The admin page now has a full Supabase email/password login gate. Employees are managed via `employee_accounts` + `roles` tables. Invites are sent via Supabase Auth. Superadmin access is determined by the persisted employee role. `/api/auth/me` verifies the JWT and returns role/permissions.
-
-**Remaining gap:**
-A migration at `supabase/migrations/20260722140000_enable_row_level_security.sql` enables RLS for all `public` tables, preventing direct browser/anon-key table access once applied to Supabase. Middleware validates bearer tokens against Supabase Auth before allowing employee, HR, role, and provider schedule-audit endpoints. Employee and role routes additionally enforce an `admin` or `superadmin` role server-side. API routes still use the service role key, which bypasses RLS, so remaining sensitive routes require server-side authorization before this risk can be closed.
-
-**What would fully resolve this:**
-- Add Next.js middleware that validates a Supabase session cookie for `/api/` routes
-- Or add `Authorization: Bearer` token validation in individual route handlers
-- Or use Supabase RLS policies on all tables (currently bypassed by service role key)
-
----
-
-## RISK-003: Patient Auth Is Non-Functional
-
-**Severity:** Medium
-**Type:** Feature completeness
-**Status:** Mitigated 2026-07-22
-
-**Resolution:**
-`AuthModal` now sends and verifies OTPs through Supabase Auth only. Insecure demo fallbacks, including the `123456` verification code and unauthenticated email lookup fallback, were removed. If Supabase Auth is unavailable, sign-in fails safely with a user-facing error.
-
----
-
-## RISK-004: localStorage as Primary Service/Category Storage (RESOLVED via RISK-025)
-
-**Severity:** Medium → **High 2026-07-27** → **Resolved 2026-07-27**
-**Type:** Data integrity
-
-**Description:**
-`serviceStore.ts` reads and writes services/categories from localStorage first. Supabase
-is synced only on explicit save actions. If a user opens the admin panel on a different
-browser or clears localStorage, they lose unsaved changes. The Supabase copy may be stale.
-
-**Correction 2026-07-27 — "synced only on explicit save actions" was wrong; there was no sync at
-all.** Measured while scoping Phase 3B task 3B.2: every save path in the admin Services UI called
-`saveDynamicServices()`, which wrote **only** to `localStorage`. Zero calls to
-`POST /api/services` existed anywhere in `admin/page.tsx`.
-
-**Resolution:** See **RISK-025**. Services are now database-primary: admin loads from and saves to
-`/api/services`, public components fetch services from the same API, and `localStorage` is used only
-for service toggles (visible/active UI state) and dynamic categories.
-
----
-
 ## RISK-005: Single 550KB Admin Page File
 
 **Severity:** Low (current scale) → Medium (as features grow)
@@ -172,6 +145,412 @@ panel (`activeNav === "Finances Dashboard"`), which has no reachable sidebar tri
 `financesExpanded` state that would expand it is never wired to a nav item). This is unrelated
 to the disabled `Finance` sidebar stub added in DEC-011 (`comingSoon: true`, superadmin-only,
 no page behind it at all). Do not conflate the two when working on either.
+
+---
+
+## RISK-010: No Gross Price Is Ever Persisted On A Reservation
+
+**Severity:** Critical · **Type:** Data integrity / Financial correctness
+**Found:** 2026-07-25 (finance discovery audit)
+
+`reservations` has only `amount_paid` and `amount_left` — there is no price, subtotal, total,
+discount, tax, or payment-method column (`supabase/migrations/20260705141242_full_migration.sql:214-238`).
+The invoice total is recomputed from the **live** services catalog on every render
+(`src/app/admin/page.tsx:26997`, `src/lib/printUtils.ts:21`), and `totalCost` is never sent to the
+server (`src/app/admin/page.tsx:27019-27025`).
+
+**Consequence:** editing a service price rewrites the total of every historical invoice.
+Reprinting a receipt from last month can produce a different number than the patient paid.
+Any revenue report built on this is not reproducible.
+
+**Mitigation:** PROPOSAL-002 Phase 1 — snapshot price/discount/COGS/commission onto immutable
+`invoices` + `invoice_lines` at issue time.
+
+---
+
+## RISK-016: Two Conflicting Definitions Of "Revenue" Already Exist
+
+**Severity:** Medium · **Type:** Reporting correctness
+**Found:** 2026-07-25
+
+Payroll defines revenue as `amount_paid + amount_left` — billed, not collected — with a
+`|| services.price` fallback that fires whenever both are 0, silently repricing a genuinely free
+session at list price (`hr/payroll/route.ts:64`, duplicated 4× in `doctor-payroll/route.ts`).
+It also counts `status='approved'` (not yet delivered) as earned.
+
+Meanwhile `customers.spent_amount` is a separate denormalized number written from two places with
+different semantics: server-side on completion as `+ amountPaid + walletWithdrawal`
+(`reservations/route.ts:579`), and client-side on a product sale as `+ totalAmount` via a direct
+browser Supabase call (`admin/page.tsx:3745-3749`) — a lost-update race that also mixes service
+revenue with retail revenue in one scalar.
+
+**Consequence:** a finance module defining revenue as collected cash will disagree with bonus
+figures already paid to staff. The definition must be chosen explicitly and documented.
+
+---
+
+## RISK-020: Migrations Are Not Tracked As Applied, And Two Databases Have Diverged
+
+**Severity:** High · **Type:** Operational / Delivery model
+**Found:** 2026-07-25 · **Verified by querying both live databases**
+
+**Production is not live yet** (confirmed 2026-07-25) — `main` serves no real patients, so nothing
+is currently broken for users. The severity is not about today; it is about two moments that are
+already scheduled:
+
+1. **At merge time.** Bringing `main` up to date means hand-applying ~15 migrations in order, with
+   no record of what already ran, against a database whose actual state nobody has snapshotted.
+   The silent-fallback insert chain below guarantees that partial failure looks like success.
+2. **At every new clinic.** DEC-001 commits to fork-per-client with a **separate Supabase project
+   per clinic**. With hand-pasted, untracked migrations, provisioning each new clinic's schema is a
+   manual 30-file operation that must go right every time. This is a scaling defect built into the
+   delivery model, not a one-off.
+
+Fixing this is far cheaper now, before production exists, than at any later point.
+
+The Supabase CLI is linked to dev, whose migration history now contains only the active
+`20260726000000` baseline. A direct dev dump generated that baseline, and `db pull` replayed it in a
+shadow database with no schema diff. New dev-based provisioning is now reproducible; the remaining
+operational risk is reviewing main directly and cutting it over to the same baseline.
+
+**The result: a file existing in `supabase/migrations/` proves nothing about any database.**
+Two Supabase projects are in use and their schemas have diverged badly.
+
+| | dev/test DB | main DB |
+|---|---|---|
+| Tables | 26 | 19 |
+| Schema current through | ~2026-07-20 | **~2026-07-05** |
+
+**Verified present in the dev DB on 2026-07-26:** `medical_records`, `medical_reports`,
+`customer_product_balances`, `product_sales.customer_id`, `reservations.provider_id`, and
+`services.duration_minutes`. This verification came from a direct linked dev schema dump.
+
+**Absent from the main DB** — 8 tables the application code actively reads and writes:
+`prescriptions`, `doctor_payroll`, `employee_notes`, `provider_schedule_audit_logs`,
+`inventory_products`, `product_sales`, `inventory_devices`, `device_maintenance_history`.
+
+`reservations` on the main DB is also missing three columns the code writes to — `service_ids`,
+`created_by_employee_id`, `is_manual` — so on that database multi-service bookings cannot be
+persisted and employee revenue attribution is silently dropped. Its `date` column is a real `date`
+type there, not the `text` the migrations declare, which is further evidence the two databases were
+built by different paths.
+
+**This class of failure stayed hidden because the code swallows it.**
+`src/app/api/reservations/route.ts:274-305` retries a failed insert after deleting
+`created_by_employee_id`, then retries again after also deleting `doctor_name`, then reports
+success. A missing column produces a booking with silently dropped attribution and no error
+anywhere.
+
+**Undocumented tables found in the live databases, created by no migration and absent from this
+file:** `admin_roles` (both databases) and `employees` (main only).
+
+**Required before any Finance work:**
+1. Take a full live-schema snapshot of the dev database and reconcile it against
+   `supabase/migrations/`.
+2. **Consolidate the 30 migration files into one clean baseline schema.** With no production data
+   to preserve, this is a one-time cheap fix that removes the conflicting duplicate table
+   definitions (`141242` vs `141244`), the `DISABLE ROW LEVEL SECURITY` re-run hazard, and the
+   ambiguity about what ran. It also makes provisioning a new clinic a single script.
+3. Adopt migration state tracking — ideally the Supabase CLI (`supabase db push`, which maintains
+   `supabase_migrations.schema_migrations`, and gives generated TypeScript types and a local stack).
+   At minimum a hand-rolled `schema_migrations` table recording applied filenames.
+4. Remove the silent-fallback insert chain in `reservations/route.ts:274-305`; let schema errors
+   surface instead of degrading data quietly.
+
+A finance module built on the assumption that the migrations folder describes the live database
+would be built on a false premise.
+
+---
+
+## RISK-053: New Cairo Branch's Working Hours Were Never Actually Configured
+
+**Severity:** Low (data/config gap, not a blocking bug) · **Type:** Data integrity
+**Found:** 2026-08-16, investigating a live report that 11:30 AM showed as "outside opening hours"
+when approving a real test booking (Therapeutic Laser, New Cairo, Tuesday 18 Aug, Dr. saifuldeen
+Naser).
+
+**What it is:** there are three independent places branch/service hours can come from, and for New
+Cairo none of them hold real data:
+
+1. `branches.service_hours` (New Cairo's row) — `null`, confirmed via `GET /api/branches`. Falls
+   back to a hardcoded 09:00–20:00-every-day default baked into `admin/page.tsx` (two separate
+   copies of the same default array, lines ~4540 and ~5146).
+2. `GET /api/availability`'s own fallback, `page_settings.value.footer.serviceHours` — the live
+   `page_settings` row has no `footer` key at all (`booking`/`deposit`/`inactivity`/`departments`
+   only, confirmed via `GET /api/page-settings`), so `data?.value?.footer?.serviceHours` evaluates
+   to `undefined || []`, i.e. an empty array, which the route then also treats as "no restriction,
+   use the 09:00–20:00 hardcoded default."
+3. The Settings → Service Hours admin UI writes to (1) — it has just never been saved for this
+   branch.
+
+**Why this didn't block 11:30 AM:** every one of these fallbacks is *permissive* (09:00–20:00,
+covers Tuesday), not restrictive, so a Tuesday 11:30 AM slot was never actually outside any of the
+three computed windows once the involved provider (`saifuldeen Naser`) had a real Tuesday
+in-person shift configured for New Cairo (09:00–20:00, confirmed via `GET /api/providers`). The
+approve modal's `getDayOperatingHoursApprove` also does not gate the "Confirm approve" button on
+its own "outside opening hours" warning — that button is only disabled by
+`approveUnavailableSlots.includes(slot) || !slot` (an actual scheduling conflict, not the hours
+warning). The specific block seen live most likely reflected the provider's schedule not yet being
+saved at that exact moment, or a slot briefly marked "taken" by the since-cancelled duplicate
+reservation (`008a9019…`) — both self-resolved, and the booking went on to be approved and started
+at the literal requested time (11:30 AM, `saifuldeen Naser`).
+
+**Not fixed — flagged for follow-up:** branch hours should be explicitly configured for every real
+branch (New Cairo, Sheikh Zayed) via Settings → Service Hours so the system stops running on
+implicit hardcoded defaults, and `fetchCachedServiceHours()` in
+[src/app/api/availability/route.ts](../src/app/api/availability/route.ts) silently returning `[]`
+for a page-settings shape that no longer exists (`footer.serviceHours`) is itself worth a decision:
+either restore that config path or delete the dead fallback.
+
+---
+
+## RISK-058: Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
+
+**Severity:** Low-Medium · **Type:** Data integrity / UX
+**Found:** 2026-08-17, while researching the Phase 1 pattern-proving Windsurf brief
+(`ai_docs/WINDSURF_BRIEFS.md` Brief 4) — not part of live patient-journey testing, but flagged per
+this file's standing convention of logging any bug found along the way.
+
+**What it is:** Settings → Clinic Profile's 8 fields (`clinicName`, `clinicNameAr`,
+`clinicLocation`, `clinicLocationAr`, `clinicEmail`, `clinicPhone`, `clinicWhatsapp`,
+`savingClinicProfile` — `src/app/admin/page.tsx:4595-4602`) initialize from hardcoded literals
+(`"Revera Clinics"`, `"+201035595691"`, etc.) and are never populated from saved data. Confirmed by
+grep: every `setClinicX` call site is an `onChange` handler on the form itself — there is no
+`useEffect`/fetch anywhere that reads `/api/page-settings` and hydrates these 8 fields on mount,
+unlike sibling Settings sections.
+
+The save side works correctly — `handleSaveClinicProfile` (`:6018-6034`) POSTs to
+`/api/page-settings`, whose handler does a real merge-and-upsert into `page_settings.value.clinic`
+(`src/app/api/page-settings/route.ts:141-166`), confirmed by reading that route. The data is saved.
+It's just never read back.
+
+**Business impact:** Staff editing Clinic Profile always sees the hardcoded Revera-specific
+placeholder values, never what was actually last saved — including on the fork this repo is meant
+to support for other clinics (RISK-001), where a clinic that saves its real name/phone/location
+would see the literal string `"Revera Clinics"` again on next page load, with no visible indication
+whether their save took effect.
+
+**Not fixed** — deliberately left for a dedicated small PR rather than folded into Brief 4's
+mechanical extraction (which must not change behaviour) or fixed inline here (out of scope for the
+Windsurf-brief-writing task that surfaced it). The fix is a `useEffect` reading `GET
+/api/page-settings` and calling the 7 setters from `data.clinic`, matching whatever hydration
+pattern sibling sections (Deposit/Notification/Queue Settings) already use.
+
+---
+
+## RISK-063: Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff
+
+**Severity:** Medium-High · **Type:** Security / Access control
+**Found:** 2026-08-19, building a table-driven auth sweep (`tests/routes/auth-sweep.test.ts`) across
+all 153 route handlers (ai_docs/TEST_COVERAGE_INVENTORY.md module 10).
+
+**What it is:** `POST /api/hr/alerts`, `POST /api/hr/attendance`, `PATCH /api/hr/attendance`, and
+`POST /api/hr/leaves` each inline their own auth check instead of calling `verifyHrAccess` (which
+every sibling GET on the same file correctly uses):
+
+```ts
+const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
+if (authError || !user) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+```
+
+This confirms the bearer token is a *valid Supabase session* — it never checks that session has a
+matching `employee_accounts` row. The comments above two of these ("Allow any employee session to
+log their missing state", "any logged in employee can submit a leave request") describe the
+intended scope, but the code doesn't enforce it: a **patient** with a valid logged-in session can
+currently submit HR attendance clock-ins, leave requests, or missing-employee alerts under any
+`employee_id` they choose to pass — there is no check that the caller's own identity has any
+connection to that id.
+
+**Consequence:** a patient account can inject fabricated attendance/leave/alert rows that
+downstream HR screens and `hr_payroll` treat as real, misattributed to whichever `employee_id` the
+request names.
+
+**Fix required:** replace the inline check in all four handlers with `verifyHrAccess(req)` (or
+`requireStaffAccess` + an explicit role allowlist, matching the `requireReceptionAccess` pattern
+RISK-059 just established), the same guard already used by every GET in these same three files.
+
+**Verification:** `tests/routes/auth-sweep.test.ts` asserts the correct behavior (403 for an
+authenticated non-staff caller) for all four as `it.fails` — currently failing-as-expected because
+the bug is unfixed. Once the guard is corrected, those four assertions will start passing and
+`it.fails` will flip to a hard failure — the signal to remove the marker.
+
+---
+
+## RISK-064: "Add New Category" (Services) Has No Arabic Name Field — Every Category Created There Gets A Permanently Blank `ar`
+
+**Severity:** Low · **Type:** Data integrity / i18n
+**Found:** 2026-08-19, verifying Windsurf's Brief 16 (Services extraction) — not caused by the
+extraction, confirmed pre-existing by diffing against the pre-extraction commit
+(`6abff84:src/app/admin/page.tsx`), where `newCategoryNameAr` was already declared and already
+never referenced anywhere but its own `useState`. The extraction moved this exact, already-broken
+behaviour verbatim into `src/components/admin/services/AdminServicesView.tsx`.
+
+**What it is:** the "Add New Category" modal (`AdminServicesView.tsx`, ~line 725) renders exactly
+one input, "Category Name (English)", bound to `newCategoryNameEn`. Its save handler (~line 754)
+hardcodes the Arabic field: `{ key, en: newCategoryNameEn.trim(), ar: "" }`. The `newCategoryNameAr`
+state (and its setter) exist in the component's own props/type — visible in an eslint
+`no-unused-vars` sweep — but there is no corresponding JSX input anywhere for it. Confirmed live in
+the browser: the modal genuinely shows only one text field.
+
+**Business impact:** every service category created through this form (not seeded via migration or
+direct DB edit) has a permanently blank Arabic name unless someone later finds and manually edits
+it elsewhere. Anywhere the public site or admin panel displays a category's Arabic label would show
+blank for these categories — silent, not an error, easy to miss until a patient-facing Arabic page
+is checked.
+
+**Not fixed** — out of scope for Brief 16, which was extraction-only with an explicit
+no-behaviour-change requirement; building the missing field is a real (if small) feature addition,
+not a mechanical move. Fix is a second input in the same modal ("Category Name (Arabic)") bound to
+`newCategoryNameAr`, and changing the save handler's `ar: ""` to `ar: newCategoryNameAr.trim()` —
+the state and prop plumbing to do this already exist, only the JSX and the one save-handler field
+are missing.
+
+---
+
+## RISK-066: System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate
+
+**Severity:** Critical · **Type:** PII exposure / access control
+**Found:** 2026-08-22, while investigating the "System Test Suite" admin section for a possible
+extraction/translation brief — not user-reported.
+**Status:** Open.
+
+**What it is:** the diagnostics runner at `page.tsx:2707-2841`/`10006-10222` ("System Test Suite" in
+Settings) fires 33 hardcoded GET requests against real endpoints — including
+`/api/medical-records`, `/api/prescriptions`, `/api/customers/products`, `/api/customers/reconcile`,
+`/api/employees`, `/api/hr/payroll`, `/api/hr/doctor-payroll` — using the operator's own bearer
+token, and stores the **full raw JSON response body** in component state
+(`responseDetails: data`, `page.tsx:2789-2795`). It is then dumped verbatim:
+```jsx
+{tc.responseDetails && (
+  <pre>{JSON.stringify(tc.responseDetails, null, 2)}</pre>
+)}
+```
+(`page.tsx:10207-10208`). Whoever runs this test suite sees another patient's medical records,
+prescriptions, and staff salary figures rendered on their own screen — not because they queried for
+that patient, but because a diagnostics button happened to fetch them.
+
+**Confirmed, not assumed:** independently verified both parts directly — the `responseDetails: data`
+assignment at line 2789-2795 and the unfiltered `<pre>{JSON.stringify(...)}}</pre>` render at
+10207-10208, and confirmed `grep -n "NODE_ENV" page.tsx` returns **zero matches** anywhere in the
+file. There is no environment gate at all.
+
+**Reachable in production, not dev-only:** it's a normal Settings submenu item (`page.tsx:5888`),
+gated only by `hasPermission("settings.test_suite")` **or** superadmin — a real, grantable
+`PERMISSION_STRUCTURE` key (`page.tsx:505`), not a superadmin-only screen. Any admin role holding
+that one permission can trigger the full PII dump.
+
+**Additional quality problem, not the security issue but worth noting alongside:** 9 of the 33
+"tests" are duplicates pointing at the same endpoint under different names (6× `/api/reservations`
+as TC-025…030, 3× `/api/reception/dashboard` as TC-031…033), and "pass" means only HTTP 200 — no
+response-shape assertion. `tests/routes/auth-sweep.test.ts` already covers the same 33 endpoints
+with real assertions, in CI, for free — this screen adds risk without adding real coverage.
+
+**Mitigation, not yet applied:**
+1. Stop rendering `responseDetails` raw — show only pass/fail, status code, and duration; drop the
+   `<pre>` block entirely, or truncate/redact before display.
+2. Either gate the whole section behind `process.env.NODE_ENV !== 'production'`, or at minimum
+   tighten its permission requirement to `adminRole === "superadmin"` only (remove the
+   `settings.test_suite` grantable-permission path).
+3. Given `auth-sweep.test.ts` already covers these endpoints with real assertions in CI, consider
+   deleting this screen outright rather than fixing it — see `WINDSURF_BRIEFS.md` Brief-25-adjacent
+   investigation notes (Group D) for the full recommendation.
+
+---
+
+## RISK-067: `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data
+
+**Severity:** High · **Type:** Data exposure / access control
+**Found:** 2026-08-22, while investigating the Settings-submenu screens for extraction/translation
+briefs — not user-reported.
+**Status:** Open.
+
+**What it is:** `src/app/api/page-settings/route.ts`'s `GET()` (line 85) has **no auth check at
+all** — confirmed directly: `requireAdministratorAccess` is imported but only invoked inside `POST`
+(line 129), never in `GET`. This is deliberate and correct for its original purpose — the public
+booking site's `BookingModal.tsx:312` calls this same endpoint unauthenticated to read public
+booking-flow config.
+
+**The problem:** the same settings blob this route serves now also holds operationally sensitive
+data that has nothing to do with the public booking flow, added by later Settings screens that
+reused the shared `page_settings` blob without revisiting the route's auth model:
+- `deposit.instapayAddress` / `deposit.walletNumber` — the clinic's payment-destination details
+  (Deposit Settings, `page.tsx:8965-9111`).
+- `notifications.staffEmail` — an internal staff contact address (Notification Settings,
+  `page.tsx:9270-9468`).
+- The `departments` list (Department Management, `page.tsx:9947-10001`, written via
+  `handleSaveDepartments`).
+
+All of these are readable by anyone who calls `GET /api/page-settings` directly, with no session,
+no token, no rate limit beyond whatever sits in front of the deployment.
+
+**Consequence:** payment-destination data (where InstaPay transfers land) and internal staff contact
+info are exposed on an endpoint that was never intended to serve them — an unrelated feature reused
+a shared storage blob without re-checking who could read it.
+
+**Compounding factor, same root cause:** `POST /api/page-settings` requires only
+`requireAdministratorAccess` with **no per-key permission check** — any administrator can rewrite
+CMS content, InstaPay payment destinations, and the departments list regardless of whether they hold
+`settings.pages`, `settings.booking_settings`, or `settings.roles` specifically. The granular
+`PERMISSION_STRUCTURE` model (RISK-025-adjacent, see Role Management) exists only client-side for
+this route.
+
+**Mitigation, not yet applied:** split the `page_settings` blob's genuinely-public keys (whatever
+`BookingModal.tsx` actually needs) from the operationally sensitive ones, and either move the
+sensitive keys to an authenticated-only table/route, or add field-level filtering to `GET` so the
+public response never includes `deposit.*`/`notifications.staffEmail`/`departments`. Separately,
+add per-key permission checks to `POST` matching the relevant `PERMISSION_STRUCTURE` prefix.
+
+---
+
+## RISK-069: Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees
+
+**Severity:** Critical · **Type:** Security / Privilege escalation
+**Found:** 2026-08-23, writing Brief 25 Part 3 tests. **Status:** OPEN (not fixed — needs a product decision on whether admins should manage roles at all).
+
+**Description:**
+`PATCH /api/employees` (`src/app/api/employees/route.ts:219`) uses `requireAdministratorAccess`, which admits both `admin` and `superadmin` roles. The only role-change guard is `employee.employee_id === 'superadmin'` (line 245) — this protects the superadmin account from being changed, but does **not** prevent a non-superadmin admin from escalating another account's `role_name` to `superadmin`.
+
+The UI (`RoleManagementView.tsx`) gates the role-change `<select>` with a client-side `adminRole === "superadmin"` check, but that is bypassable. The server has no equivalent check.
+
+**Consequence:** Any admin can grant themselves or a colleague superadmin privileges, bypassing the entire RBAC system.
+
+**Fix:** Add a server-side check in the PATCH handler: if `roleName` is provided and the caller's role is not `superadmin`, return 403. This is a one-line guard. Not fixed in this brief because the brief scope is translation, not security fixes.
+
+**Test:** `tests/routes/roles-employees.test.ts` — `it.fails('a non-superadmin admin cannot change another account\'s role_name')` confirms the current (vulnerable) behaviour. The test will go green the moment the fix is applied.
+
+---
+
+# 🟡 Partially Resolved
+
+- [RISK-002](#risk-002) — Admin Auth Is Client-Side Only (Partially Resolved)
+- [RISK-006](#risk-006) — GPS-Based Attendance Can Be Spoofed
+- [RISK-007](#risk-007) — Client-Side PDF Invoice Printing Is Browser-Dependent
+- [RISK-012](#risk-012) — Patient Debt Only Ever Grows
+- [RISK-015](#risk-015) — Doctor Cost Attribution Depends On A Name String
+- [RISK-019](#risk-019) — RLS Coverage
+- [RISK-022](#risk-022) — A Non-Existent `customer_id` On A POS Sale Silently Loses Stock With No Discoverable Record
+- [RISK-026](#risk-026) — Clinic Devices Read Blob-Shape Field Names That Don't Exist On The Real Table
+- [RISK-031](#risk-031) — New Packages/Promotions Admin UI Was Added Inline To `admin/page.tsx`, Violating DEC-027
+- [RISK-033](#risk-033) — `services.id` Regressed To `GENERATED ALWAYS`, Silently Breaking Every Edit To An Existing Service
+- [RISK-038](#risk-038) — The Doctor's Recalculated Session Total Never Reaches The Database
+- [RISK-057](#risk-057) — Doctor-Added Products Never Appeared As Invoice Line Items — Regex Format Mismatch (RESOLVED)
+
+## RISK-002: Admin Auth Is Client-Side Only (Partially Resolved)
+
+**Severity:** Medium (was Critical)
+**Type:** Security
+**Status:** Partially mitigated as of 2026-07-06
+
+**What changed:**
+The admin page now has a full Supabase email/password login gate. Employees are managed via `employee_accounts` + `roles` tables. Invites are sent via Supabase Auth. Superadmin access is determined by the persisted employee role. `/api/auth/me` verifies the JWT and returns role/permissions.
+
+**Remaining gap:**
+A migration at `supabase/migrations/20260722140000_enable_row_level_security.sql` enables RLS for all `public` tables, preventing direct browser/anon-key table access once applied to Supabase. Middleware validates bearer tokens against Supabase Auth before allowing employee, HR, role, and provider schedule-audit endpoints. Employee and role routes additionally enforce an `admin` or `superadmin` role server-side. API routes still use the service role key, which bypasses RLS, so remaining sensitive routes require server-side authorization before this risk can be closed.
+
+**What would fully resolve this:**
+- Add Next.js middleware that validates a Supabase session cookie for `/api/` routes
+- Or add `Authorization: Bearer` token validation in individual route handlers
+- Or use Supabase RLS policies on all tables (currently bypassed by service role key)
 
 ---
 
@@ -224,90 +603,6 @@ Invoice printing now uses the shared `src/lib/printUtils.ts` utility with a stan
 
 ---
 
-## RISK-008: Hardcoded Superadmin Email
-
-**Severity:** Medium
-**Type:** Security / Fork risk
-
-**Status:** Mitigated 2026-07-22
-
-**Description:**
-Superadmin access is now determined solely by the persisted `employee_accounts.role_name` value. Email-based bypasses were removed from admin authentication, attendance, and payroll handling.
-
-**Remaining requirement:**
-Every superadmin must have an `employee_accounts` row linked through `auth_user_id` and assigned the `superadmin` role.
-
----
-
-## RISK-009: Schedule Grid Can Silently Clip Overlapping Bookings
-
-**Severity:** Low (mitigated 2026-07-20)
-**Type:** Data visibility / UX
-
-**Description:**
-The Bookings → Schedule view (`calendarView === "Schedule"`, `src/app/admin/page.tsx`, see DEC-012) fixes every cell to a hard `84px` height with `overflow-hidden` on the inner content wrapper, so that booked cells render at the same height as empty ones. If more than a couple of bookings ever land on the same doctor/slot (whether from a real double-booking, a manual admin entry, or a data edge case — overlap-prevention exists in `api/availability` and `api/reservations` but was not exhaustively re-audited here), the extra booking cards could visually clip and become invisible in this view.
-
-**Mitigation (applied):**
-- Cell now shows at most `MAX_VISIBLE_BOOKINGS = 3` cards; any beyond that render as a `+N more` pill instead of clipping silently.
-- Clicking `+N more` sets `docFilter` to that cell's doctor, `dateFilter` to that day (`YYYY-MM-DD`), resets `statusFilter`/`typeFilter` to `"All"`, and switches `calendarView` to `"List"` — narrowing to exactly that doctor's bookings on that day.
-- A `dateFilter` state was added to `filteredReservations` (previously List/Calendar had no date filter at all) with a date input + clear button in the existing Filter modal, and an active-filter chip row with a "Clear all" button in the List view header — so the filtered state from a `+N more` jump is visible and easy to back out of, not a hidden/stuck state.
-- The List view applies the selected date filter, so the jump narrows to that doctor's bookings on the selected day.
-
----
-
-## RISK-010: No Gross Price Is Ever Persisted On A Reservation
-
-**Severity:** Critical · **Type:** Data integrity / Financial correctness
-**Found:** 2026-07-25 (finance discovery audit)
-
-`reservations` has only `amount_paid` and `amount_left` — there is no price, subtotal, total,
-discount, tax, or payment-method column (`supabase/migrations/20260705141242_full_migration.sql:214-238`).
-The invoice total is recomputed from the **live** services catalog on every render
-(`src/app/admin/page.tsx:26997`, `src/lib/printUtils.ts:21`), and `totalCost` is never sent to the
-server (`src/app/admin/page.tsx:27019-27025`).
-
-**Consequence:** editing a service price rewrites the total of every historical invoice.
-Reprinting a receipt from last month can produce a different number than the patient paid.
-Any revenue report built on this is not reproducible.
-
-**Mitigation:** PROPOSAL-002 Phase 1 — snapshot price/discount/COGS/commission onto immutable
-`invoices` + `invoice_lines` at issue time.
-
----
-
-## RISK-011: Branch-Specific Pricing Has Never Been Applied
-
-**Severity:** High · **Type:** Correctness / Revenue
-**Found:** 2026-07-25 · **RESOLVED 2026-07-25**
-
-**Fix:** a shared `resolveBranchName()` in `src/lib/services.ts` compares ids as strings and refuses
-to treat a UUID as a name; the server query uses `.eq('id', branchId)` with `select('name_en,
-name_ar')` and no longer discards its error. Regression check: `npx tsx scratch/pricecheck.ts`.
-
-**Historical impact: none.** Every price charged before this fix used the `isDefault` entry or
-`services.price` rather than a branch price — but all of that data is mock (DEC-026), and no
-backfill is being built, so there is nothing to restate.
-
-Original diagnosis below.
-
-Two independent bugs, both silent:
-- **Server** (`src/app/api/reservations/route.ts:198-206`): queries
-  `.eq('id', Number(branchId))` but `branches.id` is a UUID → `NaN`; and selects a `name`
-  column that does not exist (the table has `name_en` / `name_ar`, `full_migration.sql:38-39`).
-  `targetBranchName` is therefore always null.
-- **Client** (`src/lib/services.ts:137-147`): treats any non-numeric string as a branch *name*.
-  UUIDs are non-numeric strings, so the UUID itself is compared against `branchPricing[].name`
-  and never matches.
-
-**Consequence:** every price falls through to the `isDefault` entry or `services.price`.
-Per-branch prices configured in the admin UI have never taken effect anywhere.
-
-Related: `services.branch_pricing` is `jsonb NOT NULL DEFAULT '{}'` — an empty **object** —
-while all consuming code guards with `Array.isArray()` (`services.ts:150,157,230,237`), so any
-service never touched in the pricing UI silently uses `services.price`.
-
----
-
 ## RISK-012: Patient Debt Only Ever Grows
 
 **Severity:** High · **Type:** Data integrity
@@ -349,6 +644,559 @@ reservation would silently re-apply the same wallet delta and write a duplicate 
 immediately on re-running the suite — it was never updated to match the regression, meaning this
 landed outside the project's own test-net discipline. Fixed by restoring the guard (commit
 `8f8c2dd`); `walletIgnored` now correctly reflects when a movement was dropped.
+
+---
+
+## RISK-015: Doctor Cost Attribution Depends On A Name String
+
+**Severity:** Medium-High → Low (name-matching part) · **Type:** Data integrity
+**Found:** 2026-07-25 · **Name-string attribution and monthly-aggregate-only commission RESOLVED
+2026-07-26 — see `FINANCE_TRACKER.md` task 2.14. Three compounding issues below remain open.**
+
+**Fix:** `src/app/api/hr/doctor-payroll/route.ts`'s three match sites (`GET`, `POST`, `PATCH`) now
+filter reservations by `r.provider_id === prov.id` instead of a case-insensitive
+`doctor_name`/`providers.name` string comparison — a rename can no longer silently detach a
+doctor's historical commission. Commission is also no longer re-derived live from
+`amount_paid + amount_left`; it sums the real per-reservation `invoice_lines.commission_snapshot`
+values Phase 2's checkout costing (tasks 2.11/2.15) now writes at completion time, computed via
+`computeCommission()` (task 2.9) against each provider's configured `commission_type` /
+`commission_base` (task 2.8) — commission is now an inspectable per-session number, not only a
+monthly total. A reservation whose `provider_id` is `NULL` (task 0.7: the name matched zero or
+more than one provider) is simply excluded from payroll, which is more honest than a fuzzy
+string fallback silently re-attaching it to the wrong doctor.
+
+**Not fixed by this — the three compounding issues below are still open:**
+- Commission is still computed on **billed**, accrual-basis price via `invoice_lines.line_total`
+  (now snapshotted rather than re-derived, but still accrual, not cash) — must not be netted
+  directly against a cash-basis revenue view (RISK-016).
+- `doctor_payroll` PATCH still recomputes and overwrites **already-Paid** records (`:258-315`),
+  so it still cannot be treated as an immutable ledger.
+- A doctor who is also an employee still appears in **both** `hr_payroll` and `doctor_payroll`
+  for the same month (`src/app/api/employees/route.ts:174-206`) — naive summation still
+  double-counts.
+- `hr_payroll.achieved_revenue` still holds a **count**, not revenue, when
+  `target_type_snapshot='reservations'` (`hr/payroll/route.ts:111`) — summing it is still nonsense.
+
+Original diagnosis below, kept for reference.
+
+`reservations.doctor_name` is free text (`full_migration.sql:228`); there was no `provider_id` FK
+at the time this risk was found. Doctor payroll attributed revenue by case-insensitive string
+equality against `providers.name` (`src/app/api/hr/doctor-payroll/route.ts:172`). A rename, a
+typo, a title prefix, or two doctors sharing a name silently detached historical commission with
+no error.
+
+---
+
+## RISK-019: RLS Coverage
+
+**Severity:** Low (was Medium) · **Type:** Security
+**Found:** 2026-07-25 · **Largely resolved 2026-07-25**
+
+Until 2026-07-25, RLS was **disabled** on `reservations`, `customers`, `services`, `providers`,
+`branches`, `categories`, `page_settings`, `provider_attendance`, `rooms`, `service_rooms`,
+`doctor_payroll` and `provider_schedule_audit_logs` — the tables holding patient identities,
+bookings and doctor pay — because `20260722140000_enable_row_level_security.sql` had never been run.
+
+**That migration was applied to dev on 2026-07-25.** RLS is now on for every table in `public`.
+
+A prerequisite had to be fixed first: `src/app/admin/page.tsx` wrote to `customers` directly from
+the browser with the anon key, which enabling RLS would have turned into a silent no-op that still
+reported success. That write moved server-side into `POST /api/inventory/products/sales` in
+`8108b82`, and no client component reads or writes a Supabase table any more.
+
+**Residual risk:** the subset carrying permissive "allow all" policies (`roles`,
+`employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`,
+`device_maintenance_history`, `admin_roles`) is functionally open — salary and inventory data is
+readable with the anon key. Those policies should be tightened or dropped, since every access path
+now goes through the service role anyway.
+
+**Hazards for new work:**
+- That migration is a one-shot `DO` block, not a trigger. Any table created after it runs has RLS
+  **off** unless its own migration enables it explicitly (the 20260725120000 backfill does this by
+  hand at `:77-79`). A finance migration must do the same.
+- `supabase/migrations/README.md` instructs operators to re-run scripts in filename order.
+  Re-running `20260715202003_add_provider_payroll.sql:26`
+  (`ALTER TABLE doctor_payroll DISABLE ROW LEVEL SECURITY`) after the enable migration would
+  silently turn RLS back off. Same hazard for the `DISABLE` statements throughout
+  `full_migration.sql`.
+- `20260705141244_setup_supabase_schema.sql` sorts **after** `..._141242_full_migration.sql` but is
+  an older, narrower version of the same schema. Harmless only because everything is
+  `IF NOT EXISTS`. Treat `full_migration.sql` as authoritative.
+
+---
+
+## RISK-022: A Non-Existent `customer_id` On A POS Sale Silently Loses Stock With No Discoverable Record
+
+**Severity:** High · **Type:** Data integrity / RISK-014 regression
+**Found:** 2026-07-26 (manually verifying `FINANCE_TRACKER.md` task 1.11 against deployed dev) ·
+**RESOLVED 2026-07-26**
+
+**How it was found:** deliberately testing task 1.11's "force a ledger-write failure, confirm the
+POS sale itself still succeeds" checklist item, using a syntactically valid but non-existent
+`customer_id`. The Phase 1 ledger dual-write did fail as expected — but so did something the
+checklist wasn't asking about: the **native `product_sales` insert itself** failed too, silently.
+
+**Root cause:** `product_sales.customer_id` has a foreign key to `customers.id`
+(`20260725160000_add_customer_id_to_product_sales.sql`). `mapSaleToDbRow()` in
+`src/app/api/inventory/products/sales/route.ts` passes whatever `customer_id` the request sends
+straight through with no existence check first. A stale or mistyped `customer_id` (e.g. a customer
+record that was later deleted, or a typo from a barcode/manual-entry error) violates that FK, and
+the insert fails with Postgres error `23503` — **exactly RISK-014's original failure signature**,
+just triggered by a different input than the column-name mismatch RISK-014 fixed.
+
+**Consequence, confirmed live against dev (`sale-1785071843480-pbysm`,
+`sale-1785071922006-nni32`):**
+1. `deductInventoryStock()` runs **unconditionally** after the insert attempt, regardless of
+   whether it succeeded — stock left the building for real.
+2. The failed native insert falls through to the `page_settings` blob (the same fallback RISK-014
+   already established), and the API still responds `{success: true}` to the cashier.
+3. `getStoredSalesData()`'s read path trusts the native `product_sales` table **exclusively** once
+   it has any rows at all, never merging the blob back in — so once a clinic has made even one
+   real sale, every sale that falls into this trap becomes **permanently invisible** in sales
+   history and any report built on `product_sales`. Reproduced twice in a row against dev; not a
+   one-off blip. Verified by direct insert reproduction: `product_sales_customer_id_fkey` violation
+   (`23503`), `Key (customer_id)=(...) is not present in table "customers".`
+
+**Fix:** `POST /api/inventory/products/sales` now verifies `customer_id` resolves to a real
+`customers` row **before** touching stock or attempting any write, returning a clean `404` instead
+of silently degrading. Restores the intended RISK-014 behavior ("surface the reason rather than
+failing over silently") for this specific trigger.
+
+**Verify:** `npx tsc --noEmit` / `npx eslint` clean. POST with a non-existent `customer_id` now
+returns `404` before any stock or ledger write happens; a real `customer_id` still sells normally
+(re-verified against dev — see `ai_docs/manual_tests/FINANCE_PHASE_1_MANUAL_TESTS.md` task 1.11 evidence).
+
+**A second, related bug found while reproducing this, NOT fixed here — the `page_settings`
+fallback itself silently discards its own history.** `POST`'s fallback branch computes what to
+write as `[newSale, ...(await getStoredSalesData()).sales]` — but `getStoredSalesData()` prefers
+the **native** table once it has any rows, so on every failed insert this overwrites the whole
+blob with `[thisSale, ...nativeRows]`, discarding any previously-accumulated fallback entries from
+earlier failed inserts. Confirmed live: 5 sequential ghost-customer POSTs each deducted stock
+(`stock_quantity` dropped by exactly 5), but only the **last** one's entry survived in the blob —
+the other 4 were silently overwritten by each other, one at a time. This RISK-022 fix (validating
+`customer_id` up front) prevents this specific trigger from ever reaching that broken path again,
+but the fallback write logic itself is still broken for any *other* reason a `product_sales` insert
+might fail (a bad `product_id`, a transient DB error, a future schema change) — worth its own pass
+if the fallback path is meant to be a real safety net rather than effectively "keep only the most
+recent failure."
+
+---
+
+## RISK-026: Clinic Devices Read Blob-Shape Field Names That Don't Exist On The Real Table
+
+**Severity:** High · **Type:** Data integrity
+**Found:** 2026-07-27, while doing Phase 3B task 3B.4 (`lamp_replacement_cost` + rated pulses) ·
+**RESOLVED 2026-07-27** (the specific field-name mismatch below; a related unresolved item is
+noted at the end)
+
+**Root cause:** The real `inventory_devices` table (verified against
+`supabase/migrations/20260726000000_dev_schema_baseline.sql` and
+`20260726011400_add_inventory_devices_lamp_replacement_cost.sql`, not assumed) has exactly:
+`id, name, serial_number, model, branch_name, status, total_pulses, remaining_pulses,
+max_pulses_limit, lamp_replacement_cost, last_maintenance_date, next_maintenance_date,
+created_at, updated_at`. It has **no** `current_pulse_count`, `warning_threshold_1`,
+`maintenance_threshold_2`, `initial_pulse_count`, `total_lifetime_pulses`, or `category` columns
+at all — those exist only in the legacy "blob shape" (`DEFAULT_DEVICES`, and every POST/PUT body in
+`src/app/api/inventory/devices/route.ts`), a holdover from before the real table existed.
+
+`GET /api/inventory/devices`'s status-computation step, and **every single read site in
+`admin/page.tsx`** (device list stat cards, the pulse-update modal, the reset-pulses modal, the
+Edit Device form's default values — confirmed by grepping every occurrence of
+`current_pulse_count`/`warning_threshold_1`/`maintenance_threshold_2` in that file), read
+exclusively the blob-shape names. `getStoredInventoryData()` returns raw rows straight from
+`select('*')` on the real table when it has data — so every one of those reads silently resolved to
+`undefined`, and every `Number(dev.current_pulse_count) || 0` / `|| 80000` / `|| 100000` fallback
+kicked in unconditionally. **Practical effect: as soon as the real table has any rows, every
+device's displayed pulse count reads as 0, every threshold reads as the hardcoded default, and
+status always computes as "Optimal" — regardless of what's actually stored.** This is the same
+class of bug as RISK-025 (blob/table shape divergence), just on the read side only — the *write*
+side (`saveInventoryData`'s `sqlRows` mapper) was already correctly writing to the real table's
+columns; the display just never reflected it back.
+
+**Why 3B.4 specifically surfaced this:** the task asked to "confirm `max_pulses_limit` is genuinely
+settable, not only defaulted to 100000 in code." Tracing that through found it *was* settable (the
+write path was fine) but **never displayed correctly on reload** — which would have made the task's
+own verify step fail if actually tested against live data, the same way the null-duration bug would
+have failed 3B.2's verify step if not caught first.
+
+**Fix:** added `normalizeDeviceRow()` in `src/app/api/inventory/devices/route.ts`, applied to every
+row `getStoredInventoryData()` returns from the real table. It backfills the blob-shape names from
+the real columns when absent: `current_pulse_count ← total_pulses`,
+`maintenance_threshold_2 ← max_pulses_limit`. `warning_threshold_1` has no real-table equivalent to
+fall back to at all (the real schema only ever had one ceiling, not a two-tier warning/critical
+model) — derived as 80% of the real ceiling, matching the ratio `DEFAULT_DEVICES`' own seed data
+already used.
+
+**Not fixed here, worth checking separately:** `src/app/api/inventory/devices/[id]/reset-pulses/route.ts`
+reads and writes **only** `page_settings` (the blob) — it has no `supabaseServer.from('inventory_devices')`
+call at all, unlike the main route. `DB_SCHEMA.md`'s `inventory_devices` entry states this route is
+"confirmed wired," which this session did not re-verify and now has reason to doubt (same class of
+stale-doc risk RISK-020 exists to warn about). If the real table and the blob have diverged (very
+possible, since nothing keeps them in sync on this path), resetting a device's pulse count here may
+not affect what the main route's normalized read actually shows. Flagging, not fixing — out of
+scope for 3B.4.
+
+**Verify:** `npx tsc --noEmit`, `npx eslint`, and `npx next build` all clean. Set a device's
+Maintenance Threshold 2 and Lamp Replacement Cost, save, reload the page, and confirm both values
+persist and display correctly rather than resetting to defaults.
+
+---
+
+## RISK-031: New Packages/Promotions Admin UI Was Added Inline To `admin/page.tsx`, Violating DEC-027
+
+**Severity:** Low · **Type:** Architecture / tech debt (not a correctness or money bug)
+**Found:** 2026-07-28, self-flagged while auditing `ai_docs/` for staleness after shipping the
+package sell/redeem/checkout feature — not a user-reported issue.
+
+**What it is:** DEC-027 ("Modular Admin Sections Are Mandatory," 2026-07-26) requires every *new*
+admin section to be built as a focused submodule under `src/components/admin/`, explicitly to stop
+`src/app/admin/page.tsx` from growing further — existing legacy sections are only extracted
+"incrementally when touched." The 2026-07-28 packages work added a genuinely new section (a
+"Packages" tab in the customer profile, its sell-package modal, a new shared
+`PatientPackagePromoBanner` component, and redemption logic inside the checkout modal) directly
+inline into `admin/page.tsx`, mirroring the pre-existing (legacy, pre-DEC-027) "Products" tab
+pattern instead of extracting a new module. `PackageAdminPanel.tsx` (the package *definitions*
+CRUD screen, built earlier in 3B.8) correctly follows DEC-027 — only this session's customer-facing
+sell/redeem/banner work does not.
+
+**Why it happened this way:** the redemption logic sits inside the existing legacy Payment
+Settlement (checkout) modal, which is itself unextracted — DEC-027 says existing sections get
+pulled out "when touched," which arguably makes this checkout change the trigger for extracting
+that modal. Given the checkout modal is the one money-critical surface in this feature (it's what
+was flagged "take care, critical feature" for), a mid-implementation extraction was judged higher-
+risk than shipping the fix in place and refactoring separately once it's verified working in the
+browser.
+
+**Consequence:** `admin/page.tsx` grew by ~550 lines in this change, working against DEC-027's
+stated goal. No functional/money risk — this is purely a maintainability debt item.
+
+**Recommended follow-up (not done here):** once the feature is verified live, extract into
+`src/components/admin/packages/`: (1) the customer-profile "Packages" tab + sell modal as their
+own component, (2) `PatientPackagePromoBanner` (already a clean, prop-driven, extractable
+function), and (3) the checkout modal's redemption logic, ideally alongside finally extracting the
+whole Payment Settlement modal into its own module per DEC-027's "extract when touched" clause.
+
+**Partial update, 2026-07-29 (DEC-036):** while activating the "Marketing" nav section (moving
+Promotions + Packages' admin screens out from under Services/their own top-level item), Promotions
+was extracted into `src/components/admin/marketing/PromotionsAdminPanel.tsx` — this closes the
+Promotions half of DEC-027 compliance (Promotions wasn't part of this risk's original scope, since
+it predated DEC-027 and hadn't been touched yet; it's now been touched, and extracted properly).
+**The original subject of this risk — the customer-profile "Packages" tab, `PatientPackagePromoBanner`,
+and the checkout modal's redemption logic — is still unextracted and still open.**
+
+**2026-08-22 finding, still unextracted so still living in `page.tsx`, but now also a money-risk,
+not just tech debt.** Commit `e79a691` (same 58-commit non-Windsurf pull as the RISK-012/RISK-006
+regressions above) removed the `redemptionAllowed = depositAlreadyPaid === 0` guard that RISK-035's
+original fix depended on — its own removed comment explained why: *"deposits are booking-level,
+not per-service, so waiving a service's price after cash was already taken against it would need
+refund/reversal logic this feature doesn't build."* No such refund/reversal logic was added in
+that commit or `eaee305` alongside it (checked both diffs directly). `baseServicesTotal`
+(`page.tsx:18121-18124`) does correctly exclude a redeemed service from `totalCost`, so the
+arithmetic still resolves — a deposit already collected against a since-redeemed service surfaces
+as `changeAmount`, which the checkout UI can hand back as cash or credit to wallet
+(`depositChangeToWallet`) — but there is no explicit reconciliation record or forced acknowledgment
+that this happened, and it depends entirely on staff noticing and handling it correctly in the
+moment. Not proven broken (unlike RISK-012 above, this isn't independently testable from
+`billing.ts` alone — it depends on live checkout UI behavior), but the safety gate that existed
+specifically to avoid this scenario is gone with nothing replacing it. Needs either a live
+walkthrough (redeem a package on a booking with an existing deposit, confirm the change/wallet
+credit path is unambiguous to staff) or reinstating the guard until the reconciliation UX is built.
+
+---
+
+## RISK-033: `services.id` Regressed To `GENERATED ALWAYS`, Silently Breaking Every Edit To An Existing Service
+
+**Severity:** High · **Type:** Data integrity / silent failure
+**Found:** 2026-07-29, while investigating why a Promotion appeared to save in the admin UI but
+never persisted or showed on the public site — not a user-reported issue directly, but the fix
+unblocks the user's own report.
+**Status:** Migration written, **not yet applied** — needs `npx supabase db push` run by the user
+(or approved when prompted); Claude Code's auto-mode classifier blocks unattended DB migrations.
+
+**What it is:** the 2026-07-26 "dev schema baseline" migration
+(`20260726000000_dev_schema_baseline.sql`) recreated `services.id` as
+`GENERATED ALWAYS AS IDENTITY`. The pre-baseline legacy schema (`supabase/migrations/_legacy/`)
+had it as `GENERATED BY DEFAULT AS IDENTITY`. Postgres rejects any INSERT/UPSERT statement that
+includes an explicit value for a `GENERATED ALWAYS` identity column, unless the statement uses
+`OVERRIDING SYSTEM VALUE` — which `@supabase/supabase-js`'s `.upsert()` does not add.
+`POST /api/services` always includes `id` for an existing service (`mapServiceToDb`:
+`if (s.id) row.id = s.id;`), so **every save of an existing service** — the entire Services admin
+tab, and Promotions (which reads-modify-writes the whole services array) — has been silently
+failing with Postgres error `428C9` ("cannot insert a non-DEFAULT value into column \"id\"")
+since that migration took effect.
+
+**Why it was invisible:** `syncServicesToApi()` (`src/app/admin/page.tsx`) only does
+`console.error` on a failed sync and returns `null` — no alert, no thrown error the caller
+surfaces to the user. The admin UI's local state update happens optimistically *before* the sync
+call resolves, so a promotion (or any service edit) appears to save in the UI while the database
+write silently 400s underneath. New service *creation* was unaffected (no `id` in that payload),
+which is likely why this went unnoticed — only edits to already-existing rows hit the identity
+conflict.
+
+**Confirmed via direct DB query** (`scratch/check_promotions.ts`): zero services have ever had a
+promotion recorded in `branch_pricing`. Reproduced the exact failure directly
+(`scratch/test_promotion_upsert.ts`): a plain upsert of an existing service row with its `id`
+returns Postgres error 428C9.
+
+**Bonus finding while diagnosing this:** the earlier Packages public-display migration
+(`20260728010000_packages_public_display_fields.sql`, adding `name_ar`/`show_on_website`) had
+also never been applied to the remote dev database (`npx supabase migration list` showed both as
+local-only) — so "Show on Website" and Arabic package names have likely never worked live either.
+
+**Fix:** `supabase/migrations/20260729000000_fix_services_id_identity_generation.sql` —
+`ALTER TABLE public.services ALTER COLUMN id SET GENERATED BY DEFAULT;`. Metadata-only, no data
+changes; new-row creation is unaffected either way (still auto-generates when `id` is omitted).
+**Must be applied** (`npx supabase db push`, which also picks up the still-pending 3B.13 packages
+migration) before Promotions or any Services edit will actually persist.
+
+**2026-08-22: could not confirm application status.** Attempted to check via the Supabase MCP
+connector; the only project it returns is named "elevate-os", which doesn't obviously match this
+clinic platform — did not proceed with a live query against a project that might be the wrong one.
+Mohamed should confirm directly (`npx supabase migration list` against the real linked project, or
+just try editing an existing service/promotion in the browser and see if it persists) — if this is
+still unapplied, every Services/Promotions edit is still silently failing exactly as originally
+found.
+
+---
+
+## RISK-038: The Doctor's Recalculated Session Total Never Reaches The Database
+
+**Severity:** Critical · **Type:** Data loss / Revenue
+**Found:** 2026-08-16, during a full patient-journey audit requested after the clinic owner reported
+"Critical workflow logic problems from booking to payment."
+
+**What it is:** Everything a doctor adds during a live session — additional services, products used,
+extra device pulses — is computed into an invoice total on screen, and then silently discarded when
+the session is completed. Three separate defects stack to produce this:
+
+1. `handleCompleteTreatment` (`src/components/admin/DoctorAccountView.tsx:866-874`) PATCHes
+   `{ status, notes, price: updatedInvoiceTotal }`. **`reservations` has no `price` column**, and
+   the PATCH handler's field whitelist (`src/app/api/reservations/route.ts:750`) never destructures
+   `price` — it accepts `amountPaid`/`amountLeft`. The total is dropped server-side with no error.
+2. `additionalServices` is `useState` local to `DoctorOngoingSessionTab.tsx:139` — never lifted to
+   the parent, never passed to `handleCompleteTreatment`. The parent's `updatedInvoiceTotal`
+   (`DoctorAccountView.tsx:636` = `baseBookingPrice + productsSubtotal + extraPulsesSubtotal`) has
+   no knowledge additional services exist at all. So even if (1) were fixed, added services would
+   still be missing from the number being sent.
+3. Products and pulses *do* write to their own endpoints (`/api/inventory/products/sales`,
+   `/api/inventory/devices`), so stock/device counters move — but the reservation's own
+   `amount_left`/`service_ids` are never updated to match. Only a free-text summary is appended to
+   `notes`.
+
+**Business impact:** After any session where the doctor added anything, the reservation still
+carries only the originally-booked single-service price. Reception collects the wrong amount, and
+the difference is invisible — it exists only as prose inside `notes`. This is the root cause behind
+the "payment shows wrong after session end" symptom, and it compounds RISK-039 below.
+
+**Partially fixed — 2026-08-16:**
+- Defect #1: `handleCompleteTreatment` no longer sends `price`. It now sends
+  `amountLeft: updatedInvoiceTotal - amountPaid`, which the PATCH handler accepts.
+- Defect #2: `additionalServices` state lifted to parent (`DoctorAccountView.tsx:290`).
+  `updatedInvoiceTotal` (line 629) now includes `additionalServicesSubtotal`. The correct total
+  reaches the server.
+- Defect #3 (partial): `amount_left` is correctly updated. `service_ids` on the reservation is
+  still not updated when a doctor adds services during the session — a traceability gap, not a
+  money-loss gap.
+
+**Correction 2026-08-17 — Defect #3 is worse than "a traceability gap, not a money-loss gap."**
+RISK-057's investigation found `writeCheckoutInvoice()` (the only writer of the real `invoices`/
+`invoice_lines` ledger DEC-019 established) builds its lines solely from `serviceIds` — it never
+receives products/additional-services/pulses at all. That revenue reaches `amount_paid`/
+`amount_left` on the reservation row correctly, but **never becomes an `invoice_lines` row**, so
+Finance's P&L/margin/commission reporting (built on that ledger) under-reports it. See
+`DECISIONS.md` → **DEC-042** for the chosen fix (`reservation_products` staging table feeding
+`invoice_lines` directly) — **code implemented 2026-08-17, pending migration application** (see
+DEC-042's "Implementation" note for exact status; `tsc`/`eslint`/`vitest` clean, not yet verified
+live).
+
+---
+
+## RISK-057: Doctor-Added Products Never Appeared As Invoice Line Items — Regex Format Mismatch (RESOLVED)
+
+**Severity:** Medium-High · **Type:** Regression / Billing display
+**Found:** 2026-08-17, live on `dev.reveraclinics.com`, immediately after settling the RISK-056 test
+invoice — the printed invoice for a Therapeutic Laser (110 EGP) + 700 EGP product session showed a
+single line item ("Therapeutic Laser — EGP 110"), a Subtotal of EGP 110, and "Amount Paid: EGP
+810" directly beneath it, with nothing on the document explaining the 700 EGP gap. The reception
+booking-details drawer's "Products & Session Consumables" panel showed "No products added" for the
+same booking, despite `amountPaid`/`amountLeft` already being correct (RISK-056).
+
+**What it is:** neither surface stores doctor-added products as structured rows — both
+reconstruct them by regex-parsing the reservation's free-text `notes` field (the same
+`notes`-as-source-of-truth pattern RISK-038 already flagged as a traceability gap). Both parsers
+recognize three note formats: `- Name (xQty) @ Price EGP`, `[Added Product]: Name (xQty) - Total
+EGP`, and `[Extra Device Pulses]: ...`. **None of them match what `DoctorAccountView.tsx`'s
+`handleCompleteTreatment`/`handleSaveClinicalNote` actually write**:
+`[Products Used During Session]: Name (Qty: N x UnitPrice EGP = Total EGP)`. Since the doctor
+portal is the only place a product gets added *during* a session (as opposed to reception adding
+one before/after), every session-added product silently failed to reconstruct on both the
+invoice PDF and the drawer's product panel — the money was always correct (RISK-056), only the
+itemized paper trail was invisible.
+
+**Fixed:** added the same regex,
+`/(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g`,
+matching `[Products Used During Session]: ...` to **three** independent copies of this same
+reconstruction logic in [src/app/admin/page.tsx](../src/app/admin/page.tsx) — not two. First pass
+fixed the `viewingBooking` drawer's Price Details total (`drawerAttachedList`, ~line 23601) and the
+`invoiceBooking` PDF's line items (`invoiceAttachedList`, ~line 27411); deploying and re-testing
+live then surfaced a **third**, entirely separate copy driving the drawer's own "Products & Session
+Consumables" panel (`list`, ~line 23934–23980, its own `existingNames`/`matchAll` calls) — same two
+old patterns, same missing fourth one, same "No products added" symptom, just for a different
+section of the same modal. That third copy is now fixed too. (The checkout modal's own
+`extraAddonsCost` figure was never affected — it derives from `amountLeft + amountPaid -
+baseServicesTotal`, not from parsing `notes`, which is why it displayed correctly even before this
+fix.) No data migration needed — all three reconstruct from `notes` on every render, so this
+retroactively fixes every already-completed booking with this note shape, not just new ones.
+
+**Follow-up landed 2026-08-17 — DEC-042.** Finding a third copy of the identical bug while
+verifying the fix for the first two was the concrete proof that reconciling several independent
+regex-based reconstructions of `notes` instead of writing doctor-added products as real rows is
+fragile. A `reservation_products` staging table now exists (schema + full application wiring
+written and `tsc`/`eslint`/`vitest`-clean; **pending migration application to the dev database** —
+see DEC-042's "Implementation" note). Once live, the `notes`-regex parsers in all three display
+sites become a legacy-data fallback only — new writes go through real rows, and this bug class
+cannot reproduce for new sessions again.
+
+---
+
+# 🟢 Resolved
+
+- [RISK-003](#risk-003) — Patient Auth Is Non-Functional
+- [RISK-004](#risk-004) — localStorage as Primary Service/Category Storage (RESOLVED via RISK-025)
+- [RISK-008](#risk-008) — Hardcoded Superadmin Email
+- [RISK-009](#risk-009) — Schedule Grid Can Silently Clip Overlapping Bookings
+- [RISK-011](#risk-011) — Branch-Specific Pricing Has Never Been Applied
+- [RISK-013](#risk-013) — Every Product Sale Deducts Stock Twice
+- [RISK-014](#risk-014) — Every POS Sale Fails To Write, And Sales History Reads Back Empty
+- [RISK-017](#risk-017) — ~4,000 Lines Of Finance UI Are Unreachable Dead Code (RESOLVED)
+- [RISK-018](#risk-018) — The Money-Mutating API Routes Are Unauthenticated
+- [RISK-021](#risk-021) — `/api/employees` Callers Were Missing Bearer Tokens, And `/api/employees/notes` Had No Server-Side Role Check At All
+- [RISK-023](#risk-023) — The Patient List Could Silently Never Load, Depending On A Session Race
+- [RISK-024](#risk-024) — Selling More Units Than Are In Stock Was Never Rejected Server-Side
+- [RISK-025](#risk-025) — The Entire Admin "Services" Screen Is a Parallel Universe — It Never Talks to the Database (RESOLVED)
+- [RISK-027](#risk-027) — Completing a Booking Charged Material/Device Cost Without Ever Deducting The Stock Or Pulses That Caused It
+- [RISK-028](#risk-028) — A Repeat Booking Under The Same Phone Number Never Updated The Customer's Name/Email
+- [RISK-029](#risk-029) — Checkout Charged The Full Service Price Again, Ignoring The Deposit Already Paid
+- [RISK-030](#risk-030) — Promotions Discounts Are Marketing-Only — Never Applied At Booking Or Checkout, And Business Value Is Undefined (RESOLVED)
+- [RISK-032](#risk-032) — An Untrimmed/Differently-Formatted Phone Number Silently Forked A Duplicate Customer (RESOLVED)
+- [RISK-034](#risk-034) — A Doctor's Same-Weekday Schedule Silently Reopened A Day The Clinic Was Marked Closed
+- [RISK-035](#risk-035) — Package-Redeemed Visits Were Invoiced At Full Price, Double-Counting Revenue And Creating Phantom Receivables
+- [RISK-036](#risk-036) — Several PHI and Config-Mutating Routes Have No Server-Side Authorization At All (RESOLVED)
+- [RISK-037](#risk-037) — AdminBookingsView Buttons Scrolled Away, Table Had Horizontal Overflow, Status Colors Were Ambiguous (RESOLVED)
+- [RISK-039](#risk-039) — AdminBookingsView Fabricates Payment Status, Doctor Name And Room When Real Data Is Missing (RESOLVED)
+- [RISK-040](#risk-040) — "Cancel & Return" On The Public Deposit Step Orphans The Reservation And Duplicates It On Retry (RESOLVED)
+- [RISK-041](#risk-041) — Admin "New Booking" Captures No Payment And Has A Fallback Insert That Cannot Succeed (RESOLVED)
+- [RISK-042](#risk-042) — Wallet And Package Sales Bypass The Customer Balance Fields Entirely (RESOLVED)
+- [RISK-043](#risk-043) — A "Started" Session Has No Timestamp And No Expiry — Sessions Stay Open Indefinitely (RESOLVED)
+- [RISK-044](#risk-044) — Dashboard Summary Cards Use Three Different, Mostly Unbounded Time Periods (RESOLVED)
+- [RISK-045](#risk-045) — Prescription Save Reports Success On Failure; Two Rival Prescription UIs (RESOLVED)
+- [RISK-046](#risk-046) — A Failed `checked_in` Write Returns `checked_in` Anyway, Desyncing UI From Database (RESOLVED)
+- [RISK-047](#risk-047) — Approve Request Pre-Fills A Hardcoded Doctor And Discards The Patient's Requested Time (RESOLVED)
+- [RISK-048](#risk-048) — Pulse Counter Shown For Non-Laser Services; No Out-Of-Stock Indicator On Products (RESOLVED)
+- [RISK-049](#risk-049) — `GET /api/reservations` Had No Caller Check At All — Any Patient's Full Booking History Was Readable By Anyone (RESOLVED)
+- [RISK-050](#risk-050) — The RISK-040 Public-Booking Fix Was Silently Rejected By A Pre-Existing Auth Gate (RESOLVED)
+- [RISK-051](#risk-051) — Guarding `GET /api/reservations` (RISK-049) Broke The Admin Panel's Own Reads (RESOLVED)
+- [RISK-052](#risk-052) — AdminBookingsView's Approve Button Bypassed `openApprove()` Entirely (RESOLVED)
+- [RISK-054](#risk-054) — `AdminBookingsView`'s Display-Only Status Remap Leaked Into The Shared Booking-Details Modal (RESOLVED)
+- [RISK-055](#risk-055) — Stale Session Token In The Reservations Polling Effect Silently Wiped Pending Approvals & Booking History (RESOLVED)
+- [RISK-056](#risk-056) — Doctor Portal's "Complete Treatment" Silently Dropped The Base Service Price From The Invoice (RESOLVED)
+- [RISK-059](#risk-059) — `/api/reception/dashboard` Had No Auth, Could Clock In The Wrong Receptionist, And Could Silently Reopen An Ended Shift (RESOLVED)
+- [RISK-065](#risk-065) — `POST /api/packages/consume` Burns A Pre-Paid Session For A Service That Isn't On The Booking
+- [RISK-068](#risk-068) — First-Visit Medical Intake Guard Fired For Every Patient — `reservations` Prop Never Passed
+
+## RISK-003: Patient Auth Is Non-Functional
+
+**Severity:** Medium
+**Type:** Feature completeness
+**Status:** Mitigated 2026-07-22
+
+**Resolution:**
+`AuthModal` now sends and verifies OTPs through Supabase Auth only. Insecure demo fallbacks, including the `123456` verification code and unauthenticated email lookup fallback, were removed. If Supabase Auth is unavailable, sign-in fails safely with a user-facing error.
+
+---
+
+## RISK-004: localStorage as Primary Service/Category Storage (RESOLVED via RISK-025)
+
+**Severity:** Medium → **High 2026-07-27** → **Resolved 2026-07-27**
+**Type:** Data integrity
+
+**Description:**
+`serviceStore.ts` reads and writes services/categories from localStorage first. Supabase
+is synced only on explicit save actions. If a user opens the admin panel on a different
+browser or clears localStorage, they lose unsaved changes. The Supabase copy may be stale.
+
+**Correction 2026-07-27 — "synced only on explicit save actions" was wrong; there was no sync at
+all.** Measured while scoping Phase 3B task 3B.2: every save path in the admin Services UI called
+`saveDynamicServices()`, which wrote **only** to `localStorage`. Zero calls to
+`POST /api/services` existed anywhere in `admin/page.tsx`.
+
+**Resolution:** See **RISK-025**. Services are now database-primary: admin loads from and saves to
+`/api/services`, public components fetch services from the same API, and `localStorage` is used only
+for service toggles (visible/active UI state) and dynamic categories.
+
+---
+
+## RISK-008: Hardcoded Superadmin Email
+
+**Severity:** Medium
+**Type:** Security / Fork risk
+
+**Status:** Mitigated 2026-07-22
+
+**Description:**
+Superadmin access is now determined solely by the persisted `employee_accounts.role_name` value. Email-based bypasses were removed from admin authentication, attendance, and payroll handling.
+
+**Remaining requirement:**
+Every superadmin must have an `employee_accounts` row linked through `auth_user_id` and assigned the `superadmin` role.
+
+---
+
+## RISK-009: Schedule Grid Can Silently Clip Overlapping Bookings
+
+**Severity:** Low (mitigated 2026-07-20)
+**Type:** Data visibility / UX
+
+**Description:**
+The Bookings → Schedule view (`calendarView === "Schedule"`, `src/app/admin/page.tsx`, see DEC-012) fixes every cell to a hard `84px` height with `overflow-hidden` on the inner content wrapper, so that booked cells render at the same height as empty ones. If more than a couple of bookings ever land on the same doctor/slot (whether from a real double-booking, a manual admin entry, or a data edge case — overlap-prevention exists in `api/availability` and `api/reservations` but was not exhaustively re-audited here), the extra booking cards could visually clip and become invisible in this view.
+
+**Mitigation (applied):**
+- Cell now shows at most `MAX_VISIBLE_BOOKINGS = 3` cards; any beyond that render as a `+N more` pill instead of clipping silently.
+- Clicking `+N more` sets `docFilter` to that cell's doctor, `dateFilter` to that day (`YYYY-MM-DD`), resets `statusFilter`/`typeFilter` to `"All"`, and switches `calendarView` to `"List"` — narrowing to exactly that doctor's bookings on that day.
+- A `dateFilter` state was added to `filteredReservations` (previously List/Calendar had no date filter at all) with a date input + clear button in the existing Filter modal, and an active-filter chip row with a "Clear all" button in the List view header — so the filtered state from a `+N more` jump is visible and easy to back out of, not a hidden/stuck state.
+- The List view applies the selected date filter, so the jump narrows to that doctor's bookings on the selected day.
+
+---
+
+## RISK-011: Branch-Specific Pricing Has Never Been Applied
+
+**Severity:** High · **Type:** Correctness / Revenue
+**Found:** 2026-07-25 · **RESOLVED 2026-07-25**
+
+**Fix:** a shared `resolveBranchName()` in `src/lib/services.ts` compares ids as strings and refuses
+to treat a UUID as a name; the server query uses `.eq('id', branchId)` with `select('name_en,
+name_ar')` and no longer discards its error. Regression check: `npx tsx scratch/pricecheck.ts`.
+
+**Historical impact: none.** Every price charged before this fix used the `isDefault` entry or
+`services.price` rather than a branch price — but all of that data is mock (DEC-026), and no
+backfill is being built, so there is nothing to restate.
+
+Original diagnosis below.
+
+Two independent bugs, both silent:
+- **Server** (`src/app/api/reservations/route.ts:198-206`): queries
+  `.eq('id', Number(branchId))` but `branches.id` is a UUID → `NaN`; and selects a `name`
+  column that does not exist (the table has `name_en` / `name_ar`, `full_migration.sql:38-39`).
+  `targetBranchName` is therefore always null.
+- **Client** (`src/lib/services.ts:137-147`): treats any non-numeric string as a branch *name*.
+  UUIDs are non-numeric strings, so the UUID itself is compared against `branchPricing[].name`
+  and never matches.
+
+**Consequence:** every price falls through to the `isDefault` entry or `services.price`.
+Per-branch prices configured in the admin UI have never taken effect anywhere.
+
+Related: `services.branch_pricing` is `jsonb NOT NULL DEFAULT '{}'` — an empty **object** —
+while all consuming code guards with `Array.isArray()` (`services.ts:150,157,230,237`), so any
+service never touched in the pricing UI silently uses `services.price`.
 
 ---
 
@@ -432,71 +1280,12 @@ into it; the reset-pulses route writes only to `page_settings`
 
 ---
 
-## RISK-015: Doctor Cost Attribution Depends On A Name String
-
-**Severity:** Medium-High → Low (name-matching part) · **Type:** Data integrity
-**Found:** 2026-07-25 · **Name-string attribution and monthly-aggregate-only commission RESOLVED
-2026-07-26 — see `FINANCE_TRACKER.md` task 2.14. Three compounding issues below remain open.**
-
-**Fix:** `src/app/api/hr/doctor-payroll/route.ts`'s three match sites (`GET`, `POST`, `PATCH`) now
-filter reservations by `r.provider_id === prov.id` instead of a case-insensitive
-`doctor_name`/`providers.name` string comparison — a rename can no longer silently detach a
-doctor's historical commission. Commission is also no longer re-derived live from
-`amount_paid + amount_left`; it sums the real per-reservation `invoice_lines.commission_snapshot`
-values Phase 2's checkout costing (tasks 2.11/2.15) now writes at completion time, computed via
-`computeCommission()` (task 2.9) against each provider's configured `commission_type` /
-`commission_base` (task 2.8) — commission is now an inspectable per-session number, not only a
-monthly total. A reservation whose `provider_id` is `NULL` (task 0.7: the name matched zero or
-more than one provider) is simply excluded from payroll, which is more honest than a fuzzy
-string fallback silently re-attaching it to the wrong doctor.
-
-**Not fixed by this — the three compounding issues below are still open:**
-- Commission is still computed on **billed**, accrual-basis price via `invoice_lines.line_total`
-  (now snapshotted rather than re-derived, but still accrual, not cash) — must not be netted
-  directly against a cash-basis revenue view (RISK-016).
-- `doctor_payroll` PATCH still recomputes and overwrites **already-Paid** records (`:258-315`),
-  so it still cannot be treated as an immutable ledger.
-- A doctor who is also an employee still appears in **both** `hr_payroll` and `doctor_payroll`
-  for the same month (`src/app/api/employees/route.ts:174-206`) — naive summation still
-  double-counts.
-- `hr_payroll.achieved_revenue` still holds a **count**, not revenue, when
-  `target_type_snapshot='reservations'` (`hr/payroll/route.ts:111`) — summing it is still nonsense.
-
-Original diagnosis below, kept for reference.
-
-`reservations.doctor_name` is free text (`full_migration.sql:228`); there was no `provider_id` FK
-at the time this risk was found. Doctor payroll attributed revenue by case-insensitive string
-equality against `providers.name` (`src/app/api/hr/doctor-payroll/route.ts:172`). A rename, a
-typo, a title prefix, or two doctors sharing a name silently detached historical commission with
-no error.
-
----
-
-## RISK-016: Two Conflicting Definitions Of "Revenue" Already Exist
-
-**Severity:** Medium · **Type:** Reporting correctness
-**Found:** 2026-07-25
-
-Payroll defines revenue as `amount_paid + amount_left` — billed, not collected — with a
-`|| services.price` fallback that fires whenever both are 0, silently repricing a genuinely free
-session at list price (`hr/payroll/route.ts:64`, duplicated 4× in `doctor-payroll/route.ts`).
-It also counts `status='approved'` (not yet delivered) as earned.
-
-Meanwhile `customers.spent_amount` is a separate denormalized number written from two places with
-different semantics: server-side on completion as `+ amountPaid + walletWithdrawal`
-(`reservations/route.ts:579`), and client-side on a product sale as `+ totalAmount` via a direct
-browser Supabase call (`admin/page.tsx:3745-3749`) — a lost-update race that also mixes service
-revenue with retail revenue in one scalar.
-
-**Consequence:** a finance module defining revenue as collected cash will disagree with bonus
-figures already paid to staff. The definition must be chosen explicitly and documented.
-
----
-
-## RISK-017: ~4,000 Lines Of Finance UI Are Unreachable Dead Code
+## RISK-017: ~4,000 Lines Of Finance UI Are Unreachable Dead Code (RESOLVED)
 
 **Severity:** Medium · **Type:** Maintainability / Stakeholder confusion
 **Found:** 2026-07-25
+**Status:** Resolved 2026-08-22 — closed as a byproduct of a broader dead-code audit, not a
+dedicated fix for this entry.
 
 There are only 5 `setActiveNav` call sites in `admin/page.tsx`, and nav labels come exclusively
 from `SIDEBAR_ITEMS` (`:158-173`) and the Settings submenu array (`:7257-7269`). Neither contains
@@ -517,6 +1306,13 @@ Notable traps inside it:
 `financesExpanded` — `:3288` is the only occurrence of that state and the JSX at `:21746` checks
 `activeNav` alone. The block is orphaned, not gated. And it uses `MOCK_FINANCE_TRANSACTIONS`
 (`:21915`), not `MOCK_POS_ORDERS` (which belongs to the orphan POS Orders view at `:10454`).
+
+**Resolution, 2026-08-22:** a full audit of `page.tsx` found 26 unreachable `activeNav` sections —
+confirmed by zero `setActiveNav()` call sites and absence from every sidebar/Settings/Marketing
+label list, the same signature this entry already used. This block (POS Orders, and everything in
+its family) was among them and was physically deleted along with the rest (1,623 lines removed
+total, `page.tsx` 20,901 → 19,283 lines). Not a targeted fix for this specific risk — the whole
+dead-code family went in one pass.
 
 ---
 
@@ -575,117 +1371,6 @@ so it cannot currently express "admins may not see finance" without being change
 
 ---
 
-## RISK-019: RLS Coverage
-
-**Severity:** Low (was Medium) · **Type:** Security
-**Found:** 2026-07-25 · **Largely resolved 2026-07-25**
-
-Until 2026-07-25, RLS was **disabled** on `reservations`, `customers`, `services`, `providers`,
-`branches`, `categories`, `page_settings`, `provider_attendance`, `rooms`, `service_rooms`,
-`doctor_payroll` and `provider_schedule_audit_logs` — the tables holding patient identities,
-bookings and doctor pay — because `20260722140000_enable_row_level_security.sql` had never been run.
-
-**That migration was applied to dev on 2026-07-25.** RLS is now on for every table in `public`.
-
-A prerequisite had to be fixed first: `src/app/admin/page.tsx` wrote to `customers` directly from
-the browser with the anon key, which enabling RLS would have turned into a silent no-op that still
-reported success. That write moved server-side into `POST /api/inventory/products/sales` in
-`8108b82`, and no client component reads or writes a Supabase table any more.
-
-**Residual risk:** the subset carrying permissive "allow all" policies (`roles`,
-`employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`,
-`device_maintenance_history`, `admin_roles`) is functionally open — salary and inventory data is
-readable with the anon key. Those policies should be tightened or dropped, since every access path
-now goes through the service role anyway.
-
-**Hazards for new work:**
-- That migration is a one-shot `DO` block, not a trigger. Any table created after it runs has RLS
-  **off** unless its own migration enables it explicitly (the 20260725120000 backfill does this by
-  hand at `:77-79`). A finance migration must do the same.
-- `supabase/migrations/README.md` instructs operators to re-run scripts in filename order.
-  Re-running `20260715202003_add_provider_payroll.sql:26`
-  (`ALTER TABLE doctor_payroll DISABLE ROW LEVEL SECURITY`) after the enable migration would
-  silently turn RLS back off. Same hazard for the `DISABLE` statements throughout
-  `full_migration.sql`.
-- `20260705141244_setup_supabase_schema.sql` sorts **after** `..._141242_full_migration.sql` but is
-  an older, narrower version of the same schema. Harmless only because everything is
-  `IF NOT EXISTS`. Treat `full_migration.sql` as authoritative.
-
----
-
-## RISK-020: Migrations Are Not Tracked As Applied, And Two Databases Have Diverged
-
-**Severity:** High · **Type:** Operational / Delivery model
-**Found:** 2026-07-25 · **Verified by querying both live databases**
-
-**Production is not live yet** (confirmed 2026-07-25) — `main` serves no real patients, so nothing
-is currently broken for users. The severity is not about today; it is about two moments that are
-already scheduled:
-
-1. **At merge time.** Bringing `main` up to date means hand-applying ~15 migrations in order, with
-   no record of what already ran, against a database whose actual state nobody has snapshotted.
-   The silent-fallback insert chain below guarantees that partial failure looks like success.
-2. **At every new clinic.** DEC-001 commits to fork-per-client with a **separate Supabase project
-   per clinic**. With hand-pasted, untracked migrations, provisioning each new clinic's schema is a
-   manual 30-file operation that must go right every time. This is a scaling defect built into the
-   delivery model, not a one-off.
-
-Fixing this is far cheaper now, before production exists, than at any later point.
-
-The Supabase CLI is linked to dev, whose migration history now contains only the active
-`20260726000000` baseline. A direct dev dump generated that baseline, and `db pull` replayed it in a
-shadow database with no schema diff. New dev-based provisioning is now reproducible; the remaining
-operational risk is reviewing main directly and cutting it over to the same baseline.
-
-**The result: a file existing in `supabase/migrations/` proves nothing about any database.**
-Two Supabase projects are in use and their schemas have diverged badly.
-
-| | dev/test DB | main DB |
-|---|---|---|
-| Tables | 26 | 19 |
-| Schema current through | ~2026-07-20 | **~2026-07-05** |
-
-**Verified present in the dev DB on 2026-07-26:** `medical_records`, `medical_reports`,
-`customer_product_balances`, `product_sales.customer_id`, `reservations.provider_id`, and
-`services.duration_minutes`. This verification came from a direct linked dev schema dump.
-
-**Absent from the main DB** — 8 tables the application code actively reads and writes:
-`prescriptions`, `doctor_payroll`, `employee_notes`, `provider_schedule_audit_logs`,
-`inventory_products`, `product_sales`, `inventory_devices`, `device_maintenance_history`.
-
-`reservations` on the main DB is also missing three columns the code writes to — `service_ids`,
-`created_by_employee_id`, `is_manual` — so on that database multi-service bookings cannot be
-persisted and employee revenue attribution is silently dropped. Its `date` column is a real `date`
-type there, not the `text` the migrations declare, which is further evidence the two databases were
-built by different paths.
-
-**This class of failure stayed hidden because the code swallows it.**
-`src/app/api/reservations/route.ts:274-305` retries a failed insert after deleting
-`created_by_employee_id`, then retries again after also deleting `doctor_name`, then reports
-success. A missing column produces a booking with silently dropped attribution and no error
-anywhere.
-
-**Undocumented tables found in the live databases, created by no migration and absent from this
-file:** `admin_roles` (both databases) and `employees` (main only).
-
-**Required before any Finance work:**
-1. Take a full live-schema snapshot of the dev database and reconcile it against
-   `supabase/migrations/`.
-2. **Consolidate the 30 migration files into one clean baseline schema.** With no production data
-   to preserve, this is a one-time cheap fix that removes the conflicting duplicate table
-   definitions (`141242` vs `141244`), the `DISABLE ROW LEVEL SECURITY` re-run hazard, and the
-   ambiguity about what ran. It also makes provisioning a new clinic a single script.
-3. Adopt migration state tracking — ideally the Supabase CLI (`supabase db push`, which maintains
-   `supabase_migrations.schema_migrations`, and gives generated TypeScript types and a local stack).
-   At minimum a hand-rolled `schema_migrations` table recording applied filenames.
-4. Remove the silent-fallback insert chain in `reservations/route.ts:274-305`; let schema errors
-   surface instead of degrading data quietly.
-
-A finance module built on the assumption that the migrations folder describes the live database
-would be built on a false premise.
-
----
-
 ## RISK-021: `/api/employees` Callers Were Missing Bearer Tokens, And `/api/employees/notes` Had No Server-Side Role Check At All
 
 **Severity:** Medium → Resolved · **Type:** Security / Broken feature
@@ -723,63 +1408,6 @@ a cosmetic issue.
 `admin/page.tsx:768,1566` confirmed unrelated via `git stash` — present before and after this fix).
 Manually exercise Provision Employee Credentials (create, delete, resend invite, role change) and
 the employee notes panel as a staff `admin`/`superadmin` account before closing this row.
-
----
-
-## RISK-022: A Non-Existent `customer_id` On A POS Sale Silently Loses Stock With No Discoverable Record
-
-**Severity:** High · **Type:** Data integrity / RISK-014 regression
-**Found:** 2026-07-26 (manually verifying `FINANCE_TRACKER.md` task 1.11 against deployed dev) ·
-**RESOLVED 2026-07-26**
-
-**How it was found:** deliberately testing task 1.11's "force a ledger-write failure, confirm the
-POS sale itself still succeeds" checklist item, using a syntactically valid but non-existent
-`customer_id`. The Phase 1 ledger dual-write did fail as expected — but so did something the
-checklist wasn't asking about: the **native `product_sales` insert itself** failed too, silently.
-
-**Root cause:** `product_sales.customer_id` has a foreign key to `customers.id`
-(`20260725160000_add_customer_id_to_product_sales.sql`). `mapSaleToDbRow()` in
-`src/app/api/inventory/products/sales/route.ts` passes whatever `customer_id` the request sends
-straight through with no existence check first. A stale or mistyped `customer_id` (e.g. a customer
-record that was later deleted, or a typo from a barcode/manual-entry error) violates that FK, and
-the insert fails with Postgres error `23503` — **exactly RISK-014's original failure signature**,
-just triggered by a different input than the column-name mismatch RISK-014 fixed.
-
-**Consequence, confirmed live against dev (`sale-1785071843480-pbysm`,
-`sale-1785071922006-nni32`):**
-1. `deductInventoryStock()` runs **unconditionally** after the insert attempt, regardless of
-   whether it succeeded — stock left the building for real.
-2. The failed native insert falls through to the `page_settings` blob (the same fallback RISK-014
-   already established), and the API still responds `{success: true}` to the cashier.
-3. `getStoredSalesData()`'s read path trusts the native `product_sales` table **exclusively** once
-   it has any rows at all, never merging the blob back in — so once a clinic has made even one
-   real sale, every sale that falls into this trap becomes **permanently invisible** in sales
-   history and any report built on `product_sales`. Reproduced twice in a row against dev; not a
-   one-off blip. Verified by direct insert reproduction: `product_sales_customer_id_fkey` violation
-   (`23503`), `Key (customer_id)=(...) is not present in table "customers".`
-
-**Fix:** `POST /api/inventory/products/sales` now verifies `customer_id` resolves to a real
-`customers` row **before** touching stock or attempting any write, returning a clean `404` instead
-of silently degrading. Restores the intended RISK-014 behavior ("surface the reason rather than
-failing over silently") for this specific trigger.
-
-**Verify:** `npx tsc --noEmit` / `npx eslint` clean. POST with a non-existent `customer_id` now
-returns `404` before any stock or ledger write happens; a real `customer_id` still sells normally
-(re-verified against dev — see `ai_docs/manual_tests/FINANCE_PHASE_1_MANUAL_TESTS.md` task 1.11 evidence).
-
-**A second, related bug found while reproducing this, NOT fixed here — the `page_settings`
-fallback itself silently discards its own history.** `POST`'s fallback branch computes what to
-write as `[newSale, ...(await getStoredSalesData()).sales]` — but `getStoredSalesData()` prefers
-the **native** table once it has any rows, so on every failed insert this overwrites the whole
-blob with `[thisSale, ...nativeRows]`, discarding any previously-accumulated fallback entries from
-earlier failed inserts. Confirmed live: 5 sequential ghost-customer POSTs each deducted stock
-(`stock_quantity` dropped by exactly 5), but only the **last** one's entry survived in the blob —
-the other 4 were silently overwritten by each other, one at a time. This RISK-022 fix (validating
-`customer_id` up front) prevents this specific trigger from ever reaching that broken path again,
-but the fallback write logic itself is still broken for any *other* reason a `product_sales` insert
-might fail (a bad `product_id`, a transient DB error, a future schema change) — worth its own pass
-if the fallback path is meant to be a real safety net rather than effectively "keep only the most
-recent failure."
 
 ---
 
@@ -975,66 +1603,6 @@ Chosen option 2 — full database-primary cutover for services.
 
 ---
 
-## RISK-026: Clinic Devices Read Blob-Shape Field Names That Don't Exist On The Real Table
-
-**Severity:** High · **Type:** Data integrity
-**Found:** 2026-07-27, while doing Phase 3B task 3B.4 (`lamp_replacement_cost` + rated pulses) ·
-**RESOLVED 2026-07-27** (the specific field-name mismatch below; a related unresolved item is
-noted at the end)
-
-**Root cause:** The real `inventory_devices` table (verified against
-`supabase/migrations/20260726000000_dev_schema_baseline.sql` and
-`20260726011400_add_inventory_devices_lamp_replacement_cost.sql`, not assumed) has exactly:
-`id, name, serial_number, model, branch_name, status, total_pulses, remaining_pulses,
-max_pulses_limit, lamp_replacement_cost, last_maintenance_date, next_maintenance_date,
-created_at, updated_at`. It has **no** `current_pulse_count`, `warning_threshold_1`,
-`maintenance_threshold_2`, `initial_pulse_count`, `total_lifetime_pulses`, or `category` columns
-at all — those exist only in the legacy "blob shape" (`DEFAULT_DEVICES`, and every POST/PUT body in
-`src/app/api/inventory/devices/route.ts`), a holdover from before the real table existed.
-
-`GET /api/inventory/devices`'s status-computation step, and **every single read site in
-`admin/page.tsx`** (device list stat cards, the pulse-update modal, the reset-pulses modal, the
-Edit Device form's default values — confirmed by grepping every occurrence of
-`current_pulse_count`/`warning_threshold_1`/`maintenance_threshold_2` in that file), read
-exclusively the blob-shape names. `getStoredInventoryData()` returns raw rows straight from
-`select('*')` on the real table when it has data — so every one of those reads silently resolved to
-`undefined`, and every `Number(dev.current_pulse_count) || 0` / `|| 80000` / `|| 100000` fallback
-kicked in unconditionally. **Practical effect: as soon as the real table has any rows, every
-device's displayed pulse count reads as 0, every threshold reads as the hardcoded default, and
-status always computes as "Optimal" — regardless of what's actually stored.** This is the same
-class of bug as RISK-025 (blob/table shape divergence), just on the read side only — the *write*
-side (`saveInventoryData`'s `sqlRows` mapper) was already correctly writing to the real table's
-columns; the display just never reflected it back.
-
-**Why 3B.4 specifically surfaced this:** the task asked to "confirm `max_pulses_limit` is genuinely
-settable, not only defaulted to 100000 in code." Tracing that through found it *was* settable (the
-write path was fine) but **never displayed correctly on reload** — which would have made the task's
-own verify step fail if actually tested against live data, the same way the null-duration bug would
-have failed 3B.2's verify step if not caught first.
-
-**Fix:** added `normalizeDeviceRow()` in `src/app/api/inventory/devices/route.ts`, applied to every
-row `getStoredInventoryData()` returns from the real table. It backfills the blob-shape names from
-the real columns when absent: `current_pulse_count ← total_pulses`,
-`maintenance_threshold_2 ← max_pulses_limit`. `warning_threshold_1` has no real-table equivalent to
-fall back to at all (the real schema only ever had one ceiling, not a two-tier warning/critical
-model) — derived as 80% of the real ceiling, matching the ratio `DEFAULT_DEVICES`' own seed data
-already used.
-
-**Not fixed here, worth checking separately:** `src/app/api/inventory/devices/[id]/reset-pulses/route.ts`
-reads and writes **only** `page_settings` (the blob) — it has no `supabaseServer.from('inventory_devices')`
-call at all, unlike the main route. `DB_SCHEMA.md`'s `inventory_devices` entry states this route is
-"confirmed wired," which this session did not re-verify and now has reason to doubt (same class of
-stale-doc risk RISK-020 exists to warn about). If the real table and the blob have diverged (very
-possible, since nothing keeps them in sync on this path), resetting a device's pulse count here may
-not affect what the main route's normalized read actually shows. Flagging, not fixing — out of
-scope for 3B.4.
-
-**Verify:** `npx tsc --noEmit`, `npx eslint`, and `npx next build` all clean. Set a device's
-Maintenance Threshold 2 and Lamp Replacement Cost, save, reload the page, and confirm both values
-persist and display correctly rather than resetting to defaults.
-
----
-
 ## RISK-027: Completing a Booking Charged Material/Device Cost Without Ever Deducting The Stock Or Pulses That Caused It
 
 **Severity:** High · **Type:** Data integrity
@@ -1129,68 +1697,6 @@ second booking, not the first.
 
 ---
 
-## RISK-030: Promotions Discounts Are Marketing-Only — Never Applied At Booking Or Checkout, And Business Value Is Undefined (RESOLVED)
-
-**Manual test checklist:** `ai_docs/manual_tests/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md` (section 1) — also
-covers the related Packages public-display (DEC-034) and sell/redeem (DEC-035) work shipped in
-the same session.
-
-**Severity:** Medium · **Type:** Product definition / customer trust
-**Found:** 2026-07-28, while comparing the Packages admin feature (3B.8) to the Promotions nav
-tab, during a documentation pass — not a user-reported bug.
-**Status:** Resolved 2026-07-28 — product decision made: promotions are a real, checkout-enforced
-discount (not a marketing-only teaser). Clarification from the dev team that promotions are
-"connected to the Branches table" was correct but answered a different question — that's how a
-promotion is *scoped* (per-branch, via `branchPricing[]`), not whether it was *enforced* when
-money changed hands. Investigation found most charge paths already called the correct
-`getEffectiveServicePrice()` helper (booking creation, admin checkout/invoice-preview); three
-remaining gaps were fixed: (1) `BookingModal.tsx`'s deposit calc/display used the raw
-undiscounted `selectedService.price` instead of `getEffectiveServicePrice()`; (2) admin's
-"Mark Deposit as Paid" panel (`admin/page.tsx`, `pending_deposit` bookings) had the same raw-price
-bug; (3) `writeCheckoutInvoice()` in `api/reservations/route.ts` passed the already-discounted
-price as `unitPrice` with `discount` always `0`, so invoices never recorded that a promotion
-applied — now uses `getServicePriceDetails()` to record `unitPrice: basePrice` and
-`discount: basePrice - discountedPrice` (mirrors the existing `cogs_snapshot`/
-`commission_snapshot` write-once pattern), so `invoices.discount_total` is now populated and the
-actual charge (`line_total`) is unchanged.
-
-**What it is:** `admin/page.tsx`'s "Promotions" nav tab (`activeNav === "Promotions"`, lines
-~9352+) lets staff attach a percentage or fixed-amount discount, with optional start/end dates,
-to one service at one branch. Unlike RISK-004's old service-store pattern, this **does** persist
-for real: `handleSavePromotion`/`handleDeletePromotion`/`handleTogglePromotion` write into
-`branchPricing[].promotion` on the service object and call `syncServicesToApi`, which `POST`s to
-`/api/services` and lands in the real `services.branch_pricing` JSONB column. It survives a
-refresh and a different browser. So this is not the RISK-004/RISK-025 "parallel universe" bug —
-the data is real.
-
-**The gap:** the discount is only ever read back in one place —
-`getServicePriceDetails()` (`src/lib/services.ts:274-358`), consumed exclusively by
-`HomeServicesSection.tsx` and `ServicesSection.tsx` to render a "20% OFF" badge and a
-struck-through price on the public marketing pages. Nothing else reads it:
-- `BookingModal.tsx` prices a booking (and its deposit) off `selectedService.price` — the flat
-  top-level price — never `getServicePriceDetails()` or `branchPricing[].promotion`.
-- The admin checkout modal (`checkoutBooking`) computes `totalCost` from the service price the
-  same way; RISK-029's deposit fix didn't touch this path either.
-- No invoice/ledger code (`src/lib/ledger.ts`, `src/lib/billing.ts`) references `promotion` at
-  all.
-
-**Consequence:** a patient can see "SAVE 100 EGP" on the services page, then get quoted and
-charged the full undiscounted price the moment they actually book or check out — the discount
-never reaches money. That's a bait-pricing / trust problem for a clinic, not just a missing
-feature, and staff have no way to honor the advertised price without manually discounting at
-checkout (which nothing in the UI prompts them to do).
-
-**Open question — not resolved here, needs a product decision:** is Promotions meant to be a
-real, checkout-enforced discount (in which case it needs `getServicePriceDetails()` wired into
-`BookingModal` pricing/deposit calc and into `checkoutBooking`'s `totalCost`, plus a discount
-line on the invoice so reporting isn't misleading), or is it meant to stay a marketing-page-only
-"as low as" teaser with a disclaimer that final price is confirmed at booking? Either is a
-legitimate choice for a clinic, but right now the UI (percent off, a date range, an "Enabled"
-toggle) reads exactly like a real discount system, which is misleading for whoever configures it
-without reading the code. Log the decision in `DECISIONS.md` once made.
-
----
-
 ## RISK-029: Checkout Charged The Full Service Price Again, Ignoring The Deposit Already Paid
 
 **Manual test checklist:** `ai_docs/manual_tests/RISK_029_MANUAL_TESTS.md` — covers this fix, the cancel/no-show
@@ -1276,65 +1782,65 @@ findable under the new "Postponed" filter.
 
 ---
 
-## RISK-031: New Packages/Promotions Admin UI Was Added Inline To `admin/page.tsx`, Violating DEC-027
+## RISK-030: Promotions Discounts Are Marketing-Only — Never Applied At Booking Or Checkout, And Business Value Is Undefined (RESOLVED)
 
-**Severity:** Low · **Type:** Architecture / tech debt (not a correctness or money bug)
-**Found:** 2026-07-28, self-flagged while auditing `ai_docs/` for staleness after shipping the
-package sell/redeem/checkout feature — not a user-reported issue.
+**Manual test checklist:** `ai_docs/manual_tests/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md` (section 1) — also
+covers the related Packages public-display (DEC-034) and sell/redeem (DEC-035) work shipped in
+the same session.
 
-**What it is:** DEC-027 ("Modular Admin Sections Are Mandatory," 2026-07-26) requires every *new*
-admin section to be built as a focused submodule under `src/components/admin/`, explicitly to stop
-`src/app/admin/page.tsx` from growing further — existing legacy sections are only extracted
-"incrementally when touched." The 2026-07-28 packages work added a genuinely new section (a
-"Packages" tab in the customer profile, its sell-package modal, a new shared
-`PatientPackagePromoBanner` component, and redemption logic inside the checkout modal) directly
-inline into `admin/page.tsx`, mirroring the pre-existing (legacy, pre-DEC-027) "Products" tab
-pattern instead of extracting a new module. `PackageAdminPanel.tsx` (the package *definitions*
-CRUD screen, built earlier in 3B.8) correctly follows DEC-027 — only this session's customer-facing
-sell/redeem/banner work does not.
+**Severity:** Medium · **Type:** Product definition / customer trust
+**Found:** 2026-07-28, while comparing the Packages admin feature (3B.8) to the Promotions nav
+tab, during a documentation pass — not a user-reported bug.
+**Status:** Resolved 2026-07-28 — product decision made: promotions are a real, checkout-enforced
+discount (not a marketing-only teaser). Clarification from the dev team that promotions are
+"connected to the Branches table" was correct but answered a different question — that's how a
+promotion is *scoped* (per-branch, via `branchPricing[]`), not whether it was *enforced* when
+money changed hands. Investigation found most charge paths already called the correct
+`getEffectiveServicePrice()` helper (booking creation, admin checkout/invoice-preview); three
+remaining gaps were fixed: (1) `BookingModal.tsx`'s deposit calc/display used the raw
+undiscounted `selectedService.price` instead of `getEffectiveServicePrice()`; (2) admin's
+"Mark Deposit as Paid" panel (`admin/page.tsx`, `pending_deposit` bookings) had the same raw-price
+bug; (3) `writeCheckoutInvoice()` in `api/reservations/route.ts` passed the already-discounted
+price as `unitPrice` with `discount` always `0`, so invoices never recorded that a promotion
+applied — now uses `getServicePriceDetails()` to record `unitPrice: basePrice` and
+`discount: basePrice - discountedPrice` (mirrors the existing `cogs_snapshot`/
+`commission_snapshot` write-once pattern), so `invoices.discount_total` is now populated and the
+actual charge (`line_total`) is unchanged.
 
-**Why it happened this way:** the redemption logic sits inside the existing legacy Payment
-Settlement (checkout) modal, which is itself unextracted — DEC-027 says existing sections get
-pulled out "when touched," which arguably makes this checkout change the trigger for extracting
-that modal. Given the checkout modal is the one money-critical surface in this feature (it's what
-was flagged "take care, critical feature" for), a mid-implementation extraction was judged higher-
-risk than shipping the fix in place and refactoring separately once it's verified working in the
-browser.
+**What it is:** `admin/page.tsx`'s "Promotions" nav tab (`activeNav === "Promotions"`, lines
+~9352+) lets staff attach a percentage or fixed-amount discount, with optional start/end dates,
+to one service at one branch. Unlike RISK-004's old service-store pattern, this **does** persist
+for real: `handleSavePromotion`/`handleDeletePromotion`/`handleTogglePromotion` write into
+`branchPricing[].promotion` on the service object and call `syncServicesToApi`, which `POST`s to
+`/api/services` and lands in the real `services.branch_pricing` JSONB column. It survives a
+refresh and a different browser. So this is not the RISK-004/RISK-025 "parallel universe" bug —
+the data is real.
 
-**Consequence:** `admin/page.tsx` grew by ~550 lines in this change, working against DEC-027's
-stated goal. No functional/money risk — this is purely a maintainability debt item.
+**The gap:** the discount is only ever read back in one place —
+`getServicePriceDetails()` (`src/lib/services.ts:274-358`), consumed exclusively by
+`HomeServicesSection.tsx` and `ServicesSection.tsx` to render a "20% OFF" badge and a
+struck-through price on the public marketing pages. Nothing else reads it:
+- `BookingModal.tsx` prices a booking (and its deposit) off `selectedService.price` — the flat
+  top-level price — never `getServicePriceDetails()` or `branchPricing[].promotion`.
+- The admin checkout modal (`checkoutBooking`) computes `totalCost` from the service price the
+  same way; RISK-029's deposit fix didn't touch this path either.
+- No invoice/ledger code (`src/lib/ledger.ts`, `src/lib/billing.ts`) references `promotion` at
+  all.
 
-**Recommended follow-up (not done here):** once the feature is verified live, extract into
-`src/components/admin/packages/`: (1) the customer-profile "Packages" tab + sell modal as their
-own component, (2) `PatientPackagePromoBanner` (already a clean, prop-driven, extractable
-function), and (3) the checkout modal's redemption logic, ideally alongside finally extracting the
-whole Payment Settlement modal into its own module per DEC-027's "extract when touched" clause.
+**Consequence:** a patient can see "SAVE 100 EGP" on the services page, then get quoted and
+charged the full undiscounted price the moment they actually book or check out — the discount
+never reaches money. That's a bait-pricing / trust problem for a clinic, not just a missing
+feature, and staff have no way to honor the advertised price without manually discounting at
+checkout (which nothing in the UI prompts them to do).
 
-**Partial update, 2026-07-29 (DEC-036):** while activating the "Marketing" nav section (moving
-Promotions + Packages' admin screens out from under Services/their own top-level item), Promotions
-was extracted into `src/components/admin/marketing/PromotionsAdminPanel.tsx` — this closes the
-Promotions half of DEC-027 compliance (Promotions wasn't part of this risk's original scope, since
-it predated DEC-027 and hadn't been touched yet; it's now been touched, and extracted properly).
-**The original subject of this risk — the customer-profile "Packages" tab, `PatientPackagePromoBanner`,
-and the checkout modal's redemption logic — is still unextracted and still open.**
-
-**2026-08-22 finding, still unextracted so still living in `page.tsx`, but now also a money-risk,
-not just tech debt.** Commit `e79a691` (same 58-commit non-Windsurf pull as the RISK-012/RISK-006
-regressions above) removed the `redemptionAllowed = depositAlreadyPaid === 0` guard that RISK-035's
-original fix depended on — its own removed comment explained why: *"deposits are booking-level,
-not per-service, so waiving a service's price after cash was already taken against it would need
-refund/reversal logic this feature doesn't build."* No such refund/reversal logic was added in
-that commit or `eaee305` alongside it (checked both diffs directly). `baseServicesTotal`
-(`page.tsx:18121-18124`) does correctly exclude a redeemed service from `totalCost`, so the
-arithmetic still resolves — a deposit already collected against a since-redeemed service surfaces
-as `changeAmount`, which the checkout UI can hand back as cash or credit to wallet
-(`depositChangeToWallet`) — but there is no explicit reconciliation record or forced acknowledgment
-that this happened, and it depends entirely on staff noticing and handling it correctly in the
-moment. Not proven broken (unlike RISK-012 above, this isn't independently testable from
-`billing.ts` alone — it depends on live checkout UI behavior), but the safety gate that existed
-specifically to avoid this scenario is gone with nothing replacing it. Needs either a live
-walkthrough (redeem a package on a booking with an existing deposit, confirm the change/wallet
-credit path is unambiguous to staff) or reinstating the guard until the reconciliation UX is built.
+**Open question — not resolved here, needs a product decision:** is Promotions meant to be a
+real, checkout-enforced discount (in which case it needs `getServicePriceDetails()` wired into
+`BookingModal` pricing/deposit calc and into `checkoutBooking`'s `totalCost`, plus a discount
+line on the invoice so reporting isn't misleading), or is it meant to stay a marketing-page-only
+"as low as" teaser with a disclaimer that final price is confirmed at booking? Either is a
+legitimate choice for a clinic, but right now the UI (percent off, a date range, an "Enabled"
+toggle) reads exactly like a real discount system, which is misleading for whoever configures it
+without reading the code. Log the decision in `DECISIONS.md` once made.
 
 ---
 
@@ -1377,61 +1883,6 @@ bypasses the phone-matching path entirely.
 **Not fixed here:** the handful of pre-existing duplicate customer rows this bug already created in
 the dev database (mock data, disposable) — cleanup deferred pending explicit approval for the
 database-mutation script, since Claude Code's auto-mode classifier blocks unattended DB writes.
-
----
-
-## RISK-033: `services.id` Regressed To `GENERATED ALWAYS`, Silently Breaking Every Edit To An Existing Service
-
-**Severity:** High · **Type:** Data integrity / silent failure
-**Found:** 2026-07-29, while investigating why a Promotion appeared to save in the admin UI but
-never persisted or showed on the public site — not a user-reported issue directly, but the fix
-unblocks the user's own report.
-**Status:** Migration written, **not yet applied** — needs `npx supabase db push` run by the user
-(or approved when prompted); Claude Code's auto-mode classifier blocks unattended DB migrations.
-
-**What it is:** the 2026-07-26 "dev schema baseline" migration
-(`20260726000000_dev_schema_baseline.sql`) recreated `services.id` as
-`GENERATED ALWAYS AS IDENTITY`. The pre-baseline legacy schema (`supabase/migrations/_legacy/`)
-had it as `GENERATED BY DEFAULT AS IDENTITY`. Postgres rejects any INSERT/UPSERT statement that
-includes an explicit value for a `GENERATED ALWAYS` identity column, unless the statement uses
-`OVERRIDING SYSTEM VALUE` — which `@supabase/supabase-js`'s `.upsert()` does not add.
-`POST /api/services` always includes `id` for an existing service (`mapServiceToDb`:
-`if (s.id) row.id = s.id;`), so **every save of an existing service** — the entire Services admin
-tab, and Promotions (which reads-modify-writes the whole services array) — has been silently
-failing with Postgres error `428C9` ("cannot insert a non-DEFAULT value into column \"id\"")
-since that migration took effect.
-
-**Why it was invisible:** `syncServicesToApi()` (`src/app/admin/page.tsx`) only does
-`console.error` on a failed sync and returns `null` — no alert, no thrown error the caller
-surfaces to the user. The admin UI's local state update happens optimistically *before* the sync
-call resolves, so a promotion (or any service edit) appears to save in the UI while the database
-write silently 400s underneath. New service *creation* was unaffected (no `id` in that payload),
-which is likely why this went unnoticed — only edits to already-existing rows hit the identity
-conflict.
-
-**Confirmed via direct DB query** (`scratch/check_promotions.ts`): zero services have ever had a
-promotion recorded in `branch_pricing`. Reproduced the exact failure directly
-(`scratch/test_promotion_upsert.ts`): a plain upsert of an existing service row with its `id`
-returns Postgres error 428C9.
-
-**Bonus finding while diagnosing this:** the earlier Packages public-display migration
-(`20260728010000_packages_public_display_fields.sql`, adding `name_ar`/`show_on_website`) had
-also never been applied to the remote dev database (`npx supabase migration list` showed both as
-local-only) — so "Show on Website" and Arabic package names have likely never worked live either.
-
-**Fix:** `supabase/migrations/20260729000000_fix_services_id_identity_generation.sql` —
-`ALTER TABLE public.services ALTER COLUMN id SET GENERATED BY DEFAULT;`. Metadata-only, no data
-changes; new-row creation is unaffected either way (still auto-generates when `id` is omitted).
-**Must be applied** (`npx supabase db push`, which also picks up the still-pending 3B.13 packages
-migration) before Promotions or any Services edit will actually persist.
-
-**2026-08-22: could not confirm application status.** Attempted to check via the Supabase MCP
-connector; the only project it returns is named "elevate-os", which doesn't obviously match this
-clinic platform — did not proceed with a live query against a project that might be the wrong one.
-Mohamed should confirm directly (`npx supabase migration list` against the real linked project, or
-just try editing an existing service/promotion in the browser and see if it persists) — if this is
-still unapplied, every Services/Promotions edit is still silently failing exactly as originally
-found.
 
 ---
 
@@ -1538,7 +1989,7 @@ outstanding — 10/10 checks pass. Separately confirmed a normal (non-package) c
 
 ---
 
-## RISK-036: Several PHI and Config-Mutating Routes Have No Server-Side Authorization At All (PARTIALLY RESOLVED)
+## RISK-036: Several PHI and Config-Mutating Routes Have No Server-Side Authorization At All (RESOLVED)
 
 **Severity:** High (medical-records/prescriptions) / Medium (config/CMS routes) · **Type:** Security
 **Found:** 2026-08-03, during an audit written while producing `ai_docs/SECURITY.md`
@@ -1652,58 +2103,6 @@ Three usability problems were present in `src/components/admin/bookings/AdminBoo
 - Calendar legend dots updated to match the new color palette.
 
 **Files changed:** `src/components/admin/bookings/AdminBookingsView.tsx`
-
----
-
-## RISK-038: The Doctor's Recalculated Session Total Never Reaches The Database
-
-**Severity:** Critical · **Type:** Data loss / Revenue
-**Found:** 2026-08-16, during a full patient-journey audit requested after the clinic owner reported
-"Critical workflow logic problems from booking to payment."
-
-**What it is:** Everything a doctor adds during a live session — additional services, products used,
-extra device pulses — is computed into an invoice total on screen, and then silently discarded when
-the session is completed. Three separate defects stack to produce this:
-
-1. `handleCompleteTreatment` (`src/components/admin/DoctorAccountView.tsx:866-874`) PATCHes
-   `{ status, notes, price: updatedInvoiceTotal }`. **`reservations` has no `price` column**, and
-   the PATCH handler's field whitelist (`src/app/api/reservations/route.ts:750`) never destructures
-   `price` — it accepts `amountPaid`/`amountLeft`. The total is dropped server-side with no error.
-2. `additionalServices` is `useState` local to `DoctorOngoingSessionTab.tsx:139` — never lifted to
-   the parent, never passed to `handleCompleteTreatment`. The parent's `updatedInvoiceTotal`
-   (`DoctorAccountView.tsx:636` = `baseBookingPrice + productsSubtotal + extraPulsesSubtotal`) has
-   no knowledge additional services exist at all. So even if (1) were fixed, added services would
-   still be missing from the number being sent.
-3. Products and pulses *do* write to their own endpoints (`/api/inventory/products/sales`,
-   `/api/inventory/devices`), so stock/device counters move — but the reservation's own
-   `amount_left`/`service_ids` are never updated to match. Only a free-text summary is appended to
-   `notes`.
-
-**Business impact:** After any session where the doctor added anything, the reservation still
-carries only the originally-booked single-service price. Reception collects the wrong amount, and
-the difference is invisible — it exists only as prose inside `notes`. This is the root cause behind
-the "payment shows wrong after session end" symptom, and it compounds RISK-039 below.
-
-**Partially fixed — 2026-08-16:**
-- Defect #1: `handleCompleteTreatment` no longer sends `price`. It now sends
-  `amountLeft: updatedInvoiceTotal - amountPaid`, which the PATCH handler accepts.
-- Defect #2: `additionalServices` state lifted to parent (`DoctorAccountView.tsx:290`).
-  `updatedInvoiceTotal` (line 629) now includes `additionalServicesSubtotal`. The correct total
-  reaches the server.
-- Defect #3 (partial): `amount_left` is correctly updated. `service_ids` on the reservation is
-  still not updated when a doctor adds services during the session — a traceability gap, not a
-  money-loss gap.
-
-**Correction 2026-08-17 — Defect #3 is worse than "a traceability gap, not a money-loss gap."**
-RISK-057's investigation found `writeCheckoutInvoice()` (the only writer of the real `invoices`/
-`invoice_lines` ledger DEC-019 established) builds its lines solely from `serviceIds` — it never
-receives products/additional-services/pulses at all. That revenue reaches `amount_paid`/
-`amount_left` on the reservation row correctly, but **never becomes an `invoice_lines` row**, so
-Finance's P&L/margin/commission reporting (built on that ledger) under-reports it. See
-`DECISIONS.md` → **DEC-042** for the chosen fix (`reservation_products` staging table feeding
-`invoice_lines` directly) — **code implemented 2026-08-17, pending migration application** (see
-DEC-042's "Implementation" note for exact status; `tsc`/`eslint`/`vitest` clean, not yet verified
-live).
 
 ---
 
@@ -2220,48 +2619,6 @@ shipped same-day but this file wasn't updated until the RISK-053…055 write-up 
 
 ---
 
-## RISK-053: New Cairo Branch's Working Hours Were Never Actually Configured
-
-**Severity:** Low (data/config gap, not a blocking bug) · **Type:** Data integrity
-**Found:** 2026-08-16, investigating a live report that 11:30 AM showed as "outside opening hours"
-when approving a real test booking (Therapeutic Laser, New Cairo, Tuesday 18 Aug, Dr. saifuldeen
-Naser).
-
-**What it is:** there are three independent places branch/service hours can come from, and for New
-Cairo none of them hold real data:
-
-1. `branches.service_hours` (New Cairo's row) — `null`, confirmed via `GET /api/branches`. Falls
-   back to a hardcoded 09:00–20:00-every-day default baked into `admin/page.tsx` (two separate
-   copies of the same default array, lines ~4540 and ~5146).
-2. `GET /api/availability`'s own fallback, `page_settings.value.footer.serviceHours` — the live
-   `page_settings` row has no `footer` key at all (`booking`/`deposit`/`inactivity`/`departments`
-   only, confirmed via `GET /api/page-settings`), so `data?.value?.footer?.serviceHours` evaluates
-   to `undefined || []`, i.e. an empty array, which the route then also treats as "no restriction,
-   use the 09:00–20:00 hardcoded default."
-3. The Settings → Service Hours admin UI writes to (1) — it has just never been saved for this
-   branch.
-
-**Why this didn't block 11:30 AM:** every one of these fallbacks is *permissive* (09:00–20:00,
-covers Tuesday), not restrictive, so a Tuesday 11:30 AM slot was never actually outside any of the
-three computed windows once the involved provider (`saifuldeen Naser`) had a real Tuesday
-in-person shift configured for New Cairo (09:00–20:00, confirmed via `GET /api/providers`). The
-approve modal's `getDayOperatingHoursApprove` also does not gate the "Confirm approve" button on
-its own "outside opening hours" warning — that button is only disabled by
-`approveUnavailableSlots.includes(slot) || !slot` (an actual scheduling conflict, not the hours
-warning). The specific block seen live most likely reflected the provider's schedule not yet being
-saved at that exact moment, or a slot briefly marked "taken" by the since-cancelled duplicate
-reservation (`008a9019…`) — both self-resolved, and the booking went on to be approved and started
-at the literal requested time (11:30 AM, `saifuldeen Naser`).
-
-**Not fixed — flagged for follow-up:** branch hours should be explicitly configured for every real
-branch (New Cairo, Sheikh Zayed) via Settings → Service Hours so the system stops running on
-implicit hardcoded defaults, and `fetchCachedServiceHours()` in
-[src/app/api/availability/route.ts](../src/app/api/availability/route.ts) silently returning `[]`
-for a page-settings shape that no longer exists (`footer.serviceHours`) is itself worth a decision:
-either restore that config path or delete the dead fallback.
-
----
-
 ## RISK-054: `AdminBookingsView`'s Display-Only Status Remap Leaked Into The Shared Booking-Details Modal (RESOLVED)
 
 **Severity:** Medium-High · **Type:** Regression / Business logic
@@ -2393,88 +2750,6 @@ arithmetic didn't add up on screen before confirming.
 
 ---
 
-## RISK-057: Doctor-Added Products Never Appeared As Invoice Line Items — Regex Format Mismatch (RESOLVED)
-
-**Severity:** Medium-High · **Type:** Regression / Billing display
-**Found:** 2026-08-17, live on `dev.reveraclinics.com`, immediately after settling the RISK-056 test
-invoice — the printed invoice for a Therapeutic Laser (110 EGP) + 700 EGP product session showed a
-single line item ("Therapeutic Laser — EGP 110"), a Subtotal of EGP 110, and "Amount Paid: EGP
-810" directly beneath it, with nothing on the document explaining the 700 EGP gap. The reception
-booking-details drawer's "Products & Session Consumables" panel showed "No products added" for the
-same booking, despite `amountPaid`/`amountLeft` already being correct (RISK-056).
-
-**What it is:** neither surface stores doctor-added products as structured rows — both
-reconstruct them by regex-parsing the reservation's free-text `notes` field (the same
-`notes`-as-source-of-truth pattern RISK-038 already flagged as a traceability gap). Both parsers
-recognize three note formats: `- Name (xQty) @ Price EGP`, `[Added Product]: Name (xQty) - Total
-EGP`, and `[Extra Device Pulses]: ...`. **None of them match what `DoctorAccountView.tsx`'s
-`handleCompleteTreatment`/`handleSaveClinicalNote` actually write**:
-`[Products Used During Session]: Name (Qty: N x UnitPrice EGP = Total EGP)`. Since the doctor
-portal is the only place a product gets added *during* a session (as opposed to reception adding
-one before/after), every session-added product silently failed to reconstruct on both the
-invoice PDF and the drawer's product panel — the money was always correct (RISK-056), only the
-itemized paper trail was invisible.
-
-**Fixed:** added the same regex,
-`/(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g`,
-matching `[Products Used During Session]: ...` to **three** independent copies of this same
-reconstruction logic in [src/app/admin/page.tsx](../src/app/admin/page.tsx) — not two. First pass
-fixed the `viewingBooking` drawer's Price Details total (`drawerAttachedList`, ~line 23601) and the
-`invoiceBooking` PDF's line items (`invoiceAttachedList`, ~line 27411); deploying and re-testing
-live then surfaced a **third**, entirely separate copy driving the drawer's own "Products & Session
-Consumables" panel (`list`, ~line 23934–23980, its own `existingNames`/`matchAll` calls) — same two
-old patterns, same missing fourth one, same "No products added" symptom, just for a different
-section of the same modal. That third copy is now fixed too. (The checkout modal's own
-`extraAddonsCost` figure was never affected — it derives from `amountLeft + amountPaid -
-baseServicesTotal`, not from parsing `notes`, which is why it displayed correctly even before this
-fix.) No data migration needed — all three reconstruct from `notes` on every render, so this
-retroactively fixes every already-completed booking with this note shape, not just new ones.
-
-**Follow-up landed 2026-08-17 — DEC-042.** Finding a third copy of the identical bug while
-verifying the fix for the first two was the concrete proof that reconciling several independent
-regex-based reconstructions of `notes` instead of writing doctor-added products as real rows is
-fragile. A `reservation_products` staging table now exists (schema + full application wiring
-written and `tsc`/`eslint`/`vitest`-clean; **pending migration application to the dev database** —
-see DEC-042's "Implementation" note). Once live, the `notes`-regex parsers in all three display
-sites become a legacy-data fallback only — new writes go through real rows, and this bug class
-cannot reproduce for new sessions again.
-
----
-
-## RISK-058: Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
-
-**Severity:** Low-Medium · **Type:** Data integrity / UX
-**Found:** 2026-08-17, while researching the Phase 1 pattern-proving Windsurf brief
-(`ai_docs/WINDSURF_BRIEFS.md` Brief 4) — not part of live patient-journey testing, but flagged per
-this file's standing convention of logging any bug found along the way.
-
-**What it is:** Settings → Clinic Profile's 8 fields (`clinicName`, `clinicNameAr`,
-`clinicLocation`, `clinicLocationAr`, `clinicEmail`, `clinicPhone`, `clinicWhatsapp`,
-`savingClinicProfile` — `src/app/admin/page.tsx:4595-4602`) initialize from hardcoded literals
-(`"Revera Clinics"`, `"+201035595691"`, etc.) and are never populated from saved data. Confirmed by
-grep: every `setClinicX` call site is an `onChange` handler on the form itself — there is no
-`useEffect`/fetch anywhere that reads `/api/page-settings` and hydrates these 8 fields on mount,
-unlike sibling Settings sections.
-
-The save side works correctly — `handleSaveClinicProfile` (`:6018-6034`) POSTs to
-`/api/page-settings`, whose handler does a real merge-and-upsert into `page_settings.value.clinic`
-(`src/app/api/page-settings/route.ts:141-166`), confirmed by reading that route. The data is saved.
-It's just never read back.
-
-**Business impact:** Staff editing Clinic Profile always sees the hardcoded Revera-specific
-placeholder values, never what was actually last saved — including on the fork this repo is meant
-to support for other clinics (RISK-001), where a clinic that saves its real name/phone/location
-would see the literal string `"Revera Clinics"` again on next page load, with no visible indication
-whether their save took effect.
-
-**Not fixed** — deliberately left for a dedicated small PR rather than folded into Brief 4's
-mechanical extraction (which must not change behaviour) or fixed inline here (out of scope for the
-Windsurf-brief-writing task that surfaced it). The fix is a `useEffect` reading `GET
-/api/page-settings` and calling the 7 setters from `data.clinic`, matching whatever hydration
-pattern sibling sections (Deposit/Notification/Queue Settings) already use.
-
----
-
 ## RISK-059: `/api/reception/dashboard` Had No Auth, Could Clock In The Wrong Receptionist, And Could Silently Reopen An Ended Shift (RESOLVED)
 
 **Severity:** High (P0) · **Type:** Security / Data integrity
@@ -2539,75 +2814,6 @@ department-guess shape as F-2) is unchanged — it's a read, not a mutation, and
 
 ---
 
-## RISK-063: Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff
-
-**Severity:** Medium-High · **Type:** Security / Access control
-**Found:** 2026-08-19, building a table-driven auth sweep (`tests/routes/auth-sweep.test.ts`) across
-all 153 route handlers (ai_docs/TEST_COVERAGE_INVENTORY.md module 10).
-
-**What it is:** `POST /api/hr/alerts`, `POST /api/hr/attendance`, `PATCH /api/hr/attendance`, and
-`POST /api/hr/leaves` each inline their own auth check instead of calling `verifyHrAccess` (which
-every sibling GET on the same file correctly uses):
-
-```ts
-const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
-if (authError || !user) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
-```
-
-This confirms the bearer token is a *valid Supabase session* — it never checks that session has a
-matching `employee_accounts` row. The comments above two of these ("Allow any employee session to
-log their missing state", "any logged in employee can submit a leave request") describe the
-intended scope, but the code doesn't enforce it: a **patient** with a valid logged-in session can
-currently submit HR attendance clock-ins, leave requests, or missing-employee alerts under any
-`employee_id` they choose to pass — there is no check that the caller's own identity has any
-connection to that id.
-
-**Consequence:** a patient account can inject fabricated attendance/leave/alert rows that
-downstream HR screens and `hr_payroll` treat as real, misattributed to whichever `employee_id` the
-request names.
-
-**Fix required:** replace the inline check in all four handlers with `verifyHrAccess(req)` (or
-`requireStaffAccess` + an explicit role allowlist, matching the `requireReceptionAccess` pattern
-RISK-059 just established), the same guard already used by every GET in these same three files.
-
-**Verification:** `tests/routes/auth-sweep.test.ts` asserts the correct behavior (403 for an
-authenticated non-staff caller) for all four as `it.fails` — currently failing-as-expected because
-the bug is unfixed. Once the guard is corrected, those four assertions will start passing and
-`it.fails` will flip to a hard failure — the signal to remove the marker.
-
----
-
-## RISK-064: "Add New Category" (Services) Has No Arabic Name Field — Every Category Created There Gets A Permanently Blank `ar`
-
-**Severity:** Low · **Type:** Data integrity / i18n
-**Found:** 2026-08-19, verifying Windsurf's Brief 16 (Services extraction) — not caused by the
-extraction, confirmed pre-existing by diffing against the pre-extraction commit
-(`6abff84:src/app/admin/page.tsx`), where `newCategoryNameAr` was already declared and already
-never referenced anywhere but its own `useState`. The extraction moved this exact, already-broken
-behaviour verbatim into `src/components/admin/services/AdminServicesView.tsx`.
-
-**What it is:** the "Add New Category" modal (`AdminServicesView.tsx`, ~line 725) renders exactly
-one input, "Category Name (English)", bound to `newCategoryNameEn`. Its save handler (~line 754)
-hardcodes the Arabic field: `{ key, en: newCategoryNameEn.trim(), ar: "" }`. The `newCategoryNameAr`
-state (and its setter) exist in the component's own props/type — visible in an eslint
-`no-unused-vars` sweep — but there is no corresponding JSX input anywhere for it. Confirmed live in
-the browser: the modal genuinely shows only one text field.
-
-**Business impact:** every service category created through this form (not seeded via migration or
-direct DB edit) has a permanently blank Arabic name unless someone later finds and manually edits
-it elsewhere. Anywhere the public site or admin panel displays a category's Arabic label would show
-blank for these categories — silent, not an error, easy to miss until a patient-facing Arabic page
-is checked.
-
-**Not fixed** — out of scope for Brief 16, which was extraction-only with an explicit
-no-behaviour-change requirement; building the missing field is a real (if small) feature addition,
-not a mechanical move. Fix is a second input in the same modal ("Category Name (Arabic)") bound to
-`newCategoryNameAr`, and changing the save handler's `ar: ""` to `ar: newCategoryNameAr.trim()` —
-the state and prop plumbing to do this already exist, only the JSX and the one save-handler field
-are missing.
-
----
-
 ## RISK-065: `POST /api/packages/consume` Burns A Pre-Paid Session For A Service That Isn't On The Booking
 
 **Severity:** High · **Type:** Financial data integrity / patient entitlement
@@ -2653,121 +2859,6 @@ Initially deferred (money-adjacent behaviour on a live flow) so the gap would su
 failing spec rather than being silently re-tightened. Mohamed reviewed and approved applying it.
 
 ---
-
-## RISK-066: System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate
-
-**Severity:** Critical · **Type:** PII exposure / access control
-**Found:** 2026-08-22, while investigating the "System Test Suite" admin section for a possible
-extraction/translation brief — not user-reported.
-**Status:** Open.
-
-**What it is:** the diagnostics runner at `page.tsx:2707-2841`/`10006-10222` ("System Test Suite" in
-Settings) fires 33 hardcoded GET requests against real endpoints — including
-`/api/medical-records`, `/api/prescriptions`, `/api/customers/products`, `/api/customers/reconcile`,
-`/api/employees`, `/api/hr/payroll`, `/api/hr/doctor-payroll` — using the operator's own bearer
-token, and stores the **full raw JSON response body** in component state
-(`responseDetails: data`, `page.tsx:2789-2795`). It is then dumped verbatim:
-```jsx
-{tc.responseDetails && (
-  <pre>{JSON.stringify(tc.responseDetails, null, 2)}</pre>
-)}
-```
-(`page.tsx:10207-10208`). Whoever runs this test suite sees another patient's medical records,
-prescriptions, and staff salary figures rendered on their own screen — not because they queried for
-that patient, but because a diagnostics button happened to fetch them.
-
-**Confirmed, not assumed:** independently verified both parts directly — the `responseDetails: data`
-assignment at line 2789-2795 and the unfiltered `<pre>{JSON.stringify(...)}}</pre>` render at
-10207-10208, and confirmed `grep -n "NODE_ENV" page.tsx` returns **zero matches** anywhere in the
-file. There is no environment gate at all.
-
-**Reachable in production, not dev-only:** it's a normal Settings submenu item (`page.tsx:5888`),
-gated only by `hasPermission("settings.test_suite")` **or** superadmin — a real, grantable
-`PERMISSION_STRUCTURE` key (`page.tsx:505`), not a superadmin-only screen. Any admin role holding
-that one permission can trigger the full PII dump.
-
-**Additional quality problem, not the security issue but worth noting alongside:** 9 of the 33
-"tests" are duplicates pointing at the same endpoint under different names (6× `/api/reservations`
-as TC-025…030, 3× `/api/reception/dashboard` as TC-031…033), and "pass" means only HTTP 200 — no
-response-shape assertion. `tests/routes/auth-sweep.test.ts` already covers the same 33 endpoints
-with real assertions, in CI, for free — this screen adds risk without adding real coverage.
-
-**Mitigation, not yet applied:**
-1. Stop rendering `responseDetails` raw — show only pass/fail, status code, and duration; drop the
-   `<pre>` block entirely, or truncate/redact before display.
-2. Either gate the whole section behind `process.env.NODE_ENV !== 'production'`, or at minimum
-   tighten its permission requirement to `adminRole === "superadmin"` only (remove the
-   `settings.test_suite` grantable-permission path).
-3. Given `auth-sweep.test.ts` already covers these endpoints with real assertions in CI, consider
-   deleting this screen outright rather than fixing it — see `WINDSURF_BRIEFS.md` Brief-25-adjacent
-   investigation notes (Group D) for the full recommendation.
-
----
-
-## RISK-067: `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data
-
-**Severity:** High · **Type:** Data exposure / access control
-**Found:** 2026-08-22, while investigating the Settings-submenu screens for extraction/translation
-briefs — not user-reported.
-**Status:** Open.
-
-**What it is:** `src/app/api/page-settings/route.ts`'s `GET()` (line 85) has **no auth check at
-all** — confirmed directly: `requireAdministratorAccess` is imported but only invoked inside `POST`
-(line 129), never in `GET`. This is deliberate and correct for its original purpose — the public
-booking site's `BookingModal.tsx:312` calls this same endpoint unauthenticated to read public
-booking-flow config.
-
-**The problem:** the same settings blob this route serves now also holds operationally sensitive
-data that has nothing to do with the public booking flow, added by later Settings screens that
-reused the shared `page_settings` blob without revisiting the route's auth model:
-- `deposit.instapayAddress` / `deposit.walletNumber` — the clinic's payment-destination details
-  (Deposit Settings, `page.tsx:8965-9111`).
-- `notifications.staffEmail` — an internal staff contact address (Notification Settings,
-  `page.tsx:9270-9468`).
-- The `departments` list (Department Management, `page.tsx:9947-10001`, written via
-  `handleSaveDepartments`).
-
-All of these are readable by anyone who calls `GET /api/page-settings` directly, with no session,
-no token, no rate limit beyond whatever sits in front of the deployment.
-
-**Consequence:** payment-destination data (where InstaPay transfers land) and internal staff contact
-info are exposed on an endpoint that was never intended to serve them — an unrelated feature reused
-a shared storage blob without re-checking who could read it.
-
-**Compounding factor, same root cause:** `POST /api/page-settings` requires only
-`requireAdministratorAccess` with **no per-key permission check** — any administrator can rewrite
-CMS content, InstaPay payment destinations, and the departments list regardless of whether they hold
-`settings.pages`, `settings.booking_settings`, or `settings.roles` specifically. The granular
-`PERMISSION_STRUCTURE` model (RISK-025-adjacent, see Role Management) exists only client-side for
-this route.
-
-**Mitigation, not yet applied:** split the `page_settings` blob's genuinely-public keys (whatever
-`BookingModal.tsx` actually needs) from the operationally sensitive ones, and either move the
-sensitive keys to an authenticated-only table/route, or add field-level filtering to `GET` so the
-public response never includes `deposit.*`/`notifications.staffEmail`/`departments`. Separately,
-add per-key permission checks to `POST` matching the relevant `PERMISSION_STRUCTURE` prefix.
-
----
-
-## RISK-069: Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees
-
-**Severity:** Critical · **Type:** Security / Privilege escalation
-**Found:** 2026-08-23, writing Brief 25 Part 3 tests. **Status:** OPEN (not fixed — needs a product decision on whether admins should manage roles at all).
-
-**Description:**
-`PATCH /api/employees` (`src/app/api/employees/route.ts:219`) uses `requireAdministratorAccess`, which admits both `admin` and `superadmin` roles. The only role-change guard is `employee.employee_id === 'superadmin'` (line 245) — this protects the superadmin account from being changed, but does **not** prevent a non-superadmin admin from escalating another account's `role_name` to `superadmin`.
-
-The UI (`RoleManagementView.tsx`) gates the role-change `<select>` with a client-side `adminRole === "superadmin"` check, but that is bypassable. The server has no equivalent check.
-
-**Consequence:** Any admin can grant themselves or a colleague superadmin privileges, bypassing the entire RBAC system.
-
-**Fix:** Add a server-side check in the PATCH handler: if `roleName` is provided and the caller's role is not `superadmin`, return 403. This is a one-line guard. Not fixed in this brief because the brief scope is translation, not security fixes.
-
-**Test:** `tests/routes/roles-employees.test.ts` — `it.fails('a non-superadmin admin cannot change another account\'s role_name')` confirms the current (vulnerable) behaviour. The test will go green the moment the fix is applied.
-
----
-
-## PROPOSALS.md Reference
 
 ## RISK-068: First-Visit Medical Intake Guard Fired For Every Patient — `reservations` Prop Never Passed
 
