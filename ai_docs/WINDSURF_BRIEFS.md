@@ -10,148 +10,6 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 26 — the 7 small Settings screens: extract behind shared hooks, then translate, then one test
-
-> **REVIEW 2026-08-23 — NOT accepted yet. One systematic gap, fix it, then resubmit.**
-> Independently re-verified against commit `76106a5`: `tsc`/`eslint`/`vitest` all clean (625
-> passed/12 expected fail), en/ar key parity for `settingsScreens` is real (checked by evaluating
-> `adminTranslations` at runtime, not by grep), the Part 3 shallow-merge test is genuinely grounded
-> (ran it — `it.fails` fails for the documented reason, the companion `it` confirms the shallow
-> merge is fine at the top level, so the contrast proves the mechanism, not a fluke), RISK-071/072/
-> 073 are correctly written and correctly slotted into the reorganized RISKS.md structure, the four
-> state clusters and both cross-component couplings (`handleSaveBookingSettings`/`TermsManagerView`,
-> `handleSaveDepartments`/Role Management) are preserved exactly as required, and the value/label
-> separation calls (Branches `status`, numeric `<select>`s) are all correct.
->
-> **What's not done: none of the 7 components set `dir` on their own root.** Every one of them
-> takes a `lang: "en" | "ar"` prop and — in `BookingSettingsView`, `DepositSettingsView`,
-> `InactivitySettingsView`, `NotificationSettingsView`, `QueueSettingsView` — never reads it at all
-> (confirmed by ESLint: `'lang' is defined but never used` in all five). `BranchesView` and
-> `ServiceHoursView` do read `lang`, but only to pick which bilingual field to display
-> (`lang === "ar" ? br.name_ar : br.name_en`), never to set direction. Grepped `dir=` across all
-> seven files: the only hit is the intentional hardcoded `dir="rtl"` on the Arabic SMS-template
-> textarea in `NotificationSettingsView` (line 190) and the intentional `dir={dir}` content-hint on
-> Branches' bilingual field descriptors (line 131) — both are the "content-direction hints, leave
-> untouched" cases this brief itself called out, correctly left alone. But there is no
-> `dir={lang === "ar" ? "rtl" : "ltr"}` on any of the 7 root `<div>`s. Every other translated
-> screen in this refactor series (`RoleManagementView.tsx:341`, plus Employees and HR) sets this on
-> its own root — that's the established convention, and these seven are the first to skip it.
->
-> **Effect:** switch the admin panel to Arabic and open any of these 7 screens — labels/hints are
-> Arabic text now, but the layout itself (flex ordering on the title/save-button row, grid column
-> order, the Deposit screen's `pl-3 border-l-2` indent rail) stays pinned to LTR flow instead of
-> mirroring. **Also flag while you're in there:** `DepositSettingsView.tsx` line 126 uses a physical
-> `pl-3 border-l-2` on a nested block — once `dir` is added, that needs to become the logical
-> `ps-3 border-s-2` or it'll sit on the wrong side in Arabic.
->
-> **Fix:** add `dir={lang === "ar" ? "rtl" : "ltr"}` to the outermost `<div className="space-y-6">`
-> in all 7 files, same pattern as `RoleManagementView.tsx:341`. Swap `DepositSettingsView.tsx`'s
-> `pl-3 border-l-2` to `ps-3 border-s-2` in the same pass. No other changes needed — this is a
-> one-line-per-file fix, not a rewrite.
->
-> Brief text below is unchanged from the original ask.
-
-**Do not write seven separate components with seven copies of the same load/save logic.** These
-screens are ~1,114 lines total and they already share their persistence layer — the investigation
-confirmed it rather than assumed it.
-
-| Screen | Range | Size | Endpoint |
-|---|---|---|---|
-| Booking Settings | 8744–8954 | 211 | `POST /api/page-settings` key `booking` |
-| Notification Settings | 9270–9468 | 199 | `POST /api/page-settings` key `notifications` |
-| Queue Settings | 9470–9636 | 167 | `POST /api/page-settings` key `queue` |
-| Inactivity Settings | 9113–9268 | 156 | `POST /api/page-settings` key `inactivity` |
-| Branches | 8581–8736 | 156 | `POST /api/branches`, `DELETE /api/branches?id=` |
-| Deposit Settings | 8965–9111 | 147 | `POST /api/page-settings` key `deposit` |
-| Service Hours | 8502–8579 | 78 | `POST /api/branches` (writes `service_hours`) |
-
-Five share `POST /api/page-settings` with a partial payload keyed on one top-level property, and all
-five hydrate from the **same** loader `fetchPageSettings()` (4089–4258). The other two share
-`POST /api/branches` and the same `branches`/`setBranches` state — **Service Hours is really a
-sub-view of Branches**, selecting one via `selectedBranchForHoursId` (3225, dropdown 8512–8520).
-
-**Structure:** `src/components/admin/settings/` with a `usePageSettings()` hook (one loader, one
-`savePartial(key, payload)` writer) behind the five, and Branches + Service Hours sharing branch
-state. Extract first (Part 1), translate second (Part 2), one test (Part 3).
-
-**State is in FOUR clusters, not one** — assuming contiguity will lose fields:
-`811–817` (inactivity + `bookingStaleSessionHours`, which sits ~2,600 lines from the rest of Booking
-Settings' own state), `3099–3100` (`pagesSettingsTab`, `termsText`), `3217–3226` + `3372–3380`
-(branches + service hours), `3425–3463` (the booking/deposit/notification/queue block).
-
-**Cross-component coupling — `handleSaveBookingSettings` (4445) must NOT move into a Booking
-Settings component.** The already-extracted `TermsManagerView` receives it as a prop at 8959–8961,
-and both write the same `booking` key. Keep it lifted.
-
-**Also coupled:** Role Management's `handleSaveDepartments` writes the same `/api/page-settings`
-blob (Brief 25). Whichever of the two lands second must not fork the writer.
-
-### Defects found — preserve verbatim in Part 1, log them, fix none of them here
-
-1. **Notification Settings and Queue Settings never hydrate.** `fetchPageSettings` has no
-   `data.notifications` or `data.queue` branch; every `setNotif*`/`setQueue*` setter is called only
-   from its own `onChange`. Both screens are **write-only** — reload the panel and saved values
-   silently revert to the `useState` defaults. Same class as RISK-058.
-2. **`POST /api/page-settings` merges shallowly** (`{ ...existing?.value, ...body }`), so a partial
-   write that omits a sibling field inside a key **destroys it**. Live instance: `savePageSettings()`
-   (Pages Settings, Brief 27) sends a `booking` block at 4632–4641 that omits `staleSessionHours`,
-   so saving any CMS section wipes it. `handleSaveBookingSettings` includes it, so Booking Settings
-   is the safe writer and Pages Settings is the destructive one.
-3. **Booking, Notification and Queue saves are fire-and-forget** — they `await fetch(...)` and never
-   check `res.ok`, never alert, never `clearFetchCache()`, never re-fetch (4448, 4475, 4492). A
-   failed save is completely silent. Deposit (4386) and Inactivity (4420) do check.
-4. **Hardcoded client values, CLAUDE.md rule-2 / RISK-001 shape**, densest in Deposit Settings:
-   `"Revera Clinic"`, `"revera@instapay"`, `"https://www.instapay.eg"`, `"Revera Clinics Cash"`,
-   `"01012345678"` appear as `useState` defaults (3436–3442) **and again** as fallbacks in
-   `fetchPageSettings` (4216–4233); Notification adds `"Revera Clinics"` / `"ريفيرا كلينيك"`
-   (3451–3452) and `"admin@reveraclinics.com"` (3454). Name them in the PR; fix under PROPOSAL-001.
-
-### Part 2 — translation notes per screen
-
-- **Branches and Notification Settings edit bilingual *content*** — Branches has a field descriptor
-  array (8691–8698) with `dir: "rtl"` on the two Arabic rows applied via `dir={dir}` at 8705;
-  Notification has a hardcoded `dir="rtl"` at 9406 on the Arabic SMS-template textarea. **These are
-  content-direction hints, not the language toggle — leave every one untouched**, same call Brief 19
-  made for `AdminServicesView`.
-- **Service Hours: `{sh.day}` at 8534 renders the raw English weekday** — interpolated, invisible to
-  string greps, identical to the Brief 18 day-names bug. **But before adding a lookup:** the
-  `serviceHours` type already carries a `dayAr` field (3372) that every seed row populates
-  (`"الأحد"` …, 3373–3379 and 3969–3975) and **nothing ever renders**. Wire the existing field
-  rather than inventing a parallel lookup.
-- **Branches value/label:** `<option value="active">Active</option>` / `"inactive"` (8720–8721) with
-  `br.status === "active"` comparisons at 8613, 8620 driving badge class *and* label. Canonical
-  lowercase values; label-only translation.
-- **A display decision to make explicitly, not by accident:** the branch card renders `{br.name_en}`
-  as heading (8611) and `{br.name_ar}` as subtitle (8615) **regardless of `lang`**. Decide whether
-  Arabic mode swaps them or keeps both, and say which in the PR. Same question for the
-  `{b.name_en} ({b.name_ar})` cramped-bilingual `<option>` at 8518.
-- Booking/Queue/Notification `<select>`s are all **numeric** values with English suffix labels
-  (8783, 8808, 8833, 8884; 9600–9604; 9434–9438) — safe, translate labels only.
-- **Inactivity Settings is the cleanest of the seven** (no options, no placeholders, no `dir`, no
-  `toLocale*`, no value/label sites) — but its two values feed the **global** presence-monitoring
-  effect at 2232–2248 that runs for every logged-in staff role, so its state must stay lifted in
-  `page.tsx`; pass values + setters down.
-- **`toLocale*`: zero across all seven.** Nothing to pin.
-
-### Part 3 — exactly one test, and it is not a round-trip
-
-**Write the `POST /api/page-settings` shallow-merge test.** Seed a row with
-`booking: { minAdvance: 2, staleSessionHours: 6, termsText: "X" }`, POST the exact payload
-`savePageSettings()` builds at 4585–4643 (which omits `staleSessionHours`), assert the stored value.
-It will show the field destroyed — a real, currently-reproducible data-loss bug, and the single
-highest-value test in this whole survey. Land it as `it.fails` per repo convention (or fix + assert,
-but the test is required either way).
-
-**Do NOT write** round-trip tests for the individual Deposit/Inactivity/Booking/Notification/Queue
-payloads. They assert that a config blob echoes itself. The merge semantics are the thing worth
-testing; the individual payloads are not. If you want the never-hydrate bug covered, add a one-line
-assertion inside the same test rather than five new files.
-
----
----
-
-# QUEUED BRIEFS
-
 ## Brief 27 — Pages Settings: extract in 3 ordered sub-PRs (translation deferred)
 
 **`page.tsx:6640–8426`, 1,787 lines — the largest remaining block by 5×. Do not attempt this as one
@@ -207,10 +65,47 @@ one goes wrong.
 ---
 ---
 
+# QUEUED BRIEFS
+
+_(none currently queued)_
+
+---
+---
+
 # ARCHIVE — completed briefs
 
 Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
 (RISK-038 … RISK-050), which is the authoritative account.
+
+### Brief 26 — the 7 small Settings screens: extract, then translate, then test (completed 2026-08-23)
+
+Landed as one combined commit (`76106a5`, extraction + translation + Part 3 test — not the
+3-separate-commits shape the brief asked for, but each part independently verifiable within it).
+Independently re-verified: `tsc`/`eslint`/`vitest` clean (625 passing, 12 expected fail), en/ar key
+parity for `settingsScreens` confirmed by evaluating `adminTranslations` at runtime, the Part 3
+shallow-merge test genuinely grounded (ran it — `it.fails` fails for the documented reason, a
+companion `it` proves the shallow merge is fine at the top level, confirming the mechanism), the
+four state clusters and both cross-component couplings (`handleSaveBookingSettings`/
+`TermsManagerView`, `handleSaveDepartments`/Role Management) preserved exactly as required, and
+value/label separation (Branches `status`, numeric `<select>`s) all correct. RISK-071/072/073
+correctly written and slotted into the reorganized RISKS.md structure.
+
+**One gap found on first review, not accepted at the time: none of the 7 components set `dir` on
+their own root** — `lang` was threaded through as a prop but never read by 5 of 7 (confirmed by
+ESLint's `no-unused-vars`), and the other 2 only used it for bilingual content selection, never
+direction. Every prior translated screen in this series (Role Management, Employees, HR) sets
+`dir={lang === "ar" ? "rtl" : "ltr"}` on its own root; these seven were the first to skip it —
+Arabic text would render but the layout (flex ordering, grid columns, Deposit's indent rail) stayed
+LTR-pinned. **Fixed directly (commit `f189d01`) rather than sent back to Windsurf**, since Windsurf
+had already moved on to Brief 27 and the fix was a mechanical one-line-per-file addition (plus
+swapping Deposit's physical `pl-3 border-l-2` to logical `ps-3 border-s-2`) — re-verified clean
+after the fix (`tsc`/`eslint` both 0 errors/warnings on the touched lines).
+
+`usePageSettings.ts`/`useBranchState.ts` were built per the brief's suggested shared-hook mechanism
+but never wired in — the 7 components ended up purely presentational instead (zero `fetch()` calls
+of their own), which satisfies the brief's actual concern (no duplicated load/save logic) even
+though not via the suggested mechanism. Two files sit unused in the tree as a result; not blocking,
+worth a cleanup pass later.
 
 ### Brief 1 — Reception ↔ Doctor workflow defects (completed 2026-08-16)
 Nine tasks covering RISK-038 (session total silently discarded — no `price` column),
