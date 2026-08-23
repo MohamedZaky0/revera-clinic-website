@@ -1608,8 +1608,9 @@ The Admin Doctors section previously listed doctors with edit/delete actions, bu
 ## DEC-044: Public Site's SSR Language Fix (Brief 29) Accepted With Its Dynamic-Rendering Cost — Static-Preserving Rewrite Deferred
 
 **Date:** 2026-08-23
-**Status:** Decided — active. Interim; a follow-up brief is expected to supersede the `cookies()`
-approach without reopening the underlying bug.
+**Status:** Superseded same day by Brief 30 (`b5e5988`) — see closing note at the bottom. Kept as the
+record of why the interim `cookies()` approach was accepted at all, and as the spec Brief 30 was
+verified against.
 
 **Context:**
 Brief 29 fixed a real bug: the public site always server-rendered `<html lang="en">` with no `dir`
@@ -1661,3 +1662,17 @@ function instead of serving from Vercel's CDN edge cache — higher latency per 
 compute-time cost proportional to traffic. For a clinic marketing site (not high-traffic
 e-commerce), judged acceptable short-term; **not** judged acceptable as the permanent architecture,
 hence this decision explicitly flags it for a follow-up rather than closing the topic.
+
+**Closing note, 2026-08-23 (same day):** Brief 30 (`b5e5988`) landed the deferred static-preserving
+fix exactly as specified — `layout.tsx` reverted to a plain (non-`async`) component, `cookies()`
+removed, replaced with a synchronous inline `<script>` in a literal `<head>` that reads
+`cr-language` from `document.cookie` and sets `documentElement.lang`/`dir` before paint;
+`globals.css` gained an `html[dir="rtl"]` selector alongside the existing `body.rtl` one so the
+correction applies immediately without waiting on `<body>`'s class. Independently re-verified:
+`tsc`/`eslint`/`vitest` clean; production build confirms `/`, `/about`, `/contact`, `/services`,
+`/profile`, `/blog` are all back to `○` (static, prerendered) — `/book` stays dynamic, but for an
+unrelated, pre-existing reason (it reads `searchParams`, which forces dynamic rendering on its own,
+independent of anything in this fix); inspected the actual prerendered `index.html` output directly
+and confirmed the script is present in the static HTML alongside the `metadata`-generated `<title>`
+— the two coexist correctly. This decision is now fully closed — no outstanding cost, no deferred
+work remaining.

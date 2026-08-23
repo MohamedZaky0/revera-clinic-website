@@ -20,7 +20,37 @@ _(none currently active)_
 Translation of the Pages Settings tabs extracted in Brief 27 is also an obvious next brief, not yet
 written.
 
-## Brief 30 — Public site: replace Brief 29's `cookies()` fix with a static-preserving inline script (queued, not urgent)
+---
+---
+
+# ARCHIVE — completed briefs
+
+Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
+(RISK-038 … RISK-050), which is the authoritative account.
+
+### Brief 30 — Public site: replace Brief 29's `cookies()` fix with a static-preserving inline script (completed 2026-08-23)
+
+Landed in one commit (`b5e5988`), matching the spec closely: `layout.tsx` reverted to a plain
+(non-`async`) component, `cookies()`/`next/headers` import removed, replaced with the exact
+synchronous inline `<script>` pattern specified (as a hoisted `DIR_SCRIPT` constant rather than
+inlined each render — a clean touch). `globals.css` got `html[dir="rtl"]` added **alongside**
+`body.rtl` (kept, not removed) — matches the "don't assume globals.css is the only place, don't
+remove without checking" instruction.
+
+Independently re-verified: `tsc`/`eslint` clean, `vitest` unaffected (631 passing), production
+build's route table shows `/`, `/about`, `/contact`, `/services`, `/profile`, `/blog` all back to
+`○` (static) — confirmed directly, not just trusted the commit message. `/book` alone stays `ƒ`
+(dynamic), but for a reason that has nothing to do with this fix: it independently reads
+`searchParams` in its own page component, which forces dynamic rendering on its own regardless of
+cookies — correctly, the commit message didn't claim `/book` as restored. Inspected the actual
+prerendered `index.html` output directly (not just the build's summary table) and confirmed the
+inline script is genuinely present in the static HTML, coexisting correctly with the
+`metadata`-export-generated `<title>` in the same `<head>`.
+
+See `DECISIONS.md` → **DEC-044**'s closing note — the interim dynamic-rendering tradeoff it
+documented is now fully closed, no outstanding cost.
+
+### Brief 30 body (original ask, for reference)
 
 **Not a bug fix — Brief 29 already shipped and works.** This is a follow-up to remove its accepted
 side effect: `layout.tsx` calling `cookies()` (`src/app/layout.tsx`) forces the entire public site
@@ -74,12 +104,6 @@ cost. Confirm the `body.rtl` selector change didn't silently break anything else
 depended on the class specifically (grep first, per above).
 
 ---
----
-
-# ARCHIVE — completed briefs
-
-Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
-(RISK-038 … RISK-050), which is the authoritative account.
 
 ### Brief 29 — Public site: fix LTR flash on Arabic via server-side `<html dir>` (completed 2026-08-23)
 
