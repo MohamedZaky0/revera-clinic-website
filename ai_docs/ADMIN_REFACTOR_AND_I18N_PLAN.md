@@ -1,26 +1,34 @@
 # Admin Panel: Componentization → Arabic i18n → Automated Testing
 
-> **Status (updated 2026-08-22):** Employees and HR are both fully extracted (DEC-027) AND
-> translated (DEC-043), independently verified end-to-end — Briefs 21/22 (extraction), 23/24
-> (translation). Brief 23's first submission was reviewed and rejected (the live profile drawer's
-> Basic Info/Work tabs weren't wired to translation keys that already existed and were already
-> correct in the print function; the `emp.shift` value/label bug the brief itself flagged was still
-> present); fixed in `3efe21f` and re-verified live in both languages. Brief 24 had one small,
-> contained gap (a hardcoded department-filter dropdown), also fixed in the same commit.
+> **Status (updated 2026-08-23):** Employees, HR, and Role Management are all fully extracted
+> (DEC-027) AND translated (DEC-043), independently verified end-to-end — Briefs 21/22/25
+> (extraction), 23/24/25 (translation). Brief 23's first submission was reviewed and rejected (the
+> live profile drawer's Basic Info/Work tabs weren't wired to translation keys that already existed
+> and were already correct in the print function); fixed in `3efe21f` and re-verified live. Brief
+> 24 had one small, contained gap (a hardcoded department-filter dropdown), fixed in the same
+> commit. Brief 25 (Role Management) landed clean as 3 separately-verified commits — see
+> `ai_docs/manual_tests/BRIEF_25_ROLE_MANAGEMENT_MANUAL_TESTS.md`.
 >
-> **`WINDSURF_BRIEFS.md`'s active brief is now Brief 25 — Role Management** (extract → translate →
-> test, 3 ordered commits). Queued next: Brief 26 (the 7 small Settings screens, recommended as one
-> shared-hook extraction rather than 7 separate ones) and Brief 27 (Pages Settings, split into 3
-> ordered sub-PRs by tab, translation deliberately deferred — it's a bilingual CMS content editor,
-> not UI chrome).
+> **Brief 25's own Part 3 found a real Critical vulnerability, logged as RISK-069**: any
+> `admin`-role account (not just `superadmin`) can escalate another account to `superadmin` via
+> `PATCH /api/employees` — the route's only guard checks the target, never the caller's role.
+> Independently re-verified, not fixed (needs a product decision, out of a translation brief's
+> scope). A second, minor finding from the same review: RISK-070, some pre-existing roles show
+> untranslated permission chips due to legacy coarse-format data, not a code defect.
 >
-> **Two security findings from the Group A–D investigation, logged in `RISKS.md`:**
+> **`WINDSURF_BRIEFS.md`'s active brief is now Brief 26 — the 7 small Settings screens** (shared-hook
+> extraction, not 7 separate ones). Queued next: Brief 27 (Pages Settings, split into 3 ordered
+> sub-PRs by tab, translation deliberately deferred — it's a bilingual CMS content editor, not UI
+> chrome).
+>
+> **Security findings still open, logged in `RISKS.md`:**
 > **RISK-066 (Critical)** — the System Test Suite dumps raw response bodies (medical records,
 > prescriptions, payroll) into the DOM via an unfiltered `<pre>`, reachable in production behind a
 > grantable permission key, no `NODE_ENV` gate. **RISK-067 (High)** — `GET /api/page-settings` is
 > intentionally public (the booking site needs it), but later Settings screens reused the same blob
-> for InstaPay payment-destination data and staff email, now also publicly readable. Neither is
-> fixed yet; both need a decision, not a mechanical brief.
+> for InstaPay payment-destination data and staff email, now also publicly readable. **RISK-069
+> (Critical)** — the privilege-escalation gap above. None fixed yet; all need a decision, not a
+> mechanical brief.
 >
 > **POS is resolved, not just "out of scope"**: a full audit of `page.tsx` found 26 `activeNav`
 > sections — including POS, and everything downstream of it (Products, Insights, Refunds, the

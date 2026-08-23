@@ -15,7 +15,7 @@
 
 ## Status summary
 
-**12 open** · **12 partially resolved** · **42 resolved** · 66 tracked total.
+**13 open** · **12 partially resolved** · **42 resolved** · 67 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -34,6 +34,7 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 - [RISK-066](#risk-066) — System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate
 - [RISK-067](#risk-067) — `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data
 - [RISK-069](#risk-069) — Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees
+- [RISK-070](#risk-070) — Some Roles' "Allowed Modules" Chips Show Untranslated Category Names Instead Of Permission Labels
 
 ## RISK-001: Duplication Friction (hardcoded Revera-specific values)
 
@@ -517,6 +518,43 @@ The UI (`RoleManagementView.tsx`) gates the role-change `<select>` with a client
 **Fix:** Add a server-side check in the PATCH handler: if `roleName` is provided and the caller's role is not `superadmin`, return 403. This is a one-line guard. Not fixed in this brief because the brief scope is translation, not security fixes.
 
 **Test:** `tests/routes/roles-employees.test.ts` — `it.fails('a non-superadmin admin cannot change another account\'s role_name')` confirms the current (vulnerable) behaviour. The test will go green the moment the fix is applied.
+
+**Independently re-verified, 2026-08-23 (Brief 25 review).** Read `PATCH /api/employees` and
+`requireAdministratorAccess` (`src/lib/access.ts:81-88`) directly rather than trusting this note —
+confirmed the finding is exactly as described: `requireAdministratorAccess` explicitly admits
+`role !== "superadmin" && role !== "admin"` → reject, i.e. lets both through, and the handler's
+only role-change guard checks the *target's* `employee_id`, never the *caller's* role. Real,
+reproducible, not a false positive.
+
+---
+
+## RISK-070: Some Roles' "Allowed Modules" Chips Show Untranslated Category Names Instead Of Permission Labels
+
+**Severity:** Low · **Type:** i18n / display, pre-existing data
+**Found:** 2026-08-23, browser-verifying Brief 25's Arabic translation live.
+
+**What it is:** `RoleManagementView.tsx`'s roles table renders each role's `permissions` array
+through `permissionKeyToLabel[p] || p` — exactly as Brief 25 specified, translating a recognized
+`PERMISSION_STRUCTURE` key and passing anything else through unchanged. Live in the browser, the
+seeded `Admin`/`Receptionist`/`Superadmin` roles show a mix: some chips correctly translated
+(the Finance-prefixed keys, e.g. `finance.view_pnl` → "عرض الأرباح والخسائر"), others raw English
+category words (`Bookings`, `Customers`, `Providers`, `Services`, `Settings`) that never went
+through `t.*` at all. The `Rec` role, by contrast, shows every chip correctly translated.
+
+**Root cause — data, not code:** those four roles' `permissions` arrays contain coarse,
+undotted strings (`"Bookings"`, `"Customers"`...) instead of the granular dotted keys
+`PERMISSION_STRUCTURE` actually defines (`"bookings.view_calendar"`, etc.) — almost certainly
+seeded by an older/different mechanism before the fine-grained permission model existed.
+`permissionKeyToLabel` has no entry for a bare category word, so its documented fallback (show the
+raw value rather than hide it) correctly fires. `Rec`'s permissions are properly granular, which is
+why it renders cleanly.
+
+**Not a Brief 25 defect** — the translation code does exactly what it was specified to do; the
+underlying `roles` table has mixed-format legacy data Brief 25 never touched or was asked to touch.
+
+**Not fixed here:** either migrate the coarse-format rows to granular keys, or extend
+`permissionKeyToLabel` with a second fallback layer for bare category words (translating to the
+category label instead of the raw English word) if migrating existing role data isn't wanted.
 
 ---
 

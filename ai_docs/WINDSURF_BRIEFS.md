@@ -10,128 +10,6 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 25 — Role Management: extract, then translate, then test (3 parts, 3 commits)
-
-**Target: `page.tsx:9640–10004`, 365 lines** (verified 2026-08-22 at `page.tsx` = 14,735 lines,
-post-Brief-22 — re-measure). Extract to `src/components/admin/settings/RoleManagementView.tsx`.
-
-Unlike Briefs 21/22 this one is **three ordered parts in three separate commits**: Part 1
-extraction (zero behaviour change), Part 2 translation, Part 3 tests. Do not combine them — the
-project's whole review discipline depends on a mechanical move being reviewable on its own.
-
-### Part 1 — extraction
-
-**Permission gate: `activeNav === "Role Management" && adminRole === "superadmin"` (line 9640), and
-it is the only gate — zero `hasPermission()` calls inside the block. Preserve verbatim.**
-
-**Known defect, preserve and log, do NOT fix:** three layers disagree about who can see this screen.
-The sidebar (5887) shows it for `hasPermission("settings.roles")` **or** superadmin; the nav guards
-(1900, 2575) map `"Role Management" → "settings.roles"` and let a non-superadmin through; but the
-content gate (9640) demands superadmin. So an admin holding `settings.roles` sees the menu item,
-clicks it, and gets a **completely blank content area** — no message, no fallback. Real UX defect,
-out of scope for a mechanical move.
-
-**Three sub-cards, all in one grid (9648–10002):**
-
-| Card | Lines | Handlers (all defined outside the block) | API |
-|---|---|---|---|
-| Define System Roles | 9650–9788 | `handleCreateRole` (2362), `handleDeleteRole` (2393) | `POST /api/roles`, `DELETE /api/roles?name=` |
-| Provision Employee Credentials | 9791–9944 | `handleCreateEmployee` (2413), `handleUpdateEmployeeRole` (2498), `handleDeleteEmployee` (2455), `handleResendInvitation` (2474) | `POST`/`DELETE`/`PATCH ×2 /api/employees` |
-| Department Management | 9947–10001 | `handleSaveDepartments` (4260) | **`POST /api/page-settings`** (4263) |
-
-**Moves in (Role-Management-exclusive), but note it is NOT one contiguous cluster** — same trap
-Brief 22 hit: `newRoleName` (920), `newRolePermissions` (921), `roleCreateError` (925),
-`roleCreateSuccess` (926) sit together at 917–928, but **`newDeptInput` is declared ~2,400 lines
-away at 3366**, next to `departmentsList` (3365). Grep for both sites; don't assume contiguity.
-
-`handleCreateEmployee`, `handleUpdateEmployeeRole` and `handleSaveDepartments` each have exactly
-**one** call site and it is inside this block — Brief 21 left them behind as out of scope, and they
-are now genuinely exclusive to Role Management, so they move in. **Exception:**
-`handleSaveDepartments` mutates `departmentsList`, which `AdminEmployeesView` and `AdminHrView` both
-consume as a prop — move the handler, keep `departmentsList`/`setDepartmentsList` lifted in
-`page.tsx`, exactly the pattern Brief 21 used for `viewingEmployee`.
-
-**Stay props (shared, do not fork):** `employeesList` (918), `rolesList` (917), `departmentsList`
-(3365), `loadingRolesAndEmployees` (919), `newEmployeeName`/`Email`/`Role` (923/922/924 — shared
-with the Employees component's own form), `employeeCreateError`/`Success` (927/928),
-`handleDeleteEmployee`, `handleResendInvitation`, `fetchRolesAndEmployees` (2044), and `adminRole`
-(read a second time *inside* the block at 9890 as a redundant re-check — **pass it down, do not
-"simplify" the redundancy away**).
-
-**Keep in `page.tsx`:** the load effect at 2021–2024, keyed on
-`activeNav === "Role Management"` alongside `"Profile"`/`"Employees"` — same call Brief 22 made for
-`fetchHrData`.
-
-### Part 2 — translation
-
-Wiring identical to Brief 23 (`lang` + `t: typeof adminTranslations["en"]["roleManagement"]`, new
-namespace mirrored under `en`/`ar`). **Zero `dir=` and zero `toLocale*` in the whole block** — no
-Arabic content anywhere, so exactly one new `dir` on the component root, and nothing to pin.
-
-**`PERMISSION_STRUCTURE` (`page.tsx:391–521`, 131 lines) is the whole game here.** 12 category
-groups, 57 permission keys, shape `{ category, prefix, items: [{ key, label }] }`. That is
-**69 hardcoded English display strings** (12 `category` + 57 `label`) rendered at `{group.category}`
-(9698) and `{item.label}` (9719) — and the grep floor of ~50 for the block **does not include any of
-them**, because they live in a constant, not in JSX. Total real scope is ~119 strings, not 50.
-- Every `label` is pure display — nothing compares or stores one. Safe to translate.
-- Every `key` (`inventory.manage_devices`, …) is **stored in the DB and compared** by
-  `hasPermission` (834), `POST /api/roles` (2375), and the `settingsSubsections` maps (1893–1905,
-  2566–2577). **Never translate a key.**
-- **The bug this brief exists to catch:** `page.tsx:9767` renders the canonical key string *raw* as
-  the "Allowed Modules" chips —
-  `{r.permissions.map((p: string) => <span key={p}>{p}</span>)}` — with no lookup into
-  `PERMISSION_STRUCTURE.label` at all. It is an interpolated expression, **invisible to
-  `grep '>[A-Z][a-z]'`** — the exact failure class behind Brief 18's day-names bug and all five
-  Brief 20 gaps. Build a `key → label` map from `PERMISSION_STRUCTURE` and render the label, while
-  keeping `p` as the React `key` and as the stored value.
-
-**Value/label sites — one is genuinely dangerous:**
-- **`page.tsx:9984` — `dept !== "Doctors" && dept !== "Receptionist"`** decides whether a
-  department's delete button renders. These two hardcoded English names are the protected system
-  departments (seeded at 3365 and 4252). **Translating either literal silently makes both
-  deletable.** Highest-risk single line in the section after 9767.
-- 9772/9781 `r.name !== 'superadmin'` → `"System Locked"`; 9890/9915/9937
-  `emp.employee_id !== 'superadmin'` → `"System Owner"` — canonical values, translate the labels
-  only.
-- Role names (9763, 9838, 9898) and `{emp.role_name}` (9903) are user-created free text from the DB
-  — leave untranslated, and note it so nobody "fixes" it later.
-- 9908–9911 `"✓ Active"` / `"⏳ Invite Pending"` — pure labels, safe.
-- **Two imperative-string sites a JSX grep will miss:** `alert("Department already exists!")` (9957)
-  and the `confirm(...)` template at 9988.
-
-**RTL:** `text-left` on `<th>` at 9747, 9748, 9869, 9870, 9871 → `text-start`; `ml-1` at 9992 → `ms-1`.
-
-### Part 3 — tests (two, both permission-critical, neither is CRUD noise)
-
-Today `/api/roles` and `/api/employees` have **auth-shape assertions only** (`auth-sweep.test.ts`
-209 and 162) — zero behaviour coverage.
-
-1. **`PATCH /api/employees` role change — privilege escalation. Write this one first.**
-   `handleUpdateEmployeeRole` (2498) fires `PATCH /api/employees` (2500) from a `<select>` (9893)
-   whose only guard is a **client-side** `adminRole === "superadmin"` check at 9890. Server-side
-   the route requires only `requireAdministratorAccess`. Assert that a non-superadmin administrator
-   cannot PATCH another account's `role_name`. **Read the PATCH handler body first** — this is
-   stated as "assert this", not as a confirmed defect; the investigation did not read it. If the
-   route does allow it, that is a real privilege-escalation finding: stop, log it in `RISKS.md`,
-   and raise it rather than quietly fixing it inside a translation brief.
-2. **`POST /api/roles` — permission-key validation.** The route validates only
-   `Array.isArray(permissions)` (`src/app/api/roles/route.ts:30`); nothing checks the strings are
-   real `PERMISSION_STRUCTURE` keys. A typo'd key is stored silently and then never matches in
-   `hasPermission` — a role that looks configured in the UI but grants nothing. Assert unknown keys
-   are rejected; if current behaviour is permissive, assert that with `it.fails` per the repo
-   convention so a future tightening shows up.
-
-Follow `tests/routes/packages-consume.test.ts` for structure (supabase fake, seeded auth, the
-`it.fails` convention). **Do not** write round-trip tests for the settings blobs — see Brief 26.
-
----
-
-
----
----
-
-# QUEUED BRIEFS
-
 ## Brief 26 — the 7 small Settings screens: extract behind shared hooks, then translate, then one test
 
 **Do not write seven separate components with seven copies of the same load/save logic.** These
@@ -231,6 +109,9 @@ testing; the individual payloads are not. If you want the never-hydrate bug cove
 assertion inside the same test rather than five new files.
 
 ---
+---
+
+# QUEUED BRIEFS
 
 ## Brief 27 — Pages Settings: extract in 3 ordered sub-PRs (translation deferred)
 
@@ -828,4 +709,30 @@ that right without it being called out. `tsc`/`eslint`/`vitest` clean, en/ar key
 at runtime. Browser-verified live: the department filter shows Arabic labels while its underlying
 `value`s are unchanged. Manual test checklist:
 `ai_docs/manual_tests/BRIEF_24_HR_TRANSLATION_MANUAL_TESTS.md`.
+
+### Brief 25 — Role Management: extract, then translate, then test (completed 2026-08-23)
+
+Landed as 3 correctly-separated commits (`7a85428` extraction, `a1d2487` translation, `e979732`
+tests) — the brief's own requirement, followed exactly. Independently re-verified: `tsc`/`eslint`/
+`vitest` clean (624 passing, 11 expected fail), every state/handler placement the brief specified
+individually confirmed by grep (nothing left behind that should have moved, nothing moved that
+should have stayed a shared prop — including the non-contiguous `newDeptInput`), the known
+3-layer permission-mismatch defect preserved rather than silently "fixed," and the
+`PERMISSION_STRUCTURE` key→label translation (69 strings, the brief's central concern) correctly
+implemented with a safe raw-value fallback — verified live in the browser in both languages.
+
+**Part 3 found a real, confirmed Critical vulnerability while writing its own tests, exactly as
+intended.** RISK-069: `PATCH /api/employees` lets any `admin`-role caller (not just `superadmin`)
+change another account's `role_name` to `superadmin` — the only guard checks the *target* isn't
+already the system owner, never the *caller's* role. Independently re-verified by reading
+`requireAdministratorAccess` directly (it admits `admin` OR `superadmin`) and the PATCH handler's
+actual guard. Correctly left unfixed and merely logged, per the brief's explicit scope boundary —
+this needs a product decision, not a one-line brief-scope-creep fix.
+
+**One more finding, from this review, not from the brief:** RISK-070 — a handful of pre-existing
+roles (`Admin`/`Receptionist`/`Superadmin`) store coarse, undotted permission strings instead of
+`PERMISSION_STRUCTURE`'s granular keys, so their "Allowed Modules" chips show some untranslated raw
+English words. Confirmed as a data issue, not a code defect — the translation's own documented
+fallback (pass an unrecognized value through unchanged) is what's firing. Manual test checklist:
+`ai_docs/manual_tests/BRIEF_25_ROLE_MANAGEMENT_MANUAL_TESTS.md`.
 
