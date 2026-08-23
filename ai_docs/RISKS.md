@@ -2985,14 +2985,31 @@ and `superadmin`. The only role-change guard checked the *target's* `employee_id
 — never the *caller's* own role — so any `admin`-role account could PATCH another account's
 `role_name` to `"superadmin"`, a full RBAC bypass.
 
-**Fix:** one guard added in the `roleName` branch of the PATCH handler, immediately after the
-existing target-protection check: `if (access.access.role !== 'superadmin') return 403`. Exactly
-the one-line fix the risk entry itself specified.
+**Product decision confirmed with Mohamed, 2026-08-23 (first pass was too broad — see below):**
+`admin` and `superadmin` are equivalent for ordinary role/permission management — an `admin` can
+assign and edit any operational role (receptionist, doctor, HR, manager, custom roles). The only
+boundary is the `admin`/`superadmin` tier itself: only `superadmin` can grant either of those two.
+Everything else about the RBAC model (destructive DB operations, site-level/DEV config like API
+keys) already belongs to `superadmin` alone and was untouched by this fix.
 
-**Test:** `tests/routes/roles-employees.test.ts` already had this exact scenario written as
-`it.fails('a non-superadmin admin cannot change another account\'s role_name')` from the Brief 25
-Part 3 investigation. Flipped to a plain `it` now that it genuinely passes — ran it standalone to
-confirm (6 passed, 1 unrelated expected-fail for a separate `POST /api/roles` gap).
+**Fix, corrected to match:** the guard in the `roleName` branch now only fires when the *target*
+role being granted is `admin` or `superadmin` — `if ((roleName === 'admin' || roleName ===
+'superadmin') && access.access.role !== 'superadmin') return 403`. **First implementation was
+wrong and has already been superseded** — it blocked *any* role change from a non-superadmin admin
+unconditionally, which is not what was asked for and would have broken normal admin role-assignment
+work; caught by checking back before treating the fix as final.
+
+**Client-side gate updated to match:** `RoleManagementView.tsx`'s role-change `<select>` was
+`adminRole === "superadmin"`-only, hiding the control from `admin` entirely — inconsistent with the
+now-confirmed intent. Now renders for both `admin` and `superadmin`, with the `<option>` list itself
+filtered to exclude `admin`/`superadmin` when the caller isn't superadmin (the server rejects them
+either way; not offering them avoids a confusing failed-save round trip).
+
+**Test:** `tests/routes/roles-employees.test.ts` — the original `it.fails` scenario (admin →
+superadmin) is now a passing `it`; added a matching case for admin → admin (also blocked); added a
+new case proving an admin CAN reassign a target to an ordinary operational role (`manager`) — the
+boundary the first implementation had wrongly closed. 8 passed, 1 unrelated expected-fail
+(`POST /api/roles` permission-key gap).
 
 ---
 

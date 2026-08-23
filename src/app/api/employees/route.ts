@@ -245,8 +245,11 @@ export async function PATCH(req: Request) {
         if (employee.employee_id === 'superadmin') {
           return NextResponse.json({ error: 'Cannot modify the role of the system owner account.' }, { status: 400 });
         }
-        if (access.access.role !== 'superadmin') {
-          return NextResponse.json({ error: 'Only the superadmin can change an account\'s role.' }, { status: 403 });
+        // RISK-069: admin and superadmin are otherwise equivalent for role/permission management
+        // (admin can assign and edit any operational role), but only superadmin may grant the
+        // admin/superadmin tier itself — that boundary is the actual privilege-escalation guard.
+        if ((roleName === 'admin' || roleName === 'superadmin') && access.access.role !== 'superadmin') {
+          return NextResponse.json({ error: 'Only the superadmin can grant admin or superadmin access.' }, { status: 403 });
         }
         const { data: roleExists, error: roleCheckError } = await supabaseServer
           .from('roles')

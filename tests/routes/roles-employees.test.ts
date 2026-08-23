@@ -119,7 +119,7 @@ describe('PATCH /api/employees role change — privilege escalation (RISK-069)',
    * reject role changes from non-superadmin callers.
    */
 
-  it('a non-superadmin admin cannot change another account\'s role_name', async () => {
+  it('a non-superadmin admin cannot promote another account to superadmin', async () => {
     seedAdminAuth();
     seedTargetEmployee();
     // The target role must exist in the roles table for the route to accept it.
@@ -135,6 +135,36 @@ describe('PATCH /api/employees role change — privilege escalation (RISK-069)',
     // The target's role should be unchanged.
     const target = mockDb.employee_accounts.find((e: any) => e.id === EMP_TARGET)!;
     expect(target.role_name).toBe('receptionist');
+  });
+
+  it('a non-superadmin admin cannot promote another account to admin', async () => {
+    seedAdminAuth();
+    seedTargetEmployee();
+    mockDb.roles.push({ name: 'admin', permissions: [] });
+
+    const res = await PATCH_EMPLOYEES(
+      employeesPatchReq({ id: EMP_TARGET, roleName: 'admin' }),
+    );
+
+    expect(res.status).toBe(403);
+    const target = mockDb.employee_accounts.find((e: any) => e.id === EMP_TARGET)!;
+    expect(target.role_name).toBe('receptionist');
+  });
+
+  it('a non-superadmin admin CAN change another account to an operational role (not admin/superadmin)', async () => {
+    // Admin and superadmin are equivalent for ordinary role/permission management — the guard
+    // only blocks granting the admin/superadmin tier itself, per Mohamed's 2026-08-23 clarification.
+    seedAdminAuth();
+    seedTargetEmployee();
+    mockDb.roles.push({ name: 'manager', permissions: ['bookings.view_calendar'] });
+
+    const res = await PATCH_EMPLOYEES(
+      employeesPatchReq({ id: EMP_TARGET, roleName: 'manager' }),
+    );
+
+    expect(res.status).toBe(200);
+    const target = mockDb.employee_accounts.find((e: any) => e.id === EMP_TARGET)!;
+    expect(target.role_name).toBe('manager');
   });
 
   it('a superadmin can change another account\'s role_name', async () => {

@@ -587,17 +587,23 @@ export default function RoleManagementView({
                   <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
                     <td className="px-6 py-4 font-semibold text-[#1F251A]">{emp.name || emp.employee_id || '—'}</td>
                     <td className="px-6 py-4 text-xs font-semibold text-[#414E36]">
-                      {adminRole === "superadmin" && emp.employee_id !== "superadmin" ? (
+                      {(adminRole === "superadmin" || adminRole === "admin") && emp.employee_id !== "superadmin" ? (
                         <select
                           value={emp.role_name}
                           onChange={(e) => handleUpdateEmployeeRole(emp.id, e.target.value)}
                           className="rounded-lg border border-[#E6E9EB] bg-[#FBFBF9] px-2 py-1 text-xs font-semibold text-[#414E36] focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36] outline-none"
                         >
-                          {rolesList.map((r) => (
-                            <option key={r.id} value={r.name}>
-                              {r.name}
-                            </option>
-                          ))}
+                          {rolesList
+                            // RISK-069: admin can assign/edit any operational role, but only
+                            // superadmin can grant the admin/superadmin tier itself — don't even
+                            // offer those two options when the caller isn't superadmin, the
+                            // server rejects them anyway.
+                            .filter((r) => adminRole === "superadmin" || (r.name !== "admin" && r.name !== "superadmin"))
+                            .map((r) => (
+                              <option key={r.id} value={r.name}>
+                                {r.name}
+                              </option>
+                            ))}
                         </select>
                       ) : (
                         <span className="capitalize">{emp.role_name}</span>
