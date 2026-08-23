@@ -990,13 +990,27 @@ export default function DoctorAccountView({
 
       if (res.ok) {
         alert("Session completed successfully! Product stock & device pulses deducted.");
+        setReservations((prev) =>
+          prev.map((r) =>
+            String(r.id) === String(bookingTargetId)
+              ? {
+                  ...r,
+                  status: "completed",
+                  notes: finalNotes,
+                  amountLeft: updatedInvoiceTotal - Number(targetBooking.amountPaid ?? 0)
+                }
+              : r
+          )
+        );
         setActiveSessionBooking(null);
+        setScheduleModalBooking(null);
         setUsedProducts([]);
         setAdditionalServices([]);
         setExtraPulsesCount(0);
         setSelectedDeviceId("");
         setClinicalNote("");
-        fetchDoctorReservations();
+        setActiveTab("schedule");
+        await fetchDoctorReservations(true);
       } else {
         const err = await res.json().catch(() => ({}));
         alert(err.error || err.message || "Failed to complete treatment session.");
