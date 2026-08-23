@@ -10,7 +10,112 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-_(none currently active)_
+## Brief 28 — Reception scope completion: translate `ReceptionDashboardView` + `UserProfileView`
+
+**Both screens are already their own components — no extraction needed, translation only.** Both
+are reachable by Reception today: `ReceptionDashboardView` is Reception's own landing screen
+(`activeNav === "Dashboard"`, `page.tsx:7248`); `UserProfileView` is reached via the "Profile"
+button in the top header (`page.tsx:5817–5824`) — that button is **unconditional, not gated by
+`permittedSidebarItems`/role at all**, so every logged-in user including Reception sees and can
+click it. Both are squarely inside the existing "Reception-first" DEC-043 scope even though
+neither was named in the original scope list — confirm the finding, not a new scope decision.
+
+### Part A — `ReceptionDashboardView.tsx` (`src/components/admin/reception/ReceptionDashboardView.tsx`, 931 lines)
+
+Add `lang: "en" | "ar"` and a `t` prop (typed off a new `adminTranslations[...].reception.dashboard`
+namespace) to the props interface (currently 6 props, none language-related — line 35–43). Wire
+from the single call site, `page.tsx:7248`. Add `dir={lang === "ar" ? "rtl" : "ltr"}` to the root
+`<div className="space-y-4 pb-8">` (line 302), same pattern as every other translated screen in
+this series.
+
+**~55–65 chrome strings** across 6 sections + 2 modals: Today's Shift card (311–380), Notifications
+& Alerts (395–488), Bookings overview incl. 5 metric labels + 5 table headers (499–636),
+Today's Summary (649–691), Recent Activities (702–736), the Start-Shift popup modal (740–798), and
+the All-Alerts modal incl. 4 filter-pill labels (800–928).
+
+**Value/label separation is already correctly shaped — translate labels only, values untouched:**
+`alert.type` (`low_stock`/`expired_item`/`maintenance_due`/`maintenance_overdue`/
+`maintenance_completed`, compared at 427–431 and 853–857), `row.status` (`confirmed`/`checked_in`/
+`completed`/`cancelled`/`rejected`, compared at 549, 559, 569, 597), and `shiftInfo.status`
+(`started`/`ended`/`not_started`, compared at 322, 363, 378, 687) are all canonical and only drive
+badge color/icon selection or a separately-hardcoded label string — normal label-only translation,
+no bug to fix.
+
+**Real finding — alert `title`/`message` are generated server-side, not in this component.**
+`GET /api/reception/dashboard` (`src/app/api/reception/dashboard/route.ts:218–297`) hardcodes
+`title: "Low Stock"`, `"Expired Item"`, `"Maintenance Overdue"`, `"Maintenance Due"`,
+`"Maintenance Completed"`, and builds `message` server-side with interpolated English fragments
+(`` `${p.name} – Only ${stock} ${p.unit || "units"} remaining` ``, etc.) — no `lang` param, no
+alternate-language branch. Translating this component alone will **not** localize alert content.
+**Do this:** map `alert.type` client-side to `t.alerts[type].title` and discard the API's raw
+`title` string (the enum is already clean, same shape as the status/type maps above). **Do not**
+attempt to translate `message` — it embeds dynamic data assembled server-side and doing it properly
+needs an API change (a `lang` param + translated templates), which is out of scope for this brief.
+Leave `message` in English and note this as a known, deliberate limitation in the PR — do not
+silently drop the field or half-translate it.
+
+**Real finding — 5 hardcoded location/geolocation error strings are set into state, not looked up
+at render time.** `handleStartShiftWithLocation` (144–205) and its error branches set
+`locationError` directly to hardcoded English sentences (148, 181, 183, 185, 190, 198, 200 — note
+197–201 sets the identical string on both `PERMISSION_DENIED` and the `else` branch, so it's really
+one message covering two paths). **Store an error code in state instead** (e.g.
+`"permission_denied" | "out_of_location" | "generic"`), resolve to `t.errors[code]` **at render**,
+not at set-time — the same shape fix as this project's recurring value/label bug class, just with
+state instead of a prop.
+
+**5 physical-direction Tailwind classes to convert to logical** (the layout will mis-mirror in RTL
+otherwise): `ml-4` → `ms-4` (479, 898), `text-left` → `text-start` (578, 760), `pr-1` → `pe-1` (848).
+
+**Leave untouched:** `toLocaleTimeString("en-US", {...})` at line 284 — already correctly pinned,
+matches project convention. **Flag, don't translate or delete:** the `navItems` array (line
+251–260) is declared but never rendered anywhere in this file — dead code, out of scope here.
+
+### Part B — `UserProfileView.tsx` (`src/components/admin/UserProfileView.tsx`, 1,145 lines)
+
+**Shared between two unrelated translation systems — read this before touching the props
+interface.** Exactly 2 call sites: `page.tsx:6530` (admin/Reception's own Profile screen,
+`isDoctorView` defaults false, would use `adminTranslations`) and `DoctorAccountView.tsx:1188`
+(Doctor Portal's profile tab, `isDoctorView={true}`, uses the separate `doctorTranslations`
+system). **Do not import `adminTranslations` into this file and type its `t` prop off it** — that
+either breaks the Doctor Portal call site's typing or forces it to import an unrelated module.
+Instead define a local interface in this file (e.g. `UserProfileViewTranslations`) listing exactly
+the keys the component renders, and have each caller build/pass that shape from its own source:
+`page.tsx` from `adminTranslations[lang].profile...`, `DoctorAccountView.tsx` from
+`doctorTranslations[lang]...`. Add `lang`/`t` to the props interface (56–63) and `dir={lang === "ar"
+? "rtl" : "ltr"}` to the root.
+
+**`isDoctorView`-conditional labels need both variants in the shared interface, not one generic
+key** — found so far: `displayRole`/`displayEmployeeId`/`displayDepartment` fallbacks (150, 151,
+155), `"Doctor Payroll Summary"` vs `"Payroll Summary"` (864), `"Commissions & Bonuses"` vs
+`"Bonuses"` (889). **Grep for more `isDoctorView ?` sites before starting** — this list is from a
+partial read, not exhaustive.
+
+**Real finding, same value/label bug class as `emp.shift` in Brief 23:** line 1122 renders raw
+`{log.status}` directly — the attendance table's status badge (1118–1122) already switches color
+correctly on the canonical value (`"Present"`/`"Late"`/`"Overtime"`/else) but then prints that same
+raw English value as the visible label. Needs a `t.attendanceStatus[log.status]`-style lookup with
+a safe fallback, same shape as `t.profile.shiftLabel()` from Brief 23.
+
+**Real finding — two `<option>` dropdowns use the English label as the stored value.**
+`attendancePeriod`/`payrollPeriod` filters (788–790, 874–876): `<option value="This Month">This
+Month</option>`, `"Last Month"`, `"This Year"` — six sites total, values and labels identical
+strings. **Keep `value=` exactly as-is** (canonical, compared elsewhere against these exact
+strings) and translate only the visible option text — do not translate the `value` attribute.
+
+**Real finding — `toLocaleTimeString` at lines 313–314 is unpinned** (`new Date(...).
+toLocaleTimeString([], {...})` — empty locale array means "browser default", not a fixed locale).
+Every other `toLocale*` call in this file (885, 890, 895, 902, 908, 920, all `.toLocaleString()`
+for EGP amounts) is already implicitly using the default too, but these two explicitly pass `[]`,
+which reads as intentional and is exactly the unpinned-locale risk this project's `toLocale*` audit
+convention checks for in every brief. **Pin both to `"en-US"`**, matching the rest of the file and
+every other screen's convention — do this as part of this brief regardless of translation, it's not
+an i18n change, it's closing the same class of bug already fixed elsewhere.
+
+**1 physical-direction class:** `text-center sm:text-left` (558) → `sm:text-start`.
+
+**No test required** — same as every other Phase-2-only translation brief in this series (Briefs 6,
+12, 13, 14, 18, 19, 23, 24, 25 Part 2). Manual test checklist still required per CLAUDE.md, covering
+both screens and both `isDoctorView` states for Part B.
 
 ---
 ---
