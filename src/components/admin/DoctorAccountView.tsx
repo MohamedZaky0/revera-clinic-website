@@ -867,29 +867,63 @@ export default function DoctorAccountView({
   const handleCompleteTreatment = async (targetBooking: any, overrideSessionPulses?: number) => {
     if (!targetBooking) return;
 
-    if (!medicalRecord && (formAllergies || formMedicationDetails || formMedicalConditionsDetails || formPreviousTreatmentsDetails)) {
-      try {
-        const custId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
-        const headers = await getAuthHeaders();
-        const medRes = await fetch("/api/medical-records", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            customer_id: custId,
-            patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
-            skin_type: formSkinType,
-            allergies: formAllergies,
-            medication_details: formMedicationDetails,
-            medical_conditions_details: formMedicalConditionsDetails,
-            previous_treatments_details: formPreviousTreatmentsDetails
-          })
-        });
-        if (medRes.ok) {
-          const mData = await medRes.json();
-          setMedicalRecord(mData.medicalRecord || mData);
+    const custId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
+    const phone = targetBooking.phone || targetBooking.customer_phone;
+    const name = (targetBooking.name || targetBooking.customer_name || "").toLowerCase().trim();
+
+    // Verify if patient is a first-visit patient without prior medical record
+    const pastCompletedVisits = reservations.filter((r) => {
+      if (String(r.id) === String(targetBooking.id)) return false;
+      const isFinished = r.status === "completed" || r.status === "done";
+      if (!isFinished) return false;
+
+      const rCustId = r.customer_id || r.customerId;
+      const rPhone = r.phone || r.customer_phone;
+      const rName = (r.name || r.customer_name || "").toLowerCase().trim();
+
+      if (custId && rCustId && String(custId) === String(rCustId)) return true;
+      if (phone && rPhone && phone === rPhone) return true;
+      if (name && rName && name === rName) return true;
+      return false;
+    });
+
+    const isFirstVisitPatient = !medicalRecord && pastCompletedVisits.length === 0;
+
+    // Strict guard: Block completion if first visit patient has no medical record intake
+    if (isFirstVisitPatient && !medicalRecord) {
+      if (formSkinType || formAllergies || formMedicationDetails || formMedicalConditionsDetails || formPreviousTreatmentsDetails) {
+        try {
+          const headers = await getAuthHeaders();
+          const medRes = await fetch("/api/medical-records", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              customer_id: custId,
+              patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
+              skin_type: formSkinType || "Normal",
+              allergies: formAllergies,
+              medication_details: formMedicationDetails,
+              medical_conditions_details: formMedicalConditionsDetails,
+              previous_treatments_details: formPreviousTreatmentsDetails
+            })
+          });
+          if (medRes.ok) {
+            const mData = await medRes.json();
+            setMedicalRecord(mData.form || mData.medicalRecord || mData);
+          } else {
+            alert("Cannot complete treatment: Medical record intake is strictly required for first-visit patients. Please complete and save the intake form.");
+            setShowMedicalForm(true);
+            return;
+          }
+        } catch (e) {
+          alert("Cannot complete treatment: Medical record intake is required for first-visit patients. Please save the intake form first.");
+          setShowMedicalForm(true);
+          return;
         }
-      } catch (e) {
-        console.error("Auto-save medical record error:", e);
+      } else {
+        alert("Cannot complete treatment: Medical record intake is strictly required for first-visit patients. Please complete and save the intake form before ending the session.");
+        setShowMedicalForm(true);
+        return;
       }
     }
 

@@ -475,8 +475,20 @@ export default function DoctorOngoingSessionTab({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => handleCompleteTreatment(activeSessionBooking, totalSessionPulses)}
-                className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition cursor-pointer"
+                onClick={() => {
+                  if (isFirstVisit && !medicalRecord) {
+                    alert("Cannot complete treatment: Medical record intake is strictly required for first-visit patients. Please complete and save the intake form before ending the session.");
+                    setShowMedicalForm(true);
+                    return;
+                  }
+                  handleCompleteTreatment(activeSessionBooking, totalSessionPulses);
+                }}
+                className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition cursor-pointer shadow-md ${
+                  isFirstVisit && !medicalRecord
+                    ? "bg-amber-700 hover:bg-amber-800 text-white"
+                    : "bg-[#414E36] hover:bg-[#343F2B] text-white"
+                }`}
+                title={isFirstVisit && !medicalRecord ? "Medical Intake Required (First Visit)" : "Complete Treatment"}
               >
                 <Check size={16} /> {t.completeTreatmentBtn}
               </button>
