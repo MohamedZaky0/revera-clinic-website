@@ -1199,6 +1199,9 @@ export default function DoctorAccountView({
           setSelectedPatientHistory={setSelectedPatientHistory}
           handleOpenScheduleModal={handleOpenScheduleModal}
           t={t}
+          lang={lang}
+          doctorName={doctorName}
+          adminRole="doctor"
         />
       )}
     </div>
