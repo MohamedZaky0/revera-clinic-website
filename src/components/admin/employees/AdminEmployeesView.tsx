@@ -48,6 +48,8 @@ import { Branch } from "@/types";
 import { compressImage } from "@/lib/image";
 import { clearFetchCache } from "@/lib/fetchCache";
 import { DoctorServiceCommissionEditor, ServiceCommissionEntry, DefaultCommissionType } from "@/components/admin/services/DoctorServiceCommissionEditor";
+import { adminTranslations } from "@/components/admin/translations";
+
 interface AdminEmployeesViewProps {
   // Shared with Role Management invite form
   newEmployeeName: string;
@@ -91,6 +93,8 @@ interface AdminEmployeesViewProps {
   parseEgyptianNationalId: (id: string) => any;
   employeeProfileActiveTab: string;
   setEmployeeProfileActiveTab: (v: string) => void;
+  lang: "en" | "ar";
+  t: (typeof adminTranslations)["en"]["employees"];
 }
 
 export default function AdminEmployeesView({
@@ -131,6 +135,8 @@ export default function AdminEmployeesView({
   getDoctorFirstReservationDate,
   allReservations,
   parseEgyptianNationalId,
+  lang,
+  t,
 }: AdminEmployeesViewProps) {
   const [newEmployeePhone, setNewEmployeePhone] = useState("");
   const [newEmployeeDepartment, setNewEmployeeDepartment] = useState("Receptionist");
@@ -307,7 +313,7 @@ export default function AdminEmployeesView({
       const allActiveShifts: Array<{
         branchId: string;
         branchName: string;
-        type: "In-Clinic" | "Online Consultations";
+        type: string;
         startMin: number;
         endMin: number;
         startStr: string;
@@ -333,13 +339,13 @@ export default function AdminEmployeesView({
             if (eMin <= sMin) {
               return {
                 hasOverlap: true,
-                message: `Invalid shift duration on ${day} at ${bName} (In-Clinic): End time (${s.end}) must be after start time (${s.start}).`
+                message: t.doctorSection.overlapInvalidDuration(t.dayNames[day as keyof typeof t.dayNames] || day, bName, t.doctorSection.inClinic, s.end, s.start)
               };
             }
             allActiveShifts.push({
               branchId: bId,
               branchName: bName,
-              type: "In-Clinic",
+              type: t.doctorSection.inClinic,
               startMin: sMin,
               endMin: eMin,
               startStr: s.start,
@@ -361,13 +367,13 @@ export default function AdminEmployeesView({
             if (eMin <= sMin) {
               return {
                 hasOverlap: true,
-                message: `Invalid shift duration on ${day} at ${bName} (Online Consultations): End time (${s.end}) must be after start time (${s.start}).`
+                message: t.doctorSection.overlapInvalidDuration(t.dayNames[day as keyof typeof t.dayNames] || day, bName, t.doctorSection.onlineConsultations, s.end, s.start)
               };
             }
             allActiveShifts.push({
               branchId: bId,
               branchName: bName,
-              type: "Online Consultations",
+              type: t.doctorSection.onlineConsultations,
               startMin: sMin,
               endMin: eMin,
               startStr: s.start,
@@ -386,7 +392,17 @@ export default function AdminEmployeesView({
           if (s1.startMin < s2.endMin && s1.endMin > s2.startMin) {
             return {
               hasOverlap: true,
-              message: `Shift Overlap Detected on ${day}: ${s1.branchName} (${s1.type}: ${s1.startStr} - ${s1.endStr}) overlaps with ${s2.branchName} (${s2.type}: ${s2.startStr} - ${s2.endStr}).`
+              message: t.doctorSection.overlapDetected(
+                t.dayNames[day as keyof typeof t.dayNames] || day,
+                s1.branchName,
+                s1.type,
+                s1.startStr,
+                s1.endStr,
+                s2.branchName,
+                s2.type,
+                s2.startStr,
+                s2.endStr
+              )
             };
           }
         }
@@ -435,21 +451,21 @@ export default function AdminEmployeesView({
   const [attendanceInsightMonth, setAttendanceInsightMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
   function handleExportAttendanceInsights(employee: any, monthStr: string, records: any[]) {
     if (!employee) return;
-    const fileName = `Attendance_Insights_${(employee.name || 'Employee').replace(/\s+/g, '_')}_${monthStr}.csv`;
+    const fileName = `${t.csvExport.fileNamePrefix}_${(employee.name || t.profile.staffMemberFallback).replace(/\s+/g, "_")}_${monthStr}.csv`;
     
-    let csv = `ATTENDANCE INSIGHTS REPORT\n`;
-    csv += `Employee,${employee.name || 'Employee'}\n`;
-    csv += `Staff ID,${employee.employee_id || '—'}\n`;
-    csv += `Department,${employee.department || '—'}\n`;
-    csv += `Role,${employee.role_name || '—'}\n`;
-    csv += `Month,${monthStr}\n\n`;
+    let csv = `${t.csvExport.attendanceReport}\n`;
+    csv += `${t.csvExport.employee},${employee.name || t.profile.staffMemberFallback}\n`;
+    csv += `${t.csvExport.staffId},${employee.employee_id || t.csvExport.docNotAvailable}\n`;
+    csv += `${t.csvExport.department},${employee.department || t.csvExport.docNotAvailable}\n`;
+    csv += `${t.csvExport.role},${employee.role_name || t.csvExport.docNotAvailable}\n`;
+    csv += `${t.csvExport.month},${monthStr}\n\n`;
 
-    csv += `Date,Shift,Scheduled In,Scheduled Out,Actual Check In,Actual Check Out,Status,Worked (Min),Late (Min),Early Leave (Min),Overtime (Min),Mid-Shift Leave (Min)\n`;
+    csv += `${t.csvExport.date},${t.csvExport.shift},${t.csvExport.scheduledIn},${t.csvExport.scheduledOut},${t.csvExport.actualCheckIn},${t.csvExport.actualCheckOut},${t.csvExport.status},${t.csvExport.workedMin},${t.csvExport.lateMin},${t.csvExport.earlyLeaveMin},${t.csvExport.overtimeMin},${t.csvExport.midShiftLeaveMin}\n`;
 
     records.forEach((r: any) => {
-      const inTime = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString() : '—';
-      const outTime = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString() : '—';
-      csv += `"${r.date}","${employee.shift || 'Day'}","${r.scheduled_in || '09:00 AM'}","${r.scheduled_out || '05:00 PM'}","${inTime}","${outTime}","${r.status || 'Present'}",${r.worked_minutes || 0},${r.late_minutes || 0},${r.early_leave_minutes || 0},${r.overtime_minutes || 0},${r.combined_mid_shift_duration_minutes || 0}\n`;
+      const inTime = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString("en-US") : '—';
+      const outTime = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString("en-US") : '—';
+      csv += `"${r.date}","${employee.shift || t.csvExport.fallbackShift}","${r.scheduled_in || t.csvExport.fallbackScheduledIn}","${r.scheduled_out || t.csvExport.fallbackScheduledOut}","${inTime}","${outTime}","${r.status || t.csvExport.fallbackStatus}",${r.worked_minutes || 0},${r.late_minutes || 0},${r.early_leave_minutes || 0},${r.overtime_minutes || 0},${r.combined_mid_shift_duration_minutes || 0}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -503,7 +519,7 @@ export default function AdminEmployeesView({
   function handlePrintEmployeeProfile(emp: any) {
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
-      alert("Please allow popups to print employee profiles.");
+      alert(t.form.popupBlocked);
       return;
     }
 
@@ -527,7 +543,7 @@ export default function AdminEmployeesView({
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Employee Profile - ${emp.name || "Staff Details"}</title>
+        <title>${t.printProfile.title(emp.name || t.profile.staffMemberFallback)}</title>
         <style>
           body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -643,51 +659,51 @@ export default function AdminEmployeesView({
       </head>
       <body>
         <div class="letterhead">
-          <h1 class="logo">Revera Clinic</h1>
-          <p class="tagline">Employee Profile & Staff Record</p>
+          <h1 class="logo">${t.printProfile.letterhead}</h1>
+          <p class="tagline">${t.printProfile.tagline}</p>
         </div>
 
         <div class="profile-header">
           <div>
-            <h2 class="profile-name">${emp.name || "Staff Member"}</h2>
-            <p class="profile-subtitle">Registered Employee Profile Details</p>
+            <h2 class="profile-name">${emp.name || t.printProfile.staffMember}</h2>
+            <p class="profile-subtitle">${t.printProfile.subtitle}</p>
           </div>
         </div>
 
         <!-- Basic Information -->
         <div class="section">
-          <h3 class="section-title">Basic Information</h3>
+          <h3 class="section-title">${t.printProfile.basicInfo}</h3>
           <div class="grid-3">
             <div>
-              <div class="label">Employee ID</div>
-              <div class="value">${emp.employee_id || "—"}</div>
+              <div class="label">{t.profile.employeeId}</div>
+              <div class="value">${emp.employee_id || t.printProfile.docNotAvailable}</div>
             </div>
             <div>
-              <div class="label">Full Name</div>
-              <div class="value">${emp.name || "—"}</div>
+              <div class="label">{t.profile.fullName}</div>
+              <div class="value">${emp.name || t.printProfile.docNotAvailable}</div>
             </div>
             <div>
-              <div class="label">Email Address</div>
-              <div class="value">${emp.email || "—"}</div>
+              <div class="label">{t.profile.email}</div>
+              <div class="value">${emp.email || t.printProfile.docNotAvailable}</div>
             </div>
             <div>
-              <div class="label">Phone Number</div>
-              <div class="value">${emp.phone || "—"}</div>
+              <div class="label">{t.profile.phone}</div>
+              <div class="value">${emp.phone || t.printProfile.docNotAvailable}</div>
             </div>
             <div>
-              <div class="label">System Role</div>
-              <div class="value">${emp.role_name || "—"}</div>
+              <div class="label">{t.profile.role}</div>
+              <div class="value">${emp.role_name || t.printProfile.docNotAvailable}</div>
             </div>
             <div>
-              <div class="label">Account Status</div>
-              <div class="value">${emp.email_confirmed_at ? "Active" : "Pending Invitation"}</div>
+              <div class="label">{t.profile.accountStatus}</div>
+              <div class="value">${emp.email_confirmed_at ? t.profile.statusActive : t.profile.statusPending}</div>
             </div>
             <div>
-              <div class="label">Department</div>
-              <div class="value">${emp.department || "Reception"}</div>
+              <div class="label">{t.profile.department}</div>
+              <div class="value">${emp.department || t.table.fallbackDept}</div>
             </div>
             <div>
-              <div class="label">Added On</div>
+              <div class="label">{t.profile.addedOn}</div>
               <div class="value">${addedOn}</div>
             </div>
           </div>
@@ -695,85 +711,85 @@ export default function AdminEmployeesView({
 
         <!-- Work Information -->
         <div class="section">
-          <h3 class="section-title">Work Information</h3>
+          <h3 class="section-title">${t.printProfile.workInfo}</h3>
           <div class="grid-3">
             <div>
-              <div class="label">Job Title</div>
-              <div class="value">${emp.role_name || "Receptionist"}</div>
+              <div class="label">{t.profile.jobTitle}</div>
+              <div class="value">${emp.role_name || t.printProfile.receptionist}</div>
             </div>
             <div>
-              <div class="label">Shift Type</div>
-              <div class="value">${emp.shift || "Day"}</div>
+              <div class="label">{t.profile.shiftType}</div>
+              <div class="value">${t.profile.shiftLabel(emp.shift)}</div>
             </div>
             <div>
-              <div class="label">Shift Details</div>
-              <div class="value">${emp.shift === "Night" ? "General Night Shift" : "General Day Shift"}</div>
+              <div class="label">{t.profile.shiftDetails}</div>
+              <div class="value">${t.doctorSection.shiftTypeDetails(emp.shift === "Night")}</div>
             </div>
             <div>
-              <div class="label">Working Days</div>
-              <div class="value">Sunday - Thursday</div>
+              <div class="label">{t.profile.workingDays}</div>
+              <div class="value">${t.profile.workingDaysDefault}</div>
             </div>
             <div>
-              <div class="label">Working Hours</div>
-              <div class="value">${emp.shift === "Night" ? "05:00 PM - 01:00 AM" : "09:00 AM - 05:00 PM"}</div>
+              <div class="label">{t.profile.workingHours}</div>
+              <div class="value">${emp.shift === "Night" ? t.doctorSection.nightHours : t.doctorSection.dayHours}</div>
             </div>
             <div>
-              <div class="label">Break Time</div>
-              <div class="value">${emp.shift === "Night" ? "09:00 PM - 10:00 PM" : "01:00 PM - 02:00 PM"}</div>
+              <div class="label">{t.profile.breakTime}</div>
+              <div class="value">${emp.shift === "Night" ? t.doctorSection.nightBreak : t.doctorSection.dayBreak}</div>
             </div>
             <div>
-              <div class="label">Monthly Salary</div>
-              <div class="value">${monthlySalary.toLocaleString()} EGP</div>
+              <div class="label">{t.profile.monthlySalary}</div>
+              <div class="value">${monthlySalary.toLocaleString("en-US")}${t.printProfile.currencySuffix}</div>
             </div>
             <div>
-              <div class="label">Daily Salary</div>
-              <div class="value">${dailySalary.toLocaleString()} EGP</div>
+              <div class="label">{t.profile.dailySalary}</div>
+              <div class="value">${dailySalary.toLocaleString("en-US")}${t.printProfile.currencySuffix}</div>
             </div>
             <div>
-              <div class="label">Hourly Salary</div>
-              <div class="value">${hourlySalary} EGP</div>
+              <div class="label">{t.profile.hourlySalary}</div>
+              <div class="value">${hourlySalary}${t.printProfile.currencySuffix}</div>
             </div>
             <div>
-              <div class="label">Employment Type</div>
-              <div class="value">Full Time</div>
+              <div class="label">{t.profile.employmentType}</div>
+              <div class="value">${t.profile.fullTime}</div>
             </div>
             <div>
-              <div class="label">Joining Date</div>
+              <div class="label">{t.profile.joiningDate}</div>
               <div class="value">${addedOn}</div>
             </div>
             <div>
-              <div class="label">Probation Period</div>
-              <div class="value">Completed</div>
+              <div class="label">{t.profile.probationPeriod}</div>
+              <div class="value">${t.profile.completed}</div>
             </div>
           </div>
         </div>
 
         <!-- Payroll Information -->
         <div class="section">
-          <h3 class="section-title">Payroll Information</h3>
+          <h3 class="section-title">${t.printProfile.payrollInfo}</h3>
           <div class="grid-3">
             <div>
-              <div class="label">Basic Salary</div>
-              <div class="value">${monthlySalary.toLocaleString()} EGP</div>
+              <div class="label">{t.profile.basicSalary}</div>
+              <div class="value">${monthlySalary.toLocaleString("en-US")}${t.printProfile.currencySuffix}</div>
             </div>
             <div>
-              <div class="label">Bonuses</div>
-              <div class="value">200 EGP</div>
+              <div class="label">{t.profile.bonuses}</div>
+              <div class="value">200${t.printProfile.currencySuffix}</div>
             </div>
             <div>
-              <div class="label">Deductions</div>
-              <div class="value">150 EGP</div>
+              <div class="label">{t.profile.deductions}</div>
+              <div class="value">150${t.printProfile.currencySuffix}</div>
             </div>
             <div>
-              <div class="label">Net Salary</div>
-              <div class="value green">${(monthlySalary + 200 - 150).toLocaleString()} EGP</div>
+              <div class="label">{t.profile.netSalary}</div>
+              <div class="value green">${(monthlySalary + 200 - 150).toLocaleString("en-US")}${t.printProfile.currencySuffix}</div>
             </div>
             <div>
-              <div class="label">Payment Status</div>
-              <div class="value">Paid</div>
+              <div class="label">{t.profile.paymentStatus}</div>
+              <div class="value">${t.profile.paid}</div>
             </div>
             <div>
-              <div class="label">Last Payment Date</div>
+              <div class="label">${t.profile.lastPaymentDate}</div>
               <div class="value">May 5, 2026</div>
             </div>
           </div>
@@ -781,30 +797,30 @@ export default function AdminEmployeesView({
 
         <!-- Attendance Information -->
         <div class="section">
-          <h3 class="section-title">Attendance Information</h3>
+          <h3 class="section-title">${t.printProfile.attendanceInfo}</h3>
           <div class="grid-3">
             <div>
-              <div class="label">Check-In Time</div>
+              <div class="label">${t.profile.checkIn}</div>
               <div class="value">${emp.shift === "Night" ? "04:58 PM" : "08:58 AM"}</div>
             </div>
             <div>
-              <div class="label">Check-out Time</div>
+              <div class="label">${t.profile.checkOut}</div>
               <div class="value">${emp.shift === "Night" ? "01:02 AM" : "05:02 PM"}</div>
             </div>
             <div>
-              <div class="label">Total Working Hours</div>
+              <div class="label">{t.profile.totalWorkingHours}</div>
               <div class="value">8h 4m</div>
             </div>
             <div>
-              <div class="label">Late Days</div>
+              <div class="label">{t.profile.lateDays}</div>
               <div class="value">1 Day</div>
             </div>
             <div>
-              <div class="label">Absence Days</div>
+              <div class="label">{t.profile.absenceDays}</div>
               <div class="value">0 Day</div>
             </div>
             <div>
-              <div class="label">Overtime Hours</div>
+              <div class="label">{t.profile.overtimeHours}</div>
               <div class="value">2h 15m</div>
             </div>
           </div>
@@ -812,18 +828,18 @@ export default function AdminEmployeesView({
 
         <!-- Contact Information -->
         <div class="section">
-          <h3 class="section-title">Contact Information</h3>
+          <h3 class="section-title">${t.printProfile.contactInfo}</h3>
           <div class="grid-2">
             <div>
-              <div class="label">Home Address</div>
+              <div class="label">{t.profile.homeAddress}</div>
               <div class="value">${addressDetails}</div>
             </div>
             <div>
-              <div class="label">Emergency Contact Name</div>
+              <div class="label">${t.profile.emergencyName}</div>
               <div class="value">${emergencyName}</div>
             </div>
             <div>
-              <div class="label">Emergency Contact Phone</div>
+              <div class="label">${t.profile.emergencyPhone}</div>
               <div class="value">${emergencyPhone}</div>
             </div>
           </div>
@@ -831,7 +847,7 @@ export default function AdminEmployeesView({
 
         <!-- Notes -->
         <div class="section">
-          <h3 class="section-title">Internal Notes</h3>
+          <h3 class="section-title">${t.printProfile.internalNotes}</h3>
           <div class="value" style="font-weight: normal; font-style: italic;">
             ${notesStr}
           </div>
@@ -859,14 +875,14 @@ export default function AdminEmployeesView({
     printWindow.document.close();
   }
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn" dir={lang === "ar" ? "rtl" : "ltr"}>
       {!viewingEmployee && !isEditingEmployeeModalOpen && (
         <>
           {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-semibold text-[#1F251A]">Staff &amp; Employees</h2>
-          <p className="mt-2 text-sm text-[#5A6A51]">Manage all staff accounts, departments, shifts, salaries, and system roles.</p>
+          <h2 className="text-4xl font-semibold text-[#1F251A]">{t.heading}</h2>
+          <p className="mt-2 text-sm text-[#5A6A51]">{t.subtitle}</p>
         </div>
         <button
           type="button"
@@ -915,7 +931,7 @@ export default function AdminEmployeesView({
           className="rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-md shrink-0"
         >
           <Plus size={16} />
-          Add Employee
+          {t.addEmployeeBtn}
         </button>
       </div>
     
@@ -927,7 +943,7 @@ export default function AdminEmployeesView({
           </span>
           <input
             type="text"
-            placeholder="Search name, phone, email..."
+            placeholder={t.searchPlaceholder}
             value={employeeSearchQuery}
             onChange={(e) => setEmployeeSearchQuery(e.target.value)}
             className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] pl-10 pr-4 py-2.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
@@ -938,7 +954,7 @@ export default function AdminEmployeesView({
           onChange={(e) => setEmployeeFilterDepartment(e.target.value)}
           className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
         >
-          <option value="All">All Departments</option>
+          <option value="All">{t.allDepartments}</option>
           {departmentsList.map((dept) => (
             <option key={dept} value={dept}>{dept}</option>
           ))}
@@ -948,12 +964,12 @@ export default function AdminEmployeesView({
           onChange={(e) => setEmployeeFilterShift(e.target.value)}
           className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
         >
-          <option value="All">All Shifts</option>
-          <option value="Day">Day Shift</option>
-          <option value="Night">Night Shift</option>
+          <option value="All">{t.allShifts}</option>
+          <option value="Day">{t.dayShift}</option>
+          <option value="Night">{t.nightShift}</option>
         </select>
         <div className="flex items-center justify-end text-xs font-semibold text-[#5A6A51] px-2">
-          {loadingRolesAndEmployees ? "Loading..." : `${employeesList.filter((emp: any) => emp.role_name !== 'superadmin' && emp.employee_id !== 'superadmin').length} Total Employees`}
+          {loadingRolesAndEmployees ? t.loading : t.totalEmployees(employeesList.filter((emp: any) => emp.role_name !== 'superadmin' && emp.employee_id !== 'superadmin').length)}
         </div>
       </div>
     
@@ -962,21 +978,21 @@ export default function AdminEmployeesView({
         <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
-              <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Employee Info</th>
-              <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Phone</th>
-              <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Department</th>
-              <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Branch</th>
-              <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Shift</th>
-              <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Salary</th>
-              <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Status</th>
-              <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Actions</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.employeeInfo}</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.phone}</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.department}</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.branch}</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.shift}</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.salary}</th>
+              <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.status}</th>
+              <th className="px-5 py-3 text-end text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.actions}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#414E36]/5">
             {loadingRolesAndEmployees ? (
               <tr>
                 <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
-                  Loading employees...
+                  {t.table.loadingEmployees}
                 </td>
               </tr>
             ) : (() => {
@@ -1016,7 +1032,7 @@ export default function AdminEmployeesView({
                 return (
                   <tr>
                     <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
-                      No employees match your filters.
+                      {t.table.noMatches}
                     </td>
                   </tr>
                 );
@@ -1037,33 +1053,33 @@ export default function AdminEmployeesView({
                           )}
                         </div>
                         <div>
-                          <div className="font-semibold text-[#1F251A] text-sm">{emp.name || <span className="italic text-gray-400">No name</span>}</div>
+                          <div className="font-semibold text-[#1F251A] text-sm">{emp.name || <span className="italic text-gray-400">{t.table.noName}</span>}</div>
                           <div className="text-xs text-[#5A6A51]">{emp.email}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-xs font-medium text-[#1F251A]">{emp.phone || "—"}</td>
+                    <td className="px-5 py-4 whitespace-nowrap text-xs font-medium text-[#1F251A]">{emp.phone || t.table.noPhone}</td>
                     <td className="px-5 py-4 whitespace-nowrap">
                       <span className="inline-block rounded-lg bg-[#C4AE7C]/15 px-2.5 py-1 text-xs font-semibold text-[#8B7544]">
-                        {emp.department || "Reception"}
+                        {emp.department || t.table.fallbackDept}
                       </span>
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
                       <span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-1 text-xs font-semibold text-[#414E36]">
-                        {branches.find(b => b.id === emp.branch_id)?.name_en || "—"}
+                        {branches.find(b => b.id === emp.branch_id)?.name_en || t.table.noBranch}
                       </span>
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
                       <span className={`inline-block rounded-lg px-2.5 py-1 text-xs font-semibold ${(emp.shift || "").toLowerCase().includes("night") || (emp.shift || "").toLowerCase().includes("pm") ? "bg-indigo-50 text-indigo-700 border border-indigo-150" : "bg-amber-50 text-amber-700 border border-amber-150"}`}>
-                        {emp.shift || "Day"}
+                        {t.profile.shiftLabel(emp.shift)}
                       </span>
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap text-xs font-bold text-[#1F251A]">
-                      {Number(effectiveSalary).toLocaleString()} EGP
+                      {Number(effectiveSalary).toLocaleString("en-US") + t.table.salarySuffix}
                     </td>
                     <td className="px-5 py-4 text-center whitespace-nowrap">
                       <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
-                        {emp.email_confirmed_at ? "Active" : "Invited"}
+                        {emp.email_confirmed_at ? t.table.activeBadge : t.table.invitedBadge}
                       </span>
                     </td>
                     <td className="px-5 py-4 text-right whitespace-nowrap">
@@ -1072,7 +1088,7 @@ export default function AdminEmployeesView({
                           type="button"
                           onClick={() => setViewingEmployee(emp)}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                          title="View Info"
+                          title={t.actions.viewInfo}
                         >
                           <Info size={14} />
                         </button>
@@ -1147,7 +1163,7 @@ export default function AdminEmployeesView({
                                 setIsEditingEmployeeModalOpen(true);
                               }}
                               className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                              title="Edit Employee"
+                              title={t.actions.editEmployee}
                             >
                               <Pencil size={13} />
                             </button>
@@ -1156,16 +1172,16 @@ export default function AdminEmployeesView({
                                 type="button"
                                 onClick={() => handleResendInvitation(emp.id)}
                                 className="inline-flex h-7 px-2.5 items-center justify-center rounded-full border border-amber-200/60 bg-amber-50/50 text-xs font-semibold text-amber-700 transition hover:bg-amber-100/80"
-                                title="Resend invitation email"
+                                title={t.actions.resend}
                               >
-                                Resend
+                                {t.actions.resend}
                               </button>
                             )}
                             <button
                               type="button"
                               onClick={() => handleDeleteEmployee(emp.id)}
                               className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200/60 text-red-600 transition hover:bg-red-50 hover:border-red-300"
-                              title="Revoke access"
+                              title={t.actions.revoke}
                             >
                               <Trash2 size={14} />
                             </button>
@@ -1195,23 +1211,23 @@ export default function AdminEmployeesView({
               }}
               className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider"
             >
-              <ArrowLeft size={14} /> Back to Employees
+              <ArrowLeft size={14} /> {t.modal.backToEmployees}
             </button>
           </div>
           <div className="w-full bg-white rounded-3xl border border-[#414E36]/10 p-8 shadow-sm">
             <h3 className="text-2xl font-bold text-[#1F251A] mb-1">
-              {editingEmployee ? "Edit Employee" : "Add New Employee"}
+              {editingEmployee ? t.modal.editTitle : t.modal.addTitle}
             </h3>
             <p className="text-xs text-[#5A6A51] mb-6">
               {editingEmployee
-                ? "Update shift, department, salary, and role details."
-                : "Fill in the details below to invite a new staff member."}
+                ? t.modal.editSubtitle
+                : t.modal.addSubtitle}
             </p>
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
                 if (!newEmployeeName.trim() || !newEmployeeRole) {
-                  alert("Name and System Role are required.");
+                  alert(t.form.nameRequired);
                   return;
                 }
                 try {
@@ -1299,11 +1315,11 @@ export default function AdminEmployeesView({
                       fetchProviders();
                     } else {
                       const d = await res.json();
-                      alert(d.error || "Failed to update employee.");
+                      alert(d.error || t.form.updateFailed);
                     }
                   } else {
                     if (!newEmployeeEmail.trim()) {
-                      alert("Email is required.");
+                      alert(t.form.emailRequired);
                       return;
                     }
                     const res = await fetch("/api/employees", {
@@ -1352,34 +1368,34 @@ export default function AdminEmployeesView({
                       fetchProviders();
                     } else {
                       const d = await res.json();
-                      alert(d.error || "Failed to invite employee.");
+                      alert(d.error || t.form.inviteFailed);
                     }
                   }
                 } catch (err: any) {
-                  alert(err.message || "An error occurred.");
+                  alert(err.message || t.form.errorOccurred);
                 }
               }}
               className="space-y-4"
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Full Name *</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.fullName} {t.form.required}</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Mohamed Ali"
+                    placeholder={t.form.fullNamePlaceholder}
                     value={newEmployeeName}
                     onChange={(e) => setNewEmployeeName(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Email Address {editingEmployee ? "" : "*"}</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.emailAddress} {editingEmployee ? "" : t.form.required}</label>
                   <input
                     type="email"
                     required={!editingEmployee}
                     disabled={!!editingEmployee}
-                    placeholder="staff@revera.com"
+                    placeholder={t.form.emailPlaceholder}
                     value={newEmployeeEmail}
                     onChange={(e) => setNewEmployeeEmail(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1389,17 +1405,17 @@ export default function AdminEmployeesView({
     
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Phone Number</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.phoneNumber}</label>
                   <input
                     type="text"
-                    placeholder="01012345678"
+                    placeholder={t.form.phonePlaceholder}
                     value={newEmployeePhone}
                     onChange={(e) => setNewEmployeePhone(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">System Role *</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.systemRole} {t.form.required}</label>
                   <select
                     required
                     value={newEmployeeRole}
@@ -1412,21 +1428,21 @@ export default function AdminEmployeesView({
                     }}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   >
-                    <option value="" disabled>Select Role</option>
+                    <option value="" disabled>{t.form.selectRole}</option>
                     {rolesList.map((role: any) => (
                       <option key={role.name} value={role.name}>{role.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Assigned Branch *</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.assignedBranch} {t.form.required}</label>
                   <select
                     required
                     value={newEmployeeBranchId}
                     onChange={(e) => setNewEmployeeBranchId(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   >
-                    <option value="" disabled>Select Branch</option>
+                    <option value="" disabled>{t.form.selectBranch}</option>
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>{b.name_en}</option>
                     ))}
@@ -1436,7 +1452,7 @@ export default function AdminEmployeesView({
     
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Department</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.department}</label>
                   <select
                     value={newEmployeeDepartment}
                     onChange={(e) => {
@@ -1456,7 +1472,7 @@ export default function AdminEmployeesView({
                 </div>
     
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Salary (EGP)</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.salary}</label>
                   <input
                     type="number"
                     min="0"
@@ -1472,7 +1488,7 @@ export default function AdminEmployeesView({
                 <div className="rounded-2xl border border-[#C4AE7C]/30 bg-[#FBFBF9] p-5 space-y-5 shadow-sm animate-fadeIn">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#414E36] border-b border-[#C4AE7C]/20 pb-3">
                     <Stethoscope size={16} className="text-[#C4AE7C]" />
-                    Doctor &amp; Medical Configuration
+                    {t.doctorSection.title}
                   </div>
     
                   {/* Row 1: Specialty & Rating */}
@@ -1483,7 +1499,7 @@ export default function AdminEmployeesView({
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. Dermatology, Cosmetics, Gynecology..."
+                        placeholder={t.doctorSection.specialtyPlaceholder}
                         value={newEmployeeSpecialty}
                         onChange={(e) => setNewEmployeeSpecialty(e.target.value)}
                         className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
@@ -1576,7 +1592,7 @@ export default function AdminEmployeesView({
                                 }`}
                               >
                                 <span>{bName}</span>
-                                {isCurrentActive && <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md">Active</span>}
+                                {isCurrentActive && <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md">{t.profile.activeScheduleBadge}</span>}
                               </button>
                             );
                           })}
@@ -1786,7 +1802,7 @@ export default function AdminEmployeesView({
               {!(newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc")) && (
                 <>
                   <div className="mt-4">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Shift</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.table.shift}</label>
                     <div className="flex items-center gap-2 max-w-[320px]">
                       <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-3.5 py-2.5 w-full focus-within:border-[#C4AE7C] transition-colors">
                         <input
@@ -1853,11 +1869,11 @@ export default function AdminEmployeesView({
               <div className="border-t border-[#414E36]/10 pt-4 space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">National ID (14 Digits)</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.nationalId.label}</label>
                     <input
                       type="text"
                       maxLength={14}
-                      placeholder="e.g. 29503152101234"
+                      placeholder={t.nationalId.placeholder}
                       value={newEmployeeNationalId}
                       onChange={(e) => {
                         // only numbers
@@ -1876,10 +1892,10 @@ export default function AdminEmployeesView({
                         Home Address
                       </p>
                       <div>
-                        <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">Address Line 1 <span className="text-[#C4AE7C]">*</span></label>
+                        <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">{t.address.line1} <span className="text-[#C4AE7C]">{t.address.required}</span></label>
                         <input
                           type="text"
-                          placeholder="Street number and name"
+                          placeholder={t.address.line1Placeholder}
                           value={newEmployeeAddressLine1}
                           onChange={(e) => {
                             setNewEmployeeAddressLine1(e.target.value);
@@ -1889,10 +1905,10 @@ export default function AdminEmployeesView({
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">Address Line 2 <span className="text-[#8A9A81] font-normal">(Optional)</span></label>
+                        <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">{t.address.line2} <span className="text-[#8A9A81] font-normal">{t.address.optional}</span></label>
                         <input
                           type="text"
-                          placeholder="Apartment, floor, building, compound…"
+                          placeholder={t.address.line2Placeholder}
                           value={newEmployeeAddressLine2}
                           onChange={(e) => {
                             setNewEmployeeAddressLine2(e.target.value);
@@ -1903,10 +1919,10 @@ export default function AdminEmployeesView({
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">City</label>
+                          <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">{t.address.city}</label>
                           <input
                             type="text"
-                            placeholder="e.g. Cairo"
+                            placeholder={t.address.cityPlaceholder}
                             value={newEmployeeCity}
                             onChange={(e) => {
                               setNewEmployeeCity(e.target.value);
@@ -1916,7 +1932,7 @@ export default function AdminEmployeesView({
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">Governorate</label>
+                          <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">{t.address.governorate}</label>
                           <select
                             value={newEmployeeGovernorateProp}
                             onChange={(e) => {
@@ -1925,7 +1941,7 @@ export default function AdminEmployeesView({
                             }}
                             className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
                           >
-                            <option value="">— Select —</option>
+                            <option value="">{t.address.selectGovernorate}</option>
                             {["Cairo","Giza","Alexandria","Aswan","Asyut","Beheira","Beni Suef","Dakahlia","Damietta","Faiyum","Gharbia","Ismailia","Kafr el-Sheikh","Luxor","Matruh","Minya","Monufia","New Valley","North Sinai","Port Said","Qalyubia","Qena","Red Sea","Sharqia","Sohag","South Sinai","Suez"].map(g => (
                               <option key={g} value={g}>{g}</option>
                             ))}
@@ -1934,10 +1950,10 @@ export default function AdminEmployeesView({
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">Postal Code</label>
+                          <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">{t.address.postalCode}</label>
                           <input
                             type="text"
-                            placeholder="e.g. 11511"
+                            placeholder={t.address.postalCodePlaceholder}
                             value={newEmployeePostalCode}
                             onChange={(e) => {
                               setNewEmployeePostalCode(e.target.value);
@@ -1947,10 +1963,10 @@ export default function AdminEmployeesView({
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">Country</label>
+                          <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">{t.address.country}</label>
                           <input
                             type="text"
-                            placeholder="e.g. Egypt"
+                            placeholder={t.address.countryPlaceholder}
                             value={newEmployeeCountry}
                             onChange={(e) => {
                               setNewEmployeeCountry(e.target.value);
@@ -1976,15 +1992,15 @@ export default function AdminEmployeesView({
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-green-700 font-medium">
                           <div>
-                            <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Birth Date</span>
+                            <span className="block text-[9px] uppercase tracking-wider text-green-600/75">{t.nationalId.birthDate}</span>
                             {check.birthDate}
                           </div>
                           <div>
-                            <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Gender</span>
+                            <span className="block text-[9px] uppercase tracking-wider text-green-600/75">{t.nationalId.gender}</span>
                             {check.gender}
                           </div>
                           <div>
-                            <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Governorate</span>
+                            <span className="block text-[9px] uppercase tracking-wider text-green-600/75">{t.nationalId.governorate}</span>
                             {check.governorate}
                           </div>
                         </div>
@@ -2004,13 +2020,13 @@ export default function AdminEmployeesView({
                 <div className="grid gap-4 sm:grid-cols-2">
                   {/* ID Front */}
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">National ID - Front Side</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.nationalId.frontSideLabel}</label>
                     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-4 text-center">
                       {newEmployeeNationalIdFront ? (
                         <div className="relative w-full group">
                           <img
                             src={newEmployeeNationalIdFront}
-                            alt="ID Front"
+                            alt={t.nationalId.frontSideAlt}
                             className="h-28 w-full object-cover rounded-xl border border-[#414E36]/10"
                           />
                           <button
@@ -2024,8 +2040,8 @@ export default function AdminEmployeesView({
                       ) : (
                         <label className="flex flex-col items-center justify-center cursor-pointer py-4 w-full">
                           <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
-                          <span className="text-[11px] font-semibold text-[#414E36]">Upload Front Side</span>
-                          <span className="text-[9px] text-gray-400 mt-0.5">JPEG, PNG up to 5MB</span>
+                          <span className="text-[11px] font-semibold text-[#414E36]">{t.nationalId.uploadFront}</span>
+                          <span className="text-[9px] text-gray-400 mt-0.5">{t.nationalId.fileHint}</span>
                           <input
                             type="file"
                             accept="image/*"
@@ -2053,13 +2069,13 @@ export default function AdminEmployeesView({
     
                   {/* ID Back */}
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">National ID - Back Side</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.nationalId.backSideLabel}</label>
                     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-4 text-center">
                       {newEmployeeNationalIdBack ? (
                         <div className="relative w-full group">
                           <img
                             src={newEmployeeNationalIdBack}
-                            alt="ID Back"
+                            alt={t.nationalId.backSideAlt}
                             className="h-28 w-full object-cover rounded-xl border border-[#414E36]/10"
                           />
                           <button
@@ -2073,8 +2089,8 @@ export default function AdminEmployeesView({
                       ) : (
                         <label className="flex flex-col items-center justify-center cursor-pointer py-4 w-full">
                           <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
-                          <span className="text-[11px] font-semibold text-[#414E36]">Upload Back Side</span>
-                          <span className="text-[9px] text-gray-400 mt-0.5">JPEG, PNG up to 5MB</span>
+                          <span className="text-[11px] font-semibold text-[#414E36]">{t.nationalId.uploadBack}</span>
+                          <span className="text-[9px] text-gray-400 mt-0.5">{t.nationalId.fileHint}</span>
                           <input
                             type="file"
                             accept="image/*"
@@ -2104,7 +2120,7 @@ export default function AdminEmployeesView({
     
               {/* Employment Contract Upload */}
               <div className="border border-[#414E36]/10 rounded-2xl bg-[#F7F7F5] p-4">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">Employment Contract</label>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">{t.profile.employmentContract}</label>
                 <div className="rounded-2xl border border-dashed border-[#414E36]/20 bg-white overflow-hidden">
                   {newEmployeeContract ? (
                     <div className="flex items-center justify-between gap-2 p-3 bg-[#EDF1EC] rounded-2xl">
@@ -2148,7 +2164,7 @@ export default function AdminEmployeesView({
     
               {/* Additional Files Upload */}
               <div className="border border-[#414E36]/10 rounded-2xl bg-[#F7F7F5] p-4 mt-4">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">Additional Files</label>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">{t.profile.additionalFiles}</label>
                 
                 {/* List existing/added additional files */}
                 {newEmployeeAdditionalFiles.length > 0 && (
@@ -2176,8 +2192,8 @@ export default function AdminEmployeesView({
                 <div className="rounded-2xl border border-dashed border-[#414E36]/20 bg-white overflow-hidden">
                   <label className="flex flex-col items-center justify-center cursor-pointer py-5 w-full">
                     <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
-                    <span className="text-[11px] font-semibold text-[#414E36]">Upload Additional Files</span>
-                    <span className="text-[9px] text-gray-400 mt-0.5">Select one or more files (PDF, Word, or Image)</span>
+                    <span className="text-[11px] font-semibold text-[#414E36]">{t.profile.uploadAdditionalFiles}</span>
+                    <span className="text-[9px] text-gray-400 mt-0.5">{t.profile.additionalFilesHint}</span>
                     <input
                       type="file"
                       multiple
@@ -2209,13 +2225,13 @@ export default function AdminEmployeesView({
                   onClick={() => setIsEditingEmployeeModalOpen(false)}
                   className="rounded-2xl border border-[#414E36]/15 px-5 py-2.5 text-sm font-semibold text-[#414E36] hover:bg-gray-50 transition"
                 >
-                  Cancel
+                  {t.modal.cancelBtn}
                 </button>
                 <button
                   type="submit"
                   className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#2e3a26] transition shadow-md"
                 >
-                  {editingEmployee ? "Save Changes" : "Send Invitation"}
+                  {editingEmployee ? t.modal.saveChangesBtn : t.modal.sendInvitationBtn}
                 </button>
               </div>
             </form>
@@ -2232,7 +2248,7 @@ export default function AdminEmployeesView({
               onClick={() => setViewingEmployee(null)}
               className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider"
             >
-              <ArrowLeft size={14} /> Back to Employees
+              <ArrowLeft size={14} /> {t.profile.backToEmployees}
             </button>
           </div>
     
@@ -2244,7 +2260,7 @@ export default function AdminEmployeesView({
                   {customerAvatars[viewingEmployee.id || viewingEmployee.employee_id] || viewingEmployee.photo_url || viewingEmployee.avatar_url ? (
                     <img
                       src={customerAvatars[viewingEmployee.id || viewingEmployee.employee_id] || viewingEmployee.photo_url || viewingEmployee.avatar_url}
-                      alt={viewingEmployee.name || "Employee"}
+                      alt={viewingEmployee.name || t.profile.roleFallback}
                       className="h-full w-full object-cover"
                     />
                   ) : (
@@ -2252,8 +2268,8 @@ export default function AdminEmployeesView({
                   )}
                 </div>
                 <label
-                  className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-[#414E36] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
-                  title="Upload/Change Staff Photo"
+                  className="absolute -bottom-1 -end-1 p-1.5 rounded-full bg-[#414E36] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
+                  title={t.profile.uploadPhotoTitle}
                 >
                   <Camera size={12} />
                   <input
@@ -2271,22 +2287,22 @@ export default function AdminEmployeesView({
                   <button
                     type="button"
                     onClick={() => handleAvatarRemove(viewingEmployee.id || viewingEmployee.employee_id)}
-                    className="absolute -top-1 -right-1 p-1 rounded-full bg-red-600 text-white shadow-xs hover:bg-red-700 transition"
-                    title="Remove Photo"
+                    className="absolute -top-1 -end-1 p-1 rounded-full bg-red-600 text-white shadow-xs hover:bg-red-700 transition"
+                    title={t.profile.removePhotoTitle}
                   >
                     <X size={10} />
                   </button>
                 )}
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingEmployee.name || "Staff Member"}</h3>
-                <p className="text-xs text-[#5A6A51] mt-0.5">{viewingEmployee.role_name || "Employee"} • Staff ID: <span className="font-mono">{viewingEmployee.employee_id || "—"}</span></p>
+                <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingEmployee.name || t.profile.staffMemberFallback}</h3>
+                <p className="text-xs text-[#5A6A51] mt-0.5">{viewingEmployee.role_name || t.profile.roleFallback} • {t.profile.staffIdLabel} <span className="font-mono">{viewingEmployee.employee_id || t.table.noPhone}</span></p>
                 <div className="mt-2">
                   <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                     viewingEmployee.email_confirmed_at ? "bg-[#EDF1EC] text-[#414E36]" : "bg-amber-50 text-amber-700"
                   }`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-[#414E36]" : "bg-amber-500"}`} />
-                    {viewingEmployee.email_confirmed_at ? "Active" : "Pending Invitation"}
+                    {viewingEmployee.email_confirmed_at ? t.profile.statusActive : t.profile.statusPending}
                   </span>
                 </div>
               </div>
@@ -2337,30 +2353,30 @@ export default function AdminEmployeesView({
                 }}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] transition hover:bg-[#EDF1EC] shadow-sm"
               >
-                <Pencil size={12} /> Edit Profile
+                <Pencil size={12} /> {t.profile.editProfileBtn}
               </button>
-              
+
               {viewingEmployee.employee_id !== "superadmin" && (
                 <button
                   type="button"
                   onClick={() => {
-                    if (confirm("Are you sure you want to revoke access?")) {
+                    if (confirm(t.profile.revokeConfirm)) {
                       handleDeleteEmployee(viewingEmployee.id);
                       setViewingEmployee(null);
                     }
                   }}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-xs font-bold text-red-600 transition hover:bg-red-50 shadow-sm"
                 >
-                  <Lock size={12} /> Revoke Access
+                  <Lock size={12} /> {t.profile.revokeAccessBtn}
                 </button>
               )}
-    
+
               <button
                 type="button"
                 onClick={() => handlePrintEmployeeProfile(viewingEmployee)}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] transition hover:bg-[#EDF1EC] shadow-sm"
               >
-                <Printer size={12} /> Print Profile
+                <Printer size={12} /> {t.profile.printProfile}
               </button>
             </div>
           </div>
@@ -2368,13 +2384,13 @@ export default function AdminEmployeesView({
           {/* Profile Sub-navigation Tabs */}
           <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar shrink-0">
             {([
-              { id: "basic", label: "Basic Info" },
-              { id: "work", label: "Work Details" },
-              { id: "payroll", label: "Payroll" },
-              { id: "performance", label: "Target & Performance" },
-              { id: "attendance", label: "Attendance Insights" },
-              { id: "contact", label: "Contact Details" },
-              { id: "documents", label: "Notes & Documents" }
+              { id: "basic", label: t.profile.basicInfoTab },
+              { id: "work", label: t.profile.workDetailsTab },
+              { id: "payroll", label: t.profile.payrollTab },
+              { id: "performance", label: t.profile.targetPerformanceTab },
+              { id: "attendance", label: t.profile.attendanceInsightsTab },
+              { id: "contact", label: t.profile.contactDetailsTab },
+              { id: "documents", label: t.profile.notesDocumentsTab }
             ] as const).map((tab) => (
               <button
                 key={tab.id}
@@ -2396,27 +2412,27 @@ export default function AdminEmployeesView({
               <div className="space-y-4">
                 <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
                   <User size={16} className="text-[#C4AE7C]" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Basic Information</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">{t.printProfile.basicInfo}</h4>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employee ID</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.employeeId}</span>
                     <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.employee_id || "—"}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Full Name</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.fullName}</span>
                     <span className="font-semibold text-[#1F251A]">{viewingEmployee.name || "—"}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.email}</span>
                     <span className="font-semibold text-[#1F251A] break-all">{viewingEmployee.email || "—"}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.phone}</span>
                     <span className="font-semibold text-[#1F251A]">{viewingEmployee.phone || "—"}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">System Role</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.role}</span>
                     <div>
                       <span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-0.5 text-xs font-semibold text-[#414E36]">
                         {viewingEmployee.role_name || "—"}
@@ -2424,7 +2440,7 @@ export default function AdminEmployeesView({
                     </div>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Department</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.table.department}</span>
                     <div>
                       <span className="inline-block rounded-lg bg-[#C4AE7C]/15 px-2.5 py-0.5 text-xs font-semibold text-[#8B7544]">
                         {viewingEmployee.department || "Reception"}
@@ -2432,11 +2448,11 @@ export default function AdminEmployeesView({
                     </div>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.nationalId}</span>
                     <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.national_id || "—"}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Date of Birth &amp; Age</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.dateOfBirthAge}</span>
                     {(() => {
                       const check = parseEgyptianNationalId(viewingEmployee.national_id || "");
                       if (check.isValid) {
@@ -2446,18 +2462,18 @@ export default function AdminEmployeesView({
                           </span>
                         );
                       }
-                      return <span className="font-semibold text-[#5A6A51] italic text-xs">Auto-extracted when 14-digit National ID is provided</span>;
+                      return <span className="font-semibold text-[#5A6A51] italic text-xs">{t.profile.autoExtractedNote}</span>;
                     })()}
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Account Status</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.accountStatus}</span>
                     <span className={`inline-flex items-center gap-1 text-xs font-bold ${viewingEmployee.email_confirmed_at ? "text-green-700" : "text-amber-700"}`}>
                       <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-green-600" : "bg-amber-500"}`} />
-                      {viewingEmployee.email_confirmed_at ? "Active" : "Pending Invitation"}
+                      {viewingEmployee.email_confirmed_at ? t.profile.statusActive : t.profile.statusPending}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Added On</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.addedOn}</span>
                     <span className="font-semibold text-[#1F251A]">
                       {viewingEmployee.created_at
                         ? new Date(viewingEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
@@ -2472,15 +2488,15 @@ export default function AdminEmployeesView({
               <div className="space-y-4">
                 <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
                   <Briefcase size={16} className="text-[#C4AE7C]" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Work Information</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">{t.printProfile.workInfo}</h4>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Job Title</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.jobTitle}</span>
                     <span className="font-semibold text-[#1F251A]">{viewingEmployee.role_name || "Receptionist"}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Start Date</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.startDate}</span>
                     {(() => {
                       const autoDate = getDoctorFirstReservationDate(viewingEmployee.name, allReservations);
                       if (autoDate) {
@@ -2488,7 +2504,7 @@ export default function AdminEmployeesView({
                           <div className="flex flex-col">
                             <span className="font-semibold text-[#1F251A]">{autoDate}</span>
                             <span className="text-[10px] text-[#414E36] font-bold bg-[#EDF1EC] px-2 py-0.5 rounded-full border border-[#414E36]/10 w-max mt-0.5">
-                              ⚡ Auto-set (1st Booking)
+                              {t.profile.autoSet1stBooking}
                             </span>
                           </div>
                         );
@@ -2497,32 +2513,32 @@ export default function AdminEmployeesView({
                     })()}
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Shift Type</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingEmployee.shift || "Day"}</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.shiftType}</span>
+                    <span className="font-semibold text-[#1F251A]">{t.profile.shiftLabel(viewingEmployee.shift)}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Shift Details</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.shiftDetails}</span>
                     <span className="font-semibold text-[#1F251A]">
-                      {viewingEmployee.shift === "Night" ? "General Night Shift" : "General Day Shift"}
+                      {t.doctorSection.shiftTypeDetails(viewingEmployee.shift === "Night")}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Working Hours</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.workingHours}</span>
                     <span className="font-semibold text-[#1F251A]">
-                      {viewingEmployee.shift === "Night" ? "05:00 PM - 01:00 AM" : "09:00 AM - 05:00 PM"}
+                      {viewingEmployee.shift === "Night" ? t.doctorSection.nightHours : t.doctorSection.dayHours}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Break Time</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.breakTime}</span>
                     <span className="font-semibold text-[#1F251A]">
-                      {viewingEmployee.shift === "Night" ? "09:00 PM - 10:00 PM" : "01:00 PM - 02:00 PM"}
+                      {viewingEmployee.shift === "Night" ? t.doctorSection.nightBreak : t.doctorSection.dayBreak}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employment Type</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.employmentType}</span>
                     <div>
                       <span className="inline-block rounded-lg bg-[#F9F9F7] border border-[#414E36]/10 px-2.5 py-0.5 text-xs font-semibold text-[#5A6A51]">
-                        Full Time
+                        {t.profile.fullTime}
                       </span>
                     </div>
                   </div>
@@ -2534,35 +2550,35 @@ export default function AdminEmployeesView({
               <div className="space-y-4">
                 <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
                   <CircleDollarSign size={16} className="text-[#C4AE7C]" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Payroll &amp; Compensation</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">{t.profile.payrollCompensation}</h4>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Monthly Salary</span>
-                    <span className="font-semibold text-[#1F251A]">{Number(viewingEmployee.salary || 0).toLocaleString()} EGP</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.monthlySalary}</span>
+                    <span className="font-semibold text-[#1F251A]">{Number(viewingEmployee.salary || 0).toLocaleString("en-US")}{t.table.salarySuffix}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Daily Salary</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.dailySalary}</span>
                     <span className="font-semibold text-[#1F251A]">
-                      {Math.round(Number(viewingEmployee.salary || 0) / 20).toLocaleString()} EGP
+                      {Math.round(Number(viewingEmployee.salary || 0) / 20).toLocaleString("en-US")}{t.table.salarySuffix}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Hourly Salary</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.hourlySalary}</span>
                     <span className="font-semibold text-[#1F251A]">
-                      {(Number(viewingEmployee.salary || 0) / (20 * 8)).toFixed(2)} EGP
+                      {(Number(viewingEmployee.salary || 0) / (20 * 8)).toFixed(2)}{t.table.salarySuffix}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Bonuses</span>
-                    <span className="font-semibold text-[#1F251A]">200 EGP</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.bonuses}</span>
+                    <span className="font-semibold text-[#1F251A]">200{t.table.salarySuffix}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Deductions</span>
-                    <span className="font-semibold text-[#1F251A]">150 EGP</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.deductions}</span>
+                    <span className="font-semibold text-[#1F251A]">150{t.table.salarySuffix}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Last Payment Date</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.lastPaymentDate}</span>
                     <span className="font-semibold text-[#1F251A]">May 5, 2026</span>
                   </div>
                 </div>
@@ -2591,40 +2607,40 @@ export default function AdminEmployeesView({
                       <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
                         <div className="flex items-center gap-2">
                           <Target size={16} className="text-[#C4AE7C]" />
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Target &amp; Performance Bonus</h4>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">{t.profile.targetPerformanceBonus}</h4>
                         </div>
                         {hasAchievedTarget && (
                           <span className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200">
-                            Target Met ✓
+                            {t.profile.targetMet}
                           </span>
                         )}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-sm">
                         <div>
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Required Target</span>
-                          <span className="font-semibold text-[#1F251A]">{targetAmount} reservations</span>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.requiredTargetShort}</span>
+                          <span className="font-semibold text-[#1F251A]">{targetAmount} {t.profile.reservationsLabel}</span>
                         </div>
                         <div>
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Bonus Percentage</span>
-                          <span className="font-semibold text-[#1F251A]">{bonusPct}% of salary</span>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.bonusPercentageShort}</span>
+                          <span className="font-semibold text-[#1F251A]">{bonusPct}{t.profile.ofSalary}</span>
                         </div>
                         <div>
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Achieved (Current Month)</span>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.achievedLabel}</span>
                           <span className="font-semibold text-[#1F251A]">
                             {loadingEmployeeBookings ? (
-                              <span className="text-xs text-[#5A6A51] italic">Loading...</span>
+                              <span className="text-xs text-[#5A6A51] italic">{t.loading}</span>
                             ) : (
-                              achievedCount + " reservations"
+                              t.profile.reservationsSuffix(achievedCount)
                             )}
                           </span>
                         </div>
                         <div>
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Estimated Bonus</span>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.estimatedBonus}</span>
                           <span className={`font-bold ${hasAchievedTarget ? "text-green-700" : "text-[#5A6A51]"}`}>
                             {loadingEmployeeBookings ? (
-                              <span className="text-xs text-[#5A6A51] italic">Loading...</span>
+                              <span className="text-xs text-[#5A6A51] italic">{t.loading}</span>
                             ) : (
-                              potentialBonus.toLocaleString() + " EGP"
+                              potentialBonus.toLocaleString("en-US") + t.table.salarySuffix
                             )}
                           </span>
                         </div>
@@ -2633,7 +2649,7 @@ export default function AdminEmployeesView({
                       {targetAmount > 0 && !loadingEmployeeBookings && (
                         <div className="space-y-1.5 pt-2 max-w-xl">
                           <div className="flex items-center justify-between text-xs font-semibold text-[#5A6A51]">
-                            <span>Monthly Target Progress</span>
+                            <span>{t.profile.monthlyTargetProgress}</span>
                             <span>{progressPercent}%</span>
                           </div>
                           <div className="w-full bg-gray-150 h-2.5 rounded-full overflow-hidden">
@@ -2682,8 +2698,8 @@ export default function AdminEmployeesView({
                     <div className="flex items-center gap-2">
                       <Clock size={18} className="text-[#C4AE7C]" />
                       <div>
-                        <h4 className="text-sm font-bold uppercase tracking-wider text-[#414E36]">Attendance Insights</h4>
-                        <p className="text-xs text-[#5A6A51]">Comprehensive attendance analytics & daily logs</p>
+                        <h4 className="text-sm font-bold uppercase tracking-wider text-[#414E36]">{t.profile.attendanceInsights}</h4>
+                        <p className="text-xs text-[#5A6A51]">{t.profile.attendanceSubtitle}</p>
                       </div>
                     </div>
     
@@ -2699,7 +2715,7 @@ export default function AdminEmployeesView({
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[#414E36] rounded-lg hover:bg-[#323D2A] transition-all shadow-xs"
                       >
                         <Download size={14} />
-                        Export CSV
+                        {t.profile.exportCsvBtn}
                       </button>
                     </div>
                   </div>
@@ -2707,83 +2723,83 @@ export default function AdminEmployeesView({
                   {/* Stat Summary Cards */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                     <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
-                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Total Worked</span>
+                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.profile.totalWorked}</span>
                       <span className="text-base font-bold text-[#414E36]">{workedHrs}h {workedRMin}m</span>
-                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{presentCount} Days Present</span>
+                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{t.profile.daysPresent(presentCount)}</span>
                     </div>
     
                     <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
-                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Late Arrival</span>
+                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.profile.lateArrival}</span>
                       <span className={`text-base font-bold ${totalLateMins > 0 ? 'text-amber-600' : 'text-[#414E36]'}`}>{totalLateMins} min</span>
-                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{lateCount} Late Incident{lateCount === 1 ? '' : 's'}</span>
+                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{t.profile.lateIncident(lateCount)}</span>
                     </div>
     
                     <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
-                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Early Leave</span>
+                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.profile.attendanceEarlyLeave}</span>
                       <span className={`text-base font-bold ${totalEarlyLeaveMins > 0 ? 'text-amber-600' : 'text-[#414E36]'}`}>{totalEarlyLeaveMins} min</span>
-                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">Early Departures</span>
+                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{t.profile.earlyDepartures}</span>
                     </div>
     
                     <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
-                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Overtime</span>
+                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.profile.attendanceOvertime}</span>
                       <span className="text-base font-bold text-emerald-700">{totalOvertimeMins} min</span>
-                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">Extra Hours Worked</span>
+                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{t.profile.extraHoursWorked}</span>
                     </div>
-    
+
                     <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
-                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Mid-Shift Leave</span>
+                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.profile.midShiftLeave}</span>
                       <span className={`text-base font-bold ${totalMidShiftLeaveMins > 0 ? 'text-purple-700' : 'text-[#414E36]'}`}>{totalMidShiftLeaveMins} min</span>
-                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">Permission Duration</span>
+                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{t.profile.permissionDuration}</span>
                     </div>
-    
+
                     <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
-                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Absences</span>
+                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.profile.absences}</span>
                       <span className={`text-base font-bold ${absentCount > 0 ? 'text-rose-600' : 'text-[#414E36]'}`}>{absentCount} Days</span>
-                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">Unexcused / Leave</span>
+                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{t.profile.unexcusedLeave}</span>
                     </div>
                   </div>
-    
+
                   {/* Daily Breakdown Table */}
                   <div className="border border-[#414E36]/10 rounded-xl overflow-hidden bg-white shadow-xs">
                     <div className="px-4 py-3 bg-[#F7F9F6] border-b border-[#414E36]/10 flex items-center justify-between">
-                      <h5 className="text-xs font-bold text-[#414E36] uppercase tracking-wider">Daily Attendance Breakdown</h5>
-                      <span className="text-xs font-semibold text-[#5A6A51]">{empRecords.length} Record{empRecords.length === 1 ? '' : 's'}</span>
+                      <h5 className="text-xs font-bold text-[#414E36] uppercase tracking-wider">{t.profile.dailyAttendanceBreakdown}</h5>
+                      <span className="text-xs font-semibold text-[#5A6A51]">{t.profile.recordCount(empRecords.length)}</span>
                     </div>
     
                     {loadingAttendance ? (
                       <div className="p-8 text-center text-xs text-[#5A6A51] flex items-center justify-center gap-2">
                         <Loader2 size={16} className="animate-spin text-[#414E36]" />
-                        Loading attendance records...
+                        {t.profile.loadingAttendance}
                       </div>
                     ) : empRecords.length === 0 ? (
                       <div className="p-8 text-center text-xs text-[#5A6A51]">
-                        No attendance records found for {attendanceInsightMonth || 'selected month'}.
+                        {t.profile.noAttendanceRecords(attendanceInsightMonth)}
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                           <thead className="bg-[#F7F9F6]/60 text-[#5A6A51] border-b border-[#414E36]/10 font-bold uppercase tracking-wider text-[10px]">
                             <tr>
-                              <th className="py-2.5 px-3">Date</th>
-                              <th className="py-2.5 px-3">Shift Time</th>
-                              <th className="py-2.5 px-3">Check In</th>
-                              <th className="py-2.5 px-3">Check Out</th>
-                              <th className="py-2.5 px-3">Status</th>
-                              <th className="py-2.5 px-3 text-right">Worked</th>
-                              <th className="py-2.5 px-3 text-right">Late</th>
-                              <th className="py-2.5 px-3 text-right">Early Out</th>
-                              <th className="py-2.5 px-3 text-right">Overtime</th>
-                              <th className="py-2.5 px-3 text-right">Mid-Shift Leave</th>
+                              <th className="py-2.5 px-3">{t.profile.dateHeader}</th>
+                              <th className="py-2.5 px-3">{t.profile.shiftTimeHeader}</th>
+                              <th className="py-2.5 px-3">{t.profile.checkInHeader}</th>
+                              <th className="py-2.5 px-3">{t.profile.checkOutHeader}</th>
+                              <th className="py-2.5 px-3">{t.table.status}</th>
+                              <th className="py-2.5 px-3 text-right">{t.profile.workedHeader}</th>
+                              <th className="py-2.5 px-3 text-right">{t.profile.lateHeader}</th>
+                              <th className="py-2.5 px-3 text-right">{t.profile.earlyOutHeader}</th>
+                              <th className="py-2.5 px-3 text-right">{t.profile.overtimeHeader}</th>
+                              <th className="py-2.5 px-3 text-right">{t.profile.midShiftLeaveHeader}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-[#414E36]/5 text-[#1F251A]">
                             {empRecords.map((r: any, idx: number) => {
-                              const inStr = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-                              const outStr = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+                              const inStr = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' }) : '—';
+                              const outStr = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' }) : '—';
                               return (
                                 <tr key={r.id || idx} className="hover:bg-[#F7F9F6]/50 transition-colors">
                                   <td className="py-2.5 px-3 font-semibold text-[#414E36] whitespace-nowrap">{r.date}</td>
-                                  <td className="py-2.5 px-3 text-[#5A6A51] whitespace-nowrap">{r.scheduled_in || '09:00 AM'} - {r.scheduled_out || '05:00 PM'}</td>
+                                  <td className="py-2.5 px-3 text-[#5A6A51] whitespace-nowrap">{r.scheduled_in || t.csvExport.fallbackScheduledIn} - {r.scheduled_out || t.csvExport.fallbackScheduledOut}</td>
                                   <td className="py-2.5 px-3 font-medium whitespace-nowrap">{inStr}</td>
                                   <td className="py-2.5 px-3 font-medium whitespace-nowrap">{outStr}</td>
                                   <td className="py-2.5 px-3 whitespace-nowrap">
@@ -2792,7 +2808,7 @@ export default function AdminEmployeesView({
                                       (r.late_minutes || 0) > 0 ? 'bg-amber-100 text-amber-800' :
                                       'bg-emerald-100 text-emerald-800'
                                     }`}>
-                                      {r.status || 'Present'}
+                                      {r.status || t.csvExport.fallbackStatus}
                                     </span>
                                   </td>
                                   <td className="py-2.5 px-3 text-right font-medium">{Math.floor((r.worked_minutes || 0) / 60)}h {(r.worked_minutes || 0) % 60}m</td>
@@ -2816,23 +2832,23 @@ export default function AdminEmployeesView({
               <div className="space-y-4">
                 <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
                   <Phone size={16} className="text-[#C4AE7C]" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Contact Details</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">{t.profile.contactDetailsTitle}</h4>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                   <div className="md:col-span-2">
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Home Address</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.homeAddress}</span>
                     <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3.5 py-2.5 rounded-xl border border-[#414E36]/5 leading-relaxed max-w-xl">
-                      {viewingEmployee.address || "—"}
+                      {viewingEmployee.address || t.profile.noAddress}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Emergency Contact Name</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.emergencyName}</span>
                     <span className="font-semibold text-[#1F251A]">
                       {viewingEmployee.name ? `Ahmed ${viewingEmployee.name.split(" ").slice(-1)[0]}` : "Ahmed Ahmed"}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Emergency Contact Phone</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.emergencyPhone}</span>
                     <span className="font-semibold text-[#1F251A] font-mono">01098765432</span>
                   </div>
                 </div>
@@ -2846,31 +2862,31 @@ export default function AdminEmployeesView({
                   <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
                     <div className="flex items-center gap-2">
                       <FileText size={16} className="text-[#C4AE7C]" />
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Internal Notes &amp; Reminders</h4>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">{t.profile.internalNotesReminders}</h4>
                     </div>
                     <span className="text-[10px] font-bold text-[#5A6A51] bg-[#F9F9F7] px-2 py-0.5 rounded-full border border-[#414E36]/10">
-                      {viewingEmployeeNotes.length} Notes
+                      {t.profile.notesCount(viewingEmployeeNotes.length)}
                     </span>
                   </div>
                   
                   {/* Notes List */}
                   <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                     {loadingEmployeeNotes ? (
-                      <p className="text-xs text-[#5A6A51] italic py-2">Loading notes...</p>
+                      <p className="text-xs text-[#5A6A51] italic py-2">{t.profile.loadingNotes}</p>
                     ) : viewingEmployeeNotes.length === 0 ? (
-                      <p className="text-xs text-[#5A6A51]/70 italic py-2 text-center">No internal notes or reminders yet for this employee.</p>
+                      <p className="text-xs text-[#5A6A51]/70 italic py-2 text-center">{t.profile.noNotes}</p>
                     ) : (
                       viewingEmployeeNotes.map((note) => (
                         <div key={note.id} className="text-xs bg-[#FBFBF9] border border-[#414E36]/5 rounded-xl p-3.5 space-y-1.5 relative group transition hover:border-[#C4AE7C]/30">
                           <p className="text-[#1F251A] font-medium leading-relaxed break-words whitespace-pre-wrap">{note.note}</p>
                           <div className="flex items-center justify-between text-[9px] text-[#5A6A51]/80 font-semibold pt-1 border-t border-[#414E36]/5">
                             <span>
-                              Added by {note.creator?.name || "Staff Member"} on {new Date(note.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                              {t.profile.addedBy} {note.creator?.name || t.printProfile.staffMember} {t.profile.on} {new Date(note.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                             </span>
                             <button
                               type="button"
                               onClick={async () => {
-                                if (confirm("Are you sure you want to delete this note?")) {
+                                if (confirm(t.profile.deleteNoteConfirm)) {
                                   try {
                                     const res = await fetch(`/api/employees/notes?id=${note.id}`, {
                                       method: "DELETE",
@@ -2879,7 +2895,7 @@ export default function AdminEmployeesView({
                                     if (res.ok) {
                                       setViewingEmployeeNotes(prev => prev.filter(n => n.id !== note.id));
                                     } else {
-                                      alert("Failed to delete note.");
+                                      alert(t.profile.deleteNoteFailed);
                                     }
                                   } catch (e) {
                                     console.error("Delete note error:", e);
@@ -2888,7 +2904,7 @@ export default function AdminEmployeesView({
                               }}
                               className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition duration-200"
                             >
-                              Delete
+                              {t.profile.deleteNoteBtn}
                             </button>
                           </div>
                         </div>
@@ -2899,7 +2915,7 @@ export default function AdminEmployeesView({
                   {/* Note Input */}
                   <div className="pt-2 border-t border-[#414E36]/5 space-y-2 max-w-xl">
                     <textarea
-                      placeholder="Add a new internal note or reminder..."
+                      placeholder={t.profile.notesPlaceholder}
                       value={newEmployeeNoteText}
                       onChange={(e) => setNewEmployeeNoteText(e.target.value)}
                       rows={2}
@@ -2928,7 +2944,7 @@ export default function AdminEmployeesView({
                               setViewingEmployeeNotes(prev => [created, ...prev]);
                               setNewEmployeeNoteText("");
                             } else {
-                              alert("Failed to add note.");
+                              alert(t.profile.addNoteFailed);
                             }
                           } catch (e) {
                             console.error("Add note error:", e);
@@ -2937,7 +2953,7 @@ export default function AdminEmployeesView({
                         disabled={!newEmployeeNoteText.trim()}
                         className="rounded-xl bg-[#414E36] hover:bg-[#2e3a26] disabled:bg-gray-200 text-white disabled:text-gray-400 px-4 py-2 text-[11px] font-bold transition shadow-xs"
                       >
-                        Add Note
+                        {t.profile.addNoteBtn}
                       </button>
                     </div>
                   </div>
@@ -2955,15 +2971,15 @@ export default function AdminEmployeesView({
                         </div>
                         <div className="grid grid-cols-3 gap-4 text-green-700 font-medium">
                           <div>
-                            <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Birth Date</span>
+                            <span className="block text-[9px] uppercase tracking-wider text-green-600/75">{t.nationalId.birthDate}</span>
                             {check.birthDate}
                           </div>
                           <div>
-                            <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Gender</span>
+                            <span className="block text-[9px] uppercase tracking-wider text-green-600/75">{t.nationalId.gender}</span>
                             {check.gender}
                           </div>
                           <div>
-                            <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Governorate</span>
+                            <span className="block text-[9px] uppercase tracking-wider text-green-600/75">{t.nationalId.governorate}</span>
                             {check.governorate}
                           </div>
                         </div>
@@ -2976,47 +2992,47 @@ export default function AdminEmployeesView({
                 {/* Attachments */}
                 {(viewingEmployee.national_id_front || viewingEmployee.national_id_back || viewingEmployee.contract_file) && (
                   <div className="space-y-3 pt-3 border-t border-[#414E36]/5 max-w-2xl">
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">Attached Documents</span>
+                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{t.profile.attachedDocuments}</span>
     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {viewingEmployee.national_id_front && (
                         <div className="space-y-1">
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">ID Front Side</span>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">{t.profile.idFrontSide}</span>
                           <a
                             href={viewingEmployee.national_id_front}
                             target="_blank"
                             rel="noreferrer"
                             className="block relative rounded-xl overflow-hidden border border-[#414E36]/15 hover:opacity-90 transition group cursor-zoom-in"
-                            title="Click to view full size"
+                            title={t.profile.clickToViewFullSize}
                           >
                             <img
                               src={viewingEmployee.national_id_front}
-                              alt="ID Front"
+                              alt={t.nationalId.frontSideAlt}
                               className="h-32 w-full object-cover"
                             />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
-                              View Full Size
+                              {t.profile.viewFullSize}
                             </div>
                           </a>
                         </div>
                       )}
                       {viewingEmployee.national_id_back && (
                         <div className="space-y-1">
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">ID Back Side</span>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">{t.profile.idBackSide}</span>
                           <a
                             href={viewingEmployee.national_id_back}
                             target="_blank"
                             rel="noreferrer"
                             className="block relative rounded-xl overflow-hidden border border-[#414E36]/15 hover:opacity-90 transition group cursor-zoom-in"
-                            title="Click to view full size"
+                            title={t.profile.clickToViewFullSize}
                           >
                             <img
                               src={viewingEmployee.national_id_back}
-                              alt="ID Back"
+                              alt={t.nationalId.backSideAlt}
                               className="h-32 w-full object-cover"
                             />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
-                              View Full Size
+                              {t.profile.viewFullSize}
                             </div>
                           </a>
                         </div>
@@ -3042,20 +3058,20 @@ export default function AdminEmployeesView({
                         <div className="space-y-3 pt-2">
                           {contractUrl && (
                             <div>
-                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">Employment Contract</span>
+                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{t.profile.employmentContract}</span>
                               <a
                                 href={contractUrl}
                                 download={viewingEmployee.contract_file_name || "contract"}
                                 className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition shadow-xs"
                               >
                                 <FileText className="h-4 w-4 text-[#5A6A51]" />
-                                {viewingEmployee.contract_file_name || "Download Contract"}
+                                {viewingEmployee.contract_file_name || t.profile.downloadContract}
                               </a>
                             </div>
                           )}
                           {additionalList.length > 0 && (
                             <div>
-                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">Additional Files</span>
+                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{t.profile.additionalFiles}</span>
                               <div className="flex flex-wrap gap-2">
                                 {additionalList.map((fileItem, idx) => (
                                   <a

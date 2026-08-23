@@ -10282,6 +10282,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               getDoctorFirstReservationDate={getDoctorFirstReservationDate}
               allReservations={allReservations}
               parseEgyptianNationalId={parseEgyptianNationalId}
+              lang={lang}
+              t={adminTranslations[lang].employees}
             />
           )}
           {/* ============================================================= */}
@@ -10370,6 +10372,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               fetchHrAttendance={fetchHrAttendance}
               fetchHrAlerts={fetchHrAlerts}
               fetchRolesAndEmployees={fetchRolesAndEmployees}
+              lang={lang}
+              t={adminTranslations[lang].hr}
             />
           )}
 

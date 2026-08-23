@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { clearFetchCache } from "@/lib/fetchCache";
+import { adminTranslations } from "@/components/admin/translations";
 interface AdminHrViewProps {
   // HR sub-tab and data states (kept in page.tsx)
   hrActiveSubTab: string;
@@ -98,6 +99,8 @@ interface AdminHrViewProps {
   fetchHrAttendance: () => Promise<void> | void;
   fetchHrAlerts: () => Promise<void> | void;
   fetchRolesAndEmployees: () => Promise<void> | void;
+  lang: "en" | "ar";
+  t: typeof adminTranslations["en"]["hr"];
 }
 
 export default function AdminHrView({
@@ -176,15 +179,17 @@ export default function AdminHrView({
   fetchHrAttendance,
   fetchHrAlerts,
   fetchRolesAndEmployees,
+  lang,
+  t,
 }: AdminHrViewProps) {
   return (
 <>
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn" dir={lang === "ar" ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-semibold text-[#1F251A]">Human Resources</h2>
-          <p className="mt-2 text-sm text-[#5A6A51]">Manage workforce payroll, leaves, and performance evaluations.</p>
+          <h2 className="text-4xl font-semibold text-[#1F251A]">{t.heading}</h2>
+          <p className="mt-2 text-sm text-[#5A6A51]">{t.subtitle}</p>
         </div>
       </div>
     
@@ -200,7 +205,7 @@ export default function AdminHrView({
                 : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
             }`}
           >
-            {tab === "doctor-payroll" ? "Doctor Payroll" : tab === "targets" ? "Targets" : tab}
+            {tab === "overview" ? t.tabOverview : tab === "payroll" ? t.tabPayroll : tab === "doctor-payroll" ? t.tabDoctorPayroll : tab === "leaves" ? t.tabLeaves : tab === "performance" ? t.tabPerformance : tab === "attendance" ? t.tabAttendance : t.tabTargets}
           </button>
         ))}
       </div>
@@ -211,7 +216,7 @@ export default function AdminHrView({
           {/* Summary Cards */}
           <div className="grid gap-6 sm:grid-cols-3">
             <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Active Employees</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">{t.overview.activeEmployees}</p>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-3xl font-semibold text-[#1F251A]">{employeesList.length}</span>
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C4AE7C]/10 text-[#414E36]">
@@ -221,7 +226,7 @@ export default function AdminHrView({
             </div>
     
             <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Approved Leaves (This Month)</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">{t.overview.approvedLeavesThisMonth}</p>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-3xl font-semibold text-[#1F251A]">
                   {leavesList.filter(l => l.status === "Approved").length}
@@ -233,13 +238,13 @@ export default function AdminHrView({
             </div>
     
             <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Total Payroll Run ({selectedPayrollMonth})</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">{t.overview.totalPayrollRun(selectedPayrollMonth)}</p>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-3xl font-semibold text-[#1F251A]">
-                  EGP {payrollList
+                  {t.egp} {payrollList
                     .filter(p => p.month === selectedPayrollMonth)
                     .reduce((sum, p) => sum + Number(p.net_salary || 0), 0)
-                    .toLocaleString()}
+                    .toLocaleString("en-GB")}
                 </span>
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C4AE7C]/10 text-[#414E36]">
                   <DollarSign size={18} />
@@ -251,24 +256,24 @@ export default function AdminHrView({
           {/* Employees Directory Card */}
           <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
             <div className="p-6 border-b border-[#414E36]/10 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-[#1F251A]">Workforce Directory</h3>
+              <h3 className="text-lg font-bold text-[#1F251A]">{t.overview.workforceDirectory}</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left text-sm">
                 <thead>
                    <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
-                     <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Employee Info</th>
-                     <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Department</th>
-                     <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">System Role</th>
-                     <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Branch</th>
-                     <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Base Salary</th>
+                     <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.overview.employeeInfo}</th>
+                     <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.overview.department}</th>
+                     <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.overview.systemRole}</th>
+                     <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.overview.branch}</th>
+                     <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.overview.baseSalary}</th>
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-[#414E36]/5">
                   {employeesList.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
-                        No active employees found.
+                        {t.overview.noActiveEmployees}
                       </td>
                     </tr>
                   ) : (
@@ -289,7 +294,7 @@ export default function AdminHrView({
                          <td className="px-5 py-4 text-xs font-semibold text-[#1F251A]">{emp.role_name || "—"}</td>
                          <td className="px-5 py-4"><span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-1 text-xs font-semibold text-[#414E36]">{branches.find(b => b.id === emp.branch_id)?.name_en || "—"}</span></td>
                          <td className="px-5 py-4 text-xs font-mono font-bold text-[#1F251A]">
-                           EGP {Number(emp.salary || 0).toLocaleString()}
+                           {t.egp} {Number(emp.salary || 0).toLocaleString("en-GB")}
                          </td>
                        </tr>
                     ))
@@ -366,14 +371,14 @@ export default function AdminHrView({
             {/* Title & Action Buttons Row */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h2 className="text-4xl font-semibold text-[#1F251A]">Payroll</h2>
-                <p className="mt-1 text-xs text-[#8A9A81] font-medium">Home &gt; Payroll</p>
+                <h2 className="text-4xl font-semibold text-[#1F251A]">{t.payroll.heading}</h2>
+                <p className="mt-1 text-xs text-[#8A9A81] font-medium">{t.payroll.breadcrumb}</p>
               </div>
               <div className="flex items-center gap-3">
                 <button
                   onClick={async () => {
                     if (selectedPayrollMonth === "All") {
-                      alert("Please select a specific month to run payroll.");
+                      alert(t.payroll.selectMonthAlert);
                       return;
                     }
                     try {
@@ -388,29 +393,29 @@ export default function AdminHrView({
                       if (res.ok) {
                         const result = await res.json();
                         alert(result.skippedPaid > 0
-                          ? `Payroll refreshed. ${result.skippedPaid} paid record(s) were preserved.`
-                          : "Payroll ran successfully!");
+                          ? t.payroll.refreshedMsg(result.skippedPaid)
+                          : t.payroll.successMsg);
                         fetchHrPayroll();
                       } else {
                         const err = await res.json();
-                        alert(err.error || "Failed to run payroll");
+                        alert(err.error || t.payroll.failedMsg);
                       }
                     } catch (err) {
-                      alert("Failed to connect to API.");
+                      alert(t.payroll.apiFailed);
                     }
                   }}
                   className="rounded-xl bg-[#414E36] px-4 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-xs"
                 >
-                  <Plus size={14} /> Add Payroll
+                  <Plus size={14} /> {t.payroll.addPayroll}
                 </button>
                 <button
                   onClick={() => window.print()}
                   className="rounded-xl bg-white border border-[#414E36]/15 px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#EDF1EC]/20 transition flex items-center gap-2 shadow-xs"
                 >
-                  <Download size={14} /> Export
+                  <Download size={14} /> {t.payroll.export}
                 </button>
                 <button
-                  title="Filter"
+                  title={t.payroll.filterTitle}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-[#414E36]/15 text-[#414E36] hover:bg-[#EDF1EC]/20 transition shadow-xs cursor-pointer"
                 >
                   <Filter size={15} />
@@ -424,7 +429,7 @@ export default function AdminHrView({
                 <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]/65" />
                 <input
                   type="text"
-                  placeholder="Search by employee name or phone..."
+                  placeholder={t.payroll.searchPlaceholder}
                   value={payrollSearchQuery}
                   onChange={(e) => {
                     setPayrollSearchQuery(e.target.value);
@@ -443,12 +448,12 @@ export default function AdminHrView({
                   }}
                   className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
                 >
-                  <option value="All">All Departments</option>
-                  <option value="Doctors">Doctors</option>
-                  <option value="Nursing">Nursing</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Reception">Reception</option>
-                  <option value="Lab">Lab</option>
+                  <option value="All">{t.payroll.allDepartments}</option>
+                  <option value="Doctors">{t.payroll.deptDoctors}</option>
+                  <option value="Nursing">{t.payroll.deptNursing}</option>
+                  <option value="Admin">{t.payroll.deptAdmin}</option>
+                  <option value="Reception">{t.payroll.deptReception}</option>
+                  <option value="Lab">{t.payroll.deptLab}</option>
                 </select>
               </div>
     
@@ -461,7 +466,7 @@ export default function AdminHrView({
                   }}
                   className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
                 >
-                  <option value="All">All Months</option>
+                  <option value="All">{t.payroll.allMonths}</option>
                   <option value="2026-05">May 2026</option>
                   <option value="2026-06">June 2026</option>
                   <option value="2026-07">July 2026</option>
@@ -478,10 +483,10 @@ export default function AdminHrView({
                   }}
                   className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
                 >
-                  <option value="All">All Status</option>
-                  <option value="Paid">Paid</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Overdue">Overdue</option>
+                  <option value="All">{t.payroll.allStatus}</option>
+                  <option value="Paid">{t.payroll.paid}</option>
+                  <option value="Pending">{t.payroll.pending}</option>
+                  <option value="Overdue">{t.payroll.overdue}</option>
                 </select>
               </div>
     
@@ -495,7 +500,7 @@ export default function AdminHrView({
                 }}
                 className="w-full rounded-xl bg-white border border-gray-250 hover:bg-gray-50 px-4 py-2.5 text-xs font-bold text-gray-700 transition flex items-center justify-center gap-1.5 shadow-xs"
               >
-                <RotateCcw size={12} /> Clear
+                <RotateCcw size={12} /> {t.payroll.clear}
               </button>
             </div>
     
@@ -505,26 +510,26 @@ export default function AdminHrView({
                 <table className="w-full border-collapse text-left text-sm">
                   <thead>
                      <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
-                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Employee</th>
-                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Department</th>
-                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Role</th>
-                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Working Hours</th>
-                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Basic Salary</th>
-                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Bonuses</th>
-                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Deductions</th>
-                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Target</th>
-                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Perf. Bonus</th>
-                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Net Salary</th>
-                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap text-center">Status</th>
-                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Date</th>
-                       <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Actions</th>
+                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.employee}</th>
+                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.department}</th>
+                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.role}</th>
+                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.workingHours}</th>
+                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.basicSalary}</th>
+                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.bonuses}</th>
+                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.deductions}</th>
+                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.target}</th>
+                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.perfBonus}</th>
+                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.netSalary}</th>
+                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap text-center">{t.payroll.status}</th>
+                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.date}</th>
+                       <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.actions}</th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-[#414E36]/5">
                     {paged.length === 0 ? (
                       <tr>
                         <td colSpan={14} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
-                          No payroll records match your filter criteria.
+                          {t.payroll.noRecords}
                         </td>
                       </tr>
                     ) : (
@@ -533,6 +538,7 @@ export default function AdminHrView({
                         const isPaid = pay.status === "Paid";
                         const isPast = pay.month < "2026-07";
                         const statusLabel = isPaid ? "Paid" : (isPast ? "Overdue" : "Pending");
+                        const statusDisplay = isPaid ? t.payroll.paid : (isPast ? t.payroll.overdue : t.payroll.pending);
                         
                         const initials = empObj.name ? empObj.name.split(" ").slice(0, 2).map((n: string) => n[0]).join("").toUpperCase() : "EM";
     
@@ -562,19 +568,19 @@ export default function AdminHrView({
                             </td>
                             {/* Working Hours */}
                             <td className="px-5 py-4 whitespace-nowrap">
-                              <div className="text-xs font-semibold text-[#1F251A]">Sun - Thu</div>
+                              <div className="text-xs font-semibold text-[#1F251A]">{t.payroll.sunThu}</div>
                               <div className="text-[10px] text-[#5A6A51]">
-                                {empObj.shift === "Night" ? "05:00 PM - 01:00 AM" : "09:00 AM - 05:00 PM"}
+                                {empObj.shift === "Night" ? t.payroll.nightShiftHours : t.payroll.dayShiftHours}
                               </div>
                             </td>
                             {/* Basic Salary */}
                             <td className="px-5 py-4 whitespace-nowrap text-xs font-mono font-bold text-[#1F251A]">
-                              EGP {Number(pay.basic_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {t.egp} {Number(pay.basic_salary || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                             {/* Bonuses */}
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-1.5 bg-[#FBFBF9] border border-[#414E36]/15 rounded-lg px-2 py-1 w-24">
-                                <span className="text-[10px] font-bold text-[#5A6A51]">EGP</span>
+                                <span className="text-[10px] font-bold text-[#5A6A51]">{t.egp}</span>
                                 <input
                                   type="number"
                                   value={pay.bonuses}
@@ -598,7 +604,7 @@ export default function AdminHrView({
                             {/* Deductions */}
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-1.5 bg-[#FBFBF9] border border-[#414E36]/15 rounded-lg px-2 py-1 w-24">
-                                <span className="text-[10px] font-bold text-[#5A6A51]">EGP</span>
+                                <span className="text-[10px] font-bold text-[#5A6A51]">{t.egp}</span>
                                 <input
                                   type="number"
                                   value={pay.deductions}
@@ -624,10 +630,10 @@ export default function AdminHrView({
                               {pay.target_amount_snapshot > 0 ? (
                                 <div className="text-xs">
                                   <div className="font-semibold text-[#1F251A]">
-                                    EGP {Number(pay.achieved_revenue || 0).toLocaleString()}
+                                    {t.egp} {Number(pay.achieved_revenue || 0).toLocaleString("en-GB")}
                                   </div>
                                   <div className="text-[10px] text-[#5A6A51] font-medium">
-                                    of EGP {Number(pay.target_amount_snapshot).toLocaleString()}
+                                    {t.payroll.of} {t.egp} {Number(pay.target_amount_snapshot).toLocaleString("en-GB")}
                                   </div>
                                 </div>
                               ) : (
@@ -637,7 +643,7 @@ export default function AdminHrView({
                             {/* Performance Bonus */}
                             <td className="px-6 py-4">
                               <div className="text-xs font-semibold text-[#1F251A]">
-                                EGP {Number(pay.calculated_bonus || 0).toLocaleString()}
+                                {t.egp} {Number(pay.calculated_bonus || 0).toLocaleString("en-GB")}
                                 {Number(pay.calculated_bonus || 0) > 0 && (
                                   <div className="text-[9px] font-bold text-green-700">
                                     ({pay.bonus_percentage_snapshot}%)
@@ -647,7 +653,7 @@ export default function AdminHrView({
                             </td>
                             {/* Net Salary */}
                             <td className="px-5 py-4 whitespace-nowrap text-xs font-mono font-bold text-[#1F251A]">
-                              EGP {Number(pay.net_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {t.egp} {Number(pay.net_salary || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                             {/* Payment Status (Badges with Dot) */}
                             <td className="px-6 py-4 text-center">
@@ -661,7 +667,7 @@ export default function AdminHrView({
                                 <span className={`h-1.5 w-1.5 rounded-full ${
                                   statusLabel === "Paid" ? "bg-[#414E36]" : statusLabel === "Overdue" ? "bg-red-650" : "bg-[#C4AE7C]"
                                 }`} />
-                                {statusLabel}
+                                {statusDisplay}
                               </span>
                             </td>
                             {/* Payment Date */}
@@ -677,7 +683,7 @@ export default function AdminHrView({
                                        setViewingEmployee(empObj);
                                      }
                                    }}
-                                   title="View Details"
+                                   title={t.payroll.viewDetails}
                                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
                                  >
                                    <Eye size={14} />
@@ -686,7 +692,7 @@ export default function AdminHrView({
                                  {!isPaid ? (
                                    <button
                                      onClick={async () => {
-                                       if (!(await showConfirm(`Are you sure you want to mark ${empObj.name || "this employee"}'s payroll as PAID?`))) return;
+                                       if (!(await showConfirm(t.payroll.payConfirm(empObj.name || "—")))) return;
                                        try {
                                          const res = await fetch('/api/hr/payroll', {
                                            method: 'PATCH',
@@ -700,12 +706,12 @@ export default function AdminHrView({
                                            fetchHrPayroll();
                                          }
                                        } catch (e) {
-                                         alert("Failed to pay payroll.");
+                                         alert(t.payroll.payFailed);
                                        }
                                      }}
                                      className="inline-flex h-7 px-2.5 items-center justify-center rounded-full border border-emerald-200/60 bg-emerald-50/50 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100/80"
                                    >
-                                     Pay
+                                     {t.payroll.pay}
                                    </button>
                                  ) : (
                                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-green-200/60 bg-green-50 text-green-700">
@@ -726,7 +732,7 @@ export default function AdminHrView({
               {filtered.length > 0 && (
                 <div className="p-6 border-t border-[#414E36]/10 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white">
                   <span className="text-xs font-semibold text-[#5A6A51]">
-                    Showing {startIndex + 1} to {Math.min(endIndex, filtered.length)} of {filtered.length} results
+                    {t.payroll.showingResults(startIndex + 1, Math.min(endIndex, filtered.length), filtered.length)}
                   </span>
                   <div className="flex items-center gap-1">
                     <button
@@ -819,14 +825,14 @@ export default function AdminHrView({
             {/* Title & Action Buttons Row */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h2 className="text-4xl font-semibold text-[#1F251A]">Doctor Payroll</h2>
-                <p className="mt-1 text-xs text-[#8A9A81] font-medium">Home &gt; Doctor Payroll</p>
+                <h2 className="text-4xl font-semibold text-[#1F251A]">{t.doctorPayroll.heading}</h2>
+                <p className="mt-1 text-xs text-[#8A9A81] font-medium">{t.doctorPayroll.breadcrumb}</p>
               </div>
               <div className="flex items-center gap-3">
                 <button
                   onClick={async () => {
                     if (selectedDoctorPayrollMonth === "All") {
-                      alert("Please select a specific month to run doctor payroll.");
+                      alert(t.doctorPayroll.selectMonthAlert);
                       return;
                     }
                     try {
@@ -839,25 +845,25 @@ export default function AdminHrView({
                         body: JSON.stringify({ month: selectedDoctorPayrollMonth })
                       });
                       if (res.ok) {
-                        alert("Doctor payroll ran successfully!");
+                        alert(t.doctorPayroll.successMsg);
                         fetchDoctorPayroll();
                       } else {
                         const err = await res.json();
-                        alert(err.error || "Failed to run doctor payroll");
+                        alert(err.error || t.doctorPayroll.failedMsg);
                       }
                     } catch (err) {
-                      alert("Failed to connect to API.");
+                      alert(t.doctorPayroll.apiFailed);
                     }
                   }}
                   className="rounded-xl bg-[#414E36] px-4 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-xs"
                 >
-                  <Plus size={14} /> Add Doctor Payroll
+                  <Plus size={14} /> {t.doctorPayroll.add}
                 </button>
                 <button
                   onClick={() => window.print()}
                   className="rounded-xl bg-white border border-[#414E36]/15 px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#EDF1EC]/20 transition flex items-center gap-2 shadow-xs"
                 >
-                  <Download size={14} /> Export
+                  <Download size={14} /> {t.doctorPayroll.export}
                 </button>
               </div>
             </div>
@@ -868,7 +874,7 @@ export default function AdminHrView({
                 <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]/65" />
                 <input
                   type="text"
-                  placeholder="Search by doctor name..."
+                  placeholder={t.doctorPayroll.searchPlaceholder}
                   value={doctorPayrollSearchQuery}
                   onChange={(e) => {
                     setDoctorPayrollSearchQuery(e.target.value);
@@ -887,7 +893,7 @@ export default function AdminHrView({
                   }}
                   className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
                 >
-                  <option value="All">All Months</option>
+                  <option value="All">{t.doctorPayroll.allMonths}</option>
                   <option value="2026-05">May 2026</option>
                   <option value="2026-06">June 2026</option>
                   <option value="2026-07">July 2026</option>
@@ -904,9 +910,9 @@ export default function AdminHrView({
                   }}
                   className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
                 >
-                  <option value="All">All Status</option>
-                  <option value="Paid">Paid</option>
-                  <option value="Pending">Pending</option>
+                  <option value="All">{t.doctorPayroll.allStatus}</option>
+                  <option value="Paid">{t.doctorPayroll.paid}</option>
+                  <option value="Pending">{t.doctorPayroll.pending}</option>
                 </select>
               </div>
     
@@ -919,7 +925,7 @@ export default function AdminHrView({
                 }}
                 className="w-full rounded-xl bg-white border border-gray-250 hover:bg-gray-50 px-4 py-2.5 text-xs font-bold text-gray-700 transition flex items-center justify-center gap-1.5 shadow-xs"
               >
-                <RotateCcw size={12} /> Clear
+                <RotateCcw size={12} /> {t.doctorPayroll.clear}
               </button>
             </div>
     
@@ -929,24 +935,24 @@ export default function AdminHrView({
                 <table className="w-full border-collapse text-left text-sm">
                   <thead>
                     <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
-                      <th className="px-6 py-4">Doctor ID</th>
-                      <th className="px-6 py-4">Doctor Name</th>
-                      <th className="px-6 py-4">Month</th>
-                      <th className="px-6 py-4">Fixed Salary</th>
-                      <th className="px-6 py-4">Bookings Count</th>
-                      <th className="px-6 py-4">Total Booking Value</th>
-                      <th className="px-6 py-4">Commission</th>
-                      <th className="px-6 py-4">Net Salary</th>
-                      <th className="px-6 py-4 text-center">Payment Status</th>
-                      <th className="px-6 py-4">Payment Date</th>
-                      <th className="px-6 py-4 text-right">Actions</th>
+                      <th className="px-6 py-4">{t.doctorPayroll.doctorId}</th>
+                      <th className="px-6 py-4">{t.doctorPayroll.doctorName}</th>
+                      <th className="px-6 py-4">{t.doctorPayroll.month}</th>
+                      <th className="px-6 py-4">{t.doctorPayroll.fixedSalary}</th>
+                      <th className="px-6 py-4">{t.doctorPayroll.bookingsCount}</th>
+                      <th className="px-6 py-4">{t.doctorPayroll.totalBookingValue}</th>
+                      <th className="px-6 py-4">{t.doctorPayroll.commission}</th>
+                      <th className="px-6 py-4">{t.doctorPayroll.netSalary}</th>
+                      <th className="px-6 py-4 text-center">{t.doctorPayroll.paymentStatus}</th>
+                      <th className="px-6 py-4">{t.doctorPayroll.paymentDate}</th>
+                      <th className="px-6 py-4 text-right">{t.doctorPayroll.actions}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#414E36]/5">
                     {paged.length === 0 ? (
                       <tr>
                         <td colSpan={11} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
-                          No doctor payroll records match your filter criteria.
+                          {t.doctorPayroll.noRecords}
                         </td>
                       </tr>
                     ) : (
@@ -954,6 +960,7 @@ export default function AdminHrView({
                         const docObj = pay.doctor || {};
                         const isPaid = pay.status === "Paid";
                         const statusLabel = isPaid ? "Paid" : "Pending";
+                        const statusDisplay = isPaid ? t.doctorPayroll.paid : t.doctorPayroll.pending;
                         const initials = docObj.name ? docObj.name.split(" ").slice(0, 2).map((n: string) => n[0]).join("").toUpperCase() : "DR";
     
                         return (
@@ -976,26 +983,26 @@ export default function AdminHrView({
                               {pay.month}
                             </td>
                             <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
-                              EGP {Number(pay.fixed_salary_snapshot || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {t.egp} {Number(pay.fixed_salary_snapshot || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                             <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
                               {pay.reservations_count || 0}
                             </td>
                             <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
-                              EGP {Number(pay.total_reservations_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {t.egp} {Number(pay.total_reservations_value || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                             <td className="px-6 py-4">
                               <div className="text-xs font-semibold text-[#1F251A]">
-                                EGP {Number(pay.calculated_commission || 0).toLocaleString()}
+                                {t.egp} {Number(pay.calculated_commission || 0).toLocaleString("en-GB")}
                                 {pay.commission_type_snapshot !== "none" && (
                                   <div className="text-[9px] font-bold text-[#8B7544]">
-                                    ({pay.commission_type_snapshot === "percentage" ? `${pay.commission_value_snapshot}%` : `EGP ${pay.commission_value_snapshot} each`})
+                                    ({pay.commission_type_snapshot === "percentage" ? `${pay.commission_value_snapshot}%` : `${t.egp} ${pay.commission_value_snapshot} ${t.doctorPayroll.each}`})
                                   </div>
                                 )}
                               </div>
                             </td>
                             <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
-                              EGP {Number(pay.net_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {t.egp} {Number(pay.net_salary || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                             <td className="px-6 py-4 text-center">
                               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
@@ -1006,7 +1013,7 @@ export default function AdminHrView({
                                 <span className={`h-1.5 w-1.5 rounded-full ${
                                   isPaid ? "bg-[#414E36]" : "bg-[#C4AE7C]"
                                 }`} />
-                                {statusLabel}
+                                {statusDisplay}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
@@ -1017,7 +1024,7 @@ export default function AdminHrView({
                                 {!isPaid ? (
                                   <button
                                     onClick={async () => {
-                                      if (!(await showConfirm(`Are you sure you want to mark Dr. ${docObj.name || "this doctor"}'s payroll as PAID?`))) return;
+                                      if (!(await showConfirm(t.doctorPayroll.payConfirm(docObj.name || "—")))) return;
                                       try {
                                         const res = await fetch('/api/hr/doctor-payroll', {
                                           method: 'PATCH',
@@ -1031,12 +1038,12 @@ export default function AdminHrView({
                                           fetchDoctorPayroll();
                                         }
                                       } catch (e) {
-                                        alert("Failed to pay doctor payroll.");
+                                        alert(t.doctorPayroll.payFailed);
                                       }
                                     }}
                                     className="rounded-lg bg-[#414E36] hover:bg-[#2e3a26] text-[#FBFBF9] px-3.5 py-1.5 text-xs font-bold transition shadow-xs"
                                   >
-                                    Pay
+                                    {t.doctorPayroll.pay}
                                   </button>
                                 ) : (
                                   <button
@@ -1060,7 +1067,7 @@ export default function AdminHrView({
               {filtered.length > 0 && (
                 <div className="p-6 border-t border-[#414E36]/10 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white">
                   <span className="text-xs font-semibold text-[#5A6A51]">
-                    Showing {startIndex + 1} to {Math.min(endIndex, filtered.length)} of {filtered.length} results
+                    {t.doctorPayroll.showingResults(startIndex + 1, Math.min(endIndex, filtered.length), filtered.length)}
                   </span>
                   <div className="flex items-center gap-1">
                     <button
@@ -1108,25 +1115,25 @@ export default function AdminHrView({
           <div className="lg:col-span-2">
             <div className="overflow-x-auto rounded-2xl border border-[#414E36]/10 bg-white shadow-sm">
               <div className="px-5 py-4 border-b border-[#414E36]/10 flex items-center justify-between">
-                <h3 className="text-base font-bold text-[#1F251A]">Leave Requests</h3>
+                <h3 className="text-base font-bold text-[#1F251A]">{t.leaves.heading}</h3>
               </div>
               <table className="w-full min-w-[700px] text-sm">
                 <thead>
                   <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
-                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Employee</th>
-                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Type</th>
-                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Dates</th>
-                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Days</th>
-                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Reason</th>
-                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Status</th>
-                    <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Actions</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.leaves.employee}</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.leaves.type}</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.leaves.dates}</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.leaves.days}</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.leaves.reason}</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.leaves.status}</th>
+                    <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.leaves.actions}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#414E36]/5">
                   {leavesList.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
-                        No leave requests submitted yet.
+                        {t.leaves.noRecords}
                       </td>
                     </tr>
                   ) : (
@@ -1155,7 +1162,7 @@ export default function AdminHrView({
                             leave.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200/60' :
                             'bg-amber-50 text-amber-700 border-amber-200/60'
                           }`}>
-                            {leave.status}
+                            {leave.status === 'Approved' ? t.leaves.statusApproved : leave.status === 'Rejected' ? t.leaves.statusRejected : t.leaves.statusPending}
                           </span>
                         </td>
                         <td className="px-5 py-4 text-right whitespace-nowrap">
@@ -1174,7 +1181,7 @@ export default function AdminHrView({
                                   });
                                   fetchHrLeaves();
                                 }}
-                                title="Approve"
+                                title={t.leaves.approve}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200/60 text-emerald-700 bg-emerald-50 transition hover:bg-emerald-100"
                               >
                                 <Check size={14} />
@@ -1192,7 +1199,7 @@ export default function AdminHrView({
                                   });
                                   fetchHrLeaves();
                                 }}
-                                title="Reject"
+                                title={t.leaves.reject}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-rose-200/60 text-rose-700 bg-rose-50 transition hover:bg-rose-100"
                               >
                                 <X size={14} />
@@ -1212,12 +1219,12 @@ export default function AdminHrView({
     
           {/* Submit Leave Request */}
           <div className="rounded-[32px] bg-white border border-[#414E36]/10 p-6 shadow-sm h-fit">
-            <h3 className="text-lg font-bold text-[#1F251A] mb-4">Request Leave</h3>
+            <h3 className="text-lg font-bold text-[#1F251A] mb-4">{t.leaves.requestLeave}</h3>
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
                 if (!newLeaveEmployeeId || !newLeaveStartDate || !newLeaveEndDate) {
-                  alert("All fields are required.");
+                  alert(t.leaves.allFieldsRequired);
                   return;
                 }
                 try {
@@ -1240,26 +1247,26 @@ export default function AdminHrView({
                     setNewLeaveEndDate("");
                     setNewLeaveReason("");
                     fetchHrLeaves();
-                    alert("Leave request submitted successfully!");
+                    alert(t.leaves.submitSuccess);
                   } else {
                     const err = await res.json();
-                    alert(err.error || "Failed to submit request.");
+                    alert(err.error || t.leaves.submitFailed);
                   }
                 } catch (err) {
-                  alert("Failed to submit request.");
+                  alert(t.leaves.submitFailed);
                 }
               }}
               className="space-y-4"
             >
               <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Employee</label>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">{t.leaves.employee}</label>
                 <select
                   value={newLeaveEmployeeId}
                   onChange={(e) => setNewLeaveEmployeeId(e.target.value)}
                   className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
                   required
                 >
-                  <option value="">Select Employee</option>
+                  <option value="">{t.leaves.selectEmployee}</option>
                   {employeesList.map((emp) => (
                     <option key={emp.id} value={emp.id}>{emp.name}</option>
                   ))}
@@ -1267,22 +1274,22 @@ export default function AdminHrView({
               </div>
     
               <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Type</label>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">{t.leaves.type}</label>
                 <select
                   value={newLeaveType}
                   onChange={(e) => setNewLeaveType(e.target.value)}
                   className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
                 >
-                  <option value="Sick">Sick Leave</option>
-                  <option value="Annual">Annual Leave</option>
-                  <option value="Casual">Casual Leave</option>
-                  <option value="Unpaid">Unpaid Leave</option>
+                  <option value="Sick">{t.leaves.sickLeave}</option>
+                  <option value="Annual">{t.leaves.annualLeave}</option>
+                  <option value="Casual">{t.leaves.casualLeave}</option>
+                  <option value="Unpaid">{t.leaves.unpaidLeave}</option>
                 </select>
               </div>
     
               <div className="grid gap-4 grid-cols-2">
                 <div>
-                  <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Start Date</label>
+                  <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">{t.leaves.startDate}</label>
                   <input
                     type="date"
                     value={newLeaveStartDate}
@@ -1292,7 +1299,7 @@ export default function AdminHrView({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">End Date</label>
+                  <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">{t.leaves.endDate}</label>
                   <input
                     type="date"
                     value={newLeaveEndDate}
@@ -1304,9 +1311,9 @@ export default function AdminHrView({
               </div>
     
               <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Reason</label>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">{t.leaves.reason}</label>
                 <textarea
-                  placeholder="Why is leave needed?"
+                  placeholder={t.leaves.reasonPlaceholder}
                   value={newLeaveReason}
                   onChange={(e) => setNewLeaveReason(e.target.value)}
                   className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none h-20 resize-none"
@@ -1317,7 +1324,7 @@ export default function AdminHrView({
                 type="submit"
                 className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
               >
-                Submit Leave Request
+                {t.leaves.submit}
               </button>
             </form>
           </div>
@@ -1329,17 +1336,17 @@ export default function AdminHrView({
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Reviews Timeline List */}
           <div className="lg:col-span-2 space-y-4">
-            <h3 className="text-xl font-bold text-[#1F251A] mb-2">Performance Logs</h3>
+            <h3 className="text-xl font-bold text-[#1F251A] mb-2">{t.performance.heading}</h3>
             {performanceReviews.length === 0 ? (
               <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-12 text-center text-sm text-[#5A6A51]">
-                No performance reviews submitted yet.
+                {t.performance.noReviews}
               </div>
             ) : (
               performanceReviews.map((rev: any) => (
                 <div key={rev.id} className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm relative hover:border-[#414E36]/30 transition-all">
                   <button
                     onClick={async () => {
-                      if (!(await showConfirm("Delete this review?"))) return;
+                      if (!(await showConfirm(t.performance.deleteConfirm))) return;
                       await fetch(`/api/hr/performance?id=${rev.id}`, {
                         method: 'DELETE',
                         headers: { 'Authorization': `Bearer ${session?.access_token}` }
@@ -1347,7 +1354,7 @@ export default function AdminHrView({
                       fetchHrPerformance();
                     }}
                     className="absolute top-6 right-6 text-rose-600 hover:text-rose-700 transition"
-                    title="Delete Review"
+                    title={t.performance.deleteTitle}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -1357,7 +1364,7 @@ export default function AdminHrView({
                     </div>
                     <div className="space-y-1">
                       <h4 className="font-bold text-[#1F251A]">{rev.employee_accounts?.name || "—"}</h4>
-                      <p className="text-xs text-[#5A6A51]">Role: {rev.employee_accounts?.role_name || "—"}</p>
+                      <p className="text-xs text-[#5A6A51]">{t.performance.roleLabel} {rev.employee_accounts?.role_name || "—"}</p>
                       <div className="flex items-center gap-1.5 py-1">
                         {Array.from({ length: 5 }).map((_, i) => (
                           <Star
@@ -1369,16 +1376,16 @@ export default function AdminHrView({
                         <span className="text-xs text-[#5A6A51] ml-1 font-semibold">{rev.review_date}</span>
                       </div>
                       <div className="mt-3 text-sm text-[#1F251A] bg-[#FBFBF9] p-3 rounded-2xl border border-[#414E36]/5">
-                        <p className="font-semibold text-xs text-[#5A6A51] mb-1">Evaluator Notes:</p>
-                        <p className="leading-relaxed">{rev.comments || "No comments written."}</p>
+                        <p className="font-semibold text-xs text-[#5A6A51] mb-1">{t.performance.evaluatorNotes}</p>
+                        <p className="leading-relaxed">{rev.comments || t.performance.noComments}</p>
                       </div>
                       {rev.goals && (
                         <div className="mt-2 text-sm text-[#1F251A] bg-[#C4AE7C]/5 p-3 rounded-2xl border border-[#C4AE7C]/10">
-                          <p className="font-semibold text-xs text-[#8B7544] mb-1">Target Goals:</p>
+                          <p className="font-semibold text-xs text-[#8B7544] mb-1">{t.performance.targetGoals}</p>
                           <p className="leading-relaxed">{rev.goals}</p>
                         </div>
                       )}
-                      <p className="text-[10px] text-[#5A6A51] mt-3">Evaluated by: {rev.reviewer?.name || "System"}</p>
+                      <p className="text-[10px] text-[#5A6A51] mt-3">{t.performance.evaluatedBy} {rev.reviewer?.name || t.performance.systemFallback}</p>
                     </div>
                   </div>
                 </div>
@@ -1388,12 +1395,12 @@ export default function AdminHrView({
     
           {/* Create Review Form */}
           <div className="rounded-[32px] bg-white border border-[#414E36]/10 p-6 shadow-sm h-fit">
-            <h3 className="text-lg font-bold text-[#1F251A] mb-4">Add Performance Review</h3>
+            <h3 className="text-lg font-bold text-[#1F251A] mb-4">{t.performance.addReview}</h3>
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
                 if (!newReviewEmployeeId) {
-                  alert("Please select employee.");
+                  alert(t.performance.selectEmployeeAlert);
                   return;
                 }
                 const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
@@ -1416,26 +1423,26 @@ export default function AdminHrView({
                     setNewReviewComments("");
                     setNewReviewGoals("");
                     fetchHrPerformance();
-                    alert("Review created successfully!");
+                    alert(t.performance.createSuccess);
                   } else {
                     const err = await res.json();
-                    alert(err.error || "Failed to create review.");
+                    alert(err.error || t.performance.createFailed);
                   }
                 } catch (err) {
-                  alert("Failed to submit review.");
+                  alert(t.performance.submitFailed);
                 }
               }}
               className="space-y-4"
             >
               <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Employee Under Review</label>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">{t.performance.employeeUnderReview}</label>
                 <select
                   value={newReviewEmployeeId}
                   onChange={(e) => setNewReviewEmployeeId(e.target.value)}
                   className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
                   required
                 >
-                  <option value="">Select Employee</option>
+                  <option value="">{t.performance.selectEmployee}</option>
                   {employeesList.map((emp) => (
                     <option key={emp.id} value={emp.id}>{emp.name}</option>
                   ))}
@@ -1443,24 +1450,24 @@ export default function AdminHrView({
               </div>
     
               <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Rating (1 to 5 Stars)</label>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">{t.performance.ratingLabel}</label>
                 <select
                   value={newReviewRating}
                   onChange={(e) => setNewReviewRating(Number(e.target.value))}
                   className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
                 >
-                  <option value={5}>5 Stars (Excellent)</option>
-                  <option value={4}>4 Stars (Good)</option>
-                  <option value={3}>3 Stars (Satisfactory)</option>
-                  <option value={2}>2 Stars (Needs Improvement)</option>
-                  <option value={1}>1 Star (Poor)</option>
+                  <option value={5}>{t.performance.rating5}</option>
+                  <option value={4}>{t.performance.rating4}</option>
+                  <option value={3}>{t.performance.rating3}</option>
+                  <option value={2}>{t.performance.rating2}</option>
+                  <option value={1}>{t.performance.rating1}</option>
                 </select>
               </div>
     
               <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Comments</label>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">{t.performance.comments}</label>
                 <textarea
-                  placeholder="Review comments and feedback..."
+                  placeholder={t.performance.commentsPlaceholder}
                   value={newReviewComments}
                   onChange={(e) => setNewReviewComments(e.target.value)}
                   className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none h-24 resize-none"
@@ -1469,9 +1476,9 @@ export default function AdminHrView({
               </div>
     
               <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Goals &amp; Next Steps</label>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">{t.performance.goalsLabel}</label>
                 <textarea
-                  placeholder="What goals should they work towards next?"
+                  placeholder={t.performance.goalsPlaceholder}
                   value={newReviewGoals}
                   onChange={(e) => setNewReviewGoals(e.target.value)}
                   className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none h-20 resize-none"
@@ -1482,7 +1489,7 @@ export default function AdminHrView({
                 type="submit"
                 className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
               >
-                Submit Performance Review
+                {t.performance.submit}
               </button>
             </form>
           </div>
@@ -1494,28 +1501,28 @@ export default function AdminHrView({
         <div className="space-y-6">
           <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
             <div className="p-6 border-b border-[#414E36]/10">
-              <h3 className="text-lg font-bold text-[#1F251A]">Daily Attendance Log</h3>
-              <p className="mt-1 text-xs text-[#5A6A51]">Attendance is recorded automatically on first login each day via GPS proximity check.</p>
+              <h3 className="text-lg font-bold text-[#1F251A]">{t.attendance.heading}</h3>
+              <p className="mt-1 text-xs text-[#5A6A51]">{t.attendance.subtitle}</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left text-sm">
                 <thead>
                   <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
-                    <th className="px-6 py-4">Employee</th>
-                    <th className="px-6 py-4">Date</th>
-                    <th className="px-6 py-4">Shift</th>
-                    <th className="px-6 py-4">Check-in Time</th>
-                    <th className="px-6 py-4">Check-out Time</th>
-                    <th className="px-6 py-4">On Leave</th>
-                    <th className="px-6 py-4">Location (GPS)</th>
-                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">{t.attendance.employee}</th>
+                    <th className="px-6 py-4">{t.attendance.date}</th>
+                    <th className="px-6 py-4">{t.attendance.shift}</th>
+                    <th className="px-6 py-4">{t.attendance.checkInTime}</th>
+                    <th className="px-6 py-4">{t.attendance.checkOutTime}</th>
+                    <th className="px-6 py-4">{t.attendance.onLeave}</th>
+                    <th className="px-6 py-4">{t.attendance.locationGps}</th>
+                    <th className="px-6 py-4">{t.attendance.status}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#414E36]/5">
                   {loadingAttendance ? (
-                    <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51]">Loading attendance records…</td></tr>
+                    <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51]">{t.attendance.loadingRecords}</td></tr>
                   ) : attendanceList.length === 0 ? (
-                    <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">No attendance records found. Records appear after employees log in each day.</td></tr>
+                    <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">{t.attendance.noRecords}</td></tr>
                   ) : (
                     attendanceList.map((rec: any) => (
                       <tr key={rec.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
@@ -1530,14 +1537,14 @@ export default function AdminHrView({
                               ? "bg-indigo-50 text-indigo-700 border border-indigo-100"
                               : "bg-amber-50 text-amber-700 border border-amber-100"
                           }`}>
-                            {rec.employee_accounts?.shift || "Day"}
+                            {rec.employee_accounts?.shift || t.attendance.dayFallback}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
-                          {rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                          {rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit' }) : "—"}
                         </td>
                         <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
-                          {rec.check_out_time ? new Date(rec.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                          {rec.check_out_time ? new Date(rec.check_out_time).toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit' }) : "—"}
                         </td>
                         <td className="px-6 py-4 text-xs">
                           <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
@@ -1545,7 +1552,7 @@ export default function AdminHrView({
                               ? 'bg-purple-50 text-purple-700 border border-purple-100'
                               : 'text-[#5A6A51]'
                           }`}>
-                            {rec.leave_status || "No"}
+                            {rec.leave_status || t.attendance.noLeave}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-xs text-[#5A6A51]">
@@ -1559,7 +1566,7 @@ export default function AdminHrView({
                             rec.status === 'Late' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
                             'bg-rose-50 text-rose-700 border border-rose-100'
                           }`}>
-                            {rec.status}
+                            {rec.status === 'Present' ? t.attendance.present : rec.status === 'Late' ? t.attendance.late : t.attendance.absent}
                           </span>
                         </td>
                       </tr>
@@ -1573,22 +1580,22 @@ export default function AdminHrView({
           {/* Missing Alerts Log */}
           <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-[#414E36]/10">
-              <h3 className="text-lg font-bold text-[#1F251A]">Inactivity Alerts</h3>
-              <p className="mt-1 text-xs text-[#5A6A51]">Logged when an employee did not confirm presence within 10 seconds of the 30-minute activity check.</p>
+              <h3 className="text-lg font-bold text-[#1F251A]">{t.attendance.inactivityAlerts}</h3>
+              <p className="mt-1 text-xs text-[#5A6A51]">{t.attendance.inactivitySubtitle}</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left text-sm">
                 <thead>
                   <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
-                    <th className="px-6 py-4">Employee</th>
-                    <th className="px-6 py-4">Alert Time</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
+                    <th className="px-6 py-4">{t.attendance.employee}</th>
+                    <th className="px-6 py-4">{t.attendance.alertTime}</th>
+                    <th className="px-6 py-4">{t.attendance.status}</th>
+                    <th className="px-6 py-4 text-right">{t.leaves.actions}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#414E36]/5">
                   {activeMissingAlerts.length === 0 ? (
-                    <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-[#5A6A51] font-medium">No active inactivity alerts at this time.</td></tr>
+                    <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-[#5A6A51] font-medium">{t.attendance.noAlerts}</td></tr>
                   ) : (
                     activeMissingAlerts.map((a: any) => (
                       <tr key={a.id} className="hover:bg-rose-50/30 transition-colors">
@@ -1596,10 +1603,10 @@ export default function AdminHrView({
                           <div className="font-semibold text-[#1F251A]">{a.employee_accounts?.name || "—"}</div>
                           <div className="text-xs text-[#5A6A51]">{a.employee_accounts?.role_name || "—"}</div>
                         </td>
-                        <td className="px-6 py-4 text-xs text-[#1F251A]">{new Date(a.timestamp).toLocaleString()}</td>
+                        <td className="px-6 py-4 text-xs text-[#1F251A]">{new Date(a.timestamp).toLocaleString("en-GB")}</td>
                         <td className="px-6 py-4">
                           <span className="inline-block rounded-xl px-2.5 py-1 text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
-                            Unresolved
+                            {t.attendance.unresolved}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -1617,7 +1624,7 @@ export default function AdminHrView({
                             }}
                             className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition"
                           >
-                            Resolve
+                            {t.attendance.resolve}
                           </button>
                         </td>
                       </tr>
@@ -1635,27 +1642,27 @@ export default function AdminHrView({
           {/* Title & Info */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-4xl font-semibold text-[#1F251A]">Employee Targets</h2>
-              <p className="mt-1 text-xs text-[#8A9A81] font-medium">Home &gt; Employee Targets</p>
+              <h2 className="text-4xl font-semibold text-[#1F251A]">{t.targets.heading}</h2>
+              <p className="mt-1 text-xs text-[#8A9A81] font-medium">{t.targets.breadcrumb}</p>
             </div>
           </div>
     
           <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
             <div className="p-6 border-b border-[#414E36]/10">
-              <h3 className="text-lg font-bold text-[#1F251A]">Targets &amp; Performance</h3>
-              <p className="mt-1 text-xs text-[#5A6A51]">Set monthly target goals and calculate employee progress in real-time based on completed bookings.</p>
+              <h3 className="text-lg font-bold text-[#1F251A]">{t.targets.title}</h3>
+              <p className="mt-1 text-xs text-[#5A6A51]">{t.targets.subtitle}</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left text-sm">
                 <thead>
                   <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
-                    <th className="px-6 py-4">Employee Info</th>
-                    <th className="px-6 py-4">Monthly Target</th>
-                    <th className="px-6 py-4">Target Type</th>
-                    <th className="px-6 py-4">Bonus Target</th>
-                    <th className="px-6 py-4">Achieved (Current Month)</th>
-                    <th className="px-6 py-4">Progress</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
+                    <th className="px-6 py-4">{t.targets.employeeInfo}</th>
+                    <th className="px-6 py-4">{t.targets.monthlyTarget}</th>
+                    <th className="px-6 py-4">{t.targets.targetType}</th>
+                    <th className="px-6 py-4">{t.targets.bonusTarget}</th>
+                    <th className="px-6 py-4">{t.targets.achieved}</th>
+                    <th className="px-6 py-4">{t.targets.progress}</th>
+                    <th className="px-6 py-4 text-right">{t.targets.actions}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#414E36]/5">
@@ -1685,30 +1692,30 @@ export default function AdminHrView({
                       <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
                         <td className="px-6 py-4">
                           <div className="font-semibold text-[#1F251A]">{emp.name}</div>
-                          <div className="text-xs text-[#5A6A51]">{emp.email} • {emp.role_name || "Staff"}</div>
+                          <div className="text-xs text-[#5A6A51]">{emp.email} • {emp.role_name || t.targets.staffFallback}</div>
                         </td>
                         <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
                           {targetAmount > 0 ? (
-                            targetType === "revenue" ? `EGP ${targetAmount.toLocaleString()}` : `${targetAmount} reservations`
-                          ) : "No Target"}
+                            targetType === "revenue" ? `${t.egp} ${targetAmount.toLocaleString("en-GB")}` : `${targetAmount} ${t.targets.reservationsLabel}`
+                          ) : t.targets.noTarget}
                         </td>
                         <td className="px-6 py-4 text-xs font-semibold text-[#1F251A] capitalize">
                           {targetType}
                         </td>
                         <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
                           {bonusVal > 0 ? (
-                            bonusType === "fixed" ? `EGP ${bonusVal.toLocaleString()}` : `${bonusVal}% of salary`
-                          ) : "No Bonus"}
+                            bonusType === "fixed" ? `${t.egp} ${bonusVal.toLocaleString("en-GB")}` : `${bonusVal}% ${t.targets.ofSalary}`
+                          ) : t.targets.noBonus}
                         </td>
                         <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
-                          {targetType === "revenue" ? `EGP ${achievedRevenue.toLocaleString()}` : `${achievedCount} reservations`}
+                          {targetType === "revenue" ? `${t.egp} ${achievedRevenue.toLocaleString("en-GB")}` : `${achievedCount} ${t.targets.reservationsLabel}`}
                         </td>
                         <td className="px-6 py-4 text-xs">
                           {targetAmount > 0 ? (
                             <div className="space-y-1 w-44">
                               <div className="flex items-center justify-between font-semibold text-[#5A6A51] text-[10px]">
                                 <span>{progressPercent}%</span>
-                                {hasAchievedTarget && <span className="text-green-700 font-bold">Met ✓</span>}
+                                {hasAchievedTarget && <span className="text-green-700 font-bold">{t.targets.met}</span>}
                               </div>
                               <div className="w-full bg-gray-150 h-2 rounded-full overflow-hidden">
                                 <div 
@@ -1718,7 +1725,7 @@ export default function AdminHrView({
                               </div>
                             </div>
                           ) : (
-                            <span className="text-[#5A6A51] italic text-xs">N/A</span>
+                            <span className="text-[#5A6A51] italic text-xs">{t.targets.na}</span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -1732,7 +1739,7 @@ export default function AdminHrView({
                             }}
                             className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#EDF1EC] transition shadow-xs"
                           >
-                            Edit Target
+                            {t.targets.editTarget}
                           </button>
                         </td>
                       </tr>
@@ -1746,11 +1753,11 @@ export default function AdminHrView({
       )}
     </div>
     {editingTargetEmployee && (
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" dir={lang === "ar" ? "rtl" : "ltr"}>
         <div className="w-full max-w-md rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
           <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Set Monthly Target</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">{t.editTargetModal.title}</p>
               <h3 className="text-xl font-bold text-[#1F251A] mt-1">{editingTargetEmployee.name}</h3>
             </div>
             <button
@@ -1779,22 +1786,22 @@ export default function AdminHrView({
                   })
                 });
                 if (res.ok) {
-                  alert("Employee target updated successfully!");
+                  alert(t.editTargetModal.updateSuccess);
                   setEditingTargetEmployee(null);
                   clearFetchCache();
                   await fetchRolesAndEmployees();
                 } else {
                   const err = await res.json();
-                  alert(err.error || "Failed to update target");
+                  alert(err.error || t.editTargetModal.updateFailed);
                 }
               } catch (err) {
-                alert("Error updating target");
+                alert(t.editTargetModal.updateError);
               }
             }}
             className="space-y-4"
           >
             <div>
-              <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Target Type</label>
+              <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">{t.editTargetModal.targetTypeLabel}</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -1805,7 +1812,7 @@ export default function AdminHrView({
                       : "bg-white text-[#5A6A51] border-[#414E36]/15 hover:bg-[#EDF1EC]"
                   }`}
                 >
-                  Reservations
+                  {t.editTargetModal.reservations}
                 </button>
                 <button
                   type="button"
@@ -1816,14 +1823,14 @@ export default function AdminHrView({
                       : "bg-white text-[#5A6A51] border-[#414E36]/15 hover:bg-[#EDF1EC]"
                   }`}
                 >
-                  Revenue (EGP)
+                  {t.editTargetModal.revenue}
                 </button>
               </div>
             </div>
     
             <div>
               <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">
-                {targetTypeInput === "revenue" ? "Required Monthly Revenue (EGP)" : "Required Monthly Target (Reservations)"}
+                {targetTypeInput === "revenue" ? t.editTargetModal.revenueLabel : t.editTargetModal.reservationsLabel}
               </label>
               <input
                 type="number"
@@ -1836,7 +1843,7 @@ export default function AdminHrView({
             </div>
     
             <div>
-              <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Bonus Type</label>
+              <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">{t.editTargetModal.bonusTypeLabel}</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -1847,7 +1854,7 @@ export default function AdminHrView({
                       : "bg-white text-[#5A6A51] border-[#414E36]/15 hover:bg-[#EDF1EC]"
                   }`}
                 >
-                  Percentage (%)
+                  {t.editTargetModal.percentage}
                 </button>
                 <button
                   type="button"
@@ -1858,14 +1865,14 @@ export default function AdminHrView({
                       : "bg-white text-[#5A6A51] border-[#414E36]/15 hover:bg-[#EDF1EC]"
                   }`}
                 >
-                  Fixed Amount (EGP)
+                  {t.editTargetModal.fixedAmount}
                 </button>
               </div>
             </div>
     
             <div>
               <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">
-                {bonusTypeInput === "fixed" ? "Performance Bonus (EGP)" : "Performance Bonus (% of Basic Salary)"}
+                {bonusTypeInput === "fixed" ? t.editTargetModal.bonusFixedLabel : t.editTargetModal.bonusPercentageLabel}
               </label>
               <input
                 type="number"
@@ -1883,13 +1890,13 @@ export default function AdminHrView({
                 onClick={() => setEditingTargetEmployee(null)}
                 className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
               >
-                Cancel
+                {t.editTargetModal.cancel}
               </button>
               <button
                 type="submit"
                 className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
               >
-                Save Target
+                {t.editTargetModal.save}
               </button>
             </div>
           </form>
