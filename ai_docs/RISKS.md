@@ -15,7 +15,7 @@
 
 ## Status summary
 
-**13 open** · **12 partially resolved** · **45 resolved** · 70 tracked total.
+**13 open** · **12 partially resolved** · **46 resolved** · 71 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -1101,6 +1101,7 @@ cannot reproduce for new sessions again.
 - [RISK-066](#risk-066) — System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate (RESOLVED)
 - [RISK-067](#risk-067) — `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data (RESOLVED)
 - [RISK-069](#risk-069) — Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees (RESOLVED)
+- [RISK-074](#risk-074) — `page.tsx` Had 95 Lines Of UTF-8/Windows-1252 Mojibake-Corrupted Arabic Content (RESOLVED)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -3010,6 +3011,48 @@ superadmin) is now a passing `it`; added a matching case for admin → admin (al
 new case proving an admin CAN reassign a target to an ordinary operational role (`manager`) — the
 boundary the first implementation had wrongly closed. 8 passed, 1 unrelated expected-fail
 (`POST /api/roles` permission-key gap).
+
+---
+
+## RISK-074: `page.tsx` Had 95 Lines Of UTF-8/Windows-1252 Mojibake-Corrupted Arabic Content (RESOLVED)
+
+**Severity:** High · **Type:** Data integrity / i18n
+**Found:** 2026-08-23, Mohamed reported garbled text visible in Service Hours and the admin
+sidebar's language switcher. **Status:** Resolved 2026-08-23 (source code only — see open item below).
+
+**What it was:** 95 lines across `src/app/admin/page.tsx` contained Arabic text that had been
+UTF-8-encoded, then mis-decoded as Windows-1252, then re-saved as UTF-8 — the classic mojibake
+pattern (`"الأحد"` stored as `"Ø§Ù„Ø£Ø­Ø¯"`). Traced to commit `958d64a` (2026-07-22) via `git log -S` —
+**predates every brief in this session**, not something introduced by recent work. Affected:
+Home hero slide Arabic defaults (`DEFAULT_HERO_SLIDES_AR`), both Service Hours day-name state
+clusters (`dayAr` fields, matching Brief 26's earlier finding about non-contiguous state), the
+Notification Settings SMS template default, About page FAQ/WhyChooseUs/HowItWorks Arabic defaults,
+the WhatsApp/print prescription message template (including emoji and box-drawing characters), the
+admin sidebar's "العربية" language-switcher label, and several inline bilingual labels in the
+checkout/invoice UI (`Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø³ØªØ­Ù‚` etc). Grepped the rest of `src/` for the same corruption
+signature — found nowhere else; isolated entirely to this one file.
+
+**Root-caused, not guessed:** confirmed via Node's WHATWG-compliant `TextDecoder('windows-1252')`
+that the corruption is real Windows-1252 (not plain Latin-1/ISO-8859-1 as a first attempt assumed —
+that reversal lost data on bytes in the 0x80–0x9F range, e.g. every Arabic ف). Built a verified
+byte-level reversal (decode all 256 byte values via `TextDecoder` once to build a codepoint→byte
+table, then re-encode each corrupted string through it and UTF-8-decode the result) and tested it
+against known-good pairs (`"Ø§Ù„Ø£Ø­Ø¯"` → `"الأحد"`, emoji-containing strings, Arabic-numeral FAQ
+questions) before touching the real file.
+
+**Fix:** ran the verified reversal across all 95 flagged lines, diffed the full result before
+writing — every change was a pure content fix (corrupted string → correct string), zero structural
+changes. `tsc`/`eslint`/`vitest` all clean afterward (631 passing, unchanged).
+
+**Not done — open follow-up, needs a decision:** several of the corrupted defaults (Service Hours
+day names, the Home hero slides, About page FAQ/WhyChooseUs content, the Notification SMS template)
+are `useState` **fallback** values only used when `GET /api/page-settings` / a branch's
+`service_hours` returns no data — `GET /api/page-settings` seeds `DEFAULT_SETTINGS.home` into
+Supabase the first time the table is empty. **If that seed already ran against a database using the
+old corrupted defaults, the corruption is now sitting in live data too, and this source fix won't
+retroactively correct it** — only new/empty rows going forward benefit. Whether the dev/prod
+Supabase `page_settings` and `branches.service_hours` rows already contain corrupted Arabic text
+was not checked as part of this fix (would need a live DB read, a separate, explicit step).
 
 ---
 
