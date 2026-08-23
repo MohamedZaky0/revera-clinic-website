@@ -132,3 +132,23 @@ cmd /c "node_modules\.bin\vitest run"
 - Both HR spans (main block + detached Edit Target modal) moved into a single component.
 - Build/TS/lint/tests verified.
 - Core browser paths verified; remaining interactive API calls require normal manual QA but are not blocked by the extraction.
+
+---
+
+## Independent re-verification — 2026-08-22 (Mohamed's session)
+
+Re-run rather than trusted, per standing project rule.
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` (whole project) | PASS — 0 errors |
+| `npx vitest run` (full suite) | PASS — 618 passed / 9 expected fail, unchanged from the pre-extraction baseline |
+| Both spans moved | PASS — `page.tsx` retains only the `editingTargetEmployee` state declaration (`:954`) and the prop pass (`:10345`); the modal JSX itself is gone from `page.tsx` and present in `AdminHrView.tsx` |
+| The two adjacent modals that must NOT move | PASS — `presenceModalOpen` / `locationWarningOpen` still in `page.tsx` (8 refs), untouched |
+| Permission gate | PASS — still exactly `activeNav === "HR"` at `page.tsx:10296` with no role check, and **zero** `hasPermission`/`adminRole` occurrences inside `AdminHrView.tsx` — the looser-than-Employees gate was preserved, not "fixed" |
+| Known Payroll filter bug preserved, not silently fixed | PASS — `AdminHrView.tsx:338-339` are still the two identical conditions, exactly as the brief instructed |
+| Browser: HR loads, all 7 sub-tabs present | PASS — overview / payroll / Doctor Payroll / leaves / performance / attendance / Targets |
+| Browser: **detached Edit Target modal** (highest-risk item) | PASS — Targets tab → Edit Target opens the modal with its inputs bound; this is the one thing that would have broken had the two spans been extracted independently |
+| Console errors | 3 unrelated pre-existing 401s (`fetchCustomers`/`fetchRequests`/`fetchAllReservations`), identical to those seen during Brief 21 verification; nothing HR-specific |
+
+**Verdict: PASS. Archived. Unblocks Brief 24 (HR translation).**
