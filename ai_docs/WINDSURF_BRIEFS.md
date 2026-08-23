@@ -10,7 +10,54 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 29 — Public site: `<html dir>` is never set server-side, so Arabic always flashes LTR first (Navbar included)
+_(none currently active)_
+
+---
+---
+
+# QUEUED BRIEFS
+
+_(none currently queued — translation of the Pages Settings tabs extracted in Brief 27 is the
+obvious next brief, not yet written)_
+
+---
+---
+
+# ARCHIVE — completed briefs
+
+Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
+(RISK-038 … RISK-050), which is the authoritative account.
+
+### Brief 29 — Public site: fix LTR flash on Arabic via server-side `<html dir>` (completed 2026-08-23)
+
+Landed in one commit (`9420b1b`), exactly the fix path specified: `LanguageContext.tsx` now writes
+a `cr-language` cookie alongside the existing `localStorage` write; `layout.tsx` became an `async`
+Server Component that reads that cookie via `cookies()` and renders `<html lang dir>`/`<body
+className>` from it, replacing the hardcoded `lang="en"`. Independently re-verified: `tsc`/`eslint`
+clean, `vitest` unaffected (631 passing), production build succeeds.
+
+**Real, disclosed architectural tradeoff — worth flagging to Mohamed, not a defect:** calling
+`cookies()` inside `layout.tsx` opts the entire route into per-request dynamic rendering. Confirmed
+directly in the build output: `/`, `/about`, `/services`, `/contact`, `/book`, and `/profile` all
+now show `ƒ` (dynamic, server-rendered on demand) where they would previously have been `○`
+(static, prerendered). This is inherent to any real fix for a per-visitor-cookie-driven `dir`
+attribute — there is no way to vary static HTML per request without either dynamic rendering or a
+more fragile middleware HTML rewrite — so this isn't a implementation shortcoming, it's the actual
+cost of the fix. On Vercel this trades CDN-edge-cached static delivery for a server function
+invocation on every public-page view. Given this is a clinic marketing site (not high-traffic
+e-commerce), likely an acceptable tradeoff, but it's a real hosting-cost/performance change that
+should be a conscious decision, not a silent side effect — flag for Mohamed to confirm/log in
+`DECISIONS.md` if accepted.
+
+**Not yet done:** the 4 hardcoded Arabic/English ternaries in `Navbar.tsx` (430, 459, 741, 767)
+flagged as a low-priority cleanup nit — untouched, as expected (brief said don't block on it).
+
+**Still not live-verified** — the dev environment's port 3000 conflict with an unrelated Docker
+Chatwoot container was still present at review time; the CSS-mirroring reasoning (`flex-row` under
+inherited `direction: rtl`) was independently re-confirmed by reading `globals.css` again but not
+visually confirmed in a running browser.
+
+### Brief 29 body (original ask, for reference)
 
 **Scope: the public marketing site (`src/components/Navbar.tsx`, `src/contexts/LanguageContext.tsx`,
 `src/app/layout.tsx`) — not the admin panel.** Mohamed reported the Navbar doesn't visually go RTL
@@ -77,23 +124,6 @@ consistency nit, not a functional bug — output is already correct in both lang
 the shared translation object.
 
 ---
----
-
----
----
-
-# QUEUED BRIEFS
-
-_(none currently queued — translation of the Pages Settings tabs extracted in Brief 27 is the
-obvious next brief, not yet written)_
-
----
----
-
-# ARCHIVE — completed briefs
-
-Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
-(RISK-038 … RISK-050), which is the authoritative account.
 
 ### Brief 28 — Reception scope completion: translate `ReceptionDashboardView` + `UserProfileView` (completed 2026-08-23)
 
