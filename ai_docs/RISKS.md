@@ -15,7 +15,7 @@
 
 ## Status summary
 
-**13 open** · **12 partially resolved** · **46 resolved** · 71 tracked total.
+**12 open** · **13 partially resolved** · **46 resolved** · 71 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -24,7 +24,6 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 
 - [RISK-001](#risk-001) — Duplication Friction (hardcoded Revera-specific values)
 - [RISK-005](#risk-005) — Single 550KB Admin Page File
-- [RISK-010](#risk-010) — No Gross Price Is Ever Persisted On A Reservation
 - [RISK-016](#risk-016) — Two Conflicting Definitions Of "Revenue" Already Exist
 - [RISK-020](#risk-020) — Migrations Are Not Tracked As Applied, And Two Databases Have Diverged
 - [RISK-053](#risk-053) — New Cairo Branch's Working Hours Were Never Actually Configured
@@ -146,26 +145,6 @@ panel (`activeNav === "Finances Dashboard"`), which has no reachable sidebar tri
 `financesExpanded` state that would expand it is never wired to a nav item). This is unrelated
 to the disabled `Finance` sidebar stub added in DEC-011 (`comingSoon: true`, superadmin-only,
 no page behind it at all). Do not conflate the two when working on either.
-
----
-
-## RISK-010: No Gross Price Is Ever Persisted On A Reservation
-
-**Severity:** Critical · **Type:** Data integrity / Financial correctness
-**Found:** 2026-07-25 (finance discovery audit)
-
-`reservations` has only `amount_paid` and `amount_left` — there is no price, subtotal, total,
-discount, tax, or payment-method column (`supabase/migrations/20260705141242_full_migration.sql:214-238`).
-The invoice total is recomputed from the **live** services catalog on every render
-(`src/app/admin/page.tsx:26997`, `src/lib/printUtils.ts:21`), and `totalCost` is never sent to the
-server (`src/app/admin/page.tsx:27019-27025`).
-
-**Consequence:** editing a service price rewrites the total of every historical invoice.
-Reprinting a receipt from last month can produce a different number than the patient paid.
-Any revenue report built on this is not reproducible.
-
-**Mitigation:** PROPOSAL-002 Phase 1 — snapshot price/discount/COGS/commission onto immutable
-`invoices` + `invoice_lines` at issue time.
 
 ---
 
@@ -520,6 +499,7 @@ handlers, matching the Deposit/Inactivity pattern.
 - [RISK-002](#risk-002) — Admin Auth Is Client-Side Only (Partially Resolved)
 - [RISK-006](#risk-006) — GPS-Based Attendance Can Be Spoofed
 - [RISK-007](#risk-007) — Client-Side PDF Invoice Printing Is Browser-Dependent
+- [RISK-010](#risk-010) — No Gross Price Is Ever Persisted On A Reservation (Partially Resolved)
 - [RISK-012](#risk-012) — Patient Debt Only Ever Grows
 - [RISK-015](#risk-015) — Doctor Cost Attribution Depends On A Name String
 - [RISK-019](#risk-019) — RLS Coverage
@@ -595,6 +575,44 @@ Invoice printing now uses the shared `src/lib/printUtils.ts` utility with a stan
 
 **Remaining mitigation:**
 - Use a server-side PDF library (e.g., Puppeteer, react-pdf) if downloadable, identical PDF output is required.
+
+---
+
+## RISK-010: No Gross Price Is Ever Persisted On A Reservation (Partially Resolved)
+
+**Severity:** Critical (was) → Medium (the specific gap that remains) · **Type:** Data integrity /
+Financial correctness
+**Found:** 2026-07-25 (finance discovery audit). **Status updated 2026-08-24** — this entry had
+gone stale; PROPOSAL-002's Phases 0–4B are all `DONE` per `FINANCE_TRACKER.md`, contradicting the
+"Mitigation: [not started]" framing this entry carried until now.
+
+**Original problem:** `reservations` only ever had `amount_paid`/`amount_left` — no persisted
+price, subtotal, discount, or line-item breakdown. Every invoice was recomputed live from the
+**current** services catalog on every render, so editing a service's price silently rewrote the
+total of every historical invoice.
+
+**What's actually fixed:** immutable `invoices` + `invoice_lines` + `payments` tables exist and are
+correctly dual-written at the moment of issue — booking checkout (`PATCH /api/reservations`,
+`status: 'completed'`, task 1.10, commit `aed3793`) and POS product sales (task 1.11, commit
+`58fe1dc`) both now snapshot price/discount/COGS/commission at that instant, verified live. A full
+real reporting suite reads from this ledger: P&L, service/doctor/branch margins, cash flow,
+receivables aging, budget vs actual, package profitability, no-show cost, commission payouts — all
+`DONE`, all real endpoints (`GET /api/finance/*`), not mock (Phase 4/4B, `FINANCE_TRACKER.md:3290`
+onward). Purchases, suppliers, expenses (including rent as a recurring fixed expense), fixed
+assets/depreciation, and loans/amortization are also real, CRUD-complete, and wired to real UI
+screens (`src/components/admin/Finance/{Expenses,Assets,Loans}Screen.tsx` — confirmed by grep, they
+call `/api/expenses`, `/api/assets`, `/api/loans`, not hardcoded arrays).
+
+**What's still genuinely open — re-verified directly 2026-08-24, not from a doc:** the **Bookings
+screen's own invoice view/print modal** (`src/app/admin/page.tsx`, the `{invoiceBooking && (...)}`
+block, ~line 10905) was never cut over — it still looks up each service by ID against the **live**
+`localServices` catalog and calls `getEffectiveServicePrice()` fresh, exactly the original bug,
+completely independent of the now-correct `invoice_lines` data sitting in the database for that
+same booking. **Reprinting an old booking's invoice from this specific screen can still show a
+different price than what was actually charged**, even though the correct historical number is
+now captured and available in `invoice_lines` — this modal just isn't reading it. The fix is
+narrow: point this modal's price lookup at the invoice's own `invoice_lines` rows (via
+`reservation_id`) instead of re-deriving from the live catalog.
 
 ---
 
