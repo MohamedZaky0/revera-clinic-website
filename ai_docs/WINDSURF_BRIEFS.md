@@ -162,6 +162,212 @@ if the two spans were extracted independently instead of together).
 ---
 ---
 
+# QUEUED BRIEFS
+
+## Brief 23 — Phase 2: translate `AdminEmployeesView.tsx` to Arabic
+
+**Prerequisite: none blocking** — Brief 21 already landed and was verified. This is the Phase 2
+pass over the file it created (`src/components/admin/employees/AdminEmployeesView.tsx`, 3,086
+lines). Re-measure every line number below before starting; they were captured 2026-08-22.
+
+**Wiring — copy the pattern already used three times, exactly.** The component currently takes 24
+props and none of them are `lang`/`t`/`dir` (`AdminEmployeesViewProps`, lines 51–94), and its call
+site (`page.tsx:10246-10286`) passes none. Add `lang: "en" | "ar"` and
+`t: typeof adminTranslations["en"]["employees"]` to the props, and pass `lang={lang}`
+`t={adminTranslations[lang].employees}` at the call site — identical to how `AdminInventoryView`
+does it (`AdminInventoryView.tsx:32-33,57` and its call site at `page.tsx:10236-10237`).
+`adminTranslations` lives in **`src/components/admin/translations.ts`** (2,154 lines), NOT
+`src/lib/translations.ts` — that's a different file for the public site. Add a new 6th top-level
+namespace `employees` mirrored under both `en` and `ar` (existing five: `patients`, `bookings`,
+`doctors`, `services`, `inventory`). Nest sub-objects the way `doctors` does (`adminDoctorsView` +
+`providerFormFields`).
+
+**`dir` — the component root is `AdminEmployeesView.tsx:862`**,
+`<div className="space-y-6 animate-fadeIn">` — the same className `AdminInventoryView` uses, so
+apply `dir={lang === "ar" ? "rtl" : "ltr"}` there identically. **The file currently has ZERO `dir=`
+attributes anywhere**, and unlike Services it has no bilingual-content input (no Arabic
+name/description pair), so there is nothing here to confuse with the language toggle — after this
+brief there should be exactly one `dir` in the file.
+
+**Scale — the grep floor is 174, and the floor badly understates this one.** `grep '>[A-Z][a-z]'`
+= 174, plus 11 `placeholder=`, 8 `title=`, and 7 native `alert()`/`confirm()` calls (lines 506,
+1214, 1306, 2347, 2873, 2882, 2931 — native dialogs still render text and still need `t.*`).
+Rough distribution: list/table + filters ~15 (862–1186); Add/Edit form ~36 across basic fields
+(1187–1470), the Doctor & Medical Configuration panel (1470–1784), non-doctor shift/target fields
+(1785–1852), and address/national-ID/contract upload (1852–2226); the 7-tab profile view ~72
+(2227–3083, the single biggest chunk).
+
+**Two non-JSX string builders that the floor misses entirely — these need an explicit scope
+decision, do not silently skip them:**
+- `handlePrintEmployeeProfile` (503–860, ~357 lines) builds a whole HTML document as a string for
+  `window.open` printing — roughly **49** label/heading strings, and it re-derives department,
+  shift and status independently rather than reusing the JSX's values, so it reproduces the same
+  value/label bugs a second time. It also hardcodes `"Revera Clinic"` as letterhead at line 646,
+  which is a pre-existing CLAUDE.md rule-2 violation — **flag it, do not fix it here.**
+- `handleExportAttendanceInsights` (436–463) builds a CSV with hardcoded English column headers
+  (440–452) and hardcoded fallback cell values `'Day'`/`'Present'`/`'09:00 AM'`.
+Neither receives `lang` today. **Decide deliberately**: either thread `lang`/`t` into both (a
+printed profile and an exported CSV arguably *should* follow the UI language), or leave both
+English-only on purpose. Either is defensible; silently translating the JSX and leaving these two
+in English is not, because a user in Arabic mode would print an English profile with no warning.
+
+**Value/label separation — the recurring bug class, and this file has the most subtle version yet.**
+- **Department and Role are DB-driven open sets, not fixed enums.** `departmentsList` and
+  `rolesList` are props populated from admin-managed database rows. They are rendered as both
+  `value` and label (department filter 942–944, form select 1452; role select 1416–1419), while
+  logic elsewhere does substring matching on them: `.toLowerCase().includes("doc")` at 1221, 1471,
+  1786 (department), and 1409, 1445–1446 (role). **You cannot map these through a static `t.*`
+  table** the way Doctors' Gender was mapped — an admin can create any department name. Do what
+  Brief 20's `categoryLabel()` did: a small helper that translates the known fixed literals used
+  as fallbacks (`"Reception"` at 1048, `"Doctors"`) and passes any unrecognised DB value through
+  unchanged. **Every `.includes("doc")` comparison must keep comparing against the raw English
+  value, never a translated one** — translate the label at the render site only.
+- **`emp.shift` free-text substring matching**: filter logic at 990–1002 tests `.includes("day")`,
+  `.includes("am")`, `.includes("night")`, `.includes("pm")`; badge colour at 1057 tests
+  `.includes("night")`/`.includes("pm")`; raw display at 1058, 2501, and 706 (print). Same rule —
+  label only.
+- **A fourth instance Brief 21 did not flag**, because it's an exact-match ternary rather than
+  substring: `emp.shift === "Night" ? "General Night Shift" : "General Day Shift"` and its
+  associated time-range strings at 710, 718, 722, 788, 792 (print) and 2506, 2512, 2518 (profile
+  Work tab). The comparison side is safe (exact match on canonical `"Night"`), but the displayed
+  strings are hardcoded English needing `t.*`.
+- **Employee status is SAFE — confirmed, do not "fix" it.** `email_confirmed_at ? "Active" :
+  "Invited"` (1066) / `"Pending Invitation"` (2289, 2456, 683) is purely derived from a boolean
+  and never appears on the left of a `===` anywhere in the file. Translate each occurrence freely.
+  Note the pre-existing copy inconsistency: the table says "Invited", everywhere else says
+  "Pending Invitation" — pick one Arabic phrase for both and note the choice.
+- **Target type / bonus type are NOT in this file** despite living nearby conceptually — no
+  `"reservations"`/`"revenue"` or `"percentage"`/`"fixed"` toggle exists here. The Target &
+  Performance tab (2572–2652) hardcodes a single model. Don't go looking for them.
+- **A positive example to preserve, not change**: the shift filter at 951–953 already does this
+  correctly — `value="Day"` stays canonical while the visible text reads "Day Shift". Keep that
+  shape.
+- **A limitation to document rather than close**: `check.gender` / `check.governorate` /
+  `check.birthDate` are rendered raw at 2962–2967 and in the national-ID success block (1975+),
+  but they come from `parseEgyptianNationalId`, a prop function defined in `page.tsx` and therefore
+  out of this single-file brief's scope. Wrap what you can at the display site and note that the
+  source function still returns English.
+
+**Dates and numbers — this file has the widest exposure to the unpinned-locale bug so far.** 4
+calls are correctly pinned to `en-US` (511, 847, 2463, 2868). **11 are unpinned** and will silently
+follow the browser's locale — and critically, **9 of those 11 are `toLocaleString()` on numbers,
+not dates**: 726, 730, 757, 769 (print), 1062 (table salary), 2542, 2547 (profile payroll), 2627
+(bonus), plus `toLocaleTimeString()` with no locale at 450–451 (CSV) and the `[]` empty-locale form
+at 2781–2782 (attendance times — `[]` is the same bug; only the options are pinned, not the
+locale). In Arabic these render Arabic-Indic digits and different separators. Pin every one.
+**Match this file's own existing convention (`en-US`, all 4 pinned calls) rather than Brief 18's
+`en-GB`** — the wider tree is split ~28 `en-GB` / ~22 `en-US` with no dominant convention, so
+internal consistency wins here; state the choice explicitly in the PR.
+
+**Day names — a real duplicate that Brief 21 deliberately did not merge.** The weekly shift grid
+at 1628–1738 renders `{day}` raw at **line 1645** with no lookup at all — invisible to
+`grep '>[A-Z][a-z]'` because it's an interpolated expression, exactly the bug Brief 18 found in
+Doctors. `ProviderFormFields.tsx` already has a `dayNames` lookup
+(`translations.ts:573-582` en / `1649-1658` ar under `doctors.providerFormFields`). Because Brief
+21 explicitly did NOT deduplicate these two implementations, **give Employees its own `dayNames`
+block** under the new `employees` namespace, mirroring that shape exactly (7 canonical English keys
+`Sunday`…`Saturday`). Do not import the Doctors one across namespaces.
+
+**The overlap-warning messages are the largest single piece of new translation work here, and
+Brief 18 did NOT already solve this elsewhere.** Correcting a common assumption:
+`checkShiftOverlaps` exists only in this file (`grep -rln` across `src/components/admin/` returns
+one hit) — `ProviderFormFields.tsx` has the grid UI but **no overlap checker and no warning banner
+at all**. The function (282–397) builds complete English sentences with interpolated values:
+line 336 `Invalid shift duration on ${day} at ${bName} (In-Clinic): End time (${s.end}) must be
+after start time (${s.start}).`, line 364, and line 389 `Shift Overlap Detected on ${day}: ...
+overlaps with ...`. These must become parameterised translated strings (template functions on `t`,
+not static labels). The `"In-Clinic"` / `"Online Consultations"` type labels baked into those
+messages (310, 342, 370) are the same literals as the tab toggle (1607, 1618) — they must resolve
+to the same translated label in both places. The banner header `⚠️ Shift Overlap Warning:` (1756)
+is a simple string on top of that.
+
+**Do NOT touch the permission gate.** Confirmed post-extraction: the component contains zero
+`hasPermission`/`canManage`/`adminRole` calls. Its only four hits on those terms (956, 985–986,
+1025, 2343) are data filtering that hides the synthetic `superadmin` system row from the list and
+its Revoke button — not permission logic. The real gate is `adminRole === "superadmin"` at
+`page.tsx:10246`. Leave both alone.
+
+**Key parity:** there is no committed parity test or script — Briefs 18/19 counted by hand,
+Brief 20 relied on structural typing. Use the structural-typing proof as the primary guarantee
+(typing the prop as `typeof adminTranslations["en"]["employees"]` makes any en/ar mismatch a `tsc`
+error at the call site) and report a manual count alongside, as the previous three briefs did.
+
+**Method / exit criteria:** identical to every prior Phase 2 brief. `tsc`/`eslint` clean, `vitest`
+unchanged, no hardcoded English left in JSX (sweep interpolated expressions by reading, not only
+by grep), RTL logical properties (`text-start`/`ps-`/`me-`) instead of physical ones in every
+changed line. Manual test checklist per CLAUDE.md covering both languages: list/filters, add and
+edit employee (including the doctor sub-panel, the weekly grid day names, and a deliberately
+overlapping shift to see the warning text), all 7 profile tabs, notes, and whichever decision you
+made about the print/CSV outputs.
+
+---
+
+## Brief 24 — Phase 2: translate `AdminHrView.tsx` to Arabic
+
+**Prerequisite: Brief 22 must be verified first** (it landed as `c7fb113` but had not been
+independently verified when this was written). Re-measure all line numbers before starting.
+
+**Target:** `src/components/admin/hr/AdminHrView.tsx`, 1,901 lines. Same wiring as Brief 23 — add
+`lang` + `t: typeof adminTranslations["en"]["hr"]` to `AdminHrViewProps` (currently no `lang`/`t`/
+`dir` anywhere) and pass them from the call site in `page.tsx`. Add an `hr` namespace to
+`translations.ts` mirrored under `en` and `ar`.
+
+**`dir` — READ THIS BEFORE WRITING ANY JSX. This component does not have a single root.** It
+returns a Fragment (`return ( <> ...` at line 180–181) wrapping **two siblings**: the main
+`<div className="space-y-6 animate-fadeIn">` (182–1747) and the detached Edit Target modal
+`{editingTargetEmployee && (...)}` (1748–1898). A Fragment cannot carry `dir`. **Both siblings need
+their own `dir={lang === "ar" ? "rtl" : "ltr"}`.** Putting it only on the main div — the obvious
+thing to do, and what every previous single-root brief did — leaves the Edit Target modal rendering
+left-to-right in Arabic. This is the single most likely mistake in this brief.
+
+**Dates and numbers — worse than any previous target: all 17 `toLocale*` calls are unpinned, zero
+are pinned.** Breakdown: 10 bare `toLocaleString()`, 5 `toLocaleString(undefined, {...})`
+(explicitly passing `undefined` as the locale is the same bug as passing nothing), and 2
+`toLocaleTimeString([], {...})` (the `[]` form pins the options but not the locale). Since this is
+the payroll screen, these are salary and bonus figures — in Arabic they will render with
+Arabic-Indic digits and different separators. Pin every one. Unlike Brief 23 there is no existing
+in-file convention to match, so use `en-GB` per Brief 18's precedent and state the choice.
+
+**Value/label separation — one genuinely dangerous site here, unlike the mostly-cosmetic ones
+elsewhere.** `statusLabel` in the Payroll tab is **both compared and displayed**: compared at 655,
+657, 662 to choose the badge colour, and rendered raw at 664 (and again at 1009 in Doctor Payroll).
+If you translate the variable itself, the three comparisons silently stop matching and every badge
+renders in the fallback colour — a bug that looks like a styling glitch, not a translation bug, and
+that no type checker will catch. **Derive a separate display label; never reassign `statusLabel`.**
+Other sites, all label-only:
+- Leave status `"Pending"`/`"Approved"`/`"Rejected"` — compared at 227, 1162; displayed raw at 1158.
+- Payroll/Doctor-payroll filter comparisons at 337–339 and 791–792, and `pay.status === "Paid"` at
+  533, 955.
+- Attendance status displayed raw at 1562.
+- Leave type displayed raw at 1146.
+Everything on the left of a `===` stays canonical English.
+
+**Do NOT fix the Payroll status filter bug while you are in there.** Lines 338 and 339 are
+identical conditions (`payrollFilterStatus === "Pending" && status === "Paid"` and
+`... === "Overdue" && status === "Paid"`), so selecting "Overdue" returns exactly the same rows as
+"Pending" — only the badge at 655–662 actually distinguishes them by date. This is a real
+pre-existing bug, already documented in Brief 22, and it is **out of scope for a translation
+brief**. Translating the two filter option labels is in scope; making them behave differently is
+not. Flag it in the PR description.
+
+**Do NOT touch the permission gate.** HR has *no* content-level gate at all — no `hasPermission`,
+no `adminRole` check anywhere in the section (looser than Employees, which at least has
+`adminRole === "superadmin"` at its call site). That is intentional and was preserved verbatim by
+Brief 22; preserve it again. The only gating is sidebar visibility in `page.tsx`.
+
+**Scope by sub-tab** (7 tabs, all inline in this one file — re-measure, these are pre-extraction
+proportions): Overview (workforce directory), Payroll (the largest, with inline bonus/deduction
+editors and a Pay action), Doctor Payroll (same shape, separate data), Leaves (request table +
+submit form), Performance (review timeline + create form), Attendance (daily log + inactivity
+alerts), Targets (per-employee progress table) — plus the detached Edit Target modal.
+
+**Method / exit criteria:** same as Brief 23. Manual test checklist per CLAUDE.md covering all 7
+sub-tabs in both languages, and explicitly including the Edit Target modal in Arabic to confirm the
+second `dir` was applied.
+
+---
+---
+
 # ARCHIVE — completed briefs
 
 Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
