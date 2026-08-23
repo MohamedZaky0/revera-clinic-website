@@ -11358,38 +11358,124 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </div>
 
                     {/* Card B: PRESCRIPTION */}
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
-                      <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
-                        <FileText size={13} className="text-[#0F3826]" />
-                        <span>PRESCRIPTION</span>
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2.5 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
+                          <FileText size={13} className="text-[#0F3826]" />
+                          <span>PRESCRIPTION</span>
+                        </div>
+                        {drawerPrescriptions.length > 0 && (
+                          <span className="text-[10px] font-bold text-[#5A6A51] bg-gray-100 px-2 py-0.5 rounded-full">
+                            {drawerPrescriptions[0].date ? new Date(drawerPrescriptions[0].date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "Recorded"}
+                          </span>
+                        )}
                       </div>
 
-                      {drawerPrescriptions.length > 0 ? (
-                        <div className="space-y-2 pt-1">
-                          <p className="font-black text-xs text-[#1F251A]">
-                            {drawerPrescriptions[0].diagnosis ? `Diagnosis: ${drawerPrescriptions[0].diagnosis}` : "Recorded Prescription"}
-                          </p>
-                          <div className="flex items-center gap-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => handleSendPrescriptionWhatsApp(drawerPrescriptions[0], viewingBooking)}
-                              className="rounded-lg bg-[#25D366] text-white px-2.5 py-1 text-[11px] font-bold flex items-center gap-1"
-                            >
-                              WhatsApp
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => printPrescription(drawerPrescriptions[0], viewingBooking)}
-                              className="rounded-lg bg-[#0F3826] text-white px-2.5 py-1 text-[11px] font-bold flex items-center gap-1"
-                            >
-                              Print
-                            </button>
+                      {drawerPrescriptions.length > 0 ? (() => {
+                        const rx = drawerPrescriptions[0];
+                        const medsList: any[] = Array.isArray(rx.medications) && rx.medications.length > 0
+                          ? rx.medications
+                          : (Array.isArray(rx.items) ? rx.items : []);
+                        const rxNotes = rx.general_notes || rx.instructions || rx.doctor_notes || rx.notes;
+
+                        return (
+                          <div className="space-y-2.5">
+                            {/* Diagnosis Box */}
+                            {rx.diagnosis && (
+                              <div className="rounded-xl bg-[#F4F5F1] p-2.5 border border-[#414E36]/10">
+                                <span className="text-[10px] font-extrabold text-[#5A6A51] uppercase tracking-wider block">
+                                  Diagnosis
+                                </span>
+                                <p className="font-bold text-xs text-[#1F251A] mt-0.5">
+                                  {rx.diagnosis}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Itemized Medications */}
+                            {medsList.length > 0 ? (
+                              <div className="space-y-1.5">
+                                <span className="text-[10px] font-extrabold text-[#5A6A51] uppercase tracking-wider block">
+                                  Prescribed Medications ({medsList.length})
+                                </span>
+                                <div className="space-y-1.5 max-h-40 overflow-y-auto pe-1">
+                                  {medsList.map((med: any, mIdx: number) => (
+                                    <div
+                                      key={mIdx}
+                                      className="rounded-xl border border-gray-100 bg-[#FAFAFA] p-2 text-xs space-y-1"
+                                    >
+                                      <div className="flex items-center justify-between gap-1">
+                                        <span className="font-extrabold text-[#1F251A] flex items-center gap-1.5 truncate">
+                                          <span className="h-4 w-4 rounded-full bg-[#0F3826]/10 text-[#0F3826] flex items-center justify-center text-[10px] font-bold shrink-0">
+                                            {mIdx + 1}
+                                          </span>
+                                          <span className="truncate">{med.name || med.medicine_name || med.medicine || "Medication"}</span>
+                                        </span>
+                                        {med.dosage && (
+                                          <span className="text-[10px] font-bold text-[#0F3826] bg-[#EBF7EE] px-1.5 py-0.5 rounded shrink-0">
+                                            {med.dosage}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {(med.frequency || med.duration) && (
+                                        <div className="flex items-center gap-2 text-[11px] text-[#5A6A51] ps-5">
+                                          {med.frequency && <span><strong>Freq:</strong> {med.frequency}</span>}
+                                          {med.frequency && med.duration && <span>•</span>}
+                                          {med.duration && <span><strong>Duration:</strong> {med.duration}</span>}
+                                        </div>
+                                      )}
+
+                                      {med.instructions && (
+                                        <p className="text-[11px] text-[#7A8A71] italic ps-5">
+                                          ↳ {med.instructions}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : !rx.diagnosis && (
+                              <p className="text-xs text-[#1F251A] font-bold">Prescription recorded</p>
+                            )}
+
+                            {/* Doctor Clinical Instructions */}
+                            {rxNotes && (
+                              <div className="rounded-xl bg-[#FBFBF9] p-2 border border-[#414E36]/10 text-xs">
+                                <span className="text-[10px] font-extrabold text-[#5A6A51] uppercase tracking-wider block">
+                                  Instructions
+                                </span>
+                                <p className="text-[11px] text-[#1F251A] mt-0.5 whitespace-pre-line leading-relaxed">
+                                  {rxNotes}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                              <button
+                                type="button"
+                                onClick={() => handleSendPrescriptionWhatsApp(rx, viewingBooking)}
+                                className="flex-1 rounded-xl bg-[#25D366] text-white py-1.5 px-2.5 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-[#1EBE5D] transition shadow-2xs cursor-pointer"
+                              >
+                                <MessageSquare size={12} />
+                                <span>WhatsApp</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => printPrescription(rx, viewingBooking)}
+                                className="flex-1 rounded-xl bg-[#0F3826] text-white py-1.5 px-2.5 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-[#0A271A] transition shadow-2xs cursor-pointer"
+                              >
+                                <Printer size={12} />
+                                <span>Print Rx</span>
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="font-bold text-xs text-[#1F251A] pt-0.5">No prescription recorded</p>
-                          <p className="text-[11px] text-[#5A6A51] font-medium">No prescription was written for this session.</p>
+                        );
+                      })() : (
+                        <div className="py-2">
+                          <p className="font-bold text-xs text-[#1F251A]">No prescription recorded</p>
+                          <p className="text-[11px] text-[#5A6A51] font-medium mt-0.5">No prescription was written for this session.</p>
                         </div>
                       )}
                     </div>
