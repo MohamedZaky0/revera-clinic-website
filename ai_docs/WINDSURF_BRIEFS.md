@@ -10,64 +10,15 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 27 — Pages Settings: extract in 3 ordered sub-PRs (translation deferred)
-
-**`page.tsx:6640–8426`, 1,787 lines — the largest remaining block by 5×. Do not attempt this as one
-brief.** Split by tab, smallest first, the same shape that worked for Briefs 5/10/11:
-
-| Sub-PR | Tab | Range | Size | Sub-sections |
-|---|---|---|---|---|
-| 27.1 | Services | 7989–8424 | 436 | How It Works (7994), Why Choose Us (8108) |
-| 27.2 | Home | 6666–7148 | 483 | Hero Slider (6672), Before/After Results (6962) |
-| 27.3 | About Us | 7150–7987 | 838 | About Photos (7154), What We Do (7344), FAQ (7591) |
-
-Plus a shared `usePageSettings` hook holding `savePageSettings` (4532–4664), `handleAutoTranslate`
-(4506–4531) and the ~50 content state vars (roughly 3380–3424 plus scattered
-`wcu*`/`faq*`/`howItWorks*` declarations — **enumerate these before starting; the investigation
-deliberately did not, and the enumeration is mechanical but load-bearing**).
-
-**This is a bilingual content editor, not a UI needing its own chrome translated — and the two must
-not be conflated.** It already has its own content-language tab, `pageSettingsLangTab`
-(declared 3380, typed `"en" | "ar"`, toggle at 6693–6710, driving
-`const slidesList = pageSettingsLangTab === "en" ? homeHeroSlides : homeHeroSlidesAr` at 6667).
-**That is orthogonal to the admin `lang` state and must never be merged with it.** Likewise:
-- **21 hardcoded `dir=` attributes** on Arabic content inputs (7535, 7537, 7765, 7766, 7786, 7787,
-  7905, 7921, 7945, 8050, 8051, 8071, 8072, 8324, 8325, 8345, 8346, 8366, 8367, 8388, 8389) — content
-  hints, leave untouched.
-- **32 lines containing Arabic literals** are **default content values, not UI copy** — do not move
-  them into `translations.ts`.
-- `_ar` field pairs throughout (`homeHeroSlidesAr`, `whatWeDoListAr`, `faqsAr`, `wcuQuoteAr`, …).
-
-**Real auto-translate feature, not dead code:** `POST /api/translate` via `handleAutoTranslate`, 16
-call sites plus a 5-use per-slide wrapper in the Hero editor. Preserve it exactly.
-
-**Payload concern worth flagging (not fixing):** there is no image-upload endpoint — every image is
-`compressImage()`d and stored **inline as base64 in the settings JSON blob** (6784, 7036, 7098,
-7190, 7247, 7304, 7380, 7437, …), and every one of the 8 in-block `savePageSettings()` calls
-re-POSTs the entire blob including every embedded image.
-
-**Also carries defect #2 from Brief 26:** `savePageSettings()`'s `booking` block (4632–4641) omits
-`staleSessionHours` and the shallow merge therefore destroys it on every CMS save.
-
-**Chrome string count ~163** (91 JSX text nodes + 38 placeholders + 4 `title=` + headings + ~5
-`alert()` messages at 4653/4656/4660) — a floor, since the Translate buttons build labels by
-interpolation (`` `Translate to ${...} ➜` `` at 6821, 6842, 6863, 6884). **`toLocale*`: zero. No
-`<option>` elements at all.**
-
-**Pre-existing encoding corruption, found not caused:** lines 6821, 6842, 6863, 6884, 6916 contain
-`âž"` — a mojibake'd `➜`. Confirm with `git log -S` before touching; **do not "fix" it inside an
-extraction PR.**
-
-**Translation is deliberately deferred** to a later brief — extract all three sub-PRs first. The
-chrome/content distinction above is subtle enough that mixing it with a mechanical move is how this
-one goes wrong.
+_(none currently active)_
 
 ---
 ---
 
 # QUEUED BRIEFS
 
-_(none currently queued)_
+_(none currently queued — translation of the Pages Settings tabs extracted in Brief 27 is the
+obvious next brief, not yet written)_
 
 ---
 ---
@@ -76,6 +27,30 @@ _(none currently queued)_
 
 Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
 (RISK-038 … RISK-050), which is the authoritative account.
+
+### Brief 27 — Pages Settings: extract in 3 ordered sub-PRs (completed 2026-08-23)
+
+Landed as 3 separate commits, smallest-first as specified: `29defa7` (Services →
+`ServicesPageSettingsView`), `9fa5954` (Home → `HomePageSettingsView`), `bb26f3c` (About Us →
+`AboutUsPageSettingsView`). Independently re-verified: `tsc`/`eslint`/`vitest` clean (625/12,
+unchanged), zero `useState` in any of the 3 new files (all state genuinely stayed lifted in
+`page.tsx`, nothing forked), `savePageSettings`/`handleAutoTranslate` shared via props exactly as
+required, all 21 hardcoded `dir=` content-direction hints present and untouched (12 in Services + 9
+in About Us, 0 in Home — correct, Home has none), `pageSettingsLangTab` confirmed never conflated
+with admin `lang` (zero references to `lang` in any of the 3 new files), `translations.ts` and
+`RISKS.md` both untouched (correct — translation deferred, no new defects introduced).
+
+**One process deviation, not blocking:** the brief explicitly said the mojibake'd `➜` (`âž"`) in the
+Hero Slider's 4 per-slide translate buttons should be confirmed via `git log -S` and *not* fixed
+inside this extraction PR. `HomePageSettingsView.tsx` ships with the correct `→` character instead
+— the mojibake was silently fixed during extraction, undocumented in the commit message. The fix
+itself is harmless (a real display bug, now gone), but the brief's explicit "don't fix it here,
+track it separately" instruction wasn't followed. Noting for the record; no revert needed.
+
+Same pattern as Brief 26: the `usePageSettings`/`useBranchState` hooks the brief suggested were
+never wired in — all 3 components stayed purely presentational (props only), which satisfies the
+actual no-duplication goal without the suggested mechanism. Both hook files remain unused in the
+tree.
 
 ### Brief 26 — the 7 small Settings screens: extract, then translate, then test (completed 2026-08-23)
 
