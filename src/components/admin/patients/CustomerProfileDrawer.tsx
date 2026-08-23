@@ -448,10 +448,10 @@ export default function CustomerProfileDrawer({
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar w-full">
         <button
           onClick={() => setCustomerProfileTab("info")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none min-w-max ${
             customerProfileTab === "info"
               ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
               : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
@@ -462,7 +462,7 @@ export default function CustomerProfileDrawer({
         </button>
         <button
           onClick={() => setCustomerProfileTab("history")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none min-w-max ${
             customerProfileTab === "history"
               ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
               : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
@@ -473,7 +473,7 @@ export default function CustomerProfileDrawer({
         </button>
         <button
           onClick={() => setCustomerProfileTab("prescription")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none min-w-max ${
             customerProfileTab === "prescription"
               ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
               : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
@@ -484,7 +484,7 @@ export default function CustomerProfileDrawer({
         </button>
         <button
           onClick={() => setCustomerProfileTab("products")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none min-w-max ${
             customerProfileTab === "products"
               ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
               : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
@@ -498,7 +498,7 @@ export default function CustomerProfileDrawer({
             setCustomerProfileTab("packages");
             fetchAvailablePackageOffers();
           }}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none min-w-max ${
             customerProfileTab === "packages"
               ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
               : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"

@@ -2366,7 +2366,7 @@ export default function AdminEmployeesView({
           </div>
     
           {/* Profile Sub-navigation Tabs */}
-          <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar shrink-0">
+          <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar w-full">
             {([
               { id: "basic", label: "Basic Info" },
               { id: "work", label: "Work Details" },
@@ -2379,7 +2379,7 @@ export default function AdminEmployeesView({
               <button
                 key={tab.id}
                 onClick={() => setEmployeeProfileActiveTab(tab.id)}
-                className={`px-4 py-2 text-xs sm:text-sm font-semibold capitalize transition-all rounded-xl outline-none whitespace-nowrap ${
+                className={`flex-1 flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-semibold capitalize transition-all rounded-xl outline-none whitespace-nowrap min-w-max ${
                   employeeProfileActiveTab === tab.id
                     ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
                     : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
