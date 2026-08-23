@@ -11048,13 +11048,32 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       <button
                         type="button"
                         onClick={() => {
-                          const customerRecord = dbCustomers.find(c => c.id === viewingBooking.customerId || c.phone === viewingBooking.phone);
-                          if (customerRecord) {
-                            setSelectedCustomerForEdit(customerRecord);
-                            setViewingBooking(null);
-                          } else {
-                            alert("Patient profile not found in database.");
-                          }
+                          const cleanBookingPhone = (viewingBooking.phone || "").replace(/\D/g, "");
+                          const customerRecord = dbCustomers.find(c => {
+                            if (viewingBooking.customerId && c.id === viewingBooking.customerId) return true;
+                            const cPhone = (c.mobile || c.phone || "").replace(/\D/g, "");
+                            if (cPhone && cleanBookingPhone && (cPhone === cleanBookingPhone || cPhone.endsWith(cleanBookingPhone) || cleanBookingPhone.endsWith(cPhone))) {
+                              return true;
+                            }
+                            if (c.name && viewingBooking.name && c.name.toLowerCase().trim() === viewingBooking.name.toLowerCase().trim()) {
+                              return true;
+                            }
+                            return false;
+                          });
+
+                          const targetCustomer: any = customerRecord || {
+                            id: viewingBooking.customerId || `cust_${Date.now()}`,
+                            name: viewingBooking.name,
+                            first_name: viewingBooking.name?.split(" ")[0] || "",
+                            last_name: viewingBooking.name?.split(" ").slice(1).join(" ") || "",
+                            mobile: viewingBooking.phone,
+                            phone: viewingBooking.phone,
+                            email: viewingBooking.email || ""
+                          };
+
+                          setViewingBooking(null);
+                          setActiveNav("Patients");
+                          setViewingCustomerProfile(targetCustomer);
                         }}
                         className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
                       >
@@ -11726,6 +11745,92 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       </button>
                     </div>
                   </div>
+
+                  {/* 4. NOTES CARD (Under Payment Summary) */}
+                  {(() => {
+                    const cleanBookingNotes = (() => {
+                      if (!viewingBooking?.notes) return "";
+                      let text = String(viewingBooking.notes);
+                      text = text.replace(/\[Products Used During Session\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Additional Services(?: Used)?(?: During Session)?\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Device Pulses Deducted\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Extra Device Pulses\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Invoice Total Updated\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Total Invoice\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Added Product\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Added Service\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/-\s+[\s\S]*?\(x\d+\)\s+@\s+\d+[\s\S]*?EGP/gi, "");
+                      return text.trim();
+                    })();
+
+                    return (
+                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3 shadow-2xs">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[11px] uppercase tracking-wider">
+                            <FileText size={14} className="text-[#0F3826]" />
+                            <span>NOTES</span>
+                          </div>
+                          {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && !isEditingNotes && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNotesDraft(cleanBookingNotes);
+                                setIsEditingNotes(true);
+                              }}
+                              className="rounded-xl border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                            >
+                              <Pencil size={11} />
+                              <span>{cleanBookingNotes ? "Edit Note" : "+ Add Note"}</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {isEditingNotes ? (
+                          <div className="space-y-2 pt-1">
+                            <textarea
+                              rows={3}
+                              value={notesDraft}
+                              onChange={(e) => setNotesDraft(e.target.value)}
+                              placeholder="Enter notes, observations, or instructions..."
+                              className="w-full rounded-xl border border-[#414E36]/20 bg-[#FBFBF9] p-2.5 text-xs text-[#1F251A] outline-none focus:border-[#0F3826]"
+                            />
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingNotes(false)}
+                                className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const raw = String(viewingBooking.notes || "");
+                                  const matches = raw.match(/(\[(?:Products Used|Additional Services|Device Pulses|Extra Device|Invoice Total|Total Invoice|Added Product|Added Service)[^\]]*\]:[^\n\[]*)/gi);
+                                  const systemTags = matches ? "\n" + matches.join("\n") : "";
+                                  const finalNotes = notesDraft.trim() + systemTags;
+                                  await saveNotes(finalNotes);
+                                  setViewingBooking((prev: any) => prev ? { ...prev, notes: finalNotes } : null);
+                                  setIsEditingNotes(false);
+                                }}
+                                className="px-3.5 py-1.5 rounded-xl bg-[#0F3826] text-white text-xs font-bold hover:bg-[#0A271A] transition shadow-xs cursor-pointer"
+                              >
+                                Save Note
+                              </button>
+                            </div>
+                          </div>
+                        ) : cleanBookingNotes ? (
+                          <div className="rounded-xl bg-[#F7F7F3] border border-[#414E36]/10 p-3 text-xs text-[#1F251A] whitespace-pre-line leading-relaxed">
+                            {cleanBookingNotes}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-[#5A6A51] font-medium pt-0.5">
+                            No notes recorded for this booking.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                 </div>
 
