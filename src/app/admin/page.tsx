@@ -22,6 +22,13 @@ import UserProfileView from "@/components/admin/UserProfileView";
 import ClinicProfileSettingsView from "@/components/admin/settings/ClinicProfileSettingsView";
 import MedicalRecordsSettingsView from "@/components/admin/settings/MedicalRecordsSettingsView";
 import RoleManagementView from "@/components/admin/settings/RoleManagementView";
+import BookingSettingsView from "@/components/admin/settings/BookingSettingsView";
+import DepositSettingsView from "@/components/admin/settings/DepositSettingsView";
+import NotificationSettingsView from "@/components/admin/settings/NotificationSettingsView";
+import QueueSettingsView from "@/components/admin/settings/QueueSettingsView";
+import InactivitySettingsView from "@/components/admin/settings/InactivitySettingsView";
+import BranchesView from "@/components/admin/settings/BranchesView";
+import ServiceHoursView from "@/components/admin/settings/ServiceHoursView";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import CustomerFormModal from "@/components/admin/patients/CustomerFormModal";
@@ -8241,239 +8248,68 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           )}
 
           {activeNav === "Service Hours" && (
-            <div className="space-y-6">
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-4xl font-semibold text-[#1F251A]">Weekly Service Hours</h2>
-                  <p className="mt-2 text-sm text-[#5A6A51]">Configure operating schedules for Zayed and other active branches.</p>
-                  
-                  {/* Branch selector select dropdown */}
-                  <div className="mt-4 flex items-center gap-3">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Active Branch:</label>
-                    <select
-                      value={selectedBranchForHoursId}
-                      onChange={(e) => setSelectedBranchForHoursId(e.target.value)}
-                      className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none transition focus:border-[#C4AE7C] font-semibold"
-                    >
-                      {branches.map(b => (
-                        <option key={b.id} value={b.id}>{b.name_en} ({b.name_ar})</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleSaveBranchServiceHours()}
-                  disabled={savingBranchHours || !selectedBranchForHoursId}
-                  className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
-                >
-                  {savingBranchHours ? "Saving..." : "Save Changes"}
-                </button>
-              </div>
-              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-4">
-                {serviceHours.map((sh, idx) => (
-                  <div key={idx} className="flex items-center justify-between border-b border-[#F2EFE9] pb-3 last:border-b-0 last:pb-0">
-                    <span className="font-semibold text-[#1F251A] w-28">{sh.day}</span>
-                    <div className="flex items-center gap-4 flex-1 justify-end">
-                      <label className="flex items-center gap-2 cursor-pointer mr-2">
-                        <input
-                          type="checkbox"
-                          checked={sh.isOpen}
-                          onChange={(e) => {
-                            const newHours = [...serviceHours];
-                            newHours[idx].isOpen = e.target.checked;
-                            setServiceHours(newHours);
-                          }}
-                          className="accent-[#414E36] w-4 h-4 cursor-pointer"
-                        />
-                        <span className="text-sm text-[#5A6A51]">{sh.isOpen ? "Open" : "Closed"}</span>
-                      </label>
-                      {sh.isOpen && (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="time"
-                            value={sh.openTime}
-                            onChange={(e) => {
-                              const newHours = [...serviceHours];
-                              newHours[idx].openTime = e.target.value;
-                              setServiceHours(newHours);
-                            }}
-                            className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-sm outline-none w-28"
-                          />
-                          <span className="text-sm text-[#5A6A51]">to</span>
-                          <input
-                            type="time"
-                            value={sh.closeTime}
-                            onChange={(e) => {
-                              const newHours = [...serviceHours];
-                              newHours[idx].closeTime = e.target.value;
-                              setServiceHours(newHours);
-                            }}
-                            className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-sm outline-none w-28"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ServiceHoursView
+              branches={branches}
+              selectedBranchForHoursId={selectedBranchForHoursId}
+              setSelectedBranchForHoursId={setSelectedBranchForHoursId}
+              serviceHours={serviceHours}
+              setServiceHours={setServiceHours}
+              handleSaveBranchServiceHours={handleSaveBranchServiceHours}
+              savingBranchHours={savingBranchHours}
+              lang={lang}
+              t={adminTranslations[lang].settingsScreens.serviceHours}
+            />
           )}
 
           {activeNav === "Branches" && (
-            <div className="space-y-6">
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-4xl font-semibold text-[#1F251A]">Branches</h2>
-                  <p className="mt-2 text-sm text-[#5A6A51]">Add, edit, or toggle availability of clinic physical locations.</p>
-                </div>
-                <button
-                  onClick={() => setBranchModal({ open: true, mode: "add", branch: { status: "active", sort_order: branches.length } })}
-                  className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                >
-                  <Plus size={16} /> Add Branch
-                </button>
-              </div>
-
-              {loadingBranches ? (
-                <div className="text-center py-16 text-[#5A6A51]">Loading branches…</div>
-              ) : branches.length === 0 ? (
-                <div className="text-center py-16 text-[#5A6A51]">
-                  <MapIcon size={40} className="mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">No branches yet. Add your first branch.</p>
-                </div>
-              ) : (
-                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] grid gap-6 md:grid-cols-2">
-                  {branches.map((br) => (
-                    <div key={br.id} className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm flex flex-col justify-between min-h-[180px]">
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-bold text-[#1F251A] text-base">{br.name_en}</h3>
-                          <span className={`shrink-0 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                            br.status === "active" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"
-                          }`}>{br.status === "active" ? "Active" : "Inactive"}</span>
-                        </div>
-                        <p className="text-xs text-[#5A6A51] mt-1">{br.name_ar}</p>
-                        <p className="text-xs text-[#5A6A51] mt-2 leading-relaxed">{br.address_en}</p>
-                        {br.phone && <p className="text-xs text-[#5A6A51] mt-1">{br.phone}</p>}
-                      </div>
-                      <div className="mt-4 flex items-center justify-between border-t border-[#F2EFE9] pt-4 gap-2">
-                        <button
-                          onClick={async () => {
-                            const newStatus = br.status === "active" ? "inactive" : "active";
-                            await fetch("/api/branches", {
-                              method: "POST",
-                              headers: authenticatedJsonHeaders,
-                              body: JSON.stringify({ ...br, status: newStatus }),
-                            });
-                            setBranches(prev => prev.map(b => b.id === br.id ? { ...b, status: newStatus } : b));
-                          }}
-                          className="text-xs font-semibold text-[#5A6A51] hover:text-[#414E36] border border-[#E6E9EB] rounded-full px-3 py-1 transition"
-                        >
-                          {br.status === "active" ? "Set Inactive" : "Set Active"}
-                        </button>
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => setBranchModal({ open: true, mode: "edit", branch: { ...br } })}
-                            className="text-xs font-bold text-[#414E36] hover:underline"
-                          >Edit</button>
-                          <button
-                            onClick={async () => {
-                              if (!(await showConfirm(`Delete "${br.name_en}"?`))) return;
-                              setDeletingBranchId(br.id);
-                              await fetch(`/api/branches?id=${br.id}`, { method: "DELETE", headers: authenticatedJsonHeaders });
-                              setBranches(prev => prev.filter(b => b.id !== br.id));
-                              setDeletingBranchId(null);
-                            }}
-                            className="text-xs font-bold text-red-500 hover:underline disabled:opacity-50"
-                            disabled={deletingBranchId === br.id}
-                          >{deletingBranchId === br.id ? "Deleting…" : "Delete"}</button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Branch Add/Edit Modal */}
-              {branchModal.open && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                  <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-8">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-2xl font-semibold text-[#1F251A]">
-                        {branchModal.mode === "add" ? "Add Branch" : "Edit Branch"}
-                      </h3>
-                      <button onClick={() => setBranchModal({ open: false, mode: "add", branch: {} })} className="p-2 rounded-full hover:bg-[#F2EFE9]">
-                        <X size={18} />
-                      </button>
-                    </div>
-                    <form
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        setSavingBranch(true);
-                        try {
-                          const res = await fetch("/api/branches", {
-                            method: "POST",
-                            headers: authenticatedJsonHeaders,
-                            body: JSON.stringify(branchModal.branch),
-                          });
-                          const saved = await res.json();
-                          if (branchModal.mode === "edit") {
-                            setBranches(prev => prev.map(b => b.id === saved.id ? saved : b));
-                          } else {
-                            setBranches(prev => [...prev, saved]);
-                          }
-                          setBranchModal({ open: false, mode: "add", branch: {} });
-                        } finally {
-                          setSavingBranch(false);
-                        }
-                      }}
-                      className="space-y-4"
-                    >
-                      {([
-                        { field: "name_en", label: "Branch Name (English)", placeholder: "e.g. New Cairo Branch", required: true },
-                        { field: "name_ar", label: "Branch Name (Arabic)", placeholder: "مثال: فرع القاهرة الجديدة", required: true, dir: "rtl" },
-                        { field: "address_en", label: "Address (English)", placeholder: "e.g. 5th Settlement, New Cairo", required: true },
-                        { field: "address_ar", label: "Address (Arabic)", placeholder: "مثال: التجمع الخامس، القاهرة الجديدة", required: true, dir: "rtl" },
-                        { field: "phone", label: "Phone Number", placeholder: "e.g. +201035595691" },
-                        { field: "maps_embed", label: "Google Maps Embed URL", placeholder: "https://www.google.com/maps/embed?pb=…" },
-                        { field: "maps_link", label: "Google Maps Link", placeholder: "https://maps.app.goo.gl/…" },
-                      ] as Array<{ field: keyof Branch; label: string; placeholder: string; required?: boolean; dir?: string }>).map(({ field, label, placeholder, required, dir }) => (
-                        <div key={field}>
-                          <label className="block text-xs font-semibold uppercase tracking-[0.15em] text-[#5A6A51] mb-1.5">{label}</label>
-                          <input
-                            type="text"
-                            required={required}
-                            dir={dir}
-                            placeholder={placeholder}
-                            value={(branchModal.branch[field] as string) ?? ""}
-                            onChange={(e) => setBranchModal(prev => ({ ...prev, branch: { ...prev.branch, [field]: e.target.value } }))}
-                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                          />
-                        </div>
-                      ))}
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-[0.15em] text-[#5A6A51] mb-1.5">Status</label>
-                        <select
-                          value={branchModal.branch.status ?? "active"}
-                          onChange={(e) => setBranchModal(prev => ({ ...prev, branch: { ...prev.branch, status: e.target.value as "active" | "inactive" } }))}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none"
-                        >
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                        </select>
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={savingBranch}
-                        className="w-full rounded-3xl bg-[#414E36] py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-2"
-                      >
-                        {savingBranch ? "Saving…" : branchModal.mode === "add" ? "Add Branch" : "Save Changes"}
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              )}
-            </div>
+            <BranchesView
+              branches={branches}
+              loadingBranches={loadingBranches}
+              branchModal={branchModal}
+              setBranchModal={setBranchModal}
+              savingBranch={savingBranch}
+              deletingBranchId={deletingBranchId}
+              toggleBranchStatus={async (br) => {
+                const newStatus = br.status === "active" ? "inactive" : "active";
+                await fetch("/api/branches", {
+                  method: "POST",
+                  headers: authenticatedJsonHeaders,
+                  body: JSON.stringify({ ...br, status: newStatus }),
+                });
+                setBranches(prev => prev.map(b => b.id === br.id ? { ...b, status: newStatus } : b));
+              }}
+              deleteBranch={async (br) => {
+                if (!(await showConfirm(`Delete "${br.name_en}"?`))) return;
+                setDeletingBranchId(br.id);
+                await fetch(`/api/branches?id=${br.id}`, { method: "DELETE", headers: authenticatedJsonHeaders });
+                setBranches(prev => prev.filter(b => b.id !== br.id));
+                setDeletingBranchId(null);
+              }}
+              saveBranchFromModal={async () => {
+                setSavingBranch(true);
+                try {
+                  const res = await fetch("/api/branches", {
+                    method: "POST",
+                    headers: authenticatedJsonHeaders,
+                    body: JSON.stringify(branchModal.branch),
+                  });
+                  const saved = await res.json();
+                  if (branchModal.mode === "edit") {
+                    setBranches(prev => prev.map(b => b.id === saved.id ? saved : b));
+                  } else {
+                    setBranches(prev => [...prev, saved]);
+                  }
+                  setBranchModal({ open: false, mode: "add", branch: {} });
+                  return true;
+                } catch {
+                  return false;
+                } finally {
+                  setSavingBranch(false);
+                }
+              }}
+              lang={lang}
+              t={adminTranslations[lang].settingsScreens.branches}
+            />
           )}
           {activeNav === "Rooms" && (
             <RoomsManagerView
@@ -8483,215 +8319,27 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
           {activeNav === "Booking Settings" && (
-            <div className="space-y-6">
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-4xl font-semibold text-[#1F251A]">Booking Settings</h2>
-                  <p className="mt-2 text-sm text-[#5A6A51]">Configure appointment rules, advance booking limits, and slot management.</p>
-                </div>
-                <button
-                  onClick={handleSaveBookingSettings}
-                  disabled={savingBookingSettings}
-                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
-                >
-                  {savingBookingSettings ? "Saving..." : "Save Booking Settings"}
-                </button>
-              </div>
-
-              <div className="max-w-4xl rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-                <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3">Booking Rules</h3>
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Min Advance Booking (Hours)</label>
-                        <button
-                          type="button"
-                          onClick={() => setActiveInfoFeature({
-                            title: "Min Advance Booking (Hours)",
-                            description: "This setting restricts how close to the appointment time a patient can book. For example, if set to 2 hours, patients cannot book an appointment that starts within the next 2 hours. This prevents last-minute surprise bookings and gives your staff sufficient lead time to prepare for the arriving patient."
-                          })}
-                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                          title="Click for info"
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
-                      <select
-                        value={bookingMinAdvance}
-                        onChange={(e) => setBookingMinAdvance(Number(e.target.value))}
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                      >
-                        {[1, 2, 4, 6, 12, 24].map(h => <option key={h} value={h}>{h} {h === 1 ? "Hour" : "Hours"}</option>)}
-                      </select>
-                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Minimum time before appointment that bookings are allowed.</span>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Max Advance Booking (Days)</label>
-                        <button
-                          type="button"
-                          onClick={() => setActiveInfoFeature({
-                            title: "Max Advance Booking (Days)",
-                            description: "This setting defines how far in the future patients are allowed to book appointments. For example, if set to 30 Days, patients can only choose slots within the next 30 days. This keeps your schedule manageable and prevents patients from booking slots too far in advance, which are prone to cancellations."
-                          })}
-                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                          title="Click for info"
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
-                      <select
-                        value={bookingMaxAdvance}
-                        onChange={(e) => setBookingMaxAdvance(Number(e.target.value))}
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                      >
-                        {[7, 14, 30, 60, 90].map(d => <option key={d} value={d}>{d} Days</option>)}
-                      </select>
-                      <span className="text-[11px] text-[#8A9A81] mt-1 block">How far in advance patients can schedule.</span>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Cancellation Window (Hours)</label>
-                        <button
-                          type="button"
-                          onClick={() => setActiveInfoFeature({
-                            title: "Cancellation Window (Hours)",
-                            description: "This setting defines the minimum hours before an appointment that a patient can cancel or reschedule without penalty. For example, if set to 24 hours, patients must cancel at least 24 hours prior to the slot. Cancellations attempted inside this window may forfeit their deposit or require clinic intervention."
-                          })}
-                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                          title="Click for info"
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
-                      <select
-                        value={bookingCancelWindow}
-                        onChange={(e) => setBookingCancelWindow(Number(e.target.value))}
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                      >
-                        {[1, 2, 4, 6, 12, 24].map(h => <option key={h} value={h}>{h} {h === 1 ? "Hour" : "Hours"} Before</option>)}
-                      </select>
-                      <span className="text-[11px] text-[#8A9A81] mt-1 block">How early a patient must cancel to avoid a penalty.</span>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Max Bookings Per Slot</label>
-                        <button
-                          type="button"
-                          onClick={() => setActiveInfoFeature({
-                            title: "Max Bookings Per Slot",
-                            description: "This setting defines the maximum number of appointments that can be scheduled concurrently in a single time slot for the clinic. It ensures you do not exceed clinic capacity or overwhelm staff. If the limit is reached, that slot will show as full and unavailable to other patients."
-                          })}
-                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                          title="Click for info"
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
-                      <input
-                        type="number"
-                        min={1}
-                        max={10}
-                        value={bookingMaxPerSlot}
-                        onChange={(e) => setBookingMaxPerSlot(Number(e.target.value))}
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                      />
-                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Maximum concurrent appointments per time slot.</span>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Stale Session Alert (Hours)</label>
-                        <button
-                          type="button"
-                          onClick={() => setActiveInfoFeature({
-                            title: "Stale Session Alert (Hours)",
-                            description: "If a doctor starts a session and forgets to mark it Completed, it stays 'In Progress' forever, keeping a room, slot and doctor tied up. This setting controls how many hours a session can stay In Progress before it is flagged in the Bookings screen's Needs Attention panel so staff can complete or cancel it."
-                          })}
-                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                          title="Click for info"
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
-                      <select
-                        value={bookingStaleSessionHours}
-                        onChange={(e) => setBookingStaleSessionHours(Number(e.target.value))}
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                      >
-                        {[1, 2, 3, 4, 6, 8, 12].map(h => <option key={h} value={h}>{h} {h === 1 ? "Hour" : "Hours"}</option>)}
-                      </select>
-                      <span className="text-[11px] text-[#8A9A81] mt-1 block">How long a session can stay In Progress before it's flagged as forgotten.</span>
-                    </div>
-
-                  </div>
-
-                  <div className="border-t border-[#F2EFE9] pt-6 space-y-4">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={bookingInstantApproval}
-                        onChange={(e) => setBookingInstantApproval(e.target.checked)}
-                        className="accent-[#414E36] w-4 h-4 cursor-pointer"
-                      />
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-semibold text-[#1F251A]">Instant Approval</span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setActiveInfoFeature({
-                                title: "Instant Approval",
-                                description: "When enabled, bookings made by patients are automatically marked as Approved and confirmed without requiring manual review by the clinic administrator. When disabled, bookings are marked as Pending and must be manually approved by your admin team."
-                              });
-                            }}
-                            className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                            title="Click for info"
-                          >
-                            <Info size={13} />
-                          </button>
-                        </div>
-                        <span className="text-xs text-[#5A6A51]">Automatically approve bookings without manual admin review.</span>
-                      </div>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={bookingShowDoctorNotes}
-                        onChange={(e) => setBookingShowDoctorNotes(e.target.checked)}
-                        className="accent-[#414E36] w-4 h-4 cursor-pointer"
-                      />
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-semibold text-[#1F251A]">Show Doctor Notes to Patient</span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setActiveInfoFeature({
-                                title: "Show Doctor Notes to Patient",
-                                description: "When enabled, post-visit summary notes written by the provider (e.g. diagnoses, advice, instructions) will be visible to the patient inside their personal profile dashboard. When disabled, notes remain strictly private for internal staff use."
-                              });
-                            }}
-                            className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                            title="Click for info"
-                          >
-                            <Info size={13} />
-                          </button>
-                        </div>
-                        <span className="text-xs text-[#5A6A51]">Display post-visit notes from the provider in the patient portal.</span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              </div>
+            <BookingSettingsView
+              bookingMinAdvance={bookingMinAdvance}
+              setBookingMinAdvance={setBookingMinAdvance}
+              bookingMaxAdvance={bookingMaxAdvance}
+              setBookingMaxAdvance={setBookingMaxAdvance}
+              bookingCancelWindow={bookingCancelWindow}
+              setBookingCancelWindow={setBookingCancelWindow}
+              bookingMaxPerSlot={bookingMaxPerSlot}
+              setBookingMaxPerSlot={setBookingMaxPerSlot}
+              bookingInstantApproval={bookingInstantApproval}
+              setBookingInstantApproval={setBookingInstantApproval}
+              bookingShowDoctorNotes={bookingShowDoctorNotes}
+              setBookingShowDoctorNotes={setBookingShowDoctorNotes}
+              bookingStaleSessionHours={bookingStaleSessionHours}
+              setBookingStaleSessionHours={setBookingStaleSessionHours}
+              handleSaveBookingSettings={handleSaveBookingSettings}
+              savingBookingSettings={savingBookingSettings}
+              setActiveInfoFeature={setActiveInfoFeature}
+              lang={lang}
+              t={adminTranslations[lang].settingsScreens.bookingSettings}
+            />
           )}
 
           {activeNav === "Terms & Conditions" && (
@@ -8704,676 +8352,85 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           )}
 
           {activeNav === "Deposit Settings" && (
-            <div className="space-y-6">
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-4xl font-semibold text-[#1F251A]">Deposit & InstaPay Settings</h2>
-                  <p className="mt-2 text-sm text-[#5A6A51]">Configure prepayment rules, InstaPay address, quick payment links, and dynamic QR codes.</p>
-                </div>
-                <button
-                  onClick={handleSaveDepositSettings}
-                  disabled={savingDepositSettings}
-                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
-                >
-                  {savingDepositSettings ? "Saving..." : "Save Deposit Settings"}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                {/* Left Column: Form Settings */}
-                <div className="lg:col-span-7 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-                  {/* InstaPay Details */}
-                  <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3">InstaPay Details</h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">InstaPay Account / Clinic Name</label>
-                      <input
-                        type="text"
-                        value={instapayName}
-                        onChange={(e) => setInstapayName(e.target.value)}
-                        placeholder="Revera Clinics"
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] placeholder:text-[#B0BCA7] outline-none focus:border-[#414E36] transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">InstaPay Address</label>
-                      <input
-                        type="text"
-                        value={instapayAddress}
-                        onChange={(e) => setInstapayAddress(e.target.value)}
-                        placeholder="revera@instapay"
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] placeholder:text-[#B0BCA7] outline-none focus:border-[#414E36] transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">InstaPay Quick Link</label>
-                      <input
-                        type="text"
-                        value={instapayLink}
-                        onChange={(e) => setInstapayLink(e.target.value)}
-                        placeholder="e.g. https://www.instapay.eg or deep link"
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                      />
-                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Quick payment URL or deep link to open the InstaPay app.</span>
-                    </div>
-                  </div>
-
-                  {/* Mobile Wallet Details */}
-                  <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3 pt-2">Mobile Wallet Settings</h3>
-                  
-                  <div className="space-y-4">
-                    <label className="flex items-center gap-3 cursor-pointer p-3.5 rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 hover:border-[#414E36]/30 transition">
-                      <input
-                        type="checkbox"
-                        checked={walletEnabled}
-                        onChange={(e) => setWalletEnabled(e.target.checked)}
-                        className="h-5 w-5 rounded accent-[#414E36]"
-                      />
-                      <div>
-                        <span className="text-sm font-bold text-[#1F251A]">Enable Mobile Wallet Payment Method</span>
-                        <p className="text-[11px] text-[#8A9A81]">Allow patients to pay deposits via Vodafone Cash, Orange Cash, Etisalat Cash, WE Pay, etc.</p>
-                      </div>
-                    </label>
-
-                    {walletEnabled && (
-                      <div className="space-y-4 pl-3 border-l-2 border-[#414E36]/15 mt-3">
-                        <div>
-                          <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Wallet Provider / Name</label>
-                          <input
-                            type="text"
-                            value={walletName}
-                            onChange={(e) => setWalletName(e.target.value)}
-                            placeholder="e.g. Vodafone Cash / Smart Wallet"
-                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Wallet Mobile Phone Number</label>
-                          <input
-                            type="text"
-                            value={walletNumber}
-                            onChange={(e) => setWalletNumber(e.target.value)}
-                            placeholder="e.g. 01012345678"
-                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Wallet Direct Link (Optional)</label>
-                          <input
-                            type="text"
-                            value={walletLink}
-                            onChange={(e) => setWalletLink(e.target.value)}
-                            placeholder="e.g. https://..."
-                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Prepayment Rule */}
-                  <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3 pt-2">Prepayment Rules</h3>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Reservation Deposit (%)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={bookingDepositPercentage}
-                      onChange={(e) => setBookingDepositPercentage(Math.max(0, Math.min(100, Number(e.target.value))))}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                    />
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Percentage of service price to secure a booking. Set to 0 to disable prepayment requirement.</span>
-                  </div>
-                </div>
-
-                {/* Right Column: Live QR Preview */}
-                <div className="lg:col-span-5 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] text-center flex flex-col items-center">
-                  <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3 w-full mb-6">Live QR Preview</h3>
-                  <div className="bg-white p-4 rounded-3xl border border-[#C4AE7C]/20 shadow-md inline-block mb-4">
-                    <img
-                      src={instapayLink && instapayLink !== "https://www.instapay.eg" 
-                        ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(instapayLink)}` 
-                        : "/images/instapay_qr.png"}
-                      alt="InstaPay QR Preview"
-                      className="w-48 h-48 object-contain"
-                    />
-                  </div>
-                  <p className="text-xs text-[#5A6A51] font-semibold uppercase tracking-wider mb-2">Generated QR Code</p>
-                  <p className="text-[10px] text-[#8A9A81] max-w-xs">This QR code is generated dynamically from the InstaPay Quick Link above and will be displayed to patients during checkout.</p>
-                </div>
-              </div>
-            </div>
+            <DepositSettingsView
+              instapayName={instapayName}
+              setInstapayName={setInstapayName}
+              instapayAddress={instapayAddress}
+              setInstapayAddress={setInstapayAddress}
+              instapayLink={instapayLink}
+              setInstapayLink={setInstapayLink}
+              walletEnabled={walletEnabled}
+              setWalletEnabled={setWalletEnabled}
+              walletName={walletName}
+              setWalletName={setWalletName}
+              walletNumber={walletNumber}
+              setWalletNumber={setWalletNumber}
+              walletLink={walletLink}
+              setWalletLink={setWalletLink}
+              bookingDepositPercentage={bookingDepositPercentage}
+              setBookingDepositPercentage={setBookingDepositPercentage}
+              handleSaveDepositSettings={handleSaveDepositSettings}
+              savingDepositSettings={savingDepositSettings}
+              lang={lang}
+              t={adminTranslations[lang].settingsScreens.depositSettings}
+            />
           )}
 
           {activeNav === "Inactivity Settings" && (
-            <div className="space-y-6">
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-4xl font-semibold text-[#1F251A]">Inactivity Alert Settings</h2>
-                  <p className="mt-2 text-sm text-[#5A6A51]">Configure when the inactivity warning appears and how long the countdown lasts before an alert is sent.</p>
-                </div>
-                <button
-                  onClick={handleSaveInactivitySettings}
-                  disabled={savingInactivitySettings}
-                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
-                >
-                  {savingInactivitySettings ? "Saving..." : "Save Inactivity Settings"}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                {/* Inactivity Threshold */}
-                <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-                  <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-                    <div className="h-10 w-10 flex items-center justify-center rounded-full bg-amber-50 text-amber-600 border border-amber-100">
-                      <Hourglass size={20} />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-[#1F251A]">Inactivity Duration</h3>
-                      <p className="text-xs text-[#5A6A51]">Time of no activity before the alert appears</p>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">
-                      Alert Threshold (Minutes)
-                    </label>
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="range"
-                        min={5}
-                        max={120}
-                        step={5}
-                        value={inactivityThreshold}
-                        onChange={(e) => setInactivityThreshold(Number(e.target.value))}
-                        className="flex-1 accent-[#414E36] h-2 rounded-full cursor-pointer"
-                      />
-                      <div className="w-20 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-center text-sm font-bold text-[#1F251A]">
-                        {inactivityThreshold} min
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-[#8A9A81] mt-2">
-                      If the employee does not move their mouse, type, or interact for <strong>{inactivityThreshold} minutes</strong>, the inactivity warning will appear.
-                    </p>
-                    <div className="mt-4 grid grid-cols-4 gap-2">
-                      {[10, 15, 30, 60].map(val => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setInactivityThreshold(val)}
-                          className={`rounded-xl py-2 text-xs font-semibold transition border ${inactivityThreshold === val ? 'bg-[#414E36] text-white border-[#414E36]' : 'bg-[#F5F5F0] text-[#5A6A51] border-transparent hover:border-[#414E36]/30'}`}
-                        >
-                          {val} min
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Alert Countdown Duration */}
-                <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-                  <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-                    <div className="h-10 w-10 flex items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-100">
-                      <Clock size={20} />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-[#1F251A]">Alert Countdown Duration</h3>
-                      <p className="text-xs text-[#5A6A51]">How long the employee has to confirm presence</p>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">
-                      Countdown Duration (Seconds)
-                    </label>
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="range"
-                        min={5}
-                        max={60}
-                        step={5}
-                        value={inactivityCountdown}
-                        onChange={(e) => setInactivityCountdown(Number(e.target.value))}
-                        className="flex-1 accent-[#414E36] h-2 rounded-full cursor-pointer"
-                      />
-                      <div className="w-20 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-center text-sm font-bold text-[#1F251A]">
-                        {inactivityCountdown}s
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-[#8A9A81] mt-2">
-                      When the alert appears, the employee has <strong>{inactivityCountdown} seconds</strong> to click &quot;I am Present&quot; before an alert is sent to the administrator.
-                    </p>
-                    <div className="mt-4 grid grid-cols-4 gap-2">
-                      {[5, 10, 30, 60].map(val => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setInactivityCountdown(val)}
-                          className={`rounded-xl py-2 text-xs font-semibold transition border ${inactivityCountdown === val ? 'bg-[#414E36] text-white border-[#414E36]' : 'bg-[#F5F5F0] text-[#5A6A51] border-transparent hover:border-[#414E36]/30'}`}
-                        >
-                          {val}s
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Preview Card */}
-              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-                <h3 className="text-lg font-bold text-[#1F251A] border-b border-gray-100 pb-4 mb-6">Alert Preview</h3>
-                <div className="flex flex-col md:flex-row gap-8 items-start">
-                  <div className="flex-1 bg-[#FBFBF9] rounded-3xl p-6 border border-[#414E36]/10">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-[#5A6A51] mb-3">How the alert will look to the employee</p>
-                    <div className="rounded-[24px] bg-white border border-[#414E36]/10 p-6 text-center space-y-4 shadow-md max-w-xs mx-auto">
-                      <div className="h-12 w-12 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-600 border border-amber-100">
-                        <Clock size={24} />
-                      </div>
-                      <h4 className="text-lg font-bold text-[#1F251A]">Activity Verification</h4>
-                      <p className="text-xs text-[#5A6A51]">Please verify that you are active at your workstation.</p>
-                      <div className="text-4xl font-bold text-[#414E36]">{inactivityCountdown}s</div>
-                      <p className="text-[10px] text-[#8A9A81]">An inactivity alert will be sent to the administrator.</p>
-                      <div className="rounded-2xl bg-[#414E36] py-2 px-4 text-xs font-bold text-white">✓ I am Present &amp; Working</div>
-                    </div>
-                  </div>
-                  <div className="flex-1 space-y-4">
-                    <div className="flex items-start gap-3 rounded-2xl bg-amber-50 border border-amber-100 p-4">
-                      <Hourglass size={16} className="mt-0.5 text-amber-600 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-semibold text-[#1F251A]">Alert triggers after {inactivityThreshold} minutes</p>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">Mouse movement, keyboard input, clicks, and scrolling all reset the inactivity timer.</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 rounded-2xl bg-rose-50 border border-rose-100 p-4">
-                      <Clock size={16} className="mt-0.5 text-rose-600 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-semibold text-[#1F251A]">Employee has {inactivityCountdown} seconds to respond</p>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">If they do not click &quot;I am Present&quot;, an alert is automatically sent to the administrator.</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
-                      <Check size={16} className="mt-0.5 text-emerald-600 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-semibold text-[#1F251A]">Applies to standard employees only</p>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">Admins, HR, and superadmins are exempt from the inactivity monitor.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <InactivitySettingsView
+              inactivityThreshold={inactivityThreshold}
+              setInactivityThreshold={setInactivityThreshold}
+              inactivityCountdown={inactivityCountdown}
+              setInactivityCountdown={setInactivityCountdown}
+              handleSaveInactivitySettings={handleSaveInactivitySettings}
+              savingInactivitySettings={savingInactivitySettings}
+              lang={lang}
+              t={adminTranslations[lang].settingsScreens.inactivitySettings}
+            />
           )}
 
           {activeNav === "Notification Settings" && (
-            <div className="space-y-6">
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-4xl font-semibold text-[#1F251A]">Notification Settings</h2>
-                  <p className="mt-2 text-sm text-[#5A6A51]">Manage SMS, WhatsApp, email confirmations, and reminder scheduling.</p>
-                </div>
-                <button
-                  onClick={handleSaveNotificationSettings}
-                  disabled={savingNotificationSettings}
-                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
-                >
-                  {savingNotificationSettings ? "Saving..." : "Save Notification Settings"}
-                </button>
-              </div>
-
-              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-6">
-                <div className="space-y-4">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={notifSmsOtp} onChange={(e) => setNotifSmsOtp(e.target.checked)} className="accent-[#414E36] w-4 h-4 cursor-pointer" />
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold text-[#1F251A]">SMS OTP Verification</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setActiveInfoFeature({
-                              title: "SMS OTP Verification",
-                              description: "When enabled, the system sends a One-Time Password (OTP) via SMS to verify the patient's phone number during login and checkout. This ensures patient profiles are tied to active numbers, preventing spam bookings and database clutter."
-                            });
-                          }}
-                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                          title="Click for info"
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
-                      <span className="text-xs text-[#5A6A51]">Send one-time passwords to patients during login and booking.</span>
-                    </div>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={notifWhatsApp} onChange={(e) => setNotifWhatsApp(e.target.checked)} className="accent-[#414E36] w-4 h-4 cursor-pointer" />
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold text-[#1F251A]">WhatsApp Confirmations</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setActiveInfoFeature({
-                              title: "WhatsApp Confirmations",
-                              description: "When enabled, the system automatically sends booking confirmation messages, reschedule alerts, and timing reminders directly to the patient's WhatsApp number, which has a higher open rate than traditional SMS."
-                            });
-                          }}
-                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                          title="Click for info"
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
-                      <span className="text-xs text-[#5A6A51]">Send appointment confirmations and reminders via WhatsApp.</span>
-                    </div>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={notifEmailConfirm} onChange={(e) => setNotifEmailConfirm(e.target.checked)} className="accent-[#414E36] w-4 h-4 cursor-pointer" />
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold text-[#1F251A]">Email Confirmations</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setActiveInfoFeature({
-                              title: "Email Confirmations",
-                              description: "When enabled, the system sends booking receipts and confirmation details to the patient's email address (requires configuring a valid SMTP mail server in the clinic backend)."
-                            });
-                          }}
-                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                          title="Click for info"
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
-                      <span className="text-xs text-[#5A6A51]">Send email confirmations in addition to SMS (requires SMTP config).</span>
-                    </div>
-                  </label>
-                </div>
-
-                <div className="border-t border-[#F2EFE9] pt-6 space-y-5">
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SMS Confirmation Template (EN)</label>
-                      <button
-                        type="button"
-                        onClick={() => setActiveInfoFeature({
-                          title: "SMS Confirmation Template (EN)",
-                          description: "Configure the English message sent to patients when their booking is approved. You can use dynamic variables like {name} for patient name, {service} for service name, {date} for appointment date, and {time} for slot time."
-                        })}
-                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                        title="Click for info"
-                      >
-                        <Info size={13} />
-                      </button>
-                    </div>
-                    <textarea
-                      value={notifSmsTemplate}
-                      onChange={(e) => setNotifSmsTemplate(e.target.value)}
-                      rows={3}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition font-mono"
-                    />
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Supports variables: <code>{`{name}`}</code>, <code>{`{service}`}</code>, <code>{`{date}`}</code>, <code>{`{time}`}</code>.</span>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-end gap-1.5 mb-2">
-                      <button
-                        type="button"
-                        onClick={() => setActiveInfoFeature({
-                          title: "قالب رسالة التأكيد النصية (AR)",
-                          description: "قم بتهيئة نص الرسالة باللغة العربية التي تُرسل للمرضى عند تأكيد الحجز. يدعم الحقول المتغيرة مثل {name} لاسم المريض، و {service} لاسم الخدمة، و {date} لتاريخ الموعد، و {time} لوقت الموعد."
-                        })}
-                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                        title="Click for info"
-                      >
-                        <Info size={13} />
-                      </button>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] text-right">قالب رسالة التأكيد النصية (AR)</label>
-                    </div>
-                    <textarea
-                      value={notifSmsTemplateAr}
-                      onChange={(e) => setNotifSmsTemplateAr(e.target.value)}
-                      rows={3}
-                      dir="rtl"
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition font-mono text-right"
-                    />
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block text-right">يدعم الحقول المتغيرة: <code>{`{name}`}</code>، <code>{`{service}`}</code>، <code>{`{date}`}</code>، <code>{`{time}`}</code>.</span>
-                  </div>
-                </div>
-
-                <div className="border-t border-[#F2EFE9] pt-6 grid gap-6 md:grid-cols-2">
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Reminder Timing (Hours Before)</label>
-                      <button
-                        type="button"
-                        onClick={() => setActiveInfoFeature({
-                          title: "Reminder Timing (Hours Before)",
-                          description: "Set how many hours before the appointment the system should send a reminder notification (via SMS or WhatsApp) to the patient. This dramatically reduces no-show rates."
-                        })}
-                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                        title="Click for info"
-                      >
-                        <Info size={13} />
-                      </button>
-                    </div>
-                    <select
-                      value={notifReminderHours}
-                      onChange={(e) => setNotifReminderHours(Number(e.target.value))}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition font-semibold"
-                    >
-                      <option value={2}>2 Hours Before</option>
-                      <option value={6}>6 Hours Before</option>
-                      <option value={12}>12 Hours Before</option>
-                      <option value={24}>24 Hours Before (1 Day)</option>
-                      <option value={48}>48 Hours Before (2 Days)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Staff Summary Daily Email</label>
-                      <button
-                        type="button"
-                        onClick={() => setActiveInfoFeature({
-                          title: "Staff Summary Daily Email",
-                          description: "Enter the email address where the clinic should receive a consolidated daily summary of all appointments scheduled for the upcoming day. Perfect for clinic directors or administration leads."
-                        })}
-                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                        title="Click for info"
-                      >
-                        <Info size={13} />
-                      </button>
-                    </div>
-                    <input
-                      type="email"
-                      value={notifStaffEmail}
-                      onChange={(e) => setNotifStaffEmail(e.target.value)}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                    />
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Sends a daily summary of appointments to this address.</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <NotificationSettingsView
+              notifSmsOtp={notifSmsOtp}
+              setNotifSmsOtp={setNotifSmsOtp}
+              notifWhatsApp={notifWhatsApp}
+              setNotifWhatsApp={setNotifWhatsApp}
+              notifEmailConfirm={notifEmailConfirm}
+              setNotifEmailConfirm={setNotifEmailConfirm}
+              notifSmsTemplate={notifSmsTemplate}
+              setNotifSmsTemplate={setNotifSmsTemplate}
+              notifSmsTemplateAr={notifSmsTemplateAr}
+              setNotifSmsTemplateAr={setNotifSmsTemplateAr}
+              notifReminderHours={notifReminderHours}
+              setNotifReminderHours={setNotifReminderHours}
+              notifStaffEmail={notifStaffEmail}
+              setNotifStaffEmail={setNotifStaffEmail}
+              handleSaveNotificationSettings={handleSaveNotificationSettings}
+              savingNotificationSettings={savingNotificationSettings}
+              setActiveInfoFeature={setActiveInfoFeature}
+              lang={lang}
+              t={adminTranslations[lang].settingsScreens.notificationSettings}
+            />
           )}
 
           {activeNav === "Queue Settings" && (
-            <div className="space-y-6">
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-4xl font-semibold text-[#1F251A]">Queue &amp; Waiting Room Settings</h2>
-                  <p className="mt-2 text-sm text-[#5A6A51]">Configure lobby display screens, check-in thresholds and session calculations.</p>
-                </div>
-                <button
-                  onClick={handleSaveQueueSettings}
-                  disabled={savingQueueSettings}
-                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
-                >
-                  {savingQueueSettings ? "Saving..." : "Save Queue Settings"}
-                </button>
-              </div>
-
-              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-6">
-                <div className="space-y-4">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={queueVirtualRoom}
-                      onChange={(e) => setQueueVirtualRoom(e.target.checked)}
-                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
-                    />
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold text-[#1F251A]">Enable Virtual Waiting Room Tracker</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setActiveInfoFeature({
-                              title: "Enable Virtual Waiting Room Tracker",
-                              description: "When enabled, patients who have checked in can open the clinic's web portal on their phone and see a live view of their position in the queue (e.g. '3rd in line'). They receive automatic updates as the queue progresses, allowing them to wait comfortably outside the clinic."
-                            });
-                          }}
-                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                          title="Click for info"
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
-                      <span className="text-xs text-[#5A6A51]">Allows checked-in patients to track live queue position via mobile.</span>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={queueShowOnScreens}
-                      onChange={(e) => setQueueShowOnScreens(e.target.checked)}
-                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
-                    />
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold text-[#1F251A]">Display Queue on Lobby TV Screens</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setActiveInfoFeature({
-                              title: "Display Queue on Lobby TV Screens",
-                              description: "When enabled, a real-time queue board is projected onto TV screens in the clinic lobby, showing patients' ticket numbers and current calling status. This reduces reception desk inquiries and keeps the lobby atmosphere calm and organized."
-                            });
-                          }}
-                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                          title="Click for info"
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
-                      <span className="text-xs text-[#5A6A51]">Show queue statuses on public dashboard screens inside clinic lobbies.</span>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={queueAutoCheckIn}
-                      onChange={(e) => setQueueAutoCheckIn(e.target.checked)}
-                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
-                    />
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold text-[#1F251A]">Auto Check-In on Arrival</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setActiveInfoFeature({
-                              title: "Auto Check-In on Arrival",
-                              description: "When enabled, the system automatically detects a patient's arrival using GPS geofencing (when they enter the clinic's location boundary) or by scanning a QR code at reception. This eliminates manual check-in steps and instantly places the patient in the queue."
-                            });
-                          }}
-                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                          title="Click for info"
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
-                      <span className="text-xs text-[#5A6A51]">Use geofencing or terminal scan to auto register presence on patient arrival.</span>
-                    </div>
-                  </label>
-                </div>
-
-                <div className="border-t border-[#F2EFE9] pt-6 grid gap-6 md:grid-cols-2">
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Queue Alert SMS Threshold</label>
-                      <button
-                        type="button"
-                        onClick={() => setActiveInfoFeature({
-                          title: "Queue Alert SMS Threshold",
-                          description: "Set how many patients ahead of them the system should send a heads-up SMS alert to notify the next patient to return to the waiting room. For example, set to '2 Patients Ahead' so the patient is alerted when there are only 2 people before their turn."
-                        })}
-                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                        title="Click for info"
-                      >
-                        <Info size={13} />
-                      </button>
-                    </div>
-                    <select
-                      value={queueAlertThreshold}
-                      onChange={(e) => setQueueAlertThreshold(Number(e.target.value))}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                    >
-                      <option value={1}>1 Patient Ahead</option>
-                      <option value={2}>2 Patients Ahead</option>
-                      <option value={3}>3 Patients Ahead</option>
-                      <option value={4}>4 Patients Ahead</option>
-                      <option value={5}>5 Patients Ahead</option>
-                    </select>
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Trigger SMS warning alert to patient before their turn.</span>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Average Session Duration (Minutes)</label>
-                      <button
-                        type="button"
-                        onClick={() => setActiveInfoFeature({
-                          title: "Average Session Duration (Minutes)",
-                          description: "Enter the average time in minutes that a doctor's appointment or treatment session typically takes. This value is used to calculate estimated wait times for patients in the queue. For example, if set to 20 minutes and there are 3 patients ahead, the system estimates a 60-minute wait."
-                        })}
-                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                        title="Click for info"
-                      >
-                        <Info size={13} />
-                      </button>
-                    </div>
-                    <input
-                      type="number"
-                      min={1}
-                      value={queueAvgSessionDuration}
-                      onChange={(e) => setQueueAvgSessionDuration(Number(e.target.value))}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                    />
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Used for calculating estimated waiting room delays.</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <QueueSettingsView
+              queueVirtualRoom={queueVirtualRoom}
+              setQueueVirtualRoom={setQueueVirtualRoom}
+              queueShowOnScreens={queueShowOnScreens}
+              setQueueShowOnScreens={setQueueShowOnScreens}
+              queueAutoCheckIn={queueAutoCheckIn}
+              setQueueAutoCheckIn={setQueueAutoCheckIn}
+              queueAlertThreshold={queueAlertThreshold}
+              setQueueAlertThreshold={setQueueAlertThreshold}
+              queueAvgSessionDuration={queueAvgSessionDuration}
+              setQueueAvgSessionDuration={setQueueAvgSessionDuration}
+              handleSaveQueueSettings={handleSaveQueueSettings}
+              savingQueueSettings={savingQueueSettings}
+              setActiveInfoFeature={setActiveInfoFeature}
+              lang={lang}
+              t={adminTranslations[lang].settingsScreens.queueSettings}
+            />
           )}
 
 

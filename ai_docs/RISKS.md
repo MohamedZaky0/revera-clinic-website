@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-23 (reorganized by status — see summary below; RISK-069 is the newest
+> **Last Updated:** 2026-08-23 (reorganized by status — see summary below; RISK-073 is the newest
 > entry)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
@@ -15,7 +15,7 @@
 
 ## Status summary
 
-**13 open** · **12 partially resolved** · **42 resolved** · 67 tracked total.
+**16 open** · **12 partially resolved** · **42 resolved** · 70 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -35,6 +35,9 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 - [RISK-067](#risk-067) — `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data
 - [RISK-069](#risk-069) — Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees
 - [RISK-070](#risk-070) — Some Roles' "Allowed Modules" Chips Show Untranslated Category Names Instead Of Permission Labels
+- [RISK-071](#risk-071) — Notification Settings and Queue Settings Never Hydrate From Saved Data
+- [RISK-072](#risk-072) — `POST /api/page-settings` Shallow-Merge Destroys Sibling Fields Within A Key
+- [RISK-073](#risk-073) — Booking, Notification, and Queue Settings Saves Are Fire-and-Forget
 
 ## RISK-001: Duplication Friction (hardcoded Revera-specific values)
 
@@ -555,6 +558,83 @@ underlying `roles` table has mixed-format legacy data Brief 25 never touched or 
 **Not fixed here:** either migrate the coarse-format rows to granular keys, or extend
 `permissionKeyToLabel` with a second fallback layer for bare category words (translating to the
 category label instead of the raw English word) if migrating existing role data isn't wanted.
+
+---
+
+## RISK-071: Notification Settings and Queue Settings Never Hydrate From Saved Data
+
+**Severity:** Medium · **Type:** Data integrity / UX
+**Found:** 2026-08-23, during Brief 26 Part 1 extraction (WINDSURF_BRIEFS.md defect #1).
+**Status:** Open.
+
+**What it is:** `fetchPageSettings()` (`src/app/admin/page.tsx:3852-4021`) hydrates `booking`,
+`deposit`, `inactivity`, `footer.serviceHours`, and `departments` from the `page_settings` blob on
+page load — but has **no branch for `data.notifications` or `data.queue`**. Confirmed by grep:
+zero matches for `data.notifications` or `data.queue` in the function. Every `setNotif*` and
+`setQueue*` setter is called only from its own `onChange` handler, never from the loader.
+
+**Consequence:** both screens are **write-only** — save works (POST reaches the API), but reload
+the admin panel and all Notification and Queue settings silently revert to their `useState`
+defaults. The user sees placeholder values, not what was saved. Same class as RISK-058 (Clinic
+Profile).
+
+**Not fixed** — Brief 26 Part 1 is extraction-only with an explicit no-behaviour-change
+requirement. The fix is adding `if (data.notifications) { setNotifSmsOtp(...); ... }` and
+`if (data.queue) { setQueueVirtualRoom(...); ... }` branches to `fetchPageSettings()`, matching
+the existing pattern for `data.booking` / `data.deposit` / `data.inactivity`.
+
+---
+
+## RISK-072: `POST /api/page-settings` Shallow-Merge Destroys Sibling Fields Within A Key
+
+**Severity:** High · **Type:** Data integrity / Financial correctness
+**Found:** 2026-08-23, during Brief 26 Part 1 extraction (WINDSURF_BRIEFS.md defect #2).
+**Status:** Open.
+
+**What it is:** `POST /api/page-settings` (`src/app/api/page-settings/route.ts:149-151`) merges the
+incoming body into the existing `page_settings.value` blob with a **top-level shallow spread**:
+
+```ts
+const mergedValue = {
+  ...(existing?.value || {}),
+  ...body
+};
+```
+
+This means POSTing `{ booking: { minAdvance: 2 } }` replaces the **entire** `booking` key — any
+sibling field inside `booking` that the caller didn't send (e.g. `staleSessionHours`,
+`termsText`, `cancelWindow`) is silently destroyed.
+
+**Live instance:** `savePageSettings()` (Pages Settings, Brief 27) sends a `booking` block that
+omits `staleSessionHours`. Saving any CMS section through Pages Settings wipes
+`staleSessionHours` from the database. `handleSaveBookingSettings` (Booking Settings) includes it,
+so Booking Settings is the safe writer and Pages Settings is the destructive one.
+
+**Not fixed** — Brief 26 Part 1 is extraction-only. The fix is a deep-merge (per-key) in the
+POST handler: `{ ...existing.value, [key]: { ...existing.value[key], ...body[key] } }` for each
+top-level key in `body`, rather than replacing the whole key. Brief 26 Part 3 specifies a test
+for this (`it.fails` asserting the field is destroyed).
+
+---
+
+## RISK-073: Booking, Notification, and Queue Settings Saves Are Fire-and-Forget
+
+**Severity:** Medium · **Type:** Error handling / UX
+**Found:** 2026-08-23, during Brief 26 Part 1 extraction (WINDSURF_BRIEFS.md defect #3).
+**Status:** Open.
+
+**What it is:** the save handlers for Booking Settings (`handleSaveBookingSettings`), Notification
+Settings (`handleSaveNotificationSettings`), and Queue Settings (`handleSaveQueueSettings`) in
+`src/app/admin/page.tsx` all `await fetch(...)` but **never check `res.ok`**, never alert on
+failure, never `clearFetchCache()`, and never re-fetch after saving. A failed save is completely
+silent — the user sees no error and the stale cached value persists.
+
+By contrast, `handleSaveDepositSettings` and `handleSaveInactivitySettings` **do** check `res.ok`,
+alert on success/failure, clear the cache, and re-fetch.
+
+**Not fixed** — Brief 26 Part 1 is extraction-only. The fix is adding `if (res.ok) { alert(...);
+clearFetchCache(); fetchPageSettings(); } else { alert("Failed to save..."); }` to the three
+handlers, matching the Deposit/Inactivity pattern.
 
 ---
 
