@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { clearFetchCache } from "@/lib/fetchCache";
+import { adminTranslations } from "@/components/admin/translations";
 
 const PERMISSION_STRUCTURE = [
   {
@@ -160,6 +161,8 @@ interface RoleManagementViewProps {
   handleDeleteEmployee: (id: string) => Promise<void>;
   handleResendInvitation: (id: string) => Promise<void>;
   fetchRolesAndEmployees: () => Promise<void>;
+  lang: "en" | "ar";
+  t: (typeof adminTranslations)["en"]["roleManagement"];
 }
 
 export default function RoleManagementView({
@@ -185,12 +188,24 @@ export default function RoleManagementView({
   handleDeleteEmployee,
   handleResendInvitation,
   fetchRolesAndEmployees,
+  lang,
+  t,
 }: RoleManagementViewProps) {
   const [newRoleName, setNewRoleName] = useState("");
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>([]);
   const [roleCreateError, setRoleCreateError] = useState("");
   const [roleCreateSuccess, setRoleCreateSuccess] = useState("");
   const [newDeptInput, setNewDeptInput] = useState("");
+
+  const permissionKeyToLabel = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const group of PERMISSION_STRUCTURE) {
+      for (const item of group.items) {
+        map[item.key] = t.permissionLabels[item.key as keyof typeof t.permissionLabels] || item.key;
+      }
+    }
+    return map;
+  }, [t]);
 
   async function handleCreateRole(e: React.FormEvent) {
     e.preventDefault();
@@ -211,20 +226,20 @@ export default function RoleManagementView({
       if (res.ok) {
         setNewRoleName("");
         setNewRolePermissions([]);
-        setRoleCreateSuccess("Role saved successfully!");
+        setRoleCreateSuccess(t.defineRoles.roleSavedSuccess);
         fetchRolesAndEmployees();
         setTimeout(() => setRoleCreateSuccess(""), 3000);
       } else {
         const data = await res.json();
-        setRoleCreateError(data.error || "Failed to create role.");
+        setRoleCreateError(data.error || t.defineRoles.createRoleFailed);
       }
     } catch (err: any) {
-      setRoleCreateError(err.message || "Network error.");
+      setRoleCreateError(err.message || t.defineRoles.networkError);
     }
   }
 
   async function handleDeleteRole(name: string) {
-    if (!(await showConfirm(`Are you sure you want to delete the role '${name}'? This will disconnect employee accounts assigned to this role.`))) return;
+    if (!(await showConfirm(t.defineRoles.deleteRoleConfirm(name)))) return;
     try {
       const res = await fetch(`/api/roles?name=${encodeURIComponent(name)}`, {
         method: 'DELETE',
@@ -236,10 +251,10 @@ export default function RoleManagementView({
         fetchRolesAndEmployees();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to delete role.");
+        alert(data.error || t.defineRoles.deleteRoleFailed);
       }
     } catch (err: any) {
-      alert("Error deleting role: " + err.message);
+      alert(t.defineRoles.deleteRoleError + err.message);
     }
   }
 
@@ -248,7 +263,7 @@ export default function RoleManagementView({
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!newEmployeeName.trim() || !newEmployeeEmail.trim() || !newEmployeeRole) return;
     if (!emailRegex.test(newEmployeeEmail.trim())) {
-      setEmployeeCreateError("Please enter a valid email address.");
+      setEmployeeCreateError(t.provisionEmployees.invalidEmail);
       return;
     }
     setEmployeeCreateError("");
@@ -272,16 +287,16 @@ export default function RoleManagementView({
         setNewEmployeeEmail("");
         setNewEmployeeName("");
         setNewEmployeeRole("");
-        setEmployeeCreateSuccess(`Invitation sent to ${newEmployeeEmail.trim()}! They will receive an email to set their password.`);
+        setEmployeeCreateSuccess(t.provisionEmployees.invitationSent(newEmployeeEmail.trim()));
         clearFetchCache();
         fetchRolesAndEmployees();
         setTimeout(() => setEmployeeCreateSuccess(""), 6000);
       } else {
         const data = await res.json();
-        setEmployeeCreateError(data.error || "Failed to send invitation.");
+        setEmployeeCreateError(data.error || t.provisionEmployees.sendInvitationFailed);
       }
     } catch (err: any) {
-      setEmployeeCreateError(err.message || "Network error.");
+      setEmployeeCreateError(err.message || t.defineRoles.networkError);
     }
   }
 
@@ -299,10 +314,10 @@ export default function RoleManagementView({
         fetchRolesAndEmployees();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to update employee role.");
+        alert(data.error || t.provisionEmployees.updateRoleFailed);
       }
     } catch (err: any) {
-      alert("Error updating employee role: " + err.message);
+      alert(t.provisionEmployees.updateRoleError + err.message);
     }
   }
 
@@ -323,27 +338,27 @@ export default function RoleManagementView({
   }
 
   return (
-    <div className="space-y-8 animate-fadeIn">
+    <div className="space-y-8 animate-fadeIn" dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="mb-6">
-        <h2 className="text-4xl font-semibold text-[#1F251A]">Role & Credentials Management</h2>
-        <p className="mt-2 text-sm text-[#5A6A51]">Define system roles, set view permissions, and provision employee credentials.</p>
+        <h2 className="text-4xl font-semibold text-[#1F251A]">{t.title}</h2>
+        <p className="mt-2 text-sm text-[#5A6A51]">{t.subtitle}</p>
       </div>
 
       {/* Grid for Roles and Employee Accounts */}
       <div className="grid gap-8 lg:grid-cols-1">
         {/* 1. Manage Roles Card */}
         <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-          <h3 className="text-xl font-bold text-[#1F251A] mb-4">Define System Roles</h3>
+          <h3 className="text-xl font-bold text-[#1F251A] mb-4">{t.defineRoles.cardTitle}</h3>
           
           {/* Create Role Form */}
           <form onSubmit={handleCreateRole} className="mb-6 space-y-4 rounded-3xl border border-[#414E36]/10 bg-white p-5">
             <div className="space-y-4">
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Role Name</label>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.defineRoles.roleNameLabel}</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. receptionist"
+                  placeholder={t.defineRoles.roleNamePlaceholder}
                   value={newRoleName}
                   onChange={(e) => {
                     setNewRoleName(e.target.value);
@@ -353,7 +368,7 @@ export default function RoleManagementView({
                 />
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-3">Permissions & Access Control</label>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-3">{t.defineRoles.permissionsLabel}</label>
                 <div className="grid gap-4 md:grid-cols-2 max-h-[550px] overflow-y-auto rounded-3xl border border-[#414E36]/10 p-5 bg-[#FBFBF9]">
                   {PERMISSION_STRUCTURE.map((group) => {
                     const allChecked = group.items.every(item => newRolePermissions.includes(item.key));
@@ -380,7 +395,7 @@ export default function RoleManagementView({
                                 }}
                                 className="h-4 w-4 accent-[#414E36] rounded"
                               />
-                              {group.category}
+                              {t.permissionCategories[group.category as keyof typeof t.permissionCategories] || group.category}
                             </label>
                             <span className="text-[10px] font-bold text-[#414E36] bg-[#414E36]/5 px-2 py-0.5 rounded-full">
                               {group.items.filter(item => newRolePermissions.includes(item.key)).length} / {group.items.length}
@@ -401,7 +416,7 @@ export default function RoleManagementView({
                                   }}
                                   className="h-4 w-4 accent-[#414E36] rounded"
                                 />
-                                {item.label}
+                                {t.permissionLabels[item.key as keyof typeof t.permissionLabels] || item.label}
                               </label>
                             ))}
                           </div>
@@ -420,7 +435,7 @@ export default function RoleManagementView({
               type="submit"
               className="rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
             >
-              Save Role
+              {t.defineRoles.saveRoleBtn}
             </button>
           </form>
 
@@ -429,19 +444,19 @@ export default function RoleManagementView({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                  <th className="px-6 py-4 text-left">Role Name</th>
-                  <th className="px-6 py-4 text-left">Allowed Modules</th>
-                  <th className="px-6 py-4 text-center">Actions</th>
+                  <th className="px-6 py-4 text-start">{t.defineRoles.tableRoleName}</th>
+                  <th className="px-6 py-4 text-start">{t.defineRoles.tableAllowedModules}</th>
+                  <th className="px-6 py-4 text-center">{t.defineRoles.tableActions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
                 {loadingRolesAndEmployees ? (
                   <tr>
-                    <td colSpan={3} className="px-6 py-5 text-center text-xs text-gray-400">Loading roles...</td>
+                    <td colSpan={3} className="px-6 py-5 text-center text-xs text-gray-400">{t.defineRoles.loadingRoles}</td>
                   </tr>
                 ) : rolesList.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="px-6 py-5 text-center text-xs text-gray-400">No roles configured.</td>
+                    <td colSpan={3} className="px-6 py-5 text-center text-xs text-gray-400">{t.defineRoles.noRoles}</td>
                   </tr>
                 ) : rolesList.map((r) => (
                   <tr key={r.id} className="transition hover:bg-[#F9F9F7]">
@@ -449,7 +464,7 @@ export default function RoleManagementView({
                     <td className="px-6 py-4 text-xs font-semibold text-[#5A6A51]">
                       <div className="flex flex-wrap gap-1.5">
                         {r.permissions.map((p: string) => (
-                          <span key={p} className="rounded-full bg-[#EDF1EC] px-2.5 py-0.5 text-[#414E36] border border-[#414E36]/10">{p}</span>
+                          <span key={p} className="rounded-full bg-[#EDF1EC] px-2.5 py-0.5 text-[#414E36] border border-[#414E36]/10">{permissionKeyToLabel[p] || p}</span>
                         ))}
                       </div>
                     </td>
@@ -459,11 +474,11 @@ export default function RoleManagementView({
                           type="button"
                           onClick={() => handleDeleteRole(r.name)}
                           className="text-red-600 hover:text-red-800 transition"
-                          title="Delete Role"
+                          title={t.defineRoles.deleteRoleTitle}
                         >
                           <Trash2 size={16} />
                         </button>
-                      ) : <span className="text-xs text-gray-400 font-semibold italic">System Locked</span>}
+                      ) : <span className="text-xs text-gray-400 font-semibold italic">{t.defineRoles.systemLocked}</span>}
                     </td>
                   </tr>
                 ))}
@@ -474,17 +489,17 @@ export default function RoleManagementView({
 
         {/* 2. Manage Employees / Credentials Provisioning */}
         <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-          <h3 className="text-xl font-bold text-[#1F251A] mb-4">Provision Employee Credentials</h3>
+          <h3 className="text-xl font-bold text-[#1F251A] mb-4">{t.provisionEmployees.cardTitle}</h3>
           
           {/* Create Employee Form — OAuth Invite Flow */}
           <form onSubmit={handleCreateEmployee} className="mb-6 space-y-4 rounded-3xl border border-[#414E36]/10 bg-white p-5">
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Full Name</label>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.provisionEmployees.fullNameLabel}</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Sara El Gamel"
+                  placeholder={t.provisionEmployees.fullNamePlaceholder}
                   value={newEmployeeName}
                   onChange={(e) => {
                     setNewEmployeeName(e.target.value);
@@ -494,11 +509,11 @@ export default function RoleManagementView({
                 />
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Work Email Address</label>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.provisionEmployees.emailLabel}</label>
                 <input
                   type="email"
                   required
-                  placeholder="e.g. sara@gmail.com"
+                  placeholder={t.provisionEmployees.emailPlaceholder}
                   value={newEmployeeEmail}
                   onChange={(e) => {
                     setNewEmployeeEmail(e.target.value);
@@ -508,7 +523,7 @@ export default function RoleManagementView({
                 />
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Assign Role</label>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.provisionEmployees.assignRoleLabel}</label>
                 <select
                   required
                   value={newEmployeeRole}
@@ -518,7 +533,7 @@ export default function RoleManagementView({
                   }}
                   className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
                 >
-                  <option value="">Select Role...</option>
+                  <option value="">{t.provisionEmployees.selectRolePlaceholder}</option>
                   {rolesList.map(r => (
                     <option key={r.id} value={r.name} className="capitalize">{r.name}</option>
                   ))}
@@ -530,7 +545,7 @@ export default function RoleManagementView({
             <div className="flex items-start gap-2.5 rounded-2xl bg-[#EDF5E8] border border-[#414E36]/15 px-4 py-3">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mt-0.5 shrink-0 text-[#414E36]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <p className="text-xs text-[#414E36] font-medium leading-relaxed">
-                An official <strong>invitation email</strong> will be sent to the employee&apos;s address. They will set their own password via the link — no password is stored by the admin.
+                {t.provisionEmployees.inviteBanner}
               </p>
             </div>
 
@@ -542,7 +557,7 @@ export default function RoleManagementView({
               className="inline-flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-              Send Invitation
+              {t.provisionEmployees.sendInvitationBtn}
             </button>
           </form>
 
@@ -551,22 +566,22 @@ export default function RoleManagementView({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                  <th className="px-6 py-4 text-left">Full Name</th>
-                  <th className="px-6 py-4 text-left">Assigned Role</th>
-                  <th className="px-6 py-4 text-left">Login Email</th>
-                  <th className="px-6 py-4 text-center">Status</th>
-                  <th className="px-6 py-4 text-center">Actions</th>
+                  <th className="px-6 py-4 text-start">{t.provisionEmployees.tableFullName}</th>
+                  <th className="px-6 py-4 text-start">{t.provisionEmployees.tableAssignedRole}</th>
+                  <th className="px-6 py-4 text-start">{t.provisionEmployees.tableLoginEmail}</th>
+                  <th className="px-6 py-4 text-center">{t.provisionEmployees.tableStatus}</th>
+                  <th className="px-6 py-4 text-center">{t.provisionEmployees.tableActions}</th>
                 </tr>
 
               </thead>
               <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
                 {loadingRolesAndEmployees ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">Loading accounts...</td>
+                    <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">{t.provisionEmployees.loadingAccounts}</td>
                   </tr>
                 ) : employeesList.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">No employee accounts provisioned yet. Use the form above to send an invitation.</td>
+                    <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">{t.provisionEmployees.noAccounts}</td>
                   </tr>
                 ) : employeesList.map((emp) => (
                   <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
@@ -591,9 +606,9 @@ export default function RoleManagementView({
                     <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">{emp.email}</td>
                     <td className="px-6 py-4 text-center">
                       {emp.email_confirmed_at ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">✓ Active</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">{t.provisionEmployees.active}</span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">⏳ Invite Pending</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">{t.provisionEmployees.invitePending}</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -604,22 +619,22 @@ export default function RoleManagementView({
                               type="button"
                               onClick={() => handleResendInvitation(emp.id)}
                               className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100"
-                              title="Resend Invitation Email"
+                              title={t.provisionEmployees.resendTitle}
                             >
                               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9z"/></svg>
-                              Resend
+                              {t.provisionEmployees.resendBtn}
                             </button>
                           )}
                           <button
                             type="button"
                             onClick={() => handleDeleteEmployee(emp.id)}
                             className="text-red-600 hover:text-red-800 transition"
-                            title="Revoke Access"
+                            title={t.provisionEmployees.revokeAccessTitle}
                           >
                             <Trash2 size={16} />
                           </button>
                         </div>
-                      ) : <span className="text-xs text-gray-400 font-semibold italic">System Owner</span>}
+                      ) : <span className="text-xs text-gray-400 font-semibold italic">{t.provisionEmployees.systemOwner}</span>}
                     </td>
                   </tr>
                 ))}
@@ -630,8 +645,8 @@ export default function RoleManagementView({
 
         {/* 3. Department Management Card */}
         <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-          <h3 className="text-xl font-bold text-[#1F251A] mb-1">Department Management</h3>
-          <p className="text-xs text-[#5A6A51] mb-5">Add or remove organizational departments used for employee categorization.</p>
+          <h3 className="text-xl font-bold text-[#1F251A] mb-1">{t.departments.cardTitle}</h3>
+          <p className="text-xs text-[#5A6A51] mb-5">{t.departments.subtitle}</p>
 
           <form
             onSubmit={(e) => {
@@ -639,7 +654,7 @@ export default function RoleManagementView({
               const val = newDeptInput.trim();
               if (!val) return;
               if (departmentsList.map(d => d.toLowerCase()).includes(val.toLowerCase())) {
-                alert("Department already exists!");
+                alert(t.departments.alreadyExists);
                 return;
               }
               handleSaveDepartments([...departmentsList, val]);
@@ -649,7 +664,7 @@ export default function RoleManagementView({
           >
             <input
               type="text"
-              placeholder="e.g. Receptionist, Nursing, Medical..."
+              placeholder={t.departments.inputPlaceholder}
               value={newDeptInput}
               onChange={(e) => setNewDeptInput(e.target.value)}
               className="w-full max-w-md rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
@@ -658,7 +673,7 @@ export default function RoleManagementView({
               type="submit"
               className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#2e3a26] transition flex items-center gap-1.5"
             >
-              <Plus size={14} /> Add Department
+              <Plus size={14} /> {t.departments.addBtn}
             </button>
           </form>
 
@@ -670,12 +685,12 @@ export default function RoleManagementView({
                   <button
                     type="button"
                     onClick={() => {
-                      if (confirm(`Are you sure you want to remove the '${dept}' department?`)) {
+                      if (confirm(t.departments.removeConfirm(dept))) {
                         handleSaveDepartments(departmentsList.filter(d => d !== dept));
                       }
                     }}
-                    className="text-red-500 hover:text-red-700 ml-1 transition"
-                    title="Remove Department"
+                    className="text-red-500 hover:text-red-700 ms-1 transition"
+                    title={t.departments.removeTitle}
                   >
                     <Trash2 size={13} />
                   </button>

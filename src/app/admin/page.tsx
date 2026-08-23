@@ -9406,6 +9406,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               handleDeleteEmployee={handleDeleteEmployee}
               handleResendInvitation={handleResendInvitation}
               fetchRolesAndEmployees={fetchRolesAndEmployees}
+              lang={lang}
+              t={adminTranslations[lang].roleManagement}
             />
           )}
 
