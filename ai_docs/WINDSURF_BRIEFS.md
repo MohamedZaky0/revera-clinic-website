@@ -10,7 +10,113 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-_(none currently active)_
+## Brief 31 — Admin sidebar: translate nav labels and mirror it to RTL
+
+**Scope: `src/app/admin/page.tsx` lines 5528–5805 only** — the sidebar `<aside>` (5538–5805), its
+mobile backdrop, and the outer shell `<div className="grid ... grid-cols-[220px_1fr]">` (5530) that
+positions it. Not a separate component — it's inline in `page.tsx` and always has been; grepped the
+whole block for `dir=`, `adminTranslations`, `t.` — **zero hits**. Every other screen in this i18n
+series (Employees, HR, Role Management, the 7 Settings screens, Reception Dashboard, User Profile)
+has been extracted and translated; this is the one piece of chrome visible on *every single admin
+screen* that never got touched, because it was never anyone's "screen" to extract.
+
+**Read this before writing a single line — the value/label trap that will break the whole file if
+missed.** `SIDEBAR_ITEMS` (214–229) and both submenu arrays (Settings' 14 items at ~5642–5658,
+Marketing's 2 at 5728–5729) use `label` as **both** the display text **and** the canonical key:
+`onClick={() => setActiveNav(item.label)}` (5773, 5674, 5737) sets `activeNav` to that exact
+English string, and **dozens of `activeNav === "Bookings"` / `.includes(activeNav)` checks
+throughout the rest of this 11,000-line file** — the entire `{activeNav === "X" && (...)}` render
+gate pattern this whole admin panel is built on — compare against it verbatim. **Translating
+`item.label`/`sub.label` directly would silently break every one of those comparisons** (nothing
+would render, no error, no crash — the exact class of bug this project's value/label rule exists to
+prevent). **Do not touch:** `SIDEBAR_ITEMS`, the two submenu arrays, `setActiveNav(...)` calls, the
+`.filter(sub => ...)` permission logic (5659–5666), `key={item.label}` / `key={sub.label}`, or any
+`activeNav === "..."` / `.includes(activeNav)` comparison anywhere in the file. **Only** the 3
+render sites — `<span className="truncate">{item.label}</span>` (5796), `{item.label}` inside the
+Settings/Marketing parent buttons (5716, 5619-area), and `<span className="truncate">{sub.label}</span>`
+(5682, 5745) — get wrapped in a label→translation lookup with the English label as a safe fallback
+for anything unmapped (`comingSoon` items, the `title={isComingSoon ? "Coming Soon" : undefined}`
+tooltip too).
+
+**Suggested translations** (add under a new `adminTranslations[...].sidebar` namespace — verify
+these read naturally, they weren't clinic-reviewed):
+
+| English (canonical key) | Arabic |
+|---|---|
+| Dashboard | لوحة التحكم |
+| Bookings | الحجوزات |
+| Patients | المرضى |
+| Doctors | الأطباء |
+| Services | الخدمات |
+| Inventory | المخزون |
+| Employees | الموظفون |
+| HR | الموارد البشرية |
+| Marketing | التسويق |
+| Customer Support | دعم العملاء |
+| Reports | التقارير |
+| Finance | المالية |
+| Settings | الإعدادات |
+| Logout | تسجيل الخروج |
+| Clinic Profile | ملف العيادة |
+| Service Hours | ساعات العمل |
+| Branches | الفروع |
+| Rooms | الغرف |
+| Booking Settings | إعدادات الحجز |
+| Terms & Conditions | الشروط والأحكام |
+| Deposit Settings | إعدادات العربون |
+| Inactivity Settings | إعدادات الخمول |
+| Notification Settings | إعدادات الإشعارات |
+| Queue Settings | إعدادات قائمة الانتظار |
+| Pages Settings | إعدادات الصفحات |
+| Medical Records | السجلات الطبية |
+| Role Management | إدارة الأدوار |
+| System Test Suite | مجموعة اختبار النظام |
+| Promotions | العروض الترويجية |
+| Packages | الباقات |
+| Coming Soon (tooltip) | قريباً |
+
+**RTL mirroring — two separate problems, verify both live, don't assume one fix covers both:**
+
+1. **Content inside the sidebar** (icon/label order, text alignment) — straightforward: add
+   `dir={lang === "ar" ? "rtl" : "ltr"}` to the `<aside>` itself (5538), same pattern every other
+   screen uses on its own root. Convert the physical classes inside it to logical: `text-left` → 
+   `text-start` (5619, 5675, 5702, 5738, 5776 — 5 sites, one per button type), `pl-2 pr-1` → 
+   `ps-2 pe-1` (submenu containers, 5643 and 5726), `border-l-[3px] ... pl-2 rounded-l-none` →
+   `border-s-[3px] ... ps-2 rounded-s-none` (the active-sub-item accent bar, 5677 and 5740 — same
+   fix, two identical sites), `pr-0.5` → `pe-0.5` (the `<nav>` scroll-gutter padding, 5594).
+
+2. **The sidebar's own position on screen** — this is the actual "stuck on the left" bug reported,
+   and it's structurally different from #1, don't conflate them. Two sub-cases:
+   - **Mobile** (`fixed inset-y-0 left-0`, 5538, plus the `translate-x-0`/`-translate-x-full`
+     slide toggle at 5539): `position: fixed` elements are positioned relative to the *viewport*,
+     completely outside the grid — no amount of `dir` on the aside itself will move a `fixed`
+     element with a physical `left-0`. Needs the logical `start-0` (Tailwind `inset-inline-start-0`
+     via the `start-0` utility) instead, which resolves against the *aside's own* `direction` (set
+     by #1's `dir` attribute) — and the slide-in transform needs to flip too: closed state should
+     translate off-screen toward the *end* side in RTL, not always `-translate-x-full` (that's
+     always "toward the left" regardless of direction; in RTL the sidebar visually sits on the
+     right, so its closed state should push it further right, not left — check whether
+     `rtl:translate-x-full` / `ltr:-translate-x-full` conditional variants or a `lang`-driven
+     ternary is the cleaner way to express that in this codebase's existing Tailwind config).
+   - **Desktop** (`md:sticky`, in-flow inside `grid-cols-[220px_1fr]`, 5530): sticky elements *do*
+     stay in normal flow, so whether the 220px column visually ends up on the left or right depends
+     on the **grid container's own `direction`**, not the aside's. The grid `<div>` (5530) is a
+     level above where the "dir on the component's own root" convention normally applies — but
+     nothing else currently sets direction anywhere above the aside, so on desktop the grid may
+     currently render LTR-ordered regardless of `lang`. **Verify live**: at `md:` width and above,
+     does the 220px column move to the right when Arabic is selected once `dir` is on the aside, or
+     does the grid need its own `dir` too? Don't guess — check in the browser at both breakpoints
+     before deciding where the fix actually needs to live.
+
+**Not part of this brief:** the top navigation bar (branch dropdown, Profile button, hamburger —
+starts at 5807) is separate chrome with its own scope; leave it for a follow-up if it turns out to
+need the same treatment.
+
+**No test required** — same as every other Phase-2-only translation brief in this series. Manual
+test checklist still required per CLAUDE.md, covering: every top-level and submenu label renders in
+Arabic with no raw English left, `activeNav`-driven screens still render correctly after clicking
+translated sidebar items (proves the value/label separation held), sidebar visually mirrors to the
+right at both mobile and desktop widths, mobile slide-in/out still works in both languages.
 
 ---
 ---
