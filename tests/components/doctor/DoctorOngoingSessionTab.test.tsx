@@ -211,7 +211,10 @@ describe('additional services — money math', () => {
     fetchFake.on('GET', '/api/service-devices', () => ({ status: 200, body: { deviceLinks: [{ device_id: 'dev-1', pulses_per_session: 40 }] } }));
     const handleCompleteTreatment = vi.fn();
     const user = userEvent.setup();
-    render(<DoctorOngoingSessionTab {...baseProps({ handleCompleteTreatment, extraPulsesCount: 60 })} />);
+    // This test is about the pulse-sum math, not the first-visit medical-intake guard (4acad04) —
+    // a truthy medicalRecord keeps that unrelated guard out of the way, same as a returning
+    // patient with intake already on file.
+    render(<DoctorOngoingSessionTab {...baseProps({ handleCompleteTreatment, extraPulsesCount: 60, medicalRecord: { id: 'mr-1' } })} />);
 
     const panel = additionalServicesPanel();
     const [serviceSelect] = within(panel).getAllByRole('combobox');

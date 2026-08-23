@@ -66,9 +66,14 @@ const BASE_PROPS = {
   onLogout: vi.fn(),
 };
 
+// `handleCompleteTreatment` (added 4acad04) now blocks completion outright for a first-visit
+// patient — no medical record AND no prior completed visit for the same customer/phone/name —
+// until an intake form is filled and saved. That's a real clinical-safety gate, not a bug, so
+// these tests seed a prior completed visit for the same `customer_id` to represent a returning
+// patient, which is what "close out a checkout" is actually testing here. A separate describe
+// block below covers the first-visit guard itself.
 describe('checkout — handleCompleteTreatment', () => {
   it('PATCHes /api/reservations with status completed and amountLeft = invoice total minus amount already paid', async () => {
-    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [] }));
     fetchFake.on('PATCH', '/api/reservations', (call) => {
       expect(call.query.get('id')).toBe('res-1');
       expect(call.body).toMatchObject({
@@ -81,7 +86,17 @@ describe('checkout — handleCompleteTreatment', () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const user = userEvent.setup();
 
-    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[reservation({})]} />);
+    // The component silently re-fetches /api/reservations on mount and overwrites its own
+    // `reservations` state with whatever this returns — an empty-array mock would wipe out
+    // `priorVisit` before the click ever happens, since the first-visit guard reads from that
+    // same state, not from `initialReservations` directly.
+    const priorVisit = reservation({ id: 'res-0', status: 'completed', date: '2026-01-01' });
+    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [priorVisit, reservation({})] }));
+    fetchFake.on('GET', '/api/medical-records', () => ({ status: 200, body: null }));
+    fetchFake.on('GET', '/api/inventory/products', () => ({ status: 200, body: [] }));
+    fetchFake.on('GET', '/api/medical-records/templates', () => ({ status: 200, body: [] }));
+
+    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[priorVisit, reservation({})]} />);
 
     await user.click(screen.getByTitle('Ongoing Session'));
     await user.click(await screen.findByText('Complete Treatment'));
@@ -91,8 +106,35 @@ describe('checkout — handleCompleteTreatment', () => {
   });
 
   it('shows the server error instead of a false success alert when the completion PATCH fails', async () => {
-    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [] }));
     fetchFake.on('PATCH', '/api/reservations', () => ({ status: 400, body: { error: 'Reservation already completed.' } }));
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+
+    // The component silently re-fetches /api/reservations on mount and overwrites its own
+    // `reservations` state with whatever this returns — an empty-array mock would wipe out
+    // `priorVisit` before the click ever happens, since the first-visit guard reads from that
+    // same state, not from `initialReservations` directly.
+    const priorVisit = reservation({ id: 'res-0', status: 'completed', date: '2026-01-01' });
+    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [priorVisit, reservation({})] }));
+    fetchFake.on('GET', '/api/medical-records', () => ({ status: 200, body: null }));
+    fetchFake.on('GET', '/api/inventory/products', () => ({ status: 200, body: [] }));
+    fetchFake.on('GET', '/api/medical-records/templates', () => ({ status: 200, body: [] }));
+
+    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[priorVisit, reservation({})]} />);
+
+    await user.click(screen.getByTitle('Ongoing Session'));
+    await user.click(await screen.findByText('Complete Treatment'));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Reservation already completed.'));
+  });
+});
+
+describe('checkout — first-visit medical intake guard (4acad04)', () => {
+  it('blocks completion for a first-visit patient with no medical record and no prior completed visit', async () => {
+    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [] }));
+    fetchFake.on('GET', '/api/medical-records', () => ({ status: 200, body: null }));
+    fetchFake.on('GET', '/api/inventory/products', () => ({ status: 200, body: [] }));
+    fetchFake.on('GET', '/api/medical-records/templates', () => ({ status: 200, body: [] }));
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const user = userEvent.setup();
 
@@ -101,7 +143,10 @@ describe('checkout — handleCompleteTreatment', () => {
     await user.click(screen.getByTitle('Ongoing Session'));
     await user.click(await screen.findByText('Complete Treatment'));
 
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Reservation already completed.'));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith(
+      'Cannot complete treatment: Medical record intake is strictly required for first-visit patients. Please complete and save the intake form before ending the session.'
+    ));
+    expect(fetchFake.calls.some((c) => c.method === 'PATCH' && c.path === '/api/reservations')).toBe(false);
   });
 });
 

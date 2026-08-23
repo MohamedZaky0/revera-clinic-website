@@ -2751,6 +2751,45 @@ add per-key permission checks to `POST` matching the relevant `PERMISSION_STRUCT
 
 ## PROPOSALS.md Reference
 
+## RISK-068: First-Visit Medical Intake Guard Fired For Every Patient — `reservations` Prop Never Passed
+
+**Severity:** High · **Type:** Functional regression, doctor workflow
+**Found:** 2026-08-23, fixing test failures surfaced by a non-Windsurf merge. **Status:** RESOLVED
+same day.
+
+**What it is:** commit `4acad04` ("strictly prevent completing or closing treatment if first-visit
+medical record intake is missing") added a real clinical-safety rule to
+`DoctorOngoingSessionTab.tsx`: block "Complete Treatment" for a first-visit patient (no medical
+record on file AND no prior completed visit for the same customer/phone/name) until an intake form
+is saved. The "prior completed visit" half of that check reads a `reservations` prop
+(`patientPastCompletedVisits`, computed via `useMemo` over it) — but `DoctorAccountView.tsx`, the
+component's only real caller, **never passed that prop**. It defaults to `reservations = []`
+(line 136), so `patientPastCompletedVisits` was always empty and `isFirstVisit` was true for every
+patient who didn't already have a `medical_records` row, regardless of actual visit history.
+
+**Consequence:** any returning patient without a previously-saved medical record — plausible for
+most patients given intake wasn't mandatory before this commit — would be incorrectly treated as a
+first-time visitor. Doctors could not close out their session without re-doing intake, on every
+such booking.
+
+**Found via:** two test files broke after the merge (`tests/components/doctor/
+DoctorAccountView.test.tsx`, `tests/components/doctor/DoctorOngoingSessionTab.test.tsx`) — the
+checkout PATCH stopped firing because the new alert-and-return branch intercepted it first.
+Fixing the tests by seeding a past completed visit didn't help, which is what surfaced that the
+prop wiring itself was missing, not just the tests being stale.
+
+**Fix:** `src/components/admin/DoctorAccountView.tsx` — added `reservations={reservations}` to the
+`<DoctorOngoingSessionTab>` call. One line. Verified by reverting it and confirming the affected
+tests go red again (`expected false to be true` — the completion PATCH never fires), then restoring
+it and confirming both test files pass. Also added a dedicated test,
+*"blocks completion for a first-visit patient with no medical record and no prior completed
+visit"*, so the guard itself has real coverage going forward rather than only being an incidental
+side effect of the checkout tests passing.
+
+---
+
+## PROPOSALS.md Reference
+
 See `PROPOSALS.md` for:
 - **PROPOSAL-001** — extract all Revera-specific values into a single `client.config.ts`,
   making fork-per-client a one-file-edit operation.

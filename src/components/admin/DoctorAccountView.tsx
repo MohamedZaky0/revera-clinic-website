@@ -1155,6 +1155,7 @@ export default function DoctorAccountView({
             extraPulsesSubtotal={extraPulsesSubtotal}
             updatedInvoiceTotal={updatedInvoiceTotal}
             onAdditionalServicesChange={setAdditionalServices}
+            reservations={reservations}
             t={t}
           />
         )}
