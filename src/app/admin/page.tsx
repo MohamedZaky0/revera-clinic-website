@@ -5527,7 +5527,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
   return (
     <div id="admin-root" className="admin-view min-h-screen bg-[#F2EFE9] text-[#1F251A]">
-      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[220px_1fr]">
+      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[220px_1fr]" dir={lang === "ar" ? "rtl" : "ltr"}>
         {/* Backdrop for mobile sidebar */}
         {sidebarOpen && (
           <div
@@ -5535,8 +5535,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             onClick={() => setSidebarOpen(false)}
           />
         )}
-        <aside className={`fixed inset-y-0 left-0 z-50 flex w-[220px] h-screen flex-col bg-[#414E36] px-3.5 py-5 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:sticky md:top-0 md:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        <aside dir={lang === "ar" ? "rtl" : "ltr"} className={`fixed inset-y-0 start-0 z-50 flex w-[220px] h-screen flex-col bg-[#414E36] px-3.5 py-5 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:sticky md:top-0 md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : (lang === "ar" ? "translate-x-full" : "-translate-x-full")
         }`}>
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -5591,7 +5591,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             </button>
           </div>
 
-          <nav className="flex-1 space-y-1 overflow-y-auto pr-0.5">
+          <nav className="flex-1 space-y-1 overflow-y-auto pe-0.5">
             {permittedSidebarItems.map((item) => {
               if (item.label === "Settings") {
                 const Icon = item.icon;
@@ -5616,7 +5616,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       onClick={() => {
                         setSettingsExpanded(!settingsExpanded);
                       }}
-                      className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-left text-xs font-semibold transition-all duration-200 ${
+                      className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-start text-xs font-semibold transition-all duration-200 ${
                         active
                           ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
                           : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
@@ -5630,7 +5630,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         >
                           <Icon size={16} />
                         </span>
-                        <span className="truncate">{item.label}</span>
+                        <span className="truncate">{adminTranslations[lang].sidebar[item.label] || item.label}</span>
                       </div>
                       <ChevronDown
                         size={14}
@@ -5640,7 +5640,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       />
                     </button>
                     {settingsExpanded && (
-                      <div className="mt-1 space-y-0.5 overflow-hidden rounded-xl bg-black/15 py-1 pl-2 pr-1">
+                      <div className="mt-1 space-y-0.5 overflow-hidden rounded-xl bg-black/15 py-1 ps-2 pe-1">
                         {[
                           { label: "Clinic Profile", icon: Store, perm: "settings.profile" },
                           { label: "Service Hours", icon: Clock, perm: "settings.service_hours" },
@@ -5672,14 +5672,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               key={sub.label}
                               type="button"
                               onClick={() => setActiveNav(sub.label)}
-                              className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] font-medium transition-all duration-200 ${
+                              className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[11px] font-medium transition-all duration-200 ${
                                 subActive
-                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-2 rounded-l-none"
+                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-s-[3px] border-[#C4AE7C] ps-2 rounded-s-none"
                                   : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
                               }`}
                             >
                               <SubIcon size={13} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
-                              <span className="truncate">{sub.label}</span>
+                              <span className="truncate">{adminTranslations[lang].sidebar[sub.label] || sub.label}</span>
                             </button>
                           );
                         })}
@@ -5699,7 +5699,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       onClick={() => {
                         setMarketingExpanded(!marketingExpanded);
                       }}
-                      className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-left text-xs font-semibold transition-all duration-200 ${
+                      className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-start text-xs font-semibold transition-all duration-200 ${
                         active
                           ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
                           : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
@@ -5713,7 +5713,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         >
                           <Icon size={16} />
                         </span>
-                        <span className="truncate">{item.label}</span>
+                        <span className="truncate">{adminTranslations[lang].sidebar[item.label] || item.label}</span>
                       </div>
                       <ChevronDown
                         size={14}
@@ -5723,7 +5723,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       />
                     </button>
                     {marketingExpanded && (
-                      <div className="mt-1 space-y-0.5 overflow-hidden rounded-xl bg-black/15 py-1 pl-2 pr-1">
+                      <div className="mt-1 space-y-0.5 overflow-hidden rounded-xl bg-black/15 py-1 ps-2 pe-1">
                         {[
                           { label: "Promotions", icon: Tag, perm: null },
                           { label: "Packages", icon: Package, perm: null },
@@ -5735,14 +5735,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               key={sub.label}
                               type="button"
                               onClick={() => setActiveNav(sub.label)}
-                              className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] font-medium transition-all duration-200 ${
+                              className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[11px] font-medium transition-all duration-200 ${
                                 subActive
-                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-2 rounded-l-none"
+                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-s-[3px] border-[#C4AE7C] ps-2 rounded-s-none"
                                   : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
                               }`}
                             >
                               <SubIcon size={13} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
-                              <span className="truncate">{sub.label}</span>
+                              <span className="truncate">{adminTranslations[lang].sidebar[sub.label] || sub.label}</span>
                             </button>
                           );
                         })}
@@ -5761,7 +5761,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   type="button"
                   disabled={isComingSoon}
                   aria-disabled={isComingSoon}
-                  title={isComingSoon ? "Coming Soon" : undefined}
+                  title={isComingSoon ? (adminTranslations[lang].sidebar.comingSoon || "Coming Soon") : undefined}
                   onClick={async () => {
                     if (isComingSoon) return;
                     if (item.label === "Logout") {
@@ -5773,7 +5773,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       setActiveNav(item.label);
                     }
                   }}
-                  className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-left text-xs font-semibold transition-all duration-200 ${
+                  className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-start text-xs font-semibold transition-all duration-200 ${
                     isComingSoon
                       ? "cursor-not-allowed opacity-50 text-[#FBFBF9]/50"
                       : active
@@ -5793,7 +5793,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     >
                       <Icon size={16} />
                     </span>
-                    <span className="truncate">{item.label}</span>
+                    <span className="truncate">{adminTranslations[lang].sidebar[item.label] || item.label}</span>
                   </div>
                   {isComingSoon || item.submenu ? (
                     <ChevronRight size={14} className="text-[#FBFBF9]/60" />
