@@ -2749,6 +2749,24 @@ add per-key permission checks to `POST` matching the relevant `PERMISSION_STRUCT
 
 ---
 
+## RISK-069: Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees
+
+**Severity:** Critical · **Type:** Security / Privilege escalation
+**Found:** 2026-08-23, writing Brief 25 Part 3 tests. **Status:** OPEN (not fixed — needs a product decision on whether admins should manage roles at all).
+
+**Description:**
+`PATCH /api/employees` (`src/app/api/employees/route.ts:219`) uses `requireAdministratorAccess`, which admits both `admin` and `superadmin` roles. The only role-change guard is `employee.employee_id === 'superadmin'` (line 245) — this protects the superadmin account from being changed, but does **not** prevent a non-superadmin admin from escalating another account's `role_name` to `superadmin`.
+
+The UI (`RoleManagementView.tsx`) gates the role-change `<select>` with a client-side `adminRole === "superadmin"` check, but that is bypassable. The server has no equivalent check.
+
+**Consequence:** Any admin can grant themselves or a colleague superadmin privileges, bypassing the entire RBAC system.
+
+**Fix:** Add a server-side check in the PATCH handler: if `roleName` is provided and the caller's role is not `superadmin`, return 403. This is a one-line guard. Not fixed in this brief because the brief scope is translation, not security fixes.
+
+**Test:** `tests/routes/roles-employees.test.ts` — `it.fails('a non-superadmin admin cannot change another account\'s role_name')` confirms the current (vulnerable) behaviour. The test will go green the moment the fix is applied.
+
+---
+
 ## PROPOSALS.md Reference
 
 ## RISK-068: First-Visit Medical Intake Guard Fired For Every Patient — `reservations` Prop Never Passed
