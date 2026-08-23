@@ -1602,3 +1602,62 @@ The Admin Doctors section previously listed doctors with edit/delete actions, bu
      - **Export & Reports**: CSV report generation with custom date range selection and download.
 2. Added an **Info** (`<Info size={15} />`) action button next to Delete/Edit buttons in the Doctors table row in `src/app/admin/page.tsx`.
 3. Added system test suite integration for doctor profile detail view diagnostics.
+
+---
+
+## DEC-044: Public Site's SSR Language Fix (Brief 29) Accepted With Its Dynamic-Rendering Cost — Static-Preserving Rewrite Deferred
+
+**Date:** 2026-08-23
+**Status:** Decided — active. Interim; a follow-up brief is expected to supersede the `cookies()`
+approach without reopening the underlying bug.
+
+**Context:**
+Brief 29 fixed a real bug: the public site always server-rendered `<html lang="en">` with no `dir`
+attribute (`src/app/layout.tsx`), because `LanguageContext.tsx`'s `getInitialLanguage()` returns
+`"en"` unconditionally whenever `window` is undefined (i.e. every SSR pass), and the real
+preference was only ever applied client-side inside a `useEffect`. Every fresh load/refresh in
+Arabic flashed LTR first, then snapped to RTL once React hydrated — the `suppressHydrationWarning`
+on `<html>`/`<body>` existed specifically to hide the console warning this caused.
+
+The fix landed (commit `9420b1b`): `LanguageContext.tsx` now also writes a `cr-language` cookie;
+`layout.tsx` became an `async` Server Component that reads it via `cookies()` and renders the
+correct `lang`/`dir` from the first byte. Verified independently: `tsc`/`eslint` clean, `vitest`
+unaffected, build succeeds — and the fix genuinely works.
+
+**The cost, found during review, not by Windsurf:** calling `cookies()` inside a Server Component
+forces Next.js to treat that render as **per-request dynamic**, not statically generated. Confirmed
+directly in the production build's route table: `/`, `/about`, `/services`, `/contact`, `/book`,
+and `/profile` all shifted from `○` (static, prerendered, CDN-cacheable) to `ƒ` (dynamic,
+server-rendered on every request). This is not an implementation shortcoming — there is no way to
+vary static HTML per visitor's cookie without either dynamic rendering or a locale-prefixed routing
+rewrite (see rejected option below) — but it is a real hosting-cost/latency change to the entire
+public marketing site that was not part of the original bug report.
+
+**Chosen Option:** Accept the current `cookies()`-based fix as-is for now — it is correct, tested,
+and already shipped. **Defer, don't implement yet**, a static-preserving alternative: a small
+synchronous (non-`async`/`defer`) inline `<script>` as the first thing in `<head>`, reading the
+`cr-language` cookie directly (`document.cookie`, available before any paint) and setting
+`document.documentElement.lang`/`dir` before the browser renders anything — the same
+prevent-flash-of-wrong-theme pattern used by dark-mode libraries like `next-themes`. Paired with
+changing `globals.css`'s `body.rtl { direction: rtl; text-align: right; }` (line ~100) to an
+`html[dir="rtl"]` attribute selector, so the correction doesn't depend on `document.body` existing
+yet when the head script runs. This removes the flash **without** `cookies()`/dynamic rendering —
+`layout.tsx` goes back to a plain (non-`async`) component, all six routes return to `○` static.
+
+**Rejected for now:** full locale-prefixed routing (`/en/...`, `/ar/...` as separately
+statically-generated routes via `generateStaticParams`, redirected by Edge Middleware based on the
+cookie/`Accept-Language`) — the textbook, most scalable Next.js i18n pattern, but a large rewrite
+touching every internal link, canonical URL, and sitemap entry on the public site. Disproportionate
+to the scope of the bug that started this (a visual flash), revisit only if the site's i18n needs
+grow well beyond a single-language-toggle marketing site.
+
+**Reason for accepting the cost now instead of blocking on the rewrite:** Mohamed's call, given the
+fix is already shipped, tested, and correct — swapping it for the static-preserving version is a
+small, self-contained follow-up (two files: `layout.tsx`, `globals.css`) with zero risk to ship
+later, not a reason to hold the working fix. Revisit as its own brief.
+
+**Trade-offs accepted in the interim:** every public marketing page view now invokes a server
+function instead of serving from Vercel's CDN edge cache — higher latency per request and
+compute-time cost proportional to traffic. For a clinic marketing site (not high-traffic
+e-commerce), judged acceptable short-term; **not** judged acceptable as the permanent architecture,
+hence this decision explicitly flags it for a follow-up rather than closing the topic.

@@ -17,8 +17,61 @@ _(none currently active)_
 
 # QUEUED BRIEFS
 
-_(none currently queued — translation of the Pages Settings tabs extracted in Brief 27 is the
-obvious next brief, not yet written)_
+Translation of the Pages Settings tabs extracted in Brief 27 is also an obvious next brief, not yet
+written.
+
+## Brief 30 — Public site: replace Brief 29's `cookies()` fix with a static-preserving inline script (queued, not urgent)
+
+**Not a bug fix — Brief 29 already shipped and works.** This is a follow-up to remove its accepted
+side effect: `layout.tsx` calling `cookies()` (`src/app/layout.tsx`) forces the entire public site
+into per-request dynamic rendering. Confirmed in the build's route table:
+`/`, `/about`, `/services`, `/contact`, `/book`, `/profile` all now show `ƒ` (dynamic) where they
+were `○` (static) before Brief 29. See `DECISIONS.md` → **DEC-044** for the full reasoning on why
+this was accepted short-term rather than blocking Brief 29 on this rewrite.
+
+**The fix:** replace the server-side cookie read with a synchronous inline `<script>` — no `async`,
+no `defer` — as the first element inside `<head>`, reading `document.cookie` directly (available
+immediately, before any paint) and setting `document.documentElement.lang`/`dir` before the browser
+renders anything. Same pattern `next-themes`-style libraries use to prevent a flash of the wrong
+theme; here it prevents the flash of wrong text direction, without needing any server-side
+per-request logic at all.
+
+**Two files:**
+1. `src/app/layout.tsx` — revert to a plain (non-`async`) component, no `cookies()` import, no
+   `next/headers`. Add the inline script as the first child of a literal `<head>` element (Next.js
+   App Router allows rendering `<head>` directly in the root layout). Something like:
+   ```tsx
+   <script dangerouslySetInnerHTML={{ __html: `
+     (function() {
+       try {
+         var m = document.cookie.match(/(?:^|; )cr-language=([^;]*)/);
+         var lang = (m && decodeURIComponent(m[1])) === 'ar' ? 'ar' : 'en';
+         document.documentElement.lang = lang;
+         document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+       } catch (e) {}
+     })();
+   `}} />
+   ```
+   `<html lang="en">` stays as the static server-rendered fallback (matches the fallback the client
+   `getInitialLanguage()` already uses when no cookie exists) — the script corrects it before paint
+   when a cookie is present.
+2. `src/app/globals.css` — `body.rtl { direction: rtl; text-align: right; }` (currently ~line 100)
+   depends on `document.body.className` being set, which the early head script can't safely do
+   (`<body>` may not exist yet when a head script runs). Change the selector to key off the `dir`
+   attribute on `<html>` instead — e.g. `html[dir="rtl"] { direction: rtl; text-align: right; }` (or
+   `html[dir="rtl"] body { ... }` if keeping it body-scoped) — so it applies the moment the script
+   sets `<html dir>`, without depending on body markup order at all. Keep the existing `.rtl`
+   class-based rule too if anything else in the codebase still reads it — grep for `\.rtl\b` and
+   `body\.rtl` across `src/` before removing anything, don't assume `globals.css` is the only place.
+
+**`LanguageContext.tsx`'s existing cookie write (added in Brief 29) stays as-is** — the head script
+reads the same `cr-language` cookie Brief 29 already writes; no change needed there.
+
+**Verify:** production build route table shows `○` (static) again for all six routes listed above;
+`tsc`/`eslint`/`vitest` clean; live check in the browser — hard refresh with Arabic selected should
+show zero visible LTR flash, same as after Brief 29, but this time without the dynamic-rendering
+cost. Confirm the `body.rtl` selector change didn't silently break anything else in globals.css that
+depended on the class specifically (grep first, per above).
 
 ---
 ---
