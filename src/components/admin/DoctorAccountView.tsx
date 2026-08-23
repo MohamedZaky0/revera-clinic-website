@@ -464,7 +464,7 @@ export default function DoctorAccountView({
         const res = await fetch(`/api/medical-records?customerId=${encodeURIComponent(custId)}`, { headers });
         if (res.ok) {
           const data = await res.json();
-          const record = data.medicalRecord || (Array.isArray(data) ? data[0] : null);
+          const record = data.form || data.medicalRecord || (Array.isArray(data) ? data[0] : null);
           setMedicalRecord(record);
 
           if (record) {
@@ -473,6 +473,7 @@ export default function DoctorAccountView({
             setFormMedicationDetails(record.medication_details || "");
             setFormMedicalConditionsDetails(record.medical_conditions_details || "");
             setFormPreviousTreatmentsDetails(record.previous_treatments_details || "");
+            setShowMedicalForm(false);
           }
         }
       } catch (err) {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Play,
   FileText,
@@ -415,6 +415,32 @@ export default function DoctorOngoingSessionTab({
     (r) => r.status !== "completed" && r.status !== "cancelled"
   );
 
+  // Determine if this is strictly the patient's first clinic visit
+  const patientPastCompletedVisits = useMemo(() => {
+    if (!activeSessionBooking) return [];
+    const custId = activeSessionBooking.customer_id || activeSessionBooking.customerId;
+    const phone = activeSessionBooking.phone || activeSessionBooking.customer_phone;
+    const name = (activeSessionBooking.name || activeSessionBooking.customer_name || "").toLowerCase().trim();
+
+    return reservations.filter((r) => {
+      if (String(r.id) === String(activeSessionBooking.id)) return false;
+      const isFinished = r.status === "completed" || r.status === "done";
+      if (!isFinished) return false;
+
+      const rCustId = r.customer_id || r.customerId;
+      const rPhone = r.phone || r.customer_phone;
+      const rName = (r.name || r.customer_name || "").toLowerCase().trim();
+
+      if (custId && rCustId && String(custId) === String(rCustId)) return true;
+      if (phone && rPhone && phone === rPhone) return true;
+      if (name && rName && name === rName) return true;
+      return false;
+    });
+  }, [activeSessionBooking, reservations]);
+
+  const isFirstVisit = !medicalRecord && patientPastCompletedVisits.length === 0;
+  const isReturningPatient = !!medicalRecord || patientPastCompletedVisits.length > 0;
+
   return (
     <div className="space-y-6 w-full">
       {activeSessionBooking && activeSessionBooking.status !== "completed" && activeSessionBooking.status !== "done" ? (
@@ -479,9 +505,13 @@ export default function DoctorOngoingSessionTab({
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 shrink-0">
                       <CheckCircle2 size={10} /> {t.onFileStatus}
                     </span>
+                  ) : isFirstVisit ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800 shrink-0 animate-pulse">
+                      <AlertTriangle size={10} /> Intake Required (1st Visit)
+                    </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800 shrink-0">
-                      <AlertTriangle size={10} /> {t.intakeRequiredStatus}
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 shrink-0">
+                      <CheckCircle2 size={10} /> Returning Patient ({patientPastCompletedVisits.length} {patientPastCompletedVisits.length === 1 ? "visit" : "visits"})
                     </span>
                   )}
                 </div>
@@ -553,12 +583,17 @@ export default function DoctorOngoingSessionTab({
                 ) : (
                   /* Medical Intake Form */
                   <div className="space-y-3 border-t border-[#414E36]/10 pt-3">
-                    {!medicalRecord && (
+                    {isFirstVisit ? (
                       <div className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200">
-                        <strong className="block font-bold">{t.firstVisitDetected}</strong>
-                        {t.firstVisitNotice}
+                        <strong className="block font-bold">{t.firstVisitDetected || "First Visit Detected"}</strong>
+                        {t.firstVisitNotice || "Medical intake form is required for first-time patient registration."}
                       </div>
-                    )}
+                    ) : !medicalRecord && isReturningPatient ? (
+                      <div className="rounded-2xl bg-[#EDF1EC] p-3 text-xs text-[#414E36] border border-[#414E36]/15">
+                        <strong className="block font-bold">Returning Patient ({patientPastCompletedVisits.length} past visits)</strong>
+                        Previous patient clinical history is on file. You can record specialized intake notes or proceed directly with treatment.
+                      </div>
+                    ) : null}
 
                     {(activeTemplate?.fields || []).length > 0 ? (
                       (activeTemplate?.fields || []).map((f) => (
