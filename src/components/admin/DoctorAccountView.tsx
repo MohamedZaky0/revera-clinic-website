@@ -13,7 +13,7 @@ import DoctorPatientsTab from "./doctor/tabs/DoctorPatientsTab";
 import DoctorAnalyticsTab from "./doctor/tabs/DoctorAnalyticsTab";
 import DoctorSettingsTab from "./doctor/tabs/DoctorSettingsTab";
 import DoctorProfileTab from "./doctor/tabs/DoctorProfileTab";
-import UserProfileView from "./UserProfileView";
+import UserProfileView, { UserProfileViewTranslations } from "./UserProfileView";
 import DoctorSessionDrawer from "./doctor/modals/DoctorSessionDrawer";
 import DoctorPatientHistoryDrawer from "./doctor/modals/DoctorPatientHistoryDrawer";
 
@@ -1212,7 +1212,13 @@ export default function DoctorAccountView({
             }}
             isDoctorView={true}
             lang={lang}
-            t={adminTranslations[lang].userProfile as any}
+            // UserProfileView's chrome (labels, dropdown text, attendance/payroll copy) is
+            // genuinely language content, not admin-specific — it already carries both the
+            // isDoctorView and non-isDoctorView label variants internally. Reusing
+            // adminTranslations.userProfile here instead of duplicating the same ~80 strings
+            // into doctorTranslations; typed against UserProfileView's own exported interface
+            // (not `as any`) so a shape drift between the two still fails typecheck.
+            t={adminTranslations[lang].userProfile as UserProfileViewTranslations}
           />
         )}
       </main>

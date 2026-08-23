@@ -10,7 +10,49 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 28 — Reception scope completion: translate `ReceptionDashboardView` + `UserProfileView`
+_(none currently active)_
+
+---
+---
+
+# QUEUED BRIEFS
+
+_(none currently queued — translation of the Pages Settings tabs extracted in Brief 27 is the
+obvious next brief, not yet written)_
+
+---
+---
+
+# ARCHIVE — completed briefs
+
+Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
+(RISK-038 … RISK-050), which is the authoritative account.
+
+### Brief 28 — Reception scope completion: translate `ReceptionDashboardView` + `UserProfileView` (completed 2026-08-23)
+
+Landed in one commit (`46b8b45`). Independently re-verified: `tsc`/`eslint`/`vitest` clean (631
+passing, 11 expected fail), en/ar key parity for both new namespaces (`reception.dashboard`,
+`userProfile`) confirmed by evaluating `adminTranslations` at runtime. All 3 real findings from the
+brief were correctly handled: alert `title` resolved client-side via a `type`→label map (API's raw
+title discarded, `message` correctly left untranslated with the limitation not silently dropped);
+the 5 geolocation error strings converted to error-code state resolved at render time via
+`t.errors[code]`, not set-time; the `attendanceStatus`/option-dropdown/`toLocaleTimeString`
+value-label and locale-pinning fixes in Part B all landed exactly as specified, including both
+`isDoctorView` label variants. `navItems` dead code correctly left untouched per instruction.
+
+**Two small gaps found on review, both fixed directly (not sent back — Windsurf had already moved
+on, and both were mechanical):** one of the 5 flagged physical-direction classes (`pr-1` in the
+all-alerts modal, line 864) was missed — converted to `pe-1`. `DoctorAccountView.tsx` imported
+`adminTranslations` directly for `UserProfileView`'s `t` prop with an `as any` cast, instead of
+building the shape from `doctorTranslations` as the brief specified — functionally correct (the
+shared `userProfile` object already carries both `isDoctorView` label variants) but the exact
+cross-system coupling + type-safety bypass the brief said to avoid. Rather than duplicating ~80
+already-shared strings into `doctorTranslations` for no practical gain, kept the `adminTranslations`
+reuse (the content is genuinely language-neutral, not admin-specific) but replaced `as any` with a
+proper cast against `UserProfileView`'s own exported `UserProfileViewTranslations` interface, so a
+future shape drift between the two fails typecheck instead of silently passing.
+
+### Brief 28 body (original ask, for reference)
 
 **Both screens are already their own components — no extraction needed, translation only.** Both
 are reachable by Reception today: `ReceptionDashboardView` is Reception's own landing screen
@@ -118,20 +160,6 @@ an i18n change, it's closing the same class of bug already fixed elsewhere.
 both screens and both `isDoctorView` states for Part B.
 
 ---
----
-
-# QUEUED BRIEFS
-
-_(none currently queued — translation of the Pages Settings tabs extracted in Brief 27 is the
-obvious next brief, not yet written)_
-
----
----
-
-# ARCHIVE — completed briefs
-
-Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
-(RISK-038 … RISK-050), which is the authoritative account.
 
 ### Brief 27 — Pages Settings: extract in 3 ordered sub-PRs (completed 2026-08-23)
 

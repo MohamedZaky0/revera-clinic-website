@@ -861,7 +861,7 @@ export default function ReceptionDashboardView({
             </div>
 
             {/* Modal Alerts List */}
-            <div className="overflow-y-auto space-y-2.5 flex-1 pr-1">
+            <div className="overflow-y-auto space-y-2.5 flex-1 pe-1">
               {filteredAlerts.length === 0 ? (
                 <p className="text-xs text-[#8C9686] italic py-8 text-center">{tr.noAlertsInCategory ?? "No alerts in this category."}</p>
               ) : (
