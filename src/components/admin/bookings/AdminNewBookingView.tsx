@@ -18,7 +18,8 @@ import {
   Users,
   Check,
   Building2,
-  DoorOpen
+  DoorOpen,
+  AlertCircle
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { adminTranslations } from "@/components/admin/translations";
@@ -39,7 +40,14 @@ interface ProviderItem {
   id: string | number;
   name: string;
   specialty?: string;
+  department?: string;
+  sub_specialty?: string;
   image?: string;
+  schedule?: any;
+  working_days?: string[];
+  service_ids?: any[];
+  serviceIds?: any[];
+  services?: any[];
 }
 
 interface CustomerItem {
@@ -59,6 +67,7 @@ interface BranchItem {
   name_en?: string;
   name_ar?: string;
   name?: string;
+  service_hours?: any[];
 }
 
 interface RoomItem {
@@ -459,17 +468,59 @@ export default function AdminNewBookingView({
     }
   };
 
+  const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
+  const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
+  const selectedBranchObj = dbBranches.find(b => String(b.id) === String(selectedBranchId)) || dbBranches[0];
+  const selectedRoomObj = dbRooms.find(r => String(r.id) === String(selectedRoomId));
+
+  const weekdayName = useMemo(() => {
+    if (!bookingDate) return "";
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return weekdays[new Date(bookingDate).getDay()];
+  }, [bookingDate]);
+
+  // Check if branch is closed on the selected weekday
+  const isBranchClosedToday = useMemo(() => {
+    if (!weekdayName || !selectedBranchObj?.service_hours) return false;
+    const sh = selectedBranchObj.service_hours.find((s: any) => s.day?.toLowerCase() === weekdayName.toLowerCase());
+    return sh ? sh.isOpen === false : false;
+  }, [selectedBranchObj, weekdayName]);
+
+  // Check if doctor is closed on the selected weekday
+  const isDoctorClosedToday = useMemo(() => {
+    if (!weekdayName || !selectedDoctorObj) return false;
+    if (selectedDoctorObj.schedule) {
+      const dDay = selectedDoctorObj.schedule[weekdayName] || selectedDoctorObj.schedule[weekdayName.toLowerCase()];
+      if (dDay && dDay.isOpen === false) return true;
+    }
+    if (Array.isArray(selectedDoctorObj.working_days) && selectedDoctorObj.working_days.length > 0) {
+      const works = selectedDoctorObj.working_days.some((wd: string) => wd.toLowerCase() === weekdayName.toLowerCase());
+      if (!works) return true;
+    }
+    return false;
+  }, [selectedDoctorObj, weekdayName]);
+
   // 3. Dynamic Real Time Slots Calculation (Combining API & Provider Working Hours + Booked Slots)
   useEffect(() => {
     async function fetchActualTimeSlots() {
       setLoadingSlots(true);
+
+      // If branch or doctor is closed on this day, no available slots
+      if (isBranchClosedToday || isDoctorClosedToday) {
+        setAvailableTimeSlots([]);
+        setSelectedTime("");
+        setBookedTimeSlots([]);
+        setLoadingSlots(false);
+        return;
+      }
+
+      let booked: string[] = [];
       try {
         // Query existing reservations for selected date & doctor to calculate booked slots
-        let booked: string[] = [];
         if (bookingDate) {
           let qRes = supabase
             .from("reservations")
-            .select("*")
+            .select("time_slot, requested_time, start_time")
             .eq("date", bookingDate)
             .neq("status", "cancelled")
             .neq("status", "rejected");
@@ -481,7 +532,7 @@ export default function AdminNewBookingView({
           const { data: resData } = await qRes;
           if (resData) {
             booked = resData
-              .map((r: any) => normalizeTimeSlot(r.time_slot || r.requested_time || r.start_time || r.time || r.timeSlot))
+              .map((r: any) => normalizeTimeSlot(r.time_slot || r.requested_time || r.start_time || ""))
               .filter(Boolean);
           }
         }
@@ -492,84 +543,79 @@ export default function AdminNewBookingView({
         if (selectedServiceId) params.append("serviceId", String(selectedServiceId));
         if (bookingDate) params.append("date", bookingDate);
         if (selectedBranchId) params.append("branchId", String(selectedBranchId));
+        if (selectedDoctorId) params.append("doctorId", String(selectedDoctorId));
 
         const res = await fetch(`/api/availability?${params.toString()}`);
         if (res.ok) {
           const apiData = await res.json();
-          let slotsList: string[] = [];
+          let rawList: string[] = [];
           if (Array.isArray(apiData)) {
-            slotsList = apiData.map(formatSlotTo12h);
+            rawList = apiData.map(formatSlotTo12h);
           } else if (apiData && typeof apiData === "object") {
             const list = apiData[bookingDate] || apiData.slots || apiData.availableSlots;
-            if (Array.isArray(list) && list.length > 0) {
-              slotsList = list.map(formatSlotTo12h);
+            if (Array.isArray(list)) {
+              rawList = list.map(formatSlotTo12h);
             }
           }
 
-          if (slotsList.length > 0) {
-            setAvailableTimeSlots(slotsList);
-            if (!slotsList.includes(selectedTime)) {
-              setSelectedTime(slotsList[0]);
+          const validFutureSlots = rawList.filter((slot) => {
+            const isPast = isSlotInPast(slot, bookingDate);
+            const isBooked = booked.includes(normalizeTimeSlot(slot));
+            return !isPast && !isBooked;
+          });
+
+          setAvailableTimeSlots(validFutureSlots);
+          if (validFutureSlots.length > 0) {
+            if (!validFutureSlots.includes(selectedTime)) {
+              setSelectedTime(validFutureSlots[0]);
             }
-            setLoadingSlots(false);
-            return;
+          } else {
+            setSelectedTime("");
           }
+          setLoadingSlots(false);
+          return;
         }
       } catch (e) {
         console.warn("API availability fetch fallback:", e);
       }
 
-      // Generate standard clinic multi-shift slots: 09:00 AM – 02:00 PM & 05:00 PM – 09:00 PM
+      // Standard doctor shifts fallback with strict past and booked filtering
       const generated: string[] = [];
       const shiftRanges = [
-        { start: 9, end: 14 },  // Morning Shift: 09:00 AM - 02:00 PM
-        { start: 17, end: 21 }  // Evening Shift: 05:00 PM - 09:00 PM
+        { start: 9, end: 14 },
+        { start: 17, end: 21 }
       ];
 
-      shiftRanges.forEach(range => {
+      shiftRanges.forEach((range) => {
         for (let hour = range.start; hour < range.end; hour++) {
           for (const min of [0, 30]) {
             const hour12 = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
             const ampm = hour >= 12 ? "PM" : "AM";
             const hh = String(hour12).padStart(2, "0");
             const mm = String(min).padStart(2, "0");
-            generated.push(`${hh}:${mm} ${ampm}`);
+            const slotStr = `${hh}:${mm} ${ampm}`;
+            const isPast = isSlotInPast(slotStr, bookingDate);
+            const isBooked = booked.includes(normalizeTimeSlot(slotStr));
+            if (!isPast && !isBooked) {
+              generated.push(slotStr);
+            }
           }
         }
       });
 
       setAvailableTimeSlots(generated);
-      if (!generated.includes(selectedTime)) {
-        setSelectedTime(generated[0]);
+      if (generated.length > 0) {
+        if (!generated.includes(selectedTime)) {
+          setSelectedTime(generated[0]);
+        }
+      } else {
+        setSelectedTime("");
       }
       setLoadingSlots(false);
     }
 
     fetchActualTimeSlots();
-  }, [bookingDate, selectedDoctorId, selectedServiceId, selectedBranchId]);
-
-  // Auto-select the first valid (non-booked & non-past) slot
-  useEffect(() => {
-    if (availableTimeSlots.length > 0) {
-      const firstValid = availableTimeSlots.find((slot) => {
-        const norm = normalizeTimeSlot(slot);
-        const isBooked = bookedTimeSlots.includes(norm);
-        const isPast = isSlotInPast(slot, bookingDate);
-        return !isBooked && !isPast;
-      });
-
-      if (firstValid) {
-        setSelectedTime(firstValid);
-      } else if (!availableTimeSlots.includes(selectedTime)) {
-        setSelectedTime(availableTimeSlots[0]);
-      }
-    }
-  }, [availableTimeSlots, bookedTimeSlots, bookingDate]);
-
-  const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
-  const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
-  const selectedBranchObj = dbBranches.find(b => String(b.id) === String(selectedBranchId)) || dbBranches[0];
-  const selectedRoomObj = dbRooms.find(r => String(r.id) === String(selectedRoomId));
+  }, [bookingDate, selectedDoctorId, selectedServiceId, selectedBranchId, isBranchClosedToday, isDoctorClosedToday]);
 
   const selectedServiceName = getServiceName(selectedServiceObj, lang);
   const selectedDoctorName = selectedDoctorObj?.name || "Doctor";
@@ -603,8 +649,24 @@ export default function AdminNewBookingView({
       alert(tr.selectDoctorAlert);
       return;
     }
+    if (isBranchClosedToday) {
+      alert(tr.branchClosedAlert || `The branch is closed on ${weekdayName}s. Please choose an open date.`);
+      return;
+    }
+    if (isDoctorClosedToday) {
+      alert(tr.doctorUnavailableAlert || `${selectedDoctorName} is not available on ${weekdayName}s. Please choose another date or doctor.`);
+      return;
+    }
     if (!selectedTime) {
-      alert(tr.selectTimeAlert);
+      alert(tr.selectTimeAlert || "Please select an available time slot.");
+      return;
+    }
+    if (isSlotInPast(selectedTime, bookingDate)) {
+      alert(tr.slotInPastAlert || "The selected time slot has already passed. Please select a future time slot.");
+      return;
+    }
+    if (bookedTimeSlots.includes(normalizeTimeSlot(selectedTime))) {
+      alert(tr.slotAlreadyBookedAlert || "The selected time slot is already booked. Please choose another slot.");
       return;
     }
     setShowConfirmModal(true);
@@ -967,33 +1029,25 @@ export default function AdminNewBookingView({
                 <div className="relative">
                   <select
                     value={selectedTime}
+                    disabled={isBranchClosedToday || isDoctorClosedToday || availableTimeSlots.length === 0}
                     onChange={(e) => setSelectedTime(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white ps-10 pe-10 py-3 font-extrabold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 shadow-xs appearance-none"
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white ps-10 pe-10 py-3 font-extrabold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 shadow-xs appearance-none disabled:bg-gray-50 disabled:text-gray-400"
                   >
-                    {availableTimeSlots.map((tSlot) => {
-                      const normalized = normalizeTimeSlot(tSlot);
-                      const isBooked = bookedTimeSlots.includes(normalized);
-                      const isPast = isSlotInPast(tSlot, bookingDate);
-                      const isDisabled = isBooked || isPast;
-
-                      let statusText = "";
-                      if (isBooked) {
-                        statusText = ` ${tr.bookedSuffix || "(Booked)"}`;
-                      } else if (isPast) {
-                        statusText = ` ${tr.pastSuffix || "(Past)"}`;
-                      }
-
-                      return (
-                        <option
-                          key={tSlot}
-                          value={tSlot}
-                          disabled={isDisabled}
-                          className={isDisabled ? "text-gray-400 font-normal bg-gray-100" : "font-extrabold text-[#1F251A]"}
-                        >
-                          {tSlot}{statusText}
+                    {availableTimeSlots.length === 0 ? (
+                      <option value="" disabled>
+                        {isBranchClosedToday
+                          ? `${selectedBranchName} is closed on this day`
+                          : isDoctorClosedToday
+                          ? `${selectedDoctorName} is not available on this day`
+                          : (tr.noSlotsAvailableWarning || "No available slots on this date")}
+                      </option>
+                    ) : (
+                      availableTimeSlots.map((tSlot) => (
+                        <option key={tSlot} value={tSlot} className="font-extrabold text-[#1F251A]">
+                          {tSlot}
                         </option>
-                      );
-                    })}
+                      ))
+                    )}
                   </select>
 
                   <div className="absolute start-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-700">
@@ -1004,6 +1058,20 @@ export default function AdminNewBookingView({
                     <ChevronDown size={16} />
                   </div>
                 </div>
+
+                {/* Banner alert if closed day or 0 slots available */}
+                {(isBranchClosedToday || isDoctorClosedToday || (!loadingSlots && availableTimeSlots.length === 0)) && (
+                  <div className="rounded-2xl bg-amber-50 border border-amber-200/80 p-3.5 flex items-start gap-2.5 text-xs text-amber-900 mt-2.5">
+                    <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                    <span className="font-bold">
+                      {isBranchClosedToday
+                        ? (tr.branchClosedAlert || `${selectedBranchName} is closed on ${weekdayName}s. Please choose an open date.`)
+                        : isDoctorClosedToday
+                        ? (tr.doctorUnavailableAlert || `${selectedDoctorName} is not available on ${weekdayName}s. Please choose another date or doctor.`)
+                        : (tr.noSlotsAvailableWarning || "No available time slots on this date (clinic is closed or all slots are booked/past). Please choose another date.")}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Session Type (In Person vs Online) */}
@@ -1137,7 +1205,7 @@ export default function AdminNewBookingView({
         {/* Single Full Create Booking Button */}
         <button
           type="button"
-          disabled={submitting}
+          disabled={submitting || !selectedTime || isBranchClosedToday || isDoctorClosedToday || availableTimeSlots.length === 0}
           onClick={handleOpenSummaryModal}
           className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[#1E3A2B] text-white font-extrabold text-xs hover:bg-[#162C20] transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs cursor-pointer"
         >
