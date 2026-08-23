@@ -1,9 +1,26 @@
 # Admin Panel: Componentization → Arabic i18n → Automated Testing
 
-> **Status (updated 2026-08-22):** Reception-first i18n scope (Bookings, New Booking, Patients,
-> Doctors, Services, Inventory) is **fully translated and independently verified** — Brief 20
-> (Inventory) landed, its 5 value/label gaps found+fixed, content verified live in the browser by
-> Mohamed. `WINDSURF_BRIEFS.md` has no active brief right now.
+> **Status (updated 2026-08-22):** Employees and HR are both fully extracted (DEC-027) AND
+> translated (DEC-043), independently verified end-to-end — Briefs 21/22 (extraction), 23/24
+> (translation). Brief 23's first submission was reviewed and rejected (the live profile drawer's
+> Basic Info/Work tabs weren't wired to translation keys that already existed and were already
+> correct in the print function; the `emp.shift` value/label bug the brief itself flagged was still
+> present); fixed in `3efe21f` and re-verified live in both languages. Brief 24 had one small,
+> contained gap (a hardcoded department-filter dropdown), also fixed in the same commit.
+>
+> **`WINDSURF_BRIEFS.md`'s active brief is now Brief 25 — Role Management** (extract → translate →
+> test, 3 ordered commits). Queued next: Brief 26 (the 7 small Settings screens, recommended as one
+> shared-hook extraction rather than 7 separate ones) and Brief 27 (Pages Settings, split into 3
+> ordered sub-PRs by tab, translation deliberately deferred — it's a bilingual CMS content editor,
+> not UI chrome).
+>
+> **Two security findings from the Group A–D investigation, logged in `RISKS.md`:**
+> **RISK-066 (Critical)** — the System Test Suite dumps raw response bodies (medical records,
+> prescriptions, payroll) into the DOM via an unfiltered `<pre>`, reachable in production behind a
+> grantable permission key, no `NODE_ENV` gate. **RISK-067 (High)** — `GET /api/page-settings` is
+> intentionally public (the booking site needs it), but later Settings screens reused the same blob
+> for InstaPay payment-destination data and staff email, now also publicly readable. Neither is
+> fixed yet; both need a decision, not a mechanical brief.
 >
 > **POS is resolved, not just "out of scope"**: a full audit of `page.tsx` found 26 `activeNav`
 > sections — including POS, and everything downstream of it (Products, Insights, Refunds, the
@@ -13,22 +30,9 @@
 > ~4,000-line dead Finance UI estimate is now stale — the block itself no longer exists) as a
 > byproduct; RISK-017 should be updated/closed in `RISKS.md`.
 >
-> **New i18n gap surfaced, not yet in scope anywhere:** an unrelated 60+-commit pull from
-> `origin/dev` (feature work, not a Windsurf brief — bookings/billing/checkout/reception/attendance)
-> landed on top of Brief 20 and brought a genuinely new, DB-backed component with it:
-> `ReceptionDashboardView.tsx` — Reception's own landing screen (`activeNav === "Dashboard"`),
-> already extracted, ~24 hardcoded English strings, zero Arabic. This is squarely inside
-> "Reception-first" and the plan should add it as the next Phase 2-only target (no extraction
-> needed).
->
-> **Componentization (DEC-027), updated 2026-08-22:** Employees is done — Brief 21 extracted it into
-> `src/components/admin/employees/AdminEmployeesView.tsx` (independently verified: static checks,
-> full test suite unchanged, and live in the browser). **Brief 22 (HR, ~1,568 + a 151-line detached
-> Edit Target modal) is now active**, queued to start once picked up — it shares real state with
-> Employees (`attendanceList`, `employeesList`, a direct `setViewingEmployee` call from HR's own
-> Payroll tab), so it was written only after Brief 21 landed and was verified, not before. Below
-> that: Pages Settings (~1,800), Role Management (~365), System Test Suite (~220), and a cluster of
-> Settings-submenu screens each under 220 lines.
+> **Still-open i18n gap, not yet scoped anywhere:** `ReceptionDashboardView.tsx` — Reception's own
+> landing screen (`activeNav === "Dashboard"`), already extracted, ~24 hardcoded English strings,
+> zero Arabic. Squarely inside "Reception-first"; needs a Phase 2-only brief (no extraction needed).
 >
 > ---
 >
