@@ -31,6 +31,7 @@ import BranchesView from "@/components/admin/settings/BranchesView";
 import ServiceHoursView from "@/components/admin/settings/ServiceHoursView";
 import ServicesPageSettingsView from "@/components/admin/settings/ServicesPageSettingsView";
 import HomePageSettingsView from "@/components/admin/settings/HomePageSettingsView";
+import AboutUsPageSettingsView from "@/components/admin/settings/AboutUsPageSettingsView";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import CustomerFormModal from "@/components/admin/patients/CustomerFormModal";
@@ -542,37 +543,37 @@ const DEFAULT_HERO_SLIDES = [
 
 const DEFAULT_HERO_SLIDES_AR = [
   {
-    welcome: "مرحباً بكم في عيادات ريفيرا",
-    heading: "حوّل جمالك بشكل طبيعي!",
-    description: "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية مصممة لمساعدتك على تحقيق أهدافك في الجمال والصحة من خلال تقنيات طبية متقدمة.",
-    bookBtn: "احجز موعدًا",
+    welcome: "Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒÙ… ÙÙŠ Ø¹ÙŠØ§Ø¯Ø§Øª Ø±ÙŠÙÙŠØ±Ø§",
+    heading: "Ø­ÙˆÙ‘Ù„ Ø¬Ù…Ø§Ù„Ùƒ Ø¨Ø´ÙƒÙ„ Ø·Ø¨ÙŠØ¹ÙŠ!",
+    description: "Ø®Ø¯Ù…Ø§Øª Ù…ØªØ®ØµØµØ© ÙÙŠ Ø·Ø¨ Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„Ø¬Ø±Ø§Ø­Ø© Ø§Ù„ØªØ¬Ù…ÙŠÙ„ÙŠØ© Ù…Ø¹ Ø±Ø¹Ø§ÙŠØ© Ø´Ø®ØµÙŠØ© Ù…ØµÙ…Ù…Ø© Ù„Ù…Ø³Ø§Ø¹Ø¯ØªÙƒ Ø¹Ù„Ù‰ ØªØ­Ù‚ÙŠÙ‚ Ø£Ù‡Ø¯Ø§ÙÙƒ ÙÙŠ Ø§Ù„Ø¬Ù…Ø§Ù„ ÙˆØ§Ù„ØµØ­Ø© Ù…Ù† Ø®Ù„Ø§Ù„ ØªÙ‚Ù†ÙŠØ§Øª Ø·Ø¨ÙŠØ© Ù…ØªÙ‚Ø¯Ù…Ø©.",
+    bookBtn: "Ø§Ø­Ø¬Ø² Ù…ÙˆØ¹Ø¯Ù‹Ø§",
     rating: "4.5",
-    reviewCount: "(1000+ تقييم)",
+    reviewCount: "(1000+ ØªÙ‚ÙŠÙŠÙ…)",
     image: "/images/hero/slide-1.jpg"
   },
   {
-    welcome: "مرحباً بكم في عيادات ريفيرا",
-    heading: "رعاية طبية متقدمة يمكنك الوثوق بها!",
-    description: "اكتشف خدمات شاملة في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان المصممة لاحتياجاتك الفريدة. مع أكثر من 15 عاماً من الخبرة المهنية، نحن هنا لإرشادك نحو الجمال الدائم والعافية.",
-    bookBtn: "احجز موعدًا",
+    welcome: "Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒÙ… ÙÙŠ Ø¹ÙŠØ§Ø¯Ø§Øª Ø±ÙŠÙÙŠØ±Ø§",
+    heading: "Ø±Ø¹Ø§ÙŠØ© Ø·Ø¨ÙŠØ© Ù…ØªÙ‚Ø¯Ù…Ø© ÙŠÙ…ÙƒÙ†Ùƒ Ø§Ù„ÙˆØ«ÙˆÙ‚ Ø¨Ù‡Ø§!",
+    description: "Ø§ÙƒØªØ´Ù Ø®Ø¯Ù…Ø§Øª Ø´Ø§Ù…Ù„Ø© ÙÙŠ Ø·Ø¨ Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„Ø¬Ø±Ø§Ø­Ø© Ø§Ù„ØªØ¬Ù…ÙŠÙ„ÙŠØ© ÙˆØ¹Ù„Ø§Ø¬Ø§Øª Ø§Ù„Ù„ÙŠØ²Ø± ÙˆØ·Ø¨ Ø§Ù„Ø£Ø³Ù†Ø§Ù† Ø§Ù„Ù…ØµÙ…Ù…Ø© Ù„Ø§Ø­ØªÙŠØ§Ø¬Ø§ØªÙƒ Ø§Ù„ÙØ±ÙŠØ¯Ø©. Ù…Ø¹ Ø£ÙƒØ«Ø± Ù…Ù† 15 Ø¹Ø§Ù…Ø§Ù‹ Ù…Ù† Ø§Ù„Ø®Ø¨Ø±Ø© Ø§Ù„Ù…Ù‡Ù†ÙŠØ©ØŒ Ù†Ø­Ù† Ù‡Ù†Ø§ Ù„Ø¥Ø±Ø´Ø§Ø¯Ùƒ Ù†Ø­Ùˆ Ø§Ù„Ø¬Ù…Ø§Ù„ Ø§Ù„Ø¯Ø§Ø¦Ù… ÙˆØ§Ù„Ø¹Ø§ÙÙŠØ©.",
+    bookBtn: "Ø§Ø­Ø¬Ø² Ù…ÙˆØ¹Ø¯Ù‹Ø§",
     rating: "4.5",
-    reviewCount: "(1000+ تقييم)",
+    reviewCount: "(1000+ ØªÙ‚ÙŠÙŠÙ…)",
     image: "/images/hero/slide-2.jpg"
   },
   {
-    welcome: "مرحباً بكم في عيادات ريفيرا",
-    heading: "رحلتك نحو الجمال والصحة تبدأ هنا!",
-    description: "عيادات متخصصة تحت إشراف طبي كامل تقدم خدمات في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان لجميع الأعمار.",
-    bookBtn: "احجز موعدًا",
+    welcome: "Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒÙ… ÙÙŠ Ø¹ÙŠØ§Ø¯Ø§Øª Ø±ÙŠÙÙŠØ±Ø§",
+    heading: "Ø±Ø­Ù„ØªÙƒ Ù†Ø­Ùˆ Ø§Ù„Ø¬Ù…Ø§Ù„ ÙˆØ§Ù„ØµØ­Ø© ØªØ¨Ø¯Ø£ Ù‡Ù†Ø§!",
+    description: "Ø¹ÙŠØ§Ø¯Ø§Øª Ù…ØªØ®ØµØµØ© ØªØ­Øª Ø¥Ø´Ø±Ø§Ù Ø·Ø¨ÙŠ ÙƒØ§Ù…Ù„ ØªÙ‚Ø¯Ù… Ø®Ø¯Ù…Ø§Øª ÙÙŠ Ø·Ø¨ Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„Ø¬Ø±Ø§Ø­Ø© Ø§Ù„ØªØ¬Ù…ÙŠÙ„ÙŠØ© ÙˆØ¹Ù„Ø§Ø¬Ø§Øª Ø§Ù„Ù„ÙŠØ²Ø± ÙˆØ·Ø¨ Ø§Ù„Ø£Ø³Ù†Ø§Ù† Ù„Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø£Ø¹Ù…Ø§Ø±.",
+    bookBtn: "Ø§Ø­Ø¬Ø² Ù…ÙˆØ¹Ø¯Ù‹Ø§",
     rating: "4.5",
-    reviewCount: "(1000+ تقييم)",
+    reviewCount: "(1000+ ØªÙ‚ÙŠÙŠÙ…)",
     image: "/images/hero/slide-3.jpg"
   }
 ];
 
 // Shows staff, wherever a patient is in view for booking/checkout, whether that patient owns
 // active packages (with remaining sessions) and/or is eligible for an active promotion on a
-// specific service — informational only here; redemption itself only happens at checkout
+// specific service â€” informational only here; redemption itself only happens at checkout
 // (see the Payment Settlement modal), since a package session can only be consumed against a
 // real completed reservation (DEC-023's deferred-revenue model).
 function PatientPackagePromoBanner({
@@ -632,7 +633,7 @@ export default function AdminPage() {
     "Authorization": `Bearer ${session?.access_token || ""}`
   };
 
-  // Service CRUD helpers — services are now database-primary, not localStorage (RISK-025)
+  // Service CRUD helpers â€” services are now database-primary, not localStorage (RISK-025)
   const loadServicesFromApi = useCallback(async () => {
     if (!session?.access_token) return;
     try {
@@ -944,24 +945,24 @@ export default function AdminPage() {
 
     const medsText = medsList.length > 0
       ? medsList.map((m: any, idx: number) => 
-          `${idx + 1}. *${m.name || m.medicine_name || m.medicine || 'Medication'}* ${m.dosage ? `(${m.dosage})` : ''}\n   ⏱️ التكرار / Frequency: ${m.frequency || 'حسب الإرشادات'}\n   ⏳ المدة / Duration: ${m.duration || 'حسب الحاجة'}`
+          `${idx + 1}. *${m.name || m.medicine_name || m.medicine || 'Medication'}* ${m.dosage ? `(${m.dosage})` : ''}\n   â±ï¸ Ø§Ù„ØªÙƒØ±Ø§Ø± / Frequency: ${m.frequency || 'Ø­Ø³Ø¨ Ø§Ù„Ø¥Ø±Ø´Ø§Ø¯Ø§Øª'}\n   â³ Ø§Ù„Ù…Ø¯Ø© / Duration: ${m.duration || 'Ø­Ø³Ø¨ Ø§Ù„Ø­Ø§Ø¬Ø©'}`
         ).join('\n\n')
-      : 'لا توجد أدوية مسجلة';
+      : 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£Ø¯ÙˆÙŠØ© Ù…Ø³Ø¬Ù„Ø©';
 
     const msg = 
-`*REVERA CLINICS | روشتة طبية إلكترونية*
-━━━━━━━━━━━━━━━━━━━━
-👤 *المريض / Patient:* ${patientName}
-📅 *التاريخ / Date:* ${rxDate}
-👨‍⚕️ *الطبيب / Doctor:* ${doctorName}
-${diagnosis ? `🩺 *التشخيص / Diagnosis:* ${diagnosis}\n` : ''}━━━━━━━━━━━━━━━━━━━━
-💊 *الأدوية الموصوفة / Prescribed Medications:*
+`*REVERA CLINICS | Ø±ÙˆØ´ØªØ© Ø·Ø¨ÙŠØ© Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠØ©*
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+ðŸ‘¤ *Ø§Ù„Ù…Ø±ÙŠØ¶ / Patient:* ${patientName}
+ðŸ“… *Ø§Ù„ØªØ§Ø±ÙŠØ® / Date:* ${rxDate}
+ðŸ‘¨â€âš•ï¸ *Ø§Ù„Ø·Ø¨ÙŠØ¨ / Doctor:* ${doctorName}
+${diagnosis ? `ðŸ©º *Ø§Ù„ØªØ´Ø®ÙŠØµ / Diagnosis:* ${diagnosis}\n` : ''}â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+ðŸ’Š *Ø§Ù„Ø£Ø¯ÙˆÙŠØ© Ø§Ù„Ù…ÙˆØµÙˆÙØ© / Prescribed Medications:*
 
 ${medsText}
-━━━━━━━━━━━━━━━━━━━━
-${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n━━━━━━━━━━━━━━━━━━━━\n` : ''}✨ مع تمنياتنا لكم بالشفاء العاجل ودوام الصحة والعافية.
-📍 *Revera Clinics* — Sheikh Zayed & New Cairo
-📞 (+20) 01035595691`;
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+${notes ? `ðŸ“ *ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨ / Doctor Instructions:*\n${notes}\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n` : ''}âœ¨ Ù…Ø¹ ØªÙ…Ù†ÙŠØ§ØªÙ†Ø§ Ù„ÙƒÙ… Ø¨Ø§Ù„Ø´ÙØ§Ø¡ Ø§Ù„Ø¹Ø§Ø¬Ù„ ÙˆØ¯ÙˆØ§Ù… Ø§Ù„ØµØ­Ø© ÙˆØ§Ù„Ø¹Ø§ÙÙŠØ©.
+ðŸ“ *Revera Clinics* â€” Sheikh Zayed & New Cairo
+ðŸ“ž (+20) 01035595691`;
 
     const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
@@ -1263,7 +1264,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       });
   }, [invoiceBooking?.id]);
 
-  // Postpone modal state (RISK-029 follow-up) — two modes: reschedule now (real date/time known)
+  // Postpone modal state (RISK-029 follow-up) â€” two modes: reschedule now (real date/time known)
   // or follow-up later (status becomes 'postponed', no date/time change yet).
   const [postponeBooking, setPostponeBooking] = useState<any>(null);
   const [postponeMode, setPostponeMode] = useState<"reschedule" | "followup">("reschedule");
@@ -1596,7 +1597,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
     filteredReservations.forEach((reservation) => {
       if (!reservation.date || !['approved', 'confirmed', 'started', 'completed'].includes(reservation.status)) return;
-      // Slice directly — avoids UTC conversion that shifts dates for non-UTC timezones
+      // Slice directly â€” avoids UTC conversion that shifts dates for non-UTC timezones
       const normalizedDate = String(reservation.date).slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) return;
       const [year, month] = normalizedDate.split('-');
@@ -2398,7 +2399,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const totalServicePages = Math.ceil(filteredServices.length / SERVICE_PAGE_SIZE);
   const pagedServices = filteredServices.slice((servicePage - 1) * SERVICE_PAGE_SIZE, servicePage * SERVICE_PAGE_SIZE);
 
-  // Grouped services: category key → filtered services in that category
+  // Grouped services: category key â†’ filtered services in that category
   const groupedServices = useMemo(() => {
     const groups: Record<string, typeof localServices> = {};
     localCategories.forEach(cat => { groups[cat.key] = []; });
@@ -2466,10 +2467,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
 
 
-  // Inventory Products State — productsTabRef stays in page.tsx for useCustomerProfile's refreshProductSalesHistory wrapper
+  // Inventory Products State â€” productsTabRef stays in page.tsx for useCustomerProfile's refreshProductSalesHistory wrapper
   const productsTabRef = useRef<InventoryProductsTabRef>(null);
 
-  // ── System Test Suite State & Diagnostics Engine ──
+  // â”€â”€ System Test Suite State & Diagnostics Engine â”€â”€
   interface SystemTestCase {
     id: string;
     name: string;
@@ -2625,14 +2626,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     }
   }, [session]);
 
-  // Also load once session is ready regardless of tab — the notification bell's low-stock
+  // Also load once session is ready regardless of tab â€” the notification bell's low-stock
   // alerts need inventoryProducts populated even if the admin never visits the Inventory tab.
   useEffect(() => {
     fetchInventoryProducts();
   }, [fetchInventoryProducts]);
 
   // Synchronize dynamic bookings and low-stock alerts into the notifications list.
-  // No early-return guard on reservations alone — a clinic with stock but no bookings yet still
+  // No early-return guard on reservations alone â€” a clinic with stock but no bookings yet still
   // needs to see low-stock alerts, so this must run even when allReservations is empty.
   useEffect(() => {
     const latestReservations = [...(allReservations || [])]
@@ -2657,7 +2658,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       };
     });
 
-    // Low-stock alerts, worst-depleted first — same list the Inventory page's "Low Stock Alerts"
+    // Low-stock alerts, worst-depleted first â€” same list the Inventory page's "Low Stock Alerts"
     // card counts, just surfaced somewhere staff will actually see it without visiting that page.
     const lowStockNotifications = (inventoryProducts || [])
       .filter((p) => Number(p.stock_quantity) <= Number(p.min_reorder_quantity))
@@ -2687,7 +2688,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   }, [allReservations, localServices, inventoryProducts]);
 
   // Shared fetch for a customer's purchased packages (customer_packages + items), reused across
-  // the profile's Packages tab, the booking detail drawer, checkout, and manual booking creation —
+  // the profile's Packages tab, the booking detail drawer, checkout, and manual booking creation â€”
   // each keeps its own state so switching which booking/profile is in view never shows stale data.
   const fetchCustomerPackagesInto = useCallback(async (customerId: string, setter: (data: any[]) => void) => {
     try {
@@ -2704,7 +2705,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     }
   }, [session]);
 
-  // Product sales history — kept here because CustomerProfileDrawer needs it as a prop.
+  // Product sales history â€” kept here because CustomerProfileDrawer needs it as a prop.
   // InventoryProductsTab owns its own copy; this one feeds the customer profile drawer.
   const [productSalesHistory, setProductSalesHistory] = useState<any[]>([]);
   const [productSalesLoading, setProductSalesLoading] = useState(false);
@@ -2980,7 +2981,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     return !hasOverlap;
   }, [localServices, allReservations]);
 
-  // ── Branches state (moved before provider hook so hook can use branches) ──
+  // â”€â”€ Branches state (moved before provider hook so hook can use branches) â”€â”€
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [branchModal, setBranchModal] = useState<{ open: boolean; mode: "add" | "edit"; branch: Partial<Branch> }>({
@@ -2991,7 +2992,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const [selectedBranchForHoursId, setSelectedBranchForHoursId] = useState<string>("");
   const [savingBranchHours, setSavingBranchHours] = useState(false);
 
-  // ── Provider form hook (extracted from inline state — see Brief 15 Sub-PR 2) ──
+  // â”€â”€ Provider form hook (extracted from inline state â€” see Brief 15 Sub-PR 2) â”€â”€
   const providerForm = useProviderForm({
     branches,
     session,
@@ -3135,13 +3136,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const [savingPageSettings, setSavingPageSettings] = useState(false);
 
   const [serviceHours, setServiceHours] = useState<Array<{ day: string; dayAr: string; isOpen: boolean; openTime: string; closeTime: string }>>([
-    { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Friday", dayAr: "الجمعة", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Sunday", dayAr: "Ø§Ù„Ø£Ø­Ø¯", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Monday", dayAr: "Ø§Ù„Ø¥Ø«Ù†ÙŠÙ†", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Tuesday", dayAr: "Ø§Ù„Ø«Ù„Ø§Ø«Ø§Ø¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Wednesday", dayAr: "Ø§Ù„Ø£Ø±Ø¨Ø¹Ø§Ø¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Thursday", dayAr: "Ø§Ù„Ø®Ù…ÙŠØ³", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Friday", dayAr: "Ø§Ù„Ø¬Ù…Ø¹Ø©", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Saturday", dayAr: "Ø§Ù„Ø³Ø¨Øª", isOpen: true, openTime: "09:00", closeTime: "20:00" },
   ]);  const [pageSettingsLangTab, setPageSettingsLangTab] = useState<"en" | "ar">("en");
   const [aboutImage1, setAboutImage1] = useState<string>("");
   const [aboutImage2, setAboutImage2] = useState<string>("");
@@ -3209,17 +3210,17 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
 
 
-  // ── Notification Settings State ──
+  // â”€â”€ Notification Settings State â”€â”€
   const [notifSmsOtp, setNotifSmsOtp] = useState(true);
   const [notifWhatsApp, setNotifWhatsApp] = useState(true);
   const [notifEmailConfirm, setNotifEmailConfirm] = useState(false);
   const [notifSmsTemplate, setNotifSmsTemplate] = useState("Hello {name}, your appointment for {service} is confirmed on {date} at {time}. See you at Revera Clinics!");
-  const [notifSmsTemplateAr, setNotifSmsTemplateAr] = useState("مرحباً {name}، تم تأكيد موعدك لخدمة {service} بتاريخ {date} الساعة {time}. نراك في ريفيرا كلينيك!");
+  const [notifSmsTemplateAr, setNotifSmsTemplateAr] = useState("Ù…Ø±Ø­Ø¨Ø§Ù‹ {name}ØŒ ØªÙ… ØªØ£ÙƒÙŠØ¯ Ù…ÙˆØ¹Ø¯Ùƒ Ù„Ø®Ø¯Ù…Ø© {service} Ø¨ØªØ§Ø±ÙŠØ® {date} Ø§Ù„Ø³Ø§Ø¹Ø© {time}. Ù†Ø±Ø§Ùƒ ÙÙŠ Ø±ÙŠÙÙŠØ±Ø§ ÙƒÙ„ÙŠÙ†ÙŠÙƒ!");
   const [notifReminderHours, setNotifReminderHours] = useState(24);
   const [notifStaffEmail, setNotifStaffEmail] = useState("admin@reveraclinics.com");
   const [savingNotificationSettings, setSavingNotificationSettings] = useState(false);
 
-  // ── Queue Settings State ──
+  // â”€â”€ Queue Settings State â”€â”€
   const [queueVirtualRoom, setQueueVirtualRoom] = useState(false);
   const [queueShowOnScreens, setQueueShowOnScreens] = useState(true);
   const [queueAutoCheckIn, setQueueAutoCheckIn] = useState(false);
@@ -3731,13 +3732,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       setServiceHours(branchRecord.service_hours);
     } else {
       setServiceHours([
-        { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "09:00", closeTime: "20:00" },
-        { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Sunday", dayAr: "Ø§Ù„Ø£Ø­Ø¯", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Monday", dayAr: "Ø§Ù„Ø¥Ø«Ù†ÙŠÙ†", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Tuesday", dayAr: "Ø§Ù„Ø«Ù„Ø§Ø«Ø§Ø¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Wednesday", dayAr: "Ø§Ù„Ø£Ø±Ø¨Ø¹Ø§Ø¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Thursday", dayAr: "Ø§Ù„Ø®Ù…ÙŠØ³", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Friday", dayAr: "Ø§Ù„Ø¬Ù…Ø¹Ø©", isOpen: false, openTime: "09:00", closeTime: "20:00" },
+        { day: "Saturday", dayAr: "Ø§Ù„Ø³Ø¨Øª", isOpen: true, openTime: "09:00", closeTime: "20:00" },
       ]);
     }
   }, [selectedBranchForHoursId, branches]);
@@ -3797,7 +3798,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   // (background refresh, or simply resolving async after `branch` was already set), the poll
   // keeps sending the stale token forever, every 401 ("Invalid or expired session") lands in
   // fetchRequests'/fetchAllReservations' .catch and overwrites requests/allReservations with []
-  // — wiping Pending Approvals and every patient's Booking History even though a fully valid
+  // â€” wiping Pending Approvals and every patient's Booking History even though a fully valid
   // session exists in state and localStorage. Re-creating the poll when the token value changes
   // keeps it on the live token going forward.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3895,17 +3896,17 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             "Osteopathy & Therapeutic Nutrition",
           ]);
           setWhatWeDoListAr(data.aboutPage?.whatWeDoListAr || [
-            "علاجات الجلدية والتجميل",
-            "النساء والتوليد وصحة المرأة",
-            "العلاج الطبيعي وإعادة التأهيل",
-            "تقويم العظام والتغذية العلاجية",
+            "Ø¹Ù„Ø§Ø¬Ø§Øª Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„ØªØ¬Ù…ÙŠÙ„",
+            "Ø§Ù„Ù†Ø³Ø§Ø¡ ÙˆØ§Ù„ØªÙˆÙ„ÙŠØ¯ ÙˆØµØ­Ø© Ø§Ù„Ù…Ø±Ø£Ø©",
+            "Ø§Ù„Ø¹Ù„Ø§Ø¬ Ø§Ù„Ø·Ø¨ÙŠØ¹ÙŠ ÙˆØ¥Ø¹Ø§Ø¯Ø© Ø§Ù„ØªØ£Ù‡ÙŠÙ„",
+            "ØªÙ‚ÙˆÙŠÙ… Ø§Ù„Ø¹Ø¸Ø§Ù… ÙˆØ§Ù„ØªØºØ°ÙŠØ© Ø§Ù„Ø¹Ù„Ø§Ø¬ÙŠØ©",
           ]);
 
           // Load FAQ Section Settings
           setFaqTag(data.aboutPage?.faqTag || "frequently asked questions");
-          setFaqTagAr(data.aboutPage?.faqTagAr || "أسئلة شائعة");
+          setFaqTagAr(data.aboutPage?.faqTagAr || "Ø£Ø³Ø¦Ù„Ø© Ø´Ø§Ø¦Ø¹Ø©");
           setFaqHeading(data.aboutPage?.faqHeading || "Questions? We have answers.");
-          setFaqHeadingAr(data.aboutPage?.faqHeadingAr || "أسئلة؟ لدينا إجابات.");
+          setFaqHeadingAr(data.aboutPage?.faqHeadingAr || "Ø£Ø³Ø¦Ù„Ø©ØŸ Ù„Ø¯ÙŠÙ†Ø§ Ø¥Ø¬Ø§Ø¨Ø§Øª.");
           setFaqImage1(data.aboutPage?.faqImage1 || "");
           setFaqImage2(data.aboutPage?.faqImage2 || "");
           setFaqs(data.aboutPage?.faqs || [
@@ -3915,53 +3916,53 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             },
             {
               question: "2. Who is Revera designed for?",
-              answer: "Revera is designed for women who value elegance, privacy, and visible results. Our clients seek the best — not the cheapest — and expect a medical experience that matches their standards."
+              answer: "Revera is designed for women who value elegance, privacy, and visible results. Our clients seek the best â€” not the cheapest â€” and expect a medical experience that matches their standards."
             },
             {
               question: "3. How does my treatment plan work?",
-              answer: "Your journey begins with a comprehensive consultation where we assess your health, aesthetic goals, and lifestyle. From this, our doctors build a fully personalized treatment plan — never a template — that evolves with your progress and needs."
+              answer: "Your journey begins with a comprehensive consultation where we assess your health, aesthetic goals, and lifestyle. From this, our doctors build a fully personalized treatment plan â€” never a template â€” that evolves with your progress and needs."
             },
             {
               question: "4. What makes Revera different from other clinics?",
-              answer: "Revera is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint — from your first appointment to your last follow-up."
+              answer: "Revera is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint â€” from your first appointment to your last follow-up."
             }
           ]);
           setFaqsAr(data.aboutPage?.faqsAr || [
             {
-              question: "١. ما الخدمات التي تقدمها ريفيرا؟",
-              answer: "ريفيرا عيادة متميزة متخصصة في علاجات الجلدية والتجميل، وصحة المرأة والنساء والتوليد، والعلاج الطبيعي وإعادة التأهيل، وتقويم العظام والتغذية العلاجية. كل خدمة تُقدَّم بدقة طبية وتجربة فاخرة مصممة لكِ."
+              question: "Ù¡. Ù…Ø§ Ø§Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„ØªÙŠ ØªÙ‚Ø¯Ù…Ù‡Ø§ Ø±ÙŠÙÙŠØ±Ø§ØŸ",
+              answer: "Ø±ÙŠÙÙŠØ±Ø§ Ø¹ÙŠØ§Ø¯Ø© Ù…ØªÙ…ÙŠØ²Ø© Ù…ØªØ®ØµØµØ© ÙÙŠ Ø¹Ù„Ø§Ø¬Ø§Øª Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„ØªØ¬Ù…ÙŠÙ„ØŒ ÙˆØµØ­Ø© Ø§Ù„Ù…Ø±Ø£Ø© ÙˆØ§Ù„Ù†Ø³Ø§Ø¡ ÙˆØ§Ù„ØªÙˆÙ„ÙŠØ¯ØŒ ÙˆØ§Ù„Ø¹Ù„Ø§Ø¬ Ø§Ù„Ø·Ø¨ÙŠØ¹ÙŠ ÙˆØ¥Ø¹Ø§Ø¯Ø© Ø§Ù„ØªØ£Ù‡ÙŠÙ„ØŒ ÙˆØªÙ‚ÙˆÙŠÙ… Ø§Ù„Ø¹Ø¸Ø§Ù… ÙˆØ§Ù„ØªØºØ°ÙŠØ© Ø§Ù„Ø¹Ù„Ø§Ø¬ÙŠØ©. ÙƒÙ„ Ø®Ø¯Ù…Ø© ØªÙÙ‚Ø¯ÙŽÙ‘Ù… Ø¨Ø¯Ù‚Ø© Ø·Ø¨ÙŠØ© ÙˆØªØ¬Ø±Ø¨Ø© ÙØ§Ø®Ø±Ø© Ù…ØµÙ…Ù…Ø© Ù„ÙƒÙ."
             },
             {
-              question: "٢. لمن صُمِّمت ريفيرا؟",
-              answer: "ريفيرا مصممة للمرأة التي تقدّر الأناقة والخصوصية والنتائج الحقيقية. عميلاتنا يبحثن عن الأفضل — لا الأرخص — ويتوقعن تجربة طبية تليق بمعاييرهن."
+              question: "Ù¢. Ù„Ù…Ù† ØµÙÙ…ÙÙ‘Ù…Øª Ø±ÙŠÙÙŠØ±Ø§ØŸ",
+              answer: "Ø±ÙŠÙÙŠØ±Ø§ Ù…ØµÙ…Ù…Ø© Ù„Ù„Ù…Ø±Ø£Ø© Ø§Ù„ØªÙŠ ØªÙ‚Ø¯Ù‘Ø± Ø§Ù„Ø£Ù†Ø§Ù‚Ø© ÙˆØ§Ù„Ø®ØµÙˆØµÙŠØ© ÙˆØ§Ù„Ù†ØªØ§Ø¦Ø¬ Ø§Ù„Ø­Ù‚ÙŠÙ‚ÙŠØ©. Ø¹Ù…ÙŠÙ„Ø§ØªÙ†Ø§ ÙŠØ¨Ø­Ø«Ù† Ø¹Ù† Ø§Ù„Ø£ÙØ¶Ù„ â€” Ù„Ø§ Ø§Ù„Ø£Ø±Ø®Øµ â€” ÙˆÙŠØªÙˆÙ‚Ø¹Ù† ØªØ¬Ø±Ø¨Ø© Ø·Ø¨ÙŠØ© ØªÙ„ÙŠÙ‚ Ø¨Ù…Ø¹Ø§ÙŠÙŠØ±Ù‡Ù†."
             },
             {
-              question: "٣. كيف تعمل خطة علاجي؟",
-              answer: "تبدأ رحلتكِ باستشارة شاملة نُقيّم فيها صحتكِ وأهدافكِ الجمالية وأسلوب حياتكِ. بناءً على ذلك، يضع أطباؤنا خطة علاج شخصية متكاملة — لا نموذجاً جاهزاً — تتطور مع تقدمكِ واحتياجاتكِ."
+              question: "Ù£. ÙƒÙŠÙ ØªØ¹Ù…Ù„ Ø®Ø·Ø© Ø¹Ù„Ø§Ø¬ÙŠØŸ",
+              answer: "ØªØ¨Ø¯Ø£ Ø±Ø­Ù„ØªÙƒÙ Ø¨Ø§Ø³ØªØ´Ø§Ø±Ø© Ø´Ø§Ù…Ù„Ø© Ù†ÙÙ‚ÙŠÙ‘Ù… ÙÙŠÙ‡Ø§ ØµØ­ØªÙƒÙ ÙˆØ£Ù‡Ø¯Ø§ÙÙƒÙ Ø§Ù„Ø¬Ù…Ø§Ù„ÙŠØ© ÙˆØ£Ø³Ù„ÙˆØ¨ Ø­ÙŠØ§ØªÙƒÙ. Ø¨Ù†Ø§Ø¡Ù‹ Ø¹Ù„Ù‰ Ø°Ù„ÙƒØŒ ÙŠØ¶Ø¹ Ø£Ø·Ø¨Ø§Ø¤Ù†Ø§ Ø®Ø·Ø© Ø¹Ù„Ø§Ø¬ Ø´Ø®ØµÙŠØ© Ù…ØªÙƒØ§Ù…Ù„Ø© â€” Ù„Ø§ Ù†Ù…ÙˆØ°Ø¬Ø§Ù‹ Ø¬Ø§Ù‡Ø²Ø§Ù‹ â€” ØªØªØ·ÙˆØ± Ù…Ø¹ ØªÙ‚Ø¯Ù…ÙƒÙ ÙˆØ§Ø­ØªÙŠØ§Ø¬Ø§ØªÙƒÙ."
             },
             {
-              question: "٤. ما الذي يجعل ريفيرا مختلفة؟",
-              answer: "ريفيرا وجهة، لا مجرد عيادة. الفرق في الإحساس: بيئة خاصة وهادئة، وأطباء يستمعون، ومستوى رعاية يمكنكِ رؤيته والشعور به في كل لحظة — من موعدكِ الأول إلى متابعتكِ الأخيرة."
+              question: "Ù¤. Ù…Ø§ Ø§Ù„Ø°ÙŠ ÙŠØ¬Ø¹Ù„ Ø±ÙŠÙÙŠØ±Ø§ Ù…Ø®ØªÙ„ÙØ©ØŸ",
+              answer: "Ø±ÙŠÙÙŠØ±Ø§ ÙˆØ¬Ù‡Ø©ØŒ Ù„Ø§ Ù…Ø¬Ø±Ø¯ Ø¹ÙŠØ§Ø¯Ø©. Ø§Ù„ÙØ±Ù‚ ÙÙŠ Ø§Ù„Ø¥Ø­Ø³Ø§Ø³: Ø¨ÙŠØ¦Ø© Ø®Ø§ØµØ© ÙˆÙ‡Ø§Ø¯Ø¦Ø©ØŒ ÙˆØ£Ø·Ø¨Ø§Ø¡ ÙŠØ³ØªÙ…Ø¹ÙˆÙ†ØŒ ÙˆÙ…Ø³ØªÙˆÙ‰ Ø±Ø¹Ø§ÙŠØ© ÙŠÙ…ÙƒÙ†ÙƒÙ Ø±Ø¤ÙŠØªÙ‡ ÙˆØ§Ù„Ø´Ø¹ÙˆØ± Ø¨Ù‡ ÙÙŠ ÙƒÙ„ Ù„Ø­Ø¸Ø© â€” Ù…Ù† Ù…ÙˆØ¹Ø¯ÙƒÙ Ø§Ù„Ø£ÙˆÙ„ Ø¥Ù„Ù‰ Ù…ØªØ§Ø¨Ø¹ØªÙƒÙ Ø§Ù„Ø£Ø®ÙŠØ±Ø©."
             }
           ]);
           setHowItWorksHeading(data.howItWorks?.heading || "Simple steps to beauty transformations");
           setHowItWorksDescription(data.howItWorks?.description || "Discover a seamless process designed to enhance your beauty and health through personalized consultations, customized treatment plans, and dedicated medical support. We guide you every step toward achieving your beauty and wellness goals.");
-          setHowItWorksHeadingAr(data.howItWorks?.headingAr || "خطوات بسيطة لتحولات الجمال");
-          setHowItWorksDescriptionAr(data.howItWorks?.descriptionAr || "اكتشف عملية سلسة مصممة لتعزيز جمالك وصحتك من خلال استشارات شخصية وخطط علاجية مخصصة ودعم طبي متخصص. نرشدك في كل خطوة نحو تحقيق أهداف الجمال والعافية.");
+          setHowItWorksHeadingAr(data.howItWorks?.headingAr || "Ø®Ø·ÙˆØ§Øª Ø¨Ø³ÙŠØ·Ø© Ù„ØªØ­ÙˆÙ„Ø§Øª Ø§Ù„Ø¬Ù…Ø§Ù„");
+          setHowItWorksDescriptionAr(data.howItWorks?.descriptionAr || "Ø§ÙƒØªØ´Ù Ø¹Ù…Ù„ÙŠØ© Ø³Ù„Ø³Ø© Ù…ØµÙ…Ù…Ø© Ù„ØªØ¹Ø²ÙŠØ² Ø¬Ù…Ø§Ù„Ùƒ ÙˆØµØ­ØªÙƒ Ù…Ù† Ø®Ù„Ø§Ù„ Ø§Ø³ØªØ´Ø§Ø±Ø§Øª Ø´Ø®ØµÙŠØ© ÙˆØ®Ø·Ø· Ø¹Ù„Ø§Ø¬ÙŠØ© Ù…Ø®ØµØµØ© ÙˆØ¯Ø¹Ù… Ø·Ø¨ÙŠ Ù…ØªØ®ØµØµ. Ù†Ø±Ø´Ø¯Ùƒ ÙÙŠ ÙƒÙ„ Ø®Ø·ÙˆØ© Ù†Ø­Ùˆ ØªØ­Ù‚ÙŠÙ‚ Ø£Ù‡Ø¯Ø§Ù Ø§Ù„Ø¬Ù…Ø§Ù„ ÙˆØ§Ù„Ø¹Ø§ÙÙŠØ©.");
 
           // Load Why Choose Us Settings
           setWcuYearsLabel(data.whyChooseUs?.yearsLabel || "15+ years excellence");
           setWcuHeading(data.whyChooseUs?.heading || "Where medical expertise meets a luxury experience");
-          setWcuDescription(data.whyChooseUs?.description || "At Revera, every detail is intentional — from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.");
-          setWcuQuote(data.whyChooseUs?.quote || '"We don\'t treat conditions — we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey."');
+          setWcuDescription(data.whyChooseUs?.description || "At Revera, every detail is intentional â€” from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.");
+          setWcuQuote(data.whyChooseUs?.quote || '"We don\'t treat conditions â€” we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey."');
           setWcuContactLabel(data.whyChooseUs?.contactLabel || "Reach us:");
           setWcuPhone(data.whyChooseUs?.phone || "(+20) 01035595691");
 
-          setWcuYearsLabelAr(data.whyChooseUs?.yearsLabelAr || "١٥+ عاماً من التميز");
-          setWcuHeadingAr(data.whyChooseUs?.headingAr || "حيث تلتقي الخبرة الطبية بتجربة فاخرة");
-          setWcuDescriptionAr(data.whyChooseUs?.descriptionAr || "في ريفيرا، كل تفصيل مقصود — بدءاً من استشارتك الأولى وحتى لحظة خروجك متحوّلة. نقدم رعاية مدعومة بالعلم مع الثقة الهادئة لوجهة طبية خاصة.");
-          setWcuQuoteAr(data.whyChooseUs?.quoteAr || '"نحن لا نعالج فقط — بل نُحوّل الثقة. كل جلسة في ريفيرا مصممة حولكِ: أهدافكِ، بشرتكِ، رحلتكِ."');
-          setWcuContactLabelAr(data.whyChooseUs?.contactLabelAr || "تواصلي معنا:");
+          setWcuYearsLabelAr(data.whyChooseUs?.yearsLabelAr || "Ù¡Ù¥+ Ø¹Ø§Ù…Ø§Ù‹ Ù…Ù† Ø§Ù„ØªÙ…ÙŠØ²");
+          setWcuHeadingAr(data.whyChooseUs?.headingAr || "Ø­ÙŠØ« ØªÙ„ØªÙ‚ÙŠ Ø§Ù„Ø®Ø¨Ø±Ø© Ø§Ù„Ø·Ø¨ÙŠØ© Ø¨ØªØ¬Ø±Ø¨Ø© ÙØ§Ø®Ø±Ø©");
+          setWcuDescriptionAr(data.whyChooseUs?.descriptionAr || "ÙÙŠ Ø±ÙŠÙÙŠØ±Ø§ØŒ ÙƒÙ„ ØªÙØµÙŠÙ„ Ù…Ù‚ØµÙˆØ¯ â€” Ø¨Ø¯Ø¡Ø§Ù‹ Ù…Ù† Ø§Ø³ØªØ´Ø§Ø±ØªÙƒ Ø§Ù„Ø£ÙˆÙ„Ù‰ ÙˆØ­ØªÙ‰ Ù„Ø­Ø¸Ø© Ø®Ø±ÙˆØ¬Ùƒ Ù…ØªØ­ÙˆÙ‘Ù„Ø©. Ù†Ù‚Ø¯Ù… Ø±Ø¹Ø§ÙŠØ© Ù…Ø¯Ø¹ÙˆÙ…Ø© Ø¨Ø§Ù„Ø¹Ù„Ù… Ù…Ø¹ Ø§Ù„Ø«Ù‚Ø© Ø§Ù„Ù‡Ø§Ø¯Ø¦Ø© Ù„ÙˆØ¬Ù‡Ø© Ø·Ø¨ÙŠØ© Ø®Ø§ØµØ©.");
+          setWcuQuoteAr(data.whyChooseUs?.quoteAr || '"Ù†Ø­Ù† Ù„Ø§ Ù†Ø¹Ø§Ù„Ø¬ ÙÙ‚Ø· â€” Ø¨Ù„ Ù†ÙØ­ÙˆÙ‘Ù„ Ø§Ù„Ø«Ù‚Ø©. ÙƒÙ„ Ø¬Ù„Ø³Ø© ÙÙŠ Ø±ÙŠÙÙŠØ±Ø§ Ù…ØµÙ…Ù…Ø© Ø­ÙˆÙ„ÙƒÙ: Ø£Ù‡Ø¯Ø§ÙÙƒÙØŒ Ø¨Ø´Ø±ØªÙƒÙØŒ Ø±Ø­Ù„ØªÙƒÙ."');
+          setWcuContactLabelAr(data.whyChooseUs?.contactLabelAr || "ØªÙˆØ§ØµÙ„ÙŠ Ù…Ø¹Ù†Ø§:");
           setWcuPhoneAr(data.whyChooseUs?.phoneAr || "(+20) 01035595691");
 
           setWcuImage1(data.whyChooseUs?.image1 || "");
@@ -4471,12 +4472,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       image: "/images/hero/slide-1.jpg"
     };
     const newArSlide = {
-      welcome: "مرحباً بكم في عيادات ريفيرا",
-      heading: "عنوان الشريحة الجديدة",
-      description: "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية.",
-      bookBtn: "احجز موعدًا",
+      welcome: "Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒÙ… ÙÙŠ Ø¹ÙŠØ§Ø¯Ø§Øª Ø±ÙŠÙÙŠØ±Ø§",
+      heading: "Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø´Ø±ÙŠØ­Ø© Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©",
+      description: "Ø®Ø¯Ù…Ø§Øª Ù…ØªØ®ØµØµØ© ÙÙŠ Ø·Ø¨ Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„Ø¬Ø±Ø§Ø­Ø© Ø§Ù„ØªØ¬Ù…ÙŠÙ„ÙŠØ© Ù…Ø¹ Ø±Ø¹Ø§ÙŠØ© Ø´Ø®ØµÙŠØ©.",
+      bookBtn: "Ø§Ø­Ø¬Ø² Ù…ÙˆØ¹Ø¯Ù‹Ø§",
       rating: "4.5",
-      reviewCount: "(1000+ تقييم)",
+      reviewCount: "(1000+ ØªÙ‚ÙŠÙŠÙ…)",
       image: "/images/hero/slide-1.jpg"
     };
     setHomeHeroSlides([...homeHeroSlides, newEnSlide]);
@@ -4666,12 +4667,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   }
 
   // useCallback keyed on [session]: Supabase's session resolves asynchronously, so a plain
-  // mount-only effect calling this raced it — if the session wasn't ready yet the fetch bailed
+  // mount-only effect calling this raced it â€” if the session wasn't ready yet the fetch bailed
   // out silently and nothing ever retried, leaving the patient list empty for the rest of the
   // session (surfaced as "Select Patient" showing nothing in the Sell Product modal). Giving this
   // a stable identity per session, paired with the effect below that depends on it, means the
   // moment `session` actually resolves, this function's identity changes and the effect re-fires
-  // automatically — same pattern already used by fetchInventoryProducts/fetchInventoryDevices.
+  // automatically â€” same pattern already used by fetchInventoryProducts/fetchInventoryDevices.
   const fetchCustomers = useCallback(() => {
     setLoadingCustomers(true);
     fetchCustomerAvatars();
@@ -5038,7 +5039,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
   // Defaults to bypassing the cache. Nearly every caller here runs immediately after a write
   // (approve, reject, cancel, check-in, start/complete session, add product, new booking), and
-  // cachedFetch has a 2s TTL with no write-invalidation — so the default of "reuse the cached
+  // cachedFetch has a 2s TTL with no write-invalidation â€” so the default of "reuse the cached
   // array" reliably returned a list that predated the change that had just been made, which is
   // why new bookings only appeared after a full page reload. Pass useCache=true only where a
   // slightly stale list is genuinely acceptable.
@@ -5114,9 +5115,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     return unavailable;
   }
 
-  // Shared by the initial open and by changing the date inside the approve modal — recomputes
+  // Shared by the initial open and by changing the date inside the approve modal â€” recomputes
   // which time slots are actually pickable for whichever date is currently selected there.
-  // Returns the freshly-computed availability rather than relying on the state it sets —
+  // Returns the freshly-computed availability rather than relying on the state it sets â€”
   // setApproveUnavailableSlots() does not update the caller's closure within the same tick, so a
   // caller that read the state variable straight after awaiting this would see the *previous*
   // booking's list (or [] on first open) and make its decision on stale data.
@@ -5143,7 +5144,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       const { unavailable, start, end } = await refreshApproveAvailability(r, r.date);
 
       // Always show the time the patient actually asked for. If it is not bookable, select it
-      // anyway and warn — silently substituting the first free slot (09:00) is how approvals were
+      // anyway and warn â€” silently substituting the first free slot (09:00) is how approvals were
       // being confirmed at a time nobody requested.
       const requestedSlot = r.requestedTime || r.timeSlot || "";
       if (requestedSlot) {
@@ -5152,9 +5153,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const taken = unavailable.includes(requestedSlot);
         setSlot(requestedSlot);
         if (taken) {
-          setApproveTimeWarning(`Requested time ${requestedSlot} is already taken — pick another slot.`);
+          setApproveTimeWarning(`Requested time ${requestedSlot} is already taken â€” pick another slot.`);
         } else if (outsideHours) {
-          setApproveTimeWarning(`Requested time ${requestedSlot} is outside opening hours — pick another slot.`);
+          setApproveTimeWarning(`Requested time ${requestedSlot} is outside opening hours â€” pick another slot.`);
         }
       }
 
@@ -5172,11 +5173,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   }
 
   // Staff picking a different date than originally requested (e.g. the requested day turned out
-  // to be a closed day, or is already fully booked) — re-derives available slots for that date
+  // to be a closed day, or is already fully booked) â€” re-derives available slots for that date
   // instead of forcing staff to reject the request just to change the date.
   async function handleApproveDateChange(newDateStr: string) {
     setApproveDate(newDateStr);
-    // Staff deliberately moved off the requested date — the requested-time warning no longer
+    // Staff deliberately moved off the requested date â€” the requested-time warning no longer
     // applies, and refreshApproveAvailability picks a fresh slot for the new date.
     setApproveTimeWarning("");
     if (!selected) return;
@@ -5273,7 +5274,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       email: newPatientEmail,
       phone: newPatientPhone,
       // When staff explicitly picked an existing patient (search picker or a resolved phone
-      // match), link the reservation to that exact customer id directly — bypasses the
+      // match), link the reservation to that exact customer id directly â€” bypasses the
       // phone-string-matching path entirely, so a typo/formatting difference in the phone field
       // can never fork off a duplicate customer for a patient staff already identified.
       customerId: matchedCustomerId || undefined,
@@ -5431,7 +5432,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
             {loginError && (
               <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-xl p-3">
-                ⚠️ {loginError}
+                âš ï¸ {loginError}
               </p>
             )}
 
@@ -5541,7 +5542,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               className="md:hidden flex h-7 w-7 items-center justify-center rounded-full hover:bg-white/10 text-[#FBFBF9]/80 hover:text-[#FBFBF9] transition text-lg font-bold"
               title="Close sidebar"
             >
-              ×
+              Ã—
             </button>
           </div>
 
@@ -5567,7 +5568,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   : "text-[#FBFBF9]/70 hover:text-white hover:bg-white/10"
               }`}
             >
-              العربية
+              Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©
             </button>
           </div>
 
@@ -6005,7 +6006,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     className="flex items-center justify-between gap-4 rounded-3xl border border-rose-200 bg-rose-50 px-6 py-4 text-rose-800 shadow-sm animate-pulse"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">⚠️</span>
+                      <span className="text-xl">âš ï¸</span>
                       <p className="text-sm font-semibold">
                         Alert: Employee <strong>{alertItem.employee_accounts?.name}</strong> ({alertItem.employee_accounts?.role_name}) went missing at {new Date(alertItem.timestamp).toLocaleTimeString()}!
                       </p>
@@ -6050,7 +6051,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             ) : (
               <>
 
-          {/* ── PROVIDERS VIEW ── */}
+          {/* â”€â”€ PROVIDERS VIEW â”€â”€ */}
           {activeNav === "Doctors" && (
             <AdminDoctorsView
               providerForm={providerForm}
@@ -6075,7 +6076,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {/* ── SERVICES VIEW ── */}
+          {/* â”€â”€ SERVICES VIEW â”€â”€ */}
           {activeNav === "Services" && (
             <AdminServicesView
               localServices={localServices}
@@ -6176,7 +6177,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {/* ── PROMOTIONS VIEW ── */}
+          {/* â”€â”€ PROMOTIONS VIEW â”€â”€ */}
           {activeNav === "Promotions" && (
             <PromotionsAdminPanel
               localServices={localServices}
@@ -6186,12 +6187,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {/* ── PACKAGES VIEW ── */}
+          {/* â”€â”€ PACKAGES VIEW â”€â”€ */}
           {activeNav === "Packages" && (
             <PackageAdminPanel session={session} />
           )}
 
-          {/* ── FINANCE VIEW ── */}
+          {/* â”€â”€ FINANCE VIEW â”€â”€ */}
           {activeNav === "Finance" && (
             <FinanceSection
               accessToken={session?.access_token}
@@ -6199,33 +6200,33 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {/* ── ALL PRESCRIPTIONS VIEW ── */}
+          {/* â”€â”€ ALL PRESCRIPTIONS VIEW â”€â”€ */}
 
-          {/* ── MEDICINE LIBRARY VIEW ── */}
+          {/* â”€â”€ MEDICINE LIBRARY VIEW â”€â”€ */}
 
-          {/* ── PRODUCTS VIEW ── */}
+          {/* â”€â”€ PRODUCTS VIEW â”€â”€ */}
 
-          {/* ── PRODUCT CATEGORIES VIEW ── */}
+          {/* â”€â”€ PRODUCT CATEGORIES VIEW â”€â”€ */}
 
-          {/* ── POINT OF SALE VIEW ── */}
+          {/* â”€â”€ POINT OF SALE VIEW â”€â”€ */}
 
-          {/* ── INSIGHTS VIEW ── */}
+          {/* â”€â”€ INSIGHTS VIEW â”€â”€ */}
 
-          {/* ── SALES DASHBOARD VIEW ── */}
+          {/* â”€â”€ SALES DASHBOARD VIEW â”€â”€ */}
 
-          {/* ── REFUNDS VIEW ── */}
+          {/* â”€â”€ REFUNDS VIEW â”€â”€ */}
 
-          {/* ── SHIPPING METHODS VIEW ── */}
+          {/* â”€â”€ SHIPPING METHODS VIEW â”€â”€ */}
 
-          {/* ── TARGET BONUSES VIEW ── */}
+          {/* â”€â”€ TARGET BONUSES VIEW â”€â”€ */}
 
-          {/* ── COUPONS VIEW ── */}
+          {/* â”€â”€ COUPONS VIEW â”€â”€ */}
 
-          {/* ── CUSTOMERS VIEW ── */}
+          {/* â”€â”€ CUSTOMERS VIEW â”€â”€ */}
           {activeNav === "Patients" && (
             <div>
 
-              {/* ── INLINE: View Customer Profile ── */}
+              {/* â”€â”€ INLINE: View Customer Profile â”€â”€ */}
               {viewingCustomerProfile && (
                 <CustomerProfileDrawer
                   viewingCustomerProfile={viewingCustomerProfile}
@@ -6329,7 +6330,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 />
               )}
 
-              {/* ── INLINE: Add/Edit Customer Form ── */}
+              {/* â”€â”€ INLINE: Add/Edit Customer Form â”€â”€ */}
               {showCustomerFormModal && !viewingCustomerProfile && (
                 <CustomerFormModal
                   setShowCustomerFormModal={setShowCustomerFormModal}
@@ -6341,7 +6342,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 />
               )}
 
-              {/* ── CUSTOMER TABLE (only when no inline view is active) ── */}
+              {/* â”€â”€ CUSTOMER TABLE (only when no inline view is active) â”€â”€ */}
               {!viewingCustomerProfile && !showCustomerFormModal && (
               <PatientsDirectoryView
                 filteredCustomers={filteredCustomers}
@@ -6378,7 +6379,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
 
 
-          {/* ── SMS MANAGEMENT VIEWS ── */}
+          {/* â”€â”€ SMS MANAGEMENT VIEWS â”€â”€ */}
 
 
 
@@ -6386,7 +6387,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
 
 
-          {/* ── PAGES SETTINGS VIEW ── */}
+          {/* â”€â”€ PAGES SETTINGS VIEW â”€â”€ */}
           {activeNav === "Pages Settings" && (
             <div className="space-y-6">
               <div className="mb-2">
@@ -6437,842 +6438,45 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
               {/* About Us Page */}
               {pagesSettingsTab === "About Us" && (
-                <div className="space-y-8">
-                  <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-                  <div>
-                    <h3 className="text-2xl font-bold text-[#1F251A]">About Section Photos</h3>
-                    <p className="text-sm text-[#5A6A51] mt-1">Upload or edit the three main images displayed in the homepage About section.</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
-                    {/* Image 1: Left Doctor Portrait */}
-                    <div className="space-y-4">
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Photo 1: Doctor Portrait (Foreground)</label>
-                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
-                        {aboutImage1 || "/images/doctor/portrait-about.jpg" ? (
-                          <>
-                            <Image
-                              src={aboutImage1 || "/images/doctor/portrait-about.jpg"}
-                              alt="Foreground Portrait"
-                              fill
-                              className="object-cover"
-                              unoptimized
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-center p-4">
-                            <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
-                            <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              try {
-                                const compressed = await compressImage(file, 1000, 1000, 0.75);
-                                setAboutImage1(compressed);
-                              } catch (err) {
-                                console.error("Failed to compress portrait 1, using original:", err);
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setAboutImage1(reader.result as string);
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
-                        <input
-                          type="text"
-                          value={aboutImage1}
-                          onChange={(e) => setAboutImage1(e.target.value)}
-                          placeholder="/images/doctor/portrait-about.jpg"
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Image 2: Right Doctor Portrait */}
-                    <div className="space-y-4">
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Photo 2: Doctor Portrait (Background)</label>
-                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
-                        {aboutImage2 || "/images/doctor/portrait-main.jpg" ? (
-                          <>
-                            <Image
-                              src={aboutImage2 || "/images/doctor/portrait-main.jpg"}
-                              alt="Background Portrait"
-                              fill
-                              className="object-cover"
-                              unoptimized
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-center p-4">
-                            <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
-                            <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              try {
-                                const compressed = await compressImage(file, 1000, 1000, 0.75);
-                                setAboutImage2(compressed);
-                              } catch (err) {
-                                console.error("Failed to compress portrait 2, using original:", err);
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setAboutImage2(reader.result as string);
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
-                        <input
-                          type="text"
-                          value={aboutImage2}
-                          onChange={(e) => setAboutImage2(e.target.value)}
-                          placeholder="/images/doctor/portrait-main.jpg"
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Image 3: Clinic Interior */}
-                    <div className="space-y-4">
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Photo 3: Clinic Interior</label>
-                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
-                        {aboutImage3 || "/images/clinic/interior.jpg" ? (
-                          <>
-                            <Image
-                              src={aboutImage3 || "/images/clinic/interior.jpg"}
-                              alt="Clinic Interior"
-                              fill
-                              className="object-cover"
-                              unoptimized
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-center p-4">
-                            <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
-                            <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              try {
-                                const compressed = await compressImage(file, 1000, 1000, 0.75);
-                                setAboutImage3(compressed);
-                              } catch (err) {
-                                console.error("Failed to compress clinic interior, using original:", err);
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setAboutImage3(reader.result as string);
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
-                        <input
-                          type="text"
-                          value={aboutImage3}
-                          onChange={(e) => setAboutImage3(e.target.value)}
-                          placeholder="/images/clinic/interior.jpg"
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-4 border-t border-[#F2EFE9] gap-3">
-                      <button
-                        disabled={savingPageSettings}
-                        onClick={() => savePageSettings()}
-                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] duration-150 cursor-pointer"
-                      >
-                        {savingPageSettings ? "Saving..." : "Save All Changes"}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-                    <div>
-                      <h3 className="text-2xl font-bold text-[#1F251A]">What We Do</h3>
-                      <p className="text-sm text-[#5A6A51] mt-1">Upload or edit the photos and modify checklist items shown in the "What We Do" section on the About Us page.</p>
-                    </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                    {/* What We Do Photo 1: Left Before/After Collage */}
-                    <div className="space-y-4">
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">What We Do: Photo 1 (Left Collage)</label>
-                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
-                        {whatWeDoImage1 || "/images/clinic/interior.jpg" ? (
-                          <>
-                            <Image
-                              src={whatWeDoImage1 || "/images/clinic/interior.jpg"}
-                              alt="What We Do Left Image"
-                              fill
-                              className="object-cover"
-                              unoptimized
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-center p-4">
-                            <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
-                            <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              try {
-                                const compressed = await compressImage(file, 1000, 1000, 0.75);
-                                setWhatWeDoImage1(compressed);
-                              } catch (err) {
-                                console.error("Failed to compress what we do 1, using original:", err);
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setWhatWeDoImage1(reader.result as string);
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
-                        <input
-                          type="text"
-                          value={whatWeDoImage1}
-                          onChange={(e) => setWhatWeDoImage1(e.target.value)}
-                          placeholder="/images/clinic/interior.jpg"
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* What We Do Photo 2: Right Circular Image */}
-                    <div className="space-y-4">
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">What We Do: Photo 2 (Right Treatment)</label>
-                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
-                        {whatWeDoImage2 || "/images/clinic/video-thumbnail.jpg" ? (
-                          <>
-                            <Image
-                              src={whatWeDoImage2 || "/images/clinic/video-thumbnail.jpg"}
-                              alt="What We Do Right Image"
-                              fill
-                              className="object-cover"
-                              unoptimized
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-center p-4">
-                            <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
-                            <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              try {
-                                const compressed = await compressImage(file, 1000, 1000, 0.75);
-                                setWhatWeDoImage2(compressed);
-                              } catch (err) {
-                                console.error("Failed to compress what we do 2, using original:", err);
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setWhatWeDoImage2(reader.result as string);
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
-                        <input
-                          type="text"
-                          value={whatWeDoImage2}
-                          onChange={(e) => setWhatWeDoImage2(e.target.value)}
-                          placeholder="/images/clinic/video-thumbnail.jpg"
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <hr className="border-[#F2EFE9] my-6" />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                    {/* English Checklist */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-semibold text-[#1F251A]">English Checklist Items</h4>
-                        <button
-                          type="button"
-                          onClick={() => setWhatWeDoList([...whatWeDoList, ""])}
-                          className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          + Add Item
-                        </button>
-                      </div>
-                      {whatWeDoList.map((item, index) => (
-                        <div key={index} className="flex items-end gap-2">
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="block text-xs font-semibold text-[#5A6A51]">Item {index + 1}</label>
-                              <button
-                                type="button"
-                                disabled={translatingField === `whatwedo-${index}-en`}
-                                onClick={() => handleTranslateChecklistItem(index, item, "en", "ar")}
-                                className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
-                              >
-                                {translatingField === `whatwedo-${index}-en` ? "Translating..." : "Translate to Arabic →"}
-                              </button>
-                            </div>
-                            <input
-                              type="text"
-                              value={item}
-                              onChange={(e) => {
-                                const newList = [...whatWeDoList];
-                                newList[index] = e.target.value;
-                                setWhatWeDoList(newList);
-                              }}
-                              className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                              placeholder={`Checklist Item ${index + 1}`}
-                            />
-                          </div>
-                          {whatWeDoList.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newList = whatWeDoList.filter((_, i) => i !== index);
-                                setWhatWeDoList(newList);
-                              }}
-                              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition duration-155 cursor-pointer"
-                              title="Delete Item"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Arabic Checklist */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={() => setWhatWeDoListAr([...whatWeDoListAr, ""])}
-                          className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          + إضافة عنصر
-                        </button>
-                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">عناصر القائمة باللغة العربية</h4>
-                      </div>
-                      {whatWeDoListAr.map((item, index) => (
-                        <div key={index} className="flex items-end gap-2" dir="rtl">
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center justify-between mb-1" dir="ltr">
-                              <button
-                                type="button"
-                                disabled={translatingField === `whatwedo-${index}-ar`}
-                                onClick={() => handleTranslateChecklistItem(index, item, "ar", "en")}
-                                className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
-                              >
-                                {translatingField === `whatwedo-${index}-ar` ? "Translating..." : "Translate to English →"}
-                              </button>
-                              <label className="block text-xs font-semibold text-[#5A6A51] text-right">العنصر {index + 1}</label>
-                            </div>
-                            <input
-                              type="text"
-                              value={item}
-                              onChange={(e) => {
-                                const newList = [...whatWeDoListAr];
-                                newList[index] = e.target.value;
-                                setWhatWeDoListAr(newList);
-                              }}
-                              className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
-                              placeholder={`عنصر القائمة ${index + 1}`}
-                            />
-                          </div>
-                          {whatWeDoListAr.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newList = whatWeDoListAr.filter((_, i) => i !== index);
-                                setWhatWeDoListAr(newList);
-                              }}
-                              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition duration-155 cursor-pointer"
-                              title="حذف العنصر"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-4 border-t border-[#F2EFE9] gap-3">
-                    <button
-                      disabled={savingPageSettings}
-                      onClick={() => savePageSettings()}
-                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
-                    >
-                      {savingPageSettings ? "Saving..." : "Save All Changes"}
-                    </button>
-                  </div>
-
-                  {/* Frequently Asked Questions Section */}
-                  <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-                    <div>
-                      <h3 className="text-2xl font-bold text-[#1F251A]">Frequently Asked Questions</h3>
-                      <p className="text-sm text-[#5A6A51] mt-1">Configure the images, tag, heading, and list of questions & answers for the FAQ accordion on the About Us page.</p>
-                    </div>
-
-                    {/* FAQ Photos Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-[#F2EFE9]">
-                      {/* Photo 1: Left Consultation (Main) */}
-                      <div className="space-y-4">
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Photo 1: Consultation (Main Left)</label>
-                        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
-                          {faqImage1 || "/images/doctor/portrait-main.jpg" ? (
-                            <>
-                              <Image
-                                src={faqImage1 || "/images/doctor/portrait-main.jpg"}
-                                alt="Main FAQ Image"
-                                fill
-                                className="object-cover"
-                                unoptimized
-                              />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="text-center p-4">
-                              <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
-                              <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
-                            </div>
-                          )}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                try {
-                                  const compressed = await compressImage(file, 1000, 1000, 0.75);
-                                  setFaqImage1(compressed);
-                                } catch (err) {
-                                  console.error("Failed to compress FAQ Image 1, using original:", err);
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => {
-                                    setFaqImage1(reader.result as string);
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
-                          <input
-                            type="text"
-                            value={faqImage1}
-                            onChange={(e) => setFaqImage1(e.target.value)}
-                            placeholder="/images/doctor/portrait-main.jpg"
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Photo 2: Right Portrait (Secondary Overlay) */}
-                      <div className="space-y-4">
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Photo 2: Portrait (Secondary Right)</label>
-                        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
-                          {faqImage2 || "/images/doctor/portrait-faq.jpg" ? (
-                            <>
-                              <Image
-                                src={faqImage2 || "/images/doctor/portrait-faq.jpg"}
-                                alt="Secondary FAQ Image"
-                                fill
-                                className="object-cover"
-                                unoptimized
-                              />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="text-center p-4">
-                              <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
-                              <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
-                            </div>
-                          )}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                try {
-                                  const compressed = await compressImage(file, 1000, 1000, 0.75);
-                                  setFaqImage2(compressed);
-                                } catch (err) {
-                                  console.error("Failed to compress FAQ Image 2, using original:", err);
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => {
-                                    setFaqImage2(reader.result as string);
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
-                          <input
-                            type="text"
-                            value={faqImage2}
-                            onChange={(e) => setFaqImage2(e.target.value)}
-                            placeholder="/images/doctor/portrait-faq.jpg"
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* FAQ Text Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-[#F2EFE9]">
-                      {/* English General */}
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-[#1F251A]">English Content Info</h4>
-                        
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">FAQ Tagline</label>
-                            <button
-                              type="button"
-                              disabled={translatingField === "faqTag-en"}
-                              onClick={() => handleAutoTranslate(faqTag, "en", "ar", setFaqTagAr, "faqTag-en")}
-                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
-                            >
-                              {translatingField === "faqTag-en" ? "Translating..." : "Translate to Arabic →"}
-                            </button>
-                          </div>
-                          <input
-                            type="text"
-                            value={faqTag}
-                            onChange={(e) => setFaqTag(e.target.value)}
-                            placeholder="Frequently Asked Questions"
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">FAQ Heading</label>
-                            <button
-                              type="button"
-                              disabled={translatingField === "faqHeading-en"}
-                              onClick={() => handleAutoTranslate(faqHeading, "en", "ar", setFaqHeadingAr, "faqHeading-en")}
-                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
-                            >
-                              {translatingField === "faqHeading-en" ? "Translating..." : "Translate to Arabic →"}
-                            </button>
-                          </div>
-                          <input
-                            type="text"
-                            value={faqHeading}
-                            onChange={(e) => setFaqHeading(e.target.value)}
-                            placeholder="Questions? We have answers."
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Arabic General */}
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">المعلومات باللغة العربية</h4>
-                        
-                        <div className="space-y-2" dir="rtl">
-                          <div className="flex items-center justify-between mb-1" dir="ltr">
-                            <button
-                              type="button"
-                              disabled={translatingField === "faqTag-ar"}
-                              onClick={() => handleAutoTranslate(faqTagAr, "ar", "en", setFaqTag, "faqTag-ar")}
-                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
-                            >
-                              {translatingField === "faqTag-ar" ? "Translating..." : "Translate to English →"}
-                            </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان الجانبي</label>
-                          </div>
-                          <input
-                            type="text"
-                            value={faqTagAr}
-                            onChange={(e) => setFaqTagAr(e.target.value)}
-                            placeholder="أسئلة شائعة"
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
-                          />
-                        </div>
-
-                        <div className="space-y-2" dir="rtl">
-                          <div className="flex items-center justify-between mb-1" dir="ltr">
-                            <button
-                              type="button"
-                              disabled={translatingField === "faqHeading-ar"}
-                              onClick={() => handleAutoTranslate(faqHeadingAr, "ar", "en", setFaqHeading, "faqHeading-ar")}
-                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
-                            >
-                              {translatingField === "faqHeading-ar" ? "Translating..." : "Translate to English →"}
-                            </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان الرئيسي</label>
-                          </div>
-                          <input
-                            type="text"
-                            value={faqHeadingAr}
-                            onChange={(e) => setFaqHeadingAr(e.target.value)}
-                            placeholder="أسئلة؟ لدينا إجابات."
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* FAQ Items Accordion list editors */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-[#F2EFE9]">
-                      {/* English FAQ Items */}
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-semibold text-[#1F251A]">English FAQ Items</h4>
-                          <button
-                            type="button"
-                            onClick={() => setFaqs([...faqs, { question: "", answer: "" }])}
-                            className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] hover:underline flex items-center gap-1 cursor-pointer"
-                          >
-                            + Add FAQ Item
-                          </button>
-                        </div>
-
-                        <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2">
-                          {faqs.map((faq, index) => (
-                            <div key={index} className="p-4 rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] space-y-3 relative group">
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs font-bold text-[#5A6A51]">FAQ Item #{index + 1}</span>
-                                {faqs.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setFaqs(faqs.filter((_, i) => i !== index))}
-                                    className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                )}
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex items-center justify-between mb-1">
-                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase">Question</label>
-                                  <button
-                                    type="button"
-                                    disabled={translatingField === `faq-${index}-question-en`}
-                                    onClick={() => handleTranslateFaqItem(index, "question", faq.question, "en", "ar")}
-                                    className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
-                                  >
-                                    {translatingField === `faq-${index}-question-en` ? "Translating..." : "Translate to Arabic →"}
-                                  </button>
-                                </div>
-                                <input
-                                  type="text"
-                                  value={faq.question}
-                                  onChange={(e) => {
-                                    const newFaqs = [...faqs];
-                                    newFaqs[index].question = e.target.value;
-                                    setFaqs(newFaqs);
-                                  }}
-                                  placeholder="Enter Question..."
-                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex items-center justify-between mb-1">
-                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase">Answer</label>
-                                  <button
-                                    type="button"
-                                    disabled={translatingField === `faq-${index}-answer-en`}
-                                    onClick={() => handleTranslateFaqItem(index, "answer", faq.answer, "en", "ar")}
-                                    className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
-                                  >
-                                    {translatingField === `faq-${index}-answer-en` ? "Translating..." : "Translate to Arabic →"}
-                                  </button>
-                                </div>
-                                <textarea
-                                  rows={3}
-                                  value={faq.answer}
-                                  onChange={(e) => {
-                                    const newFaqs = [...faqs];
-                                    newFaqs[index].answer = e.target.value;
-                                    setFaqs(newFaqs);
-                                  }}
-                                  placeholder="Enter Answer..."
-                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none"
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Arabic FAQ Items */}
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <button
-                            type="button"
-                            onClick={() => setFaqsAr([...faqsAr, { question: "", answer: "" }])}
-                            className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] hover:underline flex items-center gap-1 cursor-pointer"
-                          >
-                            + إضافة سؤال
-                          </button>
-                          <h4 className="text-sm font-semibold text-[#1F251A] text-right">أسئلة وأجوبة باللغة العربية</h4>
-                        </div>
-
-                        <div className="space-y-6 max-h-[500px] overflow-y-auto pl-2" dir="rtl">
-                          {faqsAr.map((faq, index) => (
-                            <div key={index} className="p-4 rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] space-y-3 relative group text-right">
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs font-bold text-[#5A6A51]">سؤال وجواب #{index + 1}</span>
-                                {faqsAr.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setFaqsAr(faqsAr.filter((_, i) => i !== index))}
-                                    className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                )}
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex items-center justify-between mb-1" dir="ltr">
-                                  <button
-                                    type="button"
-                                    disabled={translatingField === `faq-${index}-question-ar`}
-                                    onClick={() => handleTranslateFaqItem(index, "question", faq.question, "ar", "en")}
-                                    className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
-                                  >
-                                    {translatingField === `faq-${index}-question-ar` ? "Translating..." : "Translate to English →"}
-                                  </button>
-                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">السؤال</label>
-                                </div>
-                                <input
-                                  type="text"
-                                  value={faq.question}
-                                  onChange={(e) => {
-                                    const newFaqs = [...faqsAr];
-                                    newFaqs[index].question = e.target.value;
-                                    setFaqsAr(newFaqs);
-                                  }}
-                                  placeholder="اكتب السؤال هنا..."
-                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex items-center justify-between mb-1" dir="ltr">
-                                  <button
-                                    type="button"
-                                    disabled={translatingField === `faq-${index}-answer-ar`}
-                                    onClick={() => handleTranslateFaqItem(index, "answer", faq.answer, "ar", "en")}
-                                    className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
-                                  >
-                                    {translatingField === `faq-${index}-answer-ar` ? "Translating..." : "Translate to English →"}
-                                  </button>
-                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">الإجابة</label>
-                                </div>
-                                <textarea
-                                  rows={3}
-                                  value={faq.answer}
-                                  onChange={(e) => {
-                                    const newFaqs = [...faqsAr];
-                                    newFaqs[index].answer = e.target.value;
-                                    setFaqsAr(newFaqs);
-                                  }}
-                                  placeholder="اكتب الإجابة هنا..."
-                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none text-right"
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end pt-4 border-t border-[#F2EFE9] gap-3">
-                      <button
-                        disabled={savingPageSettings}
-                        onClick={() => savePageSettings()}
-                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
-                      >
-                        {savingPageSettings ? "Saving..." : "Save All Changes"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+                <AboutUsPageSettingsView
+                  aboutImage1={aboutImage1}
+                  setAboutImage1={setAboutImage1}
+                  aboutImage2={aboutImage2}
+                  setAboutImage2={setAboutImage2}
+                  aboutImage3={aboutImage3}
+                  setAboutImage3={setAboutImage3}
+                  whatWeDoImage1={whatWeDoImage1}
+                  setWhatWeDoImage1={setWhatWeDoImage1}
+                  whatWeDoImage2={whatWeDoImage2}
+                  setWhatWeDoImage2={setWhatWeDoImage2}
+                  whatWeDoList={whatWeDoList}
+                  setWhatWeDoList={setWhatWeDoList}
+                  whatWeDoListAr={whatWeDoListAr}
+                  setWhatWeDoListAr={setWhatWeDoListAr}
+                  faqImage1={faqImage1}
+                  setFaqImage1={setFaqImage1}
+                  faqImage2={faqImage2}
+                  setFaqImage2={setFaqImage2}
+                  faqTag={faqTag}
+                  setFaqTag={setFaqTag}
+                  faqHeading={faqHeading}
+                  setFaqHeading={setFaqHeading}
+                  faqTagAr={faqTagAr}
+                  setFaqTagAr={setFaqTagAr}
+                  faqHeadingAr={faqHeadingAr}
+                  setFaqHeadingAr={setFaqHeadingAr}
+                  faqs={faqs}
+                  setFaqs={setFaqs}
+                  faqsAr={faqsAr}
+                  setFaqsAr={setFaqsAr}
+                  translatingField={translatingField}
+                  handleAutoTranslate={handleAutoTranslate}
+                  handleTranslateChecklistItem={handleTranslateChecklistItem}
+                  handleTranslateFaqItem={handleTranslateFaqItem}
+                  savingPageSettings={savingPageSettings}
+                  savePageSettings={savePageSettings}
+                />
+              )}
 
               {/* Services Page */}
               {pagesSettingsTab === "Services" && (
@@ -7316,7 +6520,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             </div>
           )}
 
-          {/* ── SETTINGS VIEWS ── */}
+          {/* â”€â”€ SETTINGS VIEWS â”€â”€ */}
           {activeNav === "Profile" && (() => {
             const isSuperadminBypass = adminRole === "superadmin";
             const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
@@ -7776,7 +6980,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                   )}
                                 </td>
                                 <td className="px-6 py-4 text-center font-mono text-xs font-bold text-[#5A6A51]">
-                                  {tc.durationMs !== undefined ? `${tc.durationMs}ms` : '—'}
+                                  {tc.durationMs !== undefined ? `${tc.durationMs}ms` : 'â€”'}
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                   <div className="flex items-center justify-end gap-2">
@@ -7829,7 +7033,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             </div>
           )}
 
-          {/* ── INVENTORY VIEW ── */}
+          {/* â”€â”€ INVENTORY VIEW â”€â”€ */}
           {activeNav === "Inventory" && (
             <AdminInventoryView
               authHeaders={authenticatedJsonHeaders}
@@ -7902,7 +7106,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
 
 
-          {/* ── HUMAN RESOURCES (HR) VIEW ── */}
+          {/* â”€â”€ HUMAN RESOURCES (HR) VIEW â”€â”€ */}
           {activeNav === "HR" && (
             <AdminHrView
               hrActiveSubTab={hrActiveSubTab}
@@ -8006,7 +7210,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   onClick={() => setPresenceModalOpen(false)}
                   className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
                 >
-                  ✓ I am Present &amp; Working
+                  âœ“ I am Present &amp; Working
                 </button>
               </div>
             </div>
@@ -8040,7 +7244,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             </div>
           )}
 
-          {/* ── RECEPTION DASHBOARD VIEW ── */}
+          {/* â”€â”€ RECEPTION DASHBOARD VIEW â”€â”€ */}
           {activeNav === "Dashboard" && (
             <ReceptionDashboardView
               receptionistName={loggedEmpAccount?.name || (adminEmail ? adminEmail.split("@")[0] : "Employee")}
@@ -8053,7 +7257,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {/* ── BOOKINGS & NEW BOOKING FULL VIEW ── */}
+          {/* â”€â”€ BOOKINGS & NEW BOOKING FULL VIEW â”€â”€ */}
           {activeNav === "Bookings" && (
             showFullViewNewBooking ? (
               <AdminNewBookingView
@@ -8106,7 +7310,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   // RISK-047/052: must go through openApprove() so the modal is pre-filled from
                   // the actual booking (requested time, requested doctor, availability) instead
                   // of opening with whatever `slot`/`doctorName` state happened to be left over
-                  // from a previous modal use — which is how this button independently
+                  // from a previous modal use â€” which is how this button independently
                   // reintroduced the hardcoded-doctor/wrong-time bug openApprove() itself fixed.
                   openApprove(booking as any);
                 }}
@@ -8168,7 +7372,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               </button>
             </div>
             <p className="mb-4 text-sm text-[#5A6A51]">
-              Requested for {selected.date}. Confirm the date and time slot below — change the
+              Requested for {selected.date}. Confirm the date and time slot below â€” change the
               date if the requested one isn't available (e.g. a closed day).
             </p>
             <label className="mb-2 block text-sm font-semibold text-[#414E36]">
@@ -8203,12 +7407,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   );
                 });
                 // The patient's requested time may fall outside opening hours, in which case it is
-                // not in filteredSlots and the select would render blank — hiding what was asked
+                // not in filteredSlots and the select would render blank â€” hiding what was asked
                 // for. Surface it explicitly instead.
                 if (slot && !filteredSlots.includes(slot)) {
                   options.unshift(
                     <option key={`requested-${slot}`} value={slot}>
-                      {slot} (Requested — outside opening hours)
+                      {slot} (Requested â€” outside opening hours)
                     </option>
                   );
                 }
@@ -8229,7 +7433,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               if (hasSlots) return null;
               return (
                 <p className="-mt-2 mb-4 text-xs font-semibold text-rose-600">
-                  No time slots available on this date — it may be a closed day for this branch,
+                  No time slots available on this date â€” it may be a closed day for this branch,
                   or fully booked. Pick a different date above.
                 </p>
               );
@@ -8570,7 +7774,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 sm:p-5 animate-fadeIn">
             <div className="w-full max-w-6xl rounded-[32px] bg-[#FBFBF9] p-6 sm:p-8 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[92vh] overflow-y-auto custom-scrollbar border border-[#414E36]/15 space-y-6">
               
-              {/* ── HEADER ── */}
+              {/* â”€â”€ HEADER â”€â”€ */}
               <div className="flex items-start justify-between border-b border-[#414E36]/10 pb-5">
                 <div className="space-y-1.5">
                   <h2 className="text-2xl sm:text-3xl font-black text-[#1F251A] tracking-tight">
@@ -8632,10 +7836,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 </button>
               </div>
 
-              {/* ── 2-COLUMN MAIN GRID ── */}
+              {/* â”€â”€ 2-COLUMN MAIN GRID â”€â”€ */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 
-                {/* ── LEFT COLUMN (2/3 width) ── */}
+                {/* â”€â”€ LEFT COLUMN (2/3 width) â”€â”€ */}
                 <div className="lg:col-span-2 space-y-4">
                   
                   {/* 1. PATIENT INFORMATION CARD */}
@@ -8726,7 +7930,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <Clock size={12} className="text-[#5A6A51]" />
                         <span>
                           {(() => {
-                            if (!viewingBooking.date) return "—";
+                            if (!viewingBooking.date) return "â€”";
                             try {
                               const d = new Date(viewingBooking.date);
                               const day = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
@@ -8772,7 +7976,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         {viewingBooking.doctorName || "Treating Doctor"}
                       </p>
                       <div className="flex items-center gap-1 text-amber-500 text-xs font-bold">
-                        {"★".repeat(5)}
+                        {"â˜…".repeat(5)}
                         <span className="text-[#5A6A51] text-[11px] font-semibold ml-0.5">5.0</span>
                       </div>
                     </div>
@@ -8795,7 +7999,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           const b = branches.find(br => br.id === viewingBooking.branchId);
                           const roomType = r ? `${r.type.charAt(0).toUpperCase() + r.type.slice(1)} Room` : "Clinical Room";
                           const branchName = b ? (isRTL ? b.name_ar : b.name_en) : "Main Branch";
-                          return `${roomType} • ${branchName}`;
+                          return `${roomType} â€¢ ${branchName}`;
                         })()}
                       </p>
                     </div>
@@ -9021,14 +8225,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                       {(med.frequency || med.duration) && (
                                         <div className="flex items-center gap-2 text-[11px] text-[#5A6A51] ps-5">
                                           {med.frequency && <span><strong>Freq:</strong> {med.frequency}</span>}
-                                          {med.frequency && med.duration && <span>•</span>}
+                                          {med.frequency && med.duration && <span>â€¢</span>}
                                           {med.duration && <span><strong>Duration:</strong> {med.duration}</span>}
                                         </div>
                                       )}
 
                                       {med.instructions && (
                                         <p className="text-[11px] text-[#7A8A71] italic ps-5">
-                                          ↳ {med.instructions}
+                                          â†³ {med.instructions}
                                         </p>
                                       )}
                                     </div>
@@ -9111,12 +8315,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <span className="font-bold text-[#1F251A] mt-0.5 block">
                           {(() => {
                             const dateVal = (viewingBooking as any).created_at || viewingBooking.createdAt || viewingBooking.date;
-                            if (!dateVal) return "—";
+                            if (!dateVal) return "â€”";
                             try {
                               const d = new Date(dateVal);
                               const day = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
                               const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
-                              return `${day} • ${time}`;
+                              return `${day} â€¢ ${time}`;
                             } catch {
                               return dateVal;
                             }
@@ -9128,7 +8332,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                 </div>
 
-                {/* ── RIGHT COLUMN (1/3 width) ── */}
+                {/* â”€â”€ RIGHT COLUMN (1/3 width) â”€â”€ */}
                 <div className="lg:col-span-1 space-y-4">
                   
                   {/* 1. SESSION FLOW CARD */}
@@ -9285,7 +8489,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           </button>
                         ) : (
                           <div className="w-full rounded-2xl bg-[#EBF7EE] border border-[#C3E6CB] p-3 text-center text-xs font-extrabold text-[#1E7E34]">
-                            ✓ Invoice Settled &amp; Paid
+                            âœ“ Invoice Settled &amp; Paid
                           </div>
                         )
                       )}
@@ -9558,7 +8762,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     .filter((p: any) => p.role !== 'consumable')
                     .map((p: any) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} — EGP {p.price || p.unit_price || p.selling_price || 0} (Stock: {p.stock ?? p.quantity ?? p.stock_quantity ?? 'N/A'})
+                        {p.name} â€” EGP {p.price || p.unit_price || p.selling_price || 0} (Stock: {p.stock ?? p.quantity ?? p.stock_quantity ?? 'N/A'})
                       </option>
                   ))}
                 </select>
@@ -9654,7 +8858,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
             <form onSubmit={handleSaveDrawerPrescription} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-[#1F251A] mb-1">Clinical Diagnosis / التشخيص</label>
+                <label className="block font-bold text-[#1F251A] mb-1">Clinical Diagnosis / Ø§Ù„ØªØ´Ø®ÙŠØµ</label>
                 <input
                   type="text"
                   required
@@ -9667,7 +8871,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block font-bold text-[#1F251A]">Prescribed Medications / الأدوية</label>
+                  <label className="block font-bold text-[#1F251A]">Prescribed Medications / Ø§Ù„Ø£Ø¯ÙˆÙŠØ©</label>
                   <button
                     type="button"
                     onClick={() => setDrawerRxMeds(prev => [...prev, { name: "", dosage: "", frequency: "", duration: "" }])}
@@ -9743,7 +8947,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               </div>
 
               <div>
-                <label className="block font-bold text-[#1F251A] mb-1">Doctor Instructions & Advice / تعليمات الطبيب</label>
+                <label className="block font-bold text-[#1F251A] mb-1">Doctor Instructions & Advice / ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ø·Ø¨ÙŠØ¨</label>
                 <textarea
                   rows={3}
                   placeholder="e.g. Avoid direct sunlight, apply sunscreen every 2 hours, drink plenty of water."
@@ -9855,7 +9059,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               <div>
                 <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Quick actions</p>
                 <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">
-                  Today's Bookings • {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  Today's Bookings â€¢ {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </h3>
               </div>
               <button
@@ -9901,7 +9105,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <div>
                           <p className="font-bold text-[#1F251A]">{r.name}</p>
                           <p className="text-xs text-[#5A6A51] mt-1">
-                            {service ? service.en : `Service #${r.serviceId}`} • {r.timeSlot ? `@ ${r.timeSlot}` : 'Time not specified'}
+                            {service ? service.en : `Service #${r.serviceId}`} â€¢ {r.timeSlot ? `@ ${r.timeSlot}` : 'Time not specified'}
                           </p>
                         </div>
                         <span className="rounded-full bg-[#C4AE7C]/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.1em] text-[#414E36]">
@@ -10136,7 +9340,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 />
                 {matchedCustomerId && (
                   <p className="mt-1.5 flex items-center gap-2 text-[11px] font-semibold text-emerald-700">
-                    ✓ Existing patient found{newPatientName ? `: ${newPatientName}` : ""}
+                    âœ“ Existing patient found{newPatientName ? `: ${newPatientName}` : ""}
                     <button
                       type="button"
                       onClick={() => setMatchedCustomerId(null)}
@@ -10157,7 +9361,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   return (
                     <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-2xl border border-[#414E36]/15 bg-white shadow-lg">
                       {matches.length === 0 ? (
-                        <p className="px-4 py-3 text-xs text-[#8A9A81] italic">No matching patients — filling in the fields below will create a new one.</p>
+                        <p className="px-4 py-3 text-xs text-[#8A9A81] italic">No matching patients â€” filling in the fields below will create a new one.</p>
                       ) : (
                         matches.map((c: any) => (
                           <button
@@ -10320,8 +9524,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       const showOnline = allowedType === "both" || allowedType === "online";
                       return (
                         <>
-                          {showInClinic && <option value="in_person">In Person / في العيادة</option>}
-                          {showOnline && <option value="online">Online / أونلاين</option>}
+                          {showInClinic && <option value="in_person">In Person / ÙÙŠ Ø§Ù„Ø¹ÙŠØ§Ø¯Ø©</option>}
+                          {showOnline && <option value="online">Online / Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†</option>}
                         </>
                       );
                     })()}
@@ -10495,7 +9699,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <div>
                           <p className="font-bold text-[#1F251A]">{r.name}</p>
                           <p className="text-xs text-[#5A6A51] mt-1">
-                            {service ? service.en : `Service #${r.serviceId}`} • {r.date} {r.timeSlot ? `@ ${r.timeSlot}` : r.requestedTime ? `@ ${r.requestedTime}` : ""} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === r.branchId)?.name_en || "Default/All"}</span>
+                            {service ? service.en : `Service #${r.serviceId}`} â€¢ {r.date} {r.timeSlot ? `@ ${r.timeSlot}` : r.requestedTime ? `@ ${r.requestedTime}` : ""} â€¢ <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === r.branchId)?.name_en || "Default/All"}</span>
                           </p>
                           {r.doctorName && (
                             <p className="text-xs text-[#C4AE7C] mt-0.5 font-semibold">
@@ -10543,7 +9747,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         />
       )}
 
-      {/* ── EXPORT CUSTOMERS MODAL ── */}
+      {/* â”€â”€ EXPORT CUSTOMERS MODAL â”€â”€ */}
       {showExportCustomersModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
@@ -10631,7 +9835,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         </div>
       )}
 
-      {/* ── IMPORT CUSTOMERS MODAL ── */}
+      {/* â”€â”€ IMPORT CUSTOMERS MODAL â”€â”€ */}
       {showImportCustomersModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto"
@@ -10686,7 +9890,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       <div>
                         <p className="text-sm font-semibold text-[#1F251A]">{importFile.name}</p>
                         <p className="text-xs text-[#5A6A51]">
-                          {(importFile.size / 1024).toFixed(1)} KB • {importRows.length} rows found
+                          {(importFile.size / 1024).toFixed(1)} KB â€¢ {importRows.length} rows found
                         </p>
                       </div>
                     </div>
@@ -10833,7 +10037,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       )}
 
 
-      {/* ── DELETE CUSTOMER CONFIRMATION MODAL ── */}
+      {/* â”€â”€ DELETE CUSTOMER CONFIRMATION MODAL â”€â”€ */}
       {deleteCustomerTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fadeIn">
           <div className="w-full max-w-md rounded-2xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
@@ -10873,7 +10077,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       )}
 
 
-      {/* ── Setup Password Modal (shown after accepting invite or password reset) ── */}
+      {/* â”€â”€ Setup Password Modal (shown after accepting invite or password reset) â”€â”€ */}
       {showSetupPasswordModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="relative w-full max-w-md mx-4 rounded-3xl bg-white shadow-2xl overflow-hidden">
@@ -10901,7 +10105,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </svg>
                   </div>
                   <p className="text-green-700 font-semibold text-base">{setupSuccess}</p>
-                  <p className="text-sm text-[#5A6A51]">You will be redirected automatically…</p>
+                  <p className="text-sm text-[#5A6A51]">You will be redirected automaticallyâ€¦</p>
                 </div>
               ) : (
                 <form onSubmit={handleSetupPassword} className="space-y-5">
@@ -10922,22 +10126,22 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   <div className="mt-2 text-xs space-y-1 font-semibold text-gray-500">
                     <div className="flex items-center gap-1.5">
                       <span className={setupPassword.length >= 8 ? "text-green-600" : ""}>
-                        {setupPassword.length >= 8 ? "✓" : "○"} At least 8 characters
+                        {setupPassword.length >= 8 ? "âœ“" : "â—‹"} At least 8 characters
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "text-green-600" : ""}>
-                        {/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "✓" : "○"} Uppercase & lowercase letters
+                        {/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "âœ“" : "â—‹"} Uppercase & lowercase letters
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/\d/.test(setupPassword) ? "text-green-600" : ""}>
-                        {/\d/.test(setupPassword) ? "✓" : "○"} At least one number
+                        {/\d/.test(setupPassword) ? "âœ“" : "â—‹"} At least one number
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/[^A-Za-z0-9]/.test(setupPassword) ? "text-green-600" : ""}>
-                        {/[^A-Za-z0-9]/.test(setupPassword) ? "✓" : "○"} At least one special character (e.g. @$!%*?&#)
+                        {/[^A-Za-z0-9]/.test(setupPassword) ? "âœ“" : "â—‹"} At least one special character (e.g. @$!%*?&#)
                       </span>
                     </div>
                   </div>
@@ -10974,7 +10178,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                         </svg>
-                        Setting password…
+                        Setting passwordâ€¦
                       </span>
                     ) : "Confirm & Access Dashboard"}
                   </button>
@@ -10985,7 +10189,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         </div>
       )}
 
-      {/* ── POSTPONE BOOKING MODAL ── */}
+      {/* â”€â”€ POSTPONE BOOKING MODAL â”€â”€ */}
       {postponeBooking && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
@@ -11098,13 +10302,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         </div>
       )}
 
-      {/* ── PAYMENT SETTLEMENT MODAL ── */}
+      {/* â”€â”€ PAYMENT SETTLEMENT MODAL â”€â”€ */}
       {checkoutBooking && (
         (() => {
           // 1. Calculate service cost
           const svcIds = Array.isArray(checkoutBooking.serviceIds) ? checkoutBooking.serviceIds : [checkoutBooking.serviceId];
           // A deposit collected at reservation time (BookingModal's "declare deposit paid" step)
-          // is already stored on the booking as amountPaid — checkout must charge only what's
+          // is already stored on the booking as amountPaid â€” checkout must charge only what's
           // left of the service price, not the full price again. RISK-029.
           const depositAlreadyPaid = Number(checkoutBooking.amountPaid) || 0;
           const activeCustomerPackageItems = checkoutCustomerPackages
@@ -11435,14 +10639,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 <div className="space-y-4 text-sm text-[#414E36]">
                   {/* Customer Information */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">Customer / المريض</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">Customer / Ø§Ù„Ù…Ø±ÙŠØ¶</p>
                     <p className="font-bold text-[#1F251A]">{checkoutBooking.name}</p>
                     <p className="text-xs text-[#5A6A51] mt-0.5">{checkoutBooking.phone}</p>
                   </div>
 
                   {/* Services Invoice details */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Services List / الخدمات</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Services List / Ø§Ù„Ø®Ø¯Ù…Ø§Øª</p>
                     {bookingServicesList.map((svc: any) => {
                       const isRedeemed = !!redeemedPackageItems[svc.serviceId];
                       return (
@@ -11492,7 +10696,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       <div className="mt-2.5 rounded-xl border border-[#C4AE7C]/30 bg-[#FAF5EB]/50 p-3 space-y-2 text-xs">
                         <div className="flex items-center justify-between border-b border-[#C4AE7C]/20 pb-1.5">
                           <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                            <span>✨</span> Additional Services / الخدمات الإضافية
+                            <span>âœ¨</span> Additional Services / Ø§Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„Ø¥Ø¶Ø§ÙÙŠØ©
                           </span>
                           <span className="font-bold text-[#C4AE7C]">+{checkoutAdditionalServicesCost} EGP</span>
                         </div>
@@ -11501,7 +10705,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             <div key={`chk-as-${iIdx}`} className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#C4AE7C]/20 shadow-2xs">
                               <div>
                                 <p className="font-bold text-[#1F251A]">{item.name}</p>
-                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `× ${item.unitPrice} EGP` : ''}</p>
+                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `Ã— ${item.unitPrice} EGP` : ''}</p>
                               </div>
                               <span className="font-extrabold text-[#414E36]">+{item.total} EGP</span>
                             </div>
@@ -11515,7 +10719,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       <div className="mt-2.5 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 space-y-2 text-xs">
                         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-1.5">
                           <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                            <span>📦</span> Session Consumables & Products / المستلزمات والمنتجات
+                            <span>ðŸ“¦</span> Session Consumables & Products / Ø§Ù„Ù…Ø³ØªÙ„Ø²Ù…Ø§Øª ÙˆØ§Ù„Ù…Ù†ØªØ¬Ø§Øª
                           </span>
                           <span className="font-bold text-[#414E36]">+{checkoutProductsCost} EGP</span>
                         </div>
@@ -11524,7 +10728,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             <div key={`chk-p-${iIdx}`} className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 shadow-2xs">
                               <div>
                                 <p className="font-bold text-[#1F251A]">{item.name}</p>
-                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `× ${item.unitPrice} EGP` : ''}</p>
+                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `Ã— ${item.unitPrice} EGP` : ''}</p>
                               </div>
                               <span className="font-extrabold text-[#414E36]">+{item.total} EGP</span>
                             </div>
@@ -11534,17 +10738,17 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     )}
 
                     <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
-                      <span>Total Cost / الإجمالي</span>
+                      <span>Total Cost / Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ</span>
                       <span>{totalCost} EGP</span>
                     </div>
                     {depositAlreadyPaid > 0 && (
                       <>
                         <div className="flex justify-between text-xs text-[#5A6A51]">
-                          <span>Deposit already paid / العربون المدفوع</span>
+                          <span>Deposit already paid / Ø§Ù„Ø¹Ø±Ø¨ÙˆÙ† Ø§Ù„Ù…Ø¯ÙÙˆØ¹</span>
                           <span>-{depositAlreadyPaid} EGP</span>
                         </div>
                         <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#414E36] text-base">
-                          <span>Balance Due / المتبقي</span>
+                          <span>Balance Due / Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ</span>
                           <span>{balanceDue} EGP</span>
                         </div>
                       </>
@@ -11557,7 +10761,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       <div>
                         <p className="font-bold text-[#1F251A] flex items-center gap-1.5">
                           <span className="inline-block h-2 w-2 rounded-full bg-[#C4AE7C]"></span>
-                          Use Customer Wallet / استخدام المحفظة
+                          Use Customer Wallet / Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…Ø­ÙØ¸Ø©
                         </p>
                         <p className="text-xs text-[#5A6A51] mt-0.5">Available balance: {walletBalance} EGP</p>
                       </div>
@@ -11576,7 +10780,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-[#5A6A51] mb-1">
-                        Net Due / المبلغ المستحق
+                        Net Due / Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø³ØªØ­Ù‚
                       </label>
                       <div className="relative">
                         <input
@@ -11589,7 +10793,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-[#5A6A51] mb-1">
-                        Amount Paid / المبلغ المدفوع
+                        Amount Paid / Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹
                       </label>
                       <div className="relative">
                         <input
@@ -11609,7 +10813,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   {changeAmount > 0 && (
                     <div className="rounded-2xl border border-green-200 bg-green-50/50 p-4 space-y-3">
                       <div className="flex justify-between font-bold text-green-800 text-sm">
-                        <span>Change / الباقي</span>
+                        <span>Change / Ø§Ù„Ø¨Ø§Ù‚ÙŠ</span>
                         <span>{changeAmount} EGP</span>
                       </div>
                       <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -11620,7 +10824,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
                         />
                         <span className="text-xs font-semibold text-[#1F251A]">
-                          Put change in customer's wallet / أضف الباقي إلى محفظة المريض
+                          Put change in customer's wallet / Ø£Ø¶Ù Ø§Ù„Ø¨Ø§Ù‚ÙŠ Ø¥Ù„Ù‰ Ù…Ø­ÙØ¸Ø© Ø§Ù„Ù…Ø±ÙŠØ¶
                         </span>
                       </label>
                     </div>
@@ -11628,7 +10832,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                   {remainingAmount > 0 && (
                     <div className="rounded-2xl border border-red-200 bg-red-50/50 p-4 flex justify-between font-bold text-red-800 text-sm">
-                      <span>Outstanding Balance / الرصيد المستحق</span>
+                      <span>Outstanding Balance / Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ù…Ø³ØªØ­Ù‚</span>
                       <span>{remainingAmount} EGP</span>
                     </div>
                   )}
@@ -11669,7 +10873,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         })()
       )}
 
-      {/* ── BOOKING INVOICE MODAL ── */}
+      {/* â”€â”€ BOOKING INVOICE MODAL â”€â”€ */}
       {invoiceBooking && (
         (() => {
           // 1. Calculate service cost
@@ -11679,7 +10883,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             const price = s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500;
             return {
               name: s?.en || `Service #${id}`,
-              nameAr: s?.ar || `خدمة #${id}`,
+              nameAr: s?.ar || `Ø®Ø¯Ù…Ø© #${id}`,
               qty: 1,
               unitPrice: price,
               price: price,
@@ -11715,7 +10919,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               if (lineType === 'additional_service') {
                 invoiceAdditionalServicesList.push({
                   name: `${name} (Additional Service)`,
-                  nameAr: `${name} (خدمة إضافية)`,
+                  nameAr: `${name} (Ø®Ø¯Ù…Ø© Ø¥Ø¶Ø§ÙÙŠØ©)`,
                   qty,
                   unitPrice,
                   price: unitPrice,
@@ -11724,7 +10928,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               } else {
                 invoiceProductsList.push({
                   name: `${name} (Add-on)`,
-                  nameAr: `${name} (إضافة)`,
+                  nameAr: `${name} (Ø¥Ø¶Ø§ÙØ©)`,
                   qty,
                   unitPrice,
                   price: unitPrice,
@@ -11756,7 +10960,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     existingNames.add(name.toLowerCase());
                     invoiceAdditionalServicesList.push({
                       name: `${name} (Additional Service)`,
-                      nameAr: `${name} (خدمة إضافية)`,
+                      nameAr: `${name} (Ø®Ø¯Ù…Ø© Ø¥Ø¶Ø§ÙÙŠØ©)`,
                       qty,
                       unitPrice,
                       price: unitPrice,
@@ -11775,7 +10979,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     existingNames.add(name.toLowerCase());
                     invoiceAdditionalServicesList.push({
                       name: `${name} (Additional Service)`,
-                      nameAr: `${name} (خدمة إضافية)`,
+                      nameAr: `${name} (Ø®Ø¯Ù…Ø© Ø¥Ø¶Ø§ÙÙŠØ©)`,
                       qty,
                       unitPrice,
                       price: unitPrice,
@@ -11794,7 +10998,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     existingNames.add(name.toLowerCase());
                     invoiceAdditionalServicesList.push({
                       name: `${name} (Additional Service)`,
-                      nameAr: `${name} (خدمة إضافية)`,
+                      nameAr: `${name} (Ø®Ø¯Ù…Ø© Ø¥Ø¶Ø§ÙÙŠØ©)`,
                       qty,
                       unitPrice,
                       price: unitPrice,
@@ -11820,7 +11024,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   existingNames.add(name.toLowerCase());
                   invoiceAdditionalServicesList.push({
                     name: `${name} (Additional Service)`,
-                    nameAr: `${name} (خدمة إضافية)`,
+                    nameAr: `${name} (Ø®Ø¯Ù…Ø© Ø¥Ø¶Ø§ÙÙŠØ©)`,
                     qty,
                     unitPrice,
                     price: unitPrice,
@@ -11839,7 +11043,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   existingNames.add(name.toLowerCase());
                   invoiceAdditionalServicesList.push({
                     name: `${name} (Additional Service)`,
-                    nameAr: `${name} (خدمة إضافية)`,
+                    nameAr: `${name} (Ø®Ø¯Ù…Ø© Ø¥Ø¶Ø§ÙÙŠØ©)`,
                     qty,
                     unitPrice,
                     price: unitPrice,
@@ -11868,7 +11072,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     existingNames.add(name.toLowerCase());
                     invoiceProductsList.push({
                       name: `${name} (Add-on)`,
-                      nameAr: `${name} (إضافة)`,
+                      nameAr: `${name} (Ø¥Ø¶Ø§ÙØ©)`,
                       qty,
                       unitPrice,
                       price: unitPrice,
@@ -11891,7 +11095,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 existingNames.add(name.toLowerCase());
                 invoiceProductsList.push({
                   name: `${name} (Add-on)`,
-                  nameAr: `${name} (إضافة)`,
+                  nameAr: `${name} (Ø¥Ø¶Ø§ÙØ©)`,
                   qty,
                   unitPrice,
                   price: unitPrice,
@@ -11911,7 +11115,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 existingNames.add(name.toLowerCase());
                 invoiceProductsList.push({
                   name: `${name} (Add-on)`,
-                  nameAr: `${name} (إضافة)`,
+                  nameAr: `${name} (Ø¥Ø¶Ø§ÙØ©)`,
                   qty,
                   unitPrice,
                   price: unitPrice,
@@ -11946,7 +11150,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
           const allInvoiceItems = [...baseServicesList, ...invoiceAdditionalServicesList, ...invoiceProductsList].filter((item: any) => {
             const nameLower = String(item.name || '').toLowerCase();
-            const isPulse = nameLower.includes('pulse') || nameLower.includes('device —') || nameLower.includes('device -');
+            const isPulse = nameLower.includes('pulse') || nameLower.includes('device â€”') || nameLower.includes('device -');
             if (isPulse && (Number(item.total) === 0 || Number(item.unitPrice) === 0 || Number(item.price) === 0)) {
               return false;
             }
@@ -12008,13 +11212,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Billed To</p>
                       <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name || "Patient"}</p>
-                      <p className="text-[#5A6A51] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone || "—"}</p>
-                      <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
+                      <p className="text-[#5A6A51] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone || "â€”"}</p>
+                      <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "â€”"}</p>
                     </div>
                     <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Booking Details</p>
-                      <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
-                      <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
+                      <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "â€”"}</p>
+                      <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "â€”"}</p>
                       <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
                     </div>
                   </div>
