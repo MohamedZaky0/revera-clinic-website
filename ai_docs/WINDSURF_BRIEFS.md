@@ -12,6 +12,77 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 ## Brief 23 — Phase 2: translate `AdminEmployeesView.tsx` to Arabic
 
+> **REVIEW 2026-08-22 — NOT accepted yet. Fix the gaps below, then resubmit.** Independently
+> re-verified against the reported-complete state: `tsc`/`eslint`/`vitest` all clean, en/ar key
+> parity is real (checked by actually evaluating `adminTranslations` in a throwaway vitest test,
+> not by grep — recommended if you want to re-check this yourself, a plain string-match parity
+> check gives false positives on any key whose value is a function, e.g. `reviewDate: (date) =>
+> ...`), and the `toLocale*` pinning this brief called out as the biggest risk (11 unpinned calls)
+> is now **fully correct** — every single `toLocale*` call in the file is pinned to `en-US`. Good
+> work on that specific point.
+>
+> **What's not done: two entire sections of the live "View Employee Details" drawer were never
+> wired up, despite the translation keys for them already existing and already being used
+> correctly elsewhere in this same file.** The print function (`handlePrintEmployeeProfile`,
+> ~line 670-745) correctly uses `t.profile.employeeId`, `fullName`, `email`, `phone`, `role`,
+> `accountStatus`, `department`, `addedOn`, `jobTitle`, `shiftType`, `shiftDetails` (via
+> `t.doctorSection.shiftTypeDetails(...)`), `workingHours` (via `t.doctorSection.nightHours`/
+> `dayHours`), and `breakTime` (via `t.doctorSection.nightBreak`/`dayBreak`) — all already built,
+> all already correct. **None of these were applied to the on-screen profile drawer**, which still
+> renders the raw English literals below it reads from instead:
+>
+> **Basic Info tab (~line 2415-2481) — reuse the print keys 1:1:**
+> `"Basic Information"` header (2415, check `t.printProfile.basicInfo` first),
+> `"Employee ID"` (2419) → `t.profile.employeeId`,
+> `"Full Name"` (2423) → `t.profile.fullName`,
+> `"Email Address"` (2427) → `t.profile.email`,
+> `"Phone Number"` (2431) → `t.profile.phone`,
+> `"System Role"` (2435) → `t.profile.role`,
+> `"National ID"` (2451) — no print equivalent found, needs a new key,
+> `"Account Status"` (2469) → `t.profile.accountStatus`,
+> `"Added On"` (2476) → `t.profile.addedOn`.
+>
+> **Work tab (~line 2489-2536) — same reuse, plus the exact bug this brief already asked you to
+> fix and is still present:**
+> `"Work Information"` header (2491, check `t.printProfile.workInfo` first),
+> `"Job Title"` (2495) → `t.profile.jobTitle`,
+> `"Start Date"` (2499) and `"⚡ Auto-set (1st Booking)"` (2504) — no print equivalent, new keys,
+> **`"Shift Type"` (2516) → `t.profile.shiftType`, and the raw value right under it,
+> `{viewingEmployee.shift || "Day"}` (2517), is exactly the "`emp.shift` free-text... label only"
+> rule this brief stated at the top — it is still displaying "Day"/"Night" in English in Arabic
+> mode.**
+> **`"Shift Details"` (2520) → `t.profile.shiftDetails`, and
+> `{viewingEmployee.shift === "Night" ? "General Night Shift" : "General Day Shift"}` (2522) is the
+> exact-match-ternary "4th instance" this brief already named — the print version fixed it via
+> `t.doctorSection.shiftTypeDetails(emp.shift === "Night")`, reuse that same function here.**
+> `"Working Hours"` (2526) + its `"05:00 PM - 01:00 AM"`/`"09:00 AM - 05:00 PM"` ternary (2528) →
+> `t.profile.workingHours` label, `t.doctorSection.nightHours`/`dayHours` for the value — same
+> pattern as print line ~734.
+> `"Break Time"` (2532) + its ternary (2534) → `t.profile.breakTime` label,
+> `t.doctorSection.nightBreak`/`dayBreak` value — same pattern as print line ~738.
+>
+> **Documents tab and elsewhere — new keys, no print equivalent to reuse:**
+> `"Attached Documents"` (2995), `"ID Front Side"` (3000), `"ID Back Side"` (3021),
+> `"Employment Contract"` (appears twice: Add/Edit form label 2123, and Documents tab 3061),
+> `"Additional Files"` (2167), `"Upload Additional Files"` (2195), `"Active"` schedule-tab badge
+> (1595).
+>
+> **Also still raw, on the employee list table (not just the profile drawer) — the table badge at
+> line 1073-1074 has the identical `{emp.shift || t.table.noShift}` bug** (fallback translated,
+> value not), and the print template's own equivalent at line 722 has the same gap too — three
+> sites total for the same rule, not one.
+>
+> **Not a translation bug, flag separately, do not translate it:** `"Revera Clinic Cairo"` hardcoded
+> in the print header (line 858) — that's a CLAUDE.md hard-rule-2 violation (hardcoded client
+> value), a different problem than i18n. Leave it in English and don't fold a fix for it into this
+> brief; it needs its own decision about where client-specific strings come from.
+>
+> Manual test checklist already exists
+> (`ai_docs/manual_tests/BRIEF_23_EMPLOYEES_TRANSLATION_MANUAL_TESTS.md`) with the right shape —
+> its "Profile tabs are Arabic" and per-tab checkboxes were correctly left unchecked rather than
+> falsely marked done, which is exactly how an honest gap should be reported. Finish those checks
+> for real once the above is wired up, in both languages, live in the browser.
+
 **Prerequisite: none blocking** — Brief 21 already landed and was verified. This is the Phase 2
 pass over the file it created (`src/components/admin/employees/AdminEmployeesView.tsx`, 3,086
 lines). Re-measure every line number below before starting; they were captured 2026-08-22.
@@ -152,6 +223,24 @@ made about the print/CSV outputs.
 # QUEUED BRIEFS
 
 ## Brief 24 — Phase 2: translate `AdminHrView.tsx` to Arabic
+
+> **REVIEW 2026-08-22 — very close, one specific gap before this is accepted.** Independently
+> re-verified: `tsc`/`eslint`/`vitest` clean, en/ar key parity real (evaluated at runtime, not
+> grepped), `dir={lang==="ar"?"rtl":"ltr"}` correctly present on both the component's own root AND
+> the physically-detached Edit Target modal (~line 1756) — that modal needed its own `dir` since
+> it isn't DOM-nested under the root, and you got that right.
+>
+> **The one gap: the Payroll tab's department filter dropdown is still 5 raw English `<option>`s**
+> (~line 452-456): `<option value="Doctors">Doctors</option>`, then `Nursing`, `Admin`, `Reception`,
+> `Lab` the same way. Same rule as everywhere else in this rollout — `value=` must stay the
+> canonical English string (it's compared against `pay.department` / `dept.employee_department`
+> elsewhere in this file), only the visible text between the tags gets a `t.*` label, the same
+> `categoryLabel()`-style approach Brief 20 used for Inventory. This is the same hardcoded-literal-
+> option-list pattern Brief 22 already flagged as a latent drift risk (not sourced from the dynamic
+> `departmentsList`) — translating it doesn't need to fix that drift risk too, just add the label
+> layer on top of what's there today.
+>
+> Everything else checked out — this is a small, surgical fix, not a re-do.
 
 **Prerequisite: satisfied.** Brief 22 landed as `c7fb113` and was independently verified 2026-08-22
 (including a live browser check that the relocated Edit Target modal still opens). Re-measure all
