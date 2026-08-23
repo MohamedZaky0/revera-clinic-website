@@ -96,7 +96,9 @@
     overflow-x: hidden;
   }
 
-  /* RTL support */
+  /* RTL support — html[dir] fires from the inline head script before body exists;
+     body.rtl kept for components that still add the class via LanguageContext */
+  html[dir="rtl"],
   body.rtl {
     direction: rtl;
     text-align: right;

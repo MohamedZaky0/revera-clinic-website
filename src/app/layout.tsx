@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { Marcellus, Sora } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
@@ -31,24 +30,23 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+const DIR_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|; )cr-language=([^;]*)/);var l=(m&&decodeURIComponent(m[1]))==='ar'?'ar':'en';document.documentElement.lang=l;document.documentElement.dir=l==='ar'?'rtl':'ltr';}catch(e){}})();`;
+
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = await cookies();
-  const langCookie = cookieStore.get("cr-language")?.value;
-  const lang = langCookie === "ar" ? "ar" : "en";
-  const dir = lang === "ar" ? "rtl" : "ltr";
-
   return (
     <html
-      lang={lang}
-      dir={dir}
+      lang="en"
       className={`${marcellus.variable} ${sora.variable}`}
       suppressHydrationWarning
     >
-      <body className={dir} suppressHydrationWarning spellCheck={false}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: DIR_SCRIPT }} />
+      </head>
+      <body suppressHydrationWarning spellCheck={false}>
         <LanguageProvider>
           <AlertConfirmProvider>
             {children}
