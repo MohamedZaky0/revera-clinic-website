@@ -9646,7 +9646,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
 
           {activeNav === "Medical Records" && (
-            <MedicalRecordsSettingsView services={SERVICES as any[]} lang={lang} />
+            <MedicalRecordsSettingsView services={SERVICES as any[]} lang={lang} authenticatedJsonHeaders={authenticatedJsonHeaders} />
           )}
 
           {activeNav === "Role Management" && adminRole === "superadmin" && (

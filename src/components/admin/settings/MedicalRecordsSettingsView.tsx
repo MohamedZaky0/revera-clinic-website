@@ -23,15 +23,18 @@ import {
 } from "lucide-react";
 import { MedicalRecordTemplate, IntakeField } from "@/app/api/medical-records/templates/route";
 import { SERVICES } from "@/lib/services";
+import { supabase } from "@/lib/supabaseClient";
 
 interface MedicalRecordsSettingsViewProps {
   services?: any[];
   lang?: "en" | "ar";
+  authenticatedJsonHeaders?: Record<string, string>;
 }
 
 export default function MedicalRecordsSettingsView({
   services: initialServices = [],
-  lang = "en"
+  lang = "en",
+  authenticatedJsonHeaders
 }: MedicalRecordsSettingsViewProps) {
   const [allServices, setAllServices] = useState<any[]>(
     initialServices.length > 0 ? initialServices : SERVICES
@@ -40,10 +43,24 @@ export default function MedicalRecordsSettingsView({
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const getAuthHeaders = async () => {
+    let token = "";
+    try {
+      const { data } = await supabase.auth.getSession();
+      token = data?.session?.access_token || "";
+    } catch {}
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(authenticatedJsonHeaders || {})
+    };
+  };
+
   useEffect(() => {
     const loadServices = async () => {
       try {
-        const res = await fetch("/api/services");
+        const headers = await getAuthHeaders();
+        const res = await fetch("/api/services", { headers });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.services) && data.services.length > 0) {
@@ -75,12 +92,14 @@ export default function MedicalRecordsSettingsView({
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await fetch("/api/medical-records/templates");
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/medical-records/templates", { headers });
       if (res.ok) {
         const data = await res.json();
         setTemplates(data.templates || []);
       } else {
-        setErrorMsg("Failed to load medical record templates.");
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg(err.error || "Failed to load medical record templates.");
       }
     } catch (err: any) {
       console.error("Error loading templates:", err);
@@ -136,8 +155,10 @@ export default function MedicalRecordsSettingsView({
     if (!confirm("Are you sure you want to delete this medical record template?")) return;
 
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch(`/api/medical-records/templates?id=${encodeURIComponent(id)}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers
       });
       if (res.ok) {
         setTemplates((prev) => prev.filter((t) => String(t.id) !== String(id)));
@@ -231,9 +252,10 @@ export default function MedicalRecordsSettingsView({
       };
 
       const method = editingTemplateId ? "PUT" : "POST";
+      const headers = await getAuthHeaders();
       const res = await fetch("/api/medical-records/templates", {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(payload)
       });
 

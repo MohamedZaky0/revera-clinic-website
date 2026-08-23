@@ -45,9 +45,20 @@ export default function MedicalReportModal({
         created_at: new Date().toISOString(),
       };
 
+      const reqHeaders: Record<string, string> = { ...(authenticatedJsonHeaders as any || {}) };
+      if (!reqHeaders["Authorization"] && !reqHeaders["authorization"]) {
+        try {
+          const { supabase } = await import("@/lib/supabaseClient");
+          const { data } = await supabase.auth.getSession();
+          if (data?.session?.access_token) {
+            reqHeaders["Authorization"] = `Bearer ${data.session.access_token}`;
+          }
+        } catch {}
+      }
+
       const res = await fetch("/api/medical-records", {
         method: "POST",
-        headers: authenticatedJsonHeaders,
+        headers: { "Content-Type": "application/json", ...reqHeaders },
         body: JSON.stringify({ type: "report", data: payload }),
       });
 
@@ -60,7 +71,8 @@ export default function MedicalReportModal({
         }
         setShowMedicalReportModal(false);
       } else {
-        alert(t.saveFailedAlert);
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || t.saveFailedAlert);
       }
     } catch (err: any) {
       console.error("Error saving report:", err);
