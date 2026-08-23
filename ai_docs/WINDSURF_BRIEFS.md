@@ -12,6 +12,45 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 ## Brief 26 — the 7 small Settings screens: extract behind shared hooks, then translate, then one test
 
+> **REVIEW 2026-08-23 — NOT accepted yet. One systematic gap, fix it, then resubmit.**
+> Independently re-verified against commit `76106a5`: `tsc`/`eslint`/`vitest` all clean (625
+> passed/12 expected fail), en/ar key parity for `settingsScreens` is real (checked by evaluating
+> `adminTranslations` at runtime, not by grep), the Part 3 shallow-merge test is genuinely grounded
+> (ran it — `it.fails` fails for the documented reason, the companion `it` confirms the shallow
+> merge is fine at the top level, so the contrast proves the mechanism, not a fluke), RISK-071/072/
+> 073 are correctly written and correctly slotted into the reorganized RISKS.md structure, the four
+> state clusters and both cross-component couplings (`handleSaveBookingSettings`/`TermsManagerView`,
+> `handleSaveDepartments`/Role Management) are preserved exactly as required, and the value/label
+> separation calls (Branches `status`, numeric `<select>`s) are all correct.
+>
+> **What's not done: none of the 7 components set `dir` on their own root.** Every one of them
+> takes a `lang: "en" | "ar"` prop and — in `BookingSettingsView`, `DepositSettingsView`,
+> `InactivitySettingsView`, `NotificationSettingsView`, `QueueSettingsView` — never reads it at all
+> (confirmed by ESLint: `'lang' is defined but never used` in all five). `BranchesView` and
+> `ServiceHoursView` do read `lang`, but only to pick which bilingual field to display
+> (`lang === "ar" ? br.name_ar : br.name_en`), never to set direction. Grepped `dir=` across all
+> seven files: the only hit is the intentional hardcoded `dir="rtl"` on the Arabic SMS-template
+> textarea in `NotificationSettingsView` (line 190) and the intentional `dir={dir}` content-hint on
+> Branches' bilingual field descriptors (line 131) — both are the "content-direction hints, leave
+> untouched" cases this brief itself called out, correctly left alone. But there is no
+> `dir={lang === "ar" ? "rtl" : "ltr"}` on any of the 7 root `<div>`s. Every other translated
+> screen in this refactor series (`RoleManagementView.tsx:341`, plus Employees and HR) sets this on
+> its own root — that's the established convention, and these seven are the first to skip it.
+>
+> **Effect:** switch the admin panel to Arabic and open any of these 7 screens — labels/hints are
+> Arabic text now, but the layout itself (flex ordering on the title/save-button row, grid column
+> order, the Deposit screen's `pl-3 border-l-2` indent rail) stays pinned to LTR flow instead of
+> mirroring. **Also flag while you're in there:** `DepositSettingsView.tsx` line 126 uses a physical
+> `pl-3 border-l-2` on a nested block — once `dir` is added, that needs to become the logical
+> `ps-3 border-s-2` or it'll sit on the wrong side in Arabic.
+>
+> **Fix:** add `dir={lang === "ar" ? "rtl" : "ltr"}` to the outermost `<div className="space-y-6">`
+> in all 7 files, same pattern as `RoleManagementView.tsx:341`. Swap `DepositSettingsView.tsx`'s
+> `pl-3 border-l-2` to `ps-3 border-s-2` in the same pass. No other changes needed — this is a
+> one-line-per-file fix, not a rewrite.
+>
+> Brief text below is unchanged from the original ask.
+
 **Do not write seven separate components with seven copies of the same load/save logic.** These
 screens are ~1,114 lines total and they already share their persistence layer — the investigation
 confirmed it rather than assumed it.
