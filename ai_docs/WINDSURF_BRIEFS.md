@@ -10,40 +10,51 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 33 — Give doctor and reception notes their own columns instead of sharing `reservations.notes`
+_(none currently active)_
 
-> **REVIEW 2026-08-24 — in progress, not done yet. Finish the doctor side before this is complete.**
-> Reviewed the uncommitted working tree directly. The migration, `DB_SCHEMA.md`, the API route
-> (`reservations/route.ts`), and reception's side are all correct and complete: `saveNotes`
-> (`page.tsx:5391`) now writes `receptionNotes` only, and the old tag-preservation regex at the old
-> `page.tsx:8746` is correctly removed — a full, clean cutover. `tsc`/`eslint`/`vitest` all clean.
->
-> **The doctor side is not cut over — Mohamed's explicit instruction: close it the same way, or
-> remove the old write entirely.** `handleSaveClinicalNote` and `handleCompleteTreatment`
-> (`DoctorAccountView.tsx`) currently write `doctorNotes: clinicalNote` to the new column **in
-> addition to** still writing the full `notes: fullNotes` (or `finalNotes`) — the old field, still
-> carrying the bracketed-tag block, untouched. That's not what reception did, and it's not what the
-> brief asked for either way (drop the tags if the redundancy check below confirms it, or at minimum
-> stop writing free text into `notes`). Right now the doctor's note exists in two places at once.
->
-> **Fix:** in both handlers, stop writing `notes`/`fullNotes`/`finalNotes` — write `doctorNotes:
-> clinicalNote` only. Before you do, confirm the standing question from the original brief:
-> `persistSessionLineItems()` already POSTs `usedProducts`/`additionalServices`/device-pulse usage to
-> `/api/reservation-products` (the real DEC-042 table) ahead of the notes PATCH in both handlers — if
-> that's genuinely the source of truth everywhere it needs to be (checkout's `writeCheckoutInvoice`,
-> the Brief 32 ledger path), the `sessionAddonsSummary` bracketed-tag string-building in both
-> handlers is dead weight now and should be deleted outright, not just stopped from reaching `notes`.
-> If something still depends on it, say what and why instead of guessing, but the free-text
-> clinical note itself must stop going into `notes` regardless of which way that turns out.
->
-> `notes` itself stays untouched for old bookings (no backfill, no destructive migration) — this is
-> only about where *new* saves from these two handlers go from here.
->
-> **Also outstanding, unrelated to the above:** the migration
-> (`20260824020000_add_doctor_reception_notes_to_reservations.sql`) has not been applied to the
-> live database yet — needs `npx supabase db push`, which needs Mohamed's direct approval per this
-> project's standing rule on unattended DB migrations. Until it runs, `doctor_notes`/
-> `reception_notes` don't exist as real columns and every PATCH targeting them will fail.
+---
+---
+
+# QUEUED BRIEFS
+
+Translation of the Pages Settings tabs extracted in Brief 27 is also an obvious next brief, not yet
+written.
+
+---
+---
+
+# ARCHIVE — completed briefs
+
+Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
+(RISK-038 … RISK-050), which is the authoritative account.
+
+### Brief 33 — Give doctor and reception notes their own columns instead of sharing `reservations.notes` (completed 2026-08-24)
+
+Landed in one commit (`7d60b6b`), after one round of review. First submission left the doctor side
+writing both the new `doctorNotes` column **and** the old `notes` field (with the bracketed tags) —
+flagged back with Mohamed's explicit instruction to close it the same way reception was closed.
+Final version does exactly that: `handleSaveClinicalNote`/`handleCompleteTreatment`
+(`DoctorAccountView.tsx`) now write `doctorNotes` only, and the `sessionAddonsSummary` bracketed-tag
+string-building was genuinely **deleted**, not just stopped from being read — confirmed by diff, not
+by the commit message. Reception's side was already clean from the first submission. Reads
+(`cleanBookingNotes`, the doctor drawers, the "Booking Notes" block) all correctly prefer the new
+columns with a fallback to regex-cleaned legacy `notes` for pre-migration bookings.
+
+**One deliberate exception, verified reasonable, not a corner cut:** `autoSyncServicesToBooking`
+(`DoctorOngoingSessionTab.tsx`) still writes bracketed tags into `notes` on every mid-session
+service addition. This is a genuinely different concern from the doctor's typed clinical note — a
+real-time sync so `additionalServices` state survives a page reload *before* the doctor has saved or
+completed anything, paired with the restore-parsing logic a few lines above it. Left as-is
+correctly; redesigning that mechanism was never in this brief's scope.
+
+Independently re-verified: `tsc`/`eslint`/`vitest` clean (631 passing, unchanged). The migration
+(`20260824020000_add_doctor_reception_notes_to_reservations.sql`) is applied — Mohamed approved and
+ran `supabase db push` directly (which also caught and re-synced 8 other pending migrations from
+2026-08-03 onward that had drifted out of the dev database's tracking history after an account/link
+switch — see `RISKS.md` → RISK-020's 2026-08-24 update). Confirmed `doctor_notes`/`reception_notes`
+exist as real columns via a direct schema query.
+
+### Brief 33 body (original ask, for reference)
 
 **Why this matters now, not just cleanup:** Mohamed asked directly whether doctor/reception notes
 are actually being saved, since he'd only seen them in the UI. They are — verified by tracing every
@@ -129,20 +140,6 @@ mentioning, or that some existing merge logic already prevents it, before/while 
 note on the same booking; both are visible, distinct, and neither clobbered the other.
 
 ---
----
-
-# QUEUED BRIEFS
-
-Translation of the Pages Settings tabs extracted in Brief 27 is also an obvious next brief, not yet
-written.
-
----
----
-
-# ARCHIVE — completed briefs
-
-Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
-(RISK-038 … RISK-050), which is the authoritative account.
 
 ### Brief 32 — Bookings screen's invoice modal: read the real ledger instead of live-recomputing (RISK-010 remainder) (completed 2026-08-24)
 
