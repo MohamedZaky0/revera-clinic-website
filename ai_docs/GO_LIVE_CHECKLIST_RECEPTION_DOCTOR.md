@@ -11,41 +11,45 @@
 > follows is real but smaller — three quick items worth closing before launch, and a short list of
 > things to know about for week one.
 >
-> **Re-verified 2026-08-24.** Item 1 unchanged (still dead code). Item 2 re-checked live against the
-> database — still not done, plus a new related finding (branch data hygiene, below). Item 3 stays
-> resolved. Two risks not in scope of the original 2026-08-17 audit were found and fixed since:
-> **RISK-063** (four HR endpoints accepted any authenticated session, not just staff — found
-> 2026-08-19, fixed 2026-08-24) and the **doctor/reception clinical-notes split** (previously one
-> shared `notes` field with string-concatenated tags — now two dedicated `doctor_notes`/
-> `reception_notes` columns, Brief 33, fixed 2026-08-24). Neither blocks launch today — both are
-> already closed.
+> **Re-verified 2026-08-24.** Item 1 is now **resolved** — deleted (see below; turned out the JSX
+> render block itself was already gone from an earlier cleanup, only the orphaned mock state and cart
+> logic remained, plus a related mock Prescriptions/Medicines list screen and dead product mocks found
+> and removed the same pass). Item 2 re-checked live against the database — still not done, plus a
+> new related finding (branch data hygiene, below). Item 3 stays resolved. Two risks not in scope of
+> the original 2026-08-17 audit were found and fixed since: **RISK-063** (four HR endpoints accepted
+> any authenticated session, not just staff — found 2026-08-19, fixed 2026-08-24) and the
+> **doctor/reception clinical-notes split** (previously one shared `notes` field with
+> string-concatenated tags — now two dedicated `doctor_notes`/`reception_notes` columns, Brief 33,
+> fixed 2026-08-24). None of the above block launch today — all are already closed. **Only item 2
+> (branch working hours + branch data hygiene) is still open.**
 
 ---
 
-## Before launch (3 items)
+## Before launch (1 item open, 2 resolved)
 
-### 1. `activeNav === "Point of Sale"` — dead code, not a hidden button
+### 1. `activeNav === "Point of Sale"` — dead code (RESOLVED — deleted 2026-08-24)
 
-**Corrected finding** (the first version of this audit assumed it needed hiding — verified live in
-the browser and by grep that it's actually unreachable, not just hard to find):
+**Original finding:** confirmed unreachable — no sidebar entry, no button, no `setActiveNav("Point
+of Sale")` call anywhere, so the mock cart screen could never be opened by a real user.
 
-- `src/app/admin/page.tsx:10457` — the JSX block (`{activeNav === "Point of Sale" && (...)}`,
-  ~130 lines) uses a hardcoded `MOCK_PRODUCTS` array, a `posCart` that's never persisted, and
-  "Complete Payment" is a bare `alert()` — confirmed dead/fake.
-- **But there is no sidebar entry, no button, and no `setActiveNav("Point of Sale")` call anywhere
-  in the codebase.** Grepped `SIDEBAR_ITEMS` (`page.tsx:192`) and every `setActiveNav(` call site —
-  zero matches. Nothing in the running app can ever set `activeNav` to that string, so this screen
-  is unreachable through any normal navigation path. This matches what you saw — there genuinely is
-  no button to find.
+**On deletion, a correction to the original finding:** the ~130-line JSX render block itself
+(`MOCK_PRODUCTS` cart UI, "Complete Payment" `alert()`) no longer existed in the file at all — it
+had already been removed in an earlier, unrelated cleanup. What remained was only the orphaned
+backing state: `MOCK_PRODUCTS`, `posCart`, `eCommerceSearch`, `productPage`/`PRODUCT_PAGE_SIZE`,
+`filteredProducts`, `totalProductPages`, `pagedProducts`, `productToggles`, `toggleProduct`, and an
+unreachable `activeNav === "Point of Sale"` disjunct in an unrelated `useEffect` condition. All
+removed. `npx tsc --noEmit` and `npx eslint` clean (eslint's unused-var warning count dropped by
+exactly the 8 variables tied to this). The real, working `product_sales`-backed "Sell Product" flow
+inside Patients → Customer Profile is untouched.
 
-**What to do — pick one, both are safe:**
-- **(a) Leave it.** Zero risk: no staff member can ever reach it, so it can't confuse anyone or
-  cause a silent failure. Purely dead code sitting in the bundle.
-- **(b) Delete it** (recommended if you want the codebase honest, not urgent for launch): remove
-  the JSX block at `page.tsx:10457` and its now-unnecessary reference in the `activeNav === ...`
-  condition at `page.tsx:3694`. Real cleanup, not a functional fix — the real, working
-  `product_sales`-backed "Sell Product" flow lives inside Patients → Customer Profile and is
-  unaffected either way.
+**Same pass, same shape of bug, also deleted:** a second orphaned screen pair — a standalone admin
+"Prescriptions" list (`MOCK_PRESCRIPTIONS` + its search/pagination state) and a standalone
+"Medicines" list (search/pagination/toggle state) — both computed a paged/filtered list that no JSX
+anywhere rendered. Plus three fully-unused consts (`MOCK_PRODUCT_CATEGORIES`, `MOCK_REFUNDS`,
+`MOCK_SHIPPING`) with zero references left after RISK-017's dead-Finance-UI removal. **Not deleted:**
+`MOCK_MEDICINES` itself — still feeds the real per-patient prescription writer's medicine-name
+picker (the actual `/api/prescriptions`-backed feature), so removing it would have broken a live
+feature.
 
 ### 2. New Cairo branch's real working hours were never entered
 
