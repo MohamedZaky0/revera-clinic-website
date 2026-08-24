@@ -1231,11 +1231,31 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(false);
   const [savingCheckout, setSavingCheckout] = useState<boolean>(false);
   const [invoiceBooking, setInvoiceBooking] = useState<any>(null);
+  const [ledgerInvoice, setLedgerInvoice] = useState<{ invoice: any; lines: any[] } | null>(null);
   const [copiedBookingRef, setCopiedBookingRef] = useState<boolean>(false);
 
   useEffect(() => {
     const activeId = invoiceBooking?.id;
-    if (!activeId) return;
+    if (!activeId) { setLedgerInvoice(null); return; }
+
+    // Fetch real ledger invoice from /api/invoices (Brief 32)
+    if (session?.access_token) {
+      fetch(`/api/invoices?reservationId=${encodeURIComponent(activeId)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
+      })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.invoice) {
+            setLedgerInvoice(data);
+          } else {
+            setLedgerInvoice(null);
+          }
+        })
+        .catch(() => setLedgerInvoice(null));
+    } else {
+      setLedgerInvoice(null);
+    }
 
     supabase
       .from('reservation_products')
@@ -10903,6 +10923,172 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       {/* ── BOOKING INVOICE MODAL ── */}
       {invoiceBooking && (
         (() => {
+          // Brief 32: If we have a real ledger invoice, use immutable data instead of live-recomputing
+          if (ledgerInvoice) {
+            const inv = ledgerInvoice.invoice;
+            const allInvoiceItems = ledgerInvoice.lines.map((line: any) => ({
+              name: isRTL ? (line.nameAr || line.nameEn || line.description) : (line.nameEn || line.description),
+              nameAr: line.nameAr || line.description,
+              qty: Number(line.qty) || 1,
+              unitPrice: Number(line.unit_price) || 0,
+              price: Number(line.unit_price) || 0,
+              total: Number(line.line_total) || 0,
+            }));
+            const totalCost = Number(inv.grand_total) || 0;
+
+            const rawPaid = Number(invoiceBooking.amountPaid || (invoiceBooking as any).amount_paid || 0);
+            const rawLeft = (invoiceBooking as any).amountLeft !== undefined && (invoiceBooking as any).amountLeft !== null && (invoiceBooking as any).amountLeft !== ""
+              ? Number((invoiceBooking as any).amountLeft)
+              : ((invoiceBooking as any).amount_left !== undefined && (invoiceBooking as any).amount_left !== null && (invoiceBooking as any).amount_left !== ""
+                  ? Number((invoiceBooking as any).amount_left)
+                  : null);
+            const finalPaid = rawPaid;
+            const finalLeft = rawLeft ?? 0;
+            const walletUsed = Math.max(0, totalCost - finalPaid - finalLeft);
+            const branch = branches.find((b: any) => b.id === invoiceBooking.branchId);
+            const branchName = branch ? (isRTL ? branch.name_ar : branch.name_en) : "Revera Zayed Clinic";
+            const invoiceNo = inv.invoice_no || `REV-INV-${String(invoiceBooking.id || '').slice(0, 8).toUpperCase()}`;
+
+            return (
+              <div 
+                className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto"
+                onClick={() => setInvoiceBooking(null)}
+              >
+                <div 
+                  className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl bg-white p-5 sm:p-6 shadow-2xl border border-[#414E36]/10 my-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  
+                  {/* Header Actions */}
+                  <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 mb-3 shrink-0">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#C4AE7C]">Invoice Preview</span>
+                      <h3 className="text-base font-bold text-[#1F251A] mt-0.5 font-sans">Booking Invoice Details</h3>
+                    </div>
+                    <button
+                      onClick={() => setInvoiceBooking(null)}
+                      className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200 transition cursor-pointer"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* Printable Invoice Container (Scrollable) */}
+                  <div className="overflow-y-auto pr-1.5 flex-1 border border-gray-100 rounded-2xl p-4 sm:p-5 bg-[#FBFBF9]/40 space-y-4">
+                    {/* Top Header */}
+                    <div className="flex justify-between items-start gap-4 pb-3.5 border-b border-[#414E36]/20">
+                      <div>
+                        <h1 className="text-lg sm:text-xl font-bold tracking-wider text-[#414E36]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
+                        <p className="text-xs text-[#5A6A51] mt-0.5 font-semibold">Sheikh Zayed / New Cairo</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Phone: (+20) 01035595691</p>
+                        <p className="text-[11px] text-gray-400">Email: inquiries@reveraclinics.com</p>
+                      </div>
+                      <div className="text-right">
+                        <h2 className="text-xl sm:text-2xl font-bold tracking-wide text-[#C4AE7C]" style={{ fontFamily: "Marcellus, serif" }}>INVOICE</h2>
+                        <p className="text-xs text-[#1F251A] mt-1 font-bold">No: {invoiceNo}</p>
+                        <p className="text-[11px] text-[#5A6A51] mt-0.5">Date: {invoiceBooking.date || new Date().toISOString().slice(0, 10)}</p>
+                      </div>
+                    </div>
+
+                    {/* Customer / Billing Info */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs leading-relaxed">
+                      <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Billed To</p>
+                        <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name || "Patient"}</p>
+                        <p className="text-[#5A6A51] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone || "—"}</p>
+                        <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
+                      </div>
+                      <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Booking Details</p>
+                        <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
+                        <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
+                        <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
+                      </div>
+                    </div>
+
+                    {/* Table of Services & Add-ons */}
+                    <div className="overflow-x-auto border border-gray-100 rounded-xl bg-white shadow-sm">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-[#EDF1EC] text-[#414E36] font-bold border-b border-gray-100">
+                            <th className="p-2.5 text-left">Service / Item Rendered</th>
+                            <th className="p-2.5 text-center w-14">Qty</th>
+                            <th className="p-2.5 text-right w-24">Unit Price</th>
+                            <th className="p-2.5 text-right w-24">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {allInvoiceItems.map((item: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-gray-50/50">
+                              <td className="p-2.5 font-semibold text-[#1F251A]">{item.name}</td>
+                              <td className="p-2.5 text-center text-gray-500">{item.qty || 1}</td>
+                              <td className="p-2.5 text-right text-gray-600">EGP {(Number(item.unitPrice || item.price) || 0).toLocaleString()}</td>
+                              <td className="p-2.5 text-right font-bold text-[#1F251A]">EGP {(Number(item.total) || 0).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pricing Summary */}
+                    <div className="flex justify-end text-xs">
+                      <div className="w-60 space-y-1.5">
+                        <div className="flex justify-between text-gray-500">
+                          <span>Subtotal:</span>
+                          <span className="font-semibold text-[#1F251A]">EGP {totalCost.toLocaleString()}</span>
+                        </div>
+                        {walletUsed > 0 && (
+                          <div className="flex justify-between text-green-700 font-medium">
+                            <span>Paid from Wallet:</span>
+                            <span className="font-bold">- EGP {walletUsed.toLocaleString()}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between border-t border-[#414E36] pt-1.5 text-sm font-bold text-[#414E36]">
+                          <span>Amount Paid:</span>
+                          <span>EGP {finalPaid.toLocaleString()}</span>
+                        </div>
+                        {finalLeft > 0 && (
+                          <div className="flex justify-between font-bold text-red-600">
+                            <span>Outstanding Due:</span>
+                            <span>EGP {finalLeft.toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Thank you */}
+                    <div className="text-center text-[10px] text-gray-400 pt-2 border-t border-dashed border-gray-200">
+                      <p>Thank you for choosing Revera Clinics!</p>
+                    </div>
+                  </div>
+
+                  {/* Bottom Buttons */}
+                  <div className="flex items-center justify-end gap-3 mt-3 border-t border-gray-100 pt-3 shrink-0">
+                    <button
+                      onClick={() => setInvoiceBooking(null)}
+                      className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition cursor-pointer"
+                    >
+                      Close
+                    </button>
+                    <button
+                      onClick={() => handlePrintInvoice(invoiceBooking, allInvoiceItems, totalCost, walletUsed, branchName)}
+                      className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="6 9 6 2 18 2 18 9" />
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                        <rect x="6" y="14" width="12" height="8" />
+                      </svg>
+                      Print / Save PDF
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+            );
+          }
+
+          // === FALLBACK: pre-ledger bookings (no invoice row) — existing logic unchanged ===
           // 1. Calculate service cost
           const svcIds = Array.isArray(invoiceBooking.serviceIds) ? invoiceBooking.serviceIds : (invoiceBooking.serviceId ? [invoiceBooking.serviceId] : []);
           const baseServicesList = svcIds.map((id: number) => {
