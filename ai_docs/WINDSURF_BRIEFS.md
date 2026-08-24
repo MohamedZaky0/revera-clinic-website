@@ -126,6 +126,71 @@ right at both mobile and desktop widths, mobile slide-in/out still works in both
 Translation of the Pages Settings tabs extracted in Brief 27 is also an obvious next brief, not yet
 written.
 
+## Brief 32 — Bookings screen's invoice modal: read the real ledger instead of live-recomputing (RISK-010 remainder)
+
+**Scope: the Booking Invoice Modal only** — `src/app/admin/page.tsx`, the
+`{invoiceBooking && (() => { ... })()}` block, currently ~10903–11194 (re-measure before starting).
+**Not a rewrite of that block** — it stays as the fallback path for bookings that predate the
+ledger. See `RISKS.md` → **RISK-010** (now Partially Resolved) for the full history.
+
+**What's already real, verified by reading the actual checkout code, not assumed:**
+`writeCheckoutInvoice()` (`src/app/api/reservations/route.ts:284` onward) already runs on every
+booking completion and correctly writes a complete `invoices` + `invoice_lines` snapshot — base
+services (`services.en`/price at that moment, 323–343) **and** any additional
+products/services/device-pulses attached via `reservation_products` (DEC-042, 354–399) — into
+immutable rows. **This already fully replaces what the modal's notes-regex-parsing block is trying
+to reconstruct** (5 different regex formats across ~10968–11153, itself a "safety net & historical
+support" fallback per its own comment) for any booking completed since `writeCheckoutInvoice` has
+had the DEC-042 fold-in (verify the exact commit/date this landed — bookings completed before that
+point may have an `invoices` row with only service lines, not attached products; treat those the
+same as "no invoice" for this brief's purposes, i.e. still fall back).
+
+**The gap:** the modal never queries `invoices`/`invoice_lines` at all — it always rebuilds
+everything from `invoiceBooking.serviceIds` re-priced live via `getEffectiveServicePrice()`
+(10908–10910) plus the notes-regex fallback. For any booking that already has a real invoice
+sitting in the database, the modal is silently ignoring the correct, immutable historical data and
+showing today's re-derived numbers instead.
+
+**Fix, additive not destructive:**
+1. **New endpoint**, e.g. `GET /api/invoices?reservationId=X` — `requireStaffAccess`-gated (same
+   pattern as `reservation-products/route.ts`), using `supabaseServer` (service role). **Required**
+   — `invoices`/`invoice_lines` have RLS enabled with **zero policies** (confirmed by reading
+   `supabase/migrations/20260726010000_create_invoices.sql:40`, no `CREATE POLICY` anywhere for
+   either table), so a client-side `supabase.from('invoices')...` call from the browser would
+   always return zero rows. No existing endpoint does this single-reservation lookup — the closest
+   are bulk reads inside the finance report endpoints (`pnl`, `package-profitability`), not
+   reusable here. Return the `invoices` row plus its `invoice_lines` (a single query with a join,
+   or two queries — either is fine), `status != 'void'` only.
+2. **In the modal**, before building `baseServicesList`/parsing notes: call this endpoint for
+   `invoiceBooking.id`. If a non-void invoice comes back:
+   - Render each `invoice_lines` row directly — `description` (English only, see below),
+     `qty`, `unit_price`, `line_total` — instead of `baseServicesList`/
+     `invoiceAdditionalServicesList`/`invoiceProductsList`.
+   - Totals come from `invoices.subtotal`/`discount_total`/`grand_total`, not the
+     `totalCost`/`allInvoiceItems.reduce(...)` computation (11157–11186).
+   - **`invoice_lines.description` is English-only** (built as `svc.en || ...` at
+     `reservations/route.ts:337`, no Arabic column on the table) — the current modal shows
+     bilingual `name`/`nameAr` per line. Decide explicitly whether to join `service_id`/`product_id`
+     back to `services`/`inventory_products` for the Arabic name, or accept English-only on this
+     specific invoice-view path, and say which in the PR — don't silently drop bilingual display
+     without noting it.
+   - `amountPaid`/`amountLeft` (11171–11176) **stay sourced from the reservation exactly as
+     today** — do not point these at `payments` or attempt any further cutover; that's explicitly
+     out of scope (see `FINANCE_TRACKER.md`'s "additive, then cutover" discipline — 1.14 cut
+     `outstanding`/`spent_amount`/`wallet_balance` over already, `amount_paid`/`amount_left`
+     themselves have not been, and this brief doesn't change that).
+   - If no invoice comes back (404/empty — pre-ledger booking, or a booking still in a
+     non-completed status), **fall back to the entire existing block completely unchanged** —
+     `baseServicesList`, the notes-parsing, the reconciliation-fallback logic, all of it. Do not
+     delete or "clean up" that code; it's still load-bearing for old data.
+
+**Verify:** a freshly-completed booking's invoice modal renders identically (or better — real
+attached-product lines that the notes-parser might have missed) whether read live or reopened
+later, and specifically that **editing a service's price after the fact no longer changes an
+already-issued invoice's displayed total** — the direct proof this fix actually closes the gap.
+Test against both a booking old enough to have no `invoices` row (fallback path exercised) and one
+completed after this lands (ledger path exercised). No `tsc`/`eslint`/`vitest` regressions.
+
 ---
 ---
 
