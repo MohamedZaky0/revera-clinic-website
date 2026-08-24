@@ -278,49 +278,6 @@ type Customer = {
   occupation?: string | null;
 };
 
-const MOCK_PRESCRIPTIONS = [
-  {
-    id: "PR-1082",
-    patientName: "Mariam Ali",
-    patientEmail: "mariam.ali@example.com",
-    doctorName: "Dr. Ahmed Medhat",
-    date: "10 Jun 2026",
-    time: "4:15 pm",
-    medicines: ["Amoxicillin 500mg (Capsule)", "Paracetamol 500mg (Tablet)"],
-    status: "Active"
-  },
-  {
-    id: "PR-1081",
-    patientName: "John Doe",
-    patientEmail: "john.doe@example.com",
-    doctorName: "Dr. Sara El Gamel",
-    date: "09 Jun 2026",
-    time: "11:30 am",
-    medicines: ["Ibuprofen 400mg (Tablet)"],
-    status: "Completed"
-  },
-  {
-    id: "PR-1080",
-    patientName: "Youssef Hassan",
-    patientEmail: "youssef.h@example.com",
-    doctorName: "Dr. Radwa Seif",
-    date: "08 Jun 2026",
-    time: "2:45 pm",
-    medicines: ["Claritin 10mg (Tablet)", "Flonase Nasal Spray"],
-    status: "Active"
-  },
-  {
-    id: "PR-1079",
-    patientName: "Fatima Omar",
-    patientEmail: "fatima.o@example.com",
-    doctorName: "Dr. Ahmed Medhat",
-    date: "07 Jun 2026",
-    time: "9:15 am",
-    medicines: ["Lipitor 20mg (Tablet)", "CoQ10 100mg (Softgel)"],
-    status: "Completed"
-  }
-];
-
 const MOCK_MEDICINES = [
   {
     id: "MED-001",
@@ -383,24 +340,6 @@ const MOCK_PRODUCTS = [
   { id: "PROD-002", name: "Sunscreen SPF 50+", category: "Sun Protection", price: "EGP 600.00", stock: 12, status: "In Stock" },
   { id: "PROD-003", name: "Retinol Anti-Aging Serum", category: "Serums", price: "EGP 850.00", stock: 5, status: "Low Stock" },
   { id: "PROD-004", name: "Gentle Cleansing Gel", category: "Skincare", price: "EGP 320.00", stock: 0, status: "Out of Stock" },
-];
-
-const MOCK_PRODUCT_CATEGORIES = [
-  { id: "CAT-01", name: "Skincare", description: "Lotions, creams, and cleansers for skin health", productCount: 12 },
-  { id: "CAT-02", name: "Sun Protection", description: "Broad-spectrum SPF blockers", productCount: 4 },
-  { id: "CAT-03", name: "Serums", description: "Concentrated active formula serums", productCount: 8 },
-  { id: "CAT-04", name: "Haircare", description: "Therapeutic shampoos and conditioners", productCount: 6 },
-];
-
-const MOCK_REFUNDS = [
-  { id: "REF-201", orderId: "ORD-4981", customerName: "Heba Fathy", date: "08 Jun 2026", amount: "EGP 600.00", reason: "Allergic reaction to sunscreen", status: "Processed" },
-  { id: "REF-200", orderId: "ORD-4950", customerName: "Sherif Ali", date: "05 Jun 2026", amount: "EGP 320.00", reason: "Damaged packaging", status: "Approved" },
-];
-
-const MOCK_SHIPPING = [
-  { id: "SHIP-01", name: "Standard Courier Delivery", rate: "EGP 50.00", time: "2-3 business days", status: "Active" },
-  { id: "SHIP-02", name: "Express Next-Day Shipping", rate: "EGP 120.00", time: "1 business day", status: "Active" },
-  { id: "SHIP-03", name: "Self-Pickup from Zayed Branch", rate: "EGP 0.00", time: "Immediate", status: "Active" },
 ];
 
 function parseEgyptianNationalId(id: string) {
@@ -2389,18 +2328,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     return false;
   }, [adminRole, adminPermissions, activeNav, hasPermission]);
 
-  const [prescriptionsExpanded, setPrescriptionsExpanded] = useState(false);
-  const [prescriptionsSearch, setPrescriptionsSearch] = useState("");
-  const [medicinesSearch, setMedicinesSearch] = useState("");
-  const [prescriptionPage, setPrescriptionPage] = useState(1);
-  const [medicinePage, setMedicinePage] = useState(1);
-  const PRESCRIPTION_PAGE_SIZE = 5;
-  const MEDICINE_PAGE_SIZE = 5;
-
-  const [medicineToggles, setMedicineToggles] = useState<Record<string, { visible: boolean; active: boolean }>>(
-    () => Object.fromEntries(MOCK_MEDICINES.map((m) => [m.id, { visible: true, active: true }]))
-  );
-
   const filteredServices = useMemo(() => {
     if (!serviceSearch.trim()) return localServices;
     const q = serviceSearch.toLowerCase();
@@ -2432,41 +2359,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     return groups;
   }, [filteredServices, localCategories]);
 
-  const filteredPrescriptions = useMemo(() => {
-    if (!prescriptionsSearch.trim()) return MOCK_PRESCRIPTIONS;
-    const q = prescriptionsSearch.toLowerCase();
-    return MOCK_PRESCRIPTIONS.filter(
-      (p) =>
-        p.patientName.toLowerCase().includes(q) ||
-        p.patientEmail.toLowerCase().includes(q) ||
-        p.doctorName.toLowerCase().includes(q) ||
-        p.medicines.some((m) => m.toLowerCase().includes(q))
-    );
-  }, [prescriptionsSearch]);
-
-  const totalPrescriptionPages = Math.ceil(filteredPrescriptions.length / PRESCRIPTION_PAGE_SIZE);
-  const pagedPrescriptions = filteredPrescriptions.slice(
-    (prescriptionPage - 1) * PRESCRIPTION_PAGE_SIZE,
-    prescriptionPage * PRESCRIPTION_PAGE_SIZE
-  );
-
-  const filteredMedicines = useMemo(() => {
-    if (!medicinesSearch.trim()) return MOCK_MEDICINES;
-    const q = medicinesSearch.toLowerCase();
-    return MOCK_MEDICINES.filter(
-      (m) =>
-        m.name.toLowerCase().includes(q) ||
-        m.category.toLowerCase().includes(q) ||
-        m.description.toLowerCase().includes(q)
-    );
-  }, [medicinesSearch]);
-
-  const totalMedicinePages = Math.ceil(filteredMedicines.length / MEDICINE_PAGE_SIZE);
-  const pagedMedicines = filteredMedicines.slice(
-    (medicinePage - 1) * MEDICINE_PAGE_SIZE,
-    medicinePage * MEDICINE_PAGE_SIZE
-  );
-
   function toggleService(id: number, field: "visible" | "active") {
     setServiceToggles((prev) => {
       const current = prev[id] ?? { visible: true, active: true };
@@ -2476,13 +2368,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       setServiceToggle(id, field, newValue);
       return updated;
     });
-  }
-
-  function toggleMedicine(id: string, field: "visible" | "active") {
-    setMedicineToggles((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], [field]: !prev[id][field] },
-    }));
   }
 
   const [eCommerceExpanded, setECommerceExpanded] = useState(false);
