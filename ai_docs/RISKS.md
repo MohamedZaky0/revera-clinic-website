@@ -193,6 +193,20 @@ The Supabase CLI is linked to dev, whose migration history now contains only the
 shadow database with no schema diff. New dev-based provisioning is now reproducible; the remaining
 operational risk is reviewing main directly and cutting it over to the same baseline.
 
+**Update 2026-08-24:** the drift this risk warns about recurred on dev itself — after a Supabase
+account/link switch, `supabase migration list` showed 9 migrations dated 2026-08-03 through
+2026-08-24 (`add_service_hours_to_branches` through Brief 33's `doctor_notes`/`reception_notes`
+columns, including `create_reservation_products`, the DEC-042 table Briefs 32/33 depend on) as
+present locally but unrecorded on the linked dev database's migration-history table. Queried
+`information_schema.tables` directly first — the tables these migrations create (`reservation_
+products`, `invoices`, `invoice_lines`) already existed on dev, confirming this was a bookkeeping
+gap, not a schema gap (the same database, applied through some path that didn't update the tracking
+table — not a fresh/different project). Verified all 9 files use `IF NOT EXISTS`/`DROP ... IF
+EXISTS` + recreate patterns (safe to re-run) before pushing; `supabase db push --linked` applied
+cleanly, `migration list` now shows all entries with matching local/remote. Dev's tracking gap is
+closed as of this date — **main's is not**, and re-drifts on dev remain possible if migrations get
+applied by hand again instead of through `db push`.
+
 **The result: a file existing in `supabase/migrations/` proves nothing about any database.**
 Two Supabase projects are in use and their schemas have diverged badly.
 
