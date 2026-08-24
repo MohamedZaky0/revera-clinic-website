@@ -165,6 +165,8 @@ type Req = {
   email: string;
   phone: string;
   notes?: string;
+  doctorNotes?: string | null;
+  receptionNotes?: string | null;
   status: string;
   timeSlot?: string | null;
   sessionType?: string;
@@ -5389,7 +5391,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       "/api/reservations?id=" + encodeURIComponent(viewingBooking.id),
       {
         method: "PATCH",
-        body: JSON.stringify({ status: viewingBooking.status, notes: newNotes }),
+        body: JSON.stringify({ receptionNotes: newNotes }),
         headers: authenticatedJsonHeaders,
       }
     );
@@ -8686,6 +8688,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   {/* 4. NOTES CARD (Under Payment Summary) */}
                   {(() => {
                     const cleanBookingNotes = (() => {
+                      // Brief 33: prefer reception_notes (clean column) for post-migration bookings
+                      const receptionNote = viewingBooking?.receptionNotes ?? null;
+                      if (receptionNote !== null && receptionNote !== undefined) return String(receptionNote).trim();
+                      // Fallback: regex-clean legacy notes for pre-migration bookings
                       if (!viewingBooking?.notes) return "";
                       let text = String(viewingBooking.notes);
                       text = text.replace(/\[Products Used During Session\]:[\s\S]*?(?=\[|$)/gi, "");
@@ -8742,12 +8748,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               <button
                                 type="button"
                                 onClick={async () => {
-                                  const raw = String(viewingBooking.notes || "");
-                                  const matches = raw.match(/(\[(?:Products Used|Additional Services|Device Pulses|Extra Device|Invoice Total|Total Invoice|Added Product|Added Service)[^\]]*\]:[^\n\[]*)/gi);
-                                  const systemTags = matches ? "\n" + matches.join("\n") : "";
-                                  const finalNotes = notesDraft.trim() + systemTags;
-                                  await saveNotes(finalNotes);
-                                  setViewingBooking((prev: any) => prev ? { ...prev, notes: finalNotes } : null);
+                                  const cleanNote = notesDraft.trim();
+                                  await saveNotes(cleanNote);
+                                  setViewingBooking((prev: any) => prev ? { ...prev, receptionNotes: cleanNote } : null);
                                   setIsEditingNotes(false);
                                 }}
                                 className="px-3.5 py-1.5 rounded-xl bg-[#0F3826] text-white text-xs font-bold hover:bg-[#0A271A] transition shadow-xs cursor-pointer"

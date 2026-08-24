@@ -309,6 +309,11 @@ export default function DoctorPatientHistoryDrawer({
 
             {validBookings.map((booking: any, idx: number) => {
               const parsed = parseBookingNotes(booking.notes || "");
+              // Brief 33: prefer doctor_notes (clean column) for the clinical note display
+              const dedicatedDrNote = booking.doctorNotes ?? booking.doctor_notes ?? null;
+              if (dedicatedDrNote !== null && dedicatedDrNote !== undefined) {
+                parsed.cleanDoctorNote = dedicatedDrNote;
+              }
               const isCompleted = booking.status === "completed" || booking.status === "done";
               const isInSession = booking.status === "started" || booking.status === "in-progress";
 

@@ -56,6 +56,8 @@ function mapRow(r: Record<string, any>, attachedProducts?: Array<Record<string, 
     email: r.email,
     phone: r.phone,
     notes: r.notes,
+    doctorNotes: r.doctor_notes ?? null,
+    receptionNotes: r.reception_notes ?? null,
     status: r.status,
     timeSlot: r.time_slot,
     sessionType: r.session_type,
@@ -926,7 +928,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId, consumptionOverrides, redeemedServiceIds, date: newDate, followUpDate, customerId: explicitCustomerId } = body;
+    const { action, timeSlot, status, doctorName, notes, doctorNotes, receptionNotes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId, consumptionOverrides, redeemedServiceIds, date: newDate, followUpDate, customerId: explicitCustomerId } = body;
 
     const id = (rawUrlId && rawUrlId !== 'undefined' && rawUrlId !== 'null') ? rawUrlId : (body.id || body.booking_id || body.reservation_id);
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
@@ -1306,7 +1308,7 @@ export async function PATCH(req: Request) {
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
-    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined || newDate !== undefined) {
+    } else if (status || notes !== undefined || doctorNotes !== undefined || receptionNotes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined || newDate !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (status === 'completed' && target.status !== 'completed') {
@@ -1329,6 +1331,8 @@ export async function PATCH(req: Request) {
         updates.started_at = new Date().toISOString();
       }
       if (notes !== undefined) updates.notes = notes;
+      if (doctorNotes !== undefined) updates.doctor_notes = doctorNotes;
+      if (receptionNotes !== undefined) updates.reception_notes = receptionNotes;
       if (doctorName !== undefined) {
         updates.doctor_name = doctorName;
         // Keep the durable link in step with the snapshot name.

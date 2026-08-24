@@ -84,7 +84,12 @@ export default function DoctorSessionDrawer({
   t
 }: DoctorSessionDrawerProps) {
   if (!scheduleModalBooking) return null;
-  const parsedNotes = parseBookingNotes(scheduleModalBooking.notes || "");
+  const parsedNotes = parseBookingNotes(scheduleModalBooking.notes ?? "");
+  // Brief 33: prefer doctor_notes (clean column) for the clinical note display
+  const dedicatedDoctorNote = scheduleModalBooking.doctorNotes ?? scheduleModalBooking.doctor_notes ?? null;
+  if (dedicatedDoctorNote !== null && dedicatedDoctorNote !== undefined) {
+    parsedNotes.cleanDoctorNote = dedicatedDoctorNote;
+  }
   const isCompleted = scheduleModalBooking.status === "completed" || scheduleModalBooking.status === "done";
 
   // Lookup prescriptions for this customer/booking

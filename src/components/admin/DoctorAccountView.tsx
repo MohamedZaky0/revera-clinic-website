@@ -440,12 +440,18 @@ export default function DoctorAccountView({
     }
   }, [receptionistStartedSession, reservations, activeSessionBooking]);
 
-  // Sync active session clinical notes
+  // Sync active session clinical notes — Brief 33: prefer doctor_notes (clean column),
+  // fall back to regex-cleaned legacy notes for pre-migration bookings
   useEffect(() => {
     if (activeSessionBooking) {
-      const existingNotes = activeSessionBooking.notes || activeSessionBooking.doctor_notes || "";
-      const parsed = parseBookingNotes(existingNotes);
-      setClinicalNote(parsed.cleanDoctorNote || (parsed as any).cleanNote || "");
+      const dedicatedDoctorNote = activeSessionBooking.doctorNotes ?? activeSessionBooking.doctor_notes ?? null;
+      if (dedicatedDoctorNote !== null && dedicatedDoctorNote !== undefined) {
+        setClinicalNote(dedicatedDoctorNote);
+      } else {
+        const existingNotes = activeSessionBooking.notes || "";
+        const parsed = parseBookingNotes(existingNotes);
+        setClinicalNote(parsed.cleanDoctorNote || (parsed as any).cleanNote || "");
+      }
     }
   }, [activeSessionBooking]);
 
@@ -746,22 +752,6 @@ export default function DoctorAccountView({
     if (!targetBooking) return;
 
     setSavingNote(true);
-    let sessionAddonsSummary = "";
-    if (additionalServices.length > 0) {
-      sessionAddonsSummary += `\n[Additional Services Used]: ${additionalServices.map((s) => `${s.name} (Qty: 1 x ${s.price} EGP = ${s.price} EGP)`).join(", ")}`;
-    }
-    if (usedProducts.length > 0) {
-      sessionAddonsSummary += `\n[Products Used During Session]: ${usedProducts.map((p) => `${p.name} (Qty: ${p.qty} x ${p.unitPrice} EGP = ${p.total} EGP)`).join(", ")}`;
-    }
-    if (extraPulsesCount > 0 && selectedDeviceId) {
-      const devObj = devicesList.find((d) => d.id === selectedDeviceId);
-      sessionAddonsSummary += `\n[Extra Device Pulses]: ${devObj?.name || 'Device'} — ${extraPulsesCount} pulses @ ${pricePerPulse} EGP/pulse (+${extraPulsesSubtotal} EGP)`;
-    }
-    if (additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal > 0) {
-      sessionAddonsSummary += `\n[Invoice Total Updated]: ${updatedInvoiceTotal} EGP (Base: ${baseBookingPrice} EGP + Services: ${additionalServicesSubtotal} EGP + Consumables: ${productsSubtotal + extraPulsesSubtotal} EGP)`;
-    }
-
-    const fullNotes = (clinicalNote || "") + sessionAddonsSummary;
 
     try {
       const headers = await getAuthHeaders();
@@ -769,7 +759,7 @@ export default function DoctorAccountView({
         method: "PATCH",
         headers,
         body: JSON.stringify({
-          notes: fullNotes
+          doctorNotes: clinicalNote || ""
         })
       });
 
@@ -981,23 +971,6 @@ export default function DoctorAccountView({
       }
     }
 
-    let sessionAddonsSummary = "";
-    if (additionalServices.length > 0) {
-      sessionAddonsSummary += `\n[Additional Services Used]: ${additionalServices.map((s) => `${s.name} (Qty: 1 x ${s.price} EGP = ${s.price} EGP)`).join(", ")}`;
-    }
-    if (usedProducts.length > 0) {
-      sessionAddonsSummary += `\n[Products Used During Session]: ${usedProducts.map((p) => `${p.name} (Qty: ${p.qty} x ${p.unitPrice} EGP = ${p.total} EGP)`).join(", ")}`;
-    }
-    if (pulsesToDeduct > 0 && selectedDeviceId) {
-      const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceId));
-      sessionAddonsSummary += `\n[Device Pulses Deducted]: ${devObj?.name || 'Device'} — ${pulsesToDeduct} total session pulses deducted`;
-    }
-    if (additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal > 0) {
-      sessionAddonsSummary += `\n[Invoice Total Updated]: ${updatedInvoiceTotal} EGP (Base: ${baseBookingPrice} EGP + Services: ${additionalServicesSubtotal} EGP + Consumables: ${productsSubtotal + extraPulsesSubtotal} EGP)`;
-    }
-
-    const finalNotes = (clinicalNote || "") + sessionAddonsSummary;
-
     const bookingTargetId = targetBooking?.id || targetBooking?.booking_id || targetBooking?.bookingId || targetBooking?._id || targetBooking?.reservation_id;
     if (!bookingTargetId) {
       alert("Booking ID is missing. Cannot complete treatment session.");
@@ -1019,7 +992,7 @@ export default function DoctorAccountView({
         body: JSON.stringify({
           id: bookingTargetId,
           status: "completed",
-          notes: finalNotes,
+          doctorNotes: clinicalNote || "",
           amountLeft: updatedInvoiceTotal - Number(targetBooking.amountPaid ?? 0)
         })
       });
@@ -1032,7 +1005,7 @@ export default function DoctorAccountView({
               ? {
                   ...r,
                   status: "completed",
-                  notes: finalNotes,
+                  doctorNotes: clinicalNote || "",
                   amountLeft: updatedInvoiceTotal - Number(targetBooking.amountPaid ?? 0)
                 }
               : r

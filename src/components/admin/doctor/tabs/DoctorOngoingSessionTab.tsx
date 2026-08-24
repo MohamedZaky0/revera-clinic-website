@@ -777,7 +777,7 @@ export default function DoctorOngoingSessionTab({
                 <div className="mt-4 border-t border-[#414E36]/10 pt-4 space-y-2">
                   <span className="text-xs font-bold text-[#5A6A51]">{t.bookingNotesTitle}</span>
                   <p className="text-xs text-[#1F251A] leading-relaxed bg-[#F4F5F1] p-3 rounded-2xl font-mono">
-                    {activeSessionBooking.notes || t.noBookingNotes}
+                    {(activeSessionBooking.receptionNotes ?? activeSessionBooking.reception_notes) || activeSessionBooking.notes || t.noBookingNotes}
                   </p>
                 </div>
               </div>
