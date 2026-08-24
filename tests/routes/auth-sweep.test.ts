@@ -15,13 +15,14 @@
  *
  * Every guard classification below was read directly from source (see the "Auth guard" column
  * derivation in TEST_COVERAGE_INVENTORY.md's module 10 and the commit that added this file) — not
- * inferred from a naming convention. One real defect turned up doing that reading, asserted here
- * as `it.fails` per the project's testing convention, not silently matched to current output:
+ * inferred from a naming convention.
  *
- *   - NEW (hr/alerts POST, hr/attendance POST+PATCH, hr/leaves POST): checks for a *valid Supabase
- *     session* but never checks the session belongs to an actual employee — any authenticated
- *     patient can currently submit HR attendance/leave/alert records. Logged as RISK-063 in
- *     ai_docs/RISKS.md.
+ * RISK-063 (hr/alerts POST, hr/attendance POST+PATCH, hr/leaves POST): these checked for a *valid
+ * Supabase session* but never that the session belonged to an actual employee — any authenticated
+ * patient could submit HR attendance/leave/alert records. Fixed 2026-08-24 by swapping the inline
+ * check for `requireStaffAccess` (matching every sibling GET/PATCH already using it); the four
+ * routes are registered below as normal `staff`-guarded routes now that the fix landed. See
+ * RISKS.md.
  *
  * reception/dashboard (originally F-1/F-2/F-3 here) was fixed and verified separately — see
  * RISK-059 and tests/routes/reception-dashboard.test.ts. It is registered below as a normal
@@ -179,10 +180,10 @@ const REGISTRY: RouteEntry[] = [
   { path: '/api/finance/service-mix', methods: [M('GET', FinanceServiceMix.GET, 'staff')] },
   { path: '/api/finance/trend', methods: [M('GET', FinanceTrend.GET, 'staff')] },
   { path: '/api/health/supabase', methods: [M('GET', HealthSupabase.GET, 'public', { noArgs: true })] },
-  { path: '/api/hr/alerts', methods: [M('GET', HrAlerts.GET, 'hr'), M('POST', HrAlerts.POST, 'gap-weak-auth'), M('PATCH', HrAlerts.PATCH, 'hr')] },
-  { path: '/api/hr/attendance', methods: [M('GET', HrAttendance.GET, 'hr'), M('POST', HrAttendance.POST, 'gap-weak-auth'), M('PATCH', HrAttendance.PATCH, 'gap-weak-auth')] },
+  { path: '/api/hr/alerts', methods: [M('GET', HrAlerts.GET, 'hr'), M('POST', HrAlerts.POST, 'staff'), M('PATCH', HrAlerts.PATCH, 'hr')] },
+  { path: '/api/hr/attendance', methods: [M('GET', HrAttendance.GET, 'hr'), M('POST', HrAttendance.POST, 'staff'), M('PATCH', HrAttendance.PATCH, 'staff')] },
   { path: '/api/hr/doctor-payroll', methods: [M('GET', HrDoctorPayroll.GET, 'hr'), M('POST', HrDoctorPayroll.POST, 'hr'), M('PATCH', HrDoctorPayroll.PATCH, 'hr')] },
-  { path: '/api/hr/leaves', methods: [M('GET', HrLeaves.GET, 'hr'), M('POST', HrLeaves.POST, 'gap-weak-auth'), M('PATCH', HrLeaves.PATCH, 'hr')] },
+  { path: '/api/hr/leaves', methods: [M('GET', HrLeaves.GET, 'hr'), M('POST', HrLeaves.POST, 'staff'), M('PATCH', HrLeaves.PATCH, 'hr')] },
   { path: '/api/hr/payroll', methods: [M('GET', HrPayroll.GET, 'hr'), M('POST', HrPayroll.POST, 'hr'), M('PATCH', HrPayroll.PATCH, 'hr')] },
   { path: '/api/hr/performance', methods: [M('GET', HrPerformance.GET, 'hr'), M('POST', HrPerformance.POST, 'hr'), M('DELETE', HrPerformance.DELETE, 'hr')] },
   { path: '/api/inventory/devices/[id]/reset-pulses', methods: [M('POST', InventoryDevicesResetPulses.POST, 'staff', { dynamicParams: { id: 'device-1' } })] },

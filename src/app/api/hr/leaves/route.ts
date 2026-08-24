@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyHrAccess } from '@/lib/auth';
+import { requireStaffAccess } from '@/lib/access';
 
 export async function GET(req: Request) {
   const auth = await verifyHrAccess(req);
@@ -23,17 +24,13 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  // Authentication check: any logged in employee can submit a leave request
-  const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '').trim();
-
-  if (!token) {
-    return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
-  }
-
-  const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+  // RISK-063: any registered staff member can submit a leave request - but must be staff,
+  // not just any authenticated session (a patient account was previously able to submit
+  // these). requireStaffAccess confirms an employee_accounts row without restricting by
+  // role, matching the original "any logged in employee" intent.
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   try {

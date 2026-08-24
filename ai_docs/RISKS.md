@@ -15,7 +15,7 @@
 
 ## Status summary
 
-**12 open** · **13 partially resolved** · **46 resolved** · 71 tracked total.
+**11 open** · **13 partially resolved** · **47 resolved** · 71 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -28,7 +28,6 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 - [RISK-020](#risk-020) — Migrations Are Not Tracked As Applied, And Two Databases Have Diverged
 - [RISK-053](#risk-053) — New Cairo Branch's Working Hours Were Never Actually Configured
 - [RISK-058](#risk-058) — Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
-- [RISK-063](#risk-063) — Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff
 - [RISK-064](#risk-064) — "Add New Category" (Services) Has No Arabic Name Field — Every Category Created There Gets A Permanently Blank `ar`
 - [RISK-070](#risk-070) — Some Roles' "Allowed Modules" Chips Show Untranslated Category Names Instead Of Permission Labels
 - [RISK-071](#risk-071) — Notification Settings and Queue Settings Never Hydrate From Saved Data
@@ -329,44 +328,6 @@ mechanical extraction (which must not change behaviour) or fixed inline here (ou
 Windsurf-brief-writing task that surfaced it). The fix is a `useEffect` reading `GET
 /api/page-settings` and calling the 7 setters from `data.clinic`, matching whatever hydration
 pattern sibling sections (Deposit/Notification/Queue Settings) already use.
-
----
-
-## RISK-063: Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff
-
-**Severity:** Medium-High · **Type:** Security / Access control
-**Found:** 2026-08-19, building a table-driven auth sweep (`tests/routes/auth-sweep.test.ts`) across
-all 153 route handlers (ai_docs/TEST_COVERAGE_INVENTORY.md module 10).
-
-**What it is:** `POST /api/hr/alerts`, `POST /api/hr/attendance`, `PATCH /api/hr/attendance`, and
-`POST /api/hr/leaves` each inline their own auth check instead of calling `verifyHrAccess` (which
-every sibling GET on the same file correctly uses):
-
-```ts
-const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
-if (authError || !user) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
-```
-
-This confirms the bearer token is a *valid Supabase session* — it never checks that session has a
-matching `employee_accounts` row. The comments above two of these ("Allow any employee session to
-log their missing state", "any logged in employee can submit a leave request") describe the
-intended scope, but the code doesn't enforce it: a **patient** with a valid logged-in session can
-currently submit HR attendance clock-ins, leave requests, or missing-employee alerts under any
-`employee_id` they choose to pass — there is no check that the caller's own identity has any
-connection to that id.
-
-**Consequence:** a patient account can inject fabricated attendance/leave/alert rows that
-downstream HR screens and `hr_payroll` treat as real, misattributed to whichever `employee_id` the
-request names.
-
-**Fix required:** replace the inline check in all four handlers with `verifyHrAccess(req)` (or
-`requireStaffAccess` + an explicit role allowlist, matching the `requireReceptionAccess` pattern
-RISK-059 just established), the same guard already used by every GET in these same three files.
-
-**Verification:** `tests/routes/auth-sweep.test.ts` asserts the correct behavior (403 for an
-authenticated non-staff caller) for all four as `it.fails` — currently failing-as-expected because
-the bug is unfixed. Once the guard is corrected, those four assertions will start passing and
-`it.fails` will flip to a hard failure — the signal to remove the marker.
 
 ---
 
@@ -1090,6 +1051,7 @@ cannot reproduce for new sessions again.
 - [RISK-055](#risk-055) — Stale Session Token In The Reservations Polling Effect Silently Wiped Pending Approvals & Booking History (RESOLVED)
 - [RISK-056](#risk-056) — Doctor Portal's "Complete Treatment" Silently Dropped The Base Service Price From The Invoice (RESOLVED)
 - [RISK-059](#risk-059) — `/api/reception/dashboard` Had No Auth, Could Clock In The Wrong Receptionist, And Could Silently Reopen An Ended Shift (RESOLVED)
+- [RISK-063](#risk-063) — Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff (RESOLVED)
 - [RISK-065](#risk-065) — `POST /api/packages/consume` Burns A Pre-Paid Session For A Service That Isn't On The Booking
 - [RISK-068](#risk-068) — First-Visit Medical Intake Guard Fired For Every Patient — `reservations` Prop Never Passed
 - [RISK-066](#risk-066) — System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate (RESOLVED)
@@ -2845,6 +2807,52 @@ files (pre-existing warnings elsewhere in `admin/page.tsx` untouched). Manual ch
 department-guess shape as F-2) is unchanged — it's a read, not a mutation, and no scenario in
 `TEST_COVERAGE_INVENTORY.md` §2 called for it. Worth revisiting if HR ever needs to distinguish
 "which specific receptionist's dashboard" via GET without an explicit `employeeId`.
+
+---
+
+## RISK-063: Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff (RESOLVED)
+
+**Severity:** Medium-High · **Type:** Security / Access control
+**Found:** 2026-08-19, building a table-driven auth sweep (`tests/routes/auth-sweep.test.ts`) across
+all 153 route handlers (ai_docs/TEST_COVERAGE_INVENTORY.md module 10). **Fixed:** 2026-08-24.
+
+**What it is:** `POST /api/hr/alerts`, `POST /api/hr/attendance`, `PATCH /api/hr/attendance`, and
+`POST /api/hr/leaves` each inline their own auth check instead of calling `verifyHrAccess` (which
+every sibling GET on the same file correctly uses):
+
+```ts
+const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
+if (authError || !user) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+```
+
+This confirms the bearer token is a *valid Supabase session* — it never checks that session has a
+matching `employee_accounts` row. The comments above two of these ("Allow any employee session to
+log their missing state", "any logged in employee can submit a leave request") describe the
+intended scope, but the code doesn't enforce it: a **patient** with a valid logged-in session can
+currently submit HR attendance clock-ins, leave requests, or missing-employee alerts under any
+`employee_id` they choose to pass — there is no check that the caller's own identity has any
+connection to that id.
+
+**Consequence:** a patient account can inject fabricated attendance/leave/alert rows that
+downstream HR screens and `hr_payroll` treat as real, misattributed to whichever `employee_id` the
+request names.
+
+**Fix:** replaced the inline check in all four handlers with `requireStaffAccess(req)` — not
+`verifyHrAccess`, which was considered but rejected: it restricts to HR/admin/superadmin roles,
+which would have blocked the actual intended callers (any staff member logging their own
+attendance/leave/alert, per the original "any logged in employee" comments). `requireStaffAccess`
+confirms a matching `employee_accounts` row without a role restriction — the correct guard for a
+self-service write, matching the `requireReceptionAccess` pattern RISK-059 established. The GET/PATCH
+(leaves) endpoints in the same files, which are genuinely HR-approval actions, correctly kept
+`verifyHrAccess` untouched. `POST /api/hr/attendance` had a secondary in-handler ownership check
+(`employee.id !== employeeId` → 403) already partially mitigating this for that one route; simplified
+to reuse the auth check's own resolved user id (`access.access.user.id`) rather than re-deriving it.
+
+**Verification:** `tests/routes/auth-sweep.test.ts`'s four `it.fails` RISK-063 assertions now pass
+for real — flipped the routes' guard classification from `'gap-weak-auth'` to `'staff'` in the test
+registry (the mechanism that generated the `it.fails` markers), which moved them into the standard
+staff-guarded assertion set and removed the special-case markers entirely, per the file's own
+"the signal to remove the marker" convention. Full suite: 635 passing, 7 expected-fail (was 631/11).
 
 ---
 

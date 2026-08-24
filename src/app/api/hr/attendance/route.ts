@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyHrAccess } from '@/lib/auth';
+import { requireStaffAccess } from '@/lib/access';
 import https from 'https';
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -238,16 +239,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '').trim();
-
-  if (!token) {
-    return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
-  }
-
-  const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+  // RISK-063: must be a registered staff member, not just any authenticated session.
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   try {
@@ -271,7 +266,7 @@ export async function POST(req: Request) {
     const { data: employee, error: employeeError } = await supabaseServer
       .from('employee_accounts')
       .select('id, branch_id, role_name')
-      .eq('auth_user_id', user.id)
+      .eq('auth_user_id', access.access.user.id)
       .maybeSingle();
 
     if (employeeError) throw employeeError;
@@ -410,16 +405,10 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '').trim();
-
-  if (!token) {
-    return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
-  }
-
-  const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+  // RISK-063: must be a registered staff member, not just any authenticated session.
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   try {
