@@ -335,13 +335,6 @@ const MOCK_MEDICINES = [
   }
 ];
 
-const MOCK_PRODUCTS = [
-  { id: "PROD-001", name: "Hydrating Facial Cream", category: "Skincare", price: "EGP 450.00", stock: 24, status: "In Stock" },
-  { id: "PROD-002", name: "Sunscreen SPF 50+", category: "Sun Protection", price: "EGP 600.00", stock: 12, status: "In Stock" },
-  { id: "PROD-003", name: "Retinol Anti-Aging Serum", category: "Serums", price: "EGP 850.00", stock: 5, status: "Low Stock" },
-  { id: "PROD-004", name: "Gentle Cleansing Gel", category: "Skincare", price: "EGP 320.00", stock: 0, status: "Out of Stock" },
-];
-
 function parseEgyptianNationalId(id: string) {
   if (!id || id.length !== 14 || !/^\d{14}$/.test(id)) {
     return { isValid: false, reason: "National ID must be exactly 14 digits.", age: null, dobIso: null, dobFormatted: null, gender: null, governorate: null };
@@ -2755,7 +2748,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   });
 
   useEffect(() => {
-    if (activeNav === "Inventory" || activeNav === "Products" || activeNav === "Point of Sale" || activeNav === "Patients" || viewingCustomerProfile) {
+    if (activeNav === "Inventory" || activeNav === "Products" || activeNav === "Patients" || viewingCustomerProfile) {
       fetchInventoryProducts();
     }
   }, [activeNav, viewingCustomerProfile, fetchInventoryProducts]);
@@ -3153,38 +3146,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const [queueAlertThreshold, setQueueAlertThreshold] = useState(2);
   const [queueAvgSessionDuration, setQueueAvgSessionDuration] = useState(20);
   const [savingQueueSettings, setSavingQueueSettings] = useState(false);
-  const [eCommerceSearch, setECommerceSearch] = useState("");
-  const [posCart, setPosCart] = useState<{ id: string; name: string; price: number; quantity: number }[]>([]);
-  const [productPage, setProductPage] = useState(1);
-  const PRODUCT_PAGE_SIZE = 5;
-
-  const filteredProducts = useMemo(() => {
-    if (!eCommerceSearch.trim()) return MOCK_PRODUCTS;
-    const q = eCommerceSearch.toLowerCase();
-    return MOCK_PRODUCTS.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
-    );
-  }, [eCommerceSearch]);
-
-  const totalProductPages = Math.ceil(filteredProducts.length / PRODUCT_PAGE_SIZE);
-  const pagedProducts = filteredProducts.slice(
-    (productPage - 1) * PRODUCT_PAGE_SIZE,
-    productPage * PRODUCT_PAGE_SIZE
-  );
-
-  const [productToggles, setProductToggles] = useState<Record<string, { visible: boolean; active: boolean }>>(
-    () => Object.fromEntries(MOCK_PRODUCTS.map((p) => [p.id, { visible: true, active: true }]))
-  );
-
-  function toggleProduct(id: string, field: "visible" | "active") {
-    setProductToggles((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], [field]: !prev[id][field] },
-    }));
-  }
-
   const getDayOperatingHoursAdmin = useCallback((dateStr: string | null) => {
     if (!dateStr || !newPatientService) return { start: "09:00", end: "20:00" };
     const dateObj = new Date(dateStr);
