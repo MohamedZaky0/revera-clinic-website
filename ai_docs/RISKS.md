@@ -499,7 +499,6 @@ handlers, matching the Deposit/Inactivity pattern.
 - [RISK-002](#risk-002) — Admin Auth Is Client-Side Only (Partially Resolved)
 - [RISK-006](#risk-006) — GPS-Based Attendance Can Be Spoofed
 - [RISK-007](#risk-007) — Client-Side PDF Invoice Printing Is Browser-Dependent
-- [RISK-010](#risk-010) — No Gross Price Is Ever Persisted On A Reservation (Partially Resolved)
 - [RISK-012](#risk-012) — Patient Debt Only Ever Grows
 - [RISK-015](#risk-015) — Doctor Cost Attribution Depends On A Name String
 - [RISK-019](#risk-019) — RLS Coverage
@@ -575,44 +574,6 @@ Invoice printing now uses the shared `src/lib/printUtils.ts` utility with a stan
 
 **Remaining mitigation:**
 - Use a server-side PDF library (e.g., Puppeteer, react-pdf) if downloadable, identical PDF output is required.
-
----
-
-## RISK-010: No Gross Price Is Ever Persisted On A Reservation (Partially Resolved)
-
-**Severity:** Critical (was) → Medium (the specific gap that remains) · **Type:** Data integrity /
-Financial correctness
-**Found:** 2026-07-25 (finance discovery audit). **Status updated 2026-08-24** — this entry had
-gone stale; PROPOSAL-002's Phases 0–4B are all `DONE` per `FINANCE_TRACKER.md`, contradicting the
-"Mitigation: [not started]" framing this entry carried until now.
-
-**Original problem:** `reservations` only ever had `amount_paid`/`amount_left` — no persisted
-price, subtotal, discount, or line-item breakdown. Every invoice was recomputed live from the
-**current** services catalog on every render, so editing a service's price silently rewrote the
-total of every historical invoice.
-
-**What's actually fixed:** immutable `invoices` + `invoice_lines` + `payments` tables exist and are
-correctly dual-written at the moment of issue — booking checkout (`PATCH /api/reservations`,
-`status: 'completed'`, task 1.10, commit `aed3793`) and POS product sales (task 1.11, commit
-`58fe1dc`) both now snapshot price/discount/COGS/commission at that instant, verified live. A full
-real reporting suite reads from this ledger: P&L, service/doctor/branch margins, cash flow,
-receivables aging, budget vs actual, package profitability, no-show cost, commission payouts — all
-`DONE`, all real endpoints (`GET /api/finance/*`), not mock (Phase 4/4B, `FINANCE_TRACKER.md:3290`
-onward). Purchases, suppliers, expenses (including rent as a recurring fixed expense), fixed
-assets/depreciation, and loans/amortization are also real, CRUD-complete, and wired to real UI
-screens (`src/components/admin/Finance/{Expenses,Assets,Loans}Screen.tsx` — confirmed by grep, they
-call `/api/expenses`, `/api/assets`, `/api/loans`, not hardcoded arrays).
-
-**What's still genuinely open — re-verified directly 2026-08-24, not from a doc:** the **Bookings
-screen's own invoice view/print modal** (`src/app/admin/page.tsx`, the `{invoiceBooking && (...)}`
-block, ~line 10905) was never cut over — it still looks up each service by ID against the **live**
-`localServices` catalog and calls `getEffectiveServicePrice()` fresh, exactly the original bug,
-completely independent of the now-correct `invoice_lines` data sitting in the database for that
-same booking. **Reprinting an old booking's invoice from this specific screen can still show a
-different price than what was actually charged**, even though the correct historical number is
-now captured and available in `invoice_lines` — this modal just isn't reading it. The fix is
-narrow: point this modal's price lookup at the invoice's own `invoice_lines` rows (via
-`reservation_id`) instead of re-deriving from the live catalog.
 
 ---
 
@@ -1078,6 +1039,7 @@ cannot reproduce for new sessions again.
 - [RISK-004](#risk-004) — localStorage as Primary Service/Category Storage (RESOLVED via RISK-025)
 - [RISK-008](#risk-008) — Hardcoded Superadmin Email
 - [RISK-009](#risk-009) — Schedule Grid Can Silently Clip Overlapping Bookings
+- [RISK-010](#risk-010) — No Gross Price Is Ever Persisted On A Reservation (RESOLVED)
 - [RISK-011](#risk-011) — Branch-Specific Pricing Has Never Been Applied
 - [RISK-013](#risk-013) — Every Product Sale Deducts Stock Twice
 - [RISK-014](#risk-014) — Every POS Sale Fails To Write, And Sales History Reads Back Empty
@@ -1181,6 +1143,47 @@ The Bookings → Schedule view (`calendarView === "Schedule"`, `src/app/admin/pa
 - Clicking `+N more` sets `docFilter` to that cell's doctor, `dateFilter` to that day (`YYYY-MM-DD`), resets `statusFilter`/`typeFilter` to `"All"`, and switches `calendarView` to `"List"` — narrowing to exactly that doctor's bookings on that day.
 - A `dateFilter` state was added to `filteredReservations` (previously List/Calendar had no date filter at all) with a date input + clear button in the existing Filter modal, and an active-filter chip row with a "Clear all" button in the List view header — so the filtered state from a `+N more` jump is visible and easy to back out of, not a hidden/stuck state.
 - The List view applies the selected date filter, so the jump narrows to that doctor's bookings on the selected day.
+
+---
+
+## RISK-010: No Gross Price Is Ever Persisted On A Reservation (RESOLVED)
+
+**Severity:** Critical (was) · **Type:** Data integrity / Financial correctness
+**Found:** 2026-07-25 (finance discovery audit). **Fully resolved 2026-08-24** via Brief 32
+(commit `f2aa6db`), independently re-verified the same day.
+
+**Original problem:** `reservations` only ever had `amount_paid`/`amount_left` — no persisted
+price, subtotal, discount, or line-item breakdown. Every invoice was recomputed live from the
+**current** services catalog on every render, so editing a service's price silently rewrote the
+total of every historical invoice.
+
+**Phase 1 fix (2026-08-xx):** immutable `invoices` + `invoice_lines` + `payments` tables exist and
+are correctly dual-written at the moment of issue — booking checkout (`PATCH /api/reservations`,
+`status: 'completed'`, task 1.10, commit `aed3793`) and POS product sales (task 1.11, commit
+`58fe1dc`) both now snapshot price/discount/COGS/commission at that instant. A full real reporting
+suite reads from this ledger (Phase 4/4B, `FINANCE_TRACKER.md:3290` onward).
+
+**Remaining gap, closed by Brief 32:** the Bookings screen's own invoice view/print modal
+(`src/app/admin/page.tsx`, the `{invoiceBooking && (...)}` block) still re-derived prices live from
+the current services catalog instead of reading the already-correct `invoice_lines` data sitting in
+the database for that booking. Fixed by a new staff-gated `GET /api/invoices?reservationId=X`
+(`src/app/api/invoices/route.ts`, `requireStaffAccess` + `supabaseServer` — required since
+`invoices`/`invoice_lines` have RLS enabled with zero policies, confirmed in
+`supabase/migrations/20260726010000_create_invoices.sql:40`) that the modal now queries before
+falling back to the old live-compute/notes-parsing logic. When a non-void invoice exists, the modal
+renders `invoice_lines` directly and totals from `invoices.grand_total` — editing a service's price
+after the fact no longer changes an already-issued invoice's displayed total. The fix went further
+than strictly required: the endpoint also joins `service_id`/`product_id` back to
+`services`/`inventory_products` to preserve bilingual (EN/AR) line-item names, rather than accepting
+the English-only `invoice_lines.description` column.
+
+**Fallback preserved, confirmed byte-for-byte:** for bookings that predate the ledger (or aren't
+yet completed), the entire pre-existing live-compute/notes-regex-parsing block still runs
+unmodified — diffed the full block against the pre-commit version and it is identical, not just
+"looks similar."
+
+**`amountPaid`/`amountLeft` untouched**, as required — still sourced straight from the reservation,
+not the new ledger data, matching `FINANCE_TRACKER.md`'s additive-then-cutover discipline.
 
 ---
 

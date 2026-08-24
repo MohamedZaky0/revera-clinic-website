@@ -10,7 +10,65 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 32 — Bookings screen's invoice modal: read the real ledger instead of live-recomputing (RISK-010 remainder)
+_(none currently active)_
+
+---
+---
+
+# QUEUED BRIEFS
+
+Translation of the Pages Settings tabs extracted in Brief 27 is also an obvious next brief, not yet
+written.
+
+---
+---
+
+# ARCHIVE — completed briefs
+
+Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
+(RISK-038 … RISK-050), which is the authoritative account.
+
+### Brief 32 — Bookings screen's invoice modal: read the real ledger instead of live-recomputing (RISK-010 remainder) (completed 2026-08-24)
+
+Landed in one commit (`f2aa6db`). Independently re-verified: `tsc` clean, `vitest` unaffected (631
+passing, 11 expected fail). `eslint` had two real errors on the new file
+(`src/app/api/invoices/route.ts:59-60`, `serviceNameMap`/`productNameMap` declared `let` but never
+reassigned) — fixed directly as a small, mechanical, obviously-safe `let`→`const` change (the
+objects' properties are mutated, the bindings themselves never reassigned); `eslint` clean after.
+
+New `GET /api/invoices?reservationId=X` (`src/app/api/invoices/route.ts`) matches the required
+auth pattern exactly — `requireStaffAccess` + `supabaseServer`, same shape as
+`reservation-products/route.ts` — and filters `.neq('status', 'void')`. Confirmed directly in
+`supabase/migrations/20260726010000_create_invoices.sql:40` and
+`20260726010100_create_invoice_lines.sql:40` that both `invoices` and `invoice_lines` have RLS
+enabled with zero `CREATE POLICY` statements anywhere in the migrations — the service-role
+endpoint is genuinely required, not just cautious.
+
+**Fallback path — the highest-risk part of this brief — verified byte-for-byte, not just by
+reading:** diffed the pre-commit and post-commit versions of `src/app/admin/page.tsx` from the
+`// 1. Calculate service cost` line through the end of the invoice modal (463 lines) and they are
+**identical**. The entire old live-compute/notes-regex-parsing block (`Additional Services Used`,
+`Added Product`, `getEffectiveServicePrice`, all five regex formats) still exists untouched and
+still runs whenever `ledgerInvoice` is `null`. The new ledger-backed branch is a separate `if
+(ledgerInvoice) { return (...) }` inserted before the old code, not a replacement of it.
+
+`amountPaid`/`amountLeft` in the new ledger branch use the exact same reservation-sourced
+computation (`invoiceBooking.amountPaid`/`amount_paid`, `.amountLeft`/`amount_left`) copied
+verbatim from the fallback branch — confirmed not pointed at any ledger/`payments` data, per the
+brief's explicit out-of-scope instruction.
+
+**Went beyond the brief's minimum ask on the bilingual-description question (brief item 5):**
+rather than just documenting a decision to accept English-only `invoice_lines.description`, the
+endpoint joins `service_id`/`product_id` back to `services.ar`/`inventory_products.name_ar` and
+returns both `nameEn`/`nameAr` per line, so the modal's existing Arabic-name display keeps working
+for ledger-backed invoices too — a strictly better outcome than the brief required, and documented
+in the commit message.
+
+**Not independently live-verified** — the admin panel's login gate blocks Claude from confirming
+visually (entering credentials is off-limits); this review rests on the diff, the migration files,
+and the automated test/lint/typecheck run, not a live browser check of the modal itself.
+
+### Brief 32 body (original ask, for reference)
 
 **Scope: the Booking Invoice Modal only** — `src/app/admin/page.tsx`, the
 `{invoiceBooking && (() => { ... })()}` block, currently ~10903–11194 (re-measure before starting).
@@ -76,20 +134,6 @@ Test against both a booking old enough to have no `invoices` row (fallback path 
 completed after this lands (ledger path exercised). No `tsc`/`eslint`/`vitest` regressions.
 
 ---
----
-
-# QUEUED BRIEFS
-
-Translation of the Pages Settings tabs extracted in Brief 27 is also an obvious next brief, not yet
-written.
-
----
----
-
-# ARCHIVE — completed briefs
-
-Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
-(RISK-038 … RISK-050), which is the authoritative account.
 
 ### Brief 31 — Admin sidebar: translate nav labels and mirror it to RTL (completed 2026-08-24)
 

@@ -56,8 +56,8 @@ export async function GET(req: Request) {
     const serviceIds = (lines || []).filter((l: any) => l.service_id != null).map((l: any) => l.service_id);
     const productIds = (lines || []).filter((l: any) => l.product_id != null).map((l: any) => l.product_id);
 
-    let serviceNameMap: Record<number, { en: string; ar: string }> = {};
-    let productNameMap: Record<string, { en: string; ar: string }> = {};
+    const serviceNameMap: Record<number, { en: string; ar: string }> = {};
+    const productNameMap: Record<string, { en: string; ar: string }> = {};
 
     if (serviceIds.length > 0) {
       const { data: services } = await supabaseServer
