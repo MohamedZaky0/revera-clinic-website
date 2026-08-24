@@ -10,7 +10,90 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-_(none currently active)_
+## Brief 33 — Give doctor and reception notes their own columns instead of sharing `reservations.notes`
+
+**Why this matters now, not just cleanup:** Mohamed asked directly whether doctor/reception notes
+are actually being saved, since he'd only seen them in the UI. They are — verified by tracing every
+save path to a real `PATCH /api/reservations` call — but both write into the **same single
+`reservations.notes` text column**, interleaved with auto-generated bracketed tags
+(`[Products Used During Session]:`, `[Invoice Total Updated]:`, etc.), and every reader has to
+regex-strip those tags back out to show a human a clean note. This brief separates them into their
+own columns. **Not urgent to the point of blocking go-live, but worth doing before Reception/Doctor
+lean on notes daily** — the current shape is real, not fake, but fragile.
+
+### Every save/read site, traced directly — read this before writing any code
+
+**Doctor's clinical notes — two write sites, same shape:**
+- `src/components/admin/DoctorAccountView.tsx:745` `handleSaveClinicalNote()` — mid-session "Save
+  Doctor Notes" button. Builds `fullNotes = (clinicalNote || "") + sessionAddonsSummary` (the
+  bracketed-tag block for `additionalServices`/`usedProducts`/`extraPulsesCount`), then
+  `PATCH /api/reservations?id=X` with `{ notes: fullNotes }`.
+- `src/components/admin/DoctorAccountView.tsx:868` `handleCompleteTreatment()` — same
+  `finalNotes = clinicalNote + sessionAddonsSummary` pattern, PATCHes `{ notes: finalNotes,
+  status: "completed", amountLeft: ... }` on session completion.
+- Textarea itself: `DoctorOngoingSessionTab.tsx:768-774`, bound to `clinicalNote`/`setClinicalNote`
+  (both passed down as props from `DoctorAccountView.tsx:278`).
+
+**Reception's booking notes — one write site:**
+- `src/app/admin/page.tsx:5386` `saveNotes(newNotes)` — `PATCH /api/reservations?id=X` with
+  `{ status: viewingBooking.status, notes: newNotes }`. Called from the booking-details drawer's
+  "Save Note" button (`page.tsx:8742-8756`), gated by `hasPermission("bookings.edit")`. On save, it
+  regex-extracts any existing bracketed tags from the old `notes` value
+  (`page.tsx:8746`, matches `[Products Used|Additional Services|Device Pulses|Extra Device|Invoice
+  Total|Total Invoice|Added Product|Added Service]`) and re-appends them after the user's typed
+  text — this exists specifically because reception's free text and the auto-generated tags
+  currently *have* to coexist in the same field.
+
+**Display-side proof this is already fragile:** `page.tsx:8688` `cleanBookingNotes` — a 9-step
+regex-stripping IIFE that removes every known bracketed-tag pattern just to show the human-readable
+note back to a receptionist. `DoctorOngoingSessionTab.tsx:778-781` shows the raw
+`activeSessionBooking.notes` unstripped, in a "Booking Notes" read-only block — a doctor viewing an
+active session currently sees the tags too, reception doesn't (different code paths, inconsistent
+today).
+
+**Important, verify-don't-assume finding: the bracketed tags may already be fully redundant.**
+`persistSessionLineItems()` (`DoctorAccountView.tsx:801`, called from both `handleSaveClinicalNote`
+and `handleCompleteTreatment` before the notes PATCH) already writes `usedProducts`/
+`additionalServices`/device-pulse usage to `POST /api/reservation-products` — the real, structured
+DEC-042 table. If that's the actual source of truth read everywhere that matters (checkout's
+`writeCheckoutInvoice`, the Brief 32 ledger path), then `sessionAddonsSummary` string-building in
+both doctor handlers is dead weight duplicating data already captured properly, kept only because
+nobody removed it after DEC-042 landed. **Confirm this before deleting it** — grep every reader of
+`reservations.notes` (not just the four sites above; there may be others, e.g. print/export
+templates) to make sure nothing still depends on parsing those tags out of `notes` specifically,
+especially for bookings predating `reservation_products`' existence.
+
+### The fix
+
+1. **Migration**: add `doctor_notes text` and `reception_notes text` (both nullable, no default) to
+   `reservations`. Update `DB_SCHEMA.md` in the same commit, per the standing CLAUDE.md rule.
+2. **Doctor writes**: `handleSaveClinicalNote`/`handleCompleteTreatment` PATCH `doctor_notes:
+   clinicalNote` instead of folding it into `notes`. If the redundancy finding above checks out,
+   drop the `sessionAddonsSummary` string-building entirely (simplify, don't just stop calling it —
+   dead code that still runs is worse than code that's gone). If it doesn't check out, say why in
+   the PR and keep it, but still stop writing free text into `notes`.
+3. **Reception writes**: `saveNotes`/the booking-details drawer PATCH `reception_notes: newNotes`
+   instead of `notes`. Drop the tag-preservation regex-extraction at `page.tsx:8746` — becomes
+   unnecessary once reception notes have their own clean column with nothing else sharing it.
+4. **Reads**: `cleanBookingNotes` (`page.tsx:8688`) and the "Booking Notes" block in
+   `DoctorOngoingSessionTab.tsx:778-781` both switch to reading `doctor_notes`/`reception_notes`
+   directly — no more regex-stripping needed once the columns are clean by construction.
+5. **Backward compatibility — additive, not destructive, same discipline as every ledger migration
+   this project has done (`FINANCE_TRACKER.md`'s "additive, then cutover"):** `reservations.notes`
+   itself is **not removed or migrated**. Old bookings keep whatever's already in `notes`
+   (`doctor_notes`/`reception_notes` will be `NULL` for them). Decide explicitly whether the UI
+   should show old `notes` content as a labeled "legacy note" for bookings that predate this
+   migration, or just show nothing until a note is added in the new column — say which, and why, in
+   the PR. **Do not touch** the old invoice-modal fallback's notes-regex-parsing
+   (`page.tsx`, the `{invoiceBooking && ...}` block Brief 32 explicitly preserved) — that still
+   needs to read the historical `notes` field exactly as it does today for pre-ledger bookings.
+
+**Verify:** a doctor's mid-session note and a reception note on the same booking no longer overwrite
+or concatenate with each other (today, since both PATCH the same `notes` field, whichever saves
+last effectively wins for anything not tag-shaped — confirm this is actually a live bug worth
+mentioning, or that some existing merge logic already prevents it, before/while writing the fix).
+`tsc`/`eslint`/`vitest` clean. Manual test: doctor writes a note, saves; reception separately adds a
+note on the same booking; both are visible, distinct, and neither clobbered the other.
 
 ---
 ---
