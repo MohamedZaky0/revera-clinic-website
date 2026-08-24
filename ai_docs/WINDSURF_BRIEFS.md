@@ -12,6 +12,39 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 ## Brief 33 — Give doctor and reception notes their own columns instead of sharing `reservations.notes`
 
+> **REVIEW 2026-08-24 — in progress, not done yet. Finish the doctor side before this is complete.**
+> Reviewed the uncommitted working tree directly. The migration, `DB_SCHEMA.md`, the API route
+> (`reservations/route.ts`), and reception's side are all correct and complete: `saveNotes`
+> (`page.tsx:5391`) now writes `receptionNotes` only, and the old tag-preservation regex at the old
+> `page.tsx:8746` is correctly removed — a full, clean cutover. `tsc`/`eslint`/`vitest` all clean.
+>
+> **The doctor side is not cut over — Mohamed's explicit instruction: close it the same way, or
+> remove the old write entirely.** `handleSaveClinicalNote` and `handleCompleteTreatment`
+> (`DoctorAccountView.tsx`) currently write `doctorNotes: clinicalNote` to the new column **in
+> addition to** still writing the full `notes: fullNotes` (or `finalNotes`) — the old field, still
+> carrying the bracketed-tag block, untouched. That's not what reception did, and it's not what the
+> brief asked for either way (drop the tags if the redundancy check below confirms it, or at minimum
+> stop writing free text into `notes`). Right now the doctor's note exists in two places at once.
+>
+> **Fix:** in both handlers, stop writing `notes`/`fullNotes`/`finalNotes` — write `doctorNotes:
+> clinicalNote` only. Before you do, confirm the standing question from the original brief:
+> `persistSessionLineItems()` already POSTs `usedProducts`/`additionalServices`/device-pulse usage to
+> `/api/reservation-products` (the real DEC-042 table) ahead of the notes PATCH in both handlers — if
+> that's genuinely the source of truth everywhere it needs to be (checkout's `writeCheckoutInvoice`,
+> the Brief 32 ledger path), the `sessionAddonsSummary` bracketed-tag string-building in both
+> handlers is dead weight now and should be deleted outright, not just stopped from reaching `notes`.
+> If something still depends on it, say what and why instead of guessing, but the free-text
+> clinical note itself must stop going into `notes` regardless of which way that turns out.
+>
+> `notes` itself stays untouched for old bookings (no backfill, no destructive migration) — this is
+> only about where *new* saves from these two handlers go from here.
+>
+> **Also outstanding, unrelated to the above:** the migration
+> (`20260824020000_add_doctor_reception_notes_to_reservations.sql`) has not been applied to the
+> live database yet — needs `npx supabase db push`, which needs Mohamed's direct approval per this
+> project's standing rule on unattended DB migrations. Until it runs, `doctor_notes`/
+> `reception_notes` don't exist as real columns and every PATCH targeting them will fail.
+
 **Why this matters now, not just cleanup:** Mohamed asked directly whether doctor/reception notes
 are actually being saved, since he'd only seen them in the UI. They are — verified by tracing every
 save path to a real `PATCH /api/reservations` call — but both write into the **same single
