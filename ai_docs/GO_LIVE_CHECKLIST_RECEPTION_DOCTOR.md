@@ -10,6 +10,15 @@
 > dead-end a receptionist/doctor (RISK-010 through RISK-058) is already resolved and verified. What
 > follows is real but smaller — three quick items worth closing before launch, and a short list of
 > things to know about for week one.
+>
+> **Re-verified 2026-08-24.** Item 1 unchanged (still dead code). Item 2 re-checked live against the
+> database — still not done, plus a new related finding (branch data hygiene, below). Item 3 stays
+> resolved. Two risks not in scope of the original 2026-08-17 audit were found and fixed since:
+> **RISK-063** (four HR endpoints accepted any authenticated session, not just staff — found
+> 2026-08-19, fixed 2026-08-24) and the **doctor/reception clinical-notes split** (previously one
+> shared `notes` field with string-concatenated tags — now two dedicated `doctor_notes`/
+> `reception_notes` columns, Brief 33, fixed 2026-08-24). Neither blocks launch today — both are
+> already closed.
 
 ---
 
@@ -40,14 +49,34 @@ the browser and by grep that it's actually unreachable, not just hard to find):
 
 ### 2. New Cairo branch's real working hours were never entered
 
-**RISK-053.** Not a code bug — the system runs on a permissive hardcoded default (09:00–20:00 every
-day) because `branches.service_hours` for New Cairo is `null` in the database. Booking/approval
-logic works correctly against whatever is configured — it's just not configured with the real
-hours yet.
+**RISK-053 — re-checked live against the database 2026-08-24, still not done.**
+`service_hours` is `null` for **every** branch row, not just New Cairo:
 
-**What to do:** Admin → Settings → Service Hours → New Cairo Branch → enter the actual opening
-hours and closed days for each day of the week, then Save. Repeat for Sheikh Zayed if it has the
-same gap (not confirmed either way — check both while you're in there).
+| Branch | `status` | `service_hours` |
+|---|---|---|
+| New Cairo Branch | `inactive` | `null` |
+| Sheikh Zayed Branch | `active` | `null` |
+| home | `active` | `null` |
+| Italy | `active` | `null` |
+
+Not a code bug — the system runs on a permissive hardcoded default (09:00–20:00 every day)
+wherever `service_hours` is `null`. Booking/approval logic works correctly against whatever is
+configured; it's just not configured with real hours for any branch yet.
+
+**What to do:** Admin → Settings → Service Hours → enter the actual opening hours and closed days
+for **Sheikh Zayed Branch** at minimum (it's the only real, active branch right now), and for New
+Cairo before switching it active.
+
+**New finding, same query — branch data hygiene:** two rows named **"home"** and **"Italy"** exist
+with `status: "active"`. `GET /api/branches` (`src/app/api/branches/route.ts:7-19`) returns every
+row with no status filter, and the public `BookingModal.tsx:291` does
+`filter(b => b.status === "active")` — so **"home" and "Italy" currently appear as selectable
+branches in the live public booking flow**, alongside Sheikh Zayed. Meanwhile **New Cairo Branch is
+`status: "inactive"`**, so it does *not* appear to patients at all right now (unclear whether that's
+deliberate — pending its hours being set — or an oversight; worth confirming either way, not
+something to fix silently). "home"/"Italy" look like leftover test/seed data and, if so, should be
+set `inactive` (or deleted) via Admin → Settings → Branches before launch so a real patient can't
+book against them.
 
 ### 3. Doc drift — already fixed, no action needed
 
