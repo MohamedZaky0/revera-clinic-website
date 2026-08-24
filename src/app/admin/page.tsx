@@ -5804,7 +5804,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           </nav>
         </aside>
 
-        <main className="flex flex-col px-4 md:px-8 py-0 min-w-0">
+        <main dir="ltr" className="flex flex-col px-4 md:px-8 py-0 min-w-0">
           {/* Top Navigation Bar */}
           <div className="sticky top-0 z-40 flex items-center justify-between border-b border-[#414E36]/10 bg-[#F2EFE9]/90 px-2 py-3 backdrop-blur-md gap-3">
             {/* Left: language toggle + branch selector */}
