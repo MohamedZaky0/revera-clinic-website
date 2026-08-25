@@ -113,7 +113,7 @@ export const adminTranslations = {
         floorLabel: "Floor / Apt (Optional)",
         floorPlaceholder: "e.g. Floor 2, Apt 4",
         financialSectionTitle: "Financial Information",
-        financialSectionSubtitle: "Manage the customer's wallet, total spend, and outstanding balances.",
+        financialSectionSubtitle: "View the customer's wallet, total spend, and outstanding balances.",
         walletLabel: "Wallet Balance (EGP)",
         spentLabel: "Total Spent (EGP)",
         outstandingLabel: "Outstanding Balance (EGP)",

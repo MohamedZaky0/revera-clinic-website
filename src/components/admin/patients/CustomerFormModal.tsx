@@ -547,7 +547,7 @@ export default function CustomerFormModal({
             </div>
             <div>
               <h4 className="text-base font-bold text-[#1F251A]">{t.financialSectionTitle || "Financial Information"}</h4>
-              <p className="text-xs text-[#5A6A51]">{t.financialSectionSubtitle || "Manage the customer's wallet, total spend, and outstanding balances."}</p>
+              <p className="text-xs text-[#5A6A51]">{t.financialSectionSubtitle || "View the customer's wallet, total spend, and outstanding balances."}</p>
             </div>
           </div>
 
@@ -559,12 +559,12 @@ export default function CustomerFormModal({
                   <Wallet size={16} />
                 </div>
                 <input
-                  type="number"
-                  min="0"
-                  value={custWallet}
-                  onChange={(e) => setCustWallet(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  type="text"
+                  readOnly
+                  disabled
+                  value={Number(custWallet || 0).toLocaleString("en-US")}
+                  placeholder="0"
+                  className="w-full rounded-xl border border-gray-200 bg-[#F7F7F6] px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm font-semibold text-gray-700 outline-none cursor-not-allowed select-none"
                 />
               </div>
             </div>
@@ -576,12 +576,12 @@ export default function CustomerFormModal({
                   <Coins size={16} />
                 </div>
                 <input
-                  type="number"
-                  min="0"
-                  value={custSpent}
-                  onChange={(e) => setCustSpent(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  type="text"
+                  readOnly
+                  disabled
+                  value={Number(custSpent || 0).toLocaleString("en-US")}
+                  placeholder="0"
+                  className="w-full rounded-xl border border-gray-200 bg-[#F7F7F6] px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm font-semibold text-gray-700 outline-none cursor-not-allowed select-none"
                 />
               </div>
             </div>
@@ -593,12 +593,12 @@ export default function CustomerFormModal({
                   <Receipt size={16} />
                 </div>
                 <input
-                  type="number"
-                  min="0"
-                  value={custOutstanding}
-                  onChange={(e) => setCustOutstanding(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  type="text"
+                  readOnly
+                  disabled
+                  value={Number(custOutstanding || 0).toLocaleString("en-US")}
+                  placeholder="0"
+                  className="w-full rounded-xl border border-gray-200 bg-[#F7F7F6] px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm font-semibold text-gray-700 outline-none cursor-not-allowed select-none"
                 />
               </div>
             </div>
