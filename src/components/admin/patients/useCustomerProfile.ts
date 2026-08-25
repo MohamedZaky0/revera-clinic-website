@@ -8,6 +8,8 @@ export type Customer = {
   name: string;
   phone: string;
   createdAt: string;
+  lastBookingDate?: string | null;
+  lastBookingTime?: string | null;
   bookings: number;
   spent: number;
   outstanding: number;

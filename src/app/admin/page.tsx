@@ -247,6 +247,8 @@ type Customer = {
   name: string;
   phone: string;
   createdAt: string;
+  lastBookingDate?: string | null;
+  lastBookingTime?: string | null;
   bookings: number;
   spent: number;
   outstanding: number;
@@ -2418,7 +2420,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-031', name: 'Reception Dashboard & Shift Metrics Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies receptionist shift tracking, personal target calculations, and today bookings summary.', status: 'idle' },
     { id: 'TC-032', name: 'Employee Shift Start & Geofence Verification Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies employee shift start geolocation verification, branch radius check, and attendance clock-in.', status: 'idle' },
     { id: 'TC-033', name: 'Dashboard Notifications & Inventory Alerts Engine', category: 'Inventory & Equipment', endpoint: '/api/reception/dashboard', description: 'Verifies real-time system alerts for low stock, expired items, maintenance due, and overdue devices.', status: 'idle' },
-    { id: 'TC-034', name: 'Medical Record Intake Templates Engine', category: 'Medical & Patients', endpoint: '/api/medical-records/templates', description: 'Verifies customizable medical record intake templates, multi-service assignments, and dynamic field schema.', status: 'idle' }
+    { id: 'TC-034', name: 'Medical Record Intake Templates Engine', category: 'Medical & Patients', endpoint: '/api/medical-records/templates', description: 'Verifies customizable medical record intake templates, multi-service assignments, and dynamic field schema.', status: 'idle' },
+    { id: 'TC-035', name: 'Patient Profile Edit & Customer Intake Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies customer profile records, phone/WhatsApp validation, address structure (City, Street, Building, Floor), and balances.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -3423,6 +3426,24 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         return sum;
       }, 0);
 
+      // Extract real last booking date and time from reservations
+      let lastBookingDateVal: string | null = null;
+      let lastBookingTimeVal: string | null = null;
+      if (customerReservations.length > 0) {
+        const sortedRes = [...customerReservations].sort((a: any, b: any) => {
+          const dateA = a.date ? String(a.date).slice(0, 10) : (a.createdAt ? String(a.createdAt).slice(0, 10) : "");
+          const timeA = a.timeSlot || a.requestedTime || "00:00";
+          const dateB = b.date ? String(b.date).slice(0, 10) : (b.createdAt ? String(b.createdAt).slice(0, 10) : "");
+          const timeB = b.timeSlot || b.requestedTime || "00:00";
+          return `${dateB} ${timeB}`.localeCompare(`${dateA} ${timeA}`);
+        });
+        const latest = sortedRes[0];
+        if (latest) {
+          lastBookingDateVal = latest.date || latest.createdAt || null;
+          lastBookingTimeVal = latest.timeSlot || latest.requestedTime || null;
+        }
+      }
+
       const regDateStr = c.registration_date || c.created_at || now.toISOString();
       const regDate = new Date(regDateStr);
       const registeredRecently = regDate >= twoWeeksAgo;
@@ -3435,6 +3456,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         name: c.name,
         phone: c.mobile || c.phone || "",
         createdAt: regDateStr,
+        lastBookingDate: lastBookingDateVal,
+        lastBookingTime: lastBookingTimeVal,
         bookings: totalBookingsCount,
         spent: Math.max(Number(c.spent_amount || 0), totalSpentCalculated),
         outstanding: Number(c.outstanding || 0),
@@ -3481,6 +3504,24 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         return sum;
       }, 0);
 
+      // Extract real last booking date and time for reservation-derived customers
+      let lastBookingDateVal: string | null = null;
+      let lastBookingTimeVal: string | null = null;
+      if (patientReservations.length > 0) {
+        const sortedRes = [...patientReservations].sort((a: any, b: any) => {
+          const dateA = a.date ? String(a.date).slice(0, 10) : (a.createdAt ? String(a.createdAt).slice(0, 10) : "");
+          const timeA = a.timeSlot || a.requestedTime || "00:00";
+          const dateB = b.date ? String(b.date).slice(0, 10) : (b.createdAt ? String(b.createdAt).slice(0, 10) : "");
+          const timeB = b.timeSlot || b.requestedTime || "00:00";
+          return `${dateB} ${timeB}`.localeCompare(`${dateA} ${timeA}`);
+        });
+        const latest = sortedRes[0];
+        if (latest) {
+          lastBookingDateVal = latest.date || latest.createdAt || null;
+          lastBookingTimeVal = latest.timeSlot || latest.requestedTime || null;
+        }
+      }
+
       const regDateStr = r.createdAt || r.date || now.toISOString();
 
       reservationDerivedCustomers.push({
@@ -3489,6 +3530,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         phone,
         email,
         createdAt: regDateStr,
+        lastBookingDate: lastBookingDateVal,
+        lastBookingTime: lastBookingTimeVal,
         bookings: patientReservations.length,
         spent: totalSpent,
         outstanding: 0,
