@@ -100,53 +100,39 @@ export default function AdminDoctorsView({
         <DoctorProfileDetailsView
           doctor={viewingDoctorDetails}
           onBack={() => setViewingDoctorDetails(null)}
+          onEdit={(doc) => {
+            setViewingDoctorDetails(null);
+            openEditProviderModal(doc);
+          }}
           reservations={allReservations}
           branches={branches}
           localServices={localServices}
         />
       ) : editingDoctorInline ? (
-        <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-          <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
+        <div className="space-y-6">
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => setEditingDoctorInline(null)}
+              className="inline-flex items-center gap-2 self-start rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-[#1F251A] shadow-xs transition hover:bg-gray-50 cursor-pointer"
+            >
+              <ArrowLeft size={14} /> {lang === "ar" ? "العودة لملف الطبيب" : "Back to Doctor Profile"}
+            </button>
             <div>
-              <button
-                onClick={() => setEditingDoctorInline(null)}
-                className="mb-2 inline-flex items-center gap-2 rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#414E36] shadow-sm transition hover:bg-[#F2EFE9]"
-              >
-                <ArrowLeft size={14} /> {t.backToDoctors}
-              </button>
-              <h1 className="text-3xl font-bold text-[#1F251A]">{t.editDoctorTitle} {providerFormName || editingDoctorInline.name}</h1>
+              <h1 className="text-2xl font-bold text-[#1F251A]">{lang === "ar" ? "تعديل بيانات الطبيب" : "Edit Doctor"}</h1>
+              <p className="text-xs text-[#5A6A51] mt-0.5">{lang === "ar" ? "تحديث معلومات الطبيب وتفاصيل العمل" : "Update doctor information and working details"}</p>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <ProviderFormFields
-              providerForm={providerForm}
-              branches={branches}
-              allServicesList={allServicesList}
-              getDoctorFirstReservationDate={getDoctorFirstReservationDate}
-              allReservations={allReservations}
-              parseEgyptianNationalId={parseEgyptianNationalId}
-              lang={lang}
-              t={tFormFields}
-            />
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3 pt-4 border-t border-[#E6E9EB]">
-              <button
-                onClick={handleSaveProvider}
-                disabled={savingProvider}
-                className="rounded-2xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-50"
-              >
-                {savingProvider ? t.savingBtn : t.saveChangesBtn}
-              </button>
-              <button
-                onClick={() => setEditingDoctorInline(null)}
-                className="rounded-2xl border border-[#E6E9EB] bg-white px-6 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#F2EFE9]"
-              >
-                {t.cancelBtn}
-              </button>
-            </div>
-          </div>
+          <ProviderFormFields
+            providerForm={providerForm}
+            branches={branches}
+            allServicesList={allServicesList}
+            getDoctorFirstReservationDate={getDoctorFirstReservationDate}
+            allReservations={allReservations}
+            parseEgyptianNationalId={parseEgyptianNationalId}
+            lang={lang}
+            t={tFormFields}
+          />
         </div>
       ) : (
         <div className="space-y-6">

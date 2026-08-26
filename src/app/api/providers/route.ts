@@ -42,6 +42,11 @@ function mapProvider(p: Record<string, any>, bookingsCount: number = 0) {
     rating: Number(p.rating || 0),
     image: p.image || null,
     phone: p.phone || null,
+    email: p.email || null,
+    employmentType: p.employment_type || p.employmentType || 'Full Time',
+    languages: Array.isArray(p.languages) && p.languages.length > 0 ? p.languages : ['Arabic', 'English'],
+    sessionType: p.session_type || p.sessionType || 'in_clinic',
+    active: p.active !== false,
     gender: p.gender || null,
     age: p.age ? Number(p.age) : null,
     specialty: p.specialty || null,
@@ -178,7 +183,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent, serviceCommissions } = body;
+  const { name, services, rating, more, image, phone, email, employmentType, employment_type, languages, sessionType, session_type, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent, serviceCommissions } = body;
   
   let finalBranchId = branchId || null;
   if (workingDaysHours && typeof workingDaysHours === 'object') {
@@ -196,6 +201,10 @@ export async function POST(req: Request) {
     bookings_count: 0,
     image: image || null,
     phone: phone || null,
+    email: email || null,
+    employment_type: employment_type || employmentType || 'Full Time',
+    languages: Array.isArray(languages) ? languages : ['Arabic', 'English'],
+    session_type: session_type || sessionType || 'in_clinic',
     gender: gender || null,
     age: age ? Number(age) : null,
     specialty: specialty || null,
@@ -332,10 +341,14 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent, serviceCommissions, active } = body;
+  const { name, services, rating, more, image, phone, email, employmentType, employment_type, languages, sessionType, session_type, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent, serviceCommissions, active } = body;
   const updates: Record<string, any> = {};
   if (active !== undefined) updates.active = Boolean(active);
   if (name !== undefined) updates.name = name;
+  if (email !== undefined) updates.email = email;
+  if (employment_type !== undefined || employmentType !== undefined) updates.employment_type = employment_type || employmentType;
+  if (languages !== undefined) updates.languages = languages;
+  if (session_type !== undefined || sessionType !== undefined) updates.session_type = session_type || sessionType;
   if (services !== undefined) updates.services = services;
   if (rating !== undefined) updates.rating = Number(rating || 0);
   if (more !== undefined) updates.more_count = Number(more || 0);

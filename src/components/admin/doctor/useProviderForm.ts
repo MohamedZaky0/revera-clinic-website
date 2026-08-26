@@ -71,6 +71,10 @@ export function useProviderForm({
   const [providerFormSelectedServices, setProviderFormSelectedServices] = useState<string[]>([]);
   const [providerFormImage, setProviderFormImage] = useState("");
   const [providerFormPhone, setProviderFormPhone] = useState("");
+  const [providerFormEmail, setProviderFormEmail] = useState("");
+  const [providerFormEmploymentType, setProviderFormEmploymentType] = useState("Full Time");
+  const [providerFormLanguages, setProviderFormLanguages] = useState<string[]>(["Arabic", "English"]);
+  const [providerFormSessionType, setProviderFormSessionType] = useState<"in_clinic" | "online" | "both">("in_clinic");
   const [providerFormGender, setProviderFormGender] = useState<"Male" | "Female" | "">("");
   const [providerFormAge, setProviderFormAge] = useState<string>("");
   const [providerFormSpecialty, setProviderFormSpecialty] = useState("");
@@ -80,8 +84,8 @@ export function useProviderForm({
   const [providerFormBranchSchedules, setProviderFormBranchSchedules] = useState<Record<string, { in_person: any; online: any }>>({});
   const [providerFormSelectedScheduleBranchId, setProviderFormSelectedScheduleBranchId] = useState<string>("");
   const [providerFormStartDate, setProviderFormStartDate] = useState("");
-  const [providerFormWorkingDaysHours, setProviderFormWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string; shifts?: { start: string; end: string }[] }>>({ ...DEFAULT_CLOSED_SCHEDULE });
-  const [providerFormOnlineWorkingDaysHours, setProviderFormOnlineWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string; shifts?: { start: string; end: string }[] }>>({ ...DEFAULT_CLOSED_SCHEDULE });
+  const [providerFormWorkingDaysHours, setProviderFormWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string; breakStart?: string; breakEnd?: string; shifts?: { start: string; end: string }[] }>>({ ...DEFAULT_CLOSED_SCHEDULE });
+  const [providerFormOnlineWorkingDaysHours, setProviderFormOnlineWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string; breakStart?: string; breakEnd?: string; shifts?: { start: string; end: string }[] }>>({ ...DEFAULT_CLOSED_SCHEDULE });
   const [providerFormScheduleTab, setProviderFormScheduleTab] = useState<"in_person" | "online">("in_person");
   const [savingProvider, setSavingProvider] = useState(false);
 
@@ -233,6 +237,11 @@ export function useProviderForm({
     setProviderFormSelectedServices([]);
     setProviderFormImage("");
     setProviderFormPhone("");
+    setProviderFormPhone("");
+    setProviderFormEmail("");
+    setProviderFormEmploymentType("Full Time");
+    setProviderFormLanguages(["Arabic", "English"]);
+    setProviderFormSessionType("in_clinic");
     setProviderFormGender("");
     setProviderFormAge("");
     setProviderFormSpecialty("");
@@ -264,6 +273,10 @@ export function useProviderForm({
     setProviderFormSelectedServices(provider.services || []);
     setProviderFormImage(provider.image || "");
     setProviderFormPhone(provider.phone || "");
+    setProviderFormEmail(provider.email || "");
+    setProviderFormEmploymentType(provider.employmentType || provider.employment_type || "Full Time");
+    setProviderFormLanguages(Array.isArray(provider.languages) && provider.languages.length > 0 ? provider.languages : ["Arabic", "English"]);
+    setProviderFormSessionType(provider.sessionType || provider.session_type || "in_clinic");
     setProviderFormGender(provider.gender || "");
     setProviderFormAge(provider.age ? String(provider.age) : "");
     setProviderFormSpecialty(provider.specialty || "");
@@ -446,6 +459,10 @@ export function useProviderForm({
       more: Math.max(0, providerFormSelectedServices.length - 2),
       image: providerFormImage || null,
       phone: providerFormPhone || null,
+      email: providerFormEmail || null,
+      employment_type: providerFormEmploymentType || 'Full Time',
+      languages: providerFormLanguages,
+      session_type: providerFormSessionType,
       gender: providerFormGender || null,
       age: providerFormAge ? Number(providerFormAge) : null,
       specialty: providerFormSpecialty || null,
@@ -593,6 +610,14 @@ export function useProviderForm({
     setProviderFormImage,
     providerFormPhone,
     setProviderFormPhone,
+    providerFormEmail,
+    setProviderFormEmail,
+    providerFormEmploymentType,
+    setProviderFormEmploymentType,
+    providerFormLanguages,
+    setProviderFormLanguages,
+    providerFormSessionType,
+    setProviderFormSessionType,
     providerFormGender,
     setProviderFormGender,
     providerFormAge,

@@ -18,12 +18,14 @@ import {
   ChevronRight,
   ChevronDown,
   Star,
-  X
+  X,
+  Pencil,
 } from "lucide-react";
 
 export interface DoctorProfileDetailsViewProps {
   doctor: any;
   onBack: () => void;
+  onEdit?: (doctor: any) => void;
   reservations?: any[];
   branches?: any[];
   localServices?: any[];
@@ -32,6 +34,7 @@ export interface DoctorProfileDetailsViewProps {
 export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> = ({
   doctor,
   onBack,
+  onEdit,
   reservations = [],
   branches = [],
   localServices = []
@@ -424,13 +427,24 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
           <span>Back to Doctors</span>
         </button>
 
-        <button
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-2 rounded-2xl border border-[#E6E9EB] bg-white px-4.5 py-2 text-xs font-semibold text-[#1F251A] shadow-xs transition hover:bg-[#F2EFE9]"
-        >
-          <Printer size={16} className="text-[#5A6A51]" />
-          <span>Print Profile</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onEdit && (
+            <button
+              onClick={() => onEdit(doctor)}
+              className="inline-flex items-center gap-2 rounded-2xl border border-[#414E36]/15 bg-white px-4.5 py-2 text-xs font-semibold text-[#1F251A] shadow-xs transition hover:bg-[#F2EFE9] cursor-pointer"
+            >
+              <Pencil size={14} className="text-[#5A6A51]" />
+              <span>Edit Doctor</span>
+            </button>
+          )}
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 rounded-2xl border border-[#E6E9EB] bg-white px-4.5 py-2 text-xs font-semibold text-[#1F251A] shadow-xs transition hover:bg-[#F2EFE9] cursor-pointer"
+          >
+            <Printer size={16} className="text-[#5A6A51]" />
+            <span>Print Profile</span>
+          </button>
+        </div>
       </div>
 
       {/* ── DOCTOR HERO CARD (WITH INTEGRATED PERSONAL INFORMATION) ── */}
