@@ -33,6 +33,7 @@ async function findMatchingEmployeeId(name: string, phone?: string | null): Prom
 }
 
 function mapProvider(p: Record<string, any>, bookingsCount: number = 0) {
+  const wdh = (p.working_days_hours && typeof p.working_days_hours === 'object') ? p.working_days_hours : {};
   return {
     id: p.id,
     name: p.name,
@@ -42,10 +43,10 @@ function mapProvider(p: Record<string, any>, bookingsCount: number = 0) {
     rating: Number(p.rating || 0),
     image: p.image || null,
     phone: p.phone || null,
-    email: p.email || null,
-    employmentType: p.employment_type || p.employmentType || 'Full Time',
-    languages: Array.isArray(p.languages) && p.languages.length > 0 ? p.languages : ['Arabic', 'English'],
-    sessionType: p.session_type || p.sessionType || 'in_clinic',
+    email: p.email || wdh.email || null,
+    employmentType: p.employment_type || p.employmentType || wdh.employment_type || 'Full Time',
+    languages: Array.isArray(p.languages) && p.languages.length > 0 ? p.languages : (Array.isArray(wdh.languages) && wdh.languages.length > 0 ? wdh.languages : ['Arabic', 'English']),
+    sessionType: p.session_type || p.sessionType || wdh.session_type || 'in_clinic',
     active: p.active !== false,
     gender: p.gender || null,
     age: p.age ? Number(p.age) : null,
@@ -342,13 +343,16 @@ export async function PATCH(req: Request) {
   }
 
   const { name, services, rating, more, image, phone, email, employmentType, employment_type, languages, sessionType, session_type, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent, serviceCommissions, active } = body;
+  
+  const rawWdh = (workingDaysHours && typeof workingDaysHours === 'object') ? { ...workingDaysHours } : {};
+  if (email !== undefined) rawWdh.email = email;
+  if (employment_type !== undefined || employmentType !== undefined) rawWdh.employment_type = employment_type || employmentType;
+  if (languages !== undefined) rawWdh.languages = languages;
+  if (session_type !== undefined || sessionType !== undefined) rawWdh.session_type = session_type || sessionType;
+
   const updates: Record<string, any> = {};
   if (active !== undefined) updates.active = Boolean(active);
   if (name !== undefined) updates.name = name;
-  if (email !== undefined) updates.email = email;
-  if (employment_type !== undefined || employmentType !== undefined) updates.employment_type = employment_type || employmentType;
-  if (languages !== undefined) updates.languages = languages;
-  if (session_type !== undefined || sessionType !== undefined) updates.session_type = session_type || sessionType;
   if (services !== undefined) updates.services = services;
   if (rating !== undefined) updates.rating = Number(rating || 0);
   if (more !== undefined) updates.more_count = Number(more || 0);
@@ -358,17 +362,12 @@ export async function PATCH(req: Request) {
   if (age !== undefined) updates.age = age ? Number(age) : null;
   if (specialty !== undefined) updates.specialty = specialty;
   if (nationalId !== undefined) updates.national_id = nationalId;
-  if (workingDaysHours !== undefined) {
-    updates.working_days_hours = workingDaysHours;
-    if (workingDaysHours && typeof workingDaysHours === 'object') {
-      const wdh = workingDaysHours as any;
-      if (Array.isArray(wdh.branch_ids) && wdh.branch_ids.length > 0) {
-        updates.branch_id = wdh.branch_ids[0];
-      } else {
-        updates.branch_id = null;
-      }
-    } else {
-      updates.branch_id = null;
+  if (Object.keys(rawWdh).length > 0 || workingDaysHours !== undefined) {
+    updates.working_days_hours = rawWdh;
+    if (Array.isArray(rawWdh.branch_ids) && rawWdh.branch_ids.length > 0) {
+      updates.branch_id = rawWdh.branch_ids[0];
+    } else if (branchId !== undefined) {
+      updates.branch_id = branchId;
     }
   } else if (branchId !== undefined) {
     updates.branch_id = branchId;
@@ -408,12 +407,25 @@ export async function PATCH(req: Request) {
   }
 
   try {
-    const { data, error } = await supabaseServer
+    let { data, error } = await supabaseServer
       .from('providers')
       .update(updates)
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
+
+    if (!data && name) {
+      const byNameRes = await supabaseServer
+        .from('providers')
+        .update(updates)
+        .eq('name', name)
+        .select()
+        .maybeSingle();
+      if (byNameRes.data) {
+        data = byNameRes.data;
+        error = byNameRes.error;
+      }
+    }
 
     if (!error && data) {
       if (workingDaysHours !== undefined && oldProvider) {
@@ -466,36 +478,18 @@ export async function PATCH(req: Request) {
   try {
     if (fs.existsSync(JSON_FILE_PATH)) {
       const list = JSON.parse(fs.readFileSync(JSON_FILE_PATH, 'utf-8'));
-      const index = list.findIndex((p: any) => p.id === id);
-      if (index !== -1) {
-        // Map camelCase to snake_case updates for fallback JSON storage consistency
-        const jsonUpdates = {
-          ...updates,
-          image: updates.image !== undefined ? updates.image : list[index].image,
-          phone: updates.phone !== undefined ? updates.phone : list[index].phone,
-          gender: updates.gender !== undefined ? updates.gender : list[index].gender,
-          age: updates.age !== undefined ? updates.age : list[index].age,
-          specialty: updates.specialty !== undefined ? updates.specialty : list[index].specialty,
-          nationalId: updates.national_id !== undefined ? updates.national_id : list[index].nationalId,
-          workingDaysHours: updates.working_days_hours !== undefined ? updates.working_days_hours : list[index].workingDaysHours,
-          branchId: updates.branch_id !== undefined ? updates.branch_id : list[index].branchId,
-          startDate: updates.start_date !== undefined ? updates.start_date : list[index].startDate,
-          fixedSalary: updates.fixed_salary !== undefined ? updates.fixed_salary : list[index].fixedSalary,
-          commissionType: updates.commission_type !== undefined ? updates.commission_type : list[index].commissionType,
-          commissionValue: updates.commission_value !== undefined ? updates.commission_value : list[index].commissionValue,
-        };
-
-        list[index] = {
-          ...list[index],
-          ...jsonUpdates,
-          services: updates.services !== undefined ? updates.services : list[index].services,
-          name: updates.name !== undefined ? updates.name : list[index].name,
-          rating: updates.rating !== undefined ? updates.rating : list[index].rating,
-          more: updates.more_count !== undefined ? updates.more_count : list[index].more
-        };
-        fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(list, null, 2));
-        return NextResponse.json(list[index]);
+      let index = list.findIndex((p: any) => p.id === id || (name && p.name && p.name.trim().toLowerCase() === name.trim().toLowerCase()));
+      if (index === -1) {
+        const fallbackProvider = { id, ...updates, name: name || 'Doctor', services: updates.services || [] };
+        list.push(fallbackProvider);
+        index = list.length - 1;
       }
+      list[index] = {
+        ...list[index],
+        ...updates,
+      };
+      fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(list, null, 2));
+      return NextResponse.json(mapProvider(list[index]));
     }
     return NextResponse.json({ error: 'Provider not found' }, { status: 404 });
   } catch (err) {
