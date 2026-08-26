@@ -781,6 +781,27 @@ export default function ProviderFormFields({
                                 }}
                                 className="rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                               />
+                              {dayShifts.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const filtered = dayShifts.filter((_: any, i: number) => i !== shiftIdx);
+                                    setActiveSched({
+                                      ...activeSched,
+                                      [day]: {
+                                        ...sched,
+                                        start: filtered[0]?.start || "09:00",
+                                        end: filtered[0]?.end || "17:00",
+                                        shifts: filtered
+                                      }
+                                    });
+                                  }}
+                                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-red-500 hover:bg-red-50 hover:text-red-700 transition cursor-pointer shrink-0"
+                                  title="Delete this shift"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
                             </div>
                           ))}
 

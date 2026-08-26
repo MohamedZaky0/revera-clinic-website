@@ -43,13 +43,13 @@ export default function DoctorStatusModal({
   return (
     <div
       dir={lang === "ar" ? "rtl" : "ltr"}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget && !saving) onClose();
       }}
     >
       <div
-        className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl flex flex-col gap-4.5 animate-scaleUp text-start border border-[#414E36]/10"
+        className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl flex flex-col gap-4.5 text-start border border-[#414E36]/10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
