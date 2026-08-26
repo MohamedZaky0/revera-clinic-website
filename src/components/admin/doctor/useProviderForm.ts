@@ -497,6 +497,33 @@ export function useProviderForm({
       });
   }
 
+  // ── handleToggleProviderStatus ──
+  async function handleToggleProviderStatus(provider: any) {
+    if (!provider?.id) return;
+    const newStatus = provider.active === false ? true : false;
+
+    // Optimistic local update
+    setProviders(prev => prev.map(p => (p.id === provider.id || p.name === provider.name) ? { ...p, active: newStatus } : p));
+    if (viewingDoctorDetails && (viewingDoctorDetails.id === provider.id || viewingDoctorDetails.name === provider.name)) {
+      setViewingDoctorDetails((prev: any) => prev ? { ...prev, active: newStatus } : null);
+    }
+
+    try {
+      const res = await fetch(`/api/providers?id=${provider.id}`, {
+        method: "PUT",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify({ active: newStatus }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to update doctor status");
+      }
+      fetchProviders();
+    } catch (err) {
+      console.error("handleToggleProviderStatus error:", err);
+      fetchProviders();
+    }
+  }
+
   // ── handleDeleteProvider ──
   async function handleDeleteProvider(id: string) {
     if (!id) return;
@@ -526,6 +553,7 @@ export function useProviderForm({
     providers,
     setProviders,
     fetchProviders,
+    handleToggleProviderStatus,
 
     // Inline & modal state
     editingDoctorInline,

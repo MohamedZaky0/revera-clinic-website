@@ -9,6 +9,7 @@ import {
   Star,
   MoreVertical,
   Pencil,
+  Power,
 } from "lucide-react";
 import { Branch } from "@/types";
 import { DoctorProfileDetailsView } from "@/components/admin/doctor/DoctorProfileDetailsView";
@@ -76,6 +77,7 @@ export default function AdminDoctorsView({
     handleSaveProvider,
     openEditProviderModal,
     handleDeleteProvider,
+    handleToggleProviderStatus,
     showProviderFilterPanel,
     setShowProviderFilterPanel,
     providerFilterBranchId,
@@ -362,18 +364,18 @@ export default function AdminDoctorsView({
                                     <span>{t.editDoctorBtn}</span>
                                   </button>
                                 )}
-                                {provider.id && hasPermission("providers.delete") && (
+                                {hasPermission("providers.edit") && (
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setActiveDoctorRowMenuId(null);
-                                      handleDeleteProvider(provider.id);
+                                      handleToggleProviderStatus(provider);
                                     }}
-                                    className="w-full text-start px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
+                                    className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
                                   >
-                                    <Trash2 size={13} className="text-red-600" />
-                                    <span>{t.deleteDoctorBtn}</span>
+                                    <Power size={13} className="text-[#5A6A51]" />
+                                    <span>{t.changeStatusBtn || "Change Status"}</span>
                                   </button>
                                 )}
                               </div>

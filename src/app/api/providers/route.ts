@@ -332,8 +332,9 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent, serviceCommissions } = body;
+  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent, serviceCommissions, active } = body;
   const updates: Record<string, any> = {};
+  if (active !== undefined) updates.active = Boolean(active);
   if (name !== undefined) updates.name = name;
   if (services !== undefined) updates.services = services;
   if (rating !== undefined) updates.rating = Number(rating || 0);
@@ -427,6 +428,7 @@ export async function PATCH(req: Request) {
             const matchingEmpId = await findMatchingEmployeeId(docName, docPhone);
             if (matchingEmpId) {
               const empUpdates: Record<string, any> = {};
+              if (active !== undefined) empUpdates.active = Boolean(active);
               if (fixedSalary !== undefined) empUpdates.salary = Number(fixedSalary || 0);
               if (phone !== undefined) empUpdates.phone = phone;
               if (nationalId !== undefined) empUpdates.national_id = nationalId;

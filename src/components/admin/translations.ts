@@ -589,6 +589,7 @@ export const adminTranslations = {
         actionsTitle: "Actions",
         editDoctorBtn: "Edit Doctor",
         deleteDoctorBtn: "Delete Doctor",
+        changeStatusBtn: "Change Status",
       },
       providerFormModal: {
         editHeaderLabel: "Edit Doctor / Provider",
@@ -2800,6 +2801,7 @@ export const adminTranslations = {
         actionsTitle: "إجراءات",
         editDoctorBtn: "تعديل الطبيب",
         deleteDoctorBtn: "حذف الطبيب",
+        changeStatusBtn: "تغيير الحالة",
       },
       providerFormModal: {
         editHeaderLabel: "تعديل طبيب / مزود",
