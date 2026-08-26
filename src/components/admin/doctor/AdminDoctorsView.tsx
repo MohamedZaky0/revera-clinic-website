@@ -258,13 +258,14 @@ export default function AdminDoctorsView({
                   <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.colBookings}</th>
                   <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.colServices}</th>
                   <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.colRating}</th>
+                  <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.colStatus || "Status"}</th>
                   <th className="px-4 py-3 whitespace-nowrap"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#414E36]/8">
                 {filteredProviders.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-5 py-8 text-center text-[#5A6A51]">
+                    <td colSpan={6} className="px-5 py-8 text-center text-[#5A6A51]">
                       {t.noProvidersFound}
                     </td>
                   </tr>
@@ -320,6 +321,11 @@ export default function AdminDoctorsView({
                           <span className="inline-flex items-center justify-center gap-1.5 text-[#1F251A] font-semibold text-xs">
                             <Star size={13} className="text-[#C4AE7C] fill-[#C4AE7C]" />
                             {provider.rating}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-center">
+                          <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${provider.active !== false ? "bg-green-50 text-green-700 border-green-200/50" : "bg-red-50 text-red-700 border-red-200/50"}`}>
+                            {provider.active !== false ? (t.activeBadge || "Active") : (t.inactiveBadge || "Inactive")}
                           </span>
                         </td>
                         <td className="px-4 py-4 text-center">

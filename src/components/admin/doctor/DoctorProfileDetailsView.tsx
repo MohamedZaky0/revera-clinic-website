@@ -459,8 +459,8 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-3">
                 <h1 className="text-2xl font-bold text-[#1F251A]">{doctorName}</h1>
-                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200/60">
-                  Active
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${doctor?.active !== false ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" : "bg-red-50 text-red-700 border-red-200/60"}`}>
+                  {doctor?.active !== false ? "Active" : "Inactive"}
                 </span>
               </div>
 
