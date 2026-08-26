@@ -601,6 +601,19 @@ export const adminTranslations = {
         addProviderBtn: "Add Provider",
         cancelBtn: "Cancel",
       },
+      doctorStatusModal: {
+        title: "Change Doctor Status",
+        doctorLabel: "Doctor",
+        accountStatusLabel: "Account Status",
+        active: "Active",
+        activeDescription: "Doctor can receive new bookings",
+        inactive: "Inactive",
+        inactiveDescription: "Doctor cannot receive new bookings",
+        inactiveWarning: "Inactive doctors cannot receive new bookings.",
+        cancelBtn: "Cancel",
+        saveBtn: "Save",
+        savingBtn: "Saving...",
+      },
       providerFormFields: {
         dayNames: {
           Sunday: "Sunday",
@@ -2812,6 +2825,19 @@ export const adminTranslations = {
         saveChangesBtn: "حفظ التغييرات",
         addProviderBtn: "إضافة مزود",
         cancelBtn: "إلغاء",
+      },
+      doctorStatusModal: {
+        title: "تغيير حالة الطبيب",
+        doctorLabel: "الطبيب",
+        accountStatusLabel: "حالة الحساب",
+        active: "نشط",
+        activeDescription: "يمكن للطبيب استقبال حجوزات جديدة",
+        inactive: "غير نشط",
+        inactiveDescription: "لا يمكن للطبيب استقبال حجوزات جديدة",
+        inactiveWarning: "الأطباء غير النشطين لا يمكنهم استقبال حجوزات جديدة.",
+        cancelBtn: "إلغاء",
+        saveBtn: "حفظ",
+        savingBtn: "جاري الحفظ...",
       },
       providerFormFields: {
         dayNames: {

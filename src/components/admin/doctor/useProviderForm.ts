@@ -498,9 +498,9 @@ export function useProviderForm({
   }
 
   // ── handleToggleProviderStatus ──
-  async function handleToggleProviderStatus(provider: any) {
+  async function handleToggleProviderStatus(provider: any, explicitStatus?: boolean) {
     if (!provider?.id) return;
-    const newStatus = provider.active === false ? true : false;
+    const newStatus = explicitStatus !== undefined ? explicitStatus : (provider.active === false ? true : false);
 
     // Optimistic local update
     setProviders(prev => prev.map(p => (p.id === provider.id || p.name === provider.name) ? { ...p, active: newStatus } : p));

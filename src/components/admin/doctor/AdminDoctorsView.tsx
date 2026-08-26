@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useState } from "react";
 import {
   ArrowLeft,
   Trash2,
@@ -15,6 +16,7 @@ import { Branch } from "@/types";
 import { DoctorProfileDetailsView } from "@/components/admin/doctor/DoctorProfileDetailsView";
 import { UseProviderFormReturn } from "@/components/admin/doctor/useProviderForm";
 import ProviderFormFields from "@/components/admin/doctor/ProviderFormFields";
+import DoctorStatusModal from "@/components/admin/doctor/DoctorStatusModal";
 import { adminTranslations } from "@/components/admin/translations";
 
 interface AdminDoctorsViewProps {
@@ -89,6 +91,8 @@ export default function AdminDoctorsView({
     providerSearchQuery,
     setProviderSearchQuery,
   } = providerForm;
+
+  const [statusModalDoctor, setStatusModalDoctor] = useState<any | null>(null);
 
   return (
     <section dir={lang === "ar" ? "rtl" : "ltr"} className="space-y-6">
@@ -370,7 +374,7 @@ export default function AdminDoctorsView({
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setActiveDoctorRowMenuId(null);
-                                      handleToggleProviderStatus(provider);
+                                      setStatusModalDoctor(provider);
                                     }}
                                     className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
                                   >
@@ -390,6 +394,19 @@ export default function AdminDoctorsView({
             </table>
           </div>
         </div>
+      )}
+
+      {statusModalDoctor && (
+        <DoctorStatusModal
+          doctor={statusModalDoctor}
+          onClose={() => setStatusModalDoctor(null)}
+          onSave={async (doc, newStatus) => {
+            await handleToggleProviderStatus(doc, newStatus);
+            setStatusModalDoctor(null);
+          }}
+          lang={lang}
+          t={adminTranslations[lang].doctors.doctorStatusModal}
+        />
       )}
     </section>
   );
