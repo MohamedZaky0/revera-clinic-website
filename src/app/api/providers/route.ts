@@ -504,6 +504,8 @@ export async function PATCH(req: Request) {
   }
 }
 
+export const PUT = PATCH;
+
 export async function DELETE(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
