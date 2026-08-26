@@ -478,13 +478,14 @@ export default function PatientsDirectoryView({
                 </td>
               </tr>
             )}
-            {sortedCustomers.map((c) => {
+            {sortedCustomers.map((c, index) => {
               const bookingInfo = formatLastBooking(c.lastBookingDate, c.lastBookingTime);
               const uniqueKey = c.id || c.email || c.phone;
               const displayPhone = c.mobile || c.phone || "—";
               const displayEmail = c.email || "—";
               const outstandingAmount = Number(c.outstanding) || 0;
               const currency = lang === "ar" ? "ج.م" : "EGP";
+              const isNearBottom = index >= sortedCustomers.length - 2 && sortedCustomers.length > 2;
 
               return (
                 <tr
@@ -561,7 +562,7 @@ export default function PatientsDirectoryView({
                       </button>
 
                       {activeCustomerRowMenuId === uniqueKey && (
-                        <div className="absolute end-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu">
+                        <div className={`absolute end-0 ${isNearBottom ? "bottom-8" : "top-8"} z-[9999] w-36 rounded-xl bg-white p-1 shadow-2xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu`}>
                           {hasPermission("customers.edit") && (
                             <button
                               type="button"
