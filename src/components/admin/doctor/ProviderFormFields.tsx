@@ -28,6 +28,7 @@ import {
 } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import { UseProviderFormReturn } from "@/components/admin/doctor/useProviderForm";
 import { adminTranslations } from "@/components/admin/translations";
+import { getDoctorStatusBadgeClass, getDoctorStatusDotClass } from "@/components/admin/doctor/utils";
 
 interface ProviderFormFieldsProps {
   providerForm: UseProviderFormReturn;
@@ -177,9 +178,7 @@ export default function ProviderFormFields({
               )}
             </div>
             <span
-              className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
-                doctorActive ? "bg-emerald-500" : "bg-red-500"
-              }`}
+              className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${getDoctorStatusDotClass(doctorActive)}`}
             />
           </div>
 
@@ -187,11 +186,7 @@ export default function ProviderFormFields({
             <div className="flex items-center gap-2">
               <span className="font-bold text-[#1F251A] text-lg leading-tight">{doctorName}</span>
               <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold border ${
-                  doctorActive
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : "bg-red-50 text-red-700 border-red-200"
-                }`}
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold border ${getDoctorStatusBadgeClass(doctorActive)}`}
               >
                 {doctorActive ? (lang === "ar" ? "نشط" : "Active") : (lang === "ar" ? "غير نشط" : "Inactive")}
               </span>
@@ -263,14 +258,29 @@ export default function ProviderFormFields({
                   accept="image/png, image/jpeg, image/webp"
                   className="hidden"
                 />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] hover:bg-gray-50 shadow-2xs transition cursor-pointer"
-                >
-                  <Upload size={13} className="text-[#5A6A51]" />
-                  <span>{t.changePhotoBtn || "Change Photo"}</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] hover:bg-gray-50 shadow-2xs transition cursor-pointer"
+                  >
+                    <Upload size={13} className="text-[#5A6A51]" />
+                    <span>{t.changePhotoBtn || "Change Photo"}</span>
+                  </button>
+                  {providerFormImage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProviderFormImage("");
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 shadow-2xs transition cursor-pointer"
+                    >
+                      <Trash2 size={13} className="text-red-600" />
+                      <span>{t.removePhotoBtn || "Remove"}</span>
+                    </button>
+                  )}
+                </div>
                 <p className="text-[10px] text-[#5A6A51]">
                   {t.photoLimitNote || "JPG, PNG or WEBP. Max size 2MB"}
                 </p>

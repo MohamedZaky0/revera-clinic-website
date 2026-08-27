@@ -547,7 +547,11 @@ export default function CustomerFormModal({
             </div>
             <div>
               <h4 className="text-base font-bold text-[#1F251A]">{t.financialSectionTitle || "Financial Information"}</h4>
-              <p className="text-xs text-[#5A6A51]">{t.financialSectionSubtitle || "View the customer's wallet, total spend, and outstanding balances."}</p>
+              <p className="text-xs text-[#5A6A51]">
+                {selectedCustomerForEdit
+                  ? (t.financialSectionSubtitle || "View the customer's wallet, total spend, and outstanding balances.")
+                  : (t.financialSectionSubtitleAdd || "Set an opening balance if this customer already has wallet credit, prior spend, or an outstanding debt.")}
+              </p>
             </div>
           </div>
 
@@ -559,12 +563,18 @@ export default function CustomerFormModal({
                   <Wallet size={16} />
                 </div>
                 <input
-                  type="text"
-                  readOnly
-                  disabled
-                  value={Number(custWallet || 0).toLocaleString("en-US")}
+                  type={selectedCustomerForEdit ? "text" : "number"}
+                  min={selectedCustomerForEdit ? undefined : "0"}
+                  readOnly={Boolean(selectedCustomerForEdit)}
+                  disabled={Boolean(selectedCustomerForEdit)}
+                  value={selectedCustomerForEdit ? Number(custWallet || 0).toLocaleString("en-US") : custWallet}
+                  onChange={(e) => setCustWallet(e.target.value)}
                   placeholder="0"
-                  className="w-full rounded-xl border border-gray-200 bg-[#F7F7F6] px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm font-semibold text-gray-700 outline-none cursor-not-allowed select-none"
+                  className={`w-full rounded-xl border px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm outline-none transition ${
+                    selectedCustomerForEdit
+                      ? "border-gray-200 bg-[#F7F7F6] font-semibold text-gray-700 cursor-not-allowed select-none"
+                      : "bg-white text-[#1F251A] border-[#414E36]/15 focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  }`}
                 />
               </div>
             </div>
@@ -576,12 +586,18 @@ export default function CustomerFormModal({
                   <Coins size={16} />
                 </div>
                 <input
-                  type="text"
-                  readOnly
-                  disabled
-                  value={Number(custSpent || 0).toLocaleString("en-US")}
+                  type={selectedCustomerForEdit ? "text" : "number"}
+                  min={selectedCustomerForEdit ? undefined : "0"}
+                  readOnly={Boolean(selectedCustomerForEdit)}
+                  disabled={Boolean(selectedCustomerForEdit)}
+                  value={selectedCustomerForEdit ? Number(custSpent || 0).toLocaleString("en-US") : custSpent}
+                  onChange={(e) => setCustSpent(e.target.value)}
                   placeholder="0"
-                  className="w-full rounded-xl border border-gray-200 bg-[#F7F7F6] px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm font-semibold text-gray-700 outline-none cursor-not-allowed select-none"
+                  className={`w-full rounded-xl border px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm outline-none transition ${
+                    selectedCustomerForEdit
+                      ? "border-gray-200 bg-[#F7F7F6] font-semibold text-gray-700 cursor-not-allowed select-none"
+                      : "bg-white text-[#1F251A] border-[#414E36]/15 focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  }`}
                 />
               </div>
             </div>
@@ -593,12 +609,18 @@ export default function CustomerFormModal({
                   <Receipt size={16} />
                 </div>
                 <input
-                  type="text"
-                  readOnly
-                  disabled
-                  value={Number(custOutstanding || 0).toLocaleString("en-US")}
+                  type={selectedCustomerForEdit ? "text" : "number"}
+                  min={selectedCustomerForEdit ? undefined : "0"}
+                  readOnly={Boolean(selectedCustomerForEdit)}
+                  disabled={Boolean(selectedCustomerForEdit)}
+                  value={selectedCustomerForEdit ? Number(custOutstanding || 0).toLocaleString("en-US") : custOutstanding}
+                  onChange={(e) => setCustOutstanding(e.target.value)}
                   placeholder="0"
-                  className="w-full rounded-xl border border-gray-200 bg-[#F7F7F6] px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm font-semibold text-gray-700 outline-none cursor-not-allowed select-none"
+                  className={`w-full rounded-xl border px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm outline-none transition ${
+                    selectedCustomerForEdit
+                      ? "border-gray-200 bg-[#F7F7F6] font-semibold text-gray-700 cursor-not-allowed select-none"
+                      : "bg-white text-[#1F251A] border-[#414E36]/15 focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  }`}
                 />
               </div>
             </div>

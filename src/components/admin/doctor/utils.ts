@@ -49,6 +49,17 @@ export const parseBookingNotes = (rawNotes: string) => {
   return { cleanDoctorNote, instaPayLog, productsLog, invoiceLog, extraLogs };
 };
 
+// Single source of truth for the doctor active/inactive status color — three screens
+// (AdminDoctorsView, DoctorProfileDetailsView, ProviderFormFields) previously each hardcoded
+// their own className strings and had drifted (green vs emerald).
+export const getDoctorStatusBadgeClass = (active: boolean) =>
+  active
+    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+    : "bg-red-50 text-red-700 border-red-200/60";
+
+export const getDoctorStatusDotClass = (active: boolean) =>
+  active ? "bg-emerald-500" : "bg-red-500";
+
 export const getAuthHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();
   const headers: Record<string, string> = {

@@ -21,6 +21,7 @@ import {
   X,
   Pencil,
 } from "lucide-react";
+import { getDoctorStatusBadgeClass, getDoctorStatusDotClass } from "@/components/admin/doctor/utils";
 
 export interface DoctorProfileDetailsViewProps {
   doctor: any;
@@ -465,15 +466,15 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                 </div>
               )}
               <span
-                className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-emerald-500 border-2 border-white"
-                title="Active / Online"
+                className={`absolute bottom-1 right-1 h-4 w-4 rounded-full border-2 border-white ${getDoctorStatusDotClass(doctor?.active !== false)}`}
+                title={doctor?.active !== false ? "Active" : "Inactive"}
               />
             </div>
 
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-3">
                 <h1 className="text-2xl font-bold text-[#1F251A]">{doctorName}</h1>
-                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${doctor?.active !== false ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" : "bg-red-50 text-red-700 border-red-200/60"}`}>
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${getDoctorStatusBadgeClass(doctor?.active !== false)}`}>
                   {doctor?.active !== false ? "Active" : "Inactive"}
                 </span>
               </div>

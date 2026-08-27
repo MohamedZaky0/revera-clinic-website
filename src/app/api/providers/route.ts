@@ -12,22 +12,29 @@ const JSON_FILE_PATH = path.join(process.cwd(), 'data', 'providers.json');
 const DEFAULT_PROVIDERS: any[] = [];
 
 async function findMatchingEmployeeId(name: string, phone?: string | null): Promise<string | null> {
+  // employee_accounts.name has no unique constraint — refuse to guess when a name matches more
+  // than one row rather than silently syncing to whichever one Postgres happens to return first
+  // (same "leave it unresolved on ambiguity" policy as reservations.provider_id, see RISK-015).
   const { data: byName } = await supabaseServer
     .from('employee_accounts')
     .select('id')
     .ilike('name', name)
-    .limit(1)
-    .maybeSingle();
-  if (byName) return byName.id;
+    .limit(2);
+  if (byName && byName.length === 1) return byName[0].id;
+  if (byName && byName.length > 1) {
+    console.warn(`findMatchingEmployeeId: ambiguous name match for "${name}" (${byName.length} employee_accounts rows) — refusing to guess`);
+  }
 
   if (phone) {
     const { data: byPhone } = await supabaseServer
       .from('employee_accounts')
       .select('id')
       .eq('phone', phone)
-      .limit(1)
-      .maybeSingle();
-    if (byPhone) return byPhone.id;
+      .limit(2);
+    if (byPhone && byPhone.length === 1) return byPhone[0].id;
+    if (byPhone && byPhone.length > 1) {
+      console.warn(`findMatchingEmployeeId: ambiguous phone match for "${phone}" (${byPhone.length} employee_accounts rows) — refusing to guess`);
+    }
   }
   return null;
 }
@@ -194,6 +201,15 @@ export async function POST(req: Request) {
     }
   }
 
+  // email/employment_type/languages/session_type have no columns on `providers` — stash them
+  // inside working_days_hours JSONB instead (mapProvider() reads them back out of wdh). Mirrors
+  // the same stashing PATCH already does below.
+  const wdhWithExtras: Record<string, any> = (workingDaysHours && typeof workingDaysHours === 'object') ? { ...workingDaysHours } : {};
+  if (email !== undefined) wdhWithExtras.email = email;
+  if (employment_type !== undefined || employmentType !== undefined) wdhWithExtras.employment_type = employment_type || employmentType;
+  if (languages !== undefined) wdhWithExtras.languages = languages;
+  if (session_type !== undefined || sessionType !== undefined) wdhWithExtras.session_type = session_type || sessionType;
+
   const newProvider = {
     name,
     services: services || [],
@@ -202,15 +218,11 @@ export async function POST(req: Request) {
     bookings_count: 0,
     image: image || null,
     phone: phone || null,
-    email: email || null,
-    employment_type: employment_type || employmentType || 'Full Time',
-    languages: Array.isArray(languages) ? languages : ['Arabic', 'English'],
-    session_type: session_type || sessionType || 'in_clinic',
     gender: gender || null,
     age: age ? Number(age) : null,
     specialty: specialty || null,
     national_id: nationalId || null,
-    working_days_hours: workingDaysHours || null,
+    working_days_hours: Object.keys(wdhWithExtras).length > 0 ? wdhWithExtras : null,
     branch_id: finalBranchId,
     start_date: startDate || null,
     fixed_salary: fixedSalary ? Number(fixedSalary) : 0,
@@ -272,7 +284,8 @@ export async function POST(req: Request) {
               if (phone !== undefined) empUpdates.phone = phone;
               if (nationalId !== undefined) empUpdates.national_id = nationalId;
               if (Object.keys(empUpdates).length > 0) {
-                await supabaseServer.from('employee_accounts').update(empUpdates).eq('id', matchingEmpId);
+                const { error: empErr } = await supabaseServer.from('employee_accounts').update(empUpdates).eq('id', matchingEmpId);
+                if (empErr) console.error("Failed to sync provider insert to employee_accounts:", empErr);
               }
             }
           }
@@ -343,8 +356,26 @@ export async function PATCH(req: Request) {
   }
 
   const { name, services, rating, more, image, phone, email, employmentType, employment_type, languages, sessionType, session_type, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent, serviceCommissions, active } = body;
-  
-  const rawWdh = (workingDaysHours && typeof workingDaysHours === 'object') ? { ...workingDaysHours } : {};
+
+  let oldProvider: any = null;
+  try {
+    const { data } = await supabaseServer
+      .from('providers')
+      .select('name, phone, working_days_hours, branch_id')
+      .eq('id', id)
+      .maybeSingle();
+    oldProvider = data;
+  } catch (e) {
+    console.warn("Could not fetch old provider for audit logging:", e);
+  }
+
+  // Base for the merge: when the caller sent a full `workingDaysHours`, that's an authoritative
+  // replacement (base = {}). When they didn't (e.g. a status-only or extras-only PATCH), start
+  // from what's already stored so we merge extras in instead of wiping branch_ids/branch_schedules.
+  const wdhBase: Record<string, any> = (workingDaysHours !== undefined)
+    ? {}
+    : ((oldProvider?.working_days_hours && typeof oldProvider.working_days_hours === 'object') ? { ...oldProvider.working_days_hours } : {});
+  const rawWdh: Record<string, any> = { ...wdhBase, ...((workingDaysHours && typeof workingDaysHours === 'object') ? workingDaysHours : {}) };
   if (email !== undefined) rawWdh.email = email;
   if (employment_type !== undefined || employmentType !== undefined) rawWdh.employment_type = employment_type || employmentType;
   if (languages !== undefined) rawWdh.languages = languages;
@@ -368,6 +399,10 @@ export async function PATCH(req: Request) {
       updates.branch_id = rawWdh.branch_ids[0];
     } else if (branchId !== undefined) {
       updates.branch_id = branchId;
+    } else if (workingDaysHours !== undefined) {
+      // Caller explicitly submitted a schedule with no branches assigned — clear it rather than
+      // leaving the doctor pointing at a branch they were just removed from.
+      updates.branch_id = null;
     }
   } else if (branchId !== undefined) {
     updates.branch_id = branchId;
@@ -394,37 +429,19 @@ export async function PATCH(req: Request) {
     }
   }
 
-  let oldProvider: any = null;
   try {
-    const { data } = await supabaseServer
-      .from('providers')
-      .select('name, working_days_hours')
-      .eq('id', id)
-      .maybeSingle();
-    oldProvider = data;
-  } catch (e) {
-    console.warn("Could not fetch old provider for audit logging:", e);
-  }
-
-  try {
-    let { data, error } = await supabaseServer
+    // `id` is mandatory (400 above) and providers has no unique constraint on `name`, so an
+    // id-scoped update is the only safe write here — a by-name fallback would silently edit
+    // every provider sharing that name if it ever matched more than one row.
+    const { data, error } = await supabaseServer
       .from('providers')
       .update(updates)
       .eq('id', id)
       .select()
       .maybeSingle();
 
-    if (!data && name) {
-      const byNameRes = await supabaseServer
-        .from('providers')
-        .update(updates)
-        .eq('name', name)
-        .select()
-        .maybeSingle();
-      if (byNameRes.data) {
-        data = byNameRes.data;
-        error = byNameRes.error;
-      }
+    if (!error && !data) {
+      return NextResponse.json({ error: 'Provider not found' }, { status: 404 });
     }
 
     if (!error && data) {
@@ -452,13 +469,16 @@ export async function PATCH(req: Request) {
           if (docName) {
             const matchingEmpId = await findMatchingEmployeeId(docName, docPhone);
             if (matchingEmpId) {
+              // Not synced: `active` — employee_accounts has no such column, and nothing reads
+              // it (not /api/employees, not src/lib/access.ts, not the auth routes). This field
+              // is about booking eligibility (translations.ts), not login status.
               const empUpdates: Record<string, any> = {};
-              if (active !== undefined) empUpdates.active = Boolean(active);
               if (fixedSalary !== undefined) empUpdates.salary = Number(fixedSalary || 0);
               if (phone !== undefined) empUpdates.phone = phone;
               if (nationalId !== undefined) empUpdates.national_id = nationalId;
               if (Object.keys(empUpdates).length > 0) {
-                await supabaseServer.from('employee_accounts').update(empUpdates).eq('id', matchingEmpId);
+                const { error: empErr } = await supabaseServer.from('employee_accounts').update(empUpdates).eq('id', matchingEmpId);
+                if (empErr) console.error("Failed to sync provider update to employee_accounts:", empErr);
               }
             }
           }
@@ -467,22 +487,21 @@ export async function PATCH(req: Request) {
         }
       }
       return NextResponse.json(mapProvider(data));
-    } else {
-      console.warn("Supabase providers update error, falling back to JSON:", error);
+    } else if (error) {
+      console.error("Supabase providers update error, falling back to JSON:", error);
     }
   } catch (dbErr) {
     console.error("Database providers update error, falling back to JSON:", dbErr);
   }
 
-  // Fallback to JSON file
+  // Fallback to JSON file — only reached when the Supabase call itself threw (a connection
+  // error), not for a normal "no matching row" case, which already returned 404 above.
   try {
     if (fs.existsSync(JSON_FILE_PATH)) {
       const list = JSON.parse(fs.readFileSync(JSON_FILE_PATH, 'utf-8'));
-      let index = list.findIndex((p: any) => p.id === id || (name && p.name && p.name.trim().toLowerCase() === name.trim().toLowerCase()));
+      const index = list.findIndex((p: any) => p.id === id);
       if (index === -1) {
-        const fallbackProvider = { id, ...updates, name: name || 'Doctor', services: updates.services || [] };
-        list.push(fallbackProvider);
-        index = list.length - 1;
+        return NextResponse.json({ error: 'Provider not found' }, { status: 404 });
       }
       list[index] = {
         ...list[index],

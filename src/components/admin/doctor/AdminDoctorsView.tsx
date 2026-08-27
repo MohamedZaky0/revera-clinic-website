@@ -18,6 +18,7 @@ import { UseProviderFormReturn } from "@/components/admin/doctor/useProviderForm
 import ProviderFormFields from "@/components/admin/doctor/ProviderFormFields";
 import DoctorStatusModal from "@/components/admin/doctor/DoctorStatusModal";
 import { adminTranslations } from "@/components/admin/translations";
+import { getDoctorStatusBadgeClass } from "@/components/admin/doctor/utils";
 
 interface AdminDoctorsViewProps {
   providerForm: UseProviderFormReturn;
@@ -317,7 +318,7 @@ export default function AdminDoctorsView({
                           </span>
                         </td>
                         <td className="px-5 py-4 text-center">
-                          <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${provider.active !== false ? "bg-green-50 text-green-700 border-green-200/50" : "bg-red-50 text-red-700 border-red-200/50"}`}>
+                          <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${getDoctorStatusBadgeClass(provider.active !== false)}`}>
                             {provider.active !== false ? (t.activeBadge || "Active") : (t.inactiveBadge || "Inactive")}
                           </span>
                         </td>
@@ -340,7 +341,7 @@ export default function AdminDoctorsView({
                             </button>
 
                             {activeDoctorRowMenuId === docKey && (
-                              <div className={`absolute end-0 ${isNearBottom ? "bottom-8" : "top-8"} z-[9999] w-36 rounded-xl bg-white p-1 shadow-2xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu`}>
+                              <div className={`absolute end-0 ${isNearBottom ? "bottom-8" : "top-8"} z-[9999] w-40 rounded-xl bg-white p-1 shadow-2xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu`}>
                                 {hasPermission("providers.edit") && (
                                   <button
                                     type="button"
@@ -367,6 +368,20 @@ export default function AdminDoctorsView({
                                   >
                                     <Power size={13} className="text-[#5A6A51]" />
                                     <span>{t.changeStatusBtn || "Change Status"}</span>
+                                  </button>
+                                )}
+                                {provider.id && hasPermission("providers.delete") && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveDoctorRowMenuId(null);
+                                      handleDeleteProvider(provider.id);
+                                    }}
+                                    className="w-full text-start px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
+                                  >
+                                    <Trash2 size={13} className="text-red-600" />
+                                    <span>{t.deleteDoctorBtn}</span>
                                   </button>
                                 )}
                               </div>

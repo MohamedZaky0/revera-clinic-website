@@ -15,7 +15,7 @@
 
 ## Status summary
 
-**11 open** · **13 partially resolved** · **47 resolved** · 71 tracked total.
+**11 open** · **13 partially resolved** · **48 resolved** · 72 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -1058,6 +1058,7 @@ cannot reproduce for new sessions again.
 - [RISK-067](#risk-067) — `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data (RESOLVED)
 - [RISK-069](#risk-069) — Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees (RESOLVED)
 - [RISK-074](#risk-074) — `page.tsx` Had 95 Lines Of UTF-8/Windows-1252 Mojibake-Corrupted Arabic Content (RESOLVED)
+- [RISK-075](#risk-075) — Doctor Status Feature Wrote To A Column No Migration Created, And Three Layers Of Silent Fallback Turned The Failure Into A 200 OK (RESOLVED)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -3096,6 +3097,98 @@ old corrupted defaults, the corruption is now sitting in live data too, and this
 retroactively correct it** — only new/empty rows going forward benefit. Whether the dev/prod
 Supabase `page_settings` and `branches.service_hours` rows already contain corrupted Arabic text
 was not checked as part of this fix (would need a live DB read, a separate, explicit step).
+
+---
+
+## RISK-075: Doctor Status Feature Wrote To A Column No Migration Created, And Three Layers Of Silent Fallback Turned The Failure Into A 200 OK (RESOLVED)
+
+**Severity:** Critical · **Type:** Data integrity / correctness
+**Found:** 2026-08-27, an 8-angle code review (find → 1-vote verify) against commit range
+`78dfc0a..3c6d6c1` (the Doctor Status feature, doctor edit page redesign, and Patients directory
+redesign). **Fixed same day**, planned by an Opus-model agent and executed by Sonnet.
+
+**What it was — the root cause:** `PATCH /api/providers` wrote a boolean `active` field directly
+onto the `providers` table (`src/app/api/providers/route.ts`), but no migration ever added that
+column — it wasn't in `supabase/migrations/` or `ai_docs/DB_SCHEMA.md`. Every Supabase UPDATE
+containing `active` failed with an unknown-column error. Three separate pieces of fallback logic,
+each individually reasonable, combined to turn that hard failure into a silent no-op:
+
+1. On an id-scoped update failure, the code retried with `.update(updates).eq('name', name)` —
+   scoped only by name, with **no uniqueness check**. `providers.name` has no unique constraint, so
+   two same-named doctors meant one edit could silently overwrite the other's salary, national ID,
+   schedule, and status.
+2. When even that failed, the handler fell through to a JSON-file fallback (`data/providers.json`)
+   and wrote the status there instead of the real database — so the toggle appeared to work in the
+   UI but never reached Supabase. `GET` always reads the real table, so the doctor reverted to
+   Active on the next reload.
+3. When the JSON fallback found no matching id/name, it **fabricated and saved a new phantom
+   provider record** instead of returning 404 — turning a real error into a fake success.
+
+**A second, independently broken code path (found during the fix, not the original review):**
+`POST /api/providers` (Add Doctor) inserted `email`, `employment_type`, `languages`, and
+`session_type` as top-level `providers` columns — **none of which exist either**. Unlike `PATCH`
+(which already stashed these into the `working_days_hours` JSONB column), `POST` was never updated
+to match. Locally this silently fell back to `data/providers.json`; on Vercel the filesystem is
+read-only, so `fs.writeFileSync` throws and **Add Doctor returned a 500 in production**.
+
+**Other confirmed defects in the same commit range, fixed in the same pass:**
+- `findMatchingEmployeeId()`'s doctor→`employee_accounts` login-sync lookup matched by
+  `.ilike('name', name).limit(1)` with no scoping — two staff sharing a name risked writing to the
+  wrong employee's account. (Pre-existing before this commit range, but the new Doctor Status
+  feature was the first caller to write anything security-relevant through it.)
+- That same sync's Supabase update result was discarded entirely (`{data, error}` never checked) —
+  a failed sync failed with zero signal anywhere.
+- The `PATCH` schedule-merge logic replaced `working_days_hours` wholesale instead of merging, so a
+  status-only or extras-only PATCH (no `workingDaysHours` in the body) could silently wipe a
+  doctor's stored `branch_ids`/`branch_schedules`. Not triggered by either of today's two call
+  sites, but a live trap for the next caller.
+- The same merge logic dropped the old explicit `branch_id = null` clear when a schedule submitted
+  with no branches assigned, leaving a doctor pointed at a branch they were just removed from.
+- `AdminDoctorsView.tsx`'s "Delete Doctor" action (gated on `providers.delete`) was replaced by
+  "Change Status" (gated on the weaker `providers.edit`), leaving no UI path to delete a doctor
+  record at all.
+- `CustomerFormModal.tsx`'s wallet/spent/outstanding inputs became unconditionally read-only in
+  **both** add and edit mode — new customers could no longer get an initial balance recorded.
+- `ProviderFormFields.tsx`'s photo field lost its clear/remove control when it moved from a text
+  URL input to file-upload-only.
+- The doctor active/inactive status badge rendered a different color (`emerald` vs `green`) on the
+  doctors table vs. the doctor profile page, and the profile page's presence dot was hardcoded green
+  regardless of actual status.
+
+**Fix:**
+- **`supabase/migrations/20260827000000_add_active_to_providers.sql`** — `ALTER TABLE providers ADD
+  COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true`. `ai_docs/DB_SCHEMA.md` updated in the
+  same change (rule 6).
+- **Did not** add `employee_accounts.active` — verified nothing in the codebase reads it (not
+  `/api/employees`, not `src/lib/access.ts`, not the auth routes) and the feature's own copy is
+  about booking eligibility, not login status, so the write was removed instead of adding a second
+  unused column. `DB_SCHEMA.md`'s existing "unconfirmed" note on that column was updated to record
+  this decision so it isn't re-added speculatively.
+- `src/app/api/providers/route.ts`: removed the by-name fallback update (id-only now, 404 on no
+  match); `POST` now stashes email/employment_type/languages/session_type into `working_days_hours`
+  the same way `PATCH` does; JSON fallback no longer fabricates phantom records; the schedule merge
+  now starts from the stored `working_days_hours` when the caller didn't send a full schedule
+  (fixing the wipe risk) and restores the `branch_id = null` clear; `findMatchingEmployeeId` now
+  requires an unambiguous single match (`limit(2)`, refuses to guess on 2+ rows, same policy as
+  `reservations.provider_id` — see RISK-015); both `employee_accounts` sync call sites now check and
+  log their error result instead of discarding it.
+- `AdminDoctorsView.tsx`: restored the Delete Doctor action (`providers.delete`) alongside Change
+  Status (`providers.edit`) — different privilege levels for different-severity actions.
+- `CustomerFormModal.tsx`: wallet/spent/outstanding now editable in add mode, read-only in edit
+  mode, matching the existing pattern already used by the name field.
+- `ProviderFormFields.tsx`: added a Remove button next to Change Photo.
+- New shared `getDoctorStatusBadgeClass()`/`getDoctorStatusDotClass()` in
+  `src/components/admin/doctor/utils.ts`, applied to all three badge sites and both presence dots —
+  one color (`emerald`), one place to change it next time.
+
+**Verification:** `npx tsc --noEmit`, `npx eslint` (0 errors, only pre-existing unrelated warnings),
+`npx vitest run` (635 passing / 7 expected-fail, unchanged), `npx next build` all clean.
+Manual test checklist: `ai_docs/manual_tests/DOCTOR_STATUS_AND_PROVIDERS_FIXES_MANUAL_TESTS.md`.
+
+**Not done in this pass, flagged as a follow-up:** `GET /api/availability` still doesn't filter out
+`active === false` doctors, so an Inactive doctor can still be booked — the feature's own copy
+("Inactive doctors cannot receive new bookings") isn't true yet. Deliberately left out because it
+changes live booking-availability behavior and needs a product decision, not just a bug fix.
 
 ---
 

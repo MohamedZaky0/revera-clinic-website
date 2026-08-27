@@ -280,6 +280,7 @@ read-only `/api/availability`. An admin can double-book a doctor from the panel.
 | `commission_base` | text | Default `'gross'`, CHECK IN (`'gross'`, `'net_of_materials'`) |
 | `commission_fixed_component` | numeric | Default 0 — fixed component when `commission_type = 'both'` |
 | `service_commissions` | JSONB | Default `[]` — per-service commission overrides (`{ service, serviceId?, type, value }[]`); fallback to global commission fields when a service is not listed |
+| `active` | boolean | Default `true`, NOT NULL. **Added 2026-08-27** by `20260827000000_add_active_to_providers.sql`. Doctor account status shown in the Doctors table and profile, set via the Change Status modal. `POST /api/providers` and `PATCH /api/providers` write it directly; `mapProvider()` reads it as `p.active !== false`. |
 | `created_at` | timestamptz | |
 
 ---
@@ -334,8 +335,13 @@ The full page content structure mirrors the `Translation` type in `src/types/ind
 | `created_at` | timestamptz | |
 
 **Note:** an `active` boolean column was referenced in earlier versions of this doc but is not
-created by any migration in `supabase/migrations/` — could not be confirmed against live code
-either. Treat as unconfirmed; verify directly in Supabase before relying on it.
+created by any migration in `supabase/migrations/`. **Resolved 2026-08-27** (code-review follow-up
+on the RISK-075 fix): confirmed nothing in the codebase reads `employee_accounts.active` (not
+`/api/employees`, not `src/lib/access.ts`, not the auth routes), so `PATCH /api/providers`'s
+doctor-status-to-login sync was writing to a column that doesn't exist and that nothing would have
+read anyway — that write was removed rather than adding the column. Do not re-add this column
+speculatively; if a "deactivate this employee's login" feature is built later, design it fresh
+against the actual auth-check call sites.
 
 ---
 
