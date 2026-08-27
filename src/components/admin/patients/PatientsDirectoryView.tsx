@@ -105,9 +105,9 @@ export default function PatientsDirectoryView({
   lang,
   t,
 }: PatientsDirectoryViewProps) {
-  const [sortField, setSortField] = useState<"lastBooking" | "bookings" | "outstanding" | "name" | "status" | null>("lastBooking");
+  const [sortField, setSortField] = useState<"lastBooking" | "bookings" | "wallet" | "outstanding" | "name" | "status" | null>("lastBooking");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [openSortDropdown, setOpenSortDropdown] = useState<"lastBooking" | "outstanding" | null>(null);
+  const [openSortDropdown, setOpenSortDropdown] = useState<"lastBooking" | "wallet" | "outstanding" | null>(null);
 
   // Close sort dropdown when clicking outside
   React.useEffect(() => {
@@ -135,6 +135,8 @@ export default function PatientsDirectoryView({
         comparison = timeA - timeB;
       } else if (sortField === "bookings") {
         comparison = (Number(a.bookings) || 0) - (Number(b.bookings) || 0);
+      } else if (sortField === "wallet") {
+        comparison = (Number(a.wallet) || 0) - (Number(b.wallet) || 0);
       } else if (sortField === "outstanding") {
         comparison = (Number(a.outstanding) || 0) - (Number(b.outstanding) || 0);
       } else if (sortField === "name") {
@@ -400,6 +402,72 @@ export default function PatientsDirectoryView({
                 <span>{t.colBookings}</span>
               </th>
 
+              {/* Wallet Column with Sort Droplist */}
+              <th className="relative px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap select-none sort-dropdown-container">
+                <div className="inline-flex items-center gap-2">
+                  <span>{t.colWallet}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenSortDropdown(prev => prev === "wallet" ? null : "wallet");
+                    }}
+                    className={`inline-flex items-center justify-center h-6 w-6 rounded-lg transition cursor-pointer ${
+                      sortField === "wallet"
+                        ? "bg-[#E6EDE4] text-[#2E5233]"
+                        : "bg-[#F3EFE6] text-[#5A6A51] hover:bg-[#EBE5D8]"
+                    }`}
+                    title={t.sortBy || "Sort by"}
+                  >
+                    <ArrowUpDown size={12} />
+                  </button>
+                </div>
+
+                {openSortDropdown === "wallet" && (
+                  <div className="absolute start-5 top-full mt-1.5 z-50 w-44 rounded-2xl bg-white p-2 shadow-2xl border border-[#414E36]/15 text-xs animate-fadeIn dropdown-action-menu normal-case font-normal text-start">
+                    <div className="px-3 py-1.5 text-[11px] font-semibold text-[#8A9A81] tracking-normal">
+                      {t.sortBy || "Sort by"}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSortField("wallet");
+                        setSortDirection("desc");
+                        setOpenSortDropdown(null);
+                      }}
+                      className={`w-full text-start px-3 py-2 rounded-xl flex items-center justify-between transition cursor-pointer text-xs ${
+                        sortField === "wallet" && sortDirection === "desc"
+                          ? "bg-[#E7EFE6] font-semibold text-[#2E5233]"
+                          : "font-medium text-[#1F251A] hover:bg-[#F9F9F7]"
+                      }`}
+                    >
+                      <span>{t.highToLow || "High to Low"}</span>
+                      <ArrowDown size={14} className={sortField === "wallet" && sortDirection === "desc" ? "text-[#2E5233]" : "text-[#8A9A81]"} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSortField("wallet");
+                        setSortDirection("asc");
+                        setOpenSortDropdown(null);
+                      }}
+                      className={`w-full text-start px-3 py-2 rounded-xl flex items-center justify-between transition cursor-pointer text-xs ${
+                        sortField === "wallet" && sortDirection === "asc"
+                          ? "bg-[#E7EFE6] font-semibold text-[#2E5233]"
+                          : "font-medium text-[#1F251A] hover:bg-[#F9F9F7]"
+                      }`}
+                    >
+                      <span>{t.lowToHigh || "Low to High"}</span>
+                      <ArrowUp size={14} className={sortField === "wallet" && sortDirection === "asc" ? "text-[#2E5233]" : "text-[#8A9A81]"} />
+                    </button>
+                  </div>
+                )}
+              </th>
+
               {/* Outstanding Column with Sort Droplist */}
               <th className="relative px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap select-none sort-dropdown-container">
                 <div className="inline-flex items-center gap-2">
@@ -473,7 +541,7 @@ export default function PatientsDirectoryView({
           <tbody className="divide-y divide-[#414E36]/8">
             {sortedCustomers.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-8 text-center text-[#5A6A51]">
+                <td colSpan={7} className="px-5 py-8 text-center text-[#5A6A51]">
                   {t.noCustomers}
                 </td>
               </tr>
@@ -484,6 +552,7 @@ export default function PatientsDirectoryView({
               const displayPhone = c.mobile || c.phone || "—";
               const displayEmail = c.email || "—";
               const outstandingAmount = Number(c.outstanding) || 0;
+              const walletAmount = Number(c.wallet) || 0;
               const currency = lang === "ar" ? "ج.م" : "EGP";
               const isNearBottom = index >= sortedCustomers.length - 2 && sortedCustomers.length > 2;
 
@@ -520,6 +589,13 @@ export default function PatientsDirectoryView({
                   {/* Bookings Count */}
                   <td className="px-5 py-4 text-center text-sm font-bold text-[#1F251A]">
                     {c.bookings || 0}
+                  </td>
+
+                  {/* Wallet Balance */}
+                  <td className="px-5 py-4 text-start font-semibold text-sm">
+                    <span className="text-[#1F251A] font-bold">
+                      {walletAmount.toLocaleString("en-US")} {currency}
+                    </span>
                   </td>
 
                   {/* Outstanding Balance */}
