@@ -28,6 +28,33 @@ written.
 Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
 (RISK-038 … RISK-050), which is the authoritative account.
 
+### Not a brief — fixes to Windsurf's Doctor Status / Doctor Edit / Patients redesign work (10 commits, 2026-08-25) — found by review, fixed directly 2026-08-27
+
+No brief was issued for this — Windsurf delivered the Doctor Status feature, the doctor edit page
+redesign, and the Patients directory redesign independently (commits `08a7648`…`3c6d6c1`). An 8-angle
+code review against that range found 10 confirmed bugs (2 more surfaced during the fix itself), fixed
+directly rather than sent back as a brief given the severity. Full account: **RISK-075** in
+`RISKS.md`, decision on scope: **DEC-045** in `DECISIONS.md`.
+
+**Worth knowing for future work in this area** (so the same shapes don't recur):
+- **New `providers`/`employee_accounts` fields need a real migration before the API writes to
+  them.** The Doctor Status feature wrote `active` to both tables with no migration for either —
+  every write silently failed and fell back to a local JSON file (`data/providers.json`), so the
+  feature looked like it worked in manual testing but never persisted. Same root cause separately
+  broke `POST /api/providers` entirely (four fields written as columns that don't exist → 500 in
+  production, since Vercel's filesystem is read-only for the JSON fallback). Check
+  `ai_docs/DB_SCHEMA.md` against `supabase/migrations/` before assuming a field exists on a table.
+- **Don't fall back to matching by `name` when an id-scoped lookup misses.** `providers.name` and
+  `employee_accounts.name` have no unique constraints — a by-name fallback update can silently
+  overwrite or misattribute a different row if two records share a name. Prefer a hard 404/error over
+  a guess.
+- **A merge should start from the stored value, not `{}`, when the caller didn't send that field.**
+  The schedule-merge PATCH logic rebuilt `working_days_hours` from only the fields present in the
+  current request, which meant a status-only or extras-only PATCH could silently wipe a doctor's
+  branch assignments. Fetch and spread the existing row when a field is optional in the request.
+- Swapping one action for another in a menu (e.g. "Delete" → "Change Status") should keep both if
+  they serve different purposes — deleting a genuinely duplicate/erroneous record still needs a path.
+
 ### Brief 33 — Give doctor and reception notes their own columns instead of sharing `reservations.notes` (completed 2026-08-24)
 
 Landed in one commit (`7d60b6b`), after one round of review. First submission left the doctor side

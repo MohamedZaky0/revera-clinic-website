@@ -20,8 +20,24 @@
 > any authenticated session, not just staff — found 2026-08-19, fixed 2026-08-24) and the
 > **doctor/reception clinical-notes split** (previously one shared `notes` field with
 > string-concatenated tags — now two dedicated `doctor_notes`/`reception_notes` columns, Brief 33,
-> fixed 2026-08-24). None of the above block launch today — all are already closed. **Only item 2
-> (branch working hours + branch data hygiene) is still open.**
+> fixed 2026-08-24).
+>
+> **Re-verified 2026-08-27 — a bigger one landed since: RISK-075.** A code review of Windsurf's
+> Doctor Status / doctor edit / Patients redesign work (10 commits, 2026-08-25) found the new Doctor
+> Status feature wrote to a `providers.active` column no migration had ever created — every write
+> silently failed and fell back to a local JSON file, so toggling a doctor's status never actually
+> persisted. Worse, **Add Doctor was completely broken**: `POST /api/providers` wrote four fields as
+> columns that also don't exist, which return a 500 in production (Vercel's filesystem is read-only,
+> so even the JSON fallback throws). Fixed 2026-08-27: migration added and pushed live
+> (`providers.active` confirmed present via `information_schema.columns`), the write/fallback logic
+> corrected, plus 4 related regressions in the same commit range (Delete Doctor had no replacement,
+> new-customer opening balance fields were locked to 0, doctor photo had no remove control, status
+> badge color mismatch across screens). Full write-up: RISK-075 in `RISKS.md`. This one **would have
+> blocked reception/admin from reliably onboarding or managing doctors from day one** had it shipped
+> unfixed — flagging it here even though the original audit predates it.
+>
+> None of the above block launch today — all are already closed. **Only item 2 (branch working hours
+> + branch data hygiene) is still open.**
 
 ---
 

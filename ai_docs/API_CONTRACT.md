@@ -1,6 +1,6 @@
 # API_CONTRACT.md — Revera Clinics API Endpoints
 
-> **Last Updated:** 2026-07-29
+> **Last Updated:** 2026-08-27 (`/api/providers` section rewritten to match reality — RISK-075)
 > **Base:** Next.js App Router API routes under `/app/api/`
 > **Auth:** Server-side bearer-token validation is enabled on selected sensitive routes (including employee, role, payroll, reservation PATCH/DELETE, product-sales mutations, every Phase 3 expenses/assets/loans route, and every Phase 4 `/api/finance/*` reporting route — each additionally gated on a specific `finance.*` permission via `hasFinancePermission`, not just staff membership); coverage is not yet universal. All routes use the Supabase service role key server-side
 > **Previous content was for a different project — discarded entirely**
@@ -128,17 +128,33 @@ Deletes a service by numeric ID.
 
 ## GET /api/providers
 
-Returns all providers ordered by name. Seeds defaults into Supabase if empty. Falls back to `data/providers.json` on DB error.
+Returns all providers ordered by name. Auto-syncs any `employee_accounts` row that looks like a
+doctor (`department`/`role_name` matching `%doc%`) into `providers` if missing. Falls back to
+`data/providers.json` on DB error (empty by default).
 
-**Response:** `ProviderRow[]` — `{ id, name, bookings, services, more, rating }`
+**Response:** `ProviderRow[]` — `{ id, name, bookings, services, more, rating, image, phone, email,
+employmentType, languages, sessionType, active, gender, age, specialty, nationalId,
+workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue,
+commissionBase, commissionFixedComponent, serviceCommissions }`. Note: `email`/`employmentType`/
+`languages`/`sessionType` have no dedicated columns — they're read out of the `working_days_hours`
+JSONB blob if present there (see POST/PATCH below), falling back to defaults otherwise.
 
 ---
 
 ## POST /api/providers
 
-Creates a new provider. Falls back to JSON file on DB error.
+Creates a new provider. Requires `requireStaffAccess`. Falls back to `data/providers.json` on DB
+error (this fallback throws on Vercel's read-only filesystem — a DB error here surfaces as a real
+500, not a silent success).
 
-**Body:** `{ name, services?, rating?, more? }`
+**Body:** `{ name, services?, rating?, more?, image?, phone?, email?, employmentType?,
+employment_type?, languages?, sessionType?, session_type?, gender?, age?, specialty?, nationalId?,
+workingDaysHours?, branchId?, startDate?, fixedSalary?, commissionType?, commissionValue?,
+commissionBase?, commissionFixedComponent?, serviceCommissions? }`. `email`/`employmentType`/
+`languages`/`sessionType` are stashed into the `working_days_hours` JSONB column (no dedicated
+columns exist for them — see RISK-075). Also syncs `fixedSalary`/`phone`/`nationalId` to a matching
+`employee_accounts` row if an unambiguous name/phone match is found (does **not** sync `active` —
+see DEC-045).
 
 **Response:** Created provider, status 201
 
@@ -146,17 +162,23 @@ Creates a new provider. Falls back to JSON file on DB error.
 
 ## PATCH /api/providers?id={id}
 
-Updates a provider. Falls back to JSON file on DB error.
+Updates a provider by `id` only (**not** a by-name fallback — removed in RISK-075 since
+`providers.name` has no unique constraint). Requires `requireStaffAccess`.
 
-**Body:** `{ name?, services?, rating?, more? }`
+**Body:** any subset of the POST body fields above, plus `active?` (boolean — the only field with a
+real dedicated column; see `active` in DB_SCHEMA.md's `providers` table). Sending `workingDaysHours`
+replaces the schedule; omitting it merges any of the four stashed extras into the *existing* stored
+schedule rather than wiping it.
 
-**Response:** Updated provider
+**Response:** Updated provider. **404** if `id` doesn't match any provider (both on the Supabase
+path and the JSON fallback path — the JSON fallback no longer fabricates a phantom record on a
+miss).
 
 ---
 
 ## DELETE /api/providers?id={id}
 
-Deletes a provider. Falls back to JSON file on DB error.
+Deletes a provider. Requires `requireStaffAccess`. Falls back to JSON file on DB error.
 
 **Response:** `{ success: true }`
 

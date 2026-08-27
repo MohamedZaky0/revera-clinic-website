@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-08-17 (DEC-043)
+> **Last Updated:** 2026-08-27 (DEC-045)
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -1676,3 +1676,47 @@ independent of anything in this fix); inspected the actual prerendered `index.ht
 and confirmed the script is present in the static HTML alongside the `metadata`-generated `<title>`
 — the two coexist correctly. This decision is now fully closed — no outstanding cost, no deferred
 work remaining.
+
+---
+
+## DEC-045: Doctor Active Status Lives Only On `providers.active`, Not Synced To `employee_accounts`
+
+**Date:** 2026-08-27
+**Status:** Decided and implemented, as part of the RISK-075 fix.
+
+**Context:**
+The new Doctor Status feature (`DoctorStatusModal`, `PATCH /api/providers`) was found, during a
+code review, to be writing `active` to two tables: `providers` (the field the Doctors screen and
+doctor profile actually display) and `employee_accounts` (via a name-matched sync intended to also
+flip the doctor's login/employee record). Neither column existed in any migration — `providers`
+needed one added (see RISK-075); `employee_accounts.active` had been an unconfirmed, never-created
+column referenced only in stale doc text since before this session (`DB_SCHEMA.md`'s prior note on
+it).
+
+**Question:** now that `providers.active` is being properly added via a real migration, should
+`employee_accounts.active` also get a real migration, so "deactivate this doctor" also disables
+their login?
+
+**Investigation:** grepped every auth-relevant call site — `src/app/api/employees/route.ts`,
+`src/lib/access.ts`, and every login/session route — for any read of `employee_accounts.active`.
+None exists. The feature's own translated copy (`src/components/admin/translations.ts`,
+`doctorStatusDescription` keys) describes the consequence as *"Inactive doctors cannot receive new
+bookings"* — nothing about login access. Adding the column and the sync would have created a second
+boolean with no reader, doing nothing while looking like it does something.
+
+**Chosen Option:** `providers.active` is the only status column. The `employee_accounts` sync in
+`PATCH /api/providers` was removed rather than fixed forward. `DB_SCHEMA.md`'s existing note on
+`employee_accounts.active` was updated to record this as a deliberate decision, not just an
+unconfirmed gap, so a future pass doesn't re-add it speculatively.
+
+**Rejected:** adding `employee_accounts.active` now "for consistency" or "to be safe." Rejected
+because it would be dead weight (nothing reads it) and because a real "deactivate this employee's
+login" feature is a materially different piece of work — it needs to hook into the actual auth
+check path (`src/lib/access.ts` / the Supabase Auth session, not just a database flag), which this
+fix's scope did not include.
+
+**Consequence / known gap:** deactivating a doctor today does **not** revoke their ability to log
+into the admin panel — it only removes them from new-booking eligibility (and even that isn't fully
+wired yet, see RISK-075's "not done in this pass" note on `GET /api/availability`). If a real
+account-suspension feature is needed later, design it fresh against the auth call sites rather than
+assuming this flag can be repurposed.

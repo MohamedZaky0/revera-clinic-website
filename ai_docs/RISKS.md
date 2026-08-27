@@ -1,7 +1,7 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-23 (reorganized by status — see summary below; RISK-066/067/069 were
-> resolved same-day and moved to the Resolved section)
+> **Last Updated:** 2026-08-27 (RISK-063 and RISK-075 resolved and moved to the Resolved section;
+> RISK-066/067/069 were resolved 2026-08-23 — see summary below)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -3182,7 +3182,11 @@ read-only, so `fs.writeFileSync` throws and **Add Doctor returned a 500 in produ
   one color (`emerald`), one place to change it next time.
 
 **Verification:** `npx tsc --noEmit`, `npx eslint` (0 errors, only pre-existing unrelated warnings),
-`npx vitest run` (635 passing / 7 expected-fail, unchanged), `npx next build` all clean.
+`npx vitest run` (635 passing / 7 expected-fail, unchanged), `npx next build` all clean. Migration
+pushed live via `npx supabase db push --linked` (2026-08-27) after confirming the linked project was
+the real Revera Clinics database — cross-checked against its distinctive branch fingerprint
+(`home`/`Italy`/`New Cairo Branch`/`Sheikh Zayed Branch`) before pushing, and confirmed post-push via
+`information_schema.columns` that `providers.active` exists as `boolean NOT NULL DEFAULT true`.
 Manual test checklist: `ai_docs/manual_tests/DOCTOR_STATUS_AND_PROVIDERS_FIXES_MANUAL_TESTS.md`.
 
 **Not done in this pass, flagged as a follow-up:** `GET /api/availability` still doesn't filter out

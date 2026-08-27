@@ -1,6 +1,6 @@
 # DB_SCHEMA.md — Revera Clinics Database Schema
 
-> **Last Updated:** 2026-08-13
+> **Last Updated:** 2026-08-27 (`providers.active` added — RISK-075)
 > **Database:** Supabase (PostgreSQL)
 > **Audited from:** `supabase/migrations/*.sql`, live API routes, and a direct linked dev schema dump on 2026-07-26
 > **Previous content was for a different project — discarded entirely**
