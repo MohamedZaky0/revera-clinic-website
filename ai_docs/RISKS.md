@@ -1,7 +1,7 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-27 (RISK-063 and RISK-075 resolved and moved to the Resolved section;
-> RISK-066/067/069 were resolved 2026-08-23 — see summary below)
+> **Last Updated:** 2026-08-28 (RISK-076 added and resolved same day; RISK-063/RISK-075 resolved
+> 2026-08-27; RISK-066/067/069 resolved 2026-08-23 — see summary below)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -15,7 +15,7 @@
 
 ## Status summary
 
-**11 open** · **13 partially resolved** · **48 resolved** · 72 tracked total.
+**11 open** · **13 partially resolved** · **49 resolved** · 73 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -1059,6 +1059,7 @@ cannot reproduce for new sessions again.
 - [RISK-069](#risk-069) — Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees (RESOLVED)
 - [RISK-074](#risk-074) — `page.tsx` Had 95 Lines Of UTF-8/Windows-1252 Mojibake-Corrupted Arabic Content (RESOLVED)
 - [RISK-075](#risk-075) — Doctor Status Feature Wrote To A Column No Migration Created, And Three Layers Of Silent Fallback Turned The Failure Into A 200 OK (RESOLVED)
+- [RISK-076](#risk-076) — Financial Transactions Module: Wrong Column Name Broke Every Real Request, Manual Adjustments Never Applied, Fabricated Demo Data Written To The Real Ledger, No Granular Permission Enforcement (RESOLVED)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -3193,6 +3194,116 @@ Manual test checklist: `ai_docs/manual_tests/DOCTOR_STATUS_AND_PROVIDERS_FIXES_M
 `active === false` doctors, so an Inactive doctor can still be booked — the feature's own copy
 ("Inactive doctors cannot receive new bookings") isn't true yet. Deliberately left out because it
 changes live booking-availability behavior and needs a product decision, not just a bug fix.
+
+---
+
+## RISK-076: Financial Transactions Module: Wrong Column Name Broke Every Real Request, Manual Adjustments Never Applied, Fabricated Demo Data Written To The Real Ledger, No Granular Permission Enforcement (RESOLVED)
+
+**Severity:** Critical · **Type:** Data integrity / correctness / security
+**Found:** 2026-08-28, requested review of commit `22419c3` ("Financial Transactions module,
+manual transaction form, and patient profile tab" — `src/app/api/transactions/route.ts`,
+`src/app/api/transactions/audit-logs/route.ts`, 5 new UI components, a new `transactions` +
+`transaction_audit_logs` migration). Explicitly flagged by Mohamed for extra scrutiny given it
+touches real money. **Fixed same day.**
+
+**What it was — five separate, compounding defects, none of which had any automated test coverage
+before this fix:**
+
+1. **`customers.outstanding_balance` — a column that has never existed.** The real column is
+   `outstanding` (confirmed against `ai_docs/DB_SCHEMA.md` and the live database directly via
+   `information_schema.columns`). `GET`'s customer join, `GET`'s stats query, and `POST`'s customer
+   lookup/update all referenced `outstanding_balance`. Every real `GET` request's Supabase query
+   would error (embedded-resource select on a nonexistent column); every real `POST` for a
+   patient-related transaction type — `payment`, `outstanding_payment`, `refund`, `wallet_topup`,
+   `wallet_deduction`, `adjustment` — would fail the customer lookup and return a misleading 404
+   ("Selected patient could not be found") for a patient that unquestionably exists. This is the
+   same class of bug as RISK-075: a whole feature silently non-functional because of one wrong
+   column name, and every query error was being swallowed and treated as "no data" rather than
+   surfaced.
+2. **`transaction_id` was `Math.floor(1000 + Math.random() * 9000)`** — a random 4-digit number —
+   despite the migration creating `transaction_seq` (`START 1001`) for exactly this purpose. Given
+   `transactions.transaction_id` is `UNIQUE NOT NULL`, this had a realistic collision probability
+   at normal clinic transaction volume (birthday-paradox: ~50% chance of a collision by roughly the
+   80th transaction against a 9,000-value space), which would have surfaced as random, unexplained
+   "Failed to record transaction" errors with no retry logic.
+3. **`GET` silently wrote 9 fabricated "demo" transactions into the real `transactions` table**,
+   attached to real customer ids from the live `customers` table, the first time the Transactions
+   screen was opened on an empty table — fictional payments/refunds/wallet top-ups attributed to
+   real patients, written with no indication to the user that this happened. `GET`'s stats also had
+   hardcoded fallback numbers (`totalOutstanding: 14350`, `totalWalletBalance: 38500`,
+   `todayNetPayments: 25450`, etc. — the exact figures documented as the response example in this
+   commit's own `API_CONTRACT.md` addition, confirming they were never real) that would display
+   indefinitely as long as defect #1 kept the real stats query erroring. The audit-logs endpoint had
+   the same pattern in miniature: on any query error it returned 3 fabricated audit-log entries
+   (fake staff names, fake actions) instead of surfacing the error — actively dangerous for an audit
+   trail, whose entire purpose is to be trustworthy.
+4. **`adjustment` transactions were recorded in the ledger but never changed any customer balance.**
+   The customer-balance-update `if/else if` chain in `POST` had a branch for every type except
+   `adjustment` — despite the type accepting an `adjustment_direction: 'increase' | 'decrease'` body
+   field implying a real balance change. Staff creating a manual balance correction would see it
+   logged as a transaction with zero actual effect.
+5. **No server-side enforcement of the granular `transactions.view` / `transactions.create` /
+   `transactions.refund` / `transactions.export` permissions** this same commit added to
+   `RoleManagementView.tsx`. Both routes only checked `requireStaffAccess` (any registered
+   employee) — the granular permissions existed purely as unused UI decoration. Any staff member,
+   regardless of what they'd actually been granted, could view every transaction, create manual
+   transactions, or process refunds/adjustments by calling the API directly.
+
+**Fix:**
+- All `outstanding_balance` references corrected to `outstanding` (GET's customer join and stats
+  query, POST's customer lookup and balance update). Query errors are now surfaced as real 500s
+  instead of silently swallowed and treated as empty/no-data.
+- New migration **`20260828010000_create_next_transaction_seq_rpc.sql`** adds
+  `next_transaction_seq()`, mirroring the existing `next_invoice_no()` pattern
+  (`20260726010600_create_next_invoice_no_rpc.sql`) — `.rpc()` is the only way `supabase-js` can
+  reach a Postgres sequence's `nextval()`. `POST` now calls it instead of `Math.random()`.
+- Deleted the entire fake-seed-data block from `GET` (~170 lines) and every hardcoded fallback
+  statistic. An empty `transactions` table now correctly returns an empty list and zero-valued
+  stats — `TransactionsView.tsx` already had a proper "No transactions found." empty state, so
+  nothing depended on the fabricated rows. Deleted the fabricated sample audit logs the same way.
+- `adjustment` now updates `wallet_balance` (increase/decrease per `adjustment_direction`, clamped
+  at zero on decrease) and writes a `wallet_txns` row, mirroring `wallet_topup`/`wallet_deduction`.
+  **Assumption flagged, not fully resolved:** the UI has no target-field selector for "Adjustment"
+  (no way to say "adjust wallet" vs. "adjust outstanding"), so wallet was chosen as the most
+  defensible interpretation — `adjustment_direction`'s shape exactly mirrors the wallet types, and
+  it is the most common meaning of a manual balance correction. Revisit if a different target field
+  is ever intended.
+- Added `hasFinancePermission(access, 'transactions.view')` to both GET routes,
+  `'transactions.create'` to POST, and an additional `'transactions.refund'` check specifically for
+  `refund`/`adjustment` transaction types — matching the exact pattern every `/api/finance/*` route
+  already uses (`hasFinancePermission`: superadmin bypasses, everyone else needs the explicit
+  permission).
+- Added a `VALID_TRANSACTION_TYPES` allowlist check so an unrecognized `transaction_type` returns a
+  clean 400 instead of falling through to the database's CHECK constraint and a generic 500.
+
+**Verification:** `npx tsc --noEmit`, `npx eslint` (0 errors), `npx next build` all clean. New
+`tests/routes/transactions.test.ts` (38 tests) covers auth/permission gating for both routes
+(including the transactions.create-vs-transactions.refund split), request validation, the sequence-
+based transaction_id, the balance math for every transaction type including the now-fixed
+`adjustment` case, the audit-log write, and — the regression that matters most here — that `GET` on
+an empty table returns real zero-valued stats and an empty list rather than fabricating data or
+inserting anything. `/api/transactions` and `/api/transactions/audit-logs` also registered in
+`tests/routes/auth-sweep.test.ts`. Full suite: 679 passing, 7 expected-fail (was 635/7).
+
+**Known gaps, not fixed in this pass — flagged for a product/architecture decision:**
+- `ai_docs/PRODUCT_RULES.md`'s own "Financial Transactions & Manual Ledger Rules" (added in the
+  same commit) states refunds "Requires selecting a completed original transaction," but neither
+  the UI (`NewManualTransactionView.tsx`) nor the API actually requires `related_transaction_id` —
+  both treat it as optional. Not enforced here because it's unclear whether this is a genuine
+  business requirement or aspirational documentation, and enforcing it server-side without also
+  changing the UI would make a currently-working manual-refund path (refunding cash never on file
+  as a discrete transaction) start failing.
+- Customer balance reads and writes in `POST` are not atomic (`SELECT` the current balance, then
+  `UPDATE` with a computed new value) — two concurrent requests against the same customer can race
+  (classic TOCTOU: both read the same starting balance, both succeed, one overwrite is lost). This
+  matches the current pattern used throughout the rest of the codebase's balance-mutating routes
+  (none of which have this protection either), so not fixed in isolation here.
+- Manual transactions created through this module update `customers.wallet_balance` /
+  `.outstanding` / `.spent_amount` and write to `wallet_txns`, but do **not** write to the
+  `invoices`/`invoice_lines`/`payments` ledger PROPOSAL-002/RISK-010 established as the financial
+  source of truth. A manual transaction recorded here will not appear in Finance module P&L/reports
+  that read from that ledger — a parallel record-keeping surface, not wired into the rest of the
+  financial reporting stack. A real fix is a larger architectural change beyond this pass's scope.
 
 ---
 

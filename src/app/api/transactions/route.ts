@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
-import { requireStaffAccess } from '@/lib/access';
+import { requireStaffAccess, hasFinancePermission } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 
 export const dynamic = 'force-dynamic';
+
+const VALID_TRANSACTION_TYPES = [
+  'payment', 'outstanding_payment', 'refund', 'wallet_topup', 'wallet_deduction',
+  'service_charge', 'product_purchase', 'adjustment',
+];
 
 function formatTxnId(seqVal: number): string {
   return `TXN-${String(seqVal).padStart(6, '0')}`;
@@ -12,6 +17,9 @@ export async function GET(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+  if (!hasFinancePermission(access.access, 'transactions.view')) {
+    return NextResponse.json({ error: 'Transactions access is required.' }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);
@@ -36,10 +44,10 @@ export async function GET(req: Request) {
       .from('transactions')
       .select(`
         *,
-        customer:customers(id, name, phone, wallet_balance, outstanding_balance, spent_amount),
+        customer:customers(id, name, phone, wallet_balance, outstanding, spent_amount),
         branch:branches(id, name_en, name_ar),
         invoice:invoices(id, invoice_no)
-      `, { count: 'exact' });
+      `);
 
     if (customerId) {
       query = query.eq('customer_id', customerId);
@@ -89,11 +97,11 @@ export async function GET(req: Request) {
       query = query.order('occurred_at', { ascending: sortOrder === 'asc' });
     }
 
-    const { data: rawTxns, count, error: fetchErr } = await query;
+    const { data: rawTxns, error: fetchErr } = await query;
 
     if (fetchErr) {
-      // If table doesn't exist yet or had error, handle gracefully
-      console.warn('transactions fetch error:', fetchErr.message);
+      console.error('transactions fetch error:', fetchErr.message);
+      return NextResponse.json({ error: 'Failed to fetch transactions.' }, { status: 500 });
     }
 
     let items = (rawTxns || []).map((t: any) => ({
@@ -104,7 +112,7 @@ export async function GET(req: Request) {
         name: t.customer.name,
         phone: t.customer.phone,
         wallet_balance: Number(t.customer.wallet_balance || 0),
-        outstanding: Number(t.customer.outstanding_balance || 0),
+        outstanding: Number(t.customer.outstanding || 0),
         spent: Number(t.customer.spent_amount || 0),
       } : null,
       branch: t.branch ? {
@@ -113,178 +121,6 @@ export async function GET(req: Request) {
         name_ar: t.branch.name_ar,
       } : null,
     }));
-
-    // If transactions table is currently empty, seed demonstration records to immediately populate mockup view
-    if (items.length === 0 && (!fetchErr || (count === 0 && !search && dateRange === 'all' && typeFilter === 'all'))) {
-      const { data: dbCustomers } = await supabaseServer
-        .from('customers')
-        .select('id, name, phone, wallet_balance, outstanding_balance, spent_amount')
-        .limit(10);
-
-      const { data: dbBranches } = await supabaseServer
-        .from('branches')
-        .select('id, name_en, name_ar')
-        .limit(3);
-
-      const branch1 = dbBranches?.[0];
-      const branch2 = dbBranches?.[1] || branch1;
-      const c1 = dbCustomers?.[0] || { id: '00000000-0000-0000-0000-000000000001', name: 'Yasser Zaki', phone: '010 1234 5678', wallet_balance: 1000, outstanding_balance: 400, spent_amount: 3250 };
-      const c2 = dbCustomers?.[1] || { id: '00000000-0000-0000-0000-000000000002', name: 'Saif Zaki', phone: '011 9876 5432', wallet_balance: 1000, outstanding_balance: 0, spent_amount: 5000 };
-      const c3 = dbCustomers?.[2] || { id: '00000000-0000-0000-0000-000000000003', name: 'Ahmed Ali', phone: '010 5555 1122', wallet_balance: 200, outstanding_balance: 700, spent_amount: 1400 };
-      const c4 = dbCustomers?.[3] || { id: '00000000-0000-0000-0000-000000000004', name: 'Sara Mohamed', phone: '011 2222 3344', wallet_balance: 0, outstanding_balance: 0, spent_amount: 2200 };
-      const c5 = dbCustomers?.[4] || { id: '00000000-0000-0000-0000-000000000005', name: 'Nourhan Tarek', phone: '012 3456 7890', wallet_balance: 500, outstanding_balance: 0, spent_amount: 900 };
-      const c6 = dbCustomers?.[5] || { id: '00000000-0000-0000-0000-000000000006', name: 'Omar Khaled', phone: '010 7777 8888', wallet_balance: 600, outstanding_balance: 0, spent_amount: 3800 };
-
-      const sampleSeed = [
-        {
-          transaction_id: 'TXN-001045',
-          branch_id: branch1?.id || null,
-          customer_id: c1.id,
-          type: 'payment',
-          description: 'Booking #1045 (General Consultation)',
-          payment_method: 'cash',
-          amount: 500,
-          status: 'completed',
-          source: 'automatic',
-          occurred_at: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
-          created_by_name: 'Sara Reception',
-        },
-        {
-          transaction_id: 'TXN-001044',
-          branch_id: branch1?.id || null,
-          customer_id: c2.id,
-          type: 'wallet_topup',
-          description: 'Wallet recharge',
-          payment_method: 'instapay',
-          amount: 1000,
-          status: 'completed',
-          source: 'manual',
-          occurred_at: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
-          created_by_name: 'Mohamed Said',
-        },
-        {
-          transaction_id: 'TXN-001043',
-          branch_id: branch2?.id || null,
-          customer_id: c3.id,
-          type: 'outstanding_payment',
-          description: 'Invoice #2048 (Physical Therapy)',
-          payment_method: 'vodafone_cash',
-          amount: 700,
-          status: 'pending',
-          source: 'manual',
-          occurred_at: new Date(Date.now() - 140 * 60 * 1000).toISOString(),
-          created_by_name: 'Sara Reception',
-        },
-        {
-          transaction_id: 'TXN-001042',
-          branch_id: branch1?.id || null,
-          customer_id: c4.id,
-          type: 'refund',
-          description: 'Booking #1038 (Skin Laser)',
-          payment_method: 'card',
-          amount: -300,
-          status: 'refunded',
-          source: 'manual',
-          reason: 'Patient requested session cancellation',
-          occurred_at: new Date(Date.now() - 220 * 60 * 1000).toISOString(),
-          created_by_name: 'Admin Manager',
-        },
-        {
-          transaction_id: 'TXN-001041',
-          branch_id: branch1?.id || null,
-          customer_id: c5.id,
-          type: 'service_charge',
-          description: 'Aesthetic Injection',
-          payment_method: 'none',
-          amount: 900,
-          status: 'completed',
-          source: 'automatic',
-          occurred_at: new Date(Date.now() - 300 * 60 * 1000).toISOString(),
-          created_by_name: 'Dr. Sarah',
-        },
-        {
-          transaction_id: 'TXN-001040',
-          branch_id: branch2?.id || null,
-          customer_id: c6.id,
-          type: 'wallet_deduction',
-          description: 'Used for Chemical Peel',
-          payment_method: 'wallet',
-          amount: -400,
-          status: 'completed',
-          source: 'automatic',
-          occurred_at: new Date(Date.now() - 360 * 60 * 1000).toISOString(),
-          created_by_name: 'Sara Reception',
-        },
-        {
-          transaction_id: 'TXN-001039',
-          branch_id: branch1?.id || null,
-          customer_id: c1.id,
-          type: 'outstanding_payment',
-          description: 'Previous balance settlement',
-          payment_method: 'card',
-          amount: 400,
-          status: 'completed',
-          source: 'manual',
-          occurred_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          created_by_name: 'Mohamed Said',
-        },
-        {
-          transaction_id: 'TXN-001038',
-          branch_id: branch1?.id || null,
-          customer_id: c1.id,
-          type: 'wallet_topup',
-          description: 'Wallet top-up deposit',
-          payment_method: 'cash',
-          amount: 1000,
-          status: 'completed',
-          source: 'manual',
-          occurred_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
-          created_by_name: 'Sara Reception',
-        },
-        {
-          transaction_id: 'TXN-001037',
-          branch_id: branch1?.id || null,
-          customer_id: c1.id,
-          type: 'refund',
-          description: 'Booking refund',
-          payment_method: 'card',
-          amount: -250,
-          status: 'refunded',
-          source: 'manual',
-          reason: 'Postponed appointment deposit refund',
-          occurred_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          created_by_name: 'Admin Manager',
-        }
-      ];
-
-      // Try inserting seed records into database
-      try {
-        await supabaseServer.from('transactions').insert(sampleSeed);
-        // Re-query after insertion
-        const { data: reQuery } = await query;
-        if (reQuery && reQuery.length > 0) {
-          items = reQuery.map((t: any) => ({
-            ...t,
-            invoice_no: t.invoice?.invoice_no || null,
-            customer: t.customer ? {
-              id: t.customer.id,
-              name: t.customer.name,
-              phone: t.customer.phone,
-              wallet_balance: Number(t.customer.wallet_balance || 0),
-              outstanding: Number(t.customer.outstanding_balance || 0),
-              spent: Number(t.customer.spent_amount || 0),
-            } : null,
-            branch: t.branch ? {
-              id: t.branch.id,
-              name_en: t.branch.name_en,
-              name_ar: t.branch.name_ar,
-            } : null,
-          }));
-        }
-      } catch (seedErr) {
-        console.warn('Seed insert fallback note:', seedErr);
-      }
-    }
 
     // Client-side search filtering (for joined customer name/phone or description)
     if (search) {
@@ -326,7 +162,7 @@ export async function GET(req: Request) {
     // Query all customers for outstanding and wallet balances within branch scope
     let custQuery = supabaseServer
       .from('customers')
-      .select('id, wallet_balance, outstanding_balance, spent_amount');
+      .select('id, wallet_balance, outstanding, spent_amount');
     if (branchId !== 'all' && branchId) {
       custQuery = custQuery.eq('branch_id', branchId);
     }
@@ -338,7 +174,7 @@ export async function GET(req: Request) {
     let activeWalletCount = 0;
 
     (allCustomers || []).forEach((c: any) => {
-      const out = Number(c.outstanding_balance || 0);
+      const out = Number(c.outstanding || 0);
       const wal = Number(c.wallet_balance || 0);
       if (out > 0) {
         totalOutstanding += out;
@@ -349,14 +185,6 @@ export async function GET(req: Request) {
         activeWalletCount += 1;
       }
     });
-
-    // Fallbacks if no customers in DB yet
-    if (totalOutstanding === 0 && (!allCustomers || allCustomers.length === 0)) {
-      totalOutstanding = 14350;
-      outstandingCount = 12;
-      totalWalletBalance = 38500;
-      activeWalletCount = 24;
-    }
 
     // Compute Today's Net Payments = Completed Payments Today - Completed Refunds Today
     const todayStartIso = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -373,22 +201,17 @@ export async function GET(req: Request) {
       todayTxnsQuery = todayTxnsQuery.eq('branch_id', branchId);
     }
 
-    const { data: todayTxns } = await todayTxnsQuery;
+    const { data: todayTxns, error: todayTxnsErr } = await todayTxnsQuery;
+    if (todayTxnsErr) console.error('today txns fetch error:', todayTxnsErr.message);
 
     let todayNetPayments = 0;
     let todayPaymentsCount = 0;
 
-    if (todayTxns && todayTxns.length > 0) {
-      todayTxns.forEach((tx: any) => {
-        const amt = Number(tx.amount || 0);
-        todayNetPayments += amt;
-        todayPaymentsCount += 1;
-      });
-    } else {
-      // Demo fallback matching mockup
-      todayNetPayments = 25450;
-      todayPaymentsCount = 18;
-    }
+    (todayTxns || []).forEach((tx: any) => {
+      const amt = Number(tx.amount || 0);
+      todayNetPayments += amt;
+      todayPaymentsCount += 1;
+    });
 
     // Patient specific stats if customerId provided
     let patientStats = {};
@@ -402,9 +225,9 @@ export async function GET(req: Request) {
           .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
       }
       patientStats = {
-        totalSpent: spent || 3250,
-        patientOutstanding: Number(selectedCustomer?.outstanding_balance || 400),
-        patientWalletBalance: Number(selectedCustomer?.wallet_balance || 1000),
+        totalSpent: spent,
+        patientOutstanding: Number(selectedCustomer?.outstanding || 0),
+        patientWalletBalance: Number(selectedCustomer?.wallet_balance || 0),
         patientTransactionsCount: patientTransactions.length,
       };
     }
@@ -437,6 +260,9 @@ export async function POST(req: Request) {
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
+  if (!hasFinancePermission(access.access, 'transactions.create')) {
+    return NextResponse.json({ error: 'Permission to create transactions is required.' }, { status: 403 });
+  }
 
   try {
     const body = await req.json();
@@ -459,6 +285,15 @@ export async function POST(req: Request) {
 
     if (!transaction_type) {
       return NextResponse.json({ error: 'Transaction Type is required.' }, { status: 400 });
+    }
+    if (!VALID_TRANSACTION_TYPES.includes(transaction_type)) {
+      return NextResponse.json({ error: `Unknown transaction type "${transaction_type}".` }, { status: 400 });
+    }
+
+    // Refunds and manual balance adjustments are gated separately from ordinary transaction
+    // creation, per the transactions.refund permission defined in RoleManagementView.
+    if ((transaction_type === 'refund' || transaction_type === 'adjustment') && !hasFinancePermission(access.access, 'transactions.refund')) {
+      return NextResponse.json({ error: 'Permission to process refunds/adjustments is required.' }, { status: 403 });
     }
 
     const parsedAmount = Number(amount);
@@ -485,11 +320,15 @@ export async function POST(req: Request) {
     if (customer_id) {
       const { data: custData, error: custErr } = await supabaseServer
         .from('customers')
-        .select('id, name, phone, wallet_balance, outstanding_balance, spent_amount')
+        .select('id, name, phone, wallet_balance, outstanding, spent_amount')
         .eq('id', customer_id)
         .maybeSingle();
 
-      if (custErr || !custData) {
+      if (custErr) {
+        console.error('customer lookup error:', custErr.message);
+        return NextResponse.json({ error: 'Could not look up the selected patient.' }, { status: 500 });
+      }
+      if (!custData) {
         return NextResponse.json({ error: 'Selected patient could not be found.' }, { status: 404 });
       }
       customer = custData;
@@ -501,7 +340,7 @@ export async function POST(req: Request) {
     let finalDescription = description?.trim() || '';
 
     if (transaction_type === 'outstanding_payment') {
-      const currentOutstanding = Number(customer?.outstanding_balance || 0);
+      const currentOutstanding = Number(customer?.outstanding || 0);
       if (parsedAmount > currentOutstanding) {
         return NextResponse.json({
           error: `Amount exceeds the patient's outstanding balance of EGP ${currentOutstanding.toLocaleString()}.`
@@ -554,9 +393,15 @@ export async function POST(req: Request) {
       finalDescription = finalDescription || 'Manual payment receipt';
     }
 
-    // Generate formatted transaction ID
-    const randomSeq = Math.floor(1000 + Math.random() * 9000);
-    const txnIdString = formatTxnId(randomSeq);
+    // Generate formatted transaction ID from the real transaction_seq sequence (atomic,
+    // race-condition-free — a random number here would collide against transaction_id's UNIQUE
+    // constraint at realistic transaction volume).
+    const { data: seqVal, error: seqErr } = await supabaseServer.rpc('next_transaction_seq');
+    if (seqErr || seqVal == null) {
+      console.error('next_transaction_seq RPC error:', seqErr);
+      return NextResponse.json({ error: 'Failed to generate a transaction ID.' }, { status: 500 });
+    }
+    const txnIdString = formatTxnId(Number(seqVal));
 
     const staffName = access.access.employee?.email?.split('@')[0] || 'Staff User';
 
@@ -596,7 +441,7 @@ export async function POST(req: Request) {
     // Update Customer scalar balances
     if (customer_id && customer) {
       let newWallet = customer.wallet_balance || 0;
-      let newOutstanding = customer.outstanding_balance ?? customer.outstanding ?? 0;
+      let newOutstanding = customer.outstanding || 0;
       let newSpent = customer.spent_amount || 0;
 
       if (transaction_type === 'wallet_topup') {
@@ -624,13 +469,31 @@ export async function POST(req: Request) {
         newSpent += parsedAmount;
       } else if (transaction_type === 'refund') {
         newSpent = Math.max(0, newSpent - parsedAmount);
+      } else if (transaction_type === 'adjustment') {
+        // No target-field selector exists in the UI for "Adjustment" — adjustment_direction
+        // mirrors wallet_topup/wallet_deduction's exact shape, so this treats a manual adjustment
+        // as a wallet correction (the most common interpretation, and consistent with every other
+        // signed-amount type here moving a real balance). Revisit if a different target field is
+        // ever intended.
+        if (adjustment_direction === 'decrease') {
+          newWallet = Math.max(0, newWallet - parsedAmount);
+        } else {
+          newWallet += parsedAmount;
+        }
+        await supabaseServer.from('wallet_txns').insert({
+          customer_id,
+          direction: adjustment_direction === 'decrease' ? 'out' : 'in',
+          amount: parsedAmount,
+          reason: finalDescription || 'Manual balance adjustment',
+          invoice_id: invoice_id || null,
+        });
       }
 
       await supabaseServer
         .from('customers')
         .update({
           wallet_balance: newWallet,
-          outstanding_balance: newOutstanding,
+          outstanding: newOutstanding,
           spent_amount: newSpent,
           updated_at: new Date().toISOString(),
         })

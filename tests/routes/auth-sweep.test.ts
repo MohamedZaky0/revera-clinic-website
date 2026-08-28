@@ -124,6 +124,8 @@ import * as ServiceRooms from '@/app/api/service-rooms/route';
 import * as Services from '@/app/api/services/route';
 import * as Suppliers from '@/app/api/suppliers/route';
 import * as Terms from '@/app/api/terms/route';
+import * as TransactionsAuditLogs from '@/app/api/transactions/audit-logs/route';
+import * as Transactions from '@/app/api/transactions/route';
 import * as Translate from '@/app/api/translate/route';
 
 type Guard = 'staff' | 'admin' | 'hr' | 'caller' | 'public' | 'gap-weak-auth';
@@ -215,6 +217,8 @@ const REGISTRY: RouteEntry[] = [
   { path: '/api/services', methods: [M('GET', Services.GET, 'public'), M('POST', Services.POST, 'staff'), M('DELETE', Services.DELETE, 'staff')] },
   { path: '/api/suppliers', methods: [M('GET', Suppliers.GET, 'staff'), M('POST', Suppliers.POST, 'staff'), M('PUT', Suppliers.PUT, 'staff'), M('DELETE', Suppliers.DELETE, 'staff')] },
   { path: '/api/terms', methods: [M('GET', Terms.GET, 'public'), M('POST', Terms.POST, 'admin'), M('PUT', Terms.PUT, 'admin'), M('DELETE', Terms.DELETE, 'admin')] },
+  { path: '/api/transactions', methods: [M('GET', Transactions.GET, 'staff'), M('POST', Transactions.POST, 'staff')] },
+  { path: '/api/transactions/audit-logs', methods: [M('GET', TransactionsAuditLogs.GET, 'staff')] },
   { path: '/api/translate', methods: [M('POST', Translate.POST, 'staff')] },
 ];
 
@@ -340,6 +344,6 @@ describe('registry sanity', () => {
     // This count is the acceptance criterion for "table-driven auth sweep across all handlers" —
     // if it drifts, either a route was added (add it to REGISTRY) or removed (delete its row).
     const total = ROWS.length;
-    expect(total).toBe(149);
+    expect(total).toBe(152);
   });
 });

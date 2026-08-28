@@ -1,6 +1,6 @@
 # API_CONTRACT.md — Revera Clinics API Endpoints
 
-> **Last Updated:** 2026-08-27 (`/api/providers` section rewritten to match reality — RISK-075)
+> **Last Updated:** 2026-08-28 (`/api/transactions*` section corrected to match reality — RISK-076)
 > **Base:** Next.js App Router API routes under `/app/api/`
 > **Auth:** Server-side bearer-token validation is enabled on selected sensitive routes (including employee, role, payroll, reservation PATCH/DELETE, product-sales mutations, every Phase 3 expenses/assets/loans route, and every Phase 4 `/api/finance/*` reporting route — each additionally gated on a specific `finance.*` permission via `hasFinancePermission`, not just staff membership); coverage is not yet universal. All routes use the Supabase service role key server-side
 > **Previous content was for a different project — discarded entirely**
@@ -1595,7 +1595,11 @@ separately under `walkIn`, never silently folded into either bucket.
 
 ## GET /api/transactions
 
-Requires staff access. Returns paginated financial transactions with customer and branch joins, plus aggregated overview statistics.
+Requires staff access **and** the `transactions.view` permission (superadmin bypasses, everyone
+else needs it explicitly granted — see `hasFinancePermission`, same pattern as every `/api/finance/*`
+route). Returns paginated financial transactions with customer and branch joins, plus aggregated
+overview statistics. An empty `transactions` table returns an empty list and zero-valued stats —
+does **not** seed or fabricate any data (RISK-076).
 
 **Query params:**
 - `search?`: string (matches transaction ID, invoice number, customer name, customer phone, reference, or description)
@@ -1633,49 +1637,66 @@ Requires staff access. Returns paginated financial transactions with customer an
   "page": 1,
   "totalPages": 8,
   "stats": {
-    "todayNetPayments": 25450,
-    "todayPaymentsCount": 18,
-    "totalOutstanding": 14350,
-    "outstandingCount": 12,
-    "totalWalletBalance": 38500,
-    "activeWalletCount": 24,
-    "totalSpent": 3250,
-    "patientOutstanding": 400,
-    "patientWalletBalance": 1000
+    "todayNetPayments": 0,
+    "todayPaymentsCount": 0,
+    "totalOutstanding": 0,
+    "outstandingCount": 0,
+    "totalWalletBalance": 0,
+    "activeWalletCount": 0,
+    "totalSpent": 0,
+    "patientOutstanding": 0,
+    "patientWalletBalance": 0
   }
 }
 ```
+`stats` fields are always computed from real `customers`/`transactions` rows — the figures shown
+here are illustrative zeros, not example data (an earlier version of this doc showed the module's
+old hardcoded demo fallback numbers verbatim; those were removed as part of RISK-076).
 
 ---
 
 ## POST /api/transactions
 
-Requires staff access. Manually creates a financial transaction, updates customer balances, and writes to corresponding financial ledgers (`wallet_txns`, `payments`).
+Requires staff access **and** the `transactions.create` permission; `refund` and `adjustment`
+additionally require `transactions.refund`. Manually creates a financial transaction and updates
+`customers.wallet_balance` / `.outstanding` / `.spent_amount`, writing to `wallet_txns` for
+wallet-moving types (`wallet_topup`, `wallet_deduction`, `adjustment`). **Does not** write to
+`invoices`/`invoice_lines`/`payments` — a manual transaction recorded here will not appear in
+Finance module P&L/reports, which read from that ledger (see RISK-076's "known gaps").
+
+`transaction_id` is generated from the real `transaction_seq` Postgres sequence via the
+`next_transaction_seq()` RPC (`TXN-001045`, ...) — atomic and collision-free.
 
 **Body:**
 ```json
 {
-  "transaction_type": "payment | outstanding_payment | refund | wallet_topup | wallet_deduction | adjustment",
+  "transaction_type": "payment | outstanding_payment | refund | wallet_topup | wallet_deduction | adjustment | service_charge | product_purchase",
   "customer_id": "uuid",
   "amount": 1000,
   "payment_method": "cash | card | instapay | vodafone_cash | wallet | bank_transfer",
   "branch_id": "uuid",
   "reference_no": "REC-10023",
-  "related_transaction_id": "uuid (for refund/adjustment)",
+  "related_transaction_id": "uuid (optional, for refund)",
   "description": "Session payment",
   "reason": "Required for refund/adjustment",
   "adjustment_direction": "increase | decrease",
   "occurred_at": "YYYY-MM-DDTHH:mm:ss.sssZ"
 }
 ```
+`customer_id` is required for every type except `service_charge`/`product_purchase` (those are
+meant to be created automatically elsewhere; this endpoint accepts them with no customer-balance
+effect). `adjustment` moves `wallet_balance` per `adjustment_direction` — see RISK-076 for why
+wallet was chosen as the target field.
 
-**Response:** `{ "success": true, "transaction": Transaction, "message": "Transaction created successfully." }`
+**Response:** `{ "success": true, "transaction": Transaction, "message": "Transaction created successfully." }` on success, or `{ "error": string }` with a 400/403/404/500 status — 404 means the given `customer_id` genuinely doesn't exist, not a query failure.
 
 ---
 
 ## GET /api/transactions/audit-logs
 
-Requires staff access. Returns immutable audit records for financial transactions.
+Requires staff access **and** the `transactions.view` permission. Returns immutable audit records
+for financial transactions. Returns a 500 with `{ error }` on a real query failure — does not
+fabricate sample log entries (RISK-076).
 
 **Query params:** `transactionId?`, `limit?` (default 50)
 

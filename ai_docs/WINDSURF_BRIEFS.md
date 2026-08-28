@@ -28,6 +28,39 @@ written.
 Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
 (RISK-038 … RISK-050), which is the authoritative account.
 
+### Not a brief — fixes to Windsurf's Financial Transactions module (commit `22419c3`, 2026-08-28) — found by review, fixed directly same day
+
+Mohamed explicitly asked for extra scrutiny on this one given it moves real money. Full account:
+**RISK-076** in `RISKS.md`. Five compounding defects, none caught before shipping because the
+module had zero automated tests:
+
+1. **`customers.outstanding_balance` referenced throughout — that column has never existed** (the
+   real one is `outstanding`). Broke the customer join in `GET`, the stats query, and the customer
+   lookup in `POST` — every real request against this feature failed, and the failures were
+   swallowed rather than surfaced.
+2. **`transaction_id` was `Math.random()`**, not the `transaction_seq` sequence the migration
+   created for exactly this purpose — a real collision risk against a `UNIQUE` column.
+3. **`GET` wrote 9 fabricated "demo" transactions into the real table**, attached to real customer
+   ids, the first time the screen opened on an empty table — plus hardcoded fallback stats matching
+   those same demo numbers, and a fabricated fallback audit log on query error.
+4. **`adjustment` transactions were logged but never changed any customer balance** — the
+   customer-balance-update branch simply didn't exist for that type.
+5. **The granular `transactions.view`/`create`/`refund` permissions added to `RoleManagementView.tsx`
+   in the same commit were never checked anywhere** — pure UI decoration; any staff member could hit
+   the API directly regardless of what they'd been granted.
+
+**Worth knowing for future work touching money:**
+- Before writing to or reading from any table column, double check it against `ai_docs/DB_SCHEMA.md`
+  (and ideally the live schema) — a wrong column name fails the whole query, and if the error is
+  swallowed (a `console.warn` instead of returning it) the feature just silently does nothing.
+- Never seed "demo" or placeholder data into a real table from a GET handler as a fallback for "no
+  data yet" — render an empty state client-side instead. This is doubly true for a financial ledger.
+- When a new permission is added to `RoleManagementView.tsx`, it isn't enforced anywhere by itself —
+  the API route has to actually call `hasFinancePermission(access, 'the.permission')`.
+- Every signed-amount transaction type needs a real branch in the balance-update logic — a type that
+  compiles and validates but silently no-ops on the actual money movement is the most dangerous kind
+  of bug in this class of feature.
+
 ### Not a brief — fixes to Windsurf's Doctor Status / Doctor Edit / Patients redesign work (10 commits, 2026-08-25) — found by review, fixed directly 2026-08-27
 
 No brief was issued for this — Windsurf delivered the Doctor Status feature, the doctor edit page
