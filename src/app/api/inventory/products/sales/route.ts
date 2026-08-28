@@ -4,6 +4,7 @@ import { deductInventoryStock } from '@/app/api/inventory/products/route';
 import { requireStaffAccess } from '@/lib/access';
 import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/ledger';
 import { recordWalletMovement } from '@/lib/wallet';
+import { recordTransaction } from '@/lib/transactionLedger';
 
 export const dynamic = 'force-dynamic';
 
@@ -332,6 +333,28 @@ async function writePosSaleInvoice(sale: ProductSaleRecord, receivedByEmployeeId
         received_by_employee_id: receivedByEmployeeId,
       });
     if (paymentError) throw paymentError;
+
+    // Customer-facing history (RISK-076): the purchase itself, plus the cash that settled it.
+    await recordTransaction({
+      type: 'product_purchase',
+      amount: sale.total_amount,
+      description: `${sale.product_name} × ${sale.quantity}`,
+      customerId: sale.customer_id,
+      branchId,
+      invoiceId: invoice.id,
+      paymentMethod: 'none',
+      createdByEmployeeId: receivedByEmployeeId,
+    });
+    await recordTransaction({
+      type: 'payment',
+      amount: sale.total_amount,
+      description: `Payment for ${sale.product_name}`,
+      customerId: sale.customer_id,
+      branchId,
+      invoiceId: invoice.id,
+      paymentMethod: toPaymentMethod(sale.payment_method),
+      createdByEmployeeId: receivedByEmployeeId,
+    });
   }
 }
 

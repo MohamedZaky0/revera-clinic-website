@@ -207,13 +207,36 @@ export async function GET(req: Request) {
     const { data: todayTxns, error: todayTxnsErr } = await todayTxnsQuery;
     if (todayTxnsErr) console.error('today txns fetch error:', todayTxnsErr.message);
 
+    // "Today's Payments" is a till figure — the cash that actually moved in or out today, which is
+    // what reception reconciles the drawer against at close. Only these types represent real money
+    // changing hands; `service_charge`/`product_purchase` are charges raised (billed, not
+    // collected) and `wallet_deduction` spends credit the clinic already banked at top-up time.
+    // Counting all types indiscriminately, as an earlier version did, inflated the figure with
+    // non-cash rows and subtracted wallet spend that never left the drawer (RISK-076).
+    const CASH_IN_TYPES = new Set(['payment', 'outstanding_payment', 'wallet_topup']);
     let todayNetPayments = 0;
     let todayPaymentsCount = 0;
 
     (todayTxns || []).forEach((tx: any) => {
       const amt = Number(tx.amount || 0);
-      todayNetPayments += amt;
-      todayPaymentsCount += 1;
+      if (CASH_IN_TYPES.has(tx.type)) {
+        todayNetPayments += amt;
+        todayPaymentsCount += 1;
+      } else if (tx.type === 'refund') {
+        // Already stored negative; adding it subtracts the cash handed back.
+        todayNetPayments += amt;
+        todayPaymentsCount += 1;
+      }
+    });
+
+    // "Estimated" sits under the till figure as a comparison: the full value of everything charged
+    // today, whether or not it has been collected yet. A patient booking a 30,000 course and paying
+    // 5,000 up front shows 5,000 collected against 30,000 charged.
+    let todayEstimatedTotal = 0;
+    (todayTxns || []).forEach((tx: any) => {
+      if (tx.type === 'service_charge' || tx.type === 'product_purchase') {
+        todayEstimatedTotal += Number(tx.amount || 0);
+      }
     });
 
     // Patient specific stats if customerId provided
@@ -238,6 +261,7 @@ export async function GET(req: Request) {
     const stats = {
       todayNetPayments,
       todayPaymentsCount,
+      todayEstimatedTotal,
       totalOutstanding,
       outstandingCount,
       totalWalletBalance,

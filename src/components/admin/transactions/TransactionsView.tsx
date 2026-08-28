@@ -323,6 +323,13 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             <p className="text-xs text-gray-400 font-medium">
               {stats.todayPaymentsCount} transactions
             </p>
+            {stats.todayEstimatedTotal !== undefined && stats.todayEstimatedTotal > 0 && (
+              <p className="text-[11px] font-semibold text-gray-500">
+                Estimated today:{" "}
+                <span className="text-gray-700">EGP {stats.todayEstimatedTotal.toLocaleString()}</span>
+                <span className="font-normal text-gray-400"> charged</span>
+              </p>
+            )}
           </div>
         </div>
 

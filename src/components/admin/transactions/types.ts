@@ -75,6 +75,8 @@ export interface TransactionItem {
 export interface TransactionStats {
   todayNetPayments: number;
   todayPaymentsCount: number;
+  /** Full value charged today (services + products), collected or not — shown under the till figure. */
+  todayEstimatedTotal?: number;
   totalOutstanding: number;
   outstandingCount: number;
   totalWalletBalance: number;

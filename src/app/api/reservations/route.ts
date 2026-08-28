@@ -9,6 +9,7 @@ import { deductInventoryStock } from '@/app/api/inventory/products/route';
 import { incrementDevicePulses } from '@/app/api/inventory/devices/route';
 import { normalizeEgyptMobile, isOwnIdentity } from '@/lib/customerIdentity';
 import { recordWalletMovement } from '@/lib/wallet';
+import { recordTransaction } from '@/lib/transactionLedger';
 import { classifyCaller } from '@/app/api/customers/route';
 
 /**
@@ -434,6 +435,36 @@ async function writeCheckoutInvoice(params: {
     });
     if (paymentErr) throw paymentErr;
   }
+
+  // Customer-facing financial history (RISK-076). Two rows describe the visit: what the patient
+  // was charged, and what they actually handed over — the gap between them is the receivable.
+  // Reached only on first completion (a re-fired checkout returns before writing this invoice),
+  // so these do not duplicate. Non-fatal by design — see recordTransaction.
+  if (totals.grandTotal > 0) {
+    await recordTransaction({
+      type: 'service_charge',
+      amount: totals.grandTotal,
+      description: `Invoice ${invoiceNo} — services rendered`,
+      customerId,
+      branchId,
+      invoiceId: invoice.id,
+      reservationId,
+      paymentMethod: 'none',
+      createdByEmployeeId: receivedByEmployeeId || null,
+    });
+  }
+  if (amountPaid > 0) {
+    await recordTransaction({
+      type: 'payment',
+      amount: amountPaid,
+      description: `Payment received for invoice ${invoiceNo}`,
+      customerId,
+      branchId,
+      invoiceId: invoice.id,
+      reservationId,
+      createdByEmployeeId: receivedByEmployeeId || null,
+    });
+  }
 }
 
 /**
@@ -454,7 +485,7 @@ async function appendPaymentToExistingInvoice(
 
   const { data: invoice, error: findErr } = await supabaseServer
     .from('invoices')
-    .select('id')
+    .select('id, invoice_no, customer_id, branch_id')
     .eq('reservation_id', reservationId)
     .eq('status', 'issued')
     .maybeSingle();
@@ -468,6 +499,20 @@ async function appendPaymentToExistingInvoice(
     received_by_employee_id: receivedByEmployeeId || null,
   });
   if (paymentErr) throw paymentErr;
+
+  // A payment against an already-completed booking is a patient settling what they still owed,
+  // so it lands in their history as an outstanding_payment rather than an ordinary payment
+  // (RISK-076). Callers only reach here with a real positive delta, so this does not duplicate.
+  await recordTransaction({
+    type: 'outstanding_payment',
+    amount,
+    description: `Balance settlement for invoice ${invoice.invoice_no || ''}`.trim(),
+    customerId: invoice.customer_id,
+    branchId: invoice.branch_id,
+    invoiceId: invoice.id,
+    reservationId,
+    createdByEmployeeId: receivedByEmployeeId || null,
+  });
 }
 
 export async function GET(req: Request) {

@@ -3,6 +3,7 @@ import { requireStaffAccess } from '@/lib/access';
 import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/ledger';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { recordWalletMovement } from '@/lib/wallet';
+import { recordTransaction } from '@/lib/transactionLedger';
 
 const VALID_PAYMENT_METHODS = ['cash', 'card', 'wallet', 'instapay', 'transfer'] as const;
 type PaymentMethod = typeof VALID_PAYMENT_METHODS[number];
@@ -206,6 +207,19 @@ export async function POST(req: Request) {
       await removeIncompleteSale(invoice.id, customerPackage.id);
       throw paymentError;
     }
+
+    // Customer-facing history (RISK-076). Reached once per successful sale — every earlier failure
+    // path rolls back via removeIncompleteSale and throws before this point.
+    await recordTransaction({
+      type: 'payment',
+      amount: totals.grandTotal,
+      description: `Package purchase — ${pkg.name}`,
+      customerId,
+      branchId: branchId || null,
+      invoiceId: invoice.id,
+      paymentMethod,
+      createdByEmployeeId: access.access.employee.id,
+    });
 
     // Update spent_amount on the customer (read-then-write, same shape as addToCustomerSpend)
     try {

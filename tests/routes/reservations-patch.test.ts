@@ -95,13 +95,20 @@ function seedStaffAuth() {
   fake.seed('roles', [{ name: 'reception', permissions: [] }]);
 }
 
+let txnSeq = 1001;
+
 beforeEach(() => {
   fake.reset();
+  txnSeq = 1001;
+  // The checkout now also records customer-facing transaction rows (RISK-076), which pull their
+  // human-readable id from this sequence exactly as invoices do.
+  fake.setRpc('next_transaction_seq', () => ({ data: txnSeq++, error: null }));
   for (const t of [
     'reservations', 'customers', 'employee_accounts', 'roles', 'providers', 'branches', 'rooms',
     'service_rooms', 'services', 'reservation_products', 'invoices', 'invoice_lines', 'payments',
     'service_consumables', 'service_devices', 'inventory_products', 'inventory_devices',
     'consumption_entries', 'stock_movements', 'device_maintenance_history', 'page_settings',
+    'transactions',
   ]) {
     fake.seed(t, []);
   }
@@ -715,6 +722,111 @@ describe('invoice writing on first completion', () => {
     expect(invoices).toHaveLength(1); // still one invoice
     const payments = fake.rows('payments').filter((p) => p.invoice_id === invoices[0].id);
     expect(payments.map((p) => p.amount).sort((a, b) => a - b)).toEqual([200, 300]); // original 300 + the 200 delta
+  });
+});
+
+// ── Customer-facing transaction history (RISK-076) ───────────────────────────
+
+// The `transactions` table is what Admin → Transactions and the patient profile's Transactions tab
+// read. Before this, nothing but the manual-entry form ever wrote to it: a patient with ten
+// completed visits showed an empty financial history. These assert the checkout now leaves a
+// record — and, just as importantly, that it leaves exactly one.
+describe('transaction history written on checkout', () => {
+  beforeEach(() => {
+    seedStaffAuth();
+    fake.seed('services', [{ id: SERVICE_ID, price: 500, branch_pricing: null, en: 'Facial' }]);
+    fake.seed('branches', [{ id: BRANCH_ID, name_en: 'Downtown', name_ar: null }]);
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, spent_amount: 0, outstanding: 0 }]);
+    fake.seed('providers', [{
+      id: PROVIDER_ID, commission_type: 'none', commission_value: 0,
+      commission_fixed_component: 0, commission_base: 'gross', service_commissions: [],
+    }]);
+  });
+
+  it('records the service charge and the payment as two separate rows', async () => {
+    fake.seed('reservations', [baseReservation({ status: 'confirmed', amount_paid: 0, amount_left: null })]);
+    await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 500, amountLeft: 0 } }));
+
+    const txns = fake.rows('transactions');
+    const charge = txns.find((t) => t.type === 'service_charge')!;
+    const payment = txns.find((t) => t.type === 'payment')!;
+
+    expect(charge).toBeTruthy();
+    expect(charge.amount).toBe(500);
+    expect(charge.customer_id).toBe(CUSTOMER_ID);
+    expect(charge.reservation_id).toBe(RES_ID);
+    expect(charge.source).toBe('automatic');
+
+    expect(payment).toBeTruthy();
+    expect(payment.amount).toBe(500);
+    expect(payment.source).toBe('automatic');
+  });
+
+  it('an underpayment records the full charge but only the amount actually collected', async () => {
+    fake.seed('reservations', [baseReservation({ status: 'confirmed', amount_paid: 0, amount_left: null })]);
+    await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 300, amountLeft: 200 } }));
+
+    const txns = fake.rows('transactions');
+    expect(txns.find((t) => t.type === 'service_charge')!.amount).toBe(500);
+    expect(txns.find((t) => t.type === 'payment')!.amount).toBe(300);
+  });
+
+  it('a completion with nothing paid records the charge and no payment row', async () => {
+    fake.seed('reservations', [baseReservation({ status: 'confirmed', amount_paid: 0, amount_left: null })]);
+    await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 0, amountLeft: 500 } }));
+
+    const txns = fake.rows('transactions');
+    expect(txns.filter((t) => t.type === 'service_charge')).toHaveLength(1);
+    expect(txns.filter((t) => t.type === 'payment')).toHaveLength(0);
+  });
+
+  it('re-firing completion does not duplicate the history rows', async () => {
+    fake.seed('reservations', [baseReservation({ status: 'confirmed', amount_paid: 0, amount_left: null })]);
+    await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 500, amountLeft: 0 } }));
+
+    const completedRow = fake.rows('reservations').find((r) => r.id === RES_ID)!;
+    fake.seed('reservations', [completedRow]);
+    await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 500, amountLeft: 0 } }));
+
+    const txns = fake.rows('transactions');
+    expect(txns.filter((t) => t.type === 'service_charge')).toHaveLength(1);
+    expect(txns.filter((t) => t.type === 'payment')).toHaveLength(1);
+  });
+
+  it('paying down debt later records an outstanding_payment for the delta only', async () => {
+    fake.seed('reservations', [baseReservation({ status: 'confirmed', amount_paid: 0, amount_left: null })]);
+    await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 300, amountLeft: 200 } }));
+
+    const completedRow = fake.rows('reservations').find((r) => r.id === RES_ID)!;
+    fake.seed('reservations', [completedRow]);
+    await PATCH(staffReq({ id: RES_ID, body: { amountPaid: 500, amountLeft: 0 } }));
+
+    const settlements = fake.rows('transactions').filter((t) => t.type === 'outstanding_payment');
+    expect(settlements).toHaveLength(1);
+    expect(settlements[0].amount).toBe(200); // the delta, not the new cumulative total
+  });
+
+  it('every recorded row gets a distinct sequential transaction_id', async () => {
+    fake.seed('reservations', [baseReservation({ status: 'confirmed', amount_paid: 0, amount_left: null })]);
+    await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 500, amountLeft: 0 } }));
+
+    const ids = fake.rows('transactions').map((t) => t.transaction_id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain('TXN-001001');
+  });
+
+  it('a ledger failure does not break the checkout — the money still moves', async () => {
+    // The transaction recorder is deliberately non-fatal: a patient is at the desk and the
+    // invoice/payment/balance writes have already happened.
+    fake.setRpc('next_transaction_seq', () => ({ data: null, error: { message: 'sequence unavailable' } }));
+    fake.seed('reservations', [baseReservation({ status: 'confirmed', amount_paid: 0, amount_left: null })]);
+
+    const res = await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 500, amountLeft: 0 } }));
+
+    expect(res.status).toBe(200);
+    expect(fake.rows('invoices').filter((i) => i.reservation_id === RES_ID)).toHaveLength(1);
+    expect(fake.rows('customers').find((c) => c.id === CUSTOMER_ID)!.spent_amount).toBe(500);
+    expect(fake.rows('transactions')).toHaveLength(0); // recorded nothing, broke nothing
   });
 });
 
