@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { X, ShieldCheck, Clock, User, FileText, Loader2, ArrowRight } from "lucide-react";
 import { TransactionAuditLog } from "./types";
+import { getAuthHeaders } from "@/lib/authHeaders";
 
 interface TransactionAuditLogsModalProps {
   onClose: () => void;
@@ -20,7 +21,8 @@ export const TransactionAuditLogsModal: React.FC<TransactionAuditLogsModalProps>
     const fetchLogs = async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/transactions/audit-logs?limit=50");
+        const headers = await getAuthHeaders();
+        const res = await fetch("/api/transactions/audit-logs?limit=50", { headers });
         const data = await res.json();
         if (data.logs) {
           setLogs(data.logs);

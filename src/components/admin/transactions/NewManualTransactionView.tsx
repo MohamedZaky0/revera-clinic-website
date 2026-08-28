@@ -26,13 +26,40 @@ import {
   NewManualTransactionInput,
   TransactionItem
 } from "./types";
+import { getAuthHeaders } from "@/lib/authHeaders";
 
+/**
+ * Combines the date and time the user actually picked into an ISO timestamp.
+ *
+ * Built as a *local* Date (no trailing `Z`) then converted, so the moment stored is the one the
+ * staff member meant in clinic time rather than being reinterpreted as UTC. An earlier version
+ * hardcoded `T12:00:00.000Z` and silently discarded the time field entirely, while the form's own
+ * confirmation line still echoed the picked time back to the user (RISK-076).
+ */
+function buildOccurredAt(dateStr: string, timeStr: string): string {
+  const match = (timeStr || "").trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!dateStr || !match) return new Date().toISOString();
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3]?.toUpperCase();
+  if (period === "PM" && hours < 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+  if (hours > 23 || minutes > 59) return new Date().toISOString();
+
+  const local = new Date(
+    `${dateStr}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00`
+  );
+  return isNaN(local.getTime()) ? new Date().toISOString() : local.toISOString();
+}
+
+/** Shape returned by `GET /api/customers` — raw `customers` rows (`mobile`, `outstanding`). */
 interface CustomerOption {
   id: string;
   name: string;
-  phone: string;
+  mobile?: string;
   wallet_balance?: number;
-  outstanding_balance?: number;
+  outstanding?: number;
   spent_amount?: number;
 }
 
@@ -113,16 +140,20 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
       if (!patientSearch.trim() && !preSelectedCustomerId) return;
       try {
         setLoadingCustomers(true);
-        const res = await fetch(`/api/customers?search=${encodeURIComponent(patientSearch)}&limit=8`);
+        const headers = await getAuthHeaders();
+        const res = await fetch(
+          `/api/customers?search=${encodeURIComponent(patientSearch)}&limit=8`,
+          { headers }
+        );
+        // GET /api/customers returns a bare array of customer rows, not { customers: [...] }.
         const data = await res.json();
-        if (data.customers) {
-          setCustomerOptions(data.customers);
-          if (preSelectedCustomerId && !selectedCustomer) {
-            const found = data.customers.find((c: any) => c.id === preSelectedCustomerId);
-            if (found) {
-              setSelectedCustomer(found);
-              setSelectedCustomerId(found.id);
-            }
+        const list: CustomerOption[] = Array.isArray(data) ? data : [];
+        setCustomerOptions(list);
+        if (preSelectedCustomerId && !selectedCustomer) {
+          const found = list.find((c) => c.id === preSelectedCustomerId);
+          if (found) {
+            setSelectedCustomer(found);
+            setSelectedCustomerId(found.id);
           }
         }
       } catch (err) {
@@ -142,7 +173,8 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
       const fetchPatientTxns = async () => {
         try {
           setLoadingOriginalTxns(true);
-          const res = await fetch(`/api/transactions?customerId=${selectedCustomerId}&limit=20`);
+          const headers = await getAuthHeaders();
+          const res = await fetch(`/api/transactions?customerId=${selectedCustomerId}&limit=20`, { headers });
           const data = await res.json();
           if (data.transactions) {
             const eligible = data.transactions.filter(
@@ -171,7 +203,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
   // Dynamic Balance Calculations
   const numericAmount = Math.max(0, parseFloat(amount) || 0);
   const currentWalletBalance = Number(selectedCustomer?.wallet_balance || 0);
-  const currentOutstanding = Number(selectedCustomer?.outstanding_balance || 0);
+  const currentOutstanding = Number(selectedCustomer?.outstanding || 0);
 
   const projectedWalletBalance = useMemo(() => {
     if (transactionType === "wallet_topup") {
@@ -248,12 +280,13 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
         description: description || undefined,
         reason: reason || undefined,
         adjustment_direction: adjustmentDirection,
-        occurred_at: `${txnDate}T12:00:00.000Z`,
+        occurred_at: buildOccurredAt(txnDate, txnTime),
       };
 
+      const headers = await getAuthHeaders();
       const res = await fetch("/api/transactions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -407,12 +440,12 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                     >
                       <div>
                         <div className="font-bold text-gray-800">{c.name}</div>
-                        <div className="text-[11px] text-gray-400">{c.phone}</div>
+                        <div className="text-[11px] text-gray-400">{c.mobile}</div>
                       </div>
                       <div className="text-end text-[11px]">
                         <div className="text-emerald-700 font-semibold">Wallet: EGP {(c.wallet_balance || 0).toLocaleString()}</div>
-                        {Number(c.outstanding_balance || 0) > 0 && (
-                          <div className="text-rose-600 font-semibold">Due: EGP {(c.outstanding_balance || 0).toLocaleString()}</div>
+                        {Number(c.outstanding || 0) > 0 && (
+                          <div className="text-rose-600 font-semibold">Due: EGP {(c.outstanding || 0).toLocaleString()}</div>
                         )}
                       </div>
                     </button>

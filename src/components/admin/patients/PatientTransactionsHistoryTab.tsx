@@ -26,6 +26,7 @@ import {
   TransactionStatus
 } from "../transactions/types";
 import { TransactionDetailsModal } from "../transactions/TransactionDetailsModal";
+import { getAuthHeaders } from "@/lib/authHeaders";
 
 interface PatientTransactionsHistoryTabProps {
   patientId: string;
@@ -55,9 +56,9 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
 
   // Summary Metrics
   const [stats, setStats] = useState({
-    totalSpent: 3250,
-    outstanding: 400,
-    walletBalance: 1000,
+    totalSpent: 0,
+    outstanding: 0,
+    walletBalance: 0,
   });
 
   const [selectedTxnForDetails, setSelectedTxnForDetails] = useState<TransactionItem | null>(null);
@@ -83,7 +84,8 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
       params.set("page", String(page));
       params.set("limit", String(limit));
 
-      const res = await fetch(`/api/transactions?${params.toString()}`);
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/transactions?${params.toString()}`, { headers });
       const data = await res.json();
       if (data.transactions) {
         setTransactions(data.transactions);
@@ -91,10 +93,11 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
         setTotalPages(data.totalPages || 1);
       }
       if (data.stats) {
+        // Real values only — an absent stat means zero, never a placeholder figure (RISK-076).
         setStats({
-          totalSpent: data.stats.totalSpent ?? 3250,
-          outstanding: data.stats.patientOutstanding ?? 400,
-          walletBalance: data.stats.patientWalletBalance ?? 1000,
+          totalSpent: data.stats.totalSpent ?? 0,
+          outstanding: data.stats.patientOutstanding ?? 0,
+          walletBalance: data.stats.patientWalletBalance ?? 0,
         });
       }
     } catch (err) {

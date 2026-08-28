@@ -44,7 +44,7 @@ export async function GET(req: Request) {
       .from('transactions')
       .select(`
         *,
-        customer:customers(id, name, phone, wallet_balance, outstanding, spent_amount),
+        customer:customers(id, name, mobile, wallet_balance, outstanding, spent_amount),
         branch:branches(id, name_en, name_ar),
         invoice:invoices(id, invoice_no)
       `);
@@ -110,7 +110,9 @@ export async function GET(req: Request) {
       customer: t.customer ? {
         id: t.customer.id,
         name: t.customer.name,
-        phone: t.customer.phone,
+        // `customers` stores the number in `mobile`; exposed as `phone` so the client-facing
+        // TransactionCustomer shape stays stable.
+        phone: t.customer.mobile,
         wallet_balance: Number(t.customer.wallet_balance || 0),
         outstanding: Number(t.customer.outstanding || 0),
         spent: Number(t.customer.spent_amount || 0),
@@ -159,14 +161,15 @@ export async function GET(req: Request) {
     const paginatedItems = items.slice((page - 1) * limit, page * limit);
 
     // 2. Compute Quick Overview Statistics
-    // Query all customers for outstanding and wallet balances within branch scope
-    let custQuery = supabaseServer
+    // NOTE: `customers` has no `branch_id` column — a patient is not owned by a branch, they can
+    // book at any of them. So the Outstanding / Wallet Balance totals below are always
+    // clinic-wide, even when a branch filter is applied to the transaction list itself. An
+    // earlier version filtered on `customers.branch_id`, which silently errored and zeroed both
+    // cards whenever a branch was selected (RISK-076).
+    const { data: allCustomers, error: custErr } = await supabaseServer
       .from('customers')
       .select('id, wallet_balance, outstanding, spent_amount');
-    if (branchId !== 'all' && branchId) {
-      custQuery = custQuery.eq('branch_id', branchId);
-    }
-    const { data: allCustomers } = await custQuery;
+    if (custErr) console.error('customers stats fetch error:', custErr.message);
 
     let totalOutstanding = 0;
     let outstandingCount = 0;
@@ -320,7 +323,7 @@ export async function POST(req: Request) {
     if (customer_id) {
       const { data: custData, error: custErr } = await supabaseServer
         .from('customers')
-        .select('id, name, phone, wallet_balance, outstanding, spent_amount')
+        .select('id, name, mobile, wallet_balance, outstanding, spent_amount')
         .eq('id', customer_id)
         .maybeSingle();
 

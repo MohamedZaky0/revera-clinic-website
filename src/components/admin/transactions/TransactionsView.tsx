@@ -36,6 +36,7 @@ import {
   PaymentMethod,
   TransactionStatus
 } from "./types";
+import { getAuthHeaders } from "@/lib/authHeaders";
 import { TransactionDetailsModal } from "./TransactionDetailsModal";
 import { TransactionAuditLogsModal } from "./TransactionAuditLogsModal";
 
@@ -76,13 +77,15 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   const [loading, setLoading] = useState(true);
 
   // Overview Stats
+  // Zeroed until the real figures load — never seeded with placeholder numbers, which previously
+  // meant the cards showed convincing-but-fabricated totals whenever the fetch failed (RISK-076).
   const [stats, setStats] = useState<TransactionStats>({
-    todayNetPayments: 25450,
-    todayPaymentsCount: 18,
-    totalOutstanding: 14350,
-    outstandingCount: 12,
-    totalWalletBalance: 38500,
-    activeWalletCount: 24,
+    todayNetPayments: 0,
+    todayPaymentsCount: 0,
+    totalOutstanding: 0,
+    outstandingCount: 0,
+    totalWalletBalance: 0,
+    activeWalletCount: 0,
   });
 
   // Modals state
@@ -116,7 +119,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       params.set("page", String(filters.page));
       params.set("limit", String(filters.limit));
 
-      const res = await fetch(`/api/transactions?${params.toString()}`);
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/transactions?${params.toString()}`, { headers });
       const data = await res.json();
       if (data.transactions) {
         setTransactions(data.transactions);

@@ -1,4 +1,6 @@
-import { supabase } from "@/lib/supabaseClient";
+// Re-exported from the shared helper so the doctor components' existing imports keep working
+// while the rest of the admin panel imports it from `@/lib/authHeaders` directly.
+export { getAuthHeaders } from "@/lib/authHeaders";
 
 export const parseBookingNotes = (rawNotes: string) => {
   if (!rawNotes) {
@@ -59,14 +61,3 @@ export const getDoctorStatusBadgeClass = (active: boolean) =>
 
 export const getDoctorStatusDotClass = (active: boolean) =>
   active ? "bg-emerald-500" : "bg-red-500";
-
-export const getAuthHeaders = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json"
-  };
-  if (session?.access_token) {
-    headers["Authorization"] = `Bearer ${session.access_token}`;
-  }
-  return headers;
-};

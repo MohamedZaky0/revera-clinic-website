@@ -70,10 +70,28 @@ export async function GET(req: Request) {
       return NextResponse.json(data || null);
     }
 
-    const { data: rows, error } = await supabaseServer
+    // Optional staff-only autocomplete filters. Both are opt-in, so the existing "return every
+    // customer" behaviour every other caller relies on is unchanged when they're absent.
+    const search = (searchParams.get('search') || '').trim();
+    const limitParam = searchParams.get('limit');
+
+    let listQuery = supabaseServer
       .from('customers')
       .select('*')
       .order('created_at', { ascending: false });
+
+    if (search) {
+      const escaped = search.replace(/[%,()]/g, '');
+      if (escaped) {
+        listQuery = listQuery.or(`name.ilike.%${escaped}%,mobile.ilike.%${escaped}%`);
+      }
+    }
+    if (limitParam) {
+      const parsed = parseInt(limitParam, 10);
+      if (!isNaN(parsed) && parsed > 0) listQuery = listQuery.limit(Math.min(parsed, 100));
+    }
+
+    const { data: rows, error } = await listQuery;
 
     if (error) throw error;
     return NextResponse.json(rows || []);
