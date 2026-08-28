@@ -72,7 +72,7 @@ export function useCustomerProfile({
   const [showMedicalReportModal, setShowMedicalReportModal] = useState(false);
 
   // ── Profile tab states ──
-  const [customerProfileTab, setCustomerProfileTab] = useState<"info" | "history" | "prescription" | "products" | "packages">("info");
+  const [customerProfileTab, setCustomerProfileTab] = useState<"info" | "history" | "prescription" | "transactions" | "products" | "packages">("info");
   const [customerRecordsSubTab, setCustomerRecordsSubTab] = useState<"intake" | "prescriptions" | "reports">("intake");
   const [customerPrescriptions, setCustomerPrescriptions] = useState<any[]>([]);
   const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);

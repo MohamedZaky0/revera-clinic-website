@@ -1299,6 +1299,54 @@ search) is separate follow-up work, not part of this migration.
 | `note` | text | nullable |
 | `created_at` | timestamptz | |
 
+---
+
+### `transactions`
+
+**Added 2026-08-28** by `20260828000000_create_transactions.sql`.
+Canonical ledger for clinic-wide financial transactions (payments, outstanding debt settlements, refunds, wallet top-ups, wallet deductions, service charges, product purchases, adjustments).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key DEFAULT gen_random_uuid() |
+| `transaction_id` | text | UNIQUE NOT NULL, formatted via sequence (e.g. `TXN-001045`) |
+| `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable |
+| `customer_id` | UUID | FK → customers.id ON DELETE SET NULL, nullable |
+| `invoice_id` | UUID | FK → invoices.id ON DELETE SET NULL, nullable |
+| `reservation_id` | UUID | FK → reservations.id ON DELETE SET NULL, nullable |
+| `type` | text | NOT NULL, CHECK IN (`'payment'`, `'outstanding_payment'`, `'refund'`, `'wallet_topup'`, `'wallet_deduction'`, `'service_charge'`, `'product_purchase'`, `'adjustment'`) |
+| `description` | text | NOT NULL |
+| `payment_method` | text | NOT NULL DEFAULT `'cash'`, CHECK IN (`'cash'`, `'card'`, `'bank_transfer'`, `'online_payment'`, `'wallet'`, `'instapay'`, `'vodafone_cash'`, `'other'`, `'none'`) |
+| `amount` | numeric | NOT NULL (positive for credits/charges, negative for refunds/deductions) |
+| `status` | text | NOT NULL DEFAULT `'completed'`, CHECK IN (`'completed'`, `'pending'`, `'outstanding'`, `'refunded'`, `'failed'`) |
+| `source` | text | NOT NULL DEFAULT `'manual'`, CHECK IN (`'manual'`, `'automatic'`) |
+| `reference_no` | text | nullable (receipt, bank transfer, or invoice reference) |
+| `related_transaction_id` | UUID | FK → transactions.id ON DELETE SET NULL, nullable (for refunds/adjustments) |
+| `reason` | text | nullable (mandatory for refunds and adjustments) |
+| `notes` | text | nullable |
+| `metadata` | jsonb | DEFAULT `'{}'::jsonb` |
+| `created_by_employee_id` | UUID | FK → employee_accounts.id ON DELETE SET NULL, nullable |
+| `created_by_name` | text | nullable |
+| `occurred_at` | timestamptz | NOT NULL DEFAULT now() |
+| `created_at` | timestamptz | NOT NULL DEFAULT now() |
+
+---
+
+### `transaction_audit_logs`
+
+**Added 2026-08-28** by `20260828000000_create_transactions.sql`.
+Immutable audit logs tracking financial transaction creations, refunds, adjustments, and status changes.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key DEFAULT gen_random_uuid() |
+| `transaction_id` | UUID | FK → transactions.id ON DELETE CASCADE |
+| `action` | text | NOT NULL (e.g. `'created_manual_transaction'`, `'processed_refund'`, `'applied_adjustment'`) |
+| `performed_by_employee_id` | UUID | FK → employee_accounts.id ON DELETE SET NULL, nullable |
+| `performed_by_name` | text | nullable |
+| `details` | jsonb | DEFAULT `'{}'::jsonb` |
+| `created_at` | timestamptz | NOT NULL DEFAULT now() |
+
 ## Notes on Schema Gaps
 
 - Persistent patient records are stored in the `customers` table, and connected to `reservations` via `customer_id`.

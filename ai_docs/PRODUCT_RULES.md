@@ -261,5 +261,26 @@ The following are **not currently enforced in code**:
      - **Total Price**: Total cost for the session services and add-ons (`cost EGP`).
      - **Session Paid**: Actual amount paid so far for this specific session (`amountPaid EGP`).
      - **Session Outstanding**: Remaining balance owed for this specific session (`amountLeft EGP` / `cost - amountPaid EGP`).
-   - Upon completing payment settlement checkout, Session Paid is updated to total price, Session Outstanding drops to 0 EGP, Customer Total Spent increases by settled payment, and Customer Outstanding is reduced by settled amount.
+    - Upon completing payment settlement checkout, Session Paid is updated to total price, Session Outstanding drops to 0 EGP, Customer Total Spent increases by settled payment, and Customer Outstanding is reduced by settled amount.
 
+---
+
+## Financial Transactions & Manual Ledger Rules
+**Enforced in:** `/api/transactions`, `src/components/admin/transactions/`, `src/components/admin/patients/PatientTransactionsHistoryTab.tsx`
+
+1. **Immutability of Financial Records**:
+   - Completed financial transactions are **never modified or directly deleted**.
+   - If an adjustment or refund is made, a **new transaction** is inserted on the actual date the refund/adjustment occurs, preserving historical daily net totals for earlier dates.
+2. **Today's Net Payments**:
+   - `Today's Net Payments = Completed Payments Today − Completed Refunds Today`.
+   - Excludes pending and failed transactions.
+3. **Outstanding Balance**:
+   - `Outstanding = Sum of active unpaid customer debt obligations`.
+   - Recording an `outstanding_payment` transaction decreases the patient's outstanding balance up to the maximum current debt.
+4. **Wallet Balance Calculations**:
+   - `Wallet Top-up` / `Wallet Deposit` increases the patient's wallet balance.
+   - `Wallet Deduction` / `Wallet Withdrawal` decreases the patient's wallet balance and cannot exceed available wallet funds.
+5. **Refund Validation**:
+   - Requires selecting a completed original transaction.
+   - Refund amount cannot exceed the original eligible payment.
+   - Mandatory refund reason recorded in audit trail.

@@ -130,7 +130,10 @@ import {
   Loader2,
   Copy,
   Wallet,
+  ReceiptText,
 } from "lucide-react";
+import { TransactionsView } from "@/components/admin/transactions/TransactionsView";
+import { NewManualTransactionView } from "@/components/admin/transactions/NewManualTransactionView";
 import RoomsManagerView from "@/components/RoomsManagerView";
 import SupplierManagementScreen from "@/components/admin/inventory/SupplierManagementScreen";
 import { PackageAdminPanel } from "@/components/admin/packages/PackageAdminPanel";
@@ -223,6 +226,7 @@ const SIDEBAR_ITEMS = [
   { label: "Employees", icon: CircleUser },
   { label: "HR", icon: ClipboardList },
   { label: "Marketing", icon: Megaphone, submenu: true },
+  { label: "Transactions", icon: ReceiptText },
   { label: "Customer Support", icon: MessageSquare, comingSoon: true },
   { label: "Reports", icon: BarChart3, comingSoon: true },
   { label: "Finance", icon: CircleDollarSign },
@@ -693,7 +697,7 @@ export default function AdminPage() {
     return SIDEBAR_ITEMS.filter(item => {
       if (item.label === 'Logout') return true;
       if ((item as any).comingSoon) return false;
-      if ((item.label === 'HR' || item.label === 'Inventory') && (adminRole === 'admin' || adminRole === 'HR')) return true;
+      if ((item.label === 'HR' || item.label === 'Inventory' || item.label === 'Transactions') && (adminRole === 'admin' || adminRole === 'HR' || adminRole === 'receptionist' || adminRole === 'superadmin')) return true;
       if (adminPermissions.includes(item.label)) return true;
       
       const parentScreenMap: Record<string, string> = {
@@ -704,6 +708,7 @@ export default function AdminPage() {
         "Inventory": "inventory",
         "Employees": "employees",
         "Marketing": "services",
+        "Transactions": "transactions",
         "Finance": "finance",
         "Settings": "settings"
       };
@@ -1749,6 +1754,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             "Services": "services",
             "Promotions": "services",
             "Packages": "services",
+            "Transactions": "transactions",
             "Finance": "finance",
             "Settings": "settings"
           };
@@ -2311,6 +2317,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       "Services": "services",
       "Promotions": "services",
       "Packages": "services",
+      "Transactions": "transactions",
       "Finance": "finance",
       "Settings": "settings"
     };
@@ -2422,10 +2429,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-033', name: 'Dashboard Notifications & Inventory Alerts Engine', category: 'Inventory & Equipment', endpoint: '/api/reception/dashboard', description: 'Verifies real-time system alerts for low stock, expired items, maintenance due, and overdue devices.', status: 'idle' },
     { id: 'TC-034', name: 'Medical Record Intake Templates Engine', category: 'Medical & Patients', endpoint: '/api/medical-records/templates', description: 'Verifies customizable medical record intake templates, multi-service assignments, and dynamic field schema.', status: 'idle' },
     { id: 'TC-035', name: 'Patient Profile Edit & Customer Intake Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies customer profile records, phone/WhatsApp validation, address structure (City, Street, Building, Floor), and balances.', status: 'idle' },
-    { id: 'TC-036', name: 'Doctor Status Management & Availability Lifecycle Engine', category: 'Services & Bookings', endpoint: '/api/providers', description: 'Verifies doctor status modal dialog, Active/Inactive status changes, and real-time synchronization across providers and linked employee accounts.', status: 'idle' }
+    { id: 'TC-036', name: 'Doctor Status Management & Availability Lifecycle Engine', category: 'Services & Bookings', endpoint: '/api/providers', description: 'Verifies doctor status modal dialog, Active/Inactive status changes, and real-time synchronization across providers and linked employee accounts.', status: 'idle' },
+    { id: 'TC-037', name: 'Financial Transactions & Daily Ledger Engine', category: 'Finance & Accounting', endpoint: '/api/transactions', description: 'Verifies the clinic financial transactions dashboard, daily net payments, outstanding debts, wallet balances, and manual transaction logging.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
+  const [transactionsSubView, setTransactionsSubView] = useState<'list' | 'new'>('list');
+  const [transactionPreSelectedPatient, setTransactionPreSelectedPatient] = useState<{ id: string; name: string } | null>(null);
   const [runningAllDiagnostics, setRunningAllDiagnostics] = useState(false);
   const [testCategoryFilter, setTestCategoryFilter] = useState<string>('all');
   const [testSuiteSearch, setTestSuiteSearch] = useState<string>('');
@@ -6127,6 +6137,42 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             <PackageAdminPanel session={session} />
           )}
 
+          {/* ── TRANSACTIONS VIEW ── */}
+          {activeNav === "Transactions" && (
+            transactionsSubView === "new" ? (
+              <NewManualTransactionView
+                onBack={() => {
+                  setTransactionsSubView("list");
+                  setTransactionPreSelectedPatient(null);
+                }}
+                onSuccess={() => {
+                  setTransactionsSubView("list");
+                  setTransactionPreSelectedPatient(null);
+                }}
+                preSelectedCustomerId={transactionPreSelectedPatient?.id}
+                preSelectedCustomerName={transactionPreSelectedPatient?.name}
+                staffName={loggedEmpAccount?.name || adminEmail.split("@")[0] || "Staff User"}
+                branches={branches}
+                onAddNewPatient={() => {
+                  setActiveNav("Patients");
+                  setShowCustomerFormModal(true);
+                }}
+                lang={lang}
+              />
+            ) : (
+              <TransactionsView
+                onNewTransaction={() => {
+                  setTransactionsSubView("new");
+                  setTransactionPreSelectedPatient(null);
+                }}
+                staffName={loggedEmpAccount?.name || adminEmail.split("@")[0] || "Staff User"}
+                branches={branches}
+                currentBranchId={branch || undefined}
+                lang={lang}
+              />
+            )
+          )}
+
           {/* ── FINANCE VIEW ── */}
           {activeNav === "Finance" && (
             <FinanceSection
@@ -6164,6 +6210,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               {/* ── INLINE: View Customer Profile ── */}
               {viewingCustomerProfile && (
                 <CustomerProfileDrawer
+                  onNavigateToNewTransaction={(patientId, patientName) => {
+                    setActiveNav("Transactions");
+                    setTransactionsSubView("new");
+                    setTransactionPreSelectedPatient({ id: patientId, name: patientName });
+                  }}
                   viewingCustomerProfile={viewingCustomerProfile}
                   setViewingCustomerProfile={setViewingCustomerProfile}
                   medicalRecordForm={medicalRecordForm}

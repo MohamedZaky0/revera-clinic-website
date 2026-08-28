@@ -135,6 +135,16 @@ const PERMISSION_STRUCTURE = [
       { key: "finance.manage_loans", label: "Manage Loans" },
       { key: "finance.view_capacity", label: "View Capacity & Service Mix" }
     ]
+  },
+  {
+    category: "Transactions",
+    prefix: "transactions",
+    items: [
+      { key: "transactions.view", label: "View Financial Transactions" },
+      { key: "transactions.create", label: "Create Manual Transactions" },
+      { key: "transactions.refund", label: "Process Refunds & Adjustments" },
+      { key: "transactions.export", label: "Export Transactions Data" }
+    ]
   }
 ];
 

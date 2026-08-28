@@ -1590,3 +1590,94 @@ separately under `walkIn`, never silently folded into either bucket.
   walkIn: { revenue, note }
 }
 ```
+
+---
+
+## GET /api/transactions
+
+Requires staff access. Returns paginated financial transactions with customer and branch joins, plus aggregated overview statistics.
+
+**Query params:**
+- `search?`: string (matches transaction ID, invoice number, customer name, customer phone, reference, or description)
+- `dateRange?`: `'today' | 'yesterday' | 'week' | 'month' | 'custom' | 'all'`
+- `startDate?`, `endDate?`: string (YYYY-MM-DD for custom range)
+- `type?`: `'all' | 'payment' | 'outstanding_payment' | 'refund' | 'wallet_topup' | 'wallet_deduction' | 'service_charge' | 'product_purchase' | 'adjustment'`
+- `paymentMethod?`: `'all' | 'cash' | 'card' | 'instapay' | 'vodafone_cash' | 'wallet' | 'bank_transfer' | 'other'`
+- `status?`: `'all' | 'completed' | 'pending' | 'outstanding' | 'refunded' | 'failed'`
+- `branchId?`: UUID of branch or `'all'`
+- `amountRange?`: `'all' | 'under500' | '500_1000' | '1000_5000' | 'above5000'`
+- `sortBy?`: `'date' | 'amount'`
+- `sortOrder?`: `'asc' | 'desc'`
+- `customerId?`: UUID of customer (for patient profile tab)
+- `page?`: integer (default 1)
+- `limit?`: integer (default 10)
+
+**Response:**
+```json
+{
+  "transactions": [
+    {
+      "id": "uuid",
+      "transaction_id": "TXN-001045",
+      "type": "payment",
+      "amount": 500,
+      "payment_method": "cash",
+      "status": "completed",
+      "source": "manual",
+      "description": "Session payment",
+      "customer": { "id": "uuid", "name": "Yasser Zaki", "phone": "010 1234 5678" },
+      "occurred_at": "2026-08-27T11:59:00.000Z"
+    }
+  ],
+  "total": 78,
+  "page": 1,
+  "totalPages": 8,
+  "stats": {
+    "todayNetPayments": 25450,
+    "todayPaymentsCount": 18,
+    "totalOutstanding": 14350,
+    "outstandingCount": 12,
+    "totalWalletBalance": 38500,
+    "activeWalletCount": 24,
+    "totalSpent": 3250,
+    "patientOutstanding": 400,
+    "patientWalletBalance": 1000
+  }
+}
+```
+
+---
+
+## POST /api/transactions
+
+Requires staff access. Manually creates a financial transaction, updates customer balances, and writes to corresponding financial ledgers (`wallet_txns`, `payments`).
+
+**Body:**
+```json
+{
+  "transaction_type": "payment | outstanding_payment | refund | wallet_topup | wallet_deduction | adjustment",
+  "customer_id": "uuid",
+  "amount": 1000,
+  "payment_method": "cash | card | instapay | vodafone_cash | wallet | bank_transfer",
+  "branch_id": "uuid",
+  "reference_no": "REC-10023",
+  "related_transaction_id": "uuid (for refund/adjustment)",
+  "description": "Session payment",
+  "reason": "Required for refund/adjustment",
+  "adjustment_direction": "increase | decrease",
+  "occurred_at": "YYYY-MM-DDTHH:mm:ss.sssZ"
+}
+```
+
+**Response:** `{ "success": true, "transaction": Transaction, "message": "Transaction created successfully." }`
+
+---
+
+## GET /api/transactions/audit-logs
+
+Requires staff access. Returns immutable audit records for financial transactions.
+
+**Query params:** `transactionId?`, `limit?` (default 50)
+
+**Response:** `{ "logs": TransactionAuditLog[] }`
+

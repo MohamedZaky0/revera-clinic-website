@@ -14,12 +14,16 @@ import {
   Printer,
   Calendar,
   User,
+  ReceiptText,
 } from "lucide-react";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
+import { PatientTransactionsHistoryTab } from "@/components/admin/patients/PatientTransactionsHistoryTab";
+import { NewManualTransactionView } from "@/components/admin/transactions/NewManualTransactionView";
 import type { Customer } from "@/components/admin/patients/useCustomerProfile";
 
 interface CustomerProfileDrawerProps {
+  onNavigateToNewTransaction?: (patientId: string, patientName: string) => void;
   // Hook state
   viewingCustomerProfile: Customer | null;
   setViewingCustomerProfile: (v: Customer | null) => void;
@@ -126,6 +130,7 @@ interface CustomerProfileDrawerProps {
 }
 
 export default function CustomerProfileDrawer({
+  onNavigateToNewTransaction,
   viewingCustomerProfile,
   setViewingCustomerProfile,
   medicalRecordForm,
@@ -226,6 +231,8 @@ export default function CustomerProfileDrawer({
   MOCK_MEDICINES,
 }: CustomerProfileDrawerProps) {
   if (!viewingCustomerProfile) return null;
+
+  const [showInlineManualTxnModal, setShowInlineManualTxnModal] = React.useState(false);
 
   const t = adminTranslations[lang].patients.customerProfileDrawer;
   const mf = adminTranslations[lang].patients.medicalFormModal;
@@ -481,6 +488,17 @@ export default function CustomerProfileDrawer({
         >
           <FileText size={15} />
           {t.tabPrescription}
+        </button>
+        <button
+          onClick={() => setCustomerProfileTab("transactions")}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none min-w-max ${
+            customerProfileTab === "transactions"
+              ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+              : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
+          }`}
+        >
+          <ReceiptText size={15} />
+          {t.tabTransactionsHistory || "Transactions History"}
         </button>
         <button
           onClick={() => setCustomerProfileTab("products")}
@@ -1067,7 +1085,23 @@ export default function CustomerProfileDrawer({
           </div>
         )}
 
-        {/* Tab 4: Purchased Products & Cart */}
+        {/* Tab 4: Transactions History */}
+        {customerProfileTab === "transactions" && (
+          <PatientTransactionsHistoryTab
+            patientId={viewingCustomerProfile.id || ""}
+            patientName={viewingCustomerProfile.name}
+            onAddTransaction={() => {
+              if (onNavigateToNewTransaction && viewingCustomerProfile.id) {
+                onNavigateToNewTransaction(viewingCustomerProfile.id, viewingCustomerProfile.name);
+              } else {
+                setShowInlineManualTxnModal(true);
+              }
+            }}
+            lang={lang}
+          />
+        )}
+
+        {/* Tab 5: Purchased Products & Cart */}
         {customerProfileTab === "products" && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-[#414E36]/10">
@@ -1708,6 +1742,24 @@ export default function CustomerProfileDrawer({
           lang={lang}
           t={adminTranslations[lang].patients.medicalReportModal}
         />
+      )}
+
+      {/* ── Modal: Add Manual Transaction ── */}
+      {showInlineManualTxnModal && viewingCustomerProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs overflow-y-auto">
+          <div className="relative w-full max-w-4xl rounded-3xl bg-white p-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto my-8">
+            <NewManualTransactionView
+              onBack={() => setShowInlineManualTxnModal(false)}
+              onSuccess={() => {
+                setShowInlineManualTxnModal(false);
+              }}
+              preSelectedCustomerId={viewingCustomerProfile.id}
+              preSelectedCustomerName={viewingCustomerProfile.name}
+              staffName="Staff"
+              lang={lang}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
