@@ -197,6 +197,7 @@ no application code reads or writes it; do not use it until its purpose is decid
 | `cancelled_at` | timestamptz | nullable. Same migration. Set by `PATCH /api/reservations` `action: 'cancel' \| 'no_show'` — no separate `no_show_at` column exists; this column doubles as "left the pipeline without being delivered" for both, which is what Phase 5's utilization math (`src/lib/capacity.ts`) needs to exclude from booked minutes. |
 | `doctor_notes` | text | nullable. **Added 2026-08-24** by `20260824020000_add_doctor_reception_notes_to_reservations.sql` (Brief 33). Doctor's clinical free-text note — previously interleaved with auto-generated bracketed tags in `notes`. Written by `handleSaveClinicalNote` and `handleCompleteTreatment` in `DoctorAccountView.tsx`. `NULL` for bookings predating this migration; the UI falls back to regex-cleaned `notes` for those. |
 | `reception_notes` | text | nullable. Same migration. Reception's free-text note — previously shared `notes` with the doctor and had to regex-strip tags on every read. Written by `saveNotes` in `page.tsx`. `NULL` for pre-migration bookings; same fallback. |
+| `is_historical` | boolean | Default false. **Added 2026-08-29** by `20260829000000_add_is_historical_to_reservations.sql`. Set to `true` when created via "Add Previous Booking" for historical bookings prior to system setup. |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 

@@ -144,6 +144,7 @@ import DoctorAccountView from "@/components/admin/DoctorAccountView";
 import ReceptionDashboardView from "@/components/admin/reception/ReceptionDashboardView";
 import { AdminBookingsView } from "@/components/admin/bookings/AdminBookingsView";
 import AdminNewBookingView from "@/components/admin/bookings/AdminNewBookingView";
+import AdminAddPreviousBookingView from "@/components/admin/bookings/AdminAddPreviousBookingView";
 import { DoctorProfileDetailsView } from "@/components/admin/doctor/DoctorProfileDetailsView";
 import DoctorAuditLogsModal from "@/components/admin/doctor/DoctorAuditLogsModal";
 import { useProviderForm } from "@/components/admin/doctor/useProviderForm";
@@ -1488,6 +1489,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const [showActionsMenuModal, setShowActionsMenuModal] = useState(false);
   const [showAddBookingModal, setShowAddBookingModal] = useState(false);
   const [showFullViewNewBooking, setShowFullViewNewBooking] = useState(false);
+  const [showAddPreviousBooking, setShowAddPreviousBooking] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -2430,7 +2432,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-034', name: 'Medical Record Intake Templates Engine', category: 'Medical & Patients', endpoint: '/api/medical-records/templates', description: 'Verifies customizable medical record intake templates, multi-service assignments, and dynamic field schema.', status: 'idle' },
     { id: 'TC-035', name: 'Patient Profile Edit & Customer Intake Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies customer profile records, phone/WhatsApp validation, address structure (City, Street, Building, Floor), and balances.', status: 'idle' },
     { id: 'TC-036', name: 'Doctor Status Management & Availability Lifecycle Engine', category: 'Services & Bookings', endpoint: '/api/providers', description: 'Verifies doctor status modal dialog, Active/Inactive status changes, and real-time synchronization across providers and linked employee accounts.', status: 'idle' },
-    { id: 'TC-037', name: 'Financial Transactions & Daily Ledger Engine', category: 'Finance & Accounting', endpoint: '/api/transactions', description: 'Verifies the clinic financial transactions dashboard, daily net payments, outstanding debts, wallet balances, and manual transaction logging.', status: 'idle' }
+    { id: 'TC-037', name: 'Financial Transactions & Daily Ledger Engine', category: 'Finance & Accounting', endpoint: '/api/transactions', description: 'Verifies the clinic financial transactions dashboard, daily net payments, outstanding debts, wallet balances, and manual transaction logging.', status: 'idle' },
+    { id: 'TC-038', name: 'Historical & Previous Bookings Intake Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies recording of previous historical clinic bookings, patient matching/creation, and booking history preservation.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -7248,7 +7251,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {/* ── BOOKINGS & NEW BOOKING FULL VIEW ── */}
+          {/* ── BOOKINGS, NEW BOOKING & PREVIOUS BOOKING FULL VIEW ── */}
           {activeNav === "Bookings" && (
             showFullViewNewBooking ? (
               <AdminNewBookingView
@@ -7266,6 +7269,23 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 t={adminTranslations[lang].bookings.adminNewBookingView}
                 activeBranchId={branch}
               />
+            ) : showAddPreviousBooking ? (
+              <AdminAddPreviousBookingView
+                onClose={() => setShowAddPreviousBooking(false)}
+                onBookingCreated={() => {
+                  clearFetchCache();
+                  fetchAllReservations();
+                  fetchCustomers();
+                  setShowAddPreviousBooking(false);
+                }}
+                services={localServices}
+                providers={providers}
+                customers={dbCustomers}
+                branches={branches}
+                activeBranchId={branch}
+                lang={lang}
+                t={adminTranslations[lang].bookings.adminAddPreviousBooking}
+              />
             ) : (
               <AdminBookingsView
                 allReservations={allReservations as any}
@@ -7277,6 +7297,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 lang={lang}
                 t={adminTranslations[lang].bookings.adminBookingsView}
                 onNewBooking={() => setShowFullViewNewBooking(true)}
+                onAddPreviousBooking={() => setShowAddPreviousBooking(true)}
                 onPendingApprovalsClick={() => {
                   const el = document.getElementById("pending-approvals-section");
                   if (el) el.scrollIntoView({ behavior: "smooth" });

@@ -26,7 +26,9 @@ import {
   Loader2,
   List,
   Coins,
-  DollarSign
+  DollarSign,
+  History,
+  CalendarPlus
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getSessionStaleness } from "@/lib/services";
@@ -57,6 +59,7 @@ interface AdminBookingsViewProps {
   localServices?: any[];
   userName?: string;
   onNewBooking?: () => void;
+  onAddPreviousBooking?: () => void;
   onPendingApprovalsClick?: () => void;
   onFilterClick?: () => void;
   onViewBookingDetails?: (booking: any) => void;
@@ -99,6 +102,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   localServices = [],
   userName = "Sara",
   onNewBooking,
+  onAddPreviousBooking,
   onPendingApprovalsClick,
   onFilterClick,
   onViewBookingDetails,
@@ -916,7 +920,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             </button>
 
             {isMoreMenuOpen && (
-              <div className="absolute end-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
+              <div className="absolute end-0 top-full z-30 mt-2 w-52 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
                 <button
                   onClick={() => { onPrint?.(); setIsMoreMenuOpen(false); }}
                   className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer"
@@ -931,6 +935,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 >
                   <Download size={15} className="text-[#6B7280]" />
                   {tr.exportCsvBtn}
+                </button>
+                <div className="mx-4 border-t border-gray-100" />
+                <button
+                  onClick={() => { onAddPreviousBooking?.(); setIsMoreMenuOpen(false); }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-[#F4F7F2] hover:text-[#2D3F2A] transition cursor-pointer"
+                >
+                  <History size={15} className="text-[#3D5A45]" />
+                  <span>{tr.addPreviousBookingBtn || "Add Previous Booking"}</span>
                 </button>
               </div>
             )}

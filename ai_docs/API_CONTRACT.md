@@ -241,6 +241,29 @@ manual bookings can override to schedule a deliberate one-off exception).
 
 ---
 
+## GET /api/reservations/previous
+
+Health & diagnostic endpoint for historical bookings and System Test Suite (`TC-038`). Returns metadata and recent historical booking entries.
+
+**Response:** `{ status: "ok", message: string, count: number, historicalBookings: ReservationRow[] }`
+
+---
+
+## POST /api/reservations/previous
+
+Creates a historical/previous booking that occurred before joining Revera Clinics. Does not create an upcoming active appointment, schedule conflict, or doctor slot reservation.
+
+**Body:** `{ patientPhone: string, patientName: string, date: string, doctorId?: string, doctorName?: string, serviceId?: number, serviceName?: string, paymentType?: string, branchId?: string, notes?: string, amountPaid?: number }`
+
+- Required: `patientPhone`, `patientName`, `date`.
+- Phone validation: Validates Egyptian (`01[0125]XXXXXXXX`) or international mobile format. Returns 400 with `"Please enter a valid phone number."` on invalid phone.
+- Patient matching: Looks up `customers` by phone. If matched, links `customer_id` and increments `number_of_bookings`. If not matched, auto-creates a new patient in `customers` (`active = true`, `number_of_bookings = 1`) and links the new ID.
+- Booking status: Saved with `status = 'completed'`, `is_manual = true`, `is_historical = true`, and preserving original historical `date`.
+
+**Response:** `{ success: true, message: string, booking: object, customer: object, isNewPatient: boolean }`
+
+---
+
 ## PATCH /api/reservations?id={id}
 
 Updates a reservation. Supports three modes:

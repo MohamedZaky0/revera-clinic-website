@@ -284,3 +284,23 @@ The following are **not currently enforced in code**:
    - Requires selecting a completed original transaction.
    - Refund amount cannot exceed the original eligible payment.
    - Mandatory refund reason recorded in audit trail.
+
+---
+
+## Historical & Previous Bookings Rules
+**Enforced in:** `/api/reservations/previous`, `src/components/admin/bookings/AdminAddPreviousBookingView.tsx`, `AdminBookingsView.tsx`
+
+1. **Non-Disruption of Live Scheduling**:
+   - Historical bookings are saved with `status = 'completed'`, `is_manual = true`, and `is_historical = true`.
+   - Historical bookings never generate pending approval cards, upcoming appointment slot reservations, or doctor live calendar conflicts.
+2. **Original Historical Date Preservation**:
+   - The user-specified historical date (even years prior to system deployment) is preserved verbatim in `reservations.date` and `reservations.completed_at`.
+3. **Patient Matching & Automatic Profile Creation**:
+   - Matches existing patients by phone number (normalizing Egyptian formats `+201...`, `00201...`, `201...` to `01...`).
+   - If matched, links the historical reservation to `customer_id` and increments `number_of_bookings`.
+   - If no patient matches the phone number, a new patient record is automatically created in `customers` (`active = true`, `number_of_bookings = 1`) and linked.
+4. **Field Optionality**:
+   - `patientPhone`, `patientName`, and `date` are mandatory.
+   - `doctor`, `service`, and `paymentType` are optional and can remain empty without failing creation.
+5. **Patient & Booking History Visibility**:
+   - The historical reservation is displayed in the patient's Profile Booking History and the All Appointments directory.

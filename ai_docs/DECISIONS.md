@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-08-27 (DEC-045)
+> **Last Updated:** 2026-08-29 (DEC-046)
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -1720,3 +1720,24 @@ into the admin panel — it only removes them from new-booking eligibility (and 
 wired yet, see RISK-075's "not done in this pass" note on `GET /api/availability`). If a real
 account-suspension feature is needed later, design it fresh against the auth call sites rather than
 assuming this flag can be repurposed.
+
+---
+
+## DEC-046: Add Previous / Historical Booking Intake Engine and System Test Suite Diagnostics
+
+**Date:** 2026-08-29
+**Status:** Decided & Implemented
+
+**Context:**
+Receptionists and Clinic Admins need to manually record historical bookings that took place before the clinic adopted Revera Clinics. Previously, the system only allowed creating new upcoming appointments via `AdminNewBookingView`, which enforces future slot availability, doctor shift checks, and creates active appointments that block rooms/doctors.
+
+**Decision:**
+1. Built a dedicated `AdminAddPreviousBookingView` component accessible via the 3-dots action menu beside `+ New Booking` in `AdminBookingsView`.
+2. Created backend endpoint `POST /api/reservations/previous`:
+   - Validates required fields (`patientPhone`, `patientName`, `date`).
+   - Validates Egyptian and international phone numbers.
+   - Performs patient matching on `customers` table by normalized phone: links to existing patient and increments booking count, or automatically provisions a new customer record.
+   - Saves historical bookings with `status = 'completed'`, `is_manual = true`, `is_historical = true`, and preserves the historical date without interfering with active schedules or room/doctor availability.
+3. Created `GET /api/reservations/previous` and integrated test case `TC-038` into the Admin Settings System Test Suite (`/admin` -> Settings -> System Test Suite).
+4. Provided full bilingual localization (EN/AR) in `src/components/admin/translations.ts`.
+
