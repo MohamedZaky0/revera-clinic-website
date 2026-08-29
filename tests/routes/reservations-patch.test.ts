@@ -815,6 +815,50 @@ describe('transaction history written on checkout', () => {
     expect(ids).toContain('TXN-001001');
   });
 
+  // A deposit is cash in the drawer the day it is handed over, but the invoice does not exist
+  // until checkout — so it used to surface nowhere until completion, understating the till on
+  // every day a deposit was taken.
+  it('records the deposit on the day it is paid, not weeks later at checkout', async () => {
+    fake.seed('reservations', [baseReservation({ status: 'pending_deposit', amount_paid: 0, amount_left: 500 })]);
+
+    await PATCH(staffReq({ id: RES_ID, body: { status: 'pending', amountPaid: 150, amountLeft: 350 } }));
+
+    const txns = fake.rows('transactions');
+    expect(txns).toHaveLength(1);
+    expect(txns[0]).toMatchObject({ type: 'payment', amount: 150, reservation_id: RES_ID });
+    expect(txns[0].description).toMatch(/deposit/i);
+  });
+
+  it('the later checkout records only the remaining balance, so the deposit is not counted twice', async () => {
+    fake.seed('reservations', [baseReservation({ status: 'pending_deposit', amount_paid: 0, amount_left: 500 })]);
+    await PATCH(staffReq({ id: RES_ID, body: { status: 'pending', amountPaid: 150, amountLeft: 350 } }));
+
+    // Booking now carries the deposit; complete it for the full 500.
+    const afterDeposit = fake.rows('reservations').find((r) => r.id === RES_ID)!;
+    fake.seed('reservations', [{ ...afterDeposit, status: 'confirmed' }]);
+    await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 500, amountLeft: 0 } }));
+
+    const payments = fake.rows('transactions').filter((t) => t.type === 'payment');
+    // 150 on deposit day + 350 at checkout = 500 collected, counted once.
+    expect(payments.map((p) => p.amount).sort((a, b) => a - b)).toEqual([150, 350]);
+    expect(payments.reduce((s, p) => s + p.amount, 0)).toBe(500);
+
+    // The invoice itself is still owed and paid the full 500 — only the history is split.
+    const invoice = fake.rows('invoices').find((i) => i.reservation_id === RES_ID)!;
+    expect(fake.rows('payments').filter((p) => p.invoice_id === invoice.id)[0].amount).toBe(500);
+  });
+
+  it('a deposit does not move spent/outstanding — the service has not been delivered yet', async () => {
+    fake.seed('reservations', [baseReservation({ status: 'pending_deposit', amount_paid: 0, amount_left: 500 })]);
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, spent_amount: 0, outstanding: 0 }]);
+
+    await PATCH(staffReq({ id: RES_ID, body: { status: 'pending', amountPaid: 150, amountLeft: 350 } }));
+
+    const customer = fake.rows('customers').find((c) => c.id === CUSTOMER_ID)!;
+    expect(customer.spent_amount).toBe(0);
+    expect(customer.outstanding).toBe(0);
+  });
+
   it('a ledger failure does not break the checkout — the money still moves', async () => {
     // The transaction recorder is deliberately non-fatal: a patient is at the desk and the
     // invoice/payment/balance writes have already happened.

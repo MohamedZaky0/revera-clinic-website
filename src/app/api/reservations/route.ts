@@ -291,13 +291,20 @@ async function writeCheckoutInvoice(params: {
   providerId: string | null;
   serviceIds: number[];
   amountPaid: number;
+  /**
+   * How much of `amountPaid` had already been collected before this checkout — i.e. the deposit.
+   * The `payments` row is written for the full cumulative `amountPaid` (that is what the invoice
+   * is owed), but the customer-history transaction is written for the *new* money only, since the
+   * deposit already got its own row on the day it was actually handed over.
+   */
+  priorPaid?: number;
   consumptionOverrides?: Record<string, Record<string, number>>;
   receivedByEmployeeId?: string | null;
   redeemedServiceIds?: number[];
 }): Promise<void> {
   const {
-    reservationId, customerId, branchId, providerId, serviceIds, amountPaid, consumptionOverrides,
-    receivedByEmployeeId, redeemedServiceIds,
+    reservationId, customerId, branchId, providerId, serviceIds, amountPaid, priorPaid = 0,
+    consumptionOverrides, receivedByEmployeeId, redeemedServiceIds,
   } = params;
   if (serviceIds.length === 0) return;
   const redeemedSet = new Set((redeemedServiceIds || []).map(Number));
@@ -453,11 +460,14 @@ async function writeCheckoutInvoice(params: {
       createdByEmployeeId: receivedByEmployeeId || null,
     });
   }
-  if (amountPaid > 0) {
+  const newMoneyAtCheckout = amountPaid - Math.max(0, priorPaid);
+  if (newMoneyAtCheckout > 0) {
     await recordTransaction({
       type: 'payment',
-      amount: amountPaid,
-      description: `Payment received for invoice ${invoiceNo}`,
+      amount: newMoneyAtCheckout,
+      description: priorPaid > 0
+        ? `Balance paid at checkout for invoice ${invoiceNo}`
+        : `Payment received for invoice ${invoiceNo}`,
       customerId,
       branchId,
       invoiceId: invoice.id,
@@ -1603,6 +1613,7 @@ export async function PATCH(req: Request) {
               providerId: updated.provider_id ?? null,
               serviceIds,
               amountPaid: Math.max(0, paymentDelta),
+              priorPaid: oldPaidAmount,
               consumptionOverrides,
               redeemedServiceIds: Array.isArray(redeemedServiceIds) ? redeemedServiceIds.map(Number) : undefined,
             });
@@ -1612,6 +1623,30 @@ export async function PATCH(req: Request) {
         } catch (invoiceErr) {
           console.error('Failed to write Phase 1 invoice (dual-write, non-fatal):', invoiceErr, '| reservation:', id);
         }
+      }
+
+      // Deposit paid on a booking leaving `pending_deposit`. Deliberately outside the
+      // `isSettlement` block above: a deposit is not a settlement (it must not move
+      // spent/outstanding — the service has not been delivered yet), which is exactly why the cash
+      // used to surface nowhere until checkout, days or weeks later, understating the till on
+      // every day a deposit was taken (RISK-076). No `payments` row is written because this
+      // booking has no invoice yet; `writeCheckoutInvoice` receives `priorPaid` so the eventual
+      // checkout records only the remaining balance and this is never counted twice.
+      if (
+        target.status === 'pending_deposit' &&
+        status !== undefined &&
+        status !== 'pending_deposit' &&
+        amountPaid !== undefined &&
+        Number(amountPaid) > Number(target.amount_paid || 0)
+      ) {
+        await recordTransaction({
+          type: 'payment',
+          amount: Number(amountPaid) - Number(target.amount_paid || 0),
+          description: 'Booking deposit',
+          customerId: target.customer_id || null,
+          branchId: updated.branch_id ?? null,
+          reservationId: id,
+        });
       }
 
       return NextResponse.json(mapRow(updated));
