@@ -311,45 +311,45 @@ export function useCustomerProfile({
 
   const handleAddProductToPatient = async () => {
     if (!viewingCustomerProfile || !selectedAddProductName || !selectedAddProductQty || selectedAddProductQty <= 0) return;
+    // A real inventory product is required. This used to fall back to a fabricated
+    // `prod-<timestamp>` id, which the sales API accepted (product_id is plain text with no FK),
+    // producing a real invoice and real revenue against a product that does not exist — and
+    // skipping every stock/deleted/consumable guard on the way through (RISK-076).
+    if (!selectedAddProductId) {
+      alert("Please pick a product from the inventory list before adding it.");
+      return;
+    }
     try {
       setAddingProductToPatient(true);
       const totalAmt = Number(selectedAddProductUnitPrice || 0) * Number(selectedAddProductQty || 1);
-      const res = await fetch("/api/customers/products", {
+      // One request: the sale is the financial record and owns stock movement, and it writes the
+      // patient's product balance itself via track_balance. Previously these were two separate
+      // unchecked round trips in the wrong order, so a failed sale left the patient holding a
+      // balance with no money recorded anywhere.
+      const res = await fetch("/api/inventory/products/sales", {
         method: "POST",
         headers: authenticatedJsonHeaders,
         body: JSON.stringify({
+          product_id: selectedAddProductId,
+          product_name: selectedAddProductName,
           customer_id: viewingCustomerProfile.id,
           customer_name: viewingCustomerProfile.name || '',
           customer_mobile: viewingCustomerProfile.mobile || viewingCustomerProfile.phone || '',
-          product_id: selectedAddProductId || `prod-${Date.now()}`,
-          product_name: selectedAddProductName,
           quantity: Number(selectedAddProductQty),
           unit_price: Number(selectedAddProductUnitPrice || 0),
-          total_amount: Number(totalAmt || 0)
+          total_amount: Number(totalAmt || 0),
+          sold_by: session?.user?.email || "Admin/Receptionist",
+          track_balance: true
         })
       });
 
-      if (res.ok) {
-        // Also record in product sales history
-        await fetch("/api/inventory/products/sales", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
-          },
-          body: JSON.stringify({
-            product_id: selectedAddProductId || `prod-${Date.now()}`,
-            product_name: selectedAddProductName,
-            customer_id: viewingCustomerProfile.id,
-            customer_name: viewingCustomerProfile.name || '',
-            customer_mobile: viewingCustomerProfile.mobile || viewingCustomerProfile.phone || '',
-            quantity: Number(selectedAddProductQty),
-            unit_price: Number(selectedAddProductUnitPrice || 0),
-            total_amount: Number(totalAmt || 0),
-            sold_by: session?.user?.email || "Admin/Receptionist"
-          })
-        });
+      const saleData = await res.json().catch(() => ({}));
+      if (!res.ok || saleData?.success === false) {
+        alert(saleData?.error || "Could not record the product sale. Please try again.");
+        return;
+      }
 
+      {
         if (viewingCustomerProfile.id) {
           await fetchCustomerProductBalances(viewingCustomerProfile.id);
         }

@@ -147,6 +147,45 @@ export async function POST(req: Request) {
       );
     }
 
+    await upsertCustomerProductBalance({
+      customer_id, customer_name, customer_mobile,
+      product_id, product_name, product_sku,
+      quantity, unit_price, total_amount,
+    });
+    const { balances } = await getStoredBalances();
+    return NextResponse.json({ success: true, balances });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+
+/**
+ * Adds (or tops up) a patient's owned-quantity balance for a product.
+ *
+ * Extracted so `POST /api/inventory/products/sales` can do it in the same request as the sale
+ * itself. The admin UI used to fire the two endpoints as separate unchecked round trips, which
+ * meant a failed sale left the patient holding a balance with no money recorded anywhere
+ * (RISK-076). Stock is deliberately NOT deducted here — the sales route owns that; doing both
+ * removed twice the quantity (RISK-013).
+ */
+export async function upsertCustomerProductBalance(input: {
+  customer_id: string;
+  customer_name?: string;
+  customer_mobile?: string;
+  product_id?: string;
+  product_name: string;
+  product_sku?: string;
+  quantity: number;
+  unit_price?: number;
+  total_amount?: number;
+}): Promise<void> {
+  const {
+    customer_id, customer_name, customer_mobile,
+    product_id, product_name, product_sku,
+    quantity, unit_price, total_amount,
+  } = input;
+
+  {
     const currentData = await getStoredBalances();
     const balances = [...(currentData.balances || [])];
 
@@ -196,16 +235,6 @@ export async function POST(req: Request) {
     }
 
     await saveBalancesData({ balances });
-
-    // Stock is NOT deducted here — deliberately. This route records what a patient owns;
-    // POST /api/inventory/products/sales owns stock movement and is called alongside it by
-    // both admin flows (handleConfirmSellProduct and handleAddProductToPatient). Deducting
-    // in both meant selling 2 units removed 4 (RISK-013). If you add a caller that creates a
-    // patient balance WITHOUT recording a sale, deduct stock there or the count will drift.
-
-    return NextResponse.json({ success: true, balances });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
 

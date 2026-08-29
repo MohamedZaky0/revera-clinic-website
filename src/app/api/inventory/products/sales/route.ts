@@ -5,6 +5,7 @@ import { requireStaffAccess } from '@/lib/access';
 import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/ledger';
 import { recordWalletMovement } from '@/lib/wallet';
 import { recordTransaction } from '@/lib/transactionLedger';
+import { upsertCustomerProductBalance } from '@/app/api/customers/products/route';
 
 export const dynamic = 'force-dynamic';
 
@@ -182,6 +183,38 @@ async function deductFromWallet(customerId: string, amount: number, invoiceId?: 
     });
   } catch (err) {
     console.error('Error deducting customer wallet_balance:', err);
+  }
+}
+
+
+/**
+ * Records the patient's owned-quantity balance for a sale, when the caller asked for it.
+ *
+ * Runs only after the sale itself has succeeded, so the financial record is never the thing that
+ * goes missing: a sale without a balance row is a tracking gap that can be rebuilt from
+ * product_sales, whereas a balance row without a sale is money the clinic collected and never
+ * booked. The admin UI used to make these two writes as separate unchecked round trips in the
+ * wrong order (RISK-076). Non-fatal for the same reason.
+ */
+async function trackBalanceIfRequested(
+  requested: unknown,
+  sale: ProductSaleRecord
+): Promise<void> {
+  if (!requested) return;
+  try {
+    await upsertCustomerProductBalance({
+      customer_id: sale.customer_id,
+      customer_name: sale.customer_name,
+      customer_mobile: sale.customer_mobile,
+      product_id: sale.product_id,
+      product_name: sale.product_name,
+      product_sku: sale.product_sku,
+      quantity: sale.quantity,
+      unit_price: sale.unit_price,
+      total_amount: sale.total_amount,
+    });
+  } catch (balErr) {
+    console.error('Sale recorded but customer product balance failed (non-fatal):', balErr);
   }
 }
 
@@ -395,7 +428,8 @@ export async function POST(req: Request) {
       branch_name,
       sold_by,
       payment_method,
-      notes
+      notes,
+      track_balance
     } = body;
 
     if (!product_id || !customer_id || !quantity || quantity <= 0) {
@@ -437,16 +471,29 @@ export async function POST(req: Request) {
       .eq('id', product_id)
       .maybeSingle();
     if (stockCheckErr) throw stockCheckErr;
+    // A product_id that matches nothing used to skip every guard below — each was written as
+    // `if (productForStockCheck && ...)`, so a missing row disabled the deleted-product check, the
+    // consumable check and the stock check all at once. `product_sales.product_id` is plain text
+    // with no FK, so the row inserted cleanly and produced a real invoice and real revenue against
+    // a product that does not exist. The admin UI could reach this by fabricating
+    // `prod-<timestamp>` when no product was picked (RISK-076). Rejecting outright is the only
+    // safe answer: there is no stock to move and no cost basis to report against.
+    if (!productForStockCheck) {
+      return NextResponse.json(
+        { success: false, error: `Product '${product_id}' does not exist.` },
+        { status: 404 }
+      );
+    }
     // DEC-038: a soft-deleted product is gone from the catalog everywhere else — selling it here
     // would keep generating real product_sales/invoice_lines revenue against something the clinic
     // marked as deleted, which is exactly the Finance-integrity gap soft delete exists to close.
-    if (productForStockCheck && (productForStockCheck as any).deleted_at) {
+    if ((productForStockCheck as any).deleted_at) {
       return NextResponse.json(
         { success: false, error: 'This product has been deleted and can no longer be sold.' },
         { status: 410 }
       );
     }
-    if (productForStockCheck && (productForStockCheck as any).role === 'consumable') {
+    if ((productForStockCheck as any).role === 'consumable') {
       return NextResponse.json(
         {
           success: false,
@@ -455,7 +502,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    if (productForStockCheck && Number(productForStockCheck.stock_quantity || 0) < Number(quantity)) {
+    if (Number(productForStockCheck.stock_quantity || 0) < Number(quantity)) {
       return NextResponse.json(
         {
           success: false,
@@ -532,6 +579,7 @@ export async function POST(req: Request) {
       }
 
       const allSales = await getStoredSalesData();
+      await trackBalanceIfRequested(track_balance, mapDbRowToSale(insertedDb as ProductSaleDbRow));
       return NextResponse.json({
         success: true,
         sale: mapDbRowToSale(insertedDb as ProductSaleDbRow),
@@ -549,6 +597,7 @@ export async function POST(req: Request) {
     const updatedSales = [newSale, ...(currentData.sales || [])];
     await saveSalesData({ sales: updatedSales });
 
+    await trackBalanceIfRequested(track_balance, newSale);
     return NextResponse.json({ success: true, sale: newSale, sales: updatedSales });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
