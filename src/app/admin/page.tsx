@@ -3419,12 +3419,25 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
     const dbList = Array.isArray(dbCustomers) ? dbCustomers : [];
 
+    const normalizePhone = (p: string | null | undefined): string => {
+      if (!p) return "";
+      let digits = String(p).replace(/\D/g, "");
+      if (digits.startsWith("0020")) digits = digits.slice(4);
+      else if (digits.startsWith("20")) digits = digits.slice(2);
+      if (digits.length === 10 && (digits.startsWith("10") || digits.startsWith("11") || digits.startsWith("12") || digits.startsWith("15"))) {
+        digits = "0" + digits;
+      }
+      return digits;
+    };
+
     const processedDbCustomers = dbList.map((c) => {
-      const customerReservations = allReservations.filter((r: any) => 
-        (r.phone && (r.phone === c.mobile || r.phone === c.phone)) ||
-        (r.customerId && r.customerId === c.id) ||
-        (c.name && r.name && r.name.trim().toLowerCase() === c.name.trim().toLowerCase())
-      );
+      const cPhoneClean = normalizePhone(c.mobile || c.phone);
+      const customerReservations = allReservations.filter((r: any) => {
+        if (r.customerId && c.id && String(r.customerId) === String(c.id)) return true;
+        const rPhoneClean = normalizePhone(r.phone || r.mobile || r.customerPhone);
+        if (cPhoneClean && rPhoneClean && cPhoneClean === rPhoneClean) return true;
+        return false;
+      });
 
       const hasRecentBooking = customerReservations.some((r: any) => {
         if (!r.date) return false;
@@ -3432,7 +3445,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         return bookingDate >= twoWeeksAgo;
       });
 
-      const totalBookingsCount = Math.max(c.number_of_bookings || 0, customerReservations.length);
+      const totalBookingsCount = customerReservations.length > 0
+        ? customerReservations.length
+        : Number(c.number_of_bookings || 0);
+
       const totalSpentCalculated = customerReservations.reduce((sum: number, r: any) => {
         if (['approved', 'confirmed', 'completed', 'started'].includes(r.status)) {
           return sum + Number(r.price || r.totalPrice || 0);
@@ -3482,34 +3498,32 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
     // Synthesize entries for any patients in allReservations who aren't in dbCustomers
     const existingIds = new Set(processedDbCustomers.map((c) => c.id).filter(Boolean));
-    const existingPhones = new Set(processedDbCustomers.map((c) => c.phone?.trim()).filter(Boolean));
-    const existingNames = new Set(processedDbCustomers.map((c) => c.name?.trim().toLowerCase()).filter(Boolean));
+    const existingPhones = new Set(processedDbCustomers.map((c) => normalizePhone(c.phone || c.mobile)).filter(Boolean));
 
     const reservationDerivedCustomers: Customer[] = [];
     allReservations.forEach((r: any) => {
-      // A reservation linked to a real customer record is always covered by that
-      // record, regardless of whether this particular booking's name/phone snapshot
-      // matches it verbatim (bookings can carry different display names/whitespace).
+      // A reservation linked to a real customer record is always covered by that record
       if (r.customerId && existingIds.has(r.customerId)) return;
 
       const name = r.name || r.patient_name || r.customerName;
-      const phone = (r.phone || r.mobile || r.customerPhone || "").trim();
+      const rawPhone = r.phone || r.mobile || r.customerPhone || "";
+      const phoneClean = normalizePhone(rawPhone);
       const email = r.email || r.customerEmail || "";
 
-      if (!name) return;
-      const nameKey = name.trim().toLowerCase();
+      if (!name && !rawPhone) return;
 
-      if ((phone && existingPhones.has(phone)) || existingNames.has(nameKey)) {
+      if (phoneClean && existingPhones.has(phoneClean)) {
         return; // already covered
       }
 
-      existingNames.add(nameKey);
-      if (phone) existingPhones.add(phone);
+      if (phoneClean) existingPhones.add(phoneClean);
 
-      const patientReservations = allReservations.filter((otherR: any) =>
-        (phone && (otherR.phone === phone || otherR.mobile === phone)) ||
-        (otherR.name && otherR.name.trim().toLowerCase() === nameKey)
-      );
+      const patientReservations = allReservations.filter((otherR: any) => {
+        if (r.customerId && otherR.customerId && String(otherR.customerId) === String(r.customerId)) return true;
+        const otherPhoneClean = normalizePhone(otherR.phone || otherR.mobile || otherR.customerPhone);
+        if (phoneClean && otherPhoneClean && phoneClean === otherPhoneClean) return true;
+        return false;
+      });
 
       const totalSpent = patientReservations.reduce((sum: number, pr: any) => {
         if (['approved', 'confirmed', 'completed', 'started'].includes(pr.status)) {
@@ -3539,9 +3553,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       const regDateStr = r.createdAt || r.date || now.toISOString();
 
       reservationDerivedCustomers.push({
-        id: r.customerId || `res-cust-${phone || Math.random().toString(36).slice(2, 9)}`,
+        id: r.customerId || `res-cust-${phoneClean || Math.random().toString(36).slice(2, 9)}`,
         name,
-        phone,
+        phone: rawPhone,
         email,
         createdAt: regDateStr,
         lastBookingDate: lastBookingDateVal,
