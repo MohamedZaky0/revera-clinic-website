@@ -1,7 +1,7 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-28 (RISK-076 added and resolved same day; RISK-063/RISK-075 resolved
-> 2026-08-27; RISK-066/067/069 resolved 2026-08-23 — see summary below)
+> **Last Updated:** 2026-08-29 (RISK-076 second pass — deep business-logic audit of the
+> Transactions module; RISK-063/RISK-075 resolved 2026-08-27; RISK-066/067/069 resolved 2026-08-23)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -3285,6 +3285,114 @@ an empty table returns real zero-valued stats and an empty list rather than fabr
 inserting anything. `/api/transactions` and `/api/transactions/audit-logs` also registered in
 `tests/routes/auth-sweep.test.ts`. Full suite: 679 passing, 7 expected-fail (was 635/7).
 
+---
+
+### Second pass, 2026-08-29 — deep business-logic audit (requested review of the same module)
+
+The first pass fixed what was *broken*. A follow-up audit asked for explicitly on business-logic
+grounds found that the module was also **not reachable at all**, and that its core premise was
+unimplemented. Fixed across three commits (`00b9440`, `527d5cf`, `62ed510`).
+
+**A. The module was non-functional end-to-end — five independent blockers:**
+1. **Not one of the six `fetch` calls in the module sent an `Authorization` header**, and every
+   route behind them requires `requireStaffAccess` — so every request returned 401 and nothing in
+   the module ever worked for anyone. Exactly the failure mode RISK-021 documented. Fixed with a
+   shared `getAuthHeaders()` in `src/lib/authHeaders.ts` (lifted out of `admin/doctor/utils.ts`,
+   which now re-exports it) wired into all six call sites.
+2. **`customers.phone` does not exist — the column is `mobile`.** Still present in the GET customer
+   join and the POST lookup after the first pass corrected `outstanding_balance`. Verified directly
+   against the live database, since the test fake ignores select lists and cannot catch this class
+   of bug — which is precisely how it survived two passes.
+3. **The patient autocomplete read `data.customers`, but `GET /api/customers` returns a bare
+   array** — the dropdown could never populate, so no patient could be selected, so no
+   patient-linked transaction could be created at all.
+4. `GET /api/customers` had **no `search`/`limit` support** (only `mobile`/`email`), so the
+   autocomplete's query was silently ignored. Both added as opt-in params.
+5. The form read `selectedCustomer.outstanding_balance` (never exists) → `currentOutstanding` was
+   always 0 → **the outstanding-payment validation rejected every amount**.
+
+Also removed the remaining fabricated demo figures on the *client* (`25450`/`14350`/`38500` in
+`TransactionsView`, `3250`/`400`/`1000` in `PatientTransactionsHistoryTab`) — the server-side ones
+went in the first pass, but these still rendered convincing fake totals whenever a fetch failed.
+And dropped the customers-stats branch filter: **`customers` has no `branch_id`** (a patient is not
+owned by a branch), so it silently errored and zeroed the Outstanding/Wallet cards whenever a branch
+was selected.
+
+**B. The ledger had no feed — the module's actual premise was unimplemented.**
+Grepping the whole repo confirmed **nothing except the manual-entry form ever wrote to
+`transactions`**, and `source: 'automatic'` was never written by any line of code. Not the checkout,
+not deposits, not product sales, not package sales. A patient with ten completed visits, paid
+deposits and product purchases showed an **empty** Transactions History — the screen was a ledger
+with one manual input pipe and zero automatic ones. (This also explains the fabricated seed data the
+first pass removed: it was masking an empty table.)
+
+Added `src/lib/transactionLedger.ts` (`recordTransaction`), modelled on the existing
+`recordWalletMovement`, called from the flows that already move money: checkout writes a
+`service_charge` (billed) plus a `payment` (collected); a later payment on a completed booking
+writes `outstanding_payment`; product sales write `product_purchase` + `payment`; package sales
+write `payment`. Each call sits next to an existing `payments` insert already guarded against
+re-firing, so the rows **inherit** that idempotency rather than inventing their own. The recorder is
+deliberately non-fatal — the patient is at the desk and the invoice/payment/balance writes have
+already committed; a missing history row is rebuildable from the invoice ledger, a failed checkout
+is not. Both properties are covered by tests.
+
+**C. "Today's Payments" was not a cash figure.** It summed every completed row regardless of type —
+inflating the till with `service_charge` rows (billed, never collected) and *subtracting*
+`wallet_deduction` rows for credit the clinic had already banked at top-up time. Now counts only
+real cash movement (`payment`/`outstanding_payment`/`wallet_topup`, less refunds), with an
+"Estimated today" line beneath it showing the full value charged today whether collected or not.
+
+**D. Refund integrity — three holes reachable during ordinary use:**
+- **No cumulative cap**: the same payment could be refunded repeatedly, each time up to its *full*
+  value. Now capped against what actually remains refundable, with the remainder reported.
+- **No ownership check**: a `related_transaction_id` belonging to a *different patient* was accepted
+  silently. Now rejected; an unknown id 404s instead of falling through unchecked.
+- **The money went nowhere**: a refund lowered `spent_amount` and that was all. Reception now
+  chooses the destination at the counter — cash back, or wallet credit (which writes a real
+  `wallet_txns` row).
+
+**E. Walk-in debt settlement (`POST /api/customers/settle-debt` + a "Settle Balance" action on
+patients who owe money).** Closes RISK-012's standing gap: the settlement math could reduce
+`customers.outstanding`, but no screen ever triggered it, so in practice patient debt only ever
+grew. Critically it does **not** just decrement the scalar — that is what the manual module did and
+why it corrupted the books. `customers.outstanding` is *derived*; leaving the reservations saying
+`amount_left = X` means the next touch of those bookings recomputes from them and either
+double-counts the payment or wipes it. The endpoint allocates **oldest-first against the patient's
+actual unpaid bookings**, updates each one, and appends a real `payments` row to its existing
+invoice. Money it cannot match to a booking is **reported back rather than absorbed** — if recorded
+debt exceeds what the bookings account for (exactly RISK-012's inflation), staff are told how much
+could not be allocated instead of the balance being quietly reduced by an amount no invoice supports.
+
+**Verification (second pass):** `tsc`, `eslint` (0 errors), `next build` all clean. Full suite
+**710 passing** / 7 expected-fail, up from 679 — 31 new tests covering the checkout's ledger writes
+(including re-fire idempotency and the non-fatal-failure path), cumulative refund caps,
+cross-patient refund rejection, FIFO allocation, partial settlement, and the unallocatable-remainder
+case. `/api/customers/settle-debt` registered in `auth-sweep.test.ts`.
+
+**Product decisions captured during this audit (from Mohamed):**
+- "Today's Payments" = cash in the drawer today; "Estimated" sits **under** it as a smaller line
+  (not a separate card) showing the full value of today's services.
+- Manual `adjustment` of balances is **not** wanted as an operational tool — every figure should
+  trace to a real financial event. The manual form's actual purpose is **entering an existing
+  patient's history from an old system or paper invoices**, which is why backdating is a feature
+  here and why the full type list is kept rather than trimmed.
+- Refund destination is the receptionist's choice per case.
+- Manual transactions feeding Finance/P&L: **not now, yes later** — see the gap below.
+
+**Still open after this pass:**
+- **Historical entries are not distinguishable from live ones.** Now that the manual form is
+  understood to be a historical-import tool, a backdated 2025 entry and a real one made today are
+  stored identically. `DEC-024` already specifies the mechanism (`is_opening` flag + shared `as_of`
+  date, written into the same ledgers) and it is **already implemented for assets, expenses and
+  loans** — but not for the patient side (receivables, wallet credit, packages). Deferred by
+  agreement to its own discussion.
+- **The ledger only reflects events from 2026-08-29 onward.** Bookings and sales that happened
+  before the automatic wiring landed will not appear. The data to backfill them exists in
+  `invoices`/`payments`; a migration script could reconstruct the history. Not attempted here.
+- The `customers.outstanding` ↔ `reservations.amount_left` relationship is now *maintained* by the
+  settlement endpoint, but pre-existing drift (RISK-012's inflated figures) is not repaired — the
+  new endpoint surfaces it as an unallocatable remainder rather than silently absorbing it.
+
 **Known gaps, not fixed in this pass — flagged for a product/architecture decision:**
 - `ai_docs/PRODUCT_RULES.md`'s own "Financial Transactions & Manual Ledger Rules" (added in the
   same commit) states refunds "Requires selecting a completed original transaction," but neither
@@ -3304,6 +3412,10 @@ inserting anything. `/api/transactions` and `/api/transactions/audit-logs` also 
   source of truth. A manual transaction recorded here will not appear in Finance module P&L/reports
   that read from that ledger — a parallel record-keeping surface, not wired into the rest of the
   financial reporting stack. A real fix is a larger architectural change beyond this pass's scope.
+  **Confirmed as a deliberate deferral 2026-08-29** ("not now, yes later"): manual transactions stay
+  out of Finance/P&L until the ledger link is built. Automatic transactions are unaffected — they
+  are recorded *alongside* the real `invoices`/`payments` writes, so Finance reporting already sees
+  that money through its existing source.
 
 ---
 

@@ -1,6 +1,6 @@
 # API_CONTRACT.md — Revera Clinics API Endpoints
 
-> **Last Updated:** 2026-08-28 (`/api/transactions*` section corrected to match reality — RISK-076)
+> **Last Updated:** 2026-08-29 (`/api/customers/settle-debt` added; `/api/transactions*` corrected — RISK-076)
 > **Base:** Next.js App Router API routes under `/app/api/`
 > **Auth:** Server-side bearer-token validation is enabled on selected sensitive routes (including employee, role, payroll, reservation PATCH/DELETE, product-sales mutations, every Phase 3 expenses/assets/loans route, and every Phase 4 `/api/finance/*` reporting route — each additionally gated on a specific `finance.*` permission via `hasFinancePermission`, not just staff membership); coverage is not yet universal. All routes use the Supabase service role key server-side
 > **Previous content was for a different project — discarded entirely**
@@ -1689,6 +1689,39 @@ effect). `adjustment` moves `wallet_balance` per `adjustment_direction` — see 
 wallet was chosen as the target field.
 
 **Response:** `{ "success": true, "transaction": Transaction, "message": "Transaction created successfully." }` on success, or `{ "error": string }` with a 400/403/404/500 status — 404 means the given `customer_id` genuinely doesn't exist, not a query failure.
+
+---
+
+## POST /api/customers/settle-debt
+
+Requires staff access. A patient paying down outstanding debt with no new booking involved — the
+gap RISK-012 flagged (the settlement math existed, no screen ever triggered it).
+
+Allocates the amount **oldest-first against the patient's actual unpaid completed bookings**,
+updating each reservation's `amount_paid`/`amount_left` and appending a real `payments` row to its
+existing invoice, then moves `customers.outstanding`/`spent_amount` by exactly what was applied.
+It deliberately does not just decrement the scalar — that leaves the reservations disagreeing with
+it, and the next touch of those bookings recomputes from them and double-counts (RISK-076).
+
+**Body:** `{ customerId, amount, paymentMethod?, note? }`
+
+**Response:**
+```json
+{
+  "success": true,
+  "settled": 200,
+  "unallocated": 0,
+  "outstandingAfter": 300,
+  "allocations": [{ "reservationId": "uuid", "amount": 200, "date": "2026-01-01" }],
+  "message": "Settled EGP 200."
+}
+```
+`unallocated` > 0 means the recorded debt exceeded what unpaid bookings account for (RISK-012's
+inflated figures). That portion is **not** collected and **not** deducted — it is reported so staff
+can investigate rather than having the balance quietly reduced by an amount no invoice supports.
+
+Rejects with 400 when the patient has no outstanding balance, when the amount exceeds it, or when
+no unpaid booking exists to allocate against; 404 for an unknown patient.
 
 ---
 
