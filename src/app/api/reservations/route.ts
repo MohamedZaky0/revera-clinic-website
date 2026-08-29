@@ -1497,7 +1497,7 @@ export async function PATCH(req: Request) {
           const { data: matchedCust } = await supabaseServer
             .from('customers')
             .select('id')
-            .or(`phone.eq.${rawPhone},phone.eq.${cleanPhone}`)
+            .or(`mobile.eq.${rawPhone},mobile.eq.${cleanPhone},mobile.eq.+20${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone},mobile.eq.0${cleanPhone.startsWith('20') ? cleanPhone.slice(2) : cleanPhone}`)
             .limit(1)
             .maybeSingle();
           if (matchedCust?.id) {

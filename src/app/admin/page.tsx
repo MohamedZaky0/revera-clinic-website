@@ -10618,6 +10618,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 setUseWalletBalance(false);
                 setDepositChangeToWallet(false);
                 setRedeemedPackageItems({});
+                clearFetchCache();
                 fetchAllReservations();
                 fetchCustomers();
                 setViewingBooking(null);

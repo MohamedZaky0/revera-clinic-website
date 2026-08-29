@@ -62,9 +62,9 @@ export function computeSettledBalances(input: SettlementInput): SettlementResult
   const outstandingDelta = wasCompleted ? newLeft - oldLeft : newLeft;
   const spentDelta = wasCompleted ? newPaid - oldPaid : newPaid;
 
-  const walletIgnored = wasCompleted && (Number(walletDeposit) !== 0 || Number(walletWithdrawal) !== 0);
-  const deposit = wasCompleted ? 0 : Number(walletDeposit || 0);
-  const withdrawal = wasCompleted ? 0 : Number(walletWithdrawal || 0);
+  const deposit = Number(walletDeposit || 0);
+  const withdrawal = Number(walletWithdrawal || 0);
+  const walletIgnored = false;
 
   const rawWallet = current.wallet + deposit - withdrawal;
   const rawSpent = current.spent + spentDelta + withdrawal;
