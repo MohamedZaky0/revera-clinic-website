@@ -100,6 +100,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
   const [description, setDescription] = useState<string>("");
   const [reason, setReason] = useState<string>("");
   const [adjustmentDirection, setAdjustmentDirection] = useState<"increase" | "decrease">("increase");
+  const [refundDestination, setRefundDestination] = useState<"cash" | "wallet">("cash");
   
   // Date & Time states
   const now = new Date();
@@ -212,8 +213,11 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
     if (transactionType === "wallet_deduction") {
       return Math.max(0, currentWalletBalance - numericAmount);
     }
+    if (transactionType === "refund" && refundDestination === "wallet") {
+      return currentWalletBalance + numericAmount;
+    }
     return currentWalletBalance;
-  }, [transactionType, currentWalletBalance, numericAmount]);
+  }, [transactionType, currentWalletBalance, numericAmount, refundDestination]);
 
   const handleSelectCustomer = (cust: CustomerOption) => {
     setSelectedCustomer(cust);
@@ -280,6 +284,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
         description: description || undefined,
         reason: reason || undefined,
         adjustment_direction: adjustmentDirection,
+        refund_destination: refundDestination,
         occurred_at: buildOccurredAt(txnDate, txnTime),
       };
 
@@ -529,6 +534,32 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                       <span className="text-emerald-700 font-bold">Refundable Amount: EGP {Number(selectedOriginalTxn.amount).toLocaleString()}</span>
                     </div>
                   )}
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-gray-700">
+                      Refund To <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {([
+                        { id: "cash", label: "Cash Back", hint: "Handed to the patient" },
+                        { id: "wallet", label: "Wallet Credit", hint: "Kept for a future visit" },
+                      ] as const).map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setRefundDestination(opt.id)}
+                          className={`rounded-xl border px-3 py-2 text-start transition cursor-pointer ${
+                            refundDestination === opt.id
+                              ? "border-[#414E36] bg-[#F3F6F1]"
+                              : "border-gray-200 bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          <span className="block text-xs font-bold text-gray-800">{opt.label}</span>
+                          <span className="block text-[10px] text-gray-500">{opt.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

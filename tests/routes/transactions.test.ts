@@ -304,11 +304,85 @@ describe('POST — refund', () => {
 
   it('rejects a refund amount exceeding the linked original transaction', async () => {
     fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 0, spent_amount: 500 }]);
-    fake.seed('transactions', [{ id: 'orig-1', amount: 300, status: 'completed' }]);
+    fake.seed('transactions', [{ id: 'orig-1', amount: 300, status: 'completed', customer_id: CUSTOMER_ID }]);
     const res = await POST(staffReq('POST', {
       body: { transaction_type: 'refund', customer_id: CUSTOMER_ID, amount: 400, reason: 'test', related_transaction_id: 'orig-1' },
     }));
     expect(res.status).toBe(400);
+  });
+
+  it('rejects a refund against another patient\'s transaction (RISK-076)', async () => {
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 0, spent_amount: 500 }]);
+    fake.seed('transactions', [{ id: 'orig-1', amount: 300, status: 'completed', customer_id: 'someone-else' }]);
+    const res = await POST(staffReq('POST', {
+      body: { transaction_type: 'refund', customer_id: CUSTOMER_ID, amount: 100, reason: 'test', related_transaction_id: 'orig-1' },
+    }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/different patient/i);
+  });
+
+  it('rejects an unknown related_transaction_id with 404 rather than silently allowing it', async () => {
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 0, spent_amount: 500 }]);
+    const res = await POST(staffReq('POST', {
+      body: { transaction_type: 'refund', customer_id: CUSTOMER_ID, amount: 100, reason: 'test', related_transaction_id: 'nope' },
+    }));
+    expect(res.status).toBe(404);
+  });
+
+  // The same payment could previously be refunded over and over, each time up to its full value.
+  it('caps refunds cumulatively — a second refund can only take what is left (RISK-076)', async () => {
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 0, spent_amount: 500 }]);
+    fake.seed('transactions', [
+      { id: 'orig-1', amount: 300, status: 'completed', customer_id: CUSTOMER_ID },
+      // 200 of the 300 has already been refunded.
+      { id: 'ref-1', amount: -200, type: 'refund', status: 'refunded', customer_id: CUSTOMER_ID, related_transaction_id: 'orig-1' },
+    ]);
+
+    const tooMuch = await POST(staffReq('POST', {
+      body: { transaction_type: 'refund', customer_id: CUSTOMER_ID, amount: 150, reason: 'test', related_transaction_id: 'orig-1' },
+    }));
+    expect(tooMuch.status).toBe(400);
+    expect((await tooMuch.json()).error).toMatch(/already refunded/i);
+
+    const exactRemainder = await POST(staffReq('POST', {
+      body: { transaction_type: 'refund', customer_id: CUSTOMER_ID, amount: 100, reason: 'test', related_transaction_id: 'orig-1' },
+    }));
+    expect(exactRemainder.status).toBe(200);
+  });
+
+  it('rejects any further refund once the original is fully refunded', async () => {
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 0, spent_amount: 500 }]);
+    fake.seed('transactions', [
+      { id: 'orig-1', amount: 300, status: 'completed', customer_id: CUSTOMER_ID },
+      { id: 'ref-1', amount: -300, type: 'refund', status: 'refunded', customer_id: CUSTOMER_ID, related_transaction_id: 'orig-1' },
+    ]);
+    const res = await POST(staffReq('POST', {
+      body: { transaction_type: 'refund', customer_id: CUSTOMER_ID, amount: 50, reason: 'test', related_transaction_id: 'orig-1' },
+    }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/fully refunded/i);
+  });
+
+  it('refund_destination "cash" leaves the wallet untouched', async () => {
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 100, outstanding: 0, spent_amount: 500 }]);
+    await POST(staffReq('POST', {
+      body: { transaction_type: 'refund', customer_id: CUSTOMER_ID, amount: 200, reason: 'test', refund_destination: 'cash' },
+    }));
+    const customer = fake.rows('customers').find((c) => c.id === CUSTOMER_ID)!;
+    expect(customer.wallet_balance).toBe(100);
+    expect(customer.spent_amount).toBe(300);
+    expect(fake.rows('wallet_txns')).toHaveLength(0);
+  });
+
+  it('refund_destination "wallet" credits the wallet and writes a ledger row', async () => {
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 100, outstanding: 0, spent_amount: 500 }]);
+    await POST(staffReq('POST', {
+      body: { transaction_type: 'refund', customer_id: CUSTOMER_ID, amount: 200, reason: 'test', refund_destination: 'wallet' },
+    }));
+    const customer = fake.rows('customers').find((c) => c.id === CUSTOMER_ID)!;
+    expect(customer.wallet_balance).toBe(300); // 100 + 200 credited back
+    expect(customer.spent_amount).toBe(300);
+    expect(fake.rows('wallet_txns')).toMatchObject([{ direction: 'in', amount: 200 }]);
   });
 
   it('does not let spent_amount go negative on an over-large refund with no linked original', async () => {

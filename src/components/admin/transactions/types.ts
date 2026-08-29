@@ -117,6 +117,8 @@ export interface NewManualTransactionInput {
   description?: string;
   reason?: string;
   adjustment_direction?: 'increase' | 'decrease';
+  /** Refunds only — cash handed back, or credited to the patient's wallet. */
+  refund_destination?: 'cash' | 'wallet';
   occurred_at?: string;
   notes?: string;
 }

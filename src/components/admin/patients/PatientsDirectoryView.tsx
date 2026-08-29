@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Plus, MoreVertical, Download, Upload, Search, Filter, Pencil, User, ArrowUpDown, ArrowDown, ArrowUp } from "lucide-react";
+import { Plus, MoreVertical, Download, Upload, Search, Filter, Pencil, User, ArrowUpDown, ArrowDown, ArrowUp, Receipt } from "lucide-react";
 import { adminTranslations } from "@/components/admin/translations";
+import SettleDebtModal from "@/components/admin/patients/SettleDebtModal";
 
 interface PatientsDirectoryViewProps {
   filteredCustomers: any[];
@@ -27,6 +28,8 @@ interface PatientsDirectoryViewProps {
   activeCustomerRowMenuId: string | null;
   setActiveCustomerRowMenuId: React.Dispatch<React.SetStateAction<string | null>>;
   customerMoreMenuRef: React.RefObject<HTMLDivElement | null>;
+  /** Refetches the customer list after a balance settlement changes it. */
+  fetchCustomers?: () => void;
   lang: "en" | "ar";
   t: typeof adminTranslations["en"]["patients"]["patientsDirectoryView"];
 }
@@ -102,9 +105,11 @@ export default function PatientsDirectoryView({
   activeCustomerRowMenuId,
   setActiveCustomerRowMenuId,
   customerMoreMenuRef,
+  fetchCustomers,
   lang,
   t,
 }: PatientsDirectoryViewProps) {
+  const [settlingCustomer, setSettlingCustomer] = useState<any | null>(null);
   const [sortField, setSortField] = useState<"lastBooking" | "bookings" | "wallet" | "outstanding" | "name" | "status" | null>("lastBooking");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [openSortDropdown, setOpenSortDropdown] = useState<"lastBooking" | "wallet" | "outstanding" | null>(null);
@@ -665,6 +670,20 @@ export default function PatientsDirectoryView({
                             <User size={13} className="text-[#5A6A51]" />
                             <span>{t.viewProfileBtn}</span>
                           </button>
+                          {outstandingAmount > 0 && hasPermission("customers.edit") && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveCustomerRowMenuId(null);
+                                setSettlingCustomer(c);
+                              }}
+                              className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                            >
+                              <Receipt size={13} className="text-[#5A6A51]" />
+                              <span>{t.settleBalanceBtn || "Settle Balance"}</span>
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -675,6 +694,15 @@ export default function PatientsDirectoryView({
           </tbody>
         </table>
       </div>
+
+      {settlingCustomer && (
+        <SettleDebtModal
+          customer={settlingCustomer}
+          lang={lang}
+          onClose={() => setSettlingCustomer(null)}
+          onSettled={() => fetchCustomers?.()}
+        />
+      )}
     </div>
   );
 }

@@ -476,7 +476,7 @@ async function writeCheckoutInvoice(params: {
  * this is a silent no-op — there is nothing to attach the payment to, and creating a bare invoice
  * with no line items would misrepresent what was actually sold.
  */
-async function appendPaymentToExistingInvoice(
+export async function appendPaymentToExistingInvoice(
   reservationId: string,
   amount: number,
   receivedByEmployeeId?: string | null

@@ -67,6 +67,7 @@ import * as CustomersPackageRedemptions from '@/app/api/customers/package-redemp
 import * as CustomersPackages from '@/app/api/customers/packages/route';
 import * as CustomersProducts from '@/app/api/customers/products/route';
 import * as CustomersReconcile from '@/app/api/customers/reconcile/route';
+import * as CustomersSettleDebt from '@/app/api/customers/settle-debt/route';
 import * as Customers from '@/app/api/customers/route';
 import * as EmployeesNotes from '@/app/api/employees/notes/route';
 import * as Employees from '@/app/api/employees/route';
@@ -160,6 +161,7 @@ const REGISTRY: RouteEntry[] = [
   { path: '/api/customers/packages', methods: [M('GET', CustomersPackages.GET, 'staff')] },
   { path: '/api/customers/products', methods: [M('GET', CustomersProducts.GET, 'staff'), M('POST', CustomersProducts.POST, 'staff'), M('PATCH', CustomersProducts.PATCH, 'staff')] },
   { path: '/api/customers/reconcile', methods: [M('GET', CustomersReconcile.GET, 'staff')] },
+  { path: '/api/customers/settle-debt', methods: [M('POST', CustomersSettleDebt.POST, 'staff')] },
   { path: '/api/customers', methods: [M('GET', Customers.GET, 'caller'), M('POST', Customers.POST, 'caller'), M('DELETE', Customers.DELETE, 'admin')] },
   { path: '/api/employees/notes', methods: [M('GET', EmployeesNotes.GET, 'admin'), M('POST', EmployeesNotes.POST, 'admin'), M('DELETE', EmployeesNotes.DELETE, 'admin')] },
   { path: '/api/employees', methods: [M('GET', Employees.GET, 'admin'), M('POST', Employees.POST, 'admin'), M('PATCH', Employees.PATCH, 'admin'), M('DELETE', Employees.DELETE, 'admin')] },
@@ -344,6 +346,6 @@ describe('registry sanity', () => {
     // This count is the acceptance criterion for "table-driven auth sweep across all handlers" —
     // if it drifts, either a route was added (add it to REGISTRY) or removed (delete its row).
     const total = ROWS.length;
-    expect(total).toBe(152);
+    expect(total).toBe(153);
   });
 });

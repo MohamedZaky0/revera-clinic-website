@@ -306,6 +306,7 @@ export async function POST(req: Request) {
       description,
       reason,
       adjustment_direction = 'increase',
+      refund_destination = 'cash',
       occurred_at,
       notes,
     } = body;
@@ -392,19 +393,57 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'A reason is required for refunds.' }, { status: 400 });
       }
       if (related_transaction_id) {
-        const { data: origTxn } = await supabaseServer
+        const { data: origTxn, error: origErr } = await supabaseServer
           .from('transactions')
-          .select('id, amount, status')
+          .select('id, amount, status, customer_id')
           .eq('id', related_transaction_id)
           .maybeSingle();
 
-        if (origTxn) {
-          const origAmt = Math.abs(Number(origTxn.amount || 0));
-          if (parsedAmount > origAmt) {
-            return NextResponse.json({
-              error: `Refund amount cannot exceed the original payment of EGP ${origAmt.toLocaleString()}.`
-            }, { status: 400 });
-          }
+        if (origErr) {
+          console.error('original transaction lookup error:', origErr.message);
+          return NextResponse.json({ error: 'Could not look up the original transaction.' }, { status: 500 });
+        }
+        if (!origTxn) {
+          return NextResponse.json({ error: 'The original transaction could not be found.' }, { status: 404 });
+        }
+        // A refund must be issued against the same patient's own payment — without this, a
+        // transaction id belonging to a different patient is silently accepted (RISK-076).
+        if (origTxn.customer_id && customer_id && origTxn.customer_id !== customer_id) {
+          return NextResponse.json({
+            error: 'That transaction belongs to a different patient.'
+          }, { status: 400 });
+        }
+
+        // Cap against what is left to refund, not the original amount — otherwise the same
+        // payment can be refunded repeatedly, each time up to its full value (RISK-076).
+        const { data: priorRefunds, error: priorErr } = await supabaseServer
+          .from('transactions')
+          .select('amount')
+          .eq('related_transaction_id', related_transaction_id)
+          .eq('type', 'refund');
+        if (priorErr) {
+          console.error('prior refunds lookup error:', priorErr.message);
+          return NextResponse.json({ error: 'Could not verify previous refunds.' }, { status: 500 });
+        }
+
+        const origAmt = Math.abs(Number(origTxn.amount || 0));
+        const alreadyRefunded = (priorRefunds || []).reduce(
+          (sum: number, r: any) => sum + Math.abs(Number(r.amount || 0)),
+          0
+        );
+        const refundable = origAmt - alreadyRefunded;
+
+        if (refundable <= 0) {
+          return NextResponse.json({
+            error: `That payment of EGP ${origAmt.toLocaleString()} has already been fully refunded.`
+          }, { status: 400 });
+        }
+        if (parsedAmount > refundable) {
+          return NextResponse.json({
+            error: alreadyRefunded > 0
+              ? `Only EGP ${refundable.toLocaleString()} is left to refund on that payment (EGP ${alreadyRefunded.toLocaleString()} already refunded).`
+              : `Refund amount cannot exceed the original payment of EGP ${origAmt.toLocaleString()}.`
+          }, { status: 400 });
         }
       }
       finalDescription = finalDescription || `Refund: ${reason}`;
@@ -496,6 +535,19 @@ export async function POST(req: Request) {
         newSpent += parsedAmount;
       } else if (transaction_type === 'refund') {
         newSpent = Math.max(0, newSpent - parsedAmount);
+        // Where the money actually goes is the receptionist's call at the counter: handed back as
+        // cash, or credited to the patient's wallet for a future visit. Before this, a refund
+        // lowered lifetime spend and the money went nowhere at all (RISK-076).
+        if (refund_destination === 'wallet') {
+          newWallet += parsedAmount;
+          await supabaseServer.from('wallet_txns').insert({
+            customer_id,
+            direction: 'in',
+            amount: parsedAmount,
+            reason: finalDescription || 'Refund credited to wallet',
+            invoice_id: invoice_id || null,
+          });
+        }
       } else if (transaction_type === 'adjustment') {
         // No target-field selector exists in the UI for "Adjustment" — adjustment_direction
         // mirrors wallet_topup/wallet_deduction's exact shape, so this treats a manual adjustment

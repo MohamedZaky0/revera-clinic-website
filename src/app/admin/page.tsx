@@ -6353,6 +6353,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 activeCustomerRowMenuId={activeCustomerRowMenuId}
                 setActiveCustomerRowMenuId={setActiveCustomerRowMenuId}
                 customerMoreMenuRef={customerMoreMenuRef}
+                fetchCustomers={fetchCustomers}
                 lang={lang}
                 t={adminTranslations[lang].patients.patientsDirectoryView}
               />
