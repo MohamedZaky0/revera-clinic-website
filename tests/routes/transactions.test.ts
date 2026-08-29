@@ -220,24 +220,26 @@ describe('POST — payment', () => {
   });
 });
 
-describe('POST — outstanding_payment', () => {
+// Settling a balance here would only move the aggregate `customers.outstanding` while the
+// reservations still read as unpaid, so the next touch of those bookings recomputes from them and
+// double-counts. The allocating path is POST /api/customers/settle-debt; this route refuses the
+// type outright rather than relying on the UI to hide it.
+describe('POST — outstanding_payment is refused on this route (RISK-076)', () => {
   beforeEach(() => seedStaffAuth('superadmin', []));
 
-  it('decreases outstanding and increases spent by the paid amount', async () => {
+  it('rejects it and points at the Settle Balance flow, leaving balances untouched', async () => {
     fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 400, spent_amount: 1000 }]);
-    const res = await POST(staffReq('POST', { body: { transaction_type: 'outstanding_payment', customer_id: CUSTOMER_ID, amount: 300 } }));
-    expect(res.status).toBe(200);
-    const customer = fake.rows('customers').find((c) => c.id === CUSTOMER_ID)!;
-    expect(customer.outstanding).toBe(100);
-    expect(customer.spent_amount).toBe(1300);
-  });
+    const res = await POST(staffReq('POST', {
+      body: { transaction_type: 'outstanding_payment', customer_id: CUSTOMER_ID, amount: 300 },
+    }));
 
-  it('rejects an amount exceeding the current outstanding balance (uses the real `outstanding` column, not `outstanding_balance`)', async () => {
-    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 100, spent_amount: 0 }]);
-    const res = await POST(staffReq('POST', { body: { transaction_type: 'outstanding_payment', customer_id: CUSTOMER_ID, amount: 150 } }));
     expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/settle balance/i);
+
     const customer = fake.rows('customers').find((c) => c.id === CUSTOMER_ID)!;
-    expect(customer.outstanding).toBe(100); // unchanged
+    expect(customer.outstanding).toBe(400);
+    expect(customer.spent_amount).toBe(1000);
+    expect(fake.rows('transactions')).toHaveLength(0);
   });
 });
 

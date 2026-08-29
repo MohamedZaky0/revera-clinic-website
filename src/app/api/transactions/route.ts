@@ -318,6 +318,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Unknown transaction type "${transaction_type}".` }, { status: 400 });
     }
 
+    // Settling an old balance has to be applied to the patient's actual unpaid bookings, or it
+    // only moves the aggregate `customers.outstanding` while the reservations still read as
+    // unpaid — and the next touch of those bookings recomputes from them and double-counts
+    // (RISK-076). That allocation lives in POST /api/customers/settle-debt. Enforced here, not
+    // just hidden in the UI, so the weaker path cannot be reached at all. Automatic
+    // `outstanding_payment` rows are written directly via recordTransaction by flows that *have*
+    // already settled the underlying booking, and do not come through this route.
+    if (transaction_type === 'outstanding_payment') {
+      return NextResponse.json({
+        error: 'Outstanding balances are settled from the patient\'s profile (Settle Balance), which applies the payment to their unpaid bookings.',
+      }, { status: 400 });
+    }
+
     // Refunds and manual balance adjustments are gated separately from ordinary transaction
     // creation, per the transactions.refund permission defined in RoleManagementView.
     if ((transaction_type === 'refund' || transaction_type === 'adjustment') && !hasFinancePermission(access.access, 'transactions.refund')) {

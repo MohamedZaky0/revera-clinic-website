@@ -53,6 +53,44 @@ function buildOccurredAt(dateStr: string, timeStr: string): string {
   return isNaN(local.getTime()) ? new Date().toISOString() : local.toISOString();
 }
 
+/**
+ * Types offerable in the manual form.
+ *
+ * `outstanding_payment` is deliberately absent. Settling an old balance has to be applied to the
+ * patient's actual unpaid bookings, otherwise it only moves the aggregate `customers.outstanding`
+ * while the reservations still say they are unpaid — and the next touch of those bookings
+ * recomputes from them and double-counts (RISK-076). That allocation lives in the Settle Balance
+ * flow on the Patients screen (`POST /api/customers/settle-debt`); offering a second, weaker path
+ * here would just reintroduce the bug. The API rejects the type on this route for the same reason.
+ */
+const TRANSACTION_TYPE_OPTIONS = [
+  { id: "payment", label: "Payment" },
+  { id: "refund", label: "Refund" },
+  { id: "wallet_topup", label: "Wallet Deposit (Top-up)" },
+  { id: "wallet_deduction", label: "Wallet Withdrawal" },
+  { id: "adjustment", label: "Adjustment" },
+  { id: "service_charge", label: "Service Charge" },
+  { id: "product_purchase", label: "Product Purchase" },
+] as const;
+
+/**
+ * Why a type cannot be picked for the currently selected patient, or null if it can.
+ *
+ * Surfaced on the option itself rather than as an error after the fact — letting someone choose
+ * "Wallet Withdrawal", type an amount and only then be told the wallet is empty is a worse
+ * experience than showing it is unavailable up front.
+ */
+function disabledReasonFor(
+  typeId: string,
+  customer: { wallet_balance?: number } | null
+): string | null {
+  if (!customer) return null; // nothing selected yet; nothing to validate against
+  if (typeId === "wallet_deduction" && Number(customer.wallet_balance || 0) <= 0) {
+    return "wallet is empty";
+  }
+  return null;
+}
+
 /** Shape returned by `GET /api/customers` — raw `customers` rows (`mobile`, `outstanding`). */
 interface CustomerOption {
   id: string;
@@ -225,6 +263,12 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
     setPatientSearch(cust.name);
     setShowCustomerDropdown(false);
     setErrorMsg(null);
+    // The chosen type may not be valid for this patient (e.g. Wallet Withdrawal picked before a
+    // patient with an empty wallet was selected) — fall back rather than leaving the form in a
+    // state that can only fail on submit.
+    if (disabledReasonFor(transactionType, cust)) {
+      setTransactionType("payment");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -239,11 +283,6 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
 
     if (numericAmount <= 0) {
       setErrorMsg("Please enter a valid amount greater than 0 EGP.");
-      return;
-    }
-
-    if (transactionType === "outstanding_payment" && numericAmount > currentOutstanding) {
-      setErrorMsg(`Amount exceeds the patient's outstanding balance of EGP ${currentOutstanding.toLocaleString()}.`);
       return;
     }
 
@@ -382,17 +421,21 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                   }}
                   className="w-full appearance-none rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 text-xs font-semibold text-gray-800 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
                 >
-                  <option value="payment">Payment</option>
-                  <option value="outstanding_payment">Outstanding Payment</option>
-                  <option value="refund">Refund</option>
-                  <option value="wallet_topup">Wallet Deposit (Top-up)</option>
-                  <option value="wallet_deduction">Wallet Withdrawal</option>
-                  <option value="adjustment">Adjustment</option>
-                  <option value="service_charge">Service Charge</option>
-                  <option value="product_purchase">Product Purchase</option>
+                  {TRANSACTION_TYPE_OPTIONS.map((opt) => {
+                    const blockedReason = disabledReasonFor(opt.id, selectedCustomer);
+                    return (
+                      <option key={opt.id} value={opt.id} disabled={Boolean(blockedReason)}>
+                        {opt.label}{blockedReason ? ` — ${blockedReason}` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
                 <ChevronDown size={15} className="pointer-events-none absolute right-3.5 top-3.5 text-gray-400" />
               </div>
+              <p className="text-[10px] text-gray-500">
+                Settling an old balance? Use <strong>Settle Balance</strong> on the patient in the
+                Patients screen — it applies the payment to their actual unpaid bookings.
+              </p>
             </div>
 
             {/* Patient Search & Autocomplete */}
