@@ -146,6 +146,35 @@ export async function GET(req?: Request) {
   }
 }
 
+function deepMergeSettings(existing: any, incoming: any): any {
+  if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+    return incoming;
+  }
+  if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
+    return incoming;
+  }
+
+  const result: Record<string, any> = { ...existing };
+  for (const key of Object.keys(incoming)) {
+    const incVal = incoming[key];
+    const exVal = existing[key];
+
+    if (
+      incVal &&
+      typeof incVal === 'object' &&
+      !Array.isArray(incVal) &&
+      exVal &&
+      typeof exVal === 'object' &&
+      !Array.isArray(exVal)
+    ) {
+      result[key] = deepMergeSettings(exVal, incVal);
+    } else {
+      result[key] = incVal;
+    }
+  }
+  return result;
+}
+
 export async function POST(req: Request) {
   const access = await requireAdministratorAccess(req);
   if ('error' in access) {
@@ -160,17 +189,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    // Fetch existing settings to merge them
+    // Fetch existing settings to deep-merge them
     const { data: existing } = await supabaseServer
       .from('page_settings')
       .select('value')
       .eq('key', 'home')
       .maybeSingle();
 
-    const mergedValue = {
-      ...(existing?.value || {}),
-      ...body
-    };
+    const mergedValue = deepMergeSettings(existing?.value || {}, body);
 
     // Save to Supabase
     const { error } = await supabaseServer
@@ -194,10 +220,7 @@ export async function POST(req: Request) {
         existingLocal = JSON.parse(fs.readFileSync(JSON_FILE_PATH, 'utf-8'));
       } catch (e) {}
     }
-    const mergedLocal = {
-      ...existingLocal,
-      ...body
-    };
+    const mergedLocal = deepMergeSettings(existingLocal, body);
     fs.mkdirSync(path.dirname(JSON_FILE_PATH), { recursive: true });
     fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(mergedLocal, null, 2));
     return NextResponse.json({ success: true });

@@ -15,7 +15,7 @@
 
 ## Status summary
 
-**11 open** · **13 partially resolved** · **49 resolved** · 73 tracked total.
+**7 open** · **13 partially resolved** · **53 resolved** · 73 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -29,10 +29,6 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 - [RISK-053](#risk-053) — New Cairo Branch's Working Hours Were Never Actually Configured
 - [RISK-058](#risk-058) — Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
 - [RISK-064](#risk-064) — "Add New Category" (Services) Has No Arabic Name Field — Every Category Created There Gets A Permanently Blank `ar`
-- [RISK-070](#risk-070) — Some Roles' "Allowed Modules" Chips Show Untranslated Category Names Instead Of Permission Labels
-- [RISK-071](#risk-071) — Notification Settings and Queue Settings Never Hydrate From Saved Data
-- [RISK-072](#risk-072) — `POST /api/page-settings` Shallow-Merge Destroys Sibling Fields Within A Key
-- [RISK-073](#risk-073) — Booking, Notification, and Queue Settings Saves Are Fire-and-Forget
 
 ## RISK-001: Duplication Friction (hardcoded Revera-specific values)
 
@@ -359,113 +355,6 @@ not a mechanical move. Fix is a second input in the same modal ("Category Name (
 `newCategoryNameAr`, and changing the save handler's `ar: ""` to `ar: newCategoryNameAr.trim()` —
 the state and prop plumbing to do this already exist, only the JSX and the one save-handler field
 are missing.
-
----
-
-## RISK-070: Some Roles' "Allowed Modules" Chips Show Untranslated Category Names Instead Of Permission Labels
-
-**Severity:** Low · **Type:** i18n / display, pre-existing data
-**Found:** 2026-08-23, browser-verifying Brief 25's Arabic translation live.
-
-**What it is:** `RoleManagementView.tsx`'s roles table renders each role's `permissions` array
-through `permissionKeyToLabel[p] || p` — exactly as Brief 25 specified, translating a recognized
-`PERMISSION_STRUCTURE` key and passing anything else through unchanged. Live in the browser, the
-seeded `Admin`/`Receptionist`/`Superadmin` roles show a mix: some chips correctly translated
-(the Finance-prefixed keys, e.g. `finance.view_pnl` → "عرض الأرباح والخسائر"), others raw English
-category words (`Bookings`, `Customers`, `Providers`, `Services`, `Settings`) that never went
-through `t.*` at all. The `Rec` role, by contrast, shows every chip correctly translated.
-
-**Root cause — data, not code:** those four roles' `permissions` arrays contain coarse,
-undotted strings (`"Bookings"`, `"Customers"`...) instead of the granular dotted keys
-`PERMISSION_STRUCTURE` actually defines (`"bookings.view_calendar"`, etc.) — almost certainly
-seeded by an older/different mechanism before the fine-grained permission model existed.
-`permissionKeyToLabel` has no entry for a bare category word, so its documented fallback (show the
-raw value rather than hide it) correctly fires. `Rec`'s permissions are properly granular, which is
-why it renders cleanly.
-
-**Not a Brief 25 defect** — the translation code does exactly what it was specified to do; the
-underlying `roles` table has mixed-format legacy data Brief 25 never touched or was asked to touch.
-
-**Not fixed here:** either migrate the coarse-format rows to granular keys, or extend
-`permissionKeyToLabel` with a second fallback layer for bare category words (translating to the
-category label instead of the raw English word) if migrating existing role data isn't wanted.
-
----
-
-## RISK-071: Notification Settings and Queue Settings Never Hydrate From Saved Data
-
-**Severity:** Medium · **Type:** Data integrity / UX
-**Found:** 2026-08-23, during Brief 26 Part 1 extraction (WINDSURF_BRIEFS.md defect #1).
-**Status:** Open.
-
-**What it is:** `fetchPageSettings()` (`src/app/admin/page.tsx:3852-4021`) hydrates `booking`,
-`deposit`, `inactivity`, `footer.serviceHours`, and `departments` from the `page_settings` blob on
-page load — but has **no branch for `data.notifications` or `data.queue`**. Confirmed by grep:
-zero matches for `data.notifications` or `data.queue` in the function. Every `setNotif*` and
-`setQueue*` setter is called only from its own `onChange` handler, never from the loader.
-
-**Consequence:** both screens are **write-only** — save works (POST reaches the API), but reload
-the admin panel and all Notification and Queue settings silently revert to their `useState`
-defaults. The user sees placeholder values, not what was saved. Same class as RISK-058 (Clinic
-Profile).
-
-**Not fixed** — Brief 26 Part 1 is extraction-only with an explicit no-behaviour-change
-requirement. The fix is adding `if (data.notifications) { setNotifSmsOtp(...); ... }` and
-`if (data.queue) { setQueueVirtualRoom(...); ... }` branches to `fetchPageSettings()`, matching
-the existing pattern for `data.booking` / `data.deposit` / `data.inactivity`.
-
----
-
-## RISK-072: `POST /api/page-settings` Shallow-Merge Destroys Sibling Fields Within A Key
-
-**Severity:** High · **Type:** Data integrity / Financial correctness
-**Found:** 2026-08-23, during Brief 26 Part 1 extraction (WINDSURF_BRIEFS.md defect #2).
-**Status:** Open.
-
-**What it is:** `POST /api/page-settings` (`src/app/api/page-settings/route.ts:149-151`) merges the
-incoming body into the existing `page_settings.value` blob with a **top-level shallow spread**:
-
-```ts
-const mergedValue = {
-  ...(existing?.value || {}),
-  ...body
-};
-```
-
-This means POSTing `{ booking: { minAdvance: 2 } }` replaces the **entire** `booking` key — any
-sibling field inside `booking` that the caller didn't send (e.g. `staleSessionHours`,
-`termsText`, `cancelWindow`) is silently destroyed.
-
-**Live instance:** `savePageSettings()` (Pages Settings, Brief 27) sends a `booking` block that
-omits `staleSessionHours`. Saving any CMS section through Pages Settings wipes
-`staleSessionHours` from the database. `handleSaveBookingSettings` (Booking Settings) includes it,
-so Booking Settings is the safe writer and Pages Settings is the destructive one.
-
-**Not fixed** — Brief 26 Part 1 is extraction-only. The fix is a deep-merge (per-key) in the
-POST handler: `{ ...existing.value, [key]: { ...existing.value[key], ...body[key] } }` for each
-top-level key in `body`, rather than replacing the whole key. Brief 26 Part 3 specifies a test
-for this (`it.fails` asserting the field is destroyed).
-
----
-
-## RISK-073: Booking, Notification, and Queue Settings Saves Are Fire-and-Forget
-
-**Severity:** Medium · **Type:** Error handling / UX
-**Found:** 2026-08-23, during Brief 26 Part 1 extraction (WINDSURF_BRIEFS.md defect #3).
-**Status:** Open.
-
-**What it is:** the save handlers for Booking Settings (`handleSaveBookingSettings`), Notification
-Settings (`handleSaveNotificationSettings`), and Queue Settings (`handleSaveQueueSettings`) in
-`src/app/admin/page.tsx` all `await fetch(...)` but **never check `res.ok`**, never alert on
-failure, never `clearFetchCache()`, and never re-fetch after saving. A failed save is completely
-silent — the user sees no error and the stale cached value persists.
-
-By contrast, `handleSaveDepositSettings` and `handleSaveInactivitySettings` **do** check `res.ok`,
-alert on success/failure, clear the cache, and re-fetch.
-
-**Not fixed** — Brief 26 Part 1 is extraction-only. The fix is adding `if (res.ok) { alert(...);
-clearFetchCache(); fetchPageSettings(); } else { alert("Failed to save..."); }` to the three
-handlers, matching the Deposit/Inactivity pattern.
 
 ---
 
@@ -1057,6 +946,10 @@ cannot reproduce for new sessions again.
 - [RISK-066](#risk-066) — System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate (RESOLVED)
 - [RISK-067](#risk-067) — `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data (RESOLVED)
 - [RISK-069](#risk-069) — Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees (RESOLVED)
+- [RISK-070](#risk-070) — Some Roles' "Allowed Modules" Chips Show Untranslated Category Names Instead Of Permission Labels (RESOLVED)
+- [RISK-071](#risk-071) — Notification Settings and Queue Settings Never Hydrate From Saved Data (RESOLVED)
+- [RISK-072](#risk-072) — `POST /api/page-settings` Shallow-Merge Destroys Sibling Fields Within A Key (RESOLVED)
+- [RISK-073](#risk-073) — Booking, Notification, and Queue Settings Saves Are Fire-and-Forget (RESOLVED)
 - [RISK-074](#risk-074) — `page.tsx` Had 95 Lines Of UTF-8/Windows-1252 Mojibake-Corrupted Arabic Content (RESOLVED)
 - [RISK-075](#risk-075) — Doctor Status Feature Wrote To A Column No Migration Created, And Three Layers Of Silent Fallback Turned The Failure Into A 200 OK (RESOLVED)
 - [RISK-076](#risk-076) — Financial Transactions Module: Wrong Column Name Broke Every Real Request, Manual Adjustments Never Applied, Fabricated Demo Data Written To The Real Ledger, No Granular Permission Enforcement (RESOLVED)
@@ -3416,6 +3309,46 @@ case. `/api/customers/settle-debt` registered in `auth-sweep.test.ts`.
   out of Finance/P&L until the ledger link is built. Automatic transactions are unaffected — they
   are recorded *alongside* the real `invoices`/`payments` writes, so Finance reporting already sees
   that money through its existing source.
+
+---
+
+## RISK-070: Some Roles' "Allowed Modules" Chips Show Untranslated Category Names Instead Of Permission Labels (RESOLVED)
+
+**Severity:** Low · **Type:** i18n / display
+**Resolved:** 2026-08-29
+
+**Resolution:**
+`src/components/admin/settings/RoleManagementView.tsx`'s `permissionKeyToLabel` map was extended with mappings for category headers, group prefixes, and legacy coarse category strings (`"Bookings"`, `"Customers"`, `"Providers"`, `"Services"`, `"Settings"`, `"Employees"`, `"Inventory"`, `"HR"`, `"Marketing"`, `"Support"`, `"Reports"`, `"Finance"`, `"Dashboard"`). Legacy seeded roles now render localized Arabic/English permission labels cleanly across the UI.
+
+---
+
+## RISK-071: Notification Settings and Queue Settings Never Hydrate From Saved Data (RESOLVED)
+
+**Severity:** Medium · **Type:** Data integrity / UX
+**Resolved:** 2026-08-29
+
+**Resolution:**
+`fetchPageSettings()` in `src/app/admin/page.tsx` was updated with hydration branches for `data.notifications` (`smsOtp`, `whatsapp`, `email`, `smsTemplate`, `smsTemplateAr`, `reminderHours`, `staffEmail`) and `data.queue` (`virtualRoom`, `showOnScreens`, `autoCheckIn`, `alertThreshold`, `avgSessionDuration`). Reloading the admin panel now hydrates and reflects persisted settings values rather than reverting to default component states.
+
+---
+
+## RISK-072: `POST /api/page-settings` Shallow-Merge Destroys Sibling Fields Within A Key (RESOLVED)
+
+**Severity:** High · **Type:** Data integrity / Settings correctness
+**Resolved:** 2026-08-29
+
+**Resolution:**
+`src/app/api/page-settings/route.ts` was updated with a recursive `deepMergeSettings` utility for both Supabase upserts and fallback JSON file storage. Updating a sub-field within a settings section (e.g. updating `minAdvance` inside `booking`) preserves all existing sibling properties (such as `staleSessionHours`, `termsText`, and `depositPercentage`) without accidental data destruction.
+
+---
+
+## RISK-073: Booking, Notification, and Queue Settings Saves Are Fire-and-Forget (RESOLVED)
+
+**Severity:** Medium · **Type:** Error handling / UX
+**Resolved:** 2026-08-29
+
+**Resolution:**
+`handleSaveBookingSettings`, `handleSaveNotificationSettings`, and `handleSaveQueueSettings` in `src/app/admin/page.tsx` now check `res.ok`, provide explicit user-facing success/error feedback (`alert`), call `clearFetchCache()`, and re-fetch settings via `fetchPageSettings()` upon successful save.
 
 ---
 

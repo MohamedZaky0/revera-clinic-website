@@ -3970,6 +3970,24 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             setInactivityCountdown(data.inactivity.countdown ?? 10);
           }
 
+          if (data.notifications) {
+            if (data.notifications.smsOtp !== undefined) setNotifSmsOtp(Boolean(data.notifications.smsOtp));
+            if (data.notifications.whatsapp !== undefined) setNotifWhatsApp(Boolean(data.notifications.whatsapp));
+            if (data.notifications.email !== undefined) setNotifEmailConfirm(Boolean(data.notifications.email));
+            if (data.notifications.smsTemplate) setNotifSmsTemplate(String(data.notifications.smsTemplate));
+            if (data.notifications.smsTemplateAr) setNotifSmsTemplateAr(String(data.notifications.smsTemplateAr));
+            if (data.notifications.reminderHours !== undefined) setNotifReminderHours(Number(data.notifications.reminderHours));
+            if (data.notifications.staffEmail) setNotifStaffEmail(String(data.notifications.staffEmail));
+          }
+
+          if (data.queue) {
+            if (data.queue.virtualRoom !== undefined) setQueueVirtualRoom(Boolean(data.queue.virtualRoom));
+            if (data.queue.showOnScreens !== undefined) setQueueShowOnScreens(Boolean(data.queue.showOnScreens));
+            if (data.queue.autoCheckIn !== undefined) setQueueAutoCheckIn(Boolean(data.queue.autoCheckIn));
+            if (data.queue.alertThreshold !== undefined) setQueueAlertThreshold(Number(data.queue.alertThreshold));
+            if (data.queue.avgSessionDuration !== undefined) setQueueAvgSessionDuration(Number(data.queue.avgSessionDuration));
+          }
+
           if (data.departments && Array.isArray(data.departments) && data.departments.length > 0) {
             setDepartmentsList(data.departments);
           } else {
@@ -4153,7 +4171,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   async function handleSaveBookingSettings() {
     setSavingBookingSettings(true);
     try {
-      await fetch("/api/page-settings", {
+      const res = await fetch("/api/page-settings", {
         method: "POST",
         headers: authenticatedJsonHeaders,
         body: JSON.stringify({
@@ -4170,8 +4188,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           }
         }),
       });
+      if (res.ok) {
+        alert("Booking settings saved successfully!");
+        clearFetchCache();
+        fetchPageSettings();
+      } else {
+        alert("Failed to save booking settings.");
+      }
     } catch (err) {
       console.error("handleSaveBookingSettings error:", err);
+      alert("Error saving booking settings.");
     } finally {
       setSavingBookingSettings(false);
     }
@@ -4180,15 +4206,31 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   async function handleSaveNotificationSettings() {
     setSavingNotificationSettings(true);
     try {
-      await fetch("/api/page-settings", {
+      const res = await fetch("/api/page-settings", {
         method: "POST",
         headers: authenticatedJsonHeaders,
         body: JSON.stringify({
-          notifications: { smsOtp: notifSmsOtp, whatsapp: notifWhatsApp, email: notifEmailConfirm, smsTemplate: notifSmsTemplate, smsTemplateAr: notifSmsTemplateAr, reminderHours: notifReminderHours, staffEmail: notifStaffEmail }
+          notifications: {
+            smsOtp: notifSmsOtp,
+            whatsapp: notifWhatsApp,
+            email: notifEmailConfirm,
+            smsTemplate: notifSmsTemplate,
+            smsTemplateAr: notifSmsTemplateAr,
+            reminderHours: notifReminderHours,
+            staffEmail: notifStaffEmail
+          }
         }),
       });
+      if (res.ok) {
+        alert("Notification settings saved successfully!");
+        clearFetchCache();
+        fetchPageSettings();
+      } else {
+        alert("Failed to save notification settings.");
+      }
     } catch (err) {
       console.error("handleSaveNotificationSettings error:", err);
+      alert("Error saving notification settings.");
     } finally {
       setSavingNotificationSettings(false);
     }
@@ -4197,15 +4239,29 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   async function handleSaveQueueSettings() {
     setSavingQueueSettings(true);
     try {
-      await fetch("/api/page-settings", {
+      const res = await fetch("/api/page-settings", {
         method: "POST",
         headers: authenticatedJsonHeaders,
         body: JSON.stringify({
-          queue: { virtualRoom: queueVirtualRoom, showOnScreens: queueShowOnScreens, autoCheckIn: queueAutoCheckIn, alertThreshold: queueAlertThreshold, avgSessionDuration: queueAvgSessionDuration }
+          queue: {
+            virtualRoom: queueVirtualRoom,
+            showOnScreens: queueShowOnScreens,
+            autoCheckIn: queueAutoCheckIn,
+            alertThreshold: queueAlertThreshold,
+            avgSessionDuration: queueAvgSessionDuration
+          }
         }),
       });
+      if (res.ok) {
+        alert("Queue settings saved successfully!");
+        clearFetchCache();
+        fetchPageSettings();
+      } else {
+        alert("Failed to save queue settings.");
+      }
     } catch (err) {
       console.error("handleSaveQueueSettings error:", err);
+      alert("Error saving queue settings.");
     } finally {
       setSavingQueueSettings(false);
     }

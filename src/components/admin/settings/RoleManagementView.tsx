@@ -210,10 +210,50 @@ export default function RoleManagementView({
   const permissionKeyToLabel = useMemo(() => {
     const map: Record<string, string> = {};
     for (const group of PERMISSION_STRUCTURE) {
+      const catLabel = t.permissionCategories?.[group.category as keyof typeof t.permissionCategories] || group.category;
+      map[group.category] = catLabel;
+      map[group.prefix] = catLabel;
+      map[group.prefix.toLowerCase()] = catLabel;
+      map[group.category.toLowerCase()] = catLabel;
+
       for (const item of group.items) {
-        map[item.key] = t.permissionLabels[item.key as keyof typeof t.permissionLabels] || item.key;
+        map[item.key] = t.permissionLabels[item.key as keyof typeof t.permissionLabels] || item.label || item.key;
       }
     }
+
+    const coarseCategoryMap: Record<string, string> = {
+      "Bookings": t.permissionCategories?.["Bookings Management"] || "Bookings",
+      "bookings": t.permissionCategories?.["Bookings Management"] || "Bookings",
+      "Customers": t.permissionCategories?.["Customer Management"] || "Customers",
+      "customers": t.permissionCategories?.["Customer Management"] || "Customers",
+      "Providers": t.permissionCategories?.["Doctor Management"] || "Providers",
+      "providers": t.permissionCategories?.["Doctor Management"] || "Providers",
+      "Doctor": t.permissionCategories?.["Doctor Management"] || "Doctor",
+      "doctor": t.permissionCategories?.["Doctor Management"] || "Doctor",
+      "Services": t.permissionCategories?.["Services Management"] || "Services",
+      "services": t.permissionCategories?.["Services Management"] || "Services",
+      "Settings": t.permissionCategories?.["Settings & System Control"] || "Settings",
+      "settings": t.permissionCategories?.["Settings & System Control"] || "Settings",
+      "Employees": t.permissionCategories?.["Employees & Staff"] || "Employees",
+      "employees": t.permissionCategories?.["Employees & Staff"] || "Employees",
+      "Inventory": t.permissionCategories?.["Inventory & Equipment"] || "Inventory",
+      "inventory": t.permissionCategories?.["Inventory & Equipment"] || "Inventory",
+      "HR": t.permissionCategories?.["HR & Attendance"] || "HR",
+      "hr": t.permissionCategories?.["HR & Attendance"] || "HR",
+      "Marketing": t.permissionCategories?.["Marketing & Campaigns"] || "Marketing",
+      "marketing": t.permissionCategories?.["Marketing & Campaigns"] || "Marketing",
+      "Support": t.permissionCategories?.["Customer Support"] || "Support",
+      "support": t.permissionCategories?.["Customer Support"] || "Support",
+      "Reports": t.permissionCategories?.["Reports & Analytics"] || "Reports",
+      "reports": t.permissionCategories?.["Reports & Analytics"] || "Reports",
+      "Finance": t.permissionCategories?.["Finance"] || "Finance",
+      "finance": t.permissionCategories?.["Finance"] || "Finance",
+      "Dashboard": t.permissionCategories?.["Reports & Analytics"] || "Dashboard",
+      "dashboard": t.permissionCategories?.["Reports & Analytics"] || "Dashboard",
+      "Overview": t.permissionCategories?.["Reports & Analytics"] || "Overview",
+    };
+
+    Object.assign(map, coarseCategoryMap);
     return map;
   }, [t]);
 
