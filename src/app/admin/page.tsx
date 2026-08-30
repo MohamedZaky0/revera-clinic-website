@@ -154,6 +154,8 @@ import AdminServicesView from "@/components/admin/services/AdminServicesView";
 import AdminInventoryView from "@/components/admin/inventory/AdminInventoryView";
 import AdminEmployeesView from "@/components/admin/employees/AdminEmployeesView";
 import AdminHrView from "@/components/admin/hr/AdminHrView";
+import CustomerSupportView from "@/components/admin/support/CustomerSupportView";
+import ReportsAnalyticsView from "@/components/admin/reports/ReportsAnalyticsView";
 import type { InventoryProductsTabRef } from "@/components/admin/inventory/InventoryProductsTab";
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
@@ -228,8 +230,8 @@ const SIDEBAR_ITEMS = [
   { label: "HR", icon: ClipboardList },
   { label: "Marketing", icon: Megaphone, submenu: true },
   { label: "Transactions", icon: ReceiptText },
-  { label: "Customer Support", icon: MessageSquare, comingSoon: true },
-  { label: "Reports", icon: BarChart3, comingSoon: true },
+  { label: "Customer Support", icon: MessageSquare },
+  { label: "Reports", icon: BarChart3 },
   { label: "Finance", icon: CircleDollarSign },
   { label: "Settings", icon: Settings, submenu: true },
   { label: "Logout", icon: LogOut },
@@ -796,7 +798,7 @@ export default function AdminPage() {
     return SIDEBAR_ITEMS.filter(item => {
       if (item.label === 'Logout') return true;
       if ((item as any).comingSoon) return false;
-      if ((item.label === 'HR' || item.label === 'Inventory' || item.label === 'Transactions') && (adminRole === 'admin' || adminRole === 'HR' || adminRole === 'receptionist' || adminRole === 'superadmin')) return true;
+      if ((item.label === 'HR' || item.label === 'Inventory' || item.label === 'Transactions' || item.label === 'Employees' || item.label === 'Marketing' || item.label === 'Customer Support' || item.label === 'Reports') && (adminRole === 'admin' || adminRole === 'HR' || adminRole === 'receptionist' || adminRole === 'superadmin')) return true;
       if (adminPermissions.includes(item.label)) return true;
       
       const parentScreenMap: Record<string, string> = {
@@ -1826,59 +1828,81 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     };
   }, [session, adminRole]);
 
+  const checkNavAccess = useCallback((nav: string): boolean => {
+    if (!adminRole) return false;
+    if (adminRole === 'superadmin') return true;
+    if (nav === 'Logout' || nav === 'Profile') return true;
+    
+    const settingsSubsections: Record<string, string> = {
+      "Clinic Profile": "settings.profile",
+      "Service Hours": "settings.service_hours",
+      "Branches": "settings.branches",
+      "Rooms": "settings.rooms",
+      "Booking Settings": "settings.booking_settings",
+      "Terms & Conditions": "settings.terms",
+      "Deposit Settings": "settings.booking_settings",
+      "Inactivity Settings": "settings.booking_settings",
+      "Notification Settings": "settings.notification",
+      "Queue Settings": "settings.queue",
+      "Pages Settings": "settings.pages",
+      "Medical Records": "settings.medical_records",
+      "Role Management": "settings.roles",
+      "System Test Suite": "settings.test_suite"
+    };
+    
+    if (settingsSubsections[nav]) {
+      return hasPermission(settingsSubsections[nav]);
+    }
+    
+    const parentScreenMap: Record<string, string> = {
+      "Dashboard": "dashboard",
+      "Bookings": "bookings",
+      "Patients": "customers",
+      "Doctors": "providers",
+      "Services": "services",
+      "Promotions": "marketing",
+      "Packages": "marketing",
+      "Inventory": "inventory",
+      "Employees": "employees",
+      "HR": "hr",
+      "Transactions": "transactions",
+      "Marketing": "marketing",
+      "Customer Support": "support",
+      "Reports": "reports",
+      "Finance": "finance",
+      "Settings": "settings",
+      "Clinical": "clinical"
+    };
+
+    if (adminPermissions.includes(nav)) return true;
+    const prefix = parentScreenMap[nav];
+    if (prefix) {
+      if (adminPermissions.includes(prefix) || adminPermissions.some(p => p.startsWith(prefix + "."))) return true;
+      if (hasPermission(prefix)) return true;
+    }
+    
+    // Default allowed administrative modules for common roles
+    if ((nav === 'HR' || nav === 'Inventory' || nav === 'Transactions' || nav === 'Employees' || nav === 'Marketing' || nav === 'Customer Support' || nav === 'Reports') && (adminRole === 'admin' || adminRole === 'HR' || adminRole === 'receptionist')) return true;
+
+    return false;
+  }, [adminRole, adminPermissions, hasPermission]);
+
+  const hasAccessToActiveNav = useMemo(() => {
+    return checkNavAccess(activeNav);
+  }, [checkNavAccess, activeNav]);
+
   useEffect(() => {
     if (adminRole === 'superadmin') return;
     if (adminPermissions.length > 0) {
-      let isPermitted = false;
-      if (activeNav === 'Logout' || activeNav === 'Profile') {
-        isPermitted = true;
-      } else {
-        const settingsSubsections: Record<string, string> = {
-          "Clinic Profile": "settings.profile",
-          "Service Hours": "settings.service_hours",
-          "Branches": "settings.branches",
-          "Booking Settings": "settings.booking_settings",
-          "Terms & Conditions": "settings.terms",
-          "Deposit Settings": "settings.booking_settings",
-          "Inactivity Settings": "settings.booking_settings",
-          "Notification Settings": "settings.notification",
-          "Queue Settings": "settings.queue",
-          "Pages Settings": "settings.pages",
-          "Medical Records": "settings.medical_records",
-          "Role Management": "settings.roles",
-          "System Test Suite": "settings.test_suite"
-        };
-        if (settingsSubsections[activeNav]) {
-          isPermitted = hasPermission(settingsSubsections[activeNav]);
-        } else {
-          const parentScreenMap: Record<string, string> = {
-            "Bookings": "bookings",
-            "Patients": "customers",
-            "Doctors": "providers",
-            "Services": "services",
-            "Promotions": "services",
-            "Packages": "services",
-            "Transactions": "transactions",
-            "Finance": "finance",
-            "Settings": "settings"
-          };
-          const prefix = parentScreenMap[activeNav];
-          if (prefix) {
-            isPermitted = adminPermissions.includes(activeNav) || adminPermissions.some(p => p.startsWith(prefix + "."));
-          } else {
-            isPermitted = adminPermissions.includes(activeNav);
-          }
-        }
-      }
-
+      const isPermitted = checkNavAccess(activeNav);
       if (!isPermitted && permittedSidebarItems.length > 0) {
         const firstPermitted = permittedSidebarItems.find(item => item.label !== 'Logout');
-        if (firstPermitted) {
+        if (firstPermitted && firstPermitted.label !== activeNav) {
           setActiveNav(firstPermitted.label);
         }
       }
     }
-  }, [adminPermissions, adminRole, activeNav, permittedSidebarItems, hasPermission]);
+  }, [adminPermissions, adminRole, activeNav, permittedSidebarItems, checkNavAccess]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -2386,61 +2410,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     if (session?.access_token) loadServicesFromApi();
   }, [session?.access_token, loadServicesFromApi]);
   // BRANCHES is now derived from the real branches state loaded from Supabase
-
-  const hasAccessToActiveNav = useMemo(() => {
-    console.log("RBAC Access Check - activeNav:", activeNav, "| adminRole:", adminRole, "| permissions:", adminPermissions);
-    if (!adminRole) return false;
-    if (adminRole === 'superadmin') return true;
-    if (activeNav === 'Logout' || activeNav === 'Profile') return true;
-    
-    const settingsSubsections: Record<string, string> = {
-      "Clinic Profile": "settings.profile",
-      "Service Hours": "settings.service_hours",
-      "Branches": "settings.branches",
-      "Booking Settings": "settings.booking_settings",
-      "Terms & Conditions": "settings.terms",
-      "Deposit Settings": "settings.booking_settings",
-      "Inactivity Settings": "settings.booking_settings",
-      "Notification Settings": "settings.notification",
-      "Queue Settings": "settings.queue",
-      "Pages Settings": "settings.pages",
-      "Medical Records": "settings.medical_records",
-      "Role Management": "settings.roles",
-      "System Test Suite": "settings.test_suite"
-    };
-    
-    if (settingsSubsections[activeNav]) {
-      const perm = settingsSubsections[activeNav];
-      return hasPermission(perm);
-    }
-    
-    const parentScreenMap: Record<string, string> = {
-      "Dashboard": "dashboard",
-      "Bookings": "bookings",
-      "Patients": "customers",
-      "Doctors": "providers",
-      "Services": "services",
-      "Promotions": "services",
-      "Packages": "services",
-      "Inventory": "inventory",
-      "Employees": "employees",
-      "HR": "hr",
-      "Transactions": "transactions",
-      "Marketing": "marketing",
-      "Customer Support": "support",
-      "Reports": "reports",
-      "Finance": "finance",
-      "Settings": "settings",
-      "Clinical": "clinical"
-    };
-
-    const prefix = parentScreenMap[activeNav];
-    if (prefix) {
-      return adminPermissions.includes(activeNav) || adminPermissions.includes(prefix) || adminPermissions.some(p => p.startsWith(prefix + "."));
-    }
-    
-    return false;
-  }, [adminRole, adminPermissions, activeNav, hasPermission]);
 
   const filteredServices = useMemo(() => {
     if (!serviceSearch.trim()) return localServices;
@@ -5797,13 +5766,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
               if (item.label === "Marketing") {
                 const Icon = item.icon;
-                const active = ["Promotions", "Packages"].includes(activeNav);
+                const active = ["Marketing", "Promotions", "Packages"].includes(activeNav);
                 return (
                   <div key={item.label} className="space-y-1">
                     <button
                       type="button"
                       onClick={() => {
                         setMarketingExpanded(!marketingExpanded);
+                        setActiveNav("Promotions");
                       }}
                       className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-start text-xs font-semibold transition-all duration-200 ${
                         active
@@ -6306,8 +6276,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {/* ── PROMOTIONS VIEW ── */}
-          {activeNav === "Promotions" && (
+          {/* ── MARKETING / PROMOTIONS VIEW ── */}
+          {(activeNav === "Marketing" || activeNav === "Promotions") && (
             <PromotionsAdminPanel
               localServices={localServices}
               setLocalServices={setLocalServices}
@@ -6319,6 +6289,26 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           {/* ── PACKAGES VIEW ── */}
           {activeNav === "Packages" && (
             <PackageAdminPanel session={session} />
+          )}
+
+          {/* ── CUSTOMER SUPPORT VIEW ── */}
+          {activeNav === "Customer Support" && (
+            <CustomerSupportView
+              lang={lang}
+              hasPermission={hasPermission}
+            />
+          )}
+
+          {/* ── REPORTS & ANALYTICS VIEW ── */}
+          {activeNav === "Reports" && (
+            <ReportsAnalyticsView
+              lang={lang}
+              hasPermission={hasPermission}
+              allReservations={allReservations}
+              providers={providers}
+              localServices={localServices}
+              branches={branches}
+            />
           )}
 
           {/* ── TRANSACTIONS VIEW ── */}
@@ -6960,7 +6950,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             <MedicalRecordsSettingsView services={SERVICES as any[]} lang={lang} authenticatedJsonHeaders={authenticatedJsonHeaders} />
           )}
 
-          {activeNav === "Role Management" && adminRole === "superadmin" && (
+          {activeNav === "Role Management" && (adminRole === "superadmin" || hasPermission("settings.roles") || hasPermission("settings") || hasPermission("Settings")) && (
             <RoleManagementView
               rolesList={rolesList}
               employeesList={employeesList}
@@ -6989,7 +6979,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             />
           )}
 
-          {activeNav === "System Test Suite" && adminRole === "superadmin" && (
+          {activeNav === "System Test Suite" && (adminRole === "superadmin" || hasPermission("settings.test_suite")) && (
             <div className="space-y-8 animate-fadeIn">
               <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
                 <div>
