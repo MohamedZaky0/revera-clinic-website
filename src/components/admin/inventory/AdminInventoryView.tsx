@@ -26,6 +26,7 @@ type Props = {
   canManageProducts: boolean;
   canManageSuppliers: boolean;
   isSuperadmin: boolean;
+  hasPermission?: (perm: string) => boolean;
   onRefreshProducts: () => Promise<void> | void;
   onCustomerSpentChange?: (customerId: string, newSpentAmount: number) => void;
   productsTabRef?: React.Ref<InventoryProductsTabRef>;
@@ -42,6 +43,7 @@ export default function AdminInventoryView({
   canManageProducts,
   canManageSuppliers,
   isSuperadmin,
+  hasPermission,
   onRefreshProducts,
   onCustomerSpentChange,
   productsTabRef,
@@ -141,6 +143,7 @@ export default function AdminInventoryView({
           authHeaders={authHeaders}
           branches={branches}
           canManage={canManageDevices}
+          hasPermission={hasPermission}
           onDeviceCountChange={setDeviceCount}
           lang={lang}
           t={t.devices}

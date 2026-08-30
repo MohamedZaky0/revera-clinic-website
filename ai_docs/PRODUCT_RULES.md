@@ -304,3 +304,21 @@ The following are **not currently enforced in code**:
    - `doctor`, `service`, and `paymentType` are optional and can remain empty without failing creation.
 5. **Patient & Booking History Visibility**:
    - The historical reservation is displayed in the patient's Profile Booking History and the All Appointments directory.
+
+---
+
+## Role-Based Access Control (RBAC) & Granular Action-Level Permissions Rules
+**Enforced in:** `src/app/admin/page.tsx`, `src/components/admin/settings/RoleManagementView.tsx`, `src/components/admin/translations.ts`, and individual view components.
+
+1. **Superadmin Immunity**:
+   - Users with `adminRole === 'superadmin'` possess blanket authorization across all navigation sections, APIs, action buttons, and 3-dots menus regardless of the `permissions` array.
+2. **Multi-Tier Hierarchical Fallback**:
+   - When checking an action-level permission (e.g., `bookings.action_print_schedule`, `providers.action_edit`, `inventory.action_update_pulses`), `hasPermission` automatically falls back to parent permissions (e.g. `bookings.view_calendar`, `providers.edit`, `inventory.manage_devices`) or the coarse category permission (e.g. `Bookings`, `Providers`, `Inventory`) if granular sub-keys are not explicitly defined.
+   - Preserves complete backward compatibility for existing roles configured prior to the granular matrix rollout.
+3. **Dynamic 3-Dots Menu Concealment**:
+   - When every individual action inside a 3-dots (`MoreVertical`) dropdown evaluates to `false` for the current user's role, the entire trigger button is suppressed from rendering. No empty or broken menus are ever shown to unauthorized staff.
+4. **Parent-Child Synchronization in Role Editor**:
+   - Selecting a category header or section parent in `RoleManagementView` automatically selects all underlying granular permissions.
+   - De-selecting all child actions automatically deselects the parent, ensuring the stored `permissions` array accurately reflects granular intent.
+5. **Coverage Across All 15 Subsystems**:
+   - RBAC rules strictly cover all 15 clinic categories: Dashboard & Reception, Bookings Management, Patient Management, Doctor Management, Services Catalog, Inventory & Devices, Employees & Staff, HR & Payroll, Financial Transactions, Marketing & Campaigns, Customer Support, Reports & Analytics, Finance & Accounting, Doctor Portal & Clinical Intake, and Settings & System Control.

@@ -178,55 +178,65 @@ export default function PatientsDirectoryView({
             )}
 
             {/* 3-Dots Actions Menu for Export & Import */}
-            <div ref={customerMoreMenuRef} className="relative">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowCustomerMoreMenu(prev => !prev);
-                }}
-                className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs dropdown-action-menu ${
-                  showCustomerMoreMenu
-                    ? "border-[#414E36] bg-[#414E36] text-white"
-                    : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
-                }`}
-                title={t.moreActionsTitle}
-              >
-                <MoreVertical size={16} />
-              </button>
+            {(() => {
+              const canExport = hasPermission("customers.export");
+              const canImport = hasPermission("customers.import");
+              if (!canExport && !canImport) return null;
 
-              {showCustomerMoreMenu && (
-                <div className="absolute end-0 top-11 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-2xl border border-[#414E36]/15 text-xs dropdown-action-menu">
+              return (
+                <div ref={customerMoreMenuRef} className="relative">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowCustomerMoreMenu(false);
-                      setShowExportCustomersModal(true);
+                      setShowCustomerMoreMenu(prev => !prev);
                     }}
-                    className="w-full text-start px-3.5 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs dropdown-action-menu ${
+                      showCustomerMoreMenu
+                        ? "border-[#414E36] bg-[#414E36] text-white"
+                        : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
+                    }`}
+                    title={t.moreActionsTitle}
                   >
-                    <Download size={15} className="text-[#5A6A51]" />
-                    <span>{t.exportBtn}</span>
+                    <MoreVertical size={16} />
                   </button>
 
-                  {hasPermission("customers.import") && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowCustomerMoreMenu(false);
-                        setShowImportCustomersModal(true);
-                      }}
-                      className="w-full text-start px-3.5 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
-                    >
-                      <Upload size={15} className="text-[#5A6A51]" />
-                      <span>{t.importBtn}</span>
-                    </button>
+                  {showCustomerMoreMenu && (
+                    <div className="absolute end-0 top-11 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-2xl border border-[#414E36]/15 text-xs dropdown-action-menu">
+                      {canExport && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCustomerMoreMenu(false);
+                            setShowExportCustomersModal(true);
+                          }}
+                          className="w-full text-start px-3.5 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                        >
+                          <Download size={15} className="text-[#5A6A51]" />
+                          <span>{t.exportBtn}</span>
+                        </button>
+                      )}
+
+                      {canImport && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCustomerMoreMenu(false);
+                            setShowImportCustomersModal(true);
+                          }}
+                          className="w-full text-start px-3.5 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                        >
+                          <Upload size={15} className="text-[#5A6A51]" />
+                          <span>{t.importBtn}</span>
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -625,68 +635,79 @@ export default function PatientsDirectoryView({
 
                   {/* 3-Dots Row Actions */}
                   <td className="px-4 py-4 text-center">
-                    <div className="dropdown-action-menu relative inline-block text-start">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveCustomerRowMenuId(prev => prev === uniqueKey ? null : uniqueKey);
-                        }}
-                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
-                          activeCustomerRowMenuId === uniqueKey
-                            ? "border-[#414E36] bg-[#414E36] text-white"
-                            : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
-                        }`}
-                        title={t.actionsTitle}
-                      >
-                        <MoreVertical size={13} />
-                      </button>
+                    {(() => {
+                      const canEdit = hasPermission("customers.action_edit");
+                      const canView = hasPermission("customers.action_view_profile");
+                      const canSettle = outstandingAmount > 0 && hasPermission("customers.action_settle_balance");
+                      if (!canEdit && !canView && !canSettle) return null;
 
-                      {activeCustomerRowMenuId === uniqueKey && (
-                        <div className={`absolute end-0 ${isNearBottom ? "bottom-8" : "top-8"} z-[9999] w-36 rounded-xl bg-white p-1 shadow-2xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu`}>
-                          {hasPermission("customers.edit") && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveCustomerRowMenuId(null);
-                                handleOpenEditCustomer(c);
-                              }}
-                              className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
-                            >
-                              <Pencil size={13} className="text-[#5A6A51]" />
-                              <span>{t.editPatientBtn}</span>
-                            </button>
-                          )}
+                      return (
+                        <div className="dropdown-action-menu relative inline-block text-start">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setActiveCustomerRowMenuId(null);
-                              setViewingCustomerProfile(c);
+                              setActiveCustomerRowMenuId(prev => prev === uniqueKey ? null : uniqueKey);
                             }}
-                            className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                            className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
+                              activeCustomerRowMenuId === uniqueKey
+                                ? "border-[#414E36] bg-[#414E36] text-white"
+                                : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
+                            }`}
+                            title={t.actionsTitle}
                           >
-                            <User size={13} className="text-[#5A6A51]" />
-                            <span>{t.viewProfileBtn}</span>
+                            <MoreVertical size={13} />
                           </button>
-                          {outstandingAmount > 0 && hasPermission("customers.edit") && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveCustomerRowMenuId(null);
-                                setSettlingCustomer(c);
-                              }}
-                              className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
-                            >
-                              <Receipt size={13} className="text-[#5A6A51]" />
-                              <span>{t.settleBalanceBtn || "Settle Balance"}</span>
-                            </button>
+
+                          {activeCustomerRowMenuId === uniqueKey && (
+                            <div className={`absolute end-0 ${isNearBottom ? "bottom-8" : "top-8"} z-[9999] w-36 rounded-xl bg-white p-1 shadow-2xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu`}>
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveCustomerRowMenuId(null);
+                                    handleOpenEditCustomer(c);
+                                  }}
+                                  className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                                >
+                                  <Pencil size={13} className="text-[#5A6A51]" />
+                                  <span>{t.editPatientBtn}</span>
+                                </button>
+                              )}
+                              {canView && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveCustomerRowMenuId(null);
+                                    setViewingCustomerProfile(c);
+                                  }}
+                                  className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                                >
+                                  <User size={13} className="text-[#5A6A51]" />
+                                  <span>{t.viewProfileBtn}</span>
+                                </button>
+                              )}
+                              {canSettle && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveCustomerRowMenuId(null);
+                                    setSettlingCustomer(c);
+                                  }}
+                                  className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                                >
+                                  <Receipt size={13} className="text-[#5A6A51]" />
+                                  <span>{t.settleBalanceBtn || "Settle Balance"}</span>
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
+                      );
+                    })()}
                   </td>
                 </tr>
               );

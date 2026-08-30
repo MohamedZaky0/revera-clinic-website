@@ -7,57 +7,86 @@ import { adminTranslations } from "@/components/admin/translations";
 
 const PERMISSION_STRUCTURE = [
   {
+    category: "Dashboard & Reception",
+    prefix: "dashboard",
+    items: [
+      { key: "dashboard.view", label: "View Dashboard Overview" },
+      { key: "reception.view_dashboard", label: "View Reception Dashboard" },
+      { key: "reception.start_shift", label: "Start / End Receptionist Shift" }
+    ]
+  },
+  {
     category: "Bookings Management",
     prefix: "bookings",
     items: [
       { key: "bookings.view_calendar", label: "View Calendar" },
-      { key: "bookings.view_list", label: "View Bookings List" },
-      { key: "bookings.create", label: "Create Bookings" },
-      { key: "bookings.edit", label: "Edit/Reschedule Bookings" },
-      { key: "bookings.approve_reject", label: "Approve/Reject Requests" },
-      { key: "bookings.delete", label: "Delete/Cancel Bookings" }
+      { key: "bookings.view_list", label: "View Bookings Directory" },
+      { key: "bookings.create", label: "Create Bookings (+ New Booking)" },
+      { key: "bookings.action_add_previous", label: "Add Previous / Historical Booking (3-Dots)" },
+      { key: "bookings.action_print_schedule", label: "Print Schedule PDF (3-Dots)" },
+      { key: "bookings.action_export_csv", label: "Export Bookings CSV (3-Dots)" },
+      { key: "bookings.approve_reject", label: "Approve / Reject Online Requests" },
+      { key: "bookings.edit", label: "Edit Booking Details & Reschedule" },
+      { key: "bookings.status_change", label: "Change Status (Confirm / Check-In / Start)" },
+      { key: "bookings.action_postpone", label: "Postpone Booking" },
+      { key: "bookings.action_cancel", label: "Cancel Booking" },
+      { key: "bookings.action_no_show", label: "Mark as No Show" },
+      { key: "bookings.delete", label: "Delete Booking Permanently" },
+      { key: "bookings.settle_payment", label: "Settle Invoice & Checkout" },
+      { key: "bookings.manage_prescriptions", label: "Issue & Send Prescriptions" },
+      { key: "bookings.manage_invoices", label: "View & Print Invoices PDF" },
+      { key: "bookings.manage_services", label: "Add / Remove Services on Booking" },
+      { key: "bookings.manage_notes", label: "Add / Edit Clinical & Booking Notes" }
     ]
   },
   {
     category: "Customer Management",
     prefix: "customers",
     items: [
-      { key: "customers.view", label: "View Customer Profiles" },
-      { key: "customers.create", label: "Create Patients" },
-      { key: "customers.edit", label: "Edit Patients" },
+      { key: "customers.view", label: "View Patient Profiles & Directory" },
+      { key: "customers.create", label: "Create Patients (+ Add Patient)" },
+      { key: "customers.edit", label: "Edit Patient Profile" },
       { key: "customers.delete", label: "Delete Patients" },
-      { key: "customers.import", label: "Import Patients (CSV)" }
+      { key: "customers.export", label: "Export Patients CSV (3-Dots)" },
+      { key: "customers.import", label: "Import Patients CSV (3-Dots)" },
+      { key: "customers.action_edit", label: "Edit Patient (Table 3-Dots)" },
+      { key: "customers.action_view_profile", label: "View Profile (Table 3-Dots)" },
+      { key: "customers.action_settle_balance", label: "Settle Balance (Table 3-Dots)" },
+      { key: "customers.manage_wallet", label: "Manage Wallet (Deposit / Withdraw)" },
+      { key: "customers.manage_reports", label: "Upload & Delete Medical Reports" },
+      { key: "customers.view_history", label: "View Booking & Clinical History" }
     ]
   },
   {
     category: "Doctor Management",
     prefix: "providers",
     items: [
-      { key: "providers.view", label: "View Doctor Profiles" },
-      { key: "providers.create", label: "Add New Doctors" },
-      { key: "providers.edit", label: "Edit Provider Details" },
+      { key: "providers.view", label: "View Doctor Profiles & Directory" },
+      { key: "providers.create", label: "Add New Doctors (+ Add Doctor)" },
+      { key: "providers.edit", label: "Edit Doctor Details & Services" },
       { key: "providers.delete", label: "Delete Doctors" },
-      { key: "providers.attendance", label: "Manage Doctor Attendance" }
+      { key: "providers.action_edit", label: "Edit Doctor (Table 3-Dots)" },
+      { key: "providers.action_change_status", label: "Change Status Active/Inactive (Table 3-Dots)" },
+      { key: "providers.action_delete", label: "Delete Doctor (Table 3-Dots)" },
+      { key: "providers.manage_schedule", label: "Manage Schedule, Shifts & Hours" },
+      { key: "providers.attendance", label: "Manage Doctor Attendance" },
+      { key: "providers.commissions", label: "Manage Doctor Commissions & Salary" }
     ]
   },
   {
     category: "Services Management",
     prefix: "services",
     items: [
-      { key: "services.view", label: "View Services List" },
-      { key: "services.create", label: "Create Services & Categories" },
-      { key: "services.edit", label: "Edit Services & Toggle Status" },
-      { key: "services.delete", label: "Delete Services" }
-    ]
-  },
-  {
-    category: "Employees & Staff",
-    prefix: "employees",
-    items: [
-      { key: "employees.view", label: "View Employee Directory" },
-      { key: "employees.create", label: "Add & Provision Employees" },
-      { key: "employees.edit", label: "Edit Employee Details & Roles" },
-      { key: "employees.delete", label: "Delete / Deactivate Employees" }
+      { key: "services.view", label: "View Services List & Catalog" },
+      { key: "services.create", label: "Create Services (+ Add Service)" },
+      { key: "services.create_category", label: "Create Categories (+ Add Category)" },
+      { key: "services.edit", label: "Edit Services & Categories" },
+      { key: "services.delete", label: "Delete Services" },
+      { key: "services.action_edit", label: "Edit Service (Table 3-Dots)" },
+      { key: "services.action_toggle_status", label: "Activate / Deactivate (Table 3-Dots)" },
+      { key: "services.action_delete", label: "Delete Service (Table 3-Dots)" },
+      { key: "services.edit_category", label: "Edit / Reorder Categories" },
+      { key: "services.delete_category", label: "Delete Categories" }
     ]
   },
   {
@@ -65,9 +94,35 @@ const PERMISSION_STRUCTURE = [
     prefix: "inventory",
     items: [
       { key: "inventory.view", label: "View Inventory & Stock Levels" },
-      { key: "inventory.manage_devices", label: "Manage Laser Devices & Pulses" },
+      { key: "inventory.manage_devices", label: "Manage Laser Devices & Equipment" },
+      { key: "inventory.action_update_pulses", label: "Update Pulses (Device 3-Dots)" },
+      { key: "inventory.action_reset_counter", label: "Reset Counter & Maintenance (Device 3-Dots)" },
+      { key: "inventory.action_view_device_history", label: "View Pulse History (Device 3-Dots)" },
+      { key: "inventory.action_edit_device", label: "Edit Device (Device 3-Dots)" },
+      { key: "inventory.action_delete_device", label: "Delete Device (Device 3-Dots)" },
       { key: "inventory.manage_products", label: "Manage Products & Pricing" },
-      { key: "inventory.manage_suppliers", label: "Manage Suppliers & Orders" }
+      { key: "inventory.create_product", label: "Add New Product" },
+      { key: "inventory.edit_product", label: "Edit Product Details" },
+      { key: "inventory.adjust_stock", label: "Adjust & Log Stock Levels" },
+      { key: "inventory.delete_product", label: "Delete Product" },
+      { key: "inventory.manage_suppliers", label: "Manage Suppliers & Vendors" },
+      { key: "inventory.manage_orders", label: "Manage Purchase Orders" }
+    ]
+  },
+  {
+    category: "Employees & Staff",
+    prefix: "employees",
+    items: [
+      { key: "employees.view", label: "View Employee Directory" },
+      { key: "employees.create", label: "Add & Provision Employees (+ Add Staff)" },
+      { key: "employees.edit", label: "Edit Employee Details & Roles" },
+      { key: "employees.delete", label: "Delete / Revoke Employee Access" },
+      { key: "employees.action_view_info", label: "View Info (Row Action)" },
+      { key: "employees.action_edit", label: "Edit Employee (Row Action)" },
+      { key: "employees.action_resend_invite", label: "Resend Invitation (Row Action)" },
+      { key: "employees.action_delete", label: "Revoke Access (Row Action)" },
+      { key: "employees.export_attendance", label: "Export Attendance Insights CSV" },
+      { key: "employees.manage_departments", label: "Manage Clinic Departments" }
     ]
   },
   {
@@ -76,15 +131,35 @@ const PERMISSION_STRUCTURE = [
     items: [
       { key: "hr.view_attendance", label: "View Shift Logs & GPS Check-ins" },
       { key: "hr.manage_attendance", label: "Approve / Override Attendance" },
-      { key: "hr.manage_payroll", label: "View & Process Staff Payroll" }
+      { key: "hr.export_attendance", label: "Export Attendance CSV" },
+      { key: "hr.manage_leaves", label: "Manage & Approve Leaves" },
+      { key: "hr.manage_performance", label: "Manage Performance Reviews" },
+      { key: "hr.view_payroll", label: "View Staff & Doctor Payroll" },
+      { key: "hr.manage_payroll", label: "Process & Disburse Payroll" },
+      { key: "hr.action_process_payroll", label: "Pay Staff / Doctor (Payroll Action)" }
+    ]
+  },
+  {
+    category: "Financial Transactions",
+    prefix: "transactions",
+    items: [
+      { key: "transactions.view", label: "View Financial Transactions" },
+      { key: "transactions.create", label: "Create Manual Transaction (+ New Transaction)" },
+      { key: "transactions.export", label: "Export Transactions CSV" },
+      { key: "transactions.action_view_details", label: "View Details (Table 3-Dots)" },
+      { key: "transactions.action_print_receipt", label: "Print Receipt (Table 3-Dots)" },
+      { key: "transactions.action_refund", label: "Process Refund (Table 3-Dots)" },
+      { key: "transactions.refund", label: "Process Refunds & Adjustments" }
     ]
   },
   {
     category: "Marketing & Campaigns",
     prefix: "marketing",
     items: [
-      { key: "marketing.view_campaigns", label: "View Marketing Campaigns" },
-      { key: "marketing.manage_campaigns", label: "Create & Send Broadcasts" },
+      { key: "marketing.view_campaigns", label: "View Marketing Campaigns & Offers" },
+      { key: "marketing.manage_campaigns", label: "Create & Edit Promotions & Packages" },
+      { key: "marketing.delete_campaigns", label: "Delete Promotions & Packages" },
+      { key: "marketing.send_broadcasts", label: "Send Broadcast WhatsApp / SMS" },
       { key: "marketing.manage_discounts", label: "Manage Discounts & Offers" }
     ]
   },
@@ -93,7 +168,8 @@ const PERMISSION_STRUCTURE = [
     prefix: "support",
     items: [
       { key: "support.view_tickets", label: "View Support Tickets" },
-      { key: "support.manage_tickets", label: "Respond & Resolve Tickets" }
+      { key: "support.manage_tickets", label: "Respond & Resolve Tickets" },
+      { key: "support.resolve_tickets", label: "Close & Archive Tickets" }
     ]
   },
   {
@@ -101,49 +177,51 @@ const PERMISSION_STRUCTURE = [
     prefix: "reports",
     items: [
       { key: "reports.view_analytics", label: "View Operational Analytics" },
+      { key: "reports.view_financial_reports", label: "View Financial & Revenue Reports" },
       { key: "reports.export_reports", label: "Export Business Data Reports" }
-    ]
-  },
-  {
-    category: "Settings & System Control",
-    prefix: "settings",
-    items: [
-      { key: "settings.sms", label: "Configure SMS Gateway" },
-      { key: "settings.medical_forms", label: "Manage Medical Forms" },
-      { key: "settings.roles", label: "Manage Employee Roles & Accounts" },
-      { key: "settings.profile", label: "Manage Company Profile" },
-      { key: "settings.service_hours", label: "Manage Service Hours" },
-      { key: "settings.branches", label: "Manage Branches" },
-      { key: "settings.booking_settings", label: "Manage Booking Settings" },
-      { key: "settings.terms", label: "Manage Terms & Conditions" },
-      { key: "settings.notification", label: "Manage Notification Settings" },
-      { key: "settings.queue", label: "Manage Queue Settings" },
-      { key: "settings.pages", label: "Manage Pages Settings (CMS)" },
-      { key: "settings.medical_records", label: "Manage Medical Records Intake Templates" },
-      { key: "settings.test_suite", label: "Run System Test Suite" }
     ]
   },
   {
     category: "Finance",
     prefix: "finance",
     items: [
-      { key: "finance.view_pnl", label: "View P&L" },
+      { key: "finance.view_pnl", label: "View P&L Statement" },
       { key: "finance.view_margins", label: "View Service/Doctor/Branch Margins" },
-      { key: "finance.view_cashflow", label: "View Cash Flow" },
+      { key: "finance.view_cashflow", label: "View Cash Flow Statement" },
       { key: "finance.manage_expenses", label: "Manage Expenses & Recurring Expenses" },
       { key: "finance.manage_assets", label: "Manage Fixed Assets & Depreciation" },
-      { key: "finance.manage_loans", label: "Manage Loans" },
-      { key: "finance.view_capacity", label: "View Capacity & Service Mix" }
+      { key: "finance.manage_loans", label: "Manage Loans & Debt" },
+      { key: "finance.view_capacity", label: "View Capacity & Service Mix" },
+      { key: "finance.export", label: "Export Financial Statements" }
     ]
   },
   {
-    category: "Transactions",
-    prefix: "transactions",
+    category: "Settings & System Control",
+    prefix: "settings",
     items: [
-      { key: "transactions.view", label: "View Financial Transactions" },
-      { key: "transactions.create", label: "Create Manual Transactions" },
-      { key: "transactions.refund", label: "Process Refunds & Adjustments" },
-      { key: "transactions.export", label: "Export Transactions Data" }
+      { key: "settings.profile", label: "Manage Clinic Profile" },
+      { key: "settings.service_hours", label: "Manage Service Hours" },
+      { key: "settings.branches", label: "Manage Clinic Branches" },
+      { key: "settings.booking_settings", label: "Manage Booking Settings & Deposits" },
+      { key: "settings.terms", label: "Manage Terms & Conditions (CMS)" },
+      { key: "settings.notification", label: "Manage Notification & SMS Gateway" },
+      { key: "settings.queue", label: "Manage Queue Display Settings" },
+      { key: "settings.pages", label: "Manage Pages & Hero Slides (CMS)" },
+      { key: "settings.medical_records", label: "Manage Medical Records Templates" },
+      { key: "settings.roles", label: "Manage Employee Roles & Accounts" },
+      { key: "settings.test_suite", label: "Run System Test Suite Diagnostics" }
+    ]
+  },
+  {
+    category: "Doctor Portal & Clinical Intake",
+    prefix: "clinical",
+    items: [
+      { key: "clinical.view_assigned_sessions", label: "View Assigned Sessions & Calendar" },
+      { key: "clinical.fill_intake", label: "Fill Medical Intake & Clinical Notes" },
+      { key: "clinical.create_prescriptions", label: "Issue Digital Prescriptions" },
+      { key: "clinical.manage_pulses", label: "Record Laser Pulses in Session" },
+      { key: "clinical.add_session_services", label: "Add Consumables & Additional Services" },
+      { key: "clinical.view_medical_history", label: "View Patient Medical History & Reports" }
     ]
   }
 ];
@@ -240,6 +318,8 @@ export default function RoleManagementView({
       "inventory": t.permissionCategories?.["Inventory & Equipment"] || "Inventory",
       "HR": t.permissionCategories?.["HR & Attendance"] || "HR",
       "hr": t.permissionCategories?.["HR & Attendance"] || "HR",
+      "Transactions": t.permissionCategories?.["Financial Transactions"] || "Transactions",
+      "transactions": t.permissionCategories?.["Financial Transactions"] || "Transactions",
       "Marketing": t.permissionCategories?.["Marketing & Campaigns"] || "Marketing",
       "marketing": t.permissionCategories?.["Marketing & Campaigns"] || "Marketing",
       "Support": t.permissionCategories?.["Customer Support"] || "Support",
@@ -248,9 +328,10 @@ export default function RoleManagementView({
       "reports": t.permissionCategories?.["Reports & Analytics"] || "Reports",
       "Finance": t.permissionCategories?.["Finance"] || "Finance",
       "finance": t.permissionCategories?.["Finance"] || "Finance",
-      "Dashboard": t.permissionCategories?.["Reports & Analytics"] || "Dashboard",
-      "dashboard": t.permissionCategories?.["Reports & Analytics"] || "Dashboard",
-      "Overview": t.permissionCategories?.["Reports & Analytics"] || "Overview",
+      "Dashboard": t.permissionCategories?.["Dashboard & Reception"] || "Dashboard",
+      "dashboard": t.permissionCategories?.["Dashboard & Reception"] || "Dashboard",
+      "Clinical": t.permissionCategories?.["Doctor Portal & Clinical Intake"] || "Clinical",
+      "clinical": t.permissionCategories?.["Doctor Portal & Clinical Intake"] || "Clinical",
     };
 
     Object.assign(map, coarseCategoryMap);

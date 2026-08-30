@@ -66,6 +66,7 @@ type Props = {
   authHeaders: Record<string, string>;
   branches: Branch[];
   canManage: boolean;
+  hasPermission?: (perm: string) => boolean;
   onDeviceCountChange?: (count: number) => void;
   lang: "en" | "ar";
   t: typeof adminTranslations["en"]["inventory"]["devices"];
@@ -73,7 +74,7 @@ type Props = {
 };
 
 const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
-  function InventoryDevicesTab({ authHeaders, branches, canManage, onDeviceCountChange, lang, t, auditLogsT }, ref) {
+  function InventoryDevicesTab({ authHeaders, branches, canManage, hasPermission, onDeviceCountChange, lang, t, auditLogsT }, ref) {
     // Device list state
     const [devices, setDevices] = useState<Device[]>([]);
     const [history, setHistory] = useState<DeviceHistory[]>([]);
@@ -498,105 +499,119 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
 
                         {/* Actions 3-Dots Dropdown Menu */}
                         <td className="px-6 py-5 text-right">
-                          <div ref={rowMenuRef} className="relative inline-block text-left">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveRowMenuId((prev) => (prev === dev.id ? null : dev.id));
-                              }}
-                              className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border transition cursor-pointer ${
-                                activeRowMenuId === dev.id
-                                  ? "border-[#414E36] bg-[#414E36] text-white"
-                                  : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
-                              }`}
-                              title={t.actionsTitle}
-                            >
-                              <MoreVertical size={14} />
-                            </button>
+                          {(() => {
+                            const canUpdatePulses = !hasPermission ? canManage : hasPermission("inventory.action_update_pulses");
+                            const canReset = !hasPermission ? canManage : hasPermission("inventory.action_reset_counter");
+                            const canViewHistory = !hasPermission ? true : hasPermission("inventory.action_view_device_history");
+                            const canEditDevice = !hasPermission ? canManage : hasPermission("inventory.action_edit_device");
+                            if (!canUpdatePulses && !canReset && !canViewHistory && !canEditDevice) return null;
 
-                            {activeRowMenuId === dev.id && (
-                              <div className="absolute end-0 top-9 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu">
-                                {canManage && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveRowMenuId(null);
-                                      setSelectedDeviceForPulses(dev);
-                                      setNewPulseCountInput(String(dev.current_pulse_count || 0));
-                                      setShowUpdatePulsesModal(true);
-                                    }}
-                                    className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
-                                  >
-                                    <Gauge size={14} className="text-[#414E36]" />
-                                    <span>{t.updatePulses}</span>
-                                  </button>
-                                )}
-
-                                {canManage && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveRowMenuId(null);
-                                      setSelectedDeviceForReset(dev);
-                                      setResetReason("Routine Maintenance");
-                                      setResetPerformedBy("");
-                                      setResetNotes("");
-                                      setShowResetPulsesModal(true);
-                                    }}
-                                    className="w-full text-start px-3 py-2 rounded-xl hover:bg-amber-50 font-semibold text-amber-800 flex items-center gap-2.5 transition cursor-pointer"
-                                  >
-                                    <RotateCcw size={14} className="text-amber-600" />
-                                    <span>{t.resetCounter}</span>
-                                  </button>
-                                )}
-
+                            return (
+                              <div ref={rowMenuRef} className="relative inline-block text-left">
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setActiveRowMenuId(null);
-                                    setSelectedDeviceForHistory(dev);
-                                    setShowHistoryModal(true);
+                                    setActiveRowMenuId((prev) => (prev === dev.id ? null : dev.id));
                                   }}
-                                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                                  className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border transition cursor-pointer ${
+                                    activeRowMenuId === dev.id
+                                      ? "border-[#414E36] bg-[#414E36] text-white"
+                                      : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                  }`}
+                                  title={t.actionsTitle}
                                 >
-                                  <History size={14} className="text-[#5A6A51]" />
-                                  <span>{t.viewHistory}</span>
+                                  <MoreVertical size={14} />
                                 </button>
 
-                                <div className="my-1 border-t border-gray-100" />
+                                {activeRowMenuId === dev.id && (
+                                  <div className="absolute end-0 top-9 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu">
+                                    {canUpdatePulses && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveRowMenuId(null);
+                                          setSelectedDeviceForPulses(dev);
+                                          setNewPulseCountInput(String(dev.current_pulse_count || 0));
+                                          setShowUpdatePulsesModal(true);
+                                        }}
+                                        className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                                      >
+                                        <Gauge size={14} className="text-[#414E36]" />
+                                        <span>{t.updatePulses}</span>
+                                      </button>
+                                    )}
 
-                                {canManage && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveRowMenuId(null);
-                                      setEditingDevice(dev);
-                                      setDeviceName(dev.name || "");
-                                      setDeviceModel(dev.model || "");
-                                      setDeviceSerial(dev.serial_number || "");
-                                      setDeviceCategory(dev.category || "Laser Hair Removal");
-                                      setDeviceBranchId(dev.branch_id || "");
-                                      setDeviceInitialPulses(String(dev.initial_pulse_count || 0));
-                                      setDeviceWarningThreshold1(String(dev.warning_threshold_1 || 80000));
-                                      setDeviceMaintenanceThreshold2(String(dev.maintenance_threshold_2 || 100000));
-                                      setDeviceLampReplacementCost(String(dev.lamp_replacement_cost ?? 0));
-                                      setDeviceNotes(dev.notes || "");
-                                      setShowAddModal(true);
-                                    }}
-                                    className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
-                                  >
-                                    <Pencil size={14} className="text-[#5A6A51]" />
-                                    <span>{t.editDevice}</span>
-                                  </button>
+                                    {canReset && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveRowMenuId(null);
+                                          setSelectedDeviceForReset(dev);
+                                          setResetReason("Routine Maintenance");
+                                          setResetPerformedBy("");
+                                          setResetNotes("");
+                                          setShowResetPulsesModal(true);
+                                        }}
+                                        className="w-full text-start px-3 py-2 rounded-xl hover:bg-amber-50 font-semibold text-amber-800 flex items-center gap-2.5 transition cursor-pointer"
+                                      >
+                                        <RotateCcw size={14} className="text-amber-600" />
+                                        <span>{t.resetCounter}</span>
+                                      </button>
+                                    )}
+
+                                    {canViewHistory && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveRowMenuId(null);
+                                          setSelectedDeviceForHistory(dev);
+                                          setShowHistoryModal(true);
+                                        }}
+                                        className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                                      >
+                                        <History size={14} className="text-[#5A6A51]" />
+                                        <span>{t.viewHistory}</span>
+                                      </button>
+                                    )}
+
+                                    {(canUpdatePulses || canReset || canViewHistory) && canEditDevice && (
+                                      <div className="my-1 border-t border-gray-100" />
+                                    )}
+
+                                    {canEditDevice && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveRowMenuId(null);
+                                          setEditingDevice(dev);
+                                          setDeviceName(dev.name || "");
+                                          setDeviceModel(dev.model || "");
+                                          setDeviceSerial(dev.serial_number || "");
+                                          setDeviceCategory(dev.category || "Laser Hair Removal");
+                                          setDeviceBranchId(dev.branch_id || "");
+                                          setDeviceInitialPulses(String(dev.initial_pulse_count || 0));
+                                          setDeviceWarningThreshold1(String(dev.warning_threshold_1 || 80000));
+                                          setDeviceMaintenanceThreshold2(String(dev.maintenance_threshold_2 || 100000));
+                                          setDeviceLampReplacementCost(String(dev.lamp_replacement_cost ?? 0));
+                                          setDeviceNotes(dev.notes || "");
+                                          setShowAddModal(true);
+                                        }}
+                                        className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                                      >
+                                        <Pencil size={14} className="text-[#5A6A51]" />
+                                        <span>{t.editDevice}</span>
+                                      </button>
+                                    )}
+                                  </div>
                                 )}
                               </div>
-                            )}
-                          </div>
+                            );
+                          })()}
                         </td>
                       </tr>
                     );

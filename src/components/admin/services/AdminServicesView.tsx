@@ -615,76 +615,85 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                 </td>
                                 {/* 3 Dots Actions Menu */}
                                 <td className="px-3 py-3 text-center">
-                                  <div className="relative inline-block text-start">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveServiceRowMenuId(prev => prev === svc.id ? null : svc.id);
-                                      }}
-                                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
-                                        activeServiceRowMenuId === svc.id
-                                          ? "border-[#414E36] bg-[#414E36] text-white"
-                                          : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                      }`}
-                                      title={t.actionsTitle}
-                                    >
-                                      <MoreVertical size={13} />
-                                    </button>
+                                  {(() => {
+                                    const canEdit = hasPermission("services.action_edit");
+                                    const canToggle = hasPermission("services.action_toggle_status");
+                                    const canDelete = hasPermission("services.action_delete");
+                                    if (!canEdit && !canToggle && !canDelete) return null;
 
-                                    {activeServiceRowMenuId === svc.id && (
-                                      <div className="absolute end-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu">
-                                        {hasPermission("services.edit") && (
-                                          <>
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setActiveServiceRowMenuId(null);
-                                                handleEditService(svc);
-                                              }}
-                                              className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
-                                            >
-                                              <Pencil size={13} className="text-[#5A6A51]" />
-                                              <span>{t.editService}</span>
-                                            </button>
+                                    return (
+                                      <div className="relative inline-block text-start">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveServiceRowMenuId(prev => prev === svc.id ? null : svc.id);
+                                          }}
+                                          className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
+                                            activeServiceRowMenuId === svc.id
+                                              ? "border-[#414E36] bg-[#414E36] text-white"
+                                              : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                          }`}
+                                          title={t.actionsTitle}
+                                        >
+                                          <MoreVertical size={13} />
+                                        </button>
 
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleService(svc.id, "active");
-                                              }}
-                                              className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center justify-between transition cursor-pointer"
-                                            >
-                                              <div className="flex items-center gap-2">
-                                                <span className={`h-2 w-2 rounded-full ${toggles.active ? "bg-emerald-500" : "bg-gray-300"}`} />
-                                                <span>{toggles.active ? t.deactivate : t.activate}</span>
-                                              </div>
-                                              <span className="text-[10px] font-bold text-[#5A6A51] bg-[#F2EFE9] px-1.5 py-0.5 rounded">
-                                                {toggles.active ? t.statusActive : t.statusOff}
-                                              </span>
-                                            </button>
-                                          </>
-                                        )}
+                                        {activeServiceRowMenuId === svc.id && (
+                                          <div className="absolute end-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu">
+                                            {canEdit && (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setActiveServiceRowMenuId(null);
+                                                  handleEditService(svc);
+                                                }}
+                                                className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                                              >
+                                                <Pencil size={13} className="text-[#5A6A51]" />
+                                                <span>{t.editService}</span>
+                                              </button>
+                                            )}
 
-                                        {hasPermission("services.delete") && (
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setActiveServiceRowMenuId(null);
-                                              setDeleteServiceTarget(svc);
-                                            }}
-                                            className="w-full text-start px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
-                                          >
-                                            <Trash2 size={13} className="text-red-600" />
-                                            <span>{t.deleteService}</span>
-                                          </button>
+                                            {canToggle && (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  toggleService(svc.id, "active");
+                                                }}
+                                                className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center justify-between transition cursor-pointer"
+                                              >
+                                                <div className="flex items-center gap-2">
+                                                  <span className={`h-2 w-2 rounded-full ${toggles.active ? "bg-emerald-500" : "bg-gray-300"}`} />
+                                                  <span>{toggles.active ? t.deactivate : t.activate}</span>
+                                                </div>
+                                                <span className="text-[10px] font-bold text-[#5A6A51] bg-[#F2EFE9] px-1.5 py-0.5 rounded">
+                                                  {toggles.active ? t.statusActive : t.statusOff}
+                                                </span>
+                                              </button>
+                                            )}
+
+                                            {canDelete && (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setActiveServiceRowMenuId(null);
+                                                  setDeleteServiceTarget(svc);
+                                                }}
+                                                className="w-full text-start px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
+                                              >
+                                                <Trash2 size={13} className="text-red-600" />
+                                                <span>{t.deleteService}</span>
+                                              </button>
+                                            )}
+                                          </div>
                                         )}
                                       </div>
-                                    )}
-                                  </div>
+                                    );
+                                  })()}
                                 </td>
                               </tr>
                             );

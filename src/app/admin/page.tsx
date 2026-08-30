@@ -658,30 +658,128 @@ export default function AdminPage() {
     if (!adminPermissions) return false;
     if (adminPermissions.includes(permKey)) return true;
     
-    // Backward compatibility mappings
-    if (["customers.create", "customers.edit", "customers.import"].includes(permKey)) {
-      if (adminPermissions.includes("customers.create_edit") || adminPermissions.includes("Customers")) return true;
+    // Backward compatibility & hierarchical fallbacks
+    // Bookings fallbacks
+    if (permKey.startsWith("bookings.")) {
+      if (adminPermissions.includes("Bookings") || adminPermissions.includes("bookings")) return true;
+      if (["bookings.action_print_schedule", "bookings.action_export_csv"].includes(permKey)) {
+        if (adminPermissions.includes("bookings.view_calendar") || adminPermissions.includes("bookings.view_list")) return true;
+      }
+      if (permKey === "bookings.action_add_previous" && adminPermissions.includes("bookings.create")) return true;
+      if (["bookings.action_postpone", "bookings.action_cancel", "bookings.action_no_show", "bookings.status_change", "bookings.manage_services", "bookings.manage_notes", "bookings.manage_prescriptions", "bookings.manage_invoices", "bookings.settle_payment"].includes(permKey)) {
+        if (adminPermissions.includes("bookings.edit")) return true;
+      }
     }
-    if (permKey === "customers.delete") {
-      if (adminPermissions.includes("customers.delete") || adminPermissions.includes("Customers")) return true;
+
+    // Customers fallbacks
+    if (permKey.startsWith("customers.")) {
+      if (adminPermissions.includes("Customers") || adminPermissions.includes("customers")) return true;
+      if (["customers.create", "customers.edit", "customers.import", "customers.action_edit", "customers.action_settle_balance", "customers.manage_wallet", "customers.manage_reports"].includes(permKey)) {
+        if (adminPermissions.includes("customers.create_edit") || adminPermissions.includes("customers.edit")) return true;
+      }
+      if (["customers.action_view_profile", "customers.view_history", "customers.export"].includes(permKey)) {
+        if (adminPermissions.includes("customers.view")) return true;
+      }
+      if (permKey === "customers.delete" || permKey === "customers.action_delete") {
+        if (adminPermissions.includes("customers.delete")) return true;
+      }
     }
-    if (["providers.create", "providers.edit"].includes(permKey)) {
-      if (adminPermissions.includes("providers.create_edit") || adminPermissions.includes("Providers")) return true;
+
+    // Providers / Doctors fallbacks
+    if (permKey.startsWith("providers.")) {
+      if (adminPermissions.includes("Providers") || adminPermissions.includes("providers") || adminPermissions.includes("Doctors") || adminPermissions.includes("doctors")) return true;
+      if (["providers.create", "providers.edit", "providers.action_edit", "providers.action_change_status", "providers.manage_schedule", "providers.commissions"].includes(permKey)) {
+        if (adminPermissions.includes("providers.create_edit") || adminPermissions.includes("providers.edit")) return true;
+      }
+      if (permKey === "providers.delete" || permKey === "providers.action_delete") {
+        if (adminPermissions.includes("providers.delete")) return true;
+      }
     }
-    if (permKey === "providers.delete") {
-      if (adminPermissions.includes("providers.delete") || adminPermissions.includes("Providers")) return true;
+
+    // Services fallbacks
+    if (permKey.startsWith("services.")) {
+      if (adminPermissions.includes("Services") || adminPermissions.includes("services")) return true;
+      if (["services.create", "services.create_category", "services.edit", "services.edit_category", "services.action_edit", "services.action_toggle_status"].includes(permKey)) {
+        if (adminPermissions.includes("services.create_edit_delete") || adminPermissions.includes("services.edit") || adminPermissions.includes("services.create")) return true;
+      }
+      if (permKey === "services.delete" || permKey === "services.delete_category" || permKey === "services.action_delete") {
+        if (adminPermissions.includes("services.create_edit_delete") || adminPermissions.includes("services.delete")) return true;
+      }
     }
-    if (["services.create", "services.edit", "services.delete"].includes(permKey)) {
-      if (adminPermissions.includes("services.create_edit_delete") || adminPermissions.includes("Services")) return true;
+
+    // Inventory fallbacks
+    if (permKey.startsWith("inventory.")) {
+      if (adminPermissions.includes("Inventory") || adminPermissions.includes("inventory")) return true;
+      if (["inventory.action_update_pulses", "inventory.action_reset_counter", "inventory.action_edit_device", "inventory.action_delete_device"].includes(permKey)) {
+        if (adminPermissions.includes("inventory.manage_devices")) return true;
+      }
+      if (permKey === "inventory.action_view_device_history" && (adminPermissions.includes("inventory.view") || adminPermissions.includes("inventory.manage_devices"))) return true;
+      if (["inventory.create_product", "inventory.edit_product", "inventory.adjust_stock", "inventory.delete_product"].includes(permKey)) {
+        if (adminPermissions.includes("inventory.manage_products")) return true;
+      }
+      if (permKey === "inventory.manage_orders" && adminPermissions.includes("inventory.manage_suppliers")) return true;
+    }
+
+    // Employees fallbacks
+    if (permKey.startsWith("employees.")) {
+      if (adminPermissions.includes("Employees") || adminPermissions.includes("employees")) return true;
+      if (permKey === "employees.action_view_info" && adminPermissions.includes("employees.view")) return true;
+      if (["employees.action_edit", "employees.action_resend_invite", "employees.manage_departments"].includes(permKey)) {
+        if (adminPermissions.includes("employees.edit")) return true;
+      }
+      if (permKey === "employees.action_delete" && adminPermissions.includes("employees.delete")) return true;
+      if (permKey === "employees.export_attendance" && adminPermissions.includes("employees.view")) return true;
+    }
+
+    // HR fallbacks
+    if (permKey.startsWith("hr.")) {
+      if (adminPermissions.includes("HR") || adminPermissions.includes("hr")) return true;
+      if (permKey === "hr.action_process_payroll" && (adminPermissions.includes("hr.manage_payroll") || adminPermissions.includes("hr.view_payroll"))) return true;
+      if (permKey === "hr.export_attendance" && adminPermissions.includes("hr.view_attendance")) return true;
+      if (["hr.manage_leaves", "hr.manage_performance"].includes(permKey) && adminPermissions.includes("hr.manage_attendance")) return true;
+    }
+
+    // Transactions fallbacks
+    if (permKey.startsWith("transactions.")) {
+      if (adminPermissions.includes("Transactions") || adminPermissions.includes("transactions")) return true;
+      if (["transactions.action_view_details", "transactions.action_print_receipt"].includes(permKey)) {
+        if (adminPermissions.includes("transactions.view")) return true;
+      }
+      if (permKey === "transactions.action_refund" && adminPermissions.includes("transactions.refund")) return true;
+    }
+
+    // Settings fallbacks
+    if (permKey.startsWith("settings.")) {
+      if (adminPermissions.includes("Settings") || adminPermissions.includes("settings")) return true;
+    }
+
+    // Clinical / Doctor Portal fallbacks
+    if (permKey.startsWith("clinical.")) {
+      if (adminPermissions.includes("Clinical") || adminPermissions.includes("clinical") || adminRole === "doctor" || adminRole === "Doctor") return true;
+    }
+
+    // Dashboard & Reception fallbacks
+    if (permKey.startsWith("dashboard.") || permKey.startsWith("reception.")) {
+      if (adminPermissions.includes("Dashboard") || adminPermissions.includes("dashboard") || adminRole === "receptionist" || adminRole === "admin") return true;
     }
 
     const parentScreenMap: Record<string, string> = {
+      "dashboard": "Dashboard",
+      "reception": "Dashboard",
       "bookings": "Bookings",
       "customers": "Patients",
       "providers": "Doctors",
       "services": "Services",
+      "inventory": "Inventory",
+      "employees": "Employees",
+      "hr": "HR",
+      "transactions": "Transactions",
+      "marketing": "Marketing",
+      "support": "Customer Support",
+      "reports": "Reports",
       "finance": "Finance",
-      "settings": "Settings"
+      "settings": "Settings",
+      "clinical": "Clinical"
     };
     const category = permKey.split('.')[0];
     const legacyScreen = parentScreenMap[category];
@@ -702,19 +800,23 @@ export default function AdminPage() {
       if (adminPermissions.includes(item.label)) return true;
       
       const parentScreenMap: Record<string, string> = {
+        "Dashboard": "dashboard",
         "Bookings": "bookings",
         "Patients": "customers",
         "Doctors": "providers",
         "Services": "services",
         "Inventory": "inventory",
         "Employees": "employees",
-        "Marketing": "services",
+        "HR": "hr",
         "Transactions": "transactions",
+        "Marketing": "marketing",
+        "Customer Support": "support",
+        "Reports": "reports",
         "Finance": "finance",
         "Settings": "settings"
       };
       const prefix = parentScreenMap[item.label];
-      if (prefix && adminPermissions.some(p => p.startsWith(prefix + "."))) return true;
+      if (prefix && adminPermissions.some(p => p.startsWith(prefix + ".") || p === prefix)) return true;
       
       return false;
     });
@@ -2313,20 +2415,28 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     }
     
     const parentScreenMap: Record<string, string> = {
+      "Dashboard": "dashboard",
       "Bookings": "bookings",
       "Patients": "customers",
       "Doctors": "providers",
       "Services": "services",
       "Promotions": "services",
       "Packages": "services",
+      "Inventory": "inventory",
+      "Employees": "employees",
+      "HR": "hr",
       "Transactions": "transactions",
+      "Marketing": "marketing",
+      "Customer Support": "support",
+      "Reports": "reports",
       "Finance": "finance",
-      "Settings": "settings"
+      "Settings": "settings",
+      "Clinical": "clinical"
     };
 
     const prefix = parentScreenMap[activeNav];
     if (prefix) {
-      return adminPermissions.includes(activeNav) || adminPermissions.some(p => p.startsWith(prefix + "."));
+      return adminPermissions.includes(activeNav) || adminPermissions.includes(prefix) || adminPermissions.some(p => p.startsWith(prefix + "."));
     }
     
     return false;
@@ -2433,7 +2543,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-035', name: 'Patient Profile Edit & Customer Intake Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies customer profile records, phone/WhatsApp validation, address structure (City, Street, Building, Floor), and balances.', status: 'idle' },
     { id: 'TC-036', name: 'Doctor Status Management & Availability Lifecycle Engine', category: 'Services & Bookings', endpoint: '/api/providers', description: 'Verifies doctor status modal dialog, Active/Inactive status changes, and real-time synchronization across providers and linked employee accounts.', status: 'idle' },
     { id: 'TC-037', name: 'Financial Transactions & Daily Ledger Engine', category: 'Finance & Accounting', endpoint: '/api/transactions', description: 'Verifies the clinic financial transactions dashboard, daily net payments, outstanding debts, wallet balances, and manual transaction logging.', status: 'idle' },
-    { id: 'TC-038', name: 'Historical & Previous Bookings Intake Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies recording of previous historical clinic bookings, patient matching/creation, and booking history preservation.', status: 'idle' }
+    { id: 'TC-038', name: 'Historical & Previous Bookings Intake Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies recording of previous historical clinic bookings, patient matching/creation, and booking history preservation.', status: 'idle' },
+    { id: 'TC-039', name: 'Granular Role Permissions & Action-Level Access Control Engine', category: 'HR & Payroll', endpoint: '/api/roles', description: 'Validates system roles retrieval, permission structure integrity, and granular action-level access control matrix.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -6241,6 +6352,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 staffName={loggedEmpAccount?.name || adminEmail.split("@")[0] || "Staff User"}
                 branches={branches}
                 currentBranchId={branch || undefined}
+                hasPermission={hasPermission}
                 lang={lang}
               />
             )
@@ -7117,7 +7229,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           )}
 
           {/* ===================== EMPLOYEES SECTION ===================== */}
-          {activeNav === "Employees" && adminRole === "superadmin" && (
+          {activeNav === "Employees" && (adminRole === "superadmin" || hasPermission("employees.view") || hasPermission("Employees")) && (
             <AdminEmployeesView
               newEmployeeName={newEmployeeName}
               setNewEmployeeName={setNewEmployeeName}
@@ -7133,6 +7245,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               setIsEditingEmployeeModalOpen={setIsEditingEmployeeModalOpen}
               employeeProfileActiveTab={employeeProfileActiveTab}
               setEmployeeProfileActiveTab={setEmployeeProfileActiveTab}
+              hasPermission={hasPermission}
               branches={branches}
               rolesList={rolesList}
               departmentsList={departmentsList}
@@ -7364,6 +7477,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 localServices={localServices}
                 userName={loggedEmpAccount?.name?.split(" ")[0] || "Sara"}
                 staleSessionThresholdHours={bookingStaleSessionHours}
+                hasPermission={hasPermission}
                 lang={lang}
                 t={adminTranslations[lang].bookings.adminBookingsView}
                 onNewBooking={() => setShowFullViewNewBooking(true)}

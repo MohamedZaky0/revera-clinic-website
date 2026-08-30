@@ -45,6 +45,7 @@ interface TransactionsViewProps {
   staffName?: string;
   branches?: { id: string; name_en: string; name_ar?: string }[];
   currentBranchId?: string;
+  hasPermission?: (perm: string) => boolean;
   lang?: "en" | "ar";
 }
 
@@ -53,6 +54,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   staffName = "Staff User",
   branches = [],
   currentBranchId,
+  hasPermission,
   lang = "en",
 }) => {
   // Filters & Pagination State
@@ -286,14 +288,16 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={onNewTransaction}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#313A28] hover:bg-[#1F251A] text-[#FBFBF9] font-bold text-xs shadow-sm transition-all"
-          >
-            <Plus size={15} />
-            <span>New Transaction</span>
-          </button>
+          {(!hasPermission || hasPermission("transactions.create")) && (
+            <button
+              type="button"
+              onClick={onNewTransaction}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#313A28] hover:bg-[#1F251A] text-[#FBFBF9] font-bold text-xs shadow-sm transition-all"
+            >
+              <Plus size={15} />
+              <span>New Transaction</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -666,45 +670,59 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                         className="py-3.5 px-4 text-center relative whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveDropdownTxnId(isDropdownOpen ? null : tx.id);
-                          }}
-                          className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                        >
-                          <MoreVertical size={16} />
-                        </button>
+                        {(() => {
+                          const canView = !hasPermission || hasPermission("transactions.action_view_details");
+                          const canPrint = !hasPermission || hasPermission("transactions.action_print_receipt");
+                          if (!canView && !canPrint) return null;
 
-                        {/* 3-Dots Dropdown */}
-                        {isDropdownOpen && (
-                          <div className="absolute right-4 top-10 z-30 w-44 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-xl text-xs text-start animate-in fade-in duration-100">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedTxnForDetails(tx);
-                                setActiveDropdownTxnId(null);
-                              }}
-                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-gray-700 hover:bg-[#F9F9F7] font-semibold"
-                            >
-                              <Eye size={14} className="text-gray-500" />
-                              <span>View Details</span>
-                            </button>
+                          return (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveDropdownTxnId(isDropdownOpen ? null : tx.id);
+                                }}
+                                className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                              >
+                                <MoreVertical size={16} />
+                              </button>
 
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedTxnForDetails(tx);
-                                setActiveDropdownTxnId(null);
-                              }}
-                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-gray-700 hover:bg-[#F9F9F7] font-semibold"
-                            >
-                              <Printer size={14} className="text-gray-500" />
-                              <span>Print Receipt</span>
-                            </button>
-                          </div>
-                        )}
+                              {/* 3-Dots Dropdown */}
+                              {isDropdownOpen && (
+                                <div className="absolute right-4 top-10 z-30 w-44 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-xl text-xs text-start animate-in fade-in duration-100">
+                                  {canView && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedTxnForDetails(tx);
+                                        setActiveDropdownTxnId(null);
+                                      }}
+                                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-gray-700 hover:bg-[#F9F9F7] font-semibold"
+                                    >
+                                      <Eye size={14} className="text-gray-500" />
+                                      <span>View Details</span>
+                                    </button>
+                                  )}
+
+                                  {canPrint && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedTxnForDetails(tx);
+                                        setActiveDropdownTxnId(null);
+                                      }}
+                                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-gray-700 hover:bg-[#F9F9F7] font-semibold"
+                                    >
+                                      <Printer size={14} className="text-gray-500" />
+                                      <span>Print Receipt</span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );

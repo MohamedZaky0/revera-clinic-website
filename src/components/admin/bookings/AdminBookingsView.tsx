@@ -69,6 +69,7 @@ interface AdminBookingsViewProps {
   onRejectBooking?: (booking: any) => void;
   /** SuperAdmin-configured "Stale Session Alert" from Booking Settings. Defaults to 2 hours. */
   staleSessionThresholdHours?: number;
+  hasPermission?: (perm: string) => boolean;
   lang?: "en" | "ar";
   t?: any;
 }
@@ -111,6 +112,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   onApproveBooking,
   onRejectBooking,
   staleSessionThresholdHours,
+  hasPermission,
   lang = "en",
   t,
 }) => {
@@ -892,61 +894,78 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
         {/* RIGHT ACTIONS: NEW BOOKING + 3 DOTS MENU */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onNewBooking}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#1E3A2B] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#162C20] active:scale-95 cursor-pointer"
-          >
-            <Plus size={16} />
-            <span>{tr.newBookingBtn}</span>
-          </button>
-
-          <div className="relative" ref={moreMenuRef}>
+          {(!hasPermission || hasPermission("bookings.create")) && (
             <button
               type="button"
-              onClick={() => {
-                setIsMoreMenuOpen(prev => {
-                  const nextState = !prev;
-                  if (nextState) {
-                    window.dispatchEvent(new CustomEvent("close-admin-dropdowns", { detail: "bookingsMore" }));
-                  }
-                  return nextState;
-                });
-              }}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95 cursor-pointer"
-              title={tr.moreOptionsTitle}
+              onClick={onNewBooking}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1E3A2B] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#162C20] active:scale-95 cursor-pointer"
             >
-              <MoreVertical size={18} className="text-[#6B7280]" />
+              <Plus size={16} />
+              <span>{tr.newBookingBtn}</span>
             </button>
+          )}
 
-            {isMoreMenuOpen && (
-              <div className="absolute end-0 top-full z-30 mt-2 w-52 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
+          {(() => {
+            const canPrint = !hasPermission || hasPermission("bookings.action_print_schedule");
+            const canExport = !hasPermission || hasPermission("bookings.action_export_csv");
+            const canAddPrev = !hasPermission || hasPermission("bookings.action_add_previous");
+            if (!canPrint && !canExport && !canAddPrev) return null;
+
+            return (
+              <div className="relative" ref={moreMenuRef}>
                 <button
-                  onClick={() => { onPrint?.(); setIsMoreMenuOpen(false); }}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer"
+                  type="button"
+                  onClick={() => {
+                    setIsMoreMenuOpen(prev => {
+                      const nextState = !prev;
+                      if (nextState) {
+                        window.dispatchEvent(new CustomEvent("close-admin-dropdowns", { detail: "bookingsMore" }));
+                      }
+                      return nextState;
+                    });
+                  }}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95 cursor-pointer"
+                  title={tr.moreOptionsTitle}
                 >
-                  <Printer size={15} className="text-[#6B7280]" />
-                  {tr.printScheduleBtn}
+                  <MoreVertical size={18} className="text-[#6B7280]" />
                 </button>
-                <div className="mx-4 border-t border-gray-100" />
-                <button
-                  onClick={() => { onExportCSV?.(); setIsMoreMenuOpen(false); }}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer"
-                >
-                  <Download size={15} className="text-[#6B7280]" />
-                  {tr.exportCsvBtn}
-                </button>
-                <div className="mx-4 border-t border-gray-100" />
-                <button
-                  onClick={() => { onAddPreviousBooking?.(); setIsMoreMenuOpen(false); }}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-[#F4F7F2] hover:text-[#2D3F2A] transition cursor-pointer"
-                >
-                  <History size={15} className="text-[#3D5A45]" />
-                  <span>{tr.addPreviousBookingBtn || "Add Previous Booking"}</span>
-                </button>
+
+                {isMoreMenuOpen && (
+                  <div className="absolute end-0 top-full z-30 mt-2 w-52 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
+                    {canPrint && (
+                      <button
+                        onClick={() => { onPrint?.(); setIsMoreMenuOpen(false); }}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer"
+                      >
+                        <Printer size={15} className="text-[#6B7280]" />
+                        {tr.printScheduleBtn}
+                      </button>
+                    )}
+                    {canPrint && (canExport || canAddPrev) && <div className="mx-4 border-t border-gray-100" />}
+                    {canExport && (
+                      <button
+                        onClick={() => { onExportCSV?.(); setIsMoreMenuOpen(false); }}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer"
+                      >
+                        <Download size={15} className="text-[#6B7280]" />
+                        {tr.exportCsvBtn}
+                      </button>
+                    )}
+                    {canExport && canAddPrev && <div className="mx-4 border-t border-gray-100" />}
+                    {canAddPrev && (
+                      <button
+                        onClick={() => { onAddPreviousBooking?.(); setIsMoreMenuOpen(false); }}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-[#F4F7F2] hover:text-[#2D3F2A] transition cursor-pointer"
+                      >
+                        <History size={15} className="text-[#3D5A45]" />
+                        <span>{tr.addPreviousBookingBtn || "Add Previous Booking"}</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()}
         </div>
       </div>
 

@@ -93,6 +93,7 @@ interface AdminEmployeesViewProps {
   parseEgyptianNationalId: (id: string) => any;
   employeeProfileActiveTab: string;
   setEmployeeProfileActiveTab: (v: string) => void;
+  hasPermission?: (perm: string) => boolean;
   lang: "en" | "ar";
   t: (typeof adminTranslations)["en"]["employees"];
 }
@@ -112,6 +113,7 @@ export default function AdminEmployeesView({
   setIsEditingEmployeeModalOpen,
   employeeProfileActiveTab,
   setEmployeeProfileActiveTab,
+  hasPermission,
   branches,
   rolesList,
   departmentsList,
@@ -928,7 +930,7 @@ export default function AdminEmployeesView({
             setNewEmployeeOnlineWorkingDaysHours(defaultDays);
             setIsEditingEmployeeModalOpen(true);
           }}
-          className="rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-md shrink-0"
+          className={`${(!hasPermission || hasPermission("employees.create")) ? "flex" : "hidden"} rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition items-center gap-2 shadow-md shrink-0`}
         >
           <Plus size={16} />
           {t.addEmployeeBtn}
@@ -1084,90 +1086,94 @@ export default function AdminEmployeesView({
                     </td>
                     <td className="px-5 py-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setViewingEmployee(emp)}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                          title={t.actions.viewInfo}
-                        >
-                          <Info size={14} />
-                        </button>
+                        {(!hasPermission || hasPermission("employees.action_view_info")) && (
+                          <button
+                            type="button"
+                            onClick={() => setViewingEmployee(emp)}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                            title={t.actions.viewInfo}
+                          >
+                            <Info size={14} />
+                          </button>
+                        )}
                         {!isSuperadmin && (
                           <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingEmployee(emp);
-                                setNewEmployeeName(emp.name || "");
-                                setNewEmployeeEmail(emp.email || "");
-                                setNewEmployeeRole(emp.role_name || "");
-                                setNewEmployeePhone(emp.phone || "");
-                                setNewEmployeeDepartment(emp.department || "Reception");
-                                updateShiftState(emp.shift || "Day");
-                                setNewEmployeeSalary(String(effectiveSalary));
-                                setNewEmployeeNationalId(emp.national_id || "");
-                                setNewEmployeeNationalIdFront(emp.national_id_front || "");
-                                setNewEmployeeNationalIdBack(emp.national_id_back || "");
-                                applyAddressToState(emp.address || "");
-                                setNewEmployeeBranchId(emp.branch_id || "");
-                                const rawContract = emp.contract_file || "";
-                                let contractUrl = "";
-                                let additionalList: any[] = [];
-                                try {
-                                  if (rawContract.startsWith('{')) {
-                                    const parsed = JSON.parse(rawContract);
-                                    contractUrl = parsed.contract || "";
-                                    additionalList = parsed.additional || [];
-                                  } else {
+                            {(!hasPermission || hasPermission("employees.action_edit")) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingEmployee(emp);
+                                  setNewEmployeeName(emp.name || "");
+                                  setNewEmployeeEmail(emp.email || "");
+                                  setNewEmployeeRole(emp.role_name || "");
+                                  setNewEmployeePhone(emp.phone || "");
+                                  setNewEmployeeDepartment(emp.department || "Reception");
+                                  updateShiftState(emp.shift || "Day");
+                                  setNewEmployeeSalary(String(effectiveSalary));
+                                  setNewEmployeeNationalId(emp.national_id || "");
+                                  setNewEmployeeNationalIdFront(emp.national_id_front || "");
+                                  setNewEmployeeNationalIdBack(emp.national_id_back || "");
+                                  applyAddressToState(emp.address || "");
+                                  setNewEmployeeBranchId(emp.branch_id || "");
+                                  const rawContract = emp.contract_file || "";
+                                  let contractUrl = "";
+                                  let additionalList: any[] = [];
+                                  try {
+                                    if (rawContract.startsWith('{')) {
+                                      const parsed = JSON.parse(rawContract);
+                                      contractUrl = parsed.contract || "";
+                                      additionalList = parsed.additional || [];
+                                    } else {
+                                      contractUrl = rawContract;
+                                    }
+                                  } catch (e) {
                                     contractUrl = rawContract;
                                   }
-                                } catch (e) {
-                                  contractUrl = rawContract;
-                                }
-                                setNewEmployeeContract(contractUrl);
-                                setNewEmployeeContractName(emp.contract_file_name || "");
-                                setNewEmployeeAdditionalFiles(additionalList);
-                                setNewEmployeeRequiredTargetAmount(String(emp.requiredTargetAmount || 0));
-                                setNewEmployeeBonusPercentage(String(emp.bonusPercentage || 0));
-                                const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
-                                setNewEmployeeSpecialty(matchProv?.specialty || "");
-                                setNewEmployeeSelectedServices(matchProv?.services || []);
-                                setNewEmployeeRating(String(matchProv?.rating || 5));
-                                setNewEmployeeCommissionType(matchProv?.commissionType || "none");
-                                setNewEmployeeCommissionValue(String(matchProv?.commissionValue || 0));
-                                setNewEmployeeCommissionBase((matchProv?.commissionBase as "gross" | "net_of_materials") || "gross");
-                                setNewEmployeeCommissionFixedComponent(String(matchProv?.commissionFixedComponent || 0));
-                                setNewEmployeeServiceCommissions(Array.isArray(matchProv?.serviceCommissions) ? matchProv.serviceCommissions : []);
-                                let bIds: string[] = [];
-                                if (matchProv?.workingDaysHours?.branch_ids && Array.isArray(matchProv.workingDaysHours.branch_ids)) {
-                                  bIds = matchProv.workingDaysHours.branch_ids;
-                                } else if (emp.branch_id) {
-                                  bIds = [emp.branch_id];
-                                } else if (branches.length > 0) {
-                                  bIds = [branches[0].id];
-                                }
-                                setNewEmployeeBranchIds(bIds);
-                                let sched = matchProv?.workingDaysHours?.branch_schedules?.[bIds[0]]?.in_person || matchProv?.workingDaysHours?.in_person || matchProv?.workingDaysHours;
-                                if (!sched || typeof sched !== 'object') {
-                                  sched = {
-                                    Sunday: { isOpen: true, start: "09:00", end: "17:00" },
-                                    Monday: { isOpen: true, start: "09:00", end: "17:00" },
-                                    Tuesday: { isOpen: true, start: "09:00", end: "17:00" },
-                                    Wednesday: { isOpen: true, start: "09:00", end: "17:00" },
-                                    Thursday: { isOpen: true, start: "09:00", end: "17:00" },
-                                    Friday: { isOpen: false, start: "09:00", end: "17:00" },
-                                    Saturday: { isOpen: true, start: "09:00", end: "17:00" }
-                                  };
-                                }
-                                setNewEmployeeWorkingDaysHours(sched);
-                                setIsEditingEmployeeModalOpen(true);
-                              }}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                              title={t.actions.editEmployee}
-                            >
-                              <Pencil size={13} />
-                            </button>
-                            {!emp.email_confirmed_at && (
+                                  setNewEmployeeContract(contractUrl);
+                                  setNewEmployeeContractName(emp.contract_file_name || "");
+                                  setNewEmployeeAdditionalFiles(additionalList);
+                                  setNewEmployeeRequiredTargetAmount(String(emp.requiredTargetAmount || 0));
+                                  setNewEmployeeBonusPercentage(String(emp.bonusPercentage || 0));
+                                  const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
+                                  setNewEmployeeSpecialty(matchProv?.specialty || "");
+                                  setNewEmployeeSelectedServices(matchProv?.services || []);
+                                  setNewEmployeeRating(String(matchProv?.rating || 5));
+                                  setNewEmployeeCommissionType(matchProv?.commissionType || "none");
+                                  setNewEmployeeCommissionValue(String(matchProv?.commissionValue || 0));
+                                  setNewEmployeeCommissionBase((matchProv?.commissionBase as "gross" | "net_of_materials") || "gross");
+                                  setNewEmployeeCommissionFixedComponent(String(matchProv?.commissionFixedComponent || 0));
+                                  setNewEmployeeServiceCommissions(Array.isArray(matchProv?.serviceCommissions) ? matchProv.serviceCommissions : []);
+                                  let bIds: string[] = [];
+                                  if (matchProv?.workingDaysHours?.branch_ids && Array.isArray(matchProv.workingDaysHours.branch_ids)) {
+                                    bIds = matchProv.workingDaysHours.branch_ids;
+                                  } else if (emp.branch_id) {
+                                    bIds = [emp.branch_id];
+                                  } else if (branches.length > 0) {
+                                    bIds = [branches[0].id];
+                                  }
+                                  setNewEmployeeBranchIds(bIds);
+                                  let sched = matchProv?.workingDaysHours?.branch_schedules?.[bIds[0]]?.in_person || matchProv?.workingDaysHours?.in_person || matchProv?.workingDaysHours;
+                                  if (!sched || typeof sched !== 'object') {
+                                    sched = {
+                                      Sunday: { isOpen: true, start: "09:00", end: "17:00" },
+                                      Monday: { isOpen: true, start: "09:00", end: "17:00" },
+                                      Tuesday: { isOpen: true, start: "09:00", end: "17:00" },
+                                      Wednesday: { isOpen: true, start: "09:00", end: "17:00" },
+                                      Thursday: { isOpen: true, start: "09:00", end: "17:00" },
+                                      Friday: { isOpen: false, start: "09:00", end: "17:00" },
+                                      Saturday: { isOpen: true, start: "09:00", end: "17:00" }
+                                    };
+                                  }
+                                  setNewEmployeeWorkingDaysHours(sched);
+                                  setIsEditingEmployeeModalOpen(true);
+                                }}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                title={t.actions.editEmployee}
+                              >
+                                <Pencil size={13} />
+                              </button>
+                            )}
+                            {!emp.email_confirmed_at && (!hasPermission || hasPermission("employees.action_resend_invite")) && (
                               <button
                                 type="button"
                                 onClick={() => handleResendInvitation(emp.id)}
@@ -1177,14 +1183,16 @@ export default function AdminEmployeesView({
                                 {t.actions.resend}
                               </button>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteEmployee(emp.id)}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200/60 text-red-600 transition hover:bg-red-50 hover:border-red-300"
-                              title={t.actions.revoke}
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            {(!hasPermission || hasPermission("employees.action_delete")) && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEmployee(emp.id)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200/60 text-red-600 transition hover:bg-red-50 hover:border-red-300"
+                                title={t.actions.revoke}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </>
                         )}
                       </div>

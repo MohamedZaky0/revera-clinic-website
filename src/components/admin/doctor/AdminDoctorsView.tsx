@@ -322,71 +322,81 @@ export default function AdminDoctorsView({
                             {provider.active !== false ? (t.activeBadge || "Active") : (t.inactiveBadge || "Inactive")}
                           </span>
                         </td>
+                        {/* 3-Dots Row Actions */}
                         <td className="px-4 py-4 text-center">
-                          <div className="dropdown-action-menu relative inline-block text-start">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveDoctorRowMenuId(prev => prev === docKey ? null : docKey);
-                              }}
-                              className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
-                                activeDoctorRowMenuId === docKey
-                                  ? "border-[#414E36] bg-[#414E36] text-white"
-                                  : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
-                              }`}
-                              title={t.actionsTitle}
-                            >
-                              <MoreVertical size={13} />
-                            </button>
+                          {(() => {
+                            const canEdit = hasPermission("providers.action_edit");
+                            const canChangeStatus = hasPermission("providers.action_change_status");
+                            const canDelete = provider.id && hasPermission("providers.action_delete");
+                            if (!canEdit && !canChangeStatus && !canDelete) return null;
 
-                            {activeDoctorRowMenuId === docKey && (
-                              <div className={`absolute end-0 ${isNearBottom ? "bottom-8" : "top-8"} z-[9999] w-40 rounded-xl bg-white p-1 shadow-2xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu`}>
-                                {hasPermission("providers.edit") && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveDoctorRowMenuId(null);
-                                      openEditProviderModal(provider);
-                                    }}
-                                    className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
-                                  >
-                                    <Pencil size={13} className="text-[#5A6A51]" />
-                                    <span>{t.editDoctorBtn}</span>
-                                  </button>
-                                )}
-                                {hasPermission("providers.edit") && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveDoctorRowMenuId(null);
-                                      setStatusModalDoctor(provider);
-                                    }}
-                                    className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
-                                  >
-                                    <Power size={13} className="text-[#5A6A51]" />
-                                    <span>{t.changeStatusBtn || "Change Status"}</span>
-                                  </button>
-                                )}
-                                {provider.id && hasPermission("providers.delete") && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveDoctorRowMenuId(null);
-                                      handleDeleteProvider(provider.id);
-                                    }}
-                                    className="w-full text-start px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
-                                  >
-                                    <Trash2 size={13} className="text-red-600" />
-                                    <span>{t.deleteDoctorBtn}</span>
-                                  </button>
+                            return (
+                              <div className="dropdown-action-menu relative inline-block text-start">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveDoctorRowMenuId(prev => prev === docKey ? null : docKey);
+                                  }}
+                                  className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
+                                    activeDoctorRowMenuId === docKey
+                                      ? "border-[#414E36] bg-[#414E36] text-white"
+                                      : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                  }`}
+                                  title={t.actionsTitle}
+                                >
+                                  <MoreVertical size={13} />
+                                </button>
+
+                                {activeDoctorRowMenuId === docKey && (
+                                  <div className={`absolute end-0 ${isNearBottom ? "bottom-8" : "top-8"} z-[9999] w-40 rounded-xl bg-white p-1 shadow-2xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu`}>
+                                    {canEdit && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveDoctorRowMenuId(null);
+                                          openEditProviderModal(provider);
+                                        }}
+                                        className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                                      >
+                                        <Pencil size={13} className="text-[#5A6A51]" />
+                                        <span>{t.editDoctorBtn}</span>
+                                      </button>
+                                    )}
+                                    {canChangeStatus && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveDoctorRowMenuId(null);
+                                          setStatusModalDoctor(provider);
+                                        }}
+                                        className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                                      >
+                                        <Power size={13} className="text-[#5A6A51]" />
+                                        <span>{t.changeStatusBtn || "Change Status"}</span>
+                                      </button>
+                                    )}
+                                    {canDelete && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveDoctorRowMenuId(null);
+                                          handleDeleteProvider(provider.id);
+                                        }}
+                                        className="w-full text-start px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
+                                      >
+                                        <Trash2 size={13} className="text-red-600" />
+                                        <span>{t.deleteDoctorBtn}</span>
+                                      </button>
+                                    )}
+                                  </div>
                                 )}
                               </div>
-                            )}
-                          </div>
+                            );
+                          })()}
                         </td>
                       </tr>
                     );
