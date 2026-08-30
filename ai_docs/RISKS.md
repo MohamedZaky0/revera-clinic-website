@@ -15,7 +15,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **54 resolved** · 74 tracked total.
+**8 open** · **13 partially resolved** · **55 resolved** · 76 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -29,6 +29,7 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 - [RISK-053](#risk-053) — New Cairo Branch's Working Hours Were Never Actually Configured
 - [RISK-058](#risk-058) — Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
 - [RISK-064](#risk-064) — "Add New Category" (Services) Has No Arabic Name Field — Every Category Created There Gets A Permanently Blank `ar`
+- [RISK-078](#risk-078) — Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It
 
 ## RISK-001: Duplication Friction (hardcoded Revera-specific values)
 
@@ -355,6 +356,60 @@ not a mechanical move. Fix is a second input in the same modal ("Category Name (
 `newCategoryNameAr`, and changing the save handler's `ar: ""` to `ar: newCategoryNameAr.trim()` —
 the state and prop plumbing to do this already exist, only the JSX and the one save-handler field
 are missing.
+
+---
+
+## RISK-078: Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It
+
+**Severity:** High · **Type:** Access control / false sense of security
+**Found:** 2026-08-30, reviewing commits `f713968` ("granular action-level permissions and 3-dots
+menus access control") and `1a61450` per Mohamed's request.
+
+**What it is:** `f713968` adds 100+ granular permission keys (e.g. `providers.action_delete`,
+`services.action_delete`, `inventory.delete_product`, `employees.action_delete`) and wires every
+view's buttons/3-dots menus to hide when `hasPermission(key)` is false. `hasPermission` itself
+(`src/app/admin/page.tsx`) is pure client-side state — it only decides what renders in the browser.
+Neither this commit nor `1a61450` touched a single file under `src/app/api/`.
+
+Checked what actually guards the matching endpoints:
+- `DELETE /api/providers` and `DELETE /api/services` call only `requireStaffAccess` — which admits
+  **any** authenticated employee record, any role, zero permission check. Confirmed by reading both
+  handlers directly (`src/app/api/providers/route.ts:522`, `src/app/api/services/route.ts:115`):
+  no code after the `requireStaffAccess` call inspects `access.role` or `access.permissions` at all.
+- `inventory/products`, `inventory/devices`, `customers/products` are the same shape — every
+  handler is `requireStaffAccess` only.
+- `POST /api/roles`, `GET/POST /api/employees` require `requireAdministratorAccess`
+  (`admin`/`superadmin` role only) — unaffected by whatever is in the `permissions` array.
+
+So a role editor can uncheck "Delete Doctor (Table 3-Dots)" for a Receptionist role, and the 3-dots
+button correctly disappears for that receptionist in the browser — but that receptionist's own
+session token can still call `DELETE /api/providers?id=X` directly (devtools, curl, a saved request)
+and it succeeds, because the API was never told about `providers.action_delete` in the first place.
+The Role Management screen looks like a real access-control system; for every module except
+Transactions (`transactions.view`/`.create`/`.refund`, already enforced server-side via
+`hasFinancePermission` from earlier work this session), it currently is not one.
+
+**Secondary, lower-severity symptom of the same gap:** `1a61450` also loosens the client-side gate
+on the Employees and Role Management sections (previously hard-locked to
+`adminRole === "superadmin"`, now also open to any role with `hasPermission("employees.view")` /
+`hasPermission("settings.roles")` etc.). Verified this does **not** newly expose data — `GET
+/api/employees` and `GET/POST /api/roles` still require `requireAdministratorAccess`, so a genuinely
+custom (non-admin/superadmin) role granted that permission just gets a tab that opens to an
+empty/failing state (silently, in `fetchRolesAndEmployees`'s catch block) rather than real content.
+Confusing UX, not a leak — called out here because it's a symptom of the same root cause: the
+granular permission model exists only on the client.
+
+**Business impact:** if a clinic manager configures Role Management believing it restricts what a
+role can do (e.g. blocking a receptionist from deleting a doctor's profile, deleting a service,
+deleting an inventory product), that restriction currently only removes the button from view. It
+does not stop the action.
+
+**Not fixed** — this is a cross-cutting gap spanning ~7 API route files (providers, services,
+inventory/products, inventory/devices, customers/products, employees, roles), not a
+one-file patch, and closing it means deciding, module by module, which granular key each mutating
+endpoint should require (mirroring the `hasFinancePermission(access, 'transactions.refund')` pattern
+already proven correct for Transactions). Flagged for a dedicated pass rather than folded into an
+unrelated fix.
 
 ---
 
@@ -954,6 +1009,7 @@ cannot reproduce for new sessions again.
 - [RISK-075](#risk-075) — Doctor Status Feature Wrote To A Column No Migration Created, And Three Layers Of Silent Fallback Turned The Failure Into A 200 OK (RESOLVED)
 - [RISK-076](#risk-076) — Financial Transactions Module: Wrong Column Name Broke Every Real Request, Manual Adjustments Never Applied, Fabricated Demo Data Written To The Real Ledger, No Granular Permission Enforcement (RESOLVED)
 - [RISK-077](#risk-077) — A Wallet-Movement Fix Reopened The Re-Fire Double-Counting It Was Meant To Prevent (RESOLVED)
+- [RISK-079](#risk-079) — New Reports & Analytics Panel Silently Shows Fabricated Demo Numbers Whenever Real Data Is Genuinely Zero (RESOLVED)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -3375,6 +3431,41 @@ two route-level cases: a first-time wallet deposit on an already-completed booki
 an identical re-fire against the same invoice is not duplicated. Full suite: 724 passing / 6
 expected-fail (was 722/7 before this fix; the deep-merge `it.fails` for RISK-072 also flipped green
 in the same pull, see below).
+
+---
+
+## RISK-079: New Reports & Analytics Panel Silently Shows Fabricated Demo Numbers Whenever Real Data Is Genuinely Zero (RESOLVED)
+
+**Severity:** Medium · **Type:** Data integrity / business-decision risk
+**Found:** 2026-08-30, reviewing commit `1a61450` (adds `ReportsAnalyticsView.tsx`) per Mohamed's
+request.
+**Fixed:** same day.
+
+**What it is:** the new Reports & Analytics panel's 4 headline KPI cards were wired to real props
+(`allReservations`, `providers`) but with a `realValue || hardcodedNumber` fallback:
+
+```diff
+- const totalVisits = allReservations.length || 148;
+- const completedVisits = allReservations.filter(r => r.status === "completed").length || 122;
+- const totalRevenue = allReservations.reduce((acc, curr) => acc + (Number(curr.amountPaid) || 0), 0) || 485000;
+- const activeDoctorsCount = providers.length || 6;
+```
+
+In JavaScript `0 || x` evaluates to `x` — so any branch/date-range combination with genuinely zero
+bookings, zero completed visits, zero revenue, or zero active doctors would silently render the
+fabricated demo numbers (148 visits, 122 completed, 485,000 EGP, 6 doctors) instead of zero, with no
+visual indicator that the number shown isn't real. The rest of the panel (`topServices`,
+`doctorUtilization`) is openly, unconditionally mock data — consistent with the project's existing
+mock-UI modules — but these 4 cards looked and behaved like live data except at the one value (zero)
+where they silently weren't. The "Export CSV" button on the same panel exports these same 3 metrics,
+so a manager could export and archive a report containing the fabricated numbers believing them real.
+
+**Fix:** removed the `|| hardcodedNumber` fallbacks in
+[ReportsAnalyticsView.tsx](../src/components/admin/reports/ReportsAnalyticsView.tsx) — a genuine
+zero now renders as `0`.
+
+**Verification:** `npx tsc --noEmit` clean, `npx eslint` 0 errors on the file, manual trace of the
+new expressions against `allReservations`/`providers` empty-array and non-empty cases.
 
 ---
 

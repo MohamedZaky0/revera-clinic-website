@@ -41,11 +41,11 @@ export default function ReportsAnalyticsView({
   const [reportTab, setReportTab] = useState<"clinical" | "financial" | "staff" | "inventory">("clinical");
   const [dateRange, setDateRange] = useState<"7d" | "30d" | "90d" | "year">("30d");
 
-  // Summary Metrics
-  const totalVisits = allReservations.length || 148;
-  const completedVisits = allReservations.filter(r => r.status === "completed").length || 122;
-  const totalRevenue = allReservations.reduce((acc, curr) => acc + (Number(curr.amountPaid) || 0), 0) || 485000;
-  const activeDoctorsCount = providers.length || 6;
+  // Summary Metrics (real when data is loaded; a genuine zero must render as 0, not fall back to demo numbers)
+  const totalVisits = allReservations.length;
+  const completedVisits = allReservations.filter(r => r.status === "completed").length;
+  const totalRevenue = allReservations.reduce((acc, curr) => acc + (Number(curr.amountPaid) || 0), 0);
+  const activeDoctorsCount = providers.length;
 
   // Mock Top Performing Services
   const topServices = [
