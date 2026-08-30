@@ -15,7 +15,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **53 resolved** · 73 tracked total.
+**7 open** · **13 partially resolved** · **54 resolved** · 74 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -953,6 +953,7 @@ cannot reproduce for new sessions again.
 - [RISK-074](#risk-074) — `page.tsx` Had 95 Lines Of UTF-8/Windows-1252 Mojibake-Corrupted Arabic Content (RESOLVED)
 - [RISK-075](#risk-075) — Doctor Status Feature Wrote To A Column No Migration Created, And Three Layers Of Silent Fallback Turned The Failure Into A 200 OK (RESOLVED)
 - [RISK-076](#risk-076) — Financial Transactions Module: Wrong Column Name Broke Every Real Request, Manual Adjustments Never Applied, Fabricated Demo Data Written To The Real Ledger, No Granular Permission Enforcement (RESOLVED)
+- [RISK-077](#risk-077) — A Wallet-Movement Fix Reopened The Re-Fire Double-Counting It Was Meant To Prevent (RESOLVED)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -3309,6 +3310,71 @@ case. `/api/customers/settle-debt` registered in `auth-sweep.test.ts`.
   out of Finance/P&L until the ledger link is built. Automatic transactions are unaffected — they
   are recorded *alongside* the real `invoices`/`payments` writes, so Finance reporting already sees
   that money through its existing source.
+
+---
+
+## RISK-077: A Wallet-Movement Fix Reopened The Re-Fire Double-Counting It Was Meant To Prevent (RESOLVED)
+
+**Severity:** High · **Type:** Data integrity / financial correctness
+**Found:** 2026-08-29, reviewing incoming commits per Mohamed's request.
+**Fixed:** same day.
+
+**What happened:** commit `a5f807e` ("apply walletDeposit movements during payment settlement
+even if booking was completed by doctor") fixed a real bug — a doctor can complete a booking with
+no wallet fields at all, and reception's later payment settlement legitimately wants to apply
+wallet credit or deposit change against that same, already-completed booking. The old code
+discarded any `walletDeposit`/`walletWithdrawal` unconditionally whenever `wasCompleted` was true,
+silently dropping that legitimate case.
+
+The fix, in `src/lib/billing.ts`'s `computeSettledBalances`, removed the `wasCompleted` guard
+entirely:
+
+```diff
+- const walletIgnored = wasCompleted && (Number(walletDeposit) !== 0 || Number(walletWithdrawal) !== 0);
+- const deposit = wasCompleted ? 0 : Number(walletDeposit || 0);
+- const withdrawal = wasCompleted ? 0 : Number(walletWithdrawal || 0);
++ const deposit = Number(walletDeposit || 0);
++ const withdrawal = Number(walletWithdrawal || 0);
++ const walletIgnored = false;
+```
+
+This is the **same regression this project already fixed once** — `RISK-010`'s history records
+commit `05c5136` (2026-08-20) removing this identical guard, restored in `8f8c2dd` (2026-08-22).
+`a5f807e` removed it a second time, for a different reason. `tests/lib/billing.test.ts`'s existing
+`wallet ignored when already completed` case caught it immediately: a network retry (or a
+double-submitted checkout) of the same `PATCH .../reservations` carrying the same
+`walletDeposit`/`walletWithdrawal` would now credit or debit the wallet a second time, since
+nothing distinguished "this wallet instruction has already landed" from "this is a brand-new
+wallet instruction on an already-completed booking."
+
+**Why a blanket revert was not the fix:** `computeSettledBalances` is a pure function with no
+database access — it cannot itself know whether an incoming wallet instruction is new or a
+retried duplicate, because unlike `amountPaid`/`amountLeft` (which carry an `old`/`new` pair the
+function diffs), wallet fields are one-shot "apply this now" instructions with nothing to diff
+against. Restoring the old `wasCompleted` guard would have re-broken the real case Windsurf's fix
+was for. The idempotency question has to be answered by whoever has database access, one layer up.
+
+**Fix:** moved the idempotency check into `PATCH /api/reservations` itself, scoped precisely
+instead of blanket. Before calling `computeSettledBalances`, if the booking is already completed
+and a wallet amount is being sent, look up the reservation's existing invoice and check
+`wallet_txns` for a row already matching that exact `direction`+`amount` against it; if found,
+pass `0` for that field instead of the real value. This distinguishes:
+- **A genuinely new instruction** (no matching `wallet_txns` row yet) — applied, restoring
+  Windsurf's fix.
+- **A re-fire of an already-applied instruction** (matching row found) — ignored, restoring the
+  original protection.
+
+`computeSettledBalances` itself now always applies whatever it is given (`walletIgnored` is
+hardcoded `false`, since the decision moved out of it) — correct, since the caller now only ever
+passes a movement it wants applied. Left the `walletIgnored` field on the return shape rather than
+changing the function's public type further; nothing outside `billing.ts` reads it.
+
+**Verification:** `tests/lib/billing.test.ts`'s case rewritten to assert the new (correct)
+always-apply behaviour at the pure-function level. `tests/routes/reservations-patch.test.ts` gained
+two route-level cases: a first-time wallet deposit on an already-completed booking is applied, and
+an identical re-fire against the same invoice is not duplicated. Full suite: 724 passing / 6
+expected-fail (was 722/7 before this fix; the deep-merge `it.fails` for RISK-072 also flipped green
+in the same pull, see below).
 
 ---
 

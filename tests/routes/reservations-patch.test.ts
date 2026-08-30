@@ -566,9 +566,15 @@ describe('settlement — customer balances on completion', () => {
   // status:"completed" in one PATCH, a retried or re-submitted checkout moved real money a second
   // time and wrote a duplicate ledger row. The pure-function test caught it; nothing at this level
   // would have. Restored in 8f8c2dd.
-  it('re-firing completion does not apply the wallet movement a second time or duplicate its ledger row', async () => {
+  // A doctor can complete a booking with no wallet fields at all (wasCompleted becomes true with
+  // no wallet op ever applied). Reception's later payment settlement legitimately wants to apply
+  // wallet credit or deposit change at that point — this must go through, not be discarded just
+  // because the booking already carries status:"completed".
+  it('a wallet deposit applied for the first time on an already-completed booking is not discarded', async () => {
     fake.seed('reservations', [baseReservation({ status: 'completed', amount_paid: 500, amount_left: 0 })]);
     fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 100, spent_amount: 500, outstanding: 0 }]);
+    // No invoice/wallet_txns yet for this reservation — this is genuinely the first wallet op.
+    fake.seed('invoices', [{ id: 'inv-1', reservation_id: RES_ID, customer_id: CUSTOMER_ID, status: 'issued' }]);
 
     await PATCH(staffReq({
       id: RES_ID,
@@ -576,8 +582,29 @@ describe('settlement — customer balances on completion', () => {
     }));
 
     const customer = fake.rows('customers').find((c) => c.id === CUSTOMER_ID)!;
-    expect(customer.wallet_balance).toBe(100); // not 120 — the deposit was already applied
-    expect(fake.rows('wallet_txns')).toHaveLength(0);
+    expect(customer.wallet_balance).toBe(120); // applied — this is a real, new instruction
+    expect(fake.rows('wallet_txns')).toHaveLength(1);
+  });
+
+  // The genuine re-fire case: the *same* wallet instruction (matching direction + amount) already
+  // landed a wallet_txns row against this reservation's invoice — a network retry of the same
+  // checkout PATCH must not apply it twice. Scoped to "this exact movement, this invoice", not
+  // "any movement, any time after completion" — see the guard's comment in the route.
+  it('re-firing the identical wallet instruction against the same invoice does not duplicate it', async () => {
+    fake.seed('reservations', [baseReservation({ status: 'completed', amount_paid: 500, amount_left: 0 })]);
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 120, spent_amount: 500, outstanding: 0 }]);
+    fake.seed('invoices', [{ id: 'inv-1', reservation_id: RES_ID, customer_id: CUSTOMER_ID, status: 'issued' }]);
+    // The 20 deposit already landed once, against this same invoice.
+    fake.seed('wallet_txns', [{ id: 'wtx-1', customer_id: CUSTOMER_ID, direction: 'in', amount: 20, invoice_id: 'inv-1' }]);
+
+    await PATCH(staffReq({
+      id: RES_ID,
+      body: { status: 'completed', amountPaid: 500, amountLeft: 0, walletDeposit: 20, walletWithdrawal: 0 },
+    }));
+
+    const customer = fake.rows('customers').find((c) => c.id === CUSTOMER_ID)!;
+    expect(customer.wallet_balance).toBe(120); // not 140 — the deposit was already applied
+    expect(fake.rows('wallet_txns')).toHaveLength(1); // still just the original row
   });
 
   // RISK-031. Commit e79a691 removed the guard that blocked package redemption on a booking with a

@@ -1531,6 +1531,37 @@ export async function PATCH(req: Request) {
                 ? Number(amountLeft)
                 : Math.max(0, derivedTotalCost - newPaid);
 
+            // Guard specifically against re-firing the *same* wallet instruction on an
+            // already-completed booking (e.g. a network retry of the checkout PATCH) -
+            // walletDeposit/walletWithdrawal are one-shot "apply this now" instructions with
+            // no oldValue to diff against the way amountPaid/amountLeft have, so they cannot
+            // reuse the delta-based idempotency the rest of this function relies on. This
+            // previously worked by ignoring wallet fields outright whenever wasCompleted was
+            // true, which also silently broke a real case: a doctor completes a booking with
+            // no wallet info, and reception's later payment settlement wants to apply wallet
+            // credit or deposit change - that legitimate wallet op was discarded too. Scope the
+            // guard to "this exact movement was already recorded for this reservation's
+            // invoice" instead of "any movement, any time after completion".
+            let effectiveWalletDeposit = Number(walletDeposit || 0);
+            let effectiveWalletWithdrawal = Number(walletWithdrawal || 0);
+            if (target.status === 'completed' && (effectiveWalletDeposit > 0 || effectiveWalletWithdrawal > 0)) {
+              const { data: existingInvoice } = await supabaseServer
+                .from('invoices')
+                .select('id')
+                .eq('reservation_id', id)
+                .maybeSingle();
+              if (existingInvoice?.id) {
+                const { data: priorTxns } = await supabaseServer
+                  .from('wallet_txns')
+                  .select('direction, amount')
+                  .eq('invoice_id', existingInvoice.id);
+                const alreadyApplied = (dir: string, amt: number) =>
+                  amt > 0 && (priorTxns || []).some((t: any) => t.direction === dir && Number(t.amount) === amt);
+                if (alreadyApplied('in', effectiveWalletDeposit)) effectiveWalletDeposit = 0;
+                if (alreadyApplied('out', effectiveWalletWithdrawal)) effectiveWalletWithdrawal = 0;
+              }
+            }
+
             const settled = computeSettledBalances({
               current: {
                 wallet: Number(customer.wallet_balance || 0),
@@ -1542,8 +1573,8 @@ export async function PATCH(req: Request) {
               oldLeft,
               newPaid,
               newLeft,
-              walletDeposit: Number(walletDeposit || 0),
-              walletWithdrawal: Number(walletWithdrawal || 0),
+              walletDeposit: effectiveWalletDeposit,
+              walletWithdrawal: effectiveWalletWithdrawal,
             });
 
             if (settled.clamped) {

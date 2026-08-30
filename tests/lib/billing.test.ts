@@ -49,7 +49,21 @@ describe('computeSettledBalances', () => {
     expect(result.wallet).toBe(100);
   });
 
-  it('wallet ignored when already completed', () => {
+  // Was: wallet fields were unconditionally discarded whenever wasCompleted was true. That broke
+  // a real case — a doctor completes a booking with no wallet info, and reception's later payment
+  // settlement wants to apply wallet credit or deposit change against the same reservation, which
+  // is a legitimate, first-time instruction even though the booking is already completed.
+  //
+  // computeSettledBalances is a pure function with no way to know whether an incoming
+  // walletDeposit/walletWithdrawal is a brand-new instruction or a retried duplicate of one
+  // already applied — it has no access to wallet_txns. That distinction now lives one layer up,
+  // in the PATCH /api/reservations route, which checks wallet_txns for a matching row against the
+  // reservation's invoice before calling this function, and passes 0 instead when it finds one
+  // (see tests/routes/reservations-patch.test.ts, "re-firing the identical wallet instruction").
+  // This function's job is simpler now: apply whatever amount it is given, regardless of
+  // wasCompleted. `walletIgnored` is always false; kept on the return shape for now rather than
+  // changing the type further while nothing outside this file reads it.
+  it('wallet deposit/withdrawal are applied even when already completed — the caller decides idempotency', () => {
     const result = computeSettledBalances({
       current: base,
       wasCompleted: true,
@@ -60,8 +74,8 @@ describe('computeSettledBalances', () => {
       walletDeposit: 50,
       walletWithdrawal: 30,
     });
-    expect(result.walletIgnored).toBe(true);
-    expect(result.wallet).toBe(100); // unchanged
+    expect(result.walletIgnored).toBe(false);
+    expect(result.wallet).toBe(120); // 100 + 50 - 30
   });
 
   it('wallet deposit applied on first completion', () => {

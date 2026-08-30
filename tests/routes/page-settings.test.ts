@@ -1,25 +1,19 @@
 /**
  * Route-level test for POST /api/page-settings — the shallow-merge data-loss bug
- * surfaced by Brief 26 Part 3.
+ * surfaced by Brief 26 Part 3 (RISK-072), fixed 2026-08-29.
  *
  * `savePageSettings()` in `src/app/admin/page.tsx:4328–4390` builds a `booking`
  * block that includes `minAdvance`, `maxAdvance`, `cancelWindow`, `maxPerSlot`,
  * `instantApproval`, `showDoctorNotes`, `depositPercentage`, and `termsText` —
- * but omits `staleSessionHours`. The POST handler at
- * `src/app/api/page-settings/route.ts:149–152` does a **shallow** merge:
- *
- *   const mergedValue = { ...existing?.value, ...body };
- *
- * Because the merge is shallow, the entire `booking` object from `body` replaces
- * the existing `booking` object. Any key not present in the payload is lost.
- * Every CMS save (any tab — Home, About, Services) calls `savePageSettings()`
- * which rebuilds the full payload including the incomplete `booking` block, so
- * `staleSessionHours` is silently destroyed on every save.
+ * but omits `staleSessionHours`. The POST handler used to shallow-merge
+ * (`{ ...existing?.value, ...body }`), so the entire `booking` object from `body`
+ * replaced the existing one and `staleSessionHours` was silently destroyed on
+ * every CMS save. Fixed by `deepMergeSettings()` — a per-key recursive merge
+ * that only replaces a leaf value, not the whole object it lives in.
  *
  * This test seeds a row with `booking.staleSessionHours = 6`, POSTs the exact
  * payload shape `savePageSettings()` builds (without `staleSessionHours`), and
- * asserts the stored value. Marked `it.fails` per repo convention — the test
- * documents the bug so a future fix flips it green.
+ * asserts the stored value survives.
  *
  * Structure follows `tests/routes/roles-employees.test.ts`.
  */
@@ -109,15 +103,15 @@ beforeEach(() => {
 
 // ── Test: shallow-merge destroys staleSessionHours ───────────────────────────
 
-describe('POST /api/page-settings — shallow-merge data-loss (staleSessionHours)', () => {
+describe('POST /api/page-settings — deep merge preserves sibling fields (RISK-072)', () => {
   /*
    * The payload below mirrors exactly what `savePageSettings()` builds at
    * `src/app/admin/page.tsx:4328–4390`. The `booking` block (lines 4380–4389)
-   * includes eight fields but omits `staleSessionHours`. The route's shallow
-   * merge replaces the entire `booking` object, so `staleSessionHours` is lost.
+   * includes eight fields but omits `staleSessionHours` — the deep merge must
+   * preserve it from the existing stored value rather than dropping it.
    */
 
-  it.fails('preserves staleSessionHours across a CMS save', async () => {
+  it('preserves staleSessionHours across a CMS save', async () => {
     seedAdminAuth();
     seedPageSettings();
 
