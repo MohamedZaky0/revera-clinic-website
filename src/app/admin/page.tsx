@@ -762,7 +762,7 @@ export default function AdminPage() {
 
     // Dashboard & Reception fallbacks
     if (permKey.startsWith("dashboard.") || permKey.startsWith("reception.")) {
-      if (adminPermissions.includes("Dashboard") || adminPermissions.includes("dashboard") || adminRole === "receptionist" || adminRole === "admin") return true;
+      if (adminPermissions.includes("Dashboard") || adminPermissions.includes("dashboard") || adminPermissions.some(p => p.startsWith("dashboard.")) || adminPermissions.some(p => p.startsWith("reception."))) return true;
     }
 
     const parentScreenMap: Record<string, string> = {
@@ -797,8 +797,6 @@ export default function AdminPage() {
     if (adminRole === 'superadmin') return SIDEBAR_ITEMS;
     return SIDEBAR_ITEMS.filter(item => {
       if (item.label === 'Logout') return true;
-      if ((item as any).comingSoon) return false;
-      if ((item.label === 'HR' || item.label === 'Inventory' || item.label === 'Transactions' || item.label === 'Employees' || item.label === 'Marketing' || item.label === 'Customer Support' || item.label === 'Reports') && (adminRole === 'admin' || adminRole === 'HR' || adminRole === 'receptionist' || adminRole === 'superadmin')) return true;
       if (adminPermissions.includes(item.label)) return true;
       
       const parentScreenMap: Record<string, string> = {
@@ -818,11 +816,12 @@ export default function AdminPage() {
         "Settings": "settings"
       };
       const prefix = parentScreenMap[item.label];
-      if (prefix && adminPermissions.some(p => p.startsWith(prefix + ".") || p === prefix)) return true;
+      if (prefix && (adminPermissions.includes(prefix) || adminPermissions.some(p => p.startsWith(prefix + ".")))) return true;
+      if (prefix && hasPermission(prefix)) return true;
       
       return false;
     });
-  }, [adminRole, adminPermissions]);
+  }, [adminRole, adminPermissions, hasPermission]);
 
   const [adminEmail, setAdminEmail] = useState("");
   const [adminEmployeeId, setAdminEmployeeId] = useState("");
@@ -1881,9 +1880,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       if (hasPermission(prefix)) return true;
     }
     
-    // Default allowed administrative modules for common roles
-    if ((nav === 'HR' || nav === 'Inventory' || nav === 'Transactions' || nav === 'Employees' || nav === 'Marketing' || nav === 'Customer Support' || nav === 'Reports') && (adminRole === 'admin' || adminRole === 'HR' || adminRole === 'receptionist')) return true;
-
     return false;
   }, [adminRole, adminPermissions, hasPermission]);
 
