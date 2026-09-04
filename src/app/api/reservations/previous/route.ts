@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { normalizeEgyptMobile } from '@/lib/customerIdentity';
 
@@ -41,8 +42,15 @@ function cleanPhoneForDb(phoneStr: string): string {
  * GET /api/reservations/previous
  * Health and diagnostics endpoint used by Admin System Test Suite (TC-038)
  * and for listing historical/previous reservations.
+ *
+ * Staff-gated: the response body carries real patient names and phone numbers for up to 50
+ * reservations, so an unauthenticated caller must never reach it. The Test Suite runner already
+ * sends the bearer token (`authenticatedJsonHeaders`), so TC-038 is unaffected.
  */
-export async function GET() {
+export async function GET(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const { data: historicalBookings, error, count } = await supabaseServer
       .from('reservations')
@@ -96,8 +104,14 @@ export async function GET() {
  * POST /api/reservations/previous
  * Creates a previous/historical booking that occurred before joining the system.
  * Automatically links to an existing patient by phone or creates a new customer profile.
+ *
+ * Staff-gated: this writes to `customers` and `reservations` (and can silently create a brand new
+ * patient record), so it is a privileged reception action, not a public booking endpoint.
  */
 export async function POST(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const body = await req.json();
     const {

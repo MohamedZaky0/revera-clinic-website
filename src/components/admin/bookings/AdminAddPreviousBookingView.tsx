@@ -19,6 +19,7 @@ import {
   Stethoscope
 } from "lucide-react";
 import { adminTranslations } from "@/components/admin/translations";
+import { getAuthHeaders } from "@/lib/authHeaders";
 
 interface ServiceItem {
   id: string | number;
@@ -195,11 +196,11 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         amountPaid: selectedPaymentType && selectedSrv?.price ? selectedSrv.price : 0
       };
 
+      // POST /api/reservations/previous is staff-gated, so the bearer token is required — a
+      // plain Content-Type-only fetch now 401s and the form would silently fail to save.
       const res = await fetch("/api/reservations/previous", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify(payload)
       });
 

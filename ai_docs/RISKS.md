@@ -1010,6 +1010,7 @@ cannot reproduce for new sessions again.
 - [RISK-076](#risk-076) — Financial Transactions Module: Wrong Column Name Broke Every Real Request, Manual Adjustments Never Applied, Fabricated Demo Data Written To The Real Ledger, No Granular Permission Enforcement (RESOLVED)
 - [RISK-077](#risk-077) — A Wallet-Movement Fix Reopened The Re-Fire Double-Counting It Was Meant To Prevent (RESOLVED)
 - [RISK-079](#risk-079) — New Reports & Analytics Panel Silently Shows Fabricated Demo Numbers Whenever Real Data Is Genuinely Zero (RESOLVED)
+- [RISK-080](#risk-080) — Two API Routes Reachable Without Any Session: Patient Roster Read/Write And Supabase Infrastructure Disclosure (RESOLVED)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -3506,6 +3507,69 @@ new expressions against `allReservations`/`providers` empty-array and non-empty 
 
 **Resolution:**
 `handleSaveBookingSettings`, `handleSaveNotificationSettings`, and `handleSaveQueueSettings` in `src/app/admin/page.tsx` now check `res.ok`, provide explicit user-facing success/error feedback (`alert`), call `clearFetchCache()`, and re-fetch settings via `fetchPageSettings()` upon successful save.
+
+---
+
+## RISK-080: Two API Routes Reachable Without Any Session — Patient Roster Read/Write And Supabase Infrastructure Disclosure (RESOLVED)
+
+**Severity:** High · **Type:** Security / Access control
+**Found:** 2026-09-04 (pre-production audit before the first `dev` → `main` release)
+**Resolved:** 2026-09-04
+
+**Context:**
+Audit of all 77 `/api/*` route handlers ahead of putting the system in front of real doctors and
+reception. `src/middleware.ts` only gates four path prefixes (`/api/employees`, `/api/hr/`,
+`/api/roles`, `/api/providers/schedule-audit-logs`); every other route is responsible for its own
+guard. Two were missing one entirely.
+
+**Findings:**
+
+1. **`GET|POST /api/reservations/previous`** — no guard on either verb.
+   - `GET` returned up to 50 reservation rows including `name` and `phone` — a real patient roster
+     — to any anonymous caller who knew the URL.
+   - `POST` wrote to `reservations` **and** `customers`, auto-creating a brand new patient record
+     when no phone match was found. An unauthenticated caller could inject arbitrary patients and
+     completed-status bookings into the clinic's history.
+2. **`GET /api/health/supabase`** — no guard. Reported which Supabase env vars were present and
+   under which of several accepted names, plus a `valuePreview` returning the **first 10 characters
+   of the service role key** and the first 20 of the project URL. Infrastructure fingerprinting
+   available to anyone.
+
+**Not a finding (checked and cleared during the same audit):**
+- `/api/hr/payroll`, `/api/hr/doctor-payroll`, `/api/hr/performance` — guarded by `verifyHrAccess`
+  (`src/lib/auth.ts`), which restricts to `superadmin`/`admin`/`hr`. A receptionist cannot read
+  payroll.
+- `/api/auth/me` — verifies the bearer token inline via `supabaseServer.auth.getUser(token)`.
+- `/api/availability`, `/api/branches`, `/api/terms` — intentionally public; they back the
+  patient-facing booking flow.
+- `/api/assets/post-depreciation` — guarded by `requireAdministratorAccess`.
+
+**Resolution:**
+- `src/app/api/reservations/previous/route.ts` — `requireStaffAccess` added to both `GET` and
+  `POST`. Staff-level (not administrator) is deliberate: adding a historical booking is a routine
+  reception action.
+- `src/components/admin/bookings/AdminAddPreviousBookingView.tsx` — the POST was sending only
+  `Content-Type`, so guarding the route would have made the form silently fail to save. Switched to
+  `getAuthHeaders()` from `src/lib/authHeaders.ts` (the helper that exists precisely because this
+  class of bug recurred as RISK-021 and RISK-076).
+- `src/app/api/health/supabase/route.ts` — `requireAdministratorAccess` added, and **both**
+  `valuePreview` fields removed. The endpoint now reports presence and source-variable name only,
+  never any portion of a key value.
+
+The Admin System Test Suite runner (`runSingleDiagnosticTest`, `src/app/admin/page.tsx`) already
+sends `authenticatedJsonHeaders`, so TC-001 and TC-038 continue to pass unchanged.
+
+**Accepted, not fixed — `GET /api/auth/employee-email`:**
+This route is load-bearing for login and *cannot* require a session. Admin sign-in takes an employee
+ID, resolves it to an email via `?id=`, then calls `signInWithPassword`; `AuthModal` uses `?email=`
+to decide whether an address belongs to staff or a patient. Guarding it would lock everyone out.
+It remains an enumeration surface: an anonymous caller can map employee IDs to staff email
+addresses, which is useful for phishing. Knowing an address grants no access on its own (Supabase
+Auth rate-limits the password endpoint), so this is accepted for launch rather than mitigated with
+an in-memory rate limiter, which would be ineffective across Vercel's per-instance function memory.
+Revisit if staff report targeted phishing.
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_080_MANUAL_TESTS.md`
 
 ---
 
