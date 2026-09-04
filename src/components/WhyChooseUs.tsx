@@ -218,7 +218,7 @@ export function WhyChooseUs() {
                 <div className="wcu-left-img">
                   <Image
                     src={t.whyChooseUs.image1 || "/images/clinic/treatment.jpg"}
-                    alt="Dental clinic room — Revera Clinics"
+                    alt="Physical therapy clinic room — Revera Clinics"
                     fill
                     priority
                     unoptimized
@@ -392,7 +392,7 @@ export function WhyChooseUs() {
                     }}
                     className="hover:text-brand-secondary hover:underline"
                   >
-                    {t.whyChooseUs.phone}
+                    <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">{t.whyChooseUs.phone}</span>
                   </a>
                 </div>
               </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
+import { CLIENT } from "@/config/client";
 
 type AuthStep = 1 | 2 | 3;
 
@@ -53,7 +54,6 @@ export function AuthModal() {
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<AuthStep>(1);
-  const [demoMode, setDemoMode] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [authType, setAuthType] = useState<"phone" | "email">("email");
 
@@ -96,7 +96,6 @@ export function AuthModal() {
     setCustomerId(null);
     setLoadingProfileOnboarding(false);
     setHasPhoneInDb(false);
-    setDemoMode(false);
     setVerifying(false);
     setAuthType("email");
     setEmailInput("");
@@ -233,18 +232,20 @@ export function AuthModal() {
           const emailVal = session.user.email;
           let customer = null;
 
+          const authHeaders = { Authorization: `Bearer ${session.access_token}` };
+
           try {
             if (phone) {
               let localMobile = phone;
               if (phone.startsWith("+20")) {
                 localMobile = "0" + phone.slice(3);
               }
-              const res = await fetch(`/api/customers?mobile=${localMobile}`);
+              const res = await fetch(`/api/customers?mobile=${localMobile}`, { headers: authHeaders });
               if (res.ok) customer = await res.json();
             }
 
             if (!customer && emailVal) {
-              const res = await fetch(`/api/customers?email=${emailVal}`);
+              const res = await fetch(`/api/customers?email=${emailVal}`, { headers: authHeaders });
               if (res.ok) customer = await res.json();
             }
 
@@ -314,26 +315,27 @@ export function AuthModal() {
     // Normalize phone number in the UI/state to the 11-digit format
     setPhone(localPhone);
 
-    if (supabase) {
-      try {
-        console.log("Sending SMS OTP via Supabase to:", e164Phone);
-        const { error } = await supabase.auth.signInWithOtp({
-          phone: e164Phone,
-        });
-        if (error) {
-          setPhoneError(error.message || "Failed to send code. Please try again.");
-          setSending(false);
-          return;
-        }
-        console.log("Real Supabase OTP sent successfully!");
-        setDemoMode(false);
-      } catch (err: any) {
-        setPhoneError(err.message || "An error occurred while sending the code.");
+    if (!supabase) {
+      setPhoneError("Customer authentication is unavailable. Please contact the clinic.");
+      setSending(false);
+      return;
+    }
+
+    try {
+      console.log("Sending SMS OTP via Supabase to:", e164Phone);
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: e164Phone,
+      });
+      if (error) {
+        setPhoneError(error.message || "Failed to send code. Please try again.");
         setSending(false);
         return;
       }
-    } else {
-      setDemoMode(true);
+      console.log("Real Supabase OTP sent successfully!");
+    } catch (err: any) {
+      setPhoneError(err.message || "An error occurred while sending the code.");
+      setSending(false);
+      return;
     }
 
     setSending(false);
@@ -356,32 +358,30 @@ export function AuthModal() {
     }
     let verifiedSuccess = false;
 
-    if (!demoMode && supabase) {
-      try {
-        const { error } = await supabase.auth.verifyOtp({
-          phone: e164Phone,
-          token: otp,
-          type: "sms",
-        });
-        if (error) {
-          setOtpError(error.message);
-          setVerifying(false);
-          return;
-        }
-        verifiedSuccess = true;
-      } catch (err: any) {
-        setOtpError(err.message || "Verification failed. Please try again.");
+    if (!supabase) {
+      setOtpError("Customer authentication is unavailable. Please contact the clinic.");
+      setVerifying(false);
+      return;
+    }
+
+    let verifiedAccessToken: string | undefined;
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone: e164Phone,
+        token: otp,
+        type: "sms",
+      });
+      if (error) {
+        setOtpError(error.message);
         setVerifying(false);
         return;
       }
-    } else {
-      if (otp === "123456") {
-        verifiedSuccess = true;
-      } else {
-        setOtpError("Verification error. Try using '123456' as a demo code.");
-        setVerifying(false);
-        return;
-      }
+      verifiedSuccess = true;
+      verifiedAccessToken = data.session?.access_token;
+    } catch (err: any) {
+      setOtpError(err.message || "Verification failed. Please try again.");
+      setVerifying(false);
+      return;
     }
 
     if (verifiedSuccess) {
@@ -389,7 +389,9 @@ export function AuthModal() {
         sessionStorage.setItem("customer_login_in_progress", "true");
       }
       try {
-        const res = await fetch(`/api/customers?mobile=${localPhone}`);
+        const res = await fetch(`/api/customers?mobile=${localPhone}`, {
+          headers: verifiedAccessToken ? { Authorization: `Bearer ${verifiedAccessToken}` } : {}
+        });
         if (res.ok) {
           const customer = await res.json();
           if (customer) {
@@ -416,7 +418,7 @@ export function AuthModal() {
     setSending(true);
     const { e164Phone, isValid } = cleanAndFormatPhone(phone);
 
-    if (!demoMode && supabase && isValid) {
+    if (supabase && isValid) {
       try {
         const { error } = await supabase.auth.signInWithOtp({
           phone: e164Phone,
@@ -461,31 +463,19 @@ export function AuthModal() {
     }
 
     if (!supabase) {
-      console.warn("Supabase not initialized. Using demo email auth fallback.");
-      try {
-        const res = await fetch(`/api/customers?email=${emailInput}`);
-        if (res.ok) {
-          const customer = await res.json();
-          if (customer) {
-            localStorage.setItem("revera_user", JSON.stringify(customer));
-            window.dispatchEvent(new CustomEvent("revera-auth-change"));
-            setVerifying(false);
-            handleClose();
-            return;
-          }
-        }
-      } catch (err) {
-        console.error("Demo email auth customer lookup error:", err);
-      }
-      
-      setEmail(emailInput);
-      setStep(3);
+      setEmailError("Customer authentication is unavailable. Please contact the clinic.");
       setVerifying(false);
       return;
     }
 
     try {
       if (isSignUp) {
+        const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+        if (!strongPasswordRegex.test(passwordInput)) {
+          setPasswordError("Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g. @$!%*?&#).");
+          setVerifying(false);
+          return;
+        }
         const { data, error } = await supabase.auth.signUp({
           email: emailInput,
           password: passwordInput,
@@ -508,7 +498,9 @@ export function AuthModal() {
           return;
         }
 
-        const res = await fetch(`/api/customers?email=${emailInput}`);
+        const res = await fetch(`/api/customers?email=${emailInput}`, {
+          headers: data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {}
+        });
         if (res.ok) {
           const customer = await res.json();
           if (customer) {
@@ -582,9 +574,15 @@ export function AuthModal() {
     };
 
     try {
+      const { data: sessionData } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
       const res = await fetch("/api/customers", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(sessionData.session?.access_token
+            ? { Authorization: `Bearer ${sessionData.session.access_token}` }
+            : {})
+        },
         body: JSON.stringify(payload),
       });
 
@@ -625,7 +623,7 @@ export function AuthModal() {
               style={{ backgroundColor: "var(--cr-secondary)" }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/main_logo.png" alt="Revera" width={28} height={28} style={{ objectFit: "contain" }} />
+              <img src={CLIENT.logoPath} alt={CLIENT.nameShort} width={28} height={28} style={{ objectFit: "contain" }} />
             </div>
             <h3 className="text-lg font-semibold" style={{ color: "var(--cr-primary)" }}>
               {t.auth.title}
@@ -763,6 +761,30 @@ export function AuthModal() {
                 }}
                 required
               />
+              {isSignUp && passwordInput && (
+                  <div className="mt-2 text-xs space-y-1 font-semibold opacity-90" style={{ color: "var(--cr-text-muted)" }}>
+                    <div className="flex items-center gap-1.5">
+                      <span className={passwordInput.length >= 8 ? "text-green-600" : ""}>
+                        {passwordInput.length >= 8 ? "✓" : "○"} {isRTL ? "٨ أحرف على الأقل" : "At least 8 characters"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/[A-Z]/.test(passwordInput) && /[a-z]/.test(passwordInput) ? "text-green-600" : ""}>
+                        {/[A-Z]/.test(passwordInput) && /[a-z]/.test(passwordInput) ? "✓" : "○"} {isRTL ? "حروف كبيرة وصغيرة" : "Uppercase & lowercase letters"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/\d/.test(passwordInput) ? "text-green-600" : ""}>
+                        {/\d/.test(passwordInput) ? "✓" : "○"} {isRTL ? "رقم واحد على الأقل" : "At least one number"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/[^A-Za-z0-9]/.test(passwordInput) ? "text-green-600" : ""}>
+                        {/[^A-Za-z0-9]/.test(passwordInput) ? "✓" : "○"} {isRTL ? "رمز خاص واحد على الأقل" : "At least one special character (e.g. @$!%*?&#)"}
+                      </span>
+                    </div>
+                  </div>
+                )}
               {passwordError && (
                 <p className="mt-1.5 text-xs" style={{ color: "var(--cr-error)" }}>
                   {passwordError}
@@ -876,22 +898,6 @@ export function AuthModal() {
             >
               {sending ? t.auth.sending : t.auth.resendOtp}
             </button>
-
-            {demoMode && (
-              <div
-                className="text-xs p-3 rounded-lg text-center"
-                style={{
-                  backgroundColor: "rgba(196,174,124,0.1)",
-                  color: "var(--cr-primary)",
-                  border: "1px dashed var(--cr-primary)",
-                  marginTop: "8px"
-                }}
-              >
-                {isRTL
-                  ? "وضع التجربة نشط: استخدم رمز التحقق 123456 للمتابعة."
-                  : "Demo Mode Active: Enter verification code 123456 to continue."}
-              </div>
-            )}
           </div>
         )}
 

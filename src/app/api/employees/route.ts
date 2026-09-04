@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { requireAdministratorAccess } from '@/lib/access';
+import { normalizeServiceCommissions } from '@/lib/providerCommissions';
 
-export async function GET() {
+export async function GET(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
   try {
     const { data: employees, error } = await supabaseServer
       .from('employee_accounts')
@@ -13,7 +17,7 @@ export async function GET() {
     // Fetch auth users using the service_role client to check email_confirmed_at
     const { data: authData, error: authError } = await supabaseServer.auth.admin.listUsers();
     
-    let confirmedMap = new Map<string, string | null>();
+    const confirmedMap = new Map<string, string | null>();
     if (!authError && authData?.users) {
       authData.users.forEach((u: any) => {
         if (u.id) {
@@ -26,6 +30,10 @@ export async function GET() {
 
     const enrichedEmployees = (employees || []).map((emp: any) => ({
       ...emp,
+      requiredTargetAmount: emp.required_target_amount !== null ? Number(emp.required_target_amount) : 0,
+      bonusPercentage: emp.bonus_percentage !== null ? Number(emp.bonus_percentage) : 0,
+      targetType: emp.target_type || 'reservations',
+      bonusType: emp.bonus_type || 'percentage',
       email_confirmed_at: emp.auth_user_id ? confirmedMap.get(emp.auth_user_id) : null
     }));
 
@@ -37,9 +45,12 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const body = await req.json();
-    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId } = body;
+    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType } = body;
 
     if (!email || !name || !roleName) {
       return NextResponse.json(
@@ -100,11 +111,11 @@ export async function POST(req: Request) {
 
     const requestUrl = new URL(req.url);
     const siteUrl = requestUrl.origin;
-    console.log('Sending invitation to:', cleanEmail, 'with redirectTo:', `${siteUrl}/auth/setup`);
+    console.log('Sending invitation to:', cleanEmail, 'with redirectTo:', `${siteUrl}/auth/callback?next=/auth/setup`);
     const { data: inviteData, error: inviteError } = await supabaseServer.auth.admin.inviteUserByEmail(
       cleanEmail,
       {
-        redirectTo: `${siteUrl}/auth/setup`,
+        redirectTo: `${siteUrl}/auth/callback?next=/auth/setup`,
         data: {
           full_name: cleanName,
           role: roleName,
@@ -136,6 +147,12 @@ export async function POST(req: Request) {
         national_id_back: nationalIdBack || null,
         address: address || null,
         branch_id: branchId || null,
+        contract_file: contractFile || null,
+        contract_file_name: contractFileName || null,
+        required_target_amount: requiredTargetAmount ? Number(requiredTargetAmount) : 0,
+        bonus_percentage: bonusPercentage ? Number(bonusPercentage) : 0,
+        target_type: targetType || 'reservations',
+        bonus_type: bonusType || 'percentage',
       })
       .select()
       .single();
@@ -145,7 +162,54 @@ export async function POST(req: Request) {
       throw insertError;
     }
 
-    return NextResponse.json(newEmployee, { status: 201 });
+    const mapped = newEmployee ? {
+      ...newEmployee,
+      requiredTargetAmount: newEmployee.required_target_amount !== null ? Number(newEmployee.required_target_amount) : 0,
+      bonusPercentage: newEmployee.bonus_percentage !== null ? Number(newEmployee.bonus_percentage) : 0,
+      targetType: newEmployee.target_type || 'reservations',
+      bonusType: newEmployee.bonus_type || 'percentage'
+    } : null;
+
+    // Sync with providers table if department/role is Doctor
+    const isDoctor = (department && (department.toLowerCase().includes('doc') || department.toLowerCase() === 'doctors')) || (roleName && roleName.toLowerCase().includes('doc'));
+    if (isDoctor) {
+      try {
+        const providerPayload = {
+          name: cleanName,
+          services: Array.isArray(body.services) ? body.services : [],
+          rating: body.rating ? Number(body.rating) : 5,
+          phone: phone || null,
+          specialty: body.specialty || null,
+          national_id: nationalId || null,
+          branch_id: branchId || null,
+          fixed_salary: salary ? Number(salary) : 0,
+          commission_type: body.commission_type || 'none',
+          commission_value: body.commission_value ? Number(body.commission_value) : 0,
+          commission_base: body.commission_base || 'gross',
+          commission_fixed_component: body.commission_fixed_component ? Number(body.commission_fixed_component) : 0,
+          service_commissions: normalizeServiceCommissions(body.service_commissions),
+          working_days_hours: body.workingDaysHours || null,
+          bookings_count: 0,
+          more_count: Math.max(0, (body.services || []).length - 2)
+        };
+
+        const { data: existingProvider } = await supabaseServer
+          .from('providers')
+          .select('id')
+          .or(`name.ilike.${cleanName},phone.eq.${phone || 'none'}`)
+          .maybeSingle();
+
+        if (existingProvider) {
+          await supabaseServer.from('providers').update(providerPayload).eq('id', existingProvider.id);
+        } else {
+          await supabaseServer.from('providers').insert(providerPayload);
+        }
+      } catch (provErr) {
+        console.error('Failed to sync doctor employee to providers table:', provErr);
+      }
+    }
+
+    return NextResponse.json(mapped, { status: 201 });
   } catch (err: any) {
     console.error('POST /api/employees error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
@@ -153,9 +217,12 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const body = await req.json();
-    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, resendInvite } = body;
+    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType, resendInvite } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Employee ID is required.' }, { status: 400 });
@@ -172,11 +239,17 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Employee account not found.' }, { status: 404 });
     }
 
-    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchId !== undefined)) {
+    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchId !== undefined || requiredTargetAmount !== undefined || bonusPercentage !== undefined || targetType !== undefined || bonusType !== undefined)) {
       const updates: Record<string, any> = {};
       if (roleName) {
         if (employee.employee_id === 'superadmin') {
           return NextResponse.json({ error: 'Cannot modify the role of the system owner account.' }, { status: 400 });
+        }
+        // RISK-069: admin and superadmin are otherwise equivalent for role/permission management
+        // (admin can assign and edit any operational role), but only superadmin may grant the
+        // admin/superadmin tier itself — that boundary is the actual privilege-escalation guard.
+        if ((roleName === 'admin' || roleName === 'superadmin') && access.access.role !== 'superadmin') {
+          return NextResponse.json({ error: 'Only the superadmin can grant admin or superadmin access.' }, { status: 403 });
         }
         const { data: roleExists, error: roleCheckError } = await supabaseServer
           .from('roles')
@@ -201,6 +274,12 @@ export async function PATCH(req: Request) {
       if (nationalIdBack !== undefined) updates.national_id_back = nationalIdBack;
       if (address !== undefined) updates.address = address;
       if (branchId !== undefined) updates.branch_id = branchId || null;
+      if (contractFile !== undefined) updates.contract_file = contractFile;
+      if (contractFileName !== undefined) updates.contract_file_name = contractFileName;
+      if (requiredTargetAmount !== undefined) updates.required_target_amount = Number(requiredTargetAmount);
+      if (bonusPercentage !== undefined) updates.bonus_percentage = Number(bonusPercentage);
+      if (targetType !== undefined) updates.target_type = targetType;
+      if (bonusType !== undefined) updates.bonus_type = bonusType;
 
       const { data: updatedEmp, error: updateError } = await supabaseServer
         .from('employee_accounts')
@@ -220,7 +299,78 @@ export async function PATCH(req: Request) {
         });
       }
 
-      return NextResponse.json(updatedEmp);
+      const mapped = updatedEmp ? {
+        ...updatedEmp,
+        requiredTargetAmount: updatedEmp.required_target_amount !== null ? Number(updatedEmp.required_target_amount) : 0,
+        bonusPercentage: updatedEmp.bonus_percentage !== null ? Number(updatedEmp.bonus_percentage) : 0,
+        targetType: updatedEmp.target_type || 'reservations',
+        bonusType: updatedEmp.bonus_type || 'percentage'
+      } : null;
+
+      // Sync updated employee to providers table if department/role is Doctor
+      const effectiveDept = department !== undefined ? department : employee.department;
+      const effectiveRole = roleName !== undefined ? roleName : employee.role_name;
+      const isDoctor = (effectiveDept && (effectiveDept.toLowerCase().includes('doc') || effectiveDept.toLowerCase() === 'doctors')) || (effectiveRole && effectiveRole.toLowerCase().includes('doc'));
+
+      if (isDoctor) {
+        try {
+          const docName = name !== undefined ? name : employee.name;
+          const docPhone = phone !== undefined ? phone : employee.phone;
+          const docSalary = salary !== undefined ? salary : employee.salary;
+          const docBranchId = branchId !== undefined ? branchId : employee.branch_id;
+          const docNationalId = nationalId !== undefined ? nationalId : employee.national_id;
+
+          const { data: existingProvider } = await supabaseServer
+            .from('providers')
+            .select('id')
+            .or(`name.ilike.${docName},phone.eq.${docPhone || 'none'}`)
+            .maybeSingle();
+
+          const providerPayload: Record<string, any> = {
+            name: docName,
+            ...(body.services !== undefined ? { services: body.services } : {}),
+            ...(body.specialty !== undefined ? { specialty: body.specialty } : {}),
+            ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
+            ...(body.workingDaysHours !== undefined ? { working_days_hours: body.workingDaysHours } : {}),
+            ...(body.commission_type !== undefined ? { commission_type: body.commission_type } : {}),
+            ...(body.commission_value !== undefined ? { commission_value: Number(body.commission_value) } : {}),
+            ...(body.commission_base !== undefined ? { commission_base: body.commission_base } : {}),
+            ...(body.commission_fixed_component !== undefined ? { commission_fixed_component: Number(body.commission_fixed_component) } : {}),
+            ...(body.service_commissions !== undefined ? { service_commissions: normalizeServiceCommissions(body.service_commissions) } : {}),
+            ...(docPhone !== undefined ? { phone: docPhone } : {}),
+            ...(docNationalId !== undefined ? { national_id: docNationalId } : {}),
+            ...(docBranchId !== undefined ? { branch_id: docBranchId || null } : {}),
+            ...(docSalary !== undefined ? { fixed_salary: Number(docSalary) } : {})
+          };
+
+          if (existingProvider) {
+            await supabaseServer.from('providers').update(providerPayload).eq('id', existingProvider.id);
+          } else {
+            await supabaseServer.from('providers').insert({
+              name: docName,
+              services: body.services || [],
+              rating: body.rating ? Number(body.rating) : 5,
+              phone: docPhone || null,
+              specialty: body.specialty || null,
+              national_id: docNationalId || null,
+              branch_id: docBranchId || null,
+              fixed_salary: docSalary ? Number(docSalary) : 0,
+              commission_type: body.commission_type || 'none',
+              commission_value: body.commission_value ? Number(body.commission_value) : 0,
+              commission_base: body.commission_base || 'gross',
+              commission_fixed_component: body.commission_fixed_component ? Number(body.commission_fixed_component) : 0,
+              service_commissions: normalizeServiceCommissions(body.service_commissions),
+              working_days_hours: body.workingDaysHours || null,
+              bookings_count: 0,
+              more_count: Math.max(0, (body.services || []).length - 2)
+            });
+          }
+        } catch (provErr) {
+          console.error('Failed to sync updated doctor employee to providers table:', provErr);
+        }
+      }
+
+      return NextResponse.json(mapped);
     }
 
     // 2. Resend invitation to an employee whose invite expired (fallback if roleName not provided)
@@ -234,7 +384,7 @@ export async function PATCH(req: Request) {
     const { data: inviteData, error: inviteError } = await supabaseServer.auth.admin.inviteUserByEmail(
       employee.email,
       {
-        redirectTo: `${siteUrl}/auth/setup`,
+        redirectTo: `${siteUrl}/auth/callback?next=/auth/setup`,
         data: {
           full_name: employee.name,
           role: employee.role_name,
@@ -260,6 +410,9 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

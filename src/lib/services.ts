@@ -33,6 +33,109 @@ export function getDurationInMinutes(duration: string | null | undefined): numbe
   return 30; // default fallback
 }
 
+/**
+ * Session length in minutes for a service.
+ *
+ * Prefers the numeric `duration_minutes` column and only falls back to parsing the
+ * free-text `duration` when it is absent. Prefer this over calling getDurationInMinutes()
+ * on `.duration` directly.
+ *
+ * `duration` is free text with no constraint and no write-side validation, and
+ * getDurationInMinutes silently returns 30 for anything it cannot parse — so a typo like
+ * "45" or "1 hr" quietly became a 30-minute session, and every seeded service had no
+ * duration at all. Capacity analysis (PROPOSAL-002 Phase 5) and the room-minutes overhead
+ * allocation (DEC-015) both need this to be real.
+ *
+ * Still returns 30 when nothing is available, so callers keep a usable number — but that
+ * fallback should get rarer as duration_minutes is populated.
+ */
+export function getServiceDurationMinutes(
+  service: { duration_minutes?: number | null; duration?: string | null } | null | undefined
+): number {
+  if (!service) return 30;
+  const numeric = Number(service.duration_minutes);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  return getDurationInMinutes(service.duration);
+}
+
+/**
+ * How long a session may sit in `started` before it is treated as forgotten rather than active.
+ *
+ * RISK-043: `reservations.started_at` was added so a staleness check could exist at all, but
+ * nothing consumed it — a doctor who forgot to press Complete held a slot, a room and an
+ * "Upcoming" count indefinitely (one was found still open from the 10th of the month).
+ *
+ * Fixed at 2 hours by clinic decision (2026-08-16) rather than derived from the service's
+ * `duration_minutes`: long enough that no genuine session trips it, short enough that a forgotten
+ * one is caught the same working day.
+ */
+export const STALE_SESSION_THRESHOLD_MS = 2 * 60 * 60 * 1000;
+
+export type SessionStaleness = {
+  isStale: boolean;
+  /** Milliseconds since the session was started, or null when `started_at` is absent. */
+  elapsedMs: number | null;
+  /** Short human label ("3h", "2d") for the badge, or null when nothing is known. */
+  elapsedLabel: string | null;
+};
+
+const NOT_STALE: SessionStaleness = { isStale: false, elapsedMs: null, elapsedLabel: null };
+
+function formatElapsedShort(ms: number): string {
+  const totalMinutes = Math.floor(ms / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  if (days >= 1) return `${days}d`;
+  const hours = Math.floor(totalMinutes / 60);
+  if (hours >= 1) return `${hours}h`;
+  return `${totalMinutes}m`;
+}
+
+/**
+ * Decides whether an in-progress session has been left open too long.
+ *
+ * Only ever reports on a session that is actually `started`/`in_progress` — a completed or
+ * cancelled booking is never stale no matter how old its `started_at` is.
+ *
+ * `startedAt` is null for any session started before the RISK-043 migration landed. Rather than
+ * guess an elapsed time, those fall back to the booking's own date: a session still open from an
+ * earlier day is stale with an unknown duration, one from today is left alone. `elapsedMs` stays
+ * null in that case so callers do not present a fabricated number.
+ *
+ * `thresholdMs` defaults to `STALE_SESSION_THRESHOLD_MS` (2 hours) but is a parameter, not a
+ * hardcoded read of the constant, so a SuperAdmin-configured value (Booking Settings →
+ * "Stale Session Alert") can be threaded through by the caller without editing this function.
+ */
+export function getSessionStaleness(
+  status: string | null | undefined,
+  startedAt: string | null | undefined,
+  bookingDate?: string | null,
+  thresholdMs: number = STALE_SESSION_THRESHOLD_MS,
+  now: Date = new Date()
+): SessionStaleness {
+  const st = (status || "").toLowerCase();
+  if (st !== "started" && st !== "in_progress") return NOT_STALE;
+
+  if (startedAt) {
+    const startedMs = new Date(startedAt).getTime();
+    if (!Number.isFinite(startedMs)) return NOT_STALE;
+    const elapsedMs = now.getTime() - startedMs;
+    if (elapsedMs < thresholdMs) return NOT_STALE;
+    return { isStale: true, elapsedMs, elapsedLabel: formatElapsedShort(elapsedMs) };
+  }
+
+  // No timestamp: the only defensible signal left is that the booking's day has already passed.
+  if (bookingDate) {
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+      now.getDate()
+    ).padStart(2, "0")}`;
+    if (String(bookingDate).slice(0, 10) < todayStr) {
+      return { isStale: true, elapsedMs: null, elapsedLabel: null };
+    }
+  }
+
+  return NOT_STALE;
+}
+
 export const ALL_15MIN_SLOTS: string[] = (() => {
   const slots: string[] = [];
   for (let h = 9; h <= 21; h++) {
@@ -74,7 +177,14 @@ export interface ServiceItem {
   price?: number;
   createdAt?: string;
   sortOrder?: number;
+  /** Free-text legacy field, e.g. "1:30 Hours" or "30 mins". Prefer duration_minutes. */
   duration?: string;
+  /**
+   * Session length in minutes. Added 2026-07-25 (task 0.8) because `duration` is
+   * unvalidated free text that silently parsed to 30 for anything unexpected.
+   * Read it via getServiceDurationMinutes(), never directly.
+   */
+  duration_minutes?: number | null;
   descriptionEn?: string;
   descriptionAr?: string;
   isShared?: boolean;
@@ -85,31 +195,38 @@ export interface ServiceItem {
     visible: boolean;
     status: boolean;
     isDefault?: boolean;
+    promotion?: {
+      enabled: boolean;
+      type: "percentage" | "fixed";
+      value: number;
+      startDate?: string;
+      endDate?: string;
+    };
   }>;
 }
 
 export const SERVICES: ServiceItem[] = [
-  { id: 1, en: "Skin Dermatology Clinics", ar: "عيادات الجلدية", img: "/images/services/dermatology-service/dermatology.jpeg", cat: "dermatology", unit: "session" },
-  { id: 2, en: "Skin Care Treatments", ar: "تجميل البشرة", img: "/images/services/dermatology-service/skincare-treatment.jpg", cat: "dermatology", unit: "session" },
-  { id: 3, en: "Skin Care Sessions", ar: "جلسات العناية بالبشرة", img: "/images/services/dermatology-service/skincare-session.webp", cat: "dermatology", unit: "session" },
-  { id: 4, en: "Hair & Scalp Treatment", ar: "علاج الشعر والتساقط", img: "/images/services/dermatology-service/hair-scalp-treatment.jpg", cat: "dermatology", unit: "session" },
-  { id: 5, en: "Laser Hair Removal", ar: "إزالة الشعر بالليزر (رجالي ونسائي)", img: "/images/services/dermatology-service/laser-hair-removal.jpg", cat: "dermatology", unit: "session" },
-  { id: 6, en: "Therapeutic Laser", ar: "الليزر العلاجي", img: "/images/services/dermatology-service/therapeutic-laser.jpg", cat: "dermatology", unit: "session" },
-  { id: 7, en: "Aesthetic Injections (Botox/Filler/Plasma)", ar: "حقن تجميلية (بوتوكس / فيلر / بلازما)", img: "/images/services/dermatology-service/aesthetic-injections.jpg", cat: "dermatology", unit: "session" },
-  { id: 11, en: "Gynecology Clinics", ar: "النساء والتوليد", img: "/images/services/gyna-service/gyna.jpg", cat: "gynecology", unit: "session" },
-  { id: 12, en: "Pregnancy Follow-Up", ar: "متابعة الحمل", img: "/images/services/gyna-service/pregnancy-followup.webp", cat: "gynecology", unit: "session" },
-  { id: 13, en: "Infertility & Fertility Treatment", ar: "علاج العقم وتأخر الإنجاب", img: "/images/services/gyna-service/infertility.avif", cat: "gynecology", unit: "session" },
-  { id: 14, en: "Women's Aesthetic Treatments", ar: "التجميل النسائي", img: "/images/services/gyna-service/women-aethetic-treatment.webp", cat: "gynecology", unit: "session" },
-  { id: 15, en: "Laser Vaginal Rejuvenation", ar: "ليزر تجديد المهبل", img: "/images/services/gyna-service/laser-vaginal-rejuvenation.jpg", cat: "gynecology", unit: "session" },
-  { id: 16, en: "Vaginal Tightening", ar: "شد المهبل (Tightening)", img: "/images/services/gyna-service/vaginal-tightening.jpg", cat: "gynecology", unit: "session" },
-  { id: 17, en: "Marital & Family Counseling", ar: "الاستشارات الزوجية والأسرية", img: "/images/services/gyna-service/consultation.jpg", cat: "gynecology", unit: "session" },
-  { id: 21, en: "Physical Therapy", ar: "العلاج الطبيعي", img: "/images/services/physicaltherapy_service/physical-therapy.jpg", cat: "physiotherapy", unit: "session" },
-  { id: 22, en: "Rehabilitation", ar: "إعادة التأهيل", img: "/images/services/physicaltherapy_service/rehab.jpg", cat: "physiotherapy", unit: "session" },
-  { id: 23, en: "Posture & Motion Improvement", ar: "تحسين القوام والحركة", img: "/images/services/physicaltherapy_service/posture.webp", cat: "physiotherapy", unit: "session" },
-  { id: 31, en: "Osteopathy", ar: "تقويم العظام", img: "/images/services/nutrition_service/osteopathy.jpg", cat: "osteopathy", unit: "session" },
-  { id: 32, en: "Therapeutic Nutrition", ar: "التغذية العلاجية", img: "/images/services/nutrition_service/therapeutic-diet.png", cat: "osteopathy", unit: "session" },
-  { id: 33, en: "Weight Loss Programs", ar: "برامج إنقاص الوزن", img: "/images/services/nutrition_service/weight-loss.jpg", cat: "osteopathy", unit: "session" },
-  { id: 34, en: "Body Contouring & Shaping", ar: "تنسيق القوام", img: "/images/services/nutrition_service/body-contouring.jpg", cat: "osteopathy", unit: "session" },
+  { id: 1, en: "Skin Dermatology Clinics", ar: "عيادات الجلدية", img: "/images/services/dermatology-service/dermatology.jpeg", cat: "dermatology", unit: "in_clinic" },
+  { id: 2, en: "Skin Care Treatments", ar: "تجميل البشرة", img: "/images/services/dermatology-service/skincare-treatment.jpg", cat: "dermatology", unit: "in_clinic" },
+  { id: 3, en: "Skin Care Sessions", ar: "جلسات العناية بالبشرة", img: "/images/services/dermatology-service/skincare-session.webp", cat: "dermatology", unit: "in_clinic" },
+  { id: 4, en: "Hair & Scalp Treatment", ar: "علاج الشعر والتساقط", img: "/images/services/dermatology-service/hair-scalp-treatment.jpg", cat: "dermatology", unit: "in_clinic" },
+  { id: 5, en: "Laser Hair Removal", ar: "إزالة الشعر بالليزر (رجالي ونسائي)", img: "/images/services/dermatology-service/laser-hair-removal.jpg", cat: "dermatology", unit: "in_clinic" },
+  { id: 6, en: "Therapeutic Laser", ar: "الليزر العلاجي", img: "/images/services/dermatology-service/therapeutic-laser.jpg", cat: "dermatology", unit: "in_clinic" },
+  { id: 7, en: "Aesthetic Injections (Botox/Filler/Plasma)", ar: "حقن تجميلية (بوتوكس / فيلر / بلازما)", img: "/images/services/dermatology-service/aesthetic-injections.jpg", cat: "dermatology", unit: "in_clinic" },
+  { id: 11, en: "Gynecology Clinics", ar: "النساء والتوليد", img: "/images/services/gyna-service/gyna.jpg", cat: "gynecology", unit: "both" },
+  { id: 12, en: "Pregnancy Follow-Up", ar: "متابعة الحمل", img: "/images/services/gyna-service/pregnancy-followup.webp", cat: "gynecology", unit: "both" },
+  { id: 13, en: "Infertility & Fertility Treatment", ar: "علاج العقم وتأخر الإنجاب", img: "/images/services/gyna-service/infertility.avif", cat: "gynecology", unit: "both" },
+  { id: 14, en: "Women's Aesthetic Treatments", ar: "التجميل النسائي", img: "/images/services/gyna-service/women-aethetic-treatment.webp", cat: "gynecology", unit: "in_clinic" },
+  { id: 15, en: "Laser Vaginal Rejuvenation", ar: "ليزر تجديد المهبل", img: "/images/services/gyna-service/laser-vaginal-rejuvenation.jpg", cat: "gynecology", unit: "in_clinic" },
+  { id: 16, en: "Vaginal Tightening", ar: "شد المهبل (Tightening)", img: "/images/services/gyna-service/vaginal-tightening.jpg", cat: "gynecology", unit: "in_clinic" },
+  { id: 17, en: "Marital & Family Counseling", ar: "الاستشارات الزوجية والأسرية", img: "/images/services/gyna-service/consultation.jpg", cat: "gynecology", unit: "both" },
+  { id: 21, en: "Physical Therapy", ar: "العلاج الطبيعي", img: "/images/services/physicaltherapy_service/physical-therapy.jpg", cat: "physiotherapy", unit: "in_clinic" },
+  { id: 22, en: "Rehabilitation", ar: "إعادة التأهيل", img: "/images/services/physicaltherapy_service/rehab.jpg", cat: "physiotherapy", unit: "in_clinic" },
+  { id: 23, en: "Posture & Motion Improvement", ar: "تحسين القوام والحركة", img: "/images/services/physicaltherapy_service/posture.webp", cat: "physiotherapy", unit: "in_clinic" },
+  { id: 31, en: "Osteopathy", ar: "تقويم العظام", img: "/images/services/nutrition_service/osteopathy.jpg", cat: "osteopathy", unit: "in_clinic" },
+  { id: 32, en: "Therapeutic Nutrition", ar: "التغذية العلاجية", img: "/images/services/nutrition_service/therapeutic-diet.png", cat: "osteopathy", unit: "both" },
+  { id: 33, en: "Weight Loss Programs", ar: "برامج إنقاص الوزن", img: "/images/services/nutrition_service/weight-loss.jpg", cat: "osteopathy", unit: "both" },
+  { id: 34, en: "Body Contouring & Shaping", ar: "تنسيق القوام", img: "/images/services/nutrition_service/body-contouring.jpg", cat: "osteopathy", unit: "in_clinic" },
 ];
 
 export const CATEGORY_LABELS: Record<Category, { en: string; ar: string }> = {
@@ -118,3 +235,203 @@ export const CATEGORY_LABELS: Record<Category, { en: string; ar: string }> = {
   physiotherapy: { en: "Physical Therapy", ar: "العلاج الطبيعي" },
   osteopathy: { en: "Osteopathy & Nutrition", ar: "تقويم العظام والتغذية" },
 };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type BranchLike = { id: number | string; name?: string; name_en?: string; name_ar?: string };
+
+/**
+ * Resolve whatever the caller passed — a branch id or a branch name — to the branch NAME,
+ * which is what `branchPricing[].name` is keyed by.
+ *
+ * This previously did:
+ *
+ *     if (typeof v === "string" && isNaN(Number(v))) targetBranchName = v;
+ *
+ * Branch ids are UUIDs, and a UUID is a non-numeric string, so the UUID itself was used as
+ * the branch name and never matched any `branchPricing` entry. The `branchesList` lookup
+ * underneath was unreachable for UUID ids, and it compared `Number(b.id) === Number(v)` —
+ * `NaN === NaN`, false — so it would not have matched either. Between the two,
+ * branch-specific pricing has never been applied anywhere in the app. See RISK-011.
+ */
+function resolveBranchName(
+  branchNameOrId?: string | number | null,
+  branchesList?: BranchLike[] | null
+): string | null {
+  if (branchNameOrId === undefined || branchNameOrId === null) return null;
+
+  const key = String(branchNameOrId).trim();
+  if (!key) return null;
+
+  if (branchesList && branchesList.length > 0) {
+    // Ids are UUIDs — compare as strings, never through Number().
+    const byId = branchesList.find((b) => String(b.id) === key);
+    if (byId) return byId.name || byId.name_en || byId.name_ar || null;
+
+    // The caller may equally have passed a name already.
+    const lower = key.toLowerCase();
+    const byName = branchesList.find(
+      (b) =>
+        b.name?.toLowerCase() === lower ||
+        b.name_en?.toLowerCase() === lower ||
+        b.name_ar?.toLowerCase() === lower
+    );
+    if (byName) return byName.name || byName.name_en || byName.name_ar || null;
+  }
+
+  // With no list to resolve against, only a plain name is usable. A UUID or a numeric id is
+  // an identifier we cannot translate, and must not be passed off as a name.
+  if (UUID_RE.test(key) || !isNaN(Number(key))) return null;
+
+  return key;
+}
+
+export function getEffectiveServicePrice(
+  service: { price?: number; branchPricing?: any[] | null } | null | undefined,
+  branchNameOrId?: string | number | null,
+  branchesList?: BranchLike[] | null
+): number {
+  if (!service) return 0;
+
+  const targetBranchName = resolveBranchName(branchNameOrId, branchesList);
+
+  let bpItem: any = null;
+  if (targetBranchName && service.branchPricing && Array.isArray(service.branchPricing)) {
+    bpItem = service.branchPricing.find(
+      (bp) => bp && bp.name && bp.name.toLowerCase() === targetBranchName!.toLowerCase()
+    );
+  }
+
+  // Fallback to default branch pricing
+  if (!bpItem && service.branchPricing && Array.isArray(service.branchPricing)) {
+    bpItem = service.branchPricing.find((bp) => bp && bp.isDefault);
+  }
+
+  const basePrice = bpItem ? Number(bpItem.price) : Number(service.price ?? 0);
+
+  // Apply promotion if enabled
+  if (bpItem && bpItem.promotion && bpItem.promotion.enabled) {
+    const promo = bpItem.promotion;
+
+    // Compare date strings using Egypt local time
+    const now = new Date();
+    const egyptTimeStr = now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
+    const todayStr = egyptTimeStr.slice(0, 10); // YYYY-MM-DD
+
+    let isDateActive = true;
+    if (promo.startDate && todayStr < promo.startDate) {
+      isDateActive = false;
+    }
+    if (promo.endDate && todayStr > promo.endDate) {
+      isDateActive = false;
+    }
+
+    if (isDateActive) {
+      let finalPrice = basePrice;
+      const val = Number(promo.value) || 0;
+      if (promo.type === "percentage") {
+        finalPrice = basePrice * (1 - val / 100);
+      } else if (promo.type === "fixed") {
+        finalPrice = basePrice - val;
+      }
+      return Math.max(0, Math.round(finalPrice));
+    }
+  }
+
+  return basePrice;
+}
+
+export interface ServicePriceDetails {
+  basePrice: number;
+  discountedPrice: number;
+  hasPromotion: boolean;
+  promotionText?: string;
+  promotionTextAr?: string;
+}
+
+export function getServicePriceDetails(
+  service: { price?: number; branchPricing?: any[] | null } | null | undefined,
+  branchNameOrId?: string | number | null,
+  branchesList?: BranchLike[] | null
+): ServicePriceDetails {
+  const result: ServicePriceDetails = {
+    basePrice: 0,
+    discountedPrice: 0,
+    hasPromotion: false,
+  };
+
+  if (!service) return result;
+
+  const targetBranchName = resolveBranchName(branchNameOrId, branchesList);
+
+  let bpItem: any = null;
+  if (targetBranchName && service.branchPricing && Array.isArray(service.branchPricing)) {
+    bpItem = service.branchPricing.find(
+      (bp) => bp && bp.name && bp.name.toLowerCase() === targetBranchName!.toLowerCase()
+    );
+  }
+
+  // Fallback to default branch pricing or any branch with active promotion
+  if (!bpItem && service.branchPricing && Array.isArray(service.branchPricing)) {
+    const now = new Date();
+    const egyptTimeStr = now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
+    const todayStr = egyptTimeStr.slice(0, 10);
+
+    const activePromoBranch = service.branchPricing.find((bp) => {
+      if (bp && bp.promotion && bp.promotion.enabled) {
+        const promo = bp.promotion;
+        let isDateActive = true;
+        if (promo.startDate && todayStr < promo.startDate) isDateActive = false;
+        if (promo.endDate && todayStr > promo.endDate) isDateActive = false;
+        return isDateActive;
+      }
+      return false;
+    });
+
+    if (activePromoBranch) {
+      bpItem = activePromoBranch;
+    } else {
+      bpItem = service.branchPricing.find((bp) => bp && bp.isDefault);
+    }
+  }
+
+  const basePrice = bpItem ? Number(bpItem.price) : Number(service.price ?? 0);
+  result.basePrice = basePrice;
+  result.discountedPrice = basePrice;
+
+  // Apply promotion if enabled
+  if (bpItem && bpItem.promotion && bpItem.promotion.enabled) {
+    const promo = bpItem.promotion;
+
+    // Compare date strings using Egypt local time
+    const now = new Date();
+    const egyptTimeStr = now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
+    const todayStr = egyptTimeStr.slice(0, 10); // YYYY-MM-DD
+
+    let isDateActive = true;
+    if (promo.startDate && todayStr < promo.startDate) {
+      isDateActive = false;
+    }
+    if (promo.endDate && todayStr > promo.endDate) {
+      isDateActive = false;
+    }
+
+    if (isDateActive) {
+      let finalPrice = basePrice;
+      const val = Number(promo.value) || 0;
+      if (promo.type === "percentage") {
+        finalPrice = basePrice * (1 - val / 100);
+        result.promotionText = `${val}% OFF`;
+        result.promotionTextAr = `خصم ${val}%`;
+      } else if (promo.type === "fixed") {
+        finalPrice = basePrice - val;
+        result.promotionText = `SAVE ${val} EGP`;
+        result.promotionTextAr = `وفر ${val} ج.م`;
+      }
+      result.discountedPrice = Math.max(0, Math.round(finalPrice));
+      result.hasPromotion = result.discountedPrice < basePrice;
+    }
+  }
+
+  return result;
+}

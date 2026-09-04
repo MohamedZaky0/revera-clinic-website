@@ -71,6 +71,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.dir = dir;
     document.body.className = dir;
     localStorage.setItem("cr-language", language);
+    document.cookie = "cr-language=" + language + "; path=/; max-age=31536000; SameSite=Lax";
 
     const url = new URL(window.location.href);
     url.searchParams.set("lang", language);
@@ -86,7 +87,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           if (homeSettings) {
             setDynamicTranslations(prev => {
               const updated = { ...prev };
-              if (homeSettings.hero?.slides) {
+              if (homeSettings.hero?.slides && homeSettings.hero.slides.length > 0) {
                 updated.en = {
                   ...updated.en,
                   hero: {
@@ -95,7 +96,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
                   },
                 };
               }
-              if (homeSettings.hero?.slides_ar) {
+              if (homeSettings.hero?.slides_ar && homeSettings.hero.slides_ar.length > 0) {
                 updated.ar = {
                   ...updated.ar,
                   hero: {

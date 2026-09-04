@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
+import { requireStaffAccess, requireAdministratorAccess } from '@/lib/access';
 
 function mapCategoryRow(r: any) {
   return {
@@ -20,6 +21,11 @@ function mapCategoryToDb(c: any) {
 }
 
 export async function GET(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const { data, error } = await getSupabaseServer()
       .from('categories')
@@ -35,6 +41,11 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await req.json();
     const isArray = Array.isArray(body);
@@ -54,6 +65,11 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   const url = new URL(req.url);
   const key = url.searchParams.get('key');
   if (!key) return NextResponse.json({ error: 'Missing key' }, { status: 400 });

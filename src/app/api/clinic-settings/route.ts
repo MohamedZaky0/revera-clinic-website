@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { requireStaffAccess, requireAdministratorAccess } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const key = searchParams.get('key');
@@ -27,6 +33,11 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await req.json();
     const { key, value } = body;

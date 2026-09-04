@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Revera Clinics System Architecture
 
-> **Last Updated:** 2026-06-27
-> **Audited from:** live source code (all previous content was for a different project — discarded)
+> **Last Updated:** 2026-08-03
+> **Audited from:** live source code, cross-checked against `supabase/migrations/` (all previous content was for a different project — discarded)
 
 ---
 
@@ -13,7 +13,7 @@
 | Styling | Tailwind CSS v4 + shadcn/ui + CSS custom properties |
 | Database | Supabase (PostgreSQL) |
 | Storage | Supabase primary; local JSON fallback (`data/`) for providers + page_settings |
-| Auth (admin) | Supabase Auth (email + password). Login form rendered in-page; session checked on mount via `supabase.auth.getSession()`. Employee role + permissions fetched from `employee_accounts` + `roles` tables via `/api/auth/me`. Hardcoded bypass: `superadmin@revera.com` → full permissions, no DB lookup. |
+| Auth (admin) | Supabase Auth (email + password). Login form rendered in-page; session checked on mount via `supabase.auth.getSession()`. Employee role + permissions fetched from `employee_accounts` + `roles` tables via `/api/auth/me`. Hardcoded bypass: `superadmin@revera.com` → full permissions, no DB lookup. **Note:** selected sensitive mutation routes validate bearer tokens server-side, but authorization coverage is not yet universal; the browser gate alone is not sufficient. |
 | Auth (patient) | Phone/OTP modal — UI-only; OTP is `setTimeout`-simulated, no real SMS |
 | i18n | Custom `LanguageContext` (EN/AR, RTL/LTR) |
 | Icons | lucide-react |
@@ -27,13 +27,15 @@
 ```
 src/
 ├── app/
-│   ├── layout.tsx                 Root layout: metadata, font vars, LanguageProvider
+│   ├── layout.tsx                 Root layout: metadata, font vars, LanguageProvider, mounts GlobalBookingModal (Quick Book popup)
 │   ├── page.tsx                   Homepage
 │   ├── about/page.tsx
 │   ├── services/page.tsx
 │   ├── blog/page.tsx
 │   ├── contact/page.tsx
-│   ├── admin/page.tsx             Full admin panel (single large client component, auth-gated)
+│   ├── book/page.tsx              Dedicated booking landing page (DEC-040) — SEO metadata, ?service= preselect, renders BookingModal variant="page"
+│   ├── admin/page.tsx             Legacy admin shell/composer (browser login gate only; do not add new section logic here)
+│   ├── profile/page.tsx           Patient profile + wallet + visit history
 │   ├── auth/callback/page.tsx     Supabase auth callback: handles invite + recovery hash, redirects to /admin
 │   └── api/
 │       ├── reservations/route.ts  GET/POST/PATCH/DELETE bookings
@@ -50,14 +52,37 @@ src/
 │       ├── provider-attendance/   GET/POST provider check-in/out by date
 │       ├── auth/me/route.ts       Verify JWT → return role + permissions from DB
 │       ├── auth/employee-email/   Lookup employee email by employee_id
+│       ├── rooms/route.ts         GET/POST/PATCH/DELETE rooms (per-branch clinical/admin rooms)
+│       ├── service-rooms/route.ts GET/POST/DELETE service↔room junction
+│       ├── prescriptions/route.ts GET/POST prescriptions (Supabase, local JSON fallback on error)
+│       ├── hr/payroll/            GET/POST monthly payroll runs for employee_accounts
+│       ├── hr/doctor-payroll/     GET/POST monthly payroll runs for providers (fixed+commission)
+│       ├── hr/leaves/             GET/POST/PATCH leave requests
+│       ├── hr/attendance/         GET/POST employee GPS check-in/out (800m geofence)
+│       ├── hr/performance/        GET/POST performance reviews
+│       ├── hr/alerts/             GET/POST missing-checkin alerts
+│       ├── employees/notes/       GET/POST administrative employee notes
+│       ├── providers/schedule-audit-logs/  GET provider schedule change history
+│       ├── inventory/products/    GET/POST/PUT inventory products (+ /sales for POS transactions)
+│       ├── inventory/devices/     GET/POST/PUT devices (+ /[id]/reset-pulses for maintenance, + /audit-logs for device history)
+│       ├── customers/products/    GET/POST/PATCH customer product purchase balances (`customer_product_balances` table, dual-storage with `page_settings` — fixed 2026-07-25, see DB_SCHEMA.md)
+│       ├── medical-records/       GET/POST intake form + reports (`medical_records`/`medical_reports` tables — migration backfilled 2026-07-25)
+│       ├── customer-avatars/      GET/POST avatar images — stored in `page_settings` (key `customer_avatars`), not a dedicated table
 │       └── health/supabase/       Env var diagnostics
 │
-├── components/                   All public website UI components
+├── components/                   Public website UI components and admin submodules
+│   ├── admin/                     Required location for every new admin section; legacy sections are extracted here incrementally
+│   │   ├── DoctorAccountView.tsx  Doctor portal root coordinator
+│   │   ├── doctor/                Doctor portal sub-modules (types.ts, DoctorSidebar, DoctorScheduleTab, DoctorOngoingSessionTab, DoctorPatientsTab, DoctorAnalyticsTab, DoctorSettingsTab, DoctorProfileTab, modals)
+│   │   ├── bookings/              Bookings section sub-modules (AdminBookingsView.tsx, AdminBookingsTabs.tsx, AdminBookingsFilterDrawer.tsx, AdminBookingsPendingBanner.tsx, AdminBookingsStatsCards.tsx, AdminBookingsCalendarView.tsx, AdminBookingsListView.tsx, AdminBookingsScheduleView.tsx)
+│   │   └── patient-drawer/        Patient drawer sub-modules (AdminPatientDrawer.tsx, PatientFinancialTab.tsx, PatientVisitsTab.tsx, PatientOverviewTab.tsx, PatientMedicalRecordTab.tsx)
 │   ├── Navbar.tsx
 │   ├── HeroSlider.tsx
 │   ├── ServicesSection.tsx        Services catalog + WhatsApp CTA
 │   ├── HomeServicesSection.tsx    Homepage variant of services
-│   ├── BookingModal.tsx           Patient booking flow (3 steps → reservations table)
+│   ├── BookingModal.tsx           Patient booking flow (3 steps → reservations table). variant="modal" (default, popup) | "page" (plain content for /book) — see DEC-040
+│   ├── BookingPageClient.tsx      Minimal focused shell for /book (logo + language toggle only) wrapping BookingModal variant="page"
+│   ├── GlobalBookingModal.tsx     Single root-layout mount of the popup BookingModal ("Quick Book"), skipped on /book itself
 │   ├── AuthModal.tsx              Patient phone/OTP login (UI-only, no backend wiring)
 │   ├── AuthRedirectHandler.tsx    Detects invite/recovery hash on any page → redirects to /auth/callback
 │   ├── SiteFooter.tsx
@@ -78,8 +103,9 @@ src/
 └── types/index.ts                 Branch, Translation, ServiceCard, BlogPost interfaces
 
 public/images/                    Static assets (logo, heroes, service images, doctors)
-data/                             JSON fallbacks (providers.json, page_settings.json)
+data/                             JSON fallbacks (providers.json, page_settings.json, prescriptions.json)
 scratch/                          Dev/seed scripts (not production code)
+supabase/migrations/              SQL migration history (manual — run via Supabase SQL Editor, see its README)
 ```
 
 ---
@@ -121,7 +147,10 @@ Browser → /admin/page.tsx (client component)
 
 ---
 
-## Supabase Tables (confirmed from API routes + code)
+## Supabase Tables (confirmed from `supabase/migrations/` + API routes)
+
+See `DB_SCHEMA.md` for full column-level detail — this is a purpose summary only, kept short
+so it doesn't drift; update both when a table is added.
 
 | Table | Purpose | Branch-scoped? |
 |---|---|---|
@@ -129,12 +158,30 @@ Browser → /admin/page.tsx (client component)
 | `services` | Service catalog | Via `branch_pricing` JSON field |
 | `categories` | Service categories | No |
 | `branches` | Clinic branches | Root entity |
-| `providers` | Doctors/staff | No |
-| `page_settings` | CMS content (JSONB) | No — multiple keys; `key='home'` for homepage |
+| `providers` | Doctors/staff | Yes — `branch_id` column (added 2026-06-26) |
+| `page_settings` | CMS content (JSONB) | No — multiple keys; also used as a JSON fallback store for several other tables (dual-storage pattern) |
 | `customers` | Patient/customer records with demographics | No |
-| `employee_accounts` | Admin/staff accounts linked to Supabase Auth | No |
+| `employee_accounts` | Admin/staff accounts linked to Supabase Auth | Yes — `branch_id` column |
 | `roles` | Role definitions with permissions array | No |
-| `provider_attendance` | Daily check-in/out records per provider | No |
+| `provider_attendance` | Daily check-in/out per doctor (no GPS) | No |
+| `rooms` | Physical rooms per branch, for room-based booking | Yes |
+| `service_rooms` | Junction: which rooms a service can use | Via `rooms` |
+| `hr_payroll` | Monthly payroll runs for `employee_accounts` | No |
+| `doctor_payroll` | Monthly payroll runs for `providers` (fixed+commission) | No |
+| `hr_leave_requests` | Employee leave requests | No |
+| `hr_performance_reviews` | Employee performance reviews | No |
+| `hr_attendance` | Employee GPS check-in/out (800m geofence) | Via `employee_accounts.branch_id` |
+| `hr_missing_alerts` | Missed-checkin alerts | No |
+| `employee_notes` | Administrative notes about an employee | No |
+| `provider_schedule_audit_logs` | Audit trail for doctor schedule changes | No |
+| `prescriptions` | Real (not mock) — diagnosis/medications/follow-up per customer | No |
+| `inventory_products` | Real (not mock) — product catalog + stock | Via `branch_name` (text, not FK) |
+| `product_sales` | Real (not mock) — POS transaction log | Via `branch_name` (text, not FK) |
+| `inventory_devices` | Real (not mock) — laser/medical equipment + pulse counters | Via `branch_name` (text, not FK) |
+| `device_maintenance_history` | Maintenance/pulse-reset log per device | No |
+| `medical_records` | Medical intake form, one row per customer | No |
+| `medical_reports` | Uploaded medical reports/files per customer | No |
+| `customer_product_balances` | Retail product units purchased vs. used per customer | No |
 
 **`branch` is the topmost scoping unit. There is no org/tenant layer above it.**
 

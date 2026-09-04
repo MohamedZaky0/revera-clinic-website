@@ -3,6 +3,9 @@ import { Marcellus, Sora } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AlertConfirmProvider } from "@/contexts/AlertConfirmContext";
+import { GlobalBookingModal } from "@/components/GlobalBookingModal";
+
+import { CLIENT } from "@/config/client";
 
 const marcellus = Marcellus({
   weight: "400",
@@ -19,14 +22,15 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "Revera Clinics - Medical Center",
-  description:
-    "Expert dermatology and cosmetic surgery services with personalized care designed to help you achieve your beauty and health goals through advanced medical techniques.",
+  title: `${CLIENT.name} - ${CLIENT.tagline}`,
+  description: CLIENT.metaDescription,
   icons: {
-    icon: "/icon.png",
-    apple: "/icon.png",
+    icon: CLIENT.faviconPath,
+    apple: CLIENT.faviconPath,
   },
 };
+
+const DIR_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|; )cr-language=([^;]*)/);var l=(m&&decodeURIComponent(m[1]))==='ar'?'ar':'en';document.documentElement.lang=l;document.documentElement.dir=l==='ar'?'rtl':'ltr';}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -39,10 +43,14 @@ export default function RootLayout({
       className={`${marcellus.variable} ${sora.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: DIR_SCRIPT }} />
+      </head>
       <body suppressHydrationWarning spellCheck={false}>
         <LanguageProvider>
           <AlertConfirmProvider>
             {children}
+            <GlobalBookingModal />
           </AlertConfirmProvider>
         </LanguageProvider>
       </body>

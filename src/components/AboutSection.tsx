@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Check, ArrowUpRight } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 export function AboutSection() {
   const { t, isRTL } = useLanguage();
+  const router = useRouter();
   const sectionRef = useRef<HTMLElement>(null);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -29,7 +31,7 @@ export function AboutSection() {
   }, []);
 
   function handleBooking() {
-    window.dispatchEvent(new CustomEvent("open-booking"));
+    router.push("/book");
   }
 
   const textReveal = `transition-all duration-700 ${
@@ -238,7 +240,7 @@ export function AboutSection() {
                     href={`tel:${t.about.phone.replace(/\s/g, "")}`}
                     className="text-lg font-normal text-[#414E36] font-heading hover:text-[#5A6A51] transition-colors"
                   >
-                    {t.about.phone}
+                    <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">{t.about.phone}</span>
                   </a>
                 </div>
               </div>

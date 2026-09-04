@@ -52,6 +52,7 @@
   --cr-divider: var(--color-brand-sand);
   --cr-dark-divider: rgba(255, 255, 255, 0.1);
   --cr-error: rgb(230, 87, 87);
+  --cr-success: rgb(34, 148, 63);
 
   /* Mapped to shadcn tokens */
   --background: var(--color-brand-light);
@@ -95,7 +96,9 @@
     overflow-x: hidden;
   }
 
-  /* RTL support */
+  /* RTL support — html[dir] fires from the inline head script before body exists;
+     body.rtl kept for components that still add the class via LanguageContext */
+  html[dir="rtl"],
   body.rtl {
     direction: rtl;
     text-align: right;
@@ -334,6 +337,19 @@
 [dir="rtl"] .section-tag,
 .rtl .section-tag {
   letter-spacing: normal !important;
+}
+
+/* ── LTR Formatting for Phone Numbers, Prices & Numeric Data in RTL Mode ── */
+[dir="rtl"] a[href^="tel:"],
+[dir="rtl"] .phone-number,
+[dir="rtl"] .ltr-num,
+[dir="rtl"] .ltr-text,
+[dir="rtl"] input[type="tel"],
+[dir="rtl"] input[type="number"] {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  display: inline-block;
+  text-align: left;
 }
 
 /* ── Buttons ─────────────────────────────────────────────────── */
@@ -917,4 +933,39 @@ body::-webkit-scrollbar-corner {
 
 .animate-fadeInFast {
   animation: fadeIn 0.15s ease-out forwards;
+}
+
+/* ── Universal Disable of All Animations, Transitions & Blur Filters across Admin View ── */
+#admin-root,
+#admin-root *,
+#admin-root *::before,
+#admin-root *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  --tw-enter-blur: 0 !important;
+  --tw-exit-blur: 0 !important;
+}
+
+#admin-root .animate-fadeIn,
+#admin-root .animate-fade-in,
+#admin-root .animate-fade-in-up,
+#admin-root .animate-slide-in-left,
+#admin-root .animate-slide-in-right,
+#admin-root .animate-scale-in,
+#admin-root .animate-fadeInFast,
+#admin-root .animate-bounce,
+#admin-root .animate-pulse,
+#admin-root .animate-ping,
+#admin-root [class*="animate-in"],
+#admin-root [class*="fade-in"],
+#admin-root [class*="zoom-in"],
+#admin-root .dropdown-action-menu {
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  animation: none !important;
+  transition: none !important;
+  visibility: visible !important;
 }

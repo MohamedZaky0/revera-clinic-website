@@ -5,6 +5,7 @@ import { HeroSlider } from "@/components/HeroSlider";
 import { AboutSection } from "@/components/AboutSection";
 import { OurResults } from "@/components/OurResults";
 import { HomeServicesSection } from "@/components/HomeServicesSection";
+import { PackagesSection } from "@/components/PackagesSection";
 import { WhatWeDo } from "@/components/WhatWeDo";
 import { IntroVideo } from "@/components/IntroVideo";
 import { WhyChooseUs } from "@/components/WhyChooseUs";
@@ -12,7 +13,6 @@ import { HowItWorks } from "@/components/HowItWorks";
 import { TestimonialsSection } from "@/components/TestimonialsSection";
 import { AppointmentSection } from "@/components/AppointmentSection";
 import { SiteFooter } from "@/components/SiteFooter";
-import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 import { AuthRedirectHandler } from "@/components/AuthRedirectHandler";
 
@@ -34,6 +34,7 @@ export default function Home() {
         <section id="services">
           <HomeServicesSection />
         </section>
+        <PackagesSection />
         {/* <WhatWeDo /> */}
         {/* <IntroVideo /> */}
         <WhyChooseUs />
@@ -46,7 +47,6 @@ export default function Home() {
         </section>
       </main>
       <SiteFooter />
-      <BookingModal />
       <AuthModal />
     </>
   );

@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { requireAdministratorAccess } from '@/lib/access';
 
-export async function GET() {
+export async function GET(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
   try {
     const { data: roles, error } = await supabaseServer
       .from('roles')
@@ -17,6 +20,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const body = await req.json();
     const { name, permissions } = body;
@@ -50,6 +56,9 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const { searchParams } = new URL(req.url);
     const name = searchParams.get('name');

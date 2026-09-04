@@ -16,12 +16,8 @@ export async function verifyHrAccess(req: Request) {
       return { error: authError?.message || 'Invalid session', status: 401 };
     }
 
-    const email = user.email || '';
-
     // 1. Superadmin bypass
-    if (email.toLowerCase() === 'superadmin@revera.com') {
-      return { isAuthorized: true, role: 'superadmin', user };
-    }
+    // Superadmin access is resolved from the registered employee role below.
 
     // 2. Fetch employee role
     const { data: employee, error: empError } = await supabaseServer

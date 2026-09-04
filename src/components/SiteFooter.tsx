@@ -4,6 +4,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 const QUICK_LINK_HREFS = ["/", "/about", "/services", "/contact"];
 
@@ -363,8 +364,8 @@ export function SiteFooter() {
                   }}
                 >
                   {isRTL
-                    ? "نغير حياتك من خلال طب الجلدية والجراحة التجميلية المتخصصة وعلاجات الليزر ورعاية الأسنان المتكاملة."
-                    : "Transforming lives with expert dermatology, cosmetic surgery, laser treatments, and comprehensive dental care."}
+                    ? "نغير حياتك من خلال طب الجلدية والجراحة التجميلية المتخصصة وعلاجات الليزر ورعاية العلاج الطبيعي المتكاملة."
+                    : "Transforming lives with expert dermatology, cosmetic surgery, laser treatments, and comprehensive physical therapy care."}
                 </p>
                 <div
                   className="ft-social-row"
@@ -529,18 +530,20 @@ export function SiteFooter() {
                     </svg>
                     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                       <a
-                        href="tel:+201035595691"
+                        href={`tel:${CLIENT.phoneTel}`}
                         style={{ fontSize: "14px", color: "rgba(255,255,255,0.85)", textDecoration: "none", fontWeight: 500 }}
                         className="hover:underline"
                       >
-                        {isRTL ? "القاهرة الجديدة: (+20) 01035595691" : "New Cairo: (+20) 01035595691"}
+                        <span>{isRTL ? "القاهرة الجديدة: " : "New Cairo: "}</span>
+                        <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">{CLIENT.phoneDisplay}</span>
                       </a>
                       <a
                         href="tel:+201023122323"
                         style={{ fontSize: "14px", color: "rgba(255,255,255,0.85)", textDecoration: "none", fontWeight: 500 }}
                         className="hover:underline"
                       >
-                        {isRTL ? "الشيخ زايد: (+20) 01023122323" : "Sheikh Zayed: (+20) 01023122323"}
+                        <span>{isRTL ? "الشيخ زايد: " : "Sheikh Zayed: "}</span>
+                        <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">(+20) 01023122323</span>
                       </a>
                     </div>
                   </div>

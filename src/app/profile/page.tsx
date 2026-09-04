@@ -4,9 +4,21 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { SiteFooter } from "@/components/SiteFooter";
-import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { supabase } from "@/lib/supabaseClient";
+
+/**
+ * GET/POST /api/customers requires an authenticated caller (staff or the patient's own
+ * Supabase Auth session — RISK-018 / FINANCE_TRACKER 0.10). This page has no live
+ * onAuthStateChange listener; `getSession()` reads the session the `supabase` client already
+ * persisted from AuthModal's login flow.
+ */
+async function authHeaders(): Promise<Record<string, string>> {
+  if (!supabase) return {};
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {};
+}
 import {
   User,
   Phone,
@@ -61,29 +73,13 @@ export default function ProfilePage() {
   const [services, setServices] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
 
-  // Fetch localstorage user on mount
-  useEffect(() => {
-    const stored = localStorage.getItem("revera_user");
-    if (stored) {
-      try {
-        const u = JSON.parse(stored);
-        setUser(u);
-        setFullName(u.name || "");
-        setEmail(u.email || "");
-        setMobileAndPreloadData(u);
-      } catch (err) {
-        console.error("Failed to parse user session:", err);
-      }
-    }
-    setLoadingAuth(false);
-  }, []);
-
   const setMobileAndPreloadData = async (sessionUser: any) => {
     if (!sessionUser?.mobile) return;
     setLoadingProfile(true);
     try {
       // 1. Fetch latest profile details from database
-      const res = await fetch(`/api/customers?mobile=${sessionUser.mobile}`);
+      const headers = await authHeaders();
+      const res = await fetch(`/api/customers?mobile=${sessionUser.mobile}`, { headers });
       if (res.ok) {
         const customer = await res.json();
         if (customer) {
@@ -100,7 +96,7 @@ export default function ProfilePage() {
 
       // 2. Fetch bookings list
       setLoadingBookings(true);
-      const bookingsRes = await fetch(`/api/reservations?phone=${sessionUser.mobile}`);
+      const bookingsRes = await fetch(`/api/reservations?phone=${sessionUser.mobile}`, { headers });
       if (bookingsRes.ok) {
         const list = await bookingsRes.json();
         setBookings(list || []);
@@ -112,6 +108,23 @@ export default function ProfilePage() {
       setLoadingBookings(false);
     }
   };
+
+  // Fetch localstorage user on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("revera_user");
+    if (stored) {
+      try {
+        const u = JSON.parse(stored);
+        setUser(u);
+        setFullName(u.name || "");
+        setEmail(u.email || "");
+        setMobileAndPreloadData(u);
+      } catch (err) {
+        console.error("Failed to parse user session:", err);
+      }
+    }
+    setLoadingAuth(false);
+  }, []);
 
   // Fetch reference lists (services and branches)
   useEffect(() => {
@@ -173,7 +186,7 @@ export default function ProfilePage() {
     try {
       const res = await fetch("/api/customers", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
         body: JSON.stringify(payload)
       });
 
@@ -521,7 +534,7 @@ export default function ProfilePage() {
                       <Calendar className="mx-auto text-[#5A6A51]/40 mb-4" size={40} />
                       <p className="text-[#5A6A51] text-sm font-medium">{profileT.emptyBookings}</p>
                       <button
-                        onClick={() => window.dispatchEvent(new CustomEvent("open-booking"))}
+                        onClick={() => router.push("/book")}
                         className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-3 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
                       >
                         {profileT.bookNow}
@@ -605,7 +618,6 @@ export default function ProfilePage() {
         </div>
       </main>
       <SiteFooter />
-      <BookingModal />
       <AuthModal />
     </>
   );

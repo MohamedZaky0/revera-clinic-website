@@ -34,16 +34,6 @@ export async function GET(req: Request) {
       );
     }
 
-    // 1. Check if user is the hardcoded superadmin bypass
-    if (email.toLowerCase() === 'superadmin@revera.com') {
-      return NextResponse.json({
-        role: 'superadmin',
-        permissions: ['Bookings', 'Customers', 'Providers', 'Services', 'Settings'],
-        email,
-        employeeId: 'superadmin'
-      });
-    }
-
     // 2. Query employee_accounts table for the role mapping
     const { data: employee, error: empError } = await supabaseServer
       .from('employee_accounts')
@@ -69,6 +59,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       id: employee.id,
       role: employee.role_name,
+      department: employee.department,
       permissions: role?.permissions || [],
       email: employee.email,
       employeeId: employee.employee_id
