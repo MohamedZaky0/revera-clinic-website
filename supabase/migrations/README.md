@@ -15,6 +15,12 @@ ran. That is not a theoretical problem; it has already caused real damage (RISK-
 - The **dev** and **main** databases diverged badly. dev has 26 tables and is current to
   ~2026-07-20. main has 19 and is stuck at ~2026-07-05, missing 8 tables the application code
   actively uses.
+  **RESOLVED 2026-09-04** — by then the gap had grown to 19 tables on prod vs 59 on dev, with
+  prod's migration history completely empty. `supabase db reset --linked` replayed and recorded
+  all 51 migrations against prod, and a seed file restored its config tables and `auth` users
+  from a pre-flight dump. Both databases now report identical table sets, and prod is provisioned
+  the same reproducible way any future clinic fork will be. Full write-up: `ai_docs/RISKS.md`
+  -> RISK-020, "Update 2026-09-04".
 - `20260722140000_enable_row_level_security.sql` was **never applied to dev**, so RLS is off on
   `reservations`, `customers`, `services` and others — while `ai_docs/DB_SCHEMA.md` briefly claimed
   the opposite, because someone (an AI assistant) inferred applied state from the file existing.
