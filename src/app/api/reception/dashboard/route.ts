@@ -460,7 +460,15 @@ export async function POST(req: Request) {
         let minimumDistance = Infinity;
 
         for (const branch of candidateBranches) {
-          const coords = await resolveBranchCoordinates(branch);
+          let coords = await resolveBranchCoordinates(branch);
+          if (!coords) {
+            const bName = String(branch.name_en || branch.id || "").toLowerCase();
+            if (bName.includes("zayed") || bName.includes("sheikh")) {
+              coords = { latitude: 30.0131, longitude: 30.9876 };
+            } else if (bName.includes("cairo") || bName.includes("tagamoa")) {
+              coords = { latitude: 30.0263, longitude: 31.4913 };
+            }
+          }
           if (coords) {
             const dist = getDistanceInMeters(parsedLat, parsedLng, coords.latitude, coords.longitude);
             if (dist < minimumDistance) minimumDistance = dist;
@@ -472,7 +480,7 @@ export async function POST(req: Request) {
         }
 
         // If clinic branches exist and employee is outside allowed 800m working location:
-        if (candidateBranches.length > 0 && !isInsideLocation && minimumDistance !== Infinity) {
+        if (candidateBranches.length > 0 && !isInsideLocation) {
           return NextResponse.json(
             {
               success: false,

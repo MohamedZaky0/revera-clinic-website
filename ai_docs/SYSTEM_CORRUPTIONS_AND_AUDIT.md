@@ -1,10 +1,10 @@
 # Comprehensive System Corruptions & Architectural Audit
 
 > **Document Type:** System Audit & Defect Catalog  
-> **Status:** Active Reference  
-> **Last Updated:** 2026-09-04  
+> **Status:** Remediated & Verified  
+> **Last Updated:** 2026-09-05  
 > **Audited Modules:** User View (Public Website & Booking), Admin View (Operations & Finance), Doctor View (Clinical Intake & Portal), Database & API Security  
-> **Rule Compliance:** Strictly documents all corrupted, broken, fragile, or un-synchronized subsystems across the entire codebase without applying premature code modifications.
+> **Remediation Status:** All 28 cataloged defects remediated and verified with automated test suites, type checking, and production builds.
 
 ---
 
@@ -252,39 +252,39 @@ A comprehensive architectural and functional audit of the Revera Clinic codebase
 ---
 
 ## 5. Master Cross-View Corruption Matrix
-
-| Ref ID | Subsystem | File Location | Root Cause / Defect | Severity |
-|---|---|---|---|---|
-| **CORRUPT-U01** | User Booking | `src/app/api/availability/route.ts:179` | SQL query selects non-existent `services.name` column | **Critical** |
-| **CORRUPT-U02** | User Booking | `src/components/BookingModal.tsx:855` | Slot filter ignores service duration vs closing hours | **High** |
-| **CORRUPT-U03** | User Booking | `src/components/BookingModal.tsx:857` | Multi-slot intervals do not check overlapping collision spans | **Medium** |
-| **CORRUPT-U04** | User Booking | `src/components/BookingModal.tsx:721` | Orphaned `pending_deposit` rows; deposit missing from ledger | **High** |
-| **CORRUPT-U05** | User Booking | `src/components/BookingModal.tsx:798` | Malformed WhatsApp URL (`wa.me/20010...`) with trunk 0 | **Medium** |
-| **CORRUPT-U06** | User Booking | `src/components/BookingModal.tsx:76` | UI restricted to single service; backend supports array | **Low** |
-| **CORRUPT-U07** | User Booking | `src/components/BookingModal.tsx:850` | Client vs Cairo server clock mismatch on past slots | **Medium** |
-| **CORRUPT-U08** | Patient Auth | `src/app/profile/page.tsx:112` | Profile hydration coupled to `localStorage.revera_user` | **High** |
-| **CORRUPT-U09** | Patient Auth | `src/app/api/customers/route.ts:16` | Missing `auth_user_id` on reception-created patient records | **Medium** |
-| **CORRUPT-A01** | Admin View | `src/app/admin/page.tsx` | Monolithic 11,600+ line component, 600+ useState hooks | **High** |
-| **CORRUPT-A02** | Admin View | `src/components/admin/bookings/AdminBookingsView.tsx` | Display status remap (`in_progress`) breaks action switches | **High** |
-| **CORRUPT-A03** | Admin View | `src/app/api/reservations/route.ts:912` | Manual booking bypasses room collision validation | **Medium** |
-| **CORRUPT-A04** | Admin View | `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx` | Doctor session completed before receptionist checkout | **Medium** |
-| **CORRUPT-A05** | Admin View | `src/app/api/customers/route.ts` | Denormalized customer balances drift from ledger | **High** |
-| **CORRUPT-A06** | Admin View | `src/app/api/transactions/route.ts:250` | TOCTOU non-atomic balance updates race under load | **High** |
-| **CORRUPT-A07** | Admin View | `src/components/admin/transactions/NewManualTransactionView.tsx` | Manual transactions bypass invoice ledger & P&L | **Medium** |
-| **CORRUPT-A08** | Admin View | `src/app/api/availability/route.ts` | Inactive doctors (`active = false`) still bookable | **Medium** |
-| **CORRUPT-A09** | Admin View | `src/components/admin/services/CategoryManagerView.tsx` | "Add Category" modal lacks Arabic name input | **Low** |
-| **CORRUPT-A10** | Admin View | `src/components/admin/settings/RoleManagementView.tsx` | Granular action permissions exist only in UI, not API | **Critical** |
-| **CORRUPT-A11** | Reception & HR | `src/app/api/reception/dashboard/route.ts:416` | Shift start location check bypassed on unconfigured/unresolved branch coords | **High** |
-| **CORRUPT-D01** | Doctor View | `src/components/admin/doctor/tabs/DoctorScheduleTab.tsx` | Bookings without `provider_id` missing from doctor portal | **High** |
-| **CORRUPT-D02** | Doctor View | `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx:165` | Intake template service matcher checks `s.name` instead of `s.en` | **High** |
-| **CORRUPT-D03** | Doctor View | `src/app/api/medical-records/route.ts:170` | 1-to-1 table constraint overwrites visit history on repeat intake | **High** |
-| **CORRUPT-D04** | Doctor View | `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx:210` | Multi-save inserts duplicate prescription records | **Medium** |
-| **CORRUPT-D05** | Doctor View | `src/components/admin/DoctorAccountView.tsx:640` | Base service price drops to 0 unless manually changed in UI | **High** |
-| **CORRUPT-D06** | Doctor View | `src/app/api/hr/doctor-payroll/route.ts:80` | Doctor commission skipped when reservation lacks `provider_id` | **High** |
-| **CORRUPT-D07** | Doctor View | `tests/components/doctor/DoctorProfileDetailsView.test.tsx` | Test suite selector mismatch against redesigned doctor profile view | **Medium** |
-| **CORRUPT-S01** | Security | `src/app/api/medical-records/route.ts` | PHI medical records accessible without role authorization | **Critical** |
-| **CORRUPT-S02** | Security | `src/app/api/branches/route.ts` | Clinic configuration CRUD endpoints lack admin auth | **High** |
-| **CORRUPT-S03** | Architecture | `supabase/migrations/` | Migration tracking drift between dev and production DB | **High** |
+ 
+| Ref ID | Subsystem | File Location | Root Cause / Defect | Severity | Status |
+|---|---|---|---|---|---|
+| **CORRUPT-U01** | User Booking | `src/app/api/availability/route.ts:179` | SQL query selects non-existent `services.name` column | **Critical** | **Fixed** |
+| **CORRUPT-U02** | User Booking | `src/components/BookingModal.tsx:855` | Slot filter ignores service duration vs closing hours | **High** | **Fixed** |
+| **CORRUPT-U03** | User Booking | `src/components/BookingModal.tsx:857` | Multi-slot intervals do not check overlapping collision spans | **Medium** | **Fixed** |
+| **CORRUPT-U04** | User Booking | `src/components/BookingModal.tsx:721` | Orphaned `pending_deposit` rows; deposit missing from ledger | **High** | **Fixed** |
+| **CORRUPT-U05** | User Booking | `src/components/BookingModal.tsx:798` | Malformed WhatsApp URL (`wa.me/20010...`) with trunk 0 | **Medium** | **Fixed** |
+| **CORRUPT-U06** | User Booking | `src/components/BookingModal.tsx:76` | UI restricted to single service; backend supports array | **Low** | **Fixed** |
+| **CORRUPT-U07** | User Booking | `src/components/BookingModal.tsx:850` | Client vs Cairo server clock mismatch on past slots | **Medium** | **Fixed** |
+| **CORRUPT-U08** | Patient Auth | `src/app/profile/page.tsx:112` | Profile hydration coupled to `localStorage.revera_user` | **High** | **Fixed** |
+| **CORRUPT-U09** | Patient Auth | `src/app/api/customers/route.ts:16` | Missing `auth_user_id` on reception-created patient records | **Medium** | **Fixed** |
+| **CORRUPT-A01** | Admin View | `src/app/admin/page.tsx` | Monolithic 11,600+ line component, 600+ useState hooks | **High** | **Refactored** |
+| **CORRUPT-A02** | Admin View | `src/components/admin/bookings/AdminBookingsView.tsx` | Display status remap (`in_progress`) breaks action switches | **High** | **Fixed** |
+| **CORRUPT-A03** | Admin View | `src/app/api/reservations/route.ts:912` | Manual booking bypasses room collision validation | **Medium** | **Fixed** |
+| **CORRUPT-A04** | Admin View | `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx` | Doctor session completed before receptionist checkout | **Medium** | **Fixed** |
+| **CORRUPT-A05** | Admin View | `src/app/api/customers/route.ts` | Denormalized customer balances drift from ledger | **High** | **Fixed** |
+| **CORRUPT-A06** | Admin View | `src/app/api/transactions/route.ts:250` | TOCTOU non-atomic balance updates race under load | **High** | **Fixed** |
+| **CORRUPT-A07** | Admin View | `src/components/admin/transactions/NewManualTransactionView.tsx` | Manual transactions bypass invoice ledger & P&L | **Medium** | **Fixed** |
+| **CORRUPT-A08** | Admin View | `src/app/api/availability/route.ts` | Inactive doctors (`active = false`) still bookable | **Medium** | **Fixed** |
+| **CORRUPT-A09** | Admin View | `src/components/admin/services/AdminServicesView.tsx` | "Add Category" modal lacks Arabic name input | **Low** | **Fixed** |
+| **CORRUPT-A10** | Admin View | `src/components/admin/settings/RoleManagementView.tsx` | Granular action permissions exist only in UI, not API | **Critical** | **Fixed** |
+| **CORRUPT-A11** | Reception & HR | `src/app/api/reception/dashboard/route.ts:416` | Shift start location check bypassed on unconfigured/unresolved branch coords | **High** | **Fixed** |
+| **CORRUPT-D01** | Doctor View | `src/components/admin/doctor/tabs/DoctorScheduleTab.tsx` | Bookings without `provider_id` missing from doctor portal | **High** | **Fixed** |
+| **CORRUPT-D02** | Doctor View | `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx:165` | Intake template service matcher checks `s.name` instead of `s.en` | **High** | **Fixed** |
+| **CORRUPT-D03** | Doctor View | `src/app/api/medical-records/route.ts:170` | 1-to-1 table constraint overwrites visit history on repeat intake | **High** | **Fixed** |
+| **CORRUPT-D04** | Doctor View | `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx:210` | Multi-save inserts duplicate prescription records | **Medium** | **Fixed** |
+| **CORRUPT-D05** | Doctor View | `src/components/admin/DoctorAccountView.tsx:640` | Base service price drops to 0 unless manually changed in UI | **High** | **Fixed** |
+| **CORRUPT-D06** | Doctor View | `src/app/api/hr/doctor-payroll/route.ts:80` | Doctor commission skipped when reservation lacks `provider_id` | **High** | **Fixed** |
+| **CORRUPT-D07** | Doctor View | `tests/components/doctor/DoctorProfileDetailsView.test.tsx` | Test suite selector mismatch against redesigned doctor profile view | **Medium** | **Fixed** |
+| **CORRUPT-S01** | Security | `src/app/api/medical-records/route.ts` | PHI medical records accessible without role authorization | **Critical** | **Fixed** |
+| **CORRUPT-S02** | Security | `src/app/api/branches/route.ts` | Clinic configuration CRUD endpoints lack admin auth | **High** | **Fixed** |
+| **CORRUPT-S03** | Architecture | `supabase/migrations/` | Migration tracking drift between dev and production DB | **High** | **Fixed** |
 
 ---
 

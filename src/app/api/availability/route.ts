@@ -57,7 +57,7 @@ async function fetchCachedServices() {
   if (cachedServices && now < cachedServicesExpiry) {
     return cachedServices;
   }
-  const { data } = await supabaseServer.from('services').select('id, duration, duration_minutes');
+  const { data } = await supabaseServer.from('services').select('id, en, name, duration, duration_minutes');
   cachedServices = data || [];
   cachedServicesExpiry = now + CACHE_TTL;
   return cachedServices;
@@ -171,19 +171,24 @@ export async function GET(req: Request) {
     let selectedServiceNameEn = '';
     if (serviceId) {
       const selectedSvc = dbServices.find((s: any) => s.id === Number(serviceId));
-      if (selectedSvc && (selectedSvc.duration_minutes || selectedSvc.duration)) {
-        targetDuration = getServiceDurationMinutes(selectedSvc);
-        try {
-          const { data: fullSvc } = await supabaseServer
-            .from('services')
-            .select('name')
-            .eq('id', Number(serviceId))
-            .maybeSingle();
-          if (fullSvc) {
-            selectedServiceNameEn = fullSvc.name;
+      if (selectedSvc) {
+        if (selectedSvc.duration_minutes || selectedSvc.duration) {
+          targetDuration = getServiceDurationMinutes(selectedSvc);
+        }
+        selectedServiceNameEn = selectedSvc.en || selectedSvc.name || '';
+        if (!selectedServiceNameEn) {
+          try {
+            const { data: fullSvc } = await supabaseServer
+              .from('services')
+              .select('en, name')
+              .eq('id', Number(serviceId))
+              .maybeSingle();
+            if (fullSvc) {
+              selectedServiceNameEn = (fullSvc as any).en || (fullSvc as any).name || '';
+            }
+          } catch (e) {
+            console.warn("Could not load service details for name:", e);
           }
-        } catch (e) {
-          console.warn("Could not load service details for name:", e);
         }
       }
     }
@@ -219,6 +224,10 @@ export async function GET(req: Request) {
 
     // Filter compatible providers
     const activeCompProviders = (rawProviders || []).filter((provider: any) => {
+      // Inactive doctor check
+      if (provider.active === false || provider.status === 'inactive') {
+        return false;
+      }
       // Branch check
       if (branchId) {
         const wdh = provider.working_days_hours;
@@ -347,7 +356,7 @@ export async function GET(req: Request) {
 
           for (let k = 0; k < targetSlotsNeeded; k++) {
             const currentSlot = ALL_15MIN_SLOTS[i + k];
-            if (currentSlot === undefined) {
+            if (currentSlot === undefined || currentSlot >= clinicEnd) {
               docFree = false;
               break;
             }
@@ -479,7 +488,7 @@ export async function GET(req: Request) {
 
           for (let k = 0; k < targetSlotsNeeded; k++) {
             const currentSlotIdx = i + k;
-            if (currentSlotIdx >= ALL_15MIN_SLOTS.length) {
+            if (currentSlotIdx >= ALL_15MIN_SLOTS.length || ALL_15MIN_SLOTS[currentSlotIdx] >= clinicEnd) {
               docFree = false;
               break;
             }

@@ -1,7 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-29 (RISK-076 second pass — deep business-logic audit of the
-> Transactions module; RISK-063/RISK-075 resolved 2026-08-27; RISK-066/067/069 resolved 2026-08-23)
+> **Last Updated:** 2026-09-05 (Master Defect Remediation & Audit Resolution: RISK-064 resolved; availability, booking, intake, prescription deduplication remediated)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -15,7 +14,7 @@
 
 ## Status summary
 
-**8 open** · **13 partially resolved** · **55 resolved** · 76 tracked total.
+**7 open** · **13 partially resolved** · **56 resolved** · 76 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -28,7 +27,6 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 - [RISK-020](#risk-020) — Migrations Are Not Tracked As Applied, And Two Databases Have Diverged
 - [RISK-053](#risk-053) — New Cairo Branch's Working Hours Were Never Actually Configured
 - [RISK-058](#risk-058) — Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
-- [RISK-064](#risk-064) — "Add New Category" (Services) Has No Arabic Name Field — Every Category Created There Gets A Permanently Blank `ar`
 - [RISK-078](#risk-078) — Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It
 
 ## RISK-001: Duplication Friction (hardcoded Revera-specific values)
@@ -325,37 +323,6 @@ mechanical extraction (which must not change behaviour) or fixed inline here (ou
 Windsurf-brief-writing task that surfaced it). The fix is a `useEffect` reading `GET
 /api/page-settings` and calling the 7 setters from `data.clinic`, matching whatever hydration
 pattern sibling sections (Deposit/Notification/Queue Settings) already use.
-
----
-
-## RISK-064: "Add New Category" (Services) Has No Arabic Name Field — Every Category Created There Gets A Permanently Blank `ar`
-
-**Severity:** Low · **Type:** Data integrity / i18n
-**Found:** 2026-08-19, verifying Windsurf's Brief 16 (Services extraction) — not caused by the
-extraction, confirmed pre-existing by diffing against the pre-extraction commit
-(`6abff84:src/app/admin/page.tsx`), where `newCategoryNameAr` was already declared and already
-never referenced anywhere but its own `useState`. The extraction moved this exact, already-broken
-behaviour verbatim into `src/components/admin/services/AdminServicesView.tsx`.
-
-**What it is:** the "Add New Category" modal (`AdminServicesView.tsx`, ~line 725) renders exactly
-one input, "Category Name (English)", bound to `newCategoryNameEn`. Its save handler (~line 754)
-hardcodes the Arabic field: `{ key, en: newCategoryNameEn.trim(), ar: "" }`. The `newCategoryNameAr`
-state (and its setter) exist in the component's own props/type — visible in an eslint
-`no-unused-vars` sweep — but there is no corresponding JSX input anywhere for it. Confirmed live in
-the browser: the modal genuinely shows only one text field.
-
-**Business impact:** every service category created through this form (not seeded via migration or
-direct DB edit) has a permanently blank Arabic name unless someone later finds and manually edits
-it elsewhere. Anywhere the public site or admin panel displays a category's Arabic label would show
-blank for these categories — silent, not an error, easy to miss until a patient-facing Arabic page
-is checked.
-
-**Not fixed** — out of scope for Brief 16, which was extraction-only with an explicit
-no-behaviour-change requirement; building the missing field is a real (if small) feature addition,
-not a mechanical move. Fix is a second input in the same modal ("Category Name (Arabic)") bound to
-`newCategoryNameAr`, and changing the save handler's `ar: ""` to `ar: newCategoryNameAr.trim()` —
-the state and prop plumbing to do this already exist, only the JSX and the one save-handler field
-are missing.
 
 ---
 
@@ -996,6 +963,7 @@ cannot reproduce for new sessions again.
 - [RISK-056](#risk-056) — Doctor Portal's "Complete Treatment" Silently Dropped The Base Service Price From The Invoice (RESOLVED)
 - [RISK-059](#risk-059) — `/api/reception/dashboard` Had No Auth, Could Clock In The Wrong Receptionist, And Could Silently Reopen An Ended Shift (RESOLVED)
 - [RISK-063](#risk-063) — Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff (RESOLVED)
+- [RISK-064](#risk-064) — "Add New Category" (Services) Has No Arabic Name Field (RESOLVED)
 - [RISK-065](#risk-065) — `POST /api/packages/consume` Burns A Pre-Paid Session For A Service That Isn't On The Booking
 - [RISK-068](#risk-068) — First-Visit Medical Intake Guard Fired For Every Patient — `reservations` Prop Never Passed
 - [RISK-066](#risk-066) — System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate (RESOLVED)
@@ -3623,6 +3591,20 @@ an in-memory rate limiter, which would be ineffective across Vercel's per-instan
 Revisit if staff report targeted phishing.
 
 **Manual test checklist:** `ai_docs/manual_tests/RISK_080_MANUAL_TESTS.md`
+
+---
+
+## RISK-064: "Add New Category" (Services) Has No Arabic Name Field (RESOLVED)
+
+**Severity:** Low · **Type:** Data integrity / i18n
+**Found:** 2026-08-19 · **RESOLVED:** 2026-09-05 (CORRUPT-A09 Master Defect Remediation)
+
+**What it was:** The "Add New Category" modal in `AdminServicesView.tsx` only rendered an English category name input and hardcoded `ar: ""`.
+
+**Resolution:**
+- Added Arabic category name input field (`Category Name (Arabic)` / `اسم الفئة (عربي)`) bound to `newCategoryNameAr`.
+- Updated save handler to persist `ar: newCategoryNameAr.trim()`.
+- Added localized translations in `src/components/admin/translations.ts`.
 
 ---
 

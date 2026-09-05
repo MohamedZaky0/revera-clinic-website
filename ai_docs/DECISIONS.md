@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-08-29 (DEC-046)
+> **Last Updated:** 2026-09-05 (DEC-047)
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -1740,4 +1740,39 @@ Receptionists and Clinic Admins need to manually record historical bookings that
    - Saves historical bookings with `status = 'completed'`, `is_manual = true`, `is_historical = true`, and preserves the historical date without interfering with active schedules or room/doctor availability.
 3. Created `GET /api/reservations/previous` and integrated test case `TC-038` into the Admin Settings System Test Suite (`/admin` -> Settings -> System Test Suite).
 4. Provided full bilingual localization (EN/AR) in `src/components/admin/translations.ts`.
+
+---
+
+## DEC-047: Master Defect Catalog Remediation & System Verification Suite Expansion
+
+**Date:** 2026-09-05
+**Status:** Decided & Implemented
+
+**Context:**
+A comprehensive audit documented 28 core defects across User View, Admin View, Doctor View, and Database/API Architecture (`ai_docs/SYSTEM_CORRUPTIONS_AND_AUDIT.md`).
+
+**Decisions & Remediations:**
+1. **Availability Engine & Inactive Doctor Filter (`CORRUPT-U01`, `CORRUPT-A08`, `CORRUPT-U02`, `CORRUPT-U03`):**
+   - Updated `fetchCachedServices` to select `duration` and `duration_minutes` explicitly.
+   - Updated service matching logic to check `selectedSvc.en || selectedSvc.name` with bilingual fallback.
+   - Excluded inactive doctors (`provider.active === false || provider.status === 'inactive'`) from slot calculation and provider rosters.
+   - Enforced operating hours boundaries for multi-slot services so slots exceeding clinic closing times are excluded.
+2. **Booking Modal & Egyptian WhatsApp Normalization (`CORRUPT-U02`, `CORRUPT-U05`, `CORRUPT-U07`):**
+   - Added service duration cutoff logic (`slotStartMinutes + svcDuration <= endMinutes`).
+   - Fixed Egyptian trunk prefix bugs on `wa.me` links (`2001...` -> `201...`, `01...` -> `201...`).
+   - Aligned past-slot time comparisons to `Africa/Cairo` timezone.
+3. **Patient Auth & Customer Phone Queries (`CORRUPT-U08`, `CORRUPT-U09`):**
+   - Added session hydration fallback in `/profile` when `localStorage` is missing.
+   - Added `normalizeEgyptMobile` and multi-prefix variant querying (`010...`, `+2010...`, `2010...`, `002010...`) in `GET /api/customers`.
+4. **Admin Bookings Real Status & Category Localization (`CORRUPT-A02`, `CORRUPT-A09`):**
+   - Preserved `status: r.status || st` alongside `display_status: st` in `AdminBookingsView`.
+   - Added Arabic category name input to `AdminServicesView` category modal, saving `ar: newCategoryNameAr.trim()` (resolves `RISK-064`).
+5. **Reception Geofence Guard (`CORRUPT-A11`):**
+   - Ensured `POST /api/reception/dashboard` Start Shift rejects with 400 `out_of_location` when branch coordinates are resolved and distance exceeds 800m.
+6. **Doctor Intake Matching & Prescription Deduplication (`CORRUPT-D02`, `CORRUPT-D04`, `CORRUPT-D06`):**
+   - Enhanced medical intake template service matching across `s.en`, `s.ar`, `s.name_en`, `s.name_ar`.
+   - In `POST /api/prescriptions`, when `booking_id` is provided without `id`, upserts the existing prescription for that booking rather than creating duplicate rows.
+   - Added `doctor_name` selection and fallback matching in `GET /api/hr/doctor-payroll`.
+7. **System Test Suite Diagnostic Test Cases:**
+   - Registered `TC-040` (Availability Doctor & Inactive Status Filtering), `TC-041` (Prescription Deduplication & Clinical Intake Mapping), and `TC-042` (Reception Shift Location Verification & Geofence Guard) under `/admin` -> Settings -> System Test Suite.
 

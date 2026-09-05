@@ -67,7 +67,7 @@ export async function GET(req: Request) {
     let allReservations: any[] = [];
     if (months.length > 0) {
       const [resResult, servicesResult] = await Promise.all([
-        supabaseServer.from('reservations').select('id, provider_id, status, date, amount_paid, amount_left, service_id'),
+        supabaseServer.from('reservations').select('id, provider_id, doctor_name, status, date, amount_paid, amount_left, service_id'),
         supabaseServer.from('services').select('id, price'),
       ]);
 
@@ -101,7 +101,10 @@ export async function GET(req: Request) {
 
       // Filter reservations for this doctor and month
       const docReservations = allReservations.filter((r: any) => {
-        const isProviderMatch = r.provider_id === doc.id;
+        const cleanDocName = doc.name ? doc.name.replace(/^Dr\.?\s*/i, '').toLowerCase().trim() : '';
+        const rDocName = r.doctor_name ? String(r.doctor_name).replace(/^Dr\.?\s*/i, '').toLowerCase().trim() : '';
+        const isNameMatch = Boolean(cleanDocName && rDocName && (rDocName === cleanDocName || rDocName.includes(cleanDocName) || cleanDocName.includes(rDocName)));
+        const isProviderMatch = r.provider_id === doc.id || isNameMatch;
         const isMonthMatch = r.date && r.date.startsWith(pay.month);
         return isProviderMatch && isMonthMatch;
       });

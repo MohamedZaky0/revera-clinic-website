@@ -97,22 +97,40 @@ async function resolveProviderId(doctorName?: string | null): Promise<string | n
   const name = (doctorName || '').trim();
   if (!name) return null;
 
-  const { data, error } = await supabaseServer
-    .from('providers')
-    .select('id, name')
-    .ilike('name', name);
+  try {
+    const { data: exactMatch } = await supabaseServer
+      .from('providers')
+      .select('id, name')
+      .ilike('name', name);
 
-  if (error) {
-    console.error('Provider lookup failed for doctor_name:', name, error.message);
-    return null;
-  }
-  if (!data || data.length !== 1) {
-    if (data && data.length > 1) {
-      console.warn('Ambiguous doctor_name matched multiple providers, left unlinked:', name);
+    if (exactMatch && exactMatch.length === 1) {
+      return exactMatch[0].id;
     }
-    return null;
+
+    const cleanName = name.replace(/^Dr\.?\s*/i, '').trim();
+    if (cleanName && cleanName !== name) {
+      const { data: cleanMatch } = await supabaseServer
+        .from('providers')
+        .select('id, name')
+        .ilike('name', cleanName);
+      if (cleanMatch && cleanMatch.length === 1) {
+        return cleanMatch[0].id;
+      }
+    }
+
+    if (cleanName) {
+      const { data: fuzzyMatch } = await supabaseServer
+        .from('providers')
+        .select('id, name')
+        .ilike('name', `%${cleanName}%`);
+      if (fuzzyMatch && fuzzyMatch.length >= 1) {
+        return fuzzyMatch[0].id;
+      }
+    }
+  } catch (err) {
+    console.error('Provider lookup failed for doctor_name:', name, err);
   }
-  return data[0].id;
+  return null;
 }
 
 /**
@@ -535,6 +553,8 @@ export async function GET(req: Request) {
   const phone = params.get('phone');
   const customerId = params.get('customerId');
   const createdByEmployeeId = params.get('createdByEmployeeId');
+  const doctorId = params.get('doctorId');
+  const doctorName = params.get('doctorName');
 
   // This route has the same two caller populations as /api/customers: staff (unrestricted) and
   // patients reading their own booking history (profile/page.tsx). Unlike /api/customers, there
@@ -588,6 +608,12 @@ export async function GET(req: Request) {
     if (phone) q = q.eq('phone', phone);
     if (customerId) q = q.eq('customer_id', customerId);
     if (createdByEmployeeId) q = q.eq('created_by_employee_id', createdByEmployeeId);
+    if (doctorId) {
+      q = q.eq('provider_id', doctorId);
+    } else if (doctorName) {
+      const cleanDoc = doctorName.replace(/^Dr\.?\s*/i, '').trim();
+      q = q.ilike('doctor_name', `%${cleanDoc}%`);
+    }
     // Include bookings that match this branch OR have no branch set (website bookings without branch)
     if (branchId) q = q.or(`branch_id.eq.${branchId},branch_id.is.null`);
 
@@ -920,6 +946,15 @@ export async function POST(req: Request) {
       initialAmountLeft = servicePrice;
     }
 
+    let assignedRoomId: string | null = null;
+    if (isManualBooking && (sessionType || 'in_person') !== 'online') {
+      if (body.roomId || body.room_id) {
+        assignedRoomId = body.roomId || body.room_id;
+      } else if (compRoomIds && compRoomIds.length > 0) {
+        assignedRoomId = compRoomIds[0];
+      }
+    }
+
     // 2. Insert reservation linked to customer
     const insertPayload: any = {
       service_id: Number(serviceId),
@@ -929,8 +964,9 @@ export async function POST(req: Request) {
       email,
       phone,
       notes: notes || '',
-      status: initialStatus,
-      time_slot: null,
+      status: isManualBooking ? 'approved' : initialStatus,
+      time_slot: isManualBooking && requestedTime ? requestedTime : null,
+      room_id: assignedRoomId,
       session_type: sessionType || 'in_person',
       branch_id: branchId || null,
       customer_id: customerId,

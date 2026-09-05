@@ -795,8 +795,13 @@ I have paid the reservation deposit for my booking:
 
 Attached is my payment transaction receipt photo.`;
 
-    const cleanWhatsapp = clinicWhatsapp.replace(/[^0-9]/g, "");
-    const whatsappLink = `https://wa.me/${cleanWhatsapp || CLIENT.whatsappNumber}?text=${encodeURIComponent(textMessage)}`;
+    let cleanWhatsapp = (clinicWhatsapp || CLIENT.whatsappNumber || "").replace(/[^0-9]/g, "");
+    if (cleanWhatsapp.startsWith("200")) {
+      cleanWhatsapp = "20" + cleanWhatsapp.slice(3);
+    } else if (cleanWhatsapp.startsWith("0")) {
+      cleanWhatsapp = "20" + cleanWhatsapp.slice(1);
+    }
+    const whatsappLink = `https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(textMessage)}`;
 
     setTimeout(() => {
       fetch(`/api/reservations?id=${createdReservation.id}`, {
@@ -846,19 +851,27 @@ Attached is my payment transaction receipt photo.`;
     if (!selectedDate) return [];
     const { start, end } = getDayOperatingHours(selectedDate);
 
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const nowCairo = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
+    const todayStr = `${nowCairo.getFullYear()}-${String(nowCairo.getMonth() + 1).padStart(2, '0')}-${String(nowCairo.getDate()).padStart(2, '0')}`;
     const selStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
     const isToday = selStr === todayStr;
-    const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const currentHHMM = `${String(nowCairo.getHours()).padStart(2, '0')}:${String(nowCairo.getMinutes()).padStart(2, '0')}`;
+
+    const svcDuration = selectedService ? (Number((selectedService as any).duration_minutes) || Number((selectedService as any).duration) || 30) : 30;
+    const [endH, endM] = end.split(":").map(Number);
+    const endMinutes = (endH || 0) * 60 + (endM || 0);
 
     return TIME_SLOTS.filter((slot) => {
       const slot24 = normaliseTo24hSlot(slot) ?? "";
       const taken = takenSlots.includes(slot24);
       const isPast = isToday && slot24 <= currentHHMM;
-      return slot24 >= start && slot24 < end && !taken && !isPast;
+      const [sH, sM] = slot24.split(":").map(Number);
+      const slotStartMinutes = (sH || 0) * 60 + (sM || 0);
+      const fitsWithinHours = (slotStartMinutes + svcDuration) <= endMinutes;
+
+      return slot24 >= start && fitsWithinHours && !taken && !isPast;
     });
-  }, [selectedDate, getDayOperatingHours, takenSlots]);
+  }, [selectedDate, getDayOperatingHours, takenSlots, selectedService]);
 
   // Auto-select first available time slot when valid slots load
   useEffect(() => {
