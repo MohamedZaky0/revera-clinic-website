@@ -73,7 +73,7 @@ export function useCustomerProfile({
 
   // ── Profile tab states ──
   const [customerProfileTab, setCustomerProfileTab] = useState<"info" | "history" | "prescription" | "transactions" | "products" | "packages">("info");
-  const [customerRecordsSubTab, setCustomerRecordsSubTab] = useState<"intake" | "prescriptions" | "reports">("intake");
+  const [customerRecordsSubTab, setCustomerRecordsSubTab] = useState<"intake" | "prescriptions" | "reports">("prescriptions");
   const [customerPrescriptions, setCustomerPrescriptions] = useState<any[]>([]);
   const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
   const [prescriptionEditMode, setPrescriptionEditMode] = useState(false);
