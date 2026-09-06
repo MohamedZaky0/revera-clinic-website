@@ -68,6 +68,21 @@ async function fetchCachedServiceHours() {
   if (cachedPageSettings && now < cachedPageSettingsExpiry) {
     return cachedPageSettings;
   }
+  try {
+    const { data: branchData } = await supabaseServer
+      .from('branches')
+      .select('service_hours')
+      .limit(1)
+      .maybeSingle();
+    if (branchData?.service_hours && Array.isArray(branchData.service_hours) && branchData.service_hours.length > 0) {
+      cachedPageSettings = branchData.service_hours;
+      cachedPageSettingsExpiry = now + CACHE_TTL;
+      return cachedPageSettings;
+    }
+  } catch (err) {
+    console.warn('Could not load branch service hours for default cache:', err);
+  }
+
   const { data } = await supabaseServer
     .from('page_settings')
     .select('value')
@@ -290,17 +305,23 @@ export async function GET(req: Request) {
     }
 
     // Helper to get doctor schedule config on weekday
-    const getDoctorDayConfig = (provider: any, weekday: string) => {
-      if (!provider.working_days_hours) return null;
+    const getDoctorDayConfig = (provider: any, weekday: string, defaultStart: string, defaultEnd: string) => {
+      if (!provider || !provider.working_days_hours) {
+        return {
+          isOpen: true,
+          start: defaultStart,
+          end: defaultEnd
+        };
+      }
       const wdh = provider.working_days_hours;
       let config = wdh;
       if (wdh.branch_schedules && branchId && wdh.branch_schedules[branchId]) {
         config = wdh.branch_schedules[branchId];
       }
       if (config[sessionType]) {
-        return config[sessionType][weekday] || null;
+        return config[sessionType][weekday] || { isOpen: true, start: defaultStart, end: defaultEnd };
       }
-      return config[weekday] || null;
+      return config[weekday] || { isOpen: true, start: defaultStart, end: defaultEnd };
     };
 
     const output = dateKeys.map((key) => {
@@ -326,7 +347,7 @@ export async function GET(req: Request) {
         }
       }
 
-      if (clinicClosed || activeCompProviders.length === 0 || (sessionType === 'in_person' && activeCompRooms.length === 0)) {
+      if (clinicClosed || (sessionType === 'in_person' && activeCompRooms.length === 0)) {
         return {
           date: key,
           approvedCount: slots.length,
@@ -344,42 +365,49 @@ export async function GET(req: Request) {
 
         let doctorFound = false;
 
-        for (const doc of activeCompProviders) {
-          const dayConfig = getDoctorDayConfig(doc, weekdayName);
-          if (!dayConfig || !dayConfig.isOpen) continue;
+        if (activeCompProviders.length === 0) {
+          const shiftWindows = [{ start: clinicStart, end: clinicEnd }];
+          if (sessionFitsWithinShift(slotTime, targetDuration, shiftWindows)) {
+            doctorFound = true;
+          }
+        } else {
+          for (const doc of activeCompProviders) {
+            const dayConfig = getDoctorDayConfig(doc, weekdayName, clinicStart, clinicEnd);
+            if (!dayConfig || !dayConfig.isOpen) continue;
 
-          const shiftWindows = getDayShiftWindows(dayConfig);
-          if (!sessionFitsWithinShift(slotTime, targetDuration, shiftWindows)) continue;
+            const shiftWindows = getDayShiftWindows(dayConfig);
+            if (!sessionFitsWithinShift(slotTime, targetDuration, shiftWindows)) continue;
 
-          let docFree = true;
-          const docBookings = slots.filter(s => s.doctorName === doc.name);
+            let docFree = true;
+            const docBookings = slots.filter(s => s.doctorName === doc.name);
 
-          for (let k = 0; k < targetSlotsNeeded; k++) {
-            const currentSlot = ALL_15MIN_SLOTS[i + k];
-            if (currentSlot === undefined || currentSlot >= clinicEnd) {
-              docFree = false;
-              break;
-            }
-
-            for (const rb of docBookings) {
-              const rbNorm = normaliseTo24hSlot(rb.timeSlot);
-              if (!rbNorm) continue;
-              const rbIdx = ALL_15MIN_SLOTS.indexOf(rbNorm);
-              const rbDuration = servicesMap.get(rb.serviceId) ?? 30;
-              const rbSlotsCount = Math.ceil(rbDuration / 15);
-
-              const currentSlotIdx = i + k;
-              if (currentSlotIdx >= rbIdx && currentSlotIdx < rbIdx + rbSlotsCount) {
+            for (let k = 0; k < targetSlotsNeeded; k++) {
+              const currentSlot = ALL_15MIN_SLOTS[i + k];
+              if (currentSlot === undefined || currentSlot >= clinicEnd) {
                 docFree = false;
                 break;
               }
-            }
-            if (!docFree) break;
-          }
 
-          if (docFree) {
-            doctorFound = true;
-            break;
+              for (const rb of docBookings) {
+                const rbNorm = normaliseTo24hSlot(rb.timeSlot);
+                if (!rbNorm) continue;
+                const rbIdx = ALL_15MIN_SLOTS.indexOf(rbNorm);
+                const rbDuration = servicesMap.get(rb.serviceId) ?? 30;
+                const rbSlotsCount = Math.ceil(rbDuration / 15);
+
+                const currentSlotIdx = i + k;
+                if (currentSlotIdx >= rbIdx && currentSlotIdx < rbIdx + rbSlotsCount) {
+                  docFree = false;
+                  break;
+                }
+              }
+              if (!docFree) break;
+            }
+
+            if (docFree) {
+              doctorFound = true;
+              break;
+            }
           }
         }
 
@@ -469,48 +497,55 @@ export async function GET(req: Request) {
       for (let i = 0; i < ALL_15MIN_SLOTS.length; i++) {
         const slotTime = ALL_15MIN_SLOTS[i];
 
-        if (clinicClosed || activeCompProviders.length === 0 || (sessionType === 'in_person' && activeCompRooms.length === 0) || slotTime < clinicStart || slotTime >= clinicEnd) {
+        if (clinicClosed || (sessionType === 'in_person' && activeCompRooms.length === 0) || slotTime < clinicStart || slotTime >= clinicEnd) {
           unavailableSlots.push(slotTime);
           continue;
         }
 
         let doctorFound = false;
 
-        for (const doc of activeCompProviders) {
-          const dayConfig = getDoctorDayConfig(doc, weekdayName);
-          if (!dayConfig || !dayConfig.isOpen) continue;
+        if (activeCompProviders.length === 0) {
+          const shiftWindows = [{ start: clinicStart, end: clinicEnd }];
+          if (sessionFitsWithinShift(slotTime, targetDuration, shiftWindows)) {
+            doctorFound = true;
+          }
+        } else {
+          for (const doc of activeCompProviders) {
+            const dayConfig = getDoctorDayConfig(doc, weekdayName, clinicStart, clinicEnd);
+            if (!dayConfig || !dayConfig.isOpen) continue;
 
-          const shiftWindows = getDayShiftWindows(dayConfig);
-          if (!sessionFitsWithinShift(slotTime, targetDuration, shiftWindows)) continue;
+            const shiftWindows = getDayShiftWindows(dayConfig);
+            if (!sessionFitsWithinShift(slotTime, targetDuration, shiftWindows)) continue;
 
-          let docFree = true;
-          const docBookings = slots.filter(s => s.doctorName === doc.name);
+            let docFree = true;
+            const docBookings = slots.filter(s => s.doctorName === doc.name);
 
-          for (let k = 0; k < targetSlotsNeeded; k++) {
-            const currentSlotIdx = i + k;
-            if (currentSlotIdx >= ALL_15MIN_SLOTS.length || ALL_15MIN_SLOTS[currentSlotIdx] >= clinicEnd) {
-              docFree = false;
-              break;
-            }
-
-            for (const rb of docBookings) {
-              const rbNorm = normaliseTo24hSlot(rb.timeSlot);
-              if (!rbNorm) continue;
-              const rbIdx = ALL_15MIN_SLOTS.indexOf(rbNorm);
-              const rbDuration = servicesMap.get(rb.serviceId) ?? 30;
-              const rbSlotsCount = Math.ceil(rbDuration / 15);
-
-              if (currentSlotIdx >= rbIdx && currentSlotIdx < rbIdx + rbSlotsCount) {
+            for (let k = 0; k < targetSlotsNeeded; k++) {
+              const currentSlotIdx = i + k;
+              if (currentSlotIdx >= ALL_15MIN_SLOTS.length || ALL_15MIN_SLOTS[currentSlotIdx] >= clinicEnd) {
                 docFree = false;
                 break;
               }
-            }
-            if (!docFree) break;
-          }
 
-          if (docFree) {
-            doctorFound = true;
-            break;
+              for (const rb of docBookings) {
+                const rbNorm = normaliseTo24hSlot(rb.timeSlot);
+                if (!rbNorm) continue;
+                const rbIdx = ALL_15MIN_SLOTS.indexOf(rbNorm);
+                const rbDuration = servicesMap.get(rb.serviceId) ?? 30;
+                const rbSlotsCount = Math.ceil(rbDuration / 15);
+
+                if (currentSlotIdx >= rbIdx && currentSlotIdx < rbIdx + rbSlotsCount) {
+                  docFree = false;
+                  break;
+                }
+              }
+              if (!docFree) break;
+            }
+
+            if (docFree) {
+              doctorFound = true;
+              break;
+            }
           }
         }
 

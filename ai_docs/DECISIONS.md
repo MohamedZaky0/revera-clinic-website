@@ -1822,4 +1822,29 @@ The GPS Location Check for shifts is an attendance, staff tracking, and inactivi
    - Updated `generic` error copy in `translations.ts` (EN & AR) to clearly indicate a general system/network issue rather than a false "You must be in a working location" message.
    - Added specific translation strings for `position_unavailable` and `timeout`.
 
+---
+
+## DEC-050: Fix Availability Schedule Resolution for Unconfigured Doctors & General Services
+
+**Date:** 2026-09-06
+**Status:** Decided & Implemented
+
+**Context:**
+In the website booking date picker (`MaterialDatePicker.tsx` & `BookingModal.tsx`), weekdays (Monday through Saturday) were incorrectly grayed out and closed.
+
+**Root Cause:**
+In `src/app/api/availability/route.ts`:
+1. When doctor `working_days_hours` was `null` (default in DB), `getDoctorDayConfig` returned `null`, causing the slot loop to treat active doctors as closed on all weekdays.
+2. Services without explicit doctor service tags in `providers.services` evaluated `activeCompProviders.length === 0`, which triggered a premature `isAvailable: false` on all days.
+3. Fallback service hours cache read a legacy page settings footer entry where Thursday was marked closed.
+
+**Decisions & Implementation:**
+1. **Inherit Clinic Hours for Unconfigured Doctors:**
+   - `getDoctorDayConfig` now defaults to the clinic's operating hours (`{ isOpen: true, start: clinicStart, end: clinicEnd }`) when a doctor's custom `working_days_hours` is not explicitly configured in the database.
+2. **General Service Availability Fallback:**
+   - When no specific provider is restricted to a service (`activeCompProviders.length === 0`), availability evaluates against clinical room capacity and clinic operating hours.
+3. **Branch Service Hours Priority:**
+   - `fetchCachedServiceHours` inspects active branch `service_hours` before falling back to footer defaults, ensuring only actual closed days (e.g. Friday) are marked closed.
+
+
 
