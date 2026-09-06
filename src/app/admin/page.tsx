@@ -4014,7 +4014,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             setBookingMaxPerSlot(data.booking.maxPerSlot ?? 3);
             setBookingInstantApproval(data.booking.instantApproval ?? false);
             setBookingShowDoctorNotes(data.booking.showDoctorNotes ?? true);
-            setEnableGpsShift(data.booking.enableGpsShift ?? data.shift?.gpsShiftEnabled ?? true);
             setBookingDepositPercentage(data.booking.depositPercentage ?? 20);
             setBookingStaleSessionHours(data.booking.staleSessionHours ?? 2);
           }
@@ -4050,6 +4049,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           if (data.inactivity) {
             setInactivityThreshold(data.inactivity.threshold ?? 30);
             setInactivityCountdown(data.inactivity.countdown ?? 10);
+            if (data.inactivity.enableGpsShift !== undefined) {
+              setEnableGpsShift(Boolean(data.inactivity.enableGpsShift));
+            }
+          }
+
+          // Fallback resolution for enableGpsShift if not set in inactivity
+          if (data.inactivity?.enableGpsShift === undefined) {
+            setEnableGpsShift(data.booking?.enableGpsShift ?? data.shift?.gpsShiftEnabled ?? true);
           }
 
           if (data.notifications) {
@@ -4231,7 +4238,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         body: JSON.stringify({
           inactivity: {
             threshold: Number(inactivityThreshold),
-            countdown: Number(inactivityCountdown)
+            countdown: Number(inactivityCountdown),
+            enableGpsShift: enableGpsShift
           }
         }),
       });
@@ -4264,7 +4272,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             maxPerSlot: bookingMaxPerSlot,
             instantApproval: bookingInstantApproval,
             showDoctorNotes: bookingShowDoctorNotes,
-            enableGpsShift: enableGpsShift,
             depositPercentage: bookingDepositPercentage,
             staleSessionHours: bookingStaleSessionHours,
             termsText: termsText
@@ -4477,6 +4484,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       footer: {
         serviceHours: sHours
       },
+      inactivity: {
+        threshold: Number(inactivityThreshold),
+        countdown: Number(inactivityCountdown),
+        enableGpsShift: enableGpsShift
+      },
       booking: {
         minAdvance: bookingMinAdvance,
         maxAdvance: bookingMaxAdvance,
@@ -4484,7 +4496,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         maxPerSlot: bookingMaxPerSlot,
         instantApproval: bookingInstantApproval,
         showDoctorNotes: bookingShowDoctorNotes,
-        enableGpsShift: enableGpsShift,
         depositPercentage: bookingDepositPercentage,
         termsText: overrideData?.booking?.termsText !== undefined ? overrideData.booking.termsText : termsText,
       }
@@ -6849,8 +6860,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               setBookingShowDoctorNotes={setBookingShowDoctorNotes}
               bookingStaleSessionHours={bookingStaleSessionHours}
               setBookingStaleSessionHours={setBookingStaleSessionHours}
-              enableGpsShift={enableGpsShift}
-              setEnableGpsShift={setEnableGpsShift}
               handleSaveBookingSettings={handleSaveBookingSettings}
               savingBookingSettings={savingBookingSettings}
               setActiveInfoFeature={setActiveInfoFeature}
@@ -6899,8 +6908,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               setInactivityThreshold={setInactivityThreshold}
               inactivityCountdown={inactivityCountdown}
               setInactivityCountdown={setInactivityCountdown}
+              enableGpsShift={enableGpsShift}
+              setEnableGpsShift={setEnableGpsShift}
               handleSaveInactivitySettings={handleSaveInactivitySettings}
               savingInactivitySettings={savingInactivitySettings}
+              setActiveInfoFeature={setActiveInfoFeature}
               lang={lang}
               t={adminTranslations[lang].settingsScreens.inactivitySettings}
             />

@@ -173,7 +173,7 @@ export default function ReceptionDashboardView({
           setLocationError(null);
           await fetchDashboardData();
         } else {
-          setLocationError("generic");
+          setLocationError(result.error || result.message || "generic");
         }
       } catch (err) {
         console.error("Direct start shift error:", err);
@@ -221,7 +221,7 @@ export default function ReceptionDashboardView({
             } else if (result.error === "location_permission_denied" || (result.message && result.message.includes("permission"))) {
               setLocationError("permission_denied");
             } else {
-              setLocationError("generic");
+              setLocationError(result.error || result.message || "generic");
             }
           }
         } catch (err: any) {
@@ -235,6 +235,10 @@ export default function ReceptionDashboardView({
         setShiftProcessing(false);
         if (geoErr.code === geoErr.PERMISSION_DENIED || geoErr.code === 1) {
           setLocationError("permission_denied");
+        } else if (geoErr.code === geoErr.POSITION_UNAVAILABLE || geoErr.code === 2) {
+          setLocationError("position_unavailable");
+        } else if (geoErr.code === geoErr.TIMEOUT || geoErr.code === 3) {
+          setLocationError("timeout");
         } else {
           setLocationError("permission_denied");
         }

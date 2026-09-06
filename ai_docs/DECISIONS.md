@@ -1802,3 +1802,24 @@ Receptionists and staff clock into daily shifts via the Reception Dashboard (`/a
 4. **Diagnostic Verification:**
    - Added test case `TC-043` (`Staff Shift & GPS Geofence Settings Engine`) to `/admin` -> Settings -> System Test Suite.
 
+---
+
+## DEC-049: Relocate GPS Shift Verification to Inactivity Settings & Error Resolution Hardening
+
+**Date:** 2026-09-06
+**Status:** Decided & Implemented
+
+**Context:**
+The GPS Location Check for shifts is an attendance, staff tracking, and inactivity/presence control rather than a booking rule. Placing it under Booking Settings was unintuitive. Additionally, non-geofence errors during shift start were previously misattributed to "out of location" due to a catch-all translation fallback on `generic`.
+
+**Decisions & Implementation:**
+1. **Relocated Setting UI to Inactivity Settings:**
+   - Moved `enableGpsShift` control from `BookingSettingsView.tsx` to `InactivitySettingsView.tsx` (`/admin` -> Settings -> Inactivity Settings).
+   - Designed a dedicated card with modern toggle switch, Info dialog modal (`setActiveInfoFeature`), and dual-status visual cards (Geofencing Active vs Location Bypass Active).
+   - Saved and hydrated `enableGpsShift` under `inactivity` object in `page_settings` (`inactivity.enableGpsShift`), while maintaining fallback resolution across legacy `booking.enableGpsShift` and `shift.gpsShiftEnabled`.
+2. **Shift Start Error Resolution & Localization:**
+   - Fixed `ReceptionDashboardView.tsx` so literal server error messages (`result.error` / `result.message`) are accurately surfaced rather than blindly overridden with a location error string.
+   - Updated `generic` error copy in `translations.ts` (EN & AR) to clearly indicate a general system/network issue rather than a false "You must be in a working location" message.
+   - Added specific translation strings for `position_unavailable` and `timeout`.
+
+

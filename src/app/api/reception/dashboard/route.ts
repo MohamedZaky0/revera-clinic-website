@@ -314,7 +314,7 @@ export async function GET(req: Request) {
       .eq("key", "home")
       .maybeSingle();
     const pageSettings = pageSettingsRow?.value || {};
-    const gpsShiftEnabled = pageSettings?.booking?.enableGpsShift ?? pageSettings?.shift?.gpsShiftEnabled ?? true;
+    const gpsShiftEnabled = pageSettings?.inactivity?.enableGpsShift ?? pageSettings?.booking?.enableGpsShift ?? pageSettings?.shift?.gpsShiftEnabled ?? true;
 
     return NextResponse.json({
       success: true,
@@ -426,7 +426,7 @@ export async function POST(req: Request) {
         .eq("key", "home")
         .maybeSingle();
       const psVal = psRow?.value || {};
-      const gpsShiftEnabled = psVal?.booking?.enableGpsShift ?? psVal?.shift?.gpsShiftEnabled ?? true;
+      const gpsShiftEnabled = psVal?.inactivity?.enableGpsShift ?? psVal?.booking?.enableGpsShift ?? psVal?.shift?.gpsShiftEnabled ?? true;
 
       let parsedLat: number | null = null;
       let parsedLng: number | null = null;

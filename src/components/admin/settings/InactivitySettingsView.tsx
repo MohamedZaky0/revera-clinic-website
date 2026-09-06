@@ -1,15 +1,23 @@
 "use client";
 
-import { Hourglass, Clock, Check } from "lucide-react";
+import { Hourglass, Clock, Check, MapPin, Info, ShieldCheck, MapPinOff } from "lucide-react";
 import { adminTranslations } from "@/components/admin/translations";
+
+interface ActiveInfoFeature {
+  title: string;
+  description: string;
+}
 
 interface InactivitySettingsViewProps {
   inactivityThreshold: number;
   setInactivityThreshold: (v: number) => void;
   inactivityCountdown: number;
   setInactivityCountdown: (v: number) => void;
+  enableGpsShift: boolean;
+  setEnableGpsShift: (v: boolean) => void;
   handleSaveInactivitySettings: () => Promise<void>;
   savingInactivitySettings: boolean;
+  setActiveInfoFeature?: (f: ActiveInfoFeature) => void;
   lang: "en" | "ar";
   t: (typeof adminTranslations)["en"]["settingsScreens"]["inactivitySettings"];
 }
@@ -19,8 +27,11 @@ export default function InactivitySettingsView({
   setInactivityThreshold,
   inactivityCountdown,
   setInactivityCountdown,
+  enableGpsShift,
+  setEnableGpsShift,
   handleSaveInactivitySettings,
   savingInactivitySettings,
+  setActiveInfoFeature,
   lang,
   t,
 }: InactivitySettingsViewProps) {
@@ -132,6 +143,76 @@ export default function InactivitySettingsView({
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* GPS Location Shift Verification Card */}
+      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 flex items-center justify-center rounded-full bg-[#EBF0E6] text-[#414E36] border border-[#414E36]/10 shrink-0">
+              <MapPin size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-lg font-bold text-[#1F251A]">{t.enableGpsShiftInfoTitle || t.enableGpsShift}</h3>
+                {setActiveInfoFeature && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setActiveInfoFeature({
+                        title: t.enableGpsShiftInfoTitle || t.enableGpsShift,
+                        description: t.enableGpsShiftInfoDesc || "When enabled, employees and receptionists must be physically present inside the clinic branch location (within 800m-1000m) to clock in and start their daily shift. When disabled, staff can clock in and start shifts from anywhere without GPS restriction."
+                      });
+                    }}
+                    className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                    title={t.clickForInfo || "Click for info"}
+                  >
+                    <Info size={14} />
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-[#5A6A51]">{t.enableGpsShiftHint}</p>
+            </div>
+          </div>
+
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={enableGpsShift}
+              onChange={(e) => setEnableGpsShift(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-12 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#414E36]"></div>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className={`p-4 rounded-2xl border transition-all ${enableGpsShift ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-gray-50 border-gray-200 opacity-60 text-gray-600'}`}>
+            <div className="flex items-center gap-2.5 mb-1.5">
+              <ShieldCheck size={18} className={enableGpsShift ? 'text-emerald-700' : 'text-gray-400'} />
+              <h4 className="text-sm font-bold">{lang === "ar" ? "التحقق الجغرافي مفعل" : "Geofencing Active"}</h4>
+            </div>
+            <p className="text-xs leading-relaxed">
+              {lang === "ar"
+                ? "يجب تواجد الموظفين وموظفي الاستقبال فعلياً داخل نطاق الفرع (1000 متر) لبدء الوردية وتسجيل الحضور اليومي."
+                : "Staff and receptionists must be physically present inside the clinic branch perimeter (1000m) to start their daily shift."}
+            </p>
+          </div>
+
+          <div className={`p-4 rounded-2xl border transition-all ${!enableGpsShift ? 'bg-amber-50/70 border-amber-200 text-amber-900' : 'bg-gray-50 border-gray-200 opacity-60 text-gray-600'}`}>
+            <div className="flex items-center gap-2.5 mb-1.5">
+              <MapPinOff size={18} className={!enableGpsShift ? 'text-amber-700' : 'text-gray-400'} />
+              <h4 className="text-sm font-bold">{lang === "ar" ? "تجاوز الموقع مفعل" : "Location Bypass Active"}</h4>
+            </div>
+            <p className="text-xs leading-relaxed">
+              {lang === "ar"
+                ? "يمكن للموظفين بدء الوردية وتسجيل الحضور من أي مكان دون الحاجة للتحقق من الموقع الجغرافي أو إذن الـ GPS."
+                : "Staff can start their shift and clock in from any location without requiring GPS geolocation permission."}
+            </p>
           </div>
         </div>
       </div>

@@ -23,8 +23,6 @@ interface BookingSettingsViewProps {
   setBookingShowDoctorNotes: (v: boolean) => void;
   bookingStaleSessionHours: number;
   setBookingStaleSessionHours: (v: number) => void;
-  enableGpsShift: boolean;
-  setEnableGpsShift: (v: boolean) => void;
   handleSaveBookingSettings: () => Promise<void>;
   savingBookingSettings: boolean;
   setActiveInfoFeature: (f: ActiveInfoFeature) => void;
@@ -47,8 +45,6 @@ export default function BookingSettingsView({
   setBookingShowDoctorNotes,
   bookingStaleSessionHours,
   setBookingStaleSessionHours,
-  enableGpsShift,
-  setEnableGpsShift,
   handleSaveBookingSettings,
   savingBookingSettings,
   setActiveInfoFeature,
@@ -260,36 +256,6 @@ export default function BookingSettingsView({
                   </button>
                 </div>
                 <span className="text-xs text-[#5A6A51]">{t.showDoctorNotesHint}</span>
-              </div>
-            </label>
-
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={enableGpsShift}
-                onChange={(e) => setEnableGpsShift(e.target.checked)}
-                className="accent-[#414E36] w-4 h-4 cursor-pointer"
-              />
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-semibold text-[#1F251A]">{t.enableGpsShift}</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setActiveInfoFeature({
-                        title: t.enableGpsShiftInfoTitle || t.enableGpsShift,
-                        description: t.enableGpsShiftInfoDesc || "When enabled, employees and receptionists must be physically present inside the clinic branch location (within 800m-1000m) to clock in and start their daily shift. When disabled, staff can clock in and start shifts from anywhere without GPS restriction."
-                      });
-                    }}
-                    className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                    title={t.clickForInfo}
-                  >
-                    <Info size={13} />
-                  </button>
-                </div>
-                <span className="text-xs text-[#5A6A51]">{t.enableGpsShiftHint}</span>
               </div>
             </label>
           </div>
