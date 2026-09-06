@@ -784,18 +784,9 @@ export default function CustomerProfileDrawer({
               <div className="space-y-4">
                 {medicalRecordForm ? (
                   <div className="bg-white rounded-2xl border border-[#414E36]/10 p-6 space-y-6">
-                    <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-                      <div>
-                        <h4 className="text-sm font-bold text-[#1F251A]">{t.intakeFormTitle}</h4>
-                        <p className="text-xs text-[#5A6A51]">{t.intakeFormSubtitle}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleOpenMedicalFormModal}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
-                      >
-                        <Pencil size={12} /> {t.editFormBtn}
-                      </button>
+                    <div className="border-b border-[#414E36]/10 pb-3">
+                      <h4 className="text-sm font-bold text-[#1F251A]">{t.intakeFormTitle}</h4>
+                      <p className="text-xs text-[#5A6A51]">{t.intakeFormSubtitle}</p>
                     </div>
 
                     <div className="space-y-6 text-sm">
