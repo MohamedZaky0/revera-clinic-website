@@ -86,25 +86,75 @@ export async function GET(req: Request) {
       attendanceRecord = att;
     }
 
+    interface ShiftInterval {
+      start: string;
+      end?: string | null;
+    }
+
+    let intervals: ShiftInterval[] = [];
+    if (attendanceRecord?.notes) {
+      try {
+        const parsed = JSON.parse(attendanceRecord.notes);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.start) {
+          intervals = parsed;
+        } else if (parsed && Array.isArray(parsed.intervals) && parsed.intervals.length > 0) {
+          intervals = parsed.intervals;
+        }
+      } catch {
+        // Plain text notes, ignore JSON parsing
+      }
+    }
+
+    if (intervals.length === 0 && attendanceRecord?.check_in_time) {
+      intervals = [{
+        start: attendanceRecord.check_in_time,
+        end: attendanceRecord.check_out_time || null
+      }];
+    }
+
     let actualStartingTime = "--:--";
     let elapsedTime = "00h 00m";
     let elapsedSeconds = 0;
+    let pastSessionsSeconds = 0;
+    let currentSessionStart: string | null = null;
     let shiftStatus: "not_started" | "started" | "ended" = "not_started";
 
     if (attendanceRecord?.check_in_time) {
-      const checkInDate = new Date(attendanceRecord.check_in_time);
-      actualStartingTime = checkInDate.toLocaleTimeString("en-US", {
-        timeZone: "Africa/Cairo",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true
+      // Earliest check-in of the day
+      const earliestStart = intervals[0]?.start || attendanceRecord.check_in_time;
+      const checkInDate = new Date(earliestStart);
+      if (!isNaN(checkInDate.getTime())) {
+        actualStartingTime = checkInDate.toLocaleTimeString("en-US", {
+          timeZone: "Africa/Cairo",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true
+        });
+      }
+
+      const isOpen = !attendanceRecord.check_out_time;
+      const now = Date.now();
+
+      intervals.forEach((interval) => {
+        const sMs = new Date(interval.start).getTime();
+        if (isNaN(sMs)) return;
+
+        if (interval.end) {
+          const eMs = new Date(interval.end).getTime();
+          if (!isNaN(eMs) && eMs >= sMs) {
+            const sec = Math.floor((eMs - sMs) / 1000);
+            pastSessionsSeconds += sec;
+            elapsedSeconds += sec;
+          }
+        } else if (isOpen) {
+          currentSessionStart = interval.start;
+          if (now >= sMs) {
+            const currentLiveSec = Math.floor((now - sMs) / 1000);
+            elapsedSeconds += currentLiveSec;
+          }
+        }
       });
 
-      const endDate = attendanceRecord.check_out_time
-        ? new Date(attendanceRecord.check_out_time)
-        : new Date();
-
-      elapsedSeconds = Math.max(0, Math.floor((endDate.getTime() - checkInDate.getTime()) / 1000));
       const hours = Math.floor(elapsedSeconds / 3600);
       const mins = Math.floor((elapsedSeconds % 3600) / 60);
       const paddedHours = hours.toString().padStart(2, "0");
@@ -330,10 +380,13 @@ export async function GET(req: Request) {
         actualStartingTime,
         elapsedTime,
         elapsedSeconds,
+        pastSessionsSeconds,
+        currentSessionStart,
         status: shiftStatus,
         checkInTime: attendanceRecord?.check_in_time || null,
         checkOutTime: attendanceRecord?.check_out_time || null,
-        gpsShiftEnabled
+        gpsShiftEnabled,
+        intervalsCount: intervals.length
       },
       target: {
         targetAmount,
@@ -409,13 +462,8 @@ export async function POST(req: Request) {
 
       if (fetchError) throw fetchError;
 
-      if (existing?.check_out_time) {
-        return NextResponse.json(
-          { success: false, error: "Today's shift has already ended and cannot be restarted." },
-          { status: 409 }
-        );
-      }
-      if (existing?.check_in_time) {
+      // If already started and currently open:
+      if (existing?.check_in_time && !existing.check_out_time) {
         return NextResponse.json({ success: true, action: "start_shift", attendance: existing });
       }
 
@@ -523,6 +571,52 @@ export async function POST(req: Request) {
         }
       }
 
+      let intervals: { start: string; end?: string | null }[] = [];
+
+      // If restarting / opening another shift today
+      if (existing) {
+        if (existing.notes) {
+          try {
+            const parsed = JSON.parse(existing.notes);
+            if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.start) {
+              intervals = parsed;
+            } else if (parsed && Array.isArray(parsed.intervals)) {
+              intervals = parsed.intervals;
+            }
+          } catch {}
+        }
+        if (intervals.length === 0 && existing.check_in_time) {
+          intervals = [{
+            start: existing.check_in_time,
+            end: existing.check_out_time || null
+          }];
+        }
+        // If last interval was open, close it at nowIso before appending
+        if (intervals.length > 0 && !intervals[intervals.length - 1].end) {
+          intervals[intervals.length - 1].end = nowIso;
+        }
+        intervals.push({ start: nowIso, end: null });
+
+        const { data, error } = await supabaseServer
+          .from("hr_attendance")
+          .update({
+            check_out_time: null,
+            notes: JSON.stringify(intervals),
+            latitude: parsedLat ?? existing.latitude,
+            longitude: parsedLng ?? existing.longitude,
+            status: "Present"
+          })
+          .eq("id", existing.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return NextResponse.json({ success: true, action: "start_shift", attendance: data });
+      }
+
+      // First shift of the day
+      intervals = [{ start: nowIso, end: null }];
+
       const { data, error } = await supabaseServer
         .from("hr_attendance")
         .upsert(
@@ -531,9 +625,11 @@ export async function POST(req: Request) {
             date: todayStr,
             check_in_time: nowIso,
             check_out_time: null,
+            notes: JSON.stringify(intervals),
             latitude: parsedLat,
             longitude: parsedLng,
-            status: "Present"
+            status: "Present",
+            work_hours: 0
           },
           { onConflict: "employee_id,date" }
         )
@@ -562,11 +658,55 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, action: "end_shift", attendance: existing });
       }
 
+      let intervals: { start: string; end?: string | null }[] = [];
+      if (existing.notes) {
+        try {
+          const parsed = JSON.parse(existing.notes);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.start) {
+            intervals = parsed;
+          } else if (parsed && Array.isArray(parsed.intervals)) {
+            intervals = parsed.intervals;
+          }
+        } catch {}
+      }
+
+      if (intervals.length === 0) {
+        intervals = [{ start: existing.check_in_time, end: nowIso }];
+      } else {
+        let foundOpen = false;
+        for (let idx = intervals.length - 1; idx >= 0; idx--) {
+          if (!intervals[idx].end) {
+            intervals[idx].end = nowIso;
+            foundOpen = true;
+            break;
+          }
+        }
+        if (!foundOpen) {
+          intervals.push({ start: existing.check_in_time, end: nowIso });
+        }
+      }
+
+      // Calculate total work hours across all intervals
+      let totalSecondsWorked = 0;
+      intervals.forEach((inv) => {
+        if (inv.start && inv.end) {
+          const s = new Date(inv.start).getTime();
+          const e = new Date(inv.end).getTime();
+          if (!isNaN(s) && !isNaN(e) && e >= s) {
+            totalSecondsWorked += Math.floor((e - s) / 1000);
+          }
+        }
+      });
+      const totalWorkHours = Number((totalSecondsWorked / 3600).toFixed(2));
+
       const { data, error } = await supabaseServer
         .from("hr_attendance")
-        .update({ check_out_time: nowIso })
-        .eq("employee_id", empId)
-        .eq("date", todayStr)
+        .update({
+          check_out_time: nowIso,
+          notes: JSON.stringify(intervals),
+          work_hours: totalWorkHours
+        })
+        .eq("id", existing.id)
         .select()
         .single();
 

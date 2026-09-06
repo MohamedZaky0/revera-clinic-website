@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-09-05 (DEC-047)
+> **Last Updated:** 2026-09-06 (DEC-051)
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -1843,8 +1843,26 @@ In `src/app/api/availability/route.ts`:
    - `getDoctorDayConfig` now defaults to the clinic's operating hours (`{ isOpen: true, start: clinicStart, end: clinicEnd }`) when a doctor's custom `working_days_hours` is not explicitly configured in the database.
 2. **General Service Availability Fallback:**
    - When no specific provider is restricted to a service (`activeCompProviders.length === 0`), availability evaluates against clinical room capacity and clinic operating hours.
-3. **Branch Service Hours Priority:**
-   - `fetchCachedServiceHours` inspects active branch `service_hours` before falling back to footer defaults, ensuring only actual closed days (e.g. Friday) are marked closed.
 
+---
 
+## DEC-051: Multi-Shift Daily Start/End Cycle & Cumulative Interval Tracking
 
+**Date:** 2026-09-06
+**Status:** Decided & Implemented
+
+**Context:**
+Clinic receptionists and staff may have split shifts, mid-day breaks, or need to close and reopen their working shift multiple times within the same calendar day. Previously, `POST /api/reception/dashboard` with `start_shift` rejected any second start with a 409 conflict ("Today's shift has already ended and cannot be restarted").
+
+**Decisions & Implementation:**
+1. **Support Repeated Start/End Shift Actions in Same Day:**
+   - Removed the single-shift restriction on `start_shift`. Employees can now start, end, and restart their shifts multiple times per day.
+   - When restarting an ended shift, the system preserves the initial check-in timestamp (`actualStartingTime`) for daily reference and appends a new interval to `notes` (`[{ start: t1, end: t2 }, { start: t3, end: null }]`), clearing `check_out_time` to signify an active session.
+2. **Cumulative Elapsed Time & Work Hours:**
+   - On shift end (`end_shift`), the active interval is closed, and total daily duration across all closed intervals is summed into `work_hours` (e.g., `(t2-t1) + (t4-t3)`), ignoring break gaps.
+   - `GET /api/reception/dashboard` calculates cumulative elapsed seconds (`pastSessionsSeconds + liveActiveSessionSeconds`) ensuring 100% accurate time reporting without including time spent off-shift.
+3. **Live UI Synchronization in ReceptionDashboardView:**
+   - Updated the live timer in `ReceptionDashboardView.tsx` to compute elapsed time using `pastSessionsSeconds` plus the current sub-shift elapsed time.
+   - Updated modal prompt copy dynamically: when a shift was previously ended, the modal indicates resuming/starting a new shift session.
+4. **Diagnostic Verification:**
+   - Added test case `TC-044` (`Multi-Shift Daily Cycle & Interval Tracking Engine`) to `/admin` -> Settings -> System Test Suite.
