@@ -2512,7 +2512,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-039', name: 'Granular Role Permissions & Action-Level Access Control Engine', category: 'HR & Payroll', endpoint: '/api/roles', description: 'Validates system roles retrieval, permission structure integrity, and granular action-level access control matrix.', status: 'idle' },
     { id: 'TC-040', name: 'Availability Doctor & Inactive Status Filtering Engine', category: 'Services & Bookings', endpoint: '/api/availability', description: 'Verifies doctor slot availability engine, service name resolution, and inactive doctor exclusions.', status: 'idle' },
     { id: 'TC-041', name: 'Prescription Deduplication & Clinical Intake Engine', category: 'Medical & Patients', endpoint: '/api/prescriptions', description: 'Verifies doctor prescription generation, duplicate prevention on repeated saves, and intake templates.', status: 'idle' },
-    { id: 'TC-042', name: 'Shift Location Verification & Geofence Guard Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies strict geolocation boundary checks preventing out-of-location shift starts.', status: 'idle' }
+    { id: 'TC-042', name: 'Shift Location Verification & Geofence Guard Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies strict geolocation boundary checks preventing out-of-location shift starts.', status: 'idle' },
+    { id: 'TC-043', name: 'Staff Shift & GPS Geofence Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies GPS shift check enable/disable setting configuration and reception dashboard GPS requirement toggle.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -3210,6 +3211,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const [bookingMaxPerSlot, setBookingMaxPerSlot] = useState(3);
   const [bookingInstantApproval, setBookingInstantApproval] = useState(false);
   const [bookingShowDoctorNotes, setBookingShowDoctorNotes] = useState(true);
+  const [enableGpsShift, setEnableGpsShift] = useState(true);
   const [bookingDepositPercentage, setBookingDepositPercentage] = useState(20);
   const [savingBookingSettings, setSavingBookingSettings] = useState(false);
   
@@ -4012,6 +4014,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             setBookingMaxPerSlot(data.booking.maxPerSlot ?? 3);
             setBookingInstantApproval(data.booking.instantApproval ?? false);
             setBookingShowDoctorNotes(data.booking.showDoctorNotes ?? true);
+            setEnableGpsShift(data.booking.enableGpsShift ?? data.shift?.gpsShiftEnabled ?? true);
             setBookingDepositPercentage(data.booking.depositPercentage ?? 20);
             setBookingStaleSessionHours(data.booking.staleSessionHours ?? 2);
           }
@@ -4261,6 +4264,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             maxPerSlot: bookingMaxPerSlot,
             instantApproval: bookingInstantApproval,
             showDoctorNotes: bookingShowDoctorNotes,
+            enableGpsShift: enableGpsShift,
             depositPercentage: bookingDepositPercentage,
             staleSessionHours: bookingStaleSessionHours,
             termsText: termsText
@@ -4480,6 +4484,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         maxPerSlot: bookingMaxPerSlot,
         instantApproval: bookingInstantApproval,
         showDoctorNotes: bookingShowDoctorNotes,
+        enableGpsShift: enableGpsShift,
         depositPercentage: bookingDepositPercentage,
         termsText: overrideData?.booking?.termsText !== undefined ? overrideData.booking.termsText : termsText,
       }
@@ -6844,6 +6849,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               setBookingShowDoctorNotes={setBookingShowDoctorNotes}
               bookingStaleSessionHours={bookingStaleSessionHours}
               setBookingStaleSessionHours={setBookingStaleSessionHours}
+              enableGpsShift={enableGpsShift}
+              setEnableGpsShift={setEnableGpsShift}
               handleSaveBookingSettings={handleSaveBookingSettings}
               savingBookingSettings={savingBookingSettings}
               setActiveInfoFeature={setActiveInfoFeature}

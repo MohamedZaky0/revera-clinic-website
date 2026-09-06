@@ -144,16 +144,51 @@ export default function ReceptionDashboardView({
     };
   }, [dashboardData?.shift?.status, dashboardData?.shift?.checkInTime]);
 
-  // Execute Start Shift with geolocation check
-  const handleStartShiftWithLocation = () => {
+  // Execute Start Shift with geolocation check (or instant start if GPS check is disabled)
+  const handleStartShiftWithLocation = async () => {
     setLocationError(null);
+    setShiftProcessing(true);
 
-    if (typeof window === "undefined" || !navigator.geolocation) {
-      setLocationError("permission_denied");
+    const isGpsRequired = dashboardData?.shift?.gpsShiftEnabled !== false;
+
+    // Direct shift start if GPS verification is disabled in settings
+    if (!isGpsRequired) {
+      try {
+        const res = await fetch("/api/reception/dashboard", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+          },
+          body: JSON.stringify({
+            action: "start_shift",
+            employeeId,
+            email
+          })
+        });
+
+        const result = await res.json();
+        if (result.success) {
+          setShowStartShiftPopup(false);
+          setLocationError(null);
+          await fetchDashboardData();
+        } else {
+          setLocationError("generic");
+        }
+      } catch (err) {
+        console.error("Direct start shift error:", err);
+        setLocationError("generic");
+      } finally {
+        setShiftProcessing(false);
+      }
       return;
     }
 
-    setShiftProcessing(true);
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setLocationError("permission_denied");
+      setShiftProcessing(false);
+      return;
+    }
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {

@@ -307,6 +307,15 @@ export async function GET(req: Request) {
       console.warn("Failed to aggregate dynamic alerts:", e);
     }
 
+    // Load GPS shift verification setting
+    const { data: pageSettingsRow } = await supabaseServer
+      .from("page_settings")
+      .select("value")
+      .eq("key", "home")
+      .maybeSingle();
+    const pageSettings = pageSettingsRow?.value || {};
+    const gpsShiftEnabled = pageSettings?.booking?.enableGpsShift ?? pageSettings?.shift?.gpsShiftEnabled ?? true;
+
     return NextResponse.json({
       success: true,
       receptionist: {
@@ -323,7 +332,8 @@ export async function GET(req: Request) {
         elapsedSeconds,
         status: shiftStatus,
         checkInTime: attendanceRecord?.check_in_time || null,
-        checkOutTime: attendanceRecord?.check_out_time || null
+        checkOutTime: attendanceRecord?.check_out_time || null,
+        gpsShiftEnabled
       },
       target: {
         targetAmount,
@@ -409,11 +419,20 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, action: "start_shift", attendance: existing });
       }
 
+      // Check if GPS shift verification is enabled in page_settings
+      const { data: psRow } = await supabaseServer
+        .from("page_settings")
+        .select("value")
+        .eq("key", "home")
+        .maybeSingle();
+      const psVal = psRow?.value || {};
+      const gpsShiftEnabled = psVal?.booking?.enableGpsShift ?? psVal?.shift?.gpsShiftEnabled ?? true;
+
       let parsedLat: number | null = null;
       let parsedLng: number | null = null;
 
-      // Superadmin without branch bypasses location check
-      if (!isSuperadmin || employeeRecord?.branch_id) {
+      // When GPS shift check is enabled and not superadmin without branch:
+      if (gpsShiftEnabled && (!isSuperadmin || employeeRecord?.branch_id)) {
         if (latitude === undefined || longitude === undefined || latitude === null || longitude === null) {
           return NextResponse.json(
             { success: false, error: "location_permission_denied", message: "Location permission is required to start your shift." },
@@ -439,7 +458,7 @@ export async function POST(req: Request) {
         }
 
         // Fetch clinic branch(es) to check distance
-        let branchesQuery = supabaseServer.from("branches").select("id, name_en, latitude, longitude, maps_embed, maps_link");
+        let branchesQuery = supabaseServer.from("branches").select("id, name_en, name_ar, latitude, longitude, maps_embed, maps_link");
         if (employeeRecord?.branch_id) {
           branchesQuery = branchesQuery.eq("id", employeeRecord.branch_id);
         }
@@ -447,39 +466,45 @@ export async function POST(req: Request) {
         const { data: branchRows } = await branchesQuery;
         const validBranches = Array.isArray(branchRows) && branchRows.length > 0 ? branchRows : [];
 
-        // If no specific branch matched, try all branches
-        let candidateBranches = validBranches;
-        if (candidateBranches.length === 0) {
-          const { data: allBranches } = await supabaseServer
-            .from("branches")
-            .select("id, name_en, latitude, longitude, maps_embed, maps_link");
-          if (Array.isArray(allBranches)) candidateBranches = allBranches;
-        }
+        // Also fetch all active branches for fallback proximity check
+        const { data: allBranches } = await supabaseServer
+          .from("branches")
+          .select("id, name_en, name_ar, latitude, longitude, maps_embed, maps_link");
+        const candidateBranches = validBranches.length > 0 ? validBranches : (Array.isArray(allBranches) ? allBranches : []);
+        const fallbackCheckBranches = Array.isArray(allBranches) && allBranches.length > 0 ? allBranches : candidateBranches;
 
         let isInsideLocation = false;
         let minimumDistance = Infinity;
 
+        // Check primary candidate branches first
         for (const branch of candidateBranches) {
-          let coords = await resolveBranchCoordinates(branch);
-          if (!coords) {
-            const bName = String(branch.name_en || branch.id || "").toLowerCase();
-            if (bName.includes("zayed") || bName.includes("sheikh")) {
-              coords = { latitude: 30.0131, longitude: 30.9876 };
-            } else if (bName.includes("cairo") || bName.includes("tagamoa")) {
-              coords = { latitude: 30.0263, longitude: 31.4913 };
-            }
-          }
+          const coords = await resolveBranchCoordinates(branch);
           if (coords) {
             const dist = getDistanceInMeters(parsedLat, parsedLng, coords.latitude, coords.longitude);
             if (dist < minimumDistance) minimumDistance = dist;
-            if (dist <= 800) {
+            if (dist <= 1000) { // 1000m tolerance for urban & building GPS drift
               isInsideLocation = true;
               break;
             }
           }
         }
 
-        // If clinic branches exist and employee is outside allowed 800m working location:
+        // If not in primary candidate branch, check across all active clinic branches
+        if (!isInsideLocation && fallbackCheckBranches.length > 0) {
+          for (const branch of fallbackCheckBranches) {
+            const coords = await resolveBranchCoordinates(branch);
+            if (coords) {
+              const dist = getDistanceInMeters(parsedLat, parsedLng, coords.latitude, coords.longitude);
+              if (dist < minimumDistance) minimumDistance = dist;
+              if (dist <= 1000) {
+                isInsideLocation = true;
+                break;
+              }
+            }
+          }
+        }
+
+        // If clinic branches exist and employee is outside allowed working location:
         if (candidateBranches.length > 0 && !isInsideLocation) {
           return NextResponse.json(
             {
@@ -489,6 +514,12 @@ export async function POST(req: Request) {
             },
             { status: 400 }
           );
+        }
+      } else if (!gpsShiftEnabled) {
+        // When GPS check is disabled in settings, parse coordinates if supplied, but do not block
+        if (latitude !== undefined && longitude !== undefined && Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude))) {
+          parsedLat = Number(latitude);
+          parsedLng = Number(longitude);
         }
       }
 

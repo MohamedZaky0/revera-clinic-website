@@ -1776,3 +1776,29 @@ A comprehensive audit documented 28 core defects across User View, Admin View, D
 7. **System Test Suite Diagnostic Test Cases:**
    - Registered `TC-040` (Availability Doctor & Inactive Status Filtering), `TC-041` (Prescription Deduplication & Clinical Intake Mapping), and `TC-042` (Reception Shift Location Verification & Geofence Guard) under `/admin` -> Settings -> System Test Suite.
 
+---
+
+## DEC-048: Staff Shift GPS Location Verification Toggle in Settings & Geofence Tolerance Resolution
+
+**Date:** 2026-09-06
+**Status:** Decided & Implemented
+
+**Context:**
+Receptionists and staff clock into daily shifts via the Reception Dashboard (`/api/reception/dashboard`). In urban medical buildings and indoor clinics, GPS drift can produce coordinates offset by a few hundred meters. Furthermore, clinic management needed the ability to enable or disable the GPS location check requirement dynamically from Admin Settings (e.g. during technical issues, remote work, or GPS unavailability).
+
+**Decisions & Implementation:**
+1. **Admin Settings Toggle:**
+   - Added `enableGpsShift` toggle under `/admin` -> Settings -> Booking Settings (`BookingSettingsView.tsx`), with interactive Info explanation popup.
+   - Hydrated and saved under `page_settings` payload (`booking.enableGpsShift`), maintaining backward compatibility with `shift.gpsShiftEnabled`.
+   - Localized bilingual translations (EN/AR) in `src/components/admin/translations.ts`.
+2. **Reception Dashboard Dynamic GPS Handling:**
+   - `GET /api/reception/dashboard` returns `gpsShiftEnabled` in shift metadata.
+   - `ReceptionDashboardView.tsx`: If `gpsShiftEnabled === false`, completely bypasses browser geolocation prompts and starts shift immediately.
+   - `POST /api/reception/dashboard` (`start_shift` action): If `gpsShiftEnabled === false`, skips all location checks and records attendance.
+   - If `gpsShiftEnabled === true`, validates coordinates against assigned branch and all active clinic branches with a 1000m tolerance threshold.
+3. **Geofence Coordinate Parser & Fallbacks (`src/lib/geo.ts`):**
+   - Expanded Google Maps regex to decode embed, place pin, query, center, and coordinate URLs (`!2d`, `!3d`, `!4d`, `@lat,lng`, `q=lat,lng`, `place/lat,lng`, `daddr`, `ll`).
+   - Added known clinic branch coordinate fallbacks (Sheikh Zayed: `30.0131, 30.9876`, New Cairo: `30.0263, 31.4913`, Heliopolis, Maadi, Alexandria) if external maps link is missing or unresolvable.
+4. **Diagnostic Verification:**
+   - Added test case `TC-043` (`Staff Shift & GPS Geofence Settings Engine`) to `/admin` -> Settings -> System Test Suite.
+
