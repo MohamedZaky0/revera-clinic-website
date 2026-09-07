@@ -712,6 +712,7 @@ export default function DoctorAccountView({
       const headers = await getAuthHeaders();
       const payload: any = {
         customer_id: custId,
+        reservation_id: targetBooking.id,
         patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
         skin_type: customData?.skin_type || formSkinType,
         allergies: customData?.allergies || formAllergies,
@@ -890,6 +891,7 @@ export default function DoctorAccountView({
             headers,
             body: JSON.stringify({
               customer_id: custId,
+              reservation_id: targetBooking.id,
               patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
               skin_type: formSkinType || "Normal",
               allergies: formAllergies,

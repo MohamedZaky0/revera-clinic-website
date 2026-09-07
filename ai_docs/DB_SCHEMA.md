@@ -51,7 +51,7 @@ providers (doctors)
 customers
   └──< reservations (customer_id FK, nullable)
   └──< prescriptions (customer_id FK)
-  └──< medical_records (customer_id FK, unique — one row per customer)
+  └──< medical_records (customer_id FK + reservation_id FK, unique per (customer_id, reservation_id) — one row per visit, plus one reservation_id-less profile row)
   └──< medical_reports (customer_id FK)
   └──< customer_product_balances (customer_id FK)
 
@@ -754,12 +754,25 @@ inserts into `device_maintenance_history`. Note also that reset-pulses reads its
 
 **Backfilled 2026-07-25.** Was schema drift (queried by code, no migration file) from
 2026-07-21 to 2026-07-25 — see `supabase/migrations/20260725120000_backfill_medical_and_product_balance_tables.sql`.
-One row per customer — medical intake form, upserted on `customer_id`.
+
+**Changed 2026-09-07 (RISK-081 / CORRUPT-D03):** was `UNIQUE(customer_id)` — one row per customer,
+period — so a second visit's intake silently overwrote the first visit's baseline data with no way
+to recover it. See `supabase/migrations/20260907000000_add_reservation_id_to_medical_records.sql`.
+Now `UNIQUE(customer_id, reservation_id)`: one row per **visit** when `reservation_id` is set (each
+visit's own repeated auto-saves update that one row), plus at most one `reservation_id IS NULL` row
+per customer for the visit-independent "patient profile" edit (`MedicalFormModal.tsx`, opened from
+the customer profile page, not tied to any booking). Postgres never matches `NULL` against `NULL`
+for `ON CONFLICT`, so the API layer (`src/app/api/medical-records/route.ts`) branches: a save with a
+`reservation_id` uses `.upsert(onConflict: 'customer_id,reservation_id')`; a save without one
+manually finds-or-inserts the customer's `reservation_id IS NULL` row instead. `GET` defaults to the
+most-recently-updated row for a customer (doctor prefill wants the patient's latest baseline); pass
+`?reservationId=` to fetch one specific visit's row.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID | Primary key |
-| `customer_id` | UUID | NOT NULL, UNIQUE — FK → customers.id, cascade delete; upsert `onConflict` target |
+| `customer_id` | UUID | NOT NULL — FK → customers.id, cascade delete |
+| `reservation_id` | UUID | Nullable — FK → reservations.id, `ON DELETE SET NULL`. `NULL` = visit-independent patient-profile row |
 | `skin_type` | text | Default `'Normal'` |
 | `main_concerns` | text[] | Default `{}` |
 | `other_concerns_details` | text | Default `''` |
@@ -774,6 +787,9 @@ One row per customer — medical intake form, upserted on `customer_id`.
 | `created_by_name` | text | Default `'Staff'` |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
+
+UNIQUE constraint: `medical_records_customer_id_reservation_id_key` on `(customer_id, reservation_id)`
+— the upsert `onConflict` target when `reservation_id` is present.
 
 Confirmed wired via `/api/medical-records` (GET/POST). Falls back to `data/medical_records.json`
 on Supabase error — a plain file fallback, not the `page_settings` dual-storage pattern.
