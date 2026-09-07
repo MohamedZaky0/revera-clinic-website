@@ -880,13 +880,15 @@ export async function POST(req: Request) {
 
     // Fetch service details for price calculation
     let servicePrice = 0;
+    let bookingDurationMinutes = 30;
     try {
       const { data: svc } = await supabaseServer
         .from('services')
-        .select('price, branch_pricing')
+        .select('price, branch_pricing, duration, duration_minutes')
         .eq('id', Number(serviceId))
         .maybeSingle();
       if (svc) {
+        bookingDurationMinutes = getServiceDurationMinutes(svc);
         let targetBranchName: string | null = null;
         if (branchId) {
           // Two bugs lived here, and together they meant branch pricing was never applied
@@ -951,7 +953,59 @@ export async function POST(req: Request) {
       if (body.roomId || body.room_id) {
         assignedRoomId = body.roomId || body.room_id;
       } else if (compRoomIds && compRoomIds.length > 0) {
+        // CORRUPT-A03 / RISK-081: picking compRoomIds[0] unconditionally let two manual bookings
+        // land in the same room at overlapping times with no warning. Prefer a room with no
+        // existing overlapping booking on this date; fall back to the first compatible room only
+        // if every one of them is genuinely occupied, so reception can still save the booking.
         assignedRoomId = compRoomIds[0];
+        const normReqTime = requestedTime ? normaliseTo24hSlot(requestedTime) : null;
+        if (date && normReqTime) {
+          try {
+            const startIdx = ALL_15MIN_SLOTS.indexOf(normReqTime);
+            const targetSlotsCount = Math.max(1, Math.ceil(bookingDurationMinutes / 15));
+            const { data: dayRoomBookingsRaw } = await supabaseServer
+              .from('reservations')
+              .select('room_id, time_slot, service_id, status')
+              .eq('date', date)
+              .in('room_id', compRoomIds);
+            const dayRoomBookings = (dayRoomBookingsRaw || []).filter(
+              (b: any) => b.status !== 'cancelled' && b.status !== 'rejected'
+            );
+
+            if (startIdx !== -1 && dayRoomBookings.length > 0) {
+              const svcIds = Array.from(new Set(dayRoomBookings.map((b: any) => b.service_id).filter((id: any) => id != null)));
+              const durationMap = new Map<number, number>();
+              if (svcIds.length > 0) {
+                const { data: svcRows } = await supabaseServer
+                  .from('services')
+                  .select('id, duration, duration_minutes')
+                  .in('id', svcIds);
+                (svcRows || []).forEach((s: any) => durationMap.set(s.id, getServiceDurationMinutes(s)));
+              }
+
+              const isRoomFree = (roomId: string) => {
+                const roomBookings = dayRoomBookings.filter((b: any) => b.room_id === roomId);
+                return !roomBookings.some((rb: any) => {
+                  const rbNorm = normaliseTo24hSlot(rb.time_slot);
+                  if (!rbNorm) return false;
+                  const rbIdx = ALL_15MIN_SLOTS.indexOf(rbNorm);
+                  if (rbIdx === -1) return false;
+                  const rbSlotsCount = Math.max(1, Math.ceil((durationMap.get(rb.service_id) ?? 30) / 15));
+                  return rbIdx < startIdx + targetSlotsCount && startIdx < rbIdx + rbSlotsCount;
+                });
+              };
+
+              const freeRoom = compRoomIds.find(isRoomFree);
+              if (freeRoom) {
+                assignedRoomId = freeRoom;
+              } else {
+                console.warn('No free compatible room for manual booking at', date, normReqTime, '- assigning first compatible room anyway:', compRoomIds[0]);
+              }
+            }
+          } catch (e) {
+            console.warn('Room collision check failed for manual booking, assigning first compatible room:', e);
+          }
+        }
       }
     }
 
