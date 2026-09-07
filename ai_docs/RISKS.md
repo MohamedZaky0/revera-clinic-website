@@ -2900,6 +2900,24 @@ department-guess shape as F-2) is unchanged — it's a read, not a mutation, and
 `TEST_COVERAGE_INVENTORY.md` §2 called for it. Worth revisiting if HR ever needs to distinguish
 "which specific receptionist's dashboard" via GET without an explicit `employeeId`.
 
+**2026-09-07 update — F-3's 409 rejection was deliberately superseded, not broken.** Commit
+`bd55d49` ("allow starting and ending shifts multiple times per day with interval tracking") added
+legitimate support for a receptionist leaving and coming back the same day (lunch, a mid-day
+errand). `start_shift` on an already-ended shift no longer returns 409 — it reopens the row
+(`check_out_time: null`) and starts a new interval, but the interval that already ended is not
+lost: it's preserved as an entry in a `notes` JSON array (`GET`'s status/summary logic already read
+this array back to compute total worked time and earliest start). The original F-3 bug was real
+data loss with no record of the ended shift; this is a deliberate, recorded re-open. The test this
+session originally wrote to prove F-3 fixed
+(`start_shift on an already-ended shift does not erase check_out_time`, asserting a straight 409)
+was consequently failing — not because the fix regressed, but because the contract it tested
+changed underneath it, and the test also predated the GPS shift-verification gate added since
+(`49de5d4`/`9a2e1f6`), which now sits in front of this exact code path and returns 400 for missing
+coordinates before the interval logic is ever reached. Rewrote it to assert the current contract:
+200, `check_out_time` reset to `null`, and the prior interval intact inside `notes` — with GPS
+disabled via a seeded `page_settings` row so the test again isolates F-3's own behavior instead of
+tripping the (separately covered) location gate.
+
 ---
 
 ## RISK-063: Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff (RESOLVED)

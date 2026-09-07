@@ -186,21 +186,33 @@ describe('POST start_shift / end_shift', () => {
   });
 });
 
-// ── F-3: start_shift must not wipe an existing check_out_time ────────────────
+// ── F-3: start_shift must not silently destroy an already-ended shift's data ──
+// Superseded by the "multiple shifts per day" feature (commit bd55d49): starting a shift after
+// an earlier one ended the same day is now a deliberate, supported action (a receptionist who
+// left for lunch and comes back), not an error. The original F-3 bug was that check_out_time got
+// wiped with no record of the shift that just ended; the fix isn't to block the re-start, it's to
+// preserve that ended interval — which now happens via the `notes` interval-history JSON instead
+// of the single check_in_time/check_out_time pair.
 
 describe('F-3 — start_shift idempotency', () => {
-  it('start_shift on an already-ended shift does not erase check_out_time', async () => {
+  it('start_shift on an already-ended shift opens a new interval without losing the ended one', async () => {
     seedReceptionAuth();
+    fake.seed('page_settings', [{ key: 'home', value: { inactivity: { enableGpsShift: false } } }]);
     mockDb.hr_attendance.push({
       id: 'att-1', employee_id: EMP_RECEPTION_A, date: TODAY,
       check_in_time: '2026-08-19T07:00:00.000Z', check_out_time: '2026-08-19T15:00:00.000Z', status: 'Present',
     });
 
     const res = await POST(authedReq('reception-token', { body: { action: 'start_shift' } }));
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(200);
 
     const row = mockDb.hr_attendance.find((r) => r.employee_id === EMP_RECEPTION_A && r.date === TODAY);
-    expect(row!.check_out_time).toBe('2026-08-19T15:00:00.000Z');
+    // The shift is open again (a new interval started) ...
+    expect(row!.check_out_time).toBeNull();
+    // ... but the interval that already ended at 15:00 is still there, not overwritten.
+    const intervals = JSON.parse(row!.notes);
+    expect(intervals[0]).toEqual({ start: '2026-08-19T07:00:00.000Z', end: '2026-08-19T15:00:00.000Z' });
+    expect(intervals[1].end).toBeNull();
   });
 
   it('re-firing start_shift while already in progress is a harmless no-op', async () => {
