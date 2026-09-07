@@ -442,21 +442,35 @@ one reads (traced from source):
 
 `src/lib/auth.ts` and `src/lib/access.ts` gate everything.
 
-**Covered** — `tests/routes/auth-sweep.test.ts`: a single table-driven registry over 149 of the
-153 handlers, asserting two dimensions per guarded route — no token → 401, and an authenticated
-non-staff (patient) session → 403 — plus a "confirmed-public reads stay public" check for the
-handful that are intentionally unguarded. 286 assertions from one registry, not 153 hand-written
-tests, and it fails loudly the moment a new route is added without updating the registry (a sanity
-test pins the exact row count).
+**Covered** — `tests/routes/auth-sweep.test.ts`: a single table-driven registry over all 153
+route/method handlers, asserting two dimensions per guarded route — no token → 401, and an
+authenticated non-staff (patient) session → 403 — plus a "confirmed-public reads stay public"
+check (`not 401, not 403`) for the 14 rows that are intentionally unguarded. 295 assertions from
+one registry, not 153 hand-written tests, and it fails loudly the moment a new route is added
+without updating the registry (a sanity test pins the exact row count at 153). **The `'public'`
+assertion is weak by construction** (`not 401, not 403` — not "actually 200") — see the
+2026-09-07 correction below for how that let a real regression (`/api/health/supabase`) sit
+undetected for over a week.
 
 **A note on `CLAUDE.md` rule 3:** it states `/api/*` routes are not auth-validated server-side. This
 sweep found that to be **out of date** — every route file now calls a guard except the confirmed
 intentionally-public ones (`/api/auth/employee-email`, `/api/branches` GET, `/api/services` GET,
 `/api/terms` GET, `/api/providers` GET, `/api/page-settings` GET, `/api/packages` GET,
-`/api/availability`, `/api/health/supabase`, `/api/customer-avatars` GET — each either explicitly
-commented "public" or plainly needed by the unauthenticated marketing site). `/api/reception/
-dashboard`'s hole (F-1/F-2/F-3) was fixed 2026-08-19, see RISK-059. Rule 3 in `CLAUDE.md` should be
-rewritten to reflect this.
+`/api/availability`, `/api/customer-avatars` GET — each either explicitly commented "public" or
+plainly needed by the unauthenticated marketing site). `/api/reception/dashboard`'s hole
+(F-1/F-2/F-3) was fixed 2026-08-19, see RISK-059. Rule 3 in `CLAUDE.md` should be rewritten to
+reflect this.
+
+**2026-09-07 correction:** `/api/health/supabase` was listed above as confirmed-public in this
+file's own earlier text, and the sweep's registry itself still had it as
+`M('GET', HealthSupabase.GET, 'public', { noArgs: true })` — both stale. RISK-080 (2026-08-30) added
+`requireAdministratorAccess` to it (it was previously leaking the first characters of the Supabase
+service-role key with zero auth). The registry's `'public'` assertion (`not 401, not 403`) never
+caught the drift because calling the route's new `GET(req: Request)` signature with `noArgs: true`
+throws inside `requireStaffAccess`, which its own try/catch turns into a 500 — satisfying "not 401,
+not 403" for the wrong reason instead of failing loudly. Registry entry corrected to `'admin'`
+(now 295 assertions, was 286/294 depending on when counted); this route no longer belongs in the
+public list above.
 
 **New finding from building the sweep — RISK-063 (open):** `POST /api/hr/alerts`,
 `POST`/`PATCH /api/hr/attendance`, and `POST /api/hr/leaves` each inline a check for *a valid

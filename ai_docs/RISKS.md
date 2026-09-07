@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **57 resolved** · 77 tracked total.
+**7 open** · **13 partially resolved** · **58 resolved** · 78 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -1097,6 +1097,7 @@ cannot reproduce for new sessions again.
 - [RISK-079](#risk-079) — New Reports & Analytics Panel Silently Shows Fabricated Demo Numbers Whenever Real Data Is Genuinely Zero (RESOLVED)
 - [RISK-078](#risk-078) — Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It (RESOLVED — body still filed under Open above, see there)
 - [RISK-080](#risk-080) — Two API Routes Reachable Without Any Session: Patient Roster Read/Write And Supabase Infrastructure Disclosure (RESOLVED)
+- [RISK-082](#risk-082) — `auth-sweep.test.ts`'s Weak "Public" Assertion Let `/api/health/supabase`'s RISK-080 Fix Go Unverified For A Week (RESOLVED)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -3741,6 +3742,51 @@ Revisit if staff report targeted phishing.
 - Added Arabic category name input field (`Category Name (Arabic)` / `اسم الفئة (عربي)`) bound to `newCategoryNameAr`.
 - Updated save handler to persist `ar: newCategoryNameAr.trim()`.
 - Added localized translations in `src/components/admin/translations.ts`.
+
+---
+
+## RISK-082: `auth-sweep.test.ts`'s Weak "Public" Assertion Let `/api/health/supabase`'s RISK-080 Fix Go Unverified For A Week (RESOLVED)
+
+**Severity:** Medium · **Type:** Test reliability / false confidence
+**Found:** 2026-09-07, during a documentation-currency pass over `SECURITY.md` and
+`TEST_COVERAGE_INVENTORY.md` prompted by Mohamed asking to bring every doc up to date before
+merging `dev` → `main`.
+**Fixed:** same day.
+
+**What happened:** `tests/routes/auth-sweep.test.ts`'s registry still had
+`{ path: '/api/health/supabase', methods: [M('GET', HealthSupabase.GET, 'public', { noArgs: true })] }`
+— unchanged since before RISK-080 (2026-08-30) added `requireAdministratorAccess` to that route.
+Before RISK-080, `GET()` took no arguments at all, so `noArgs: true` correctly called it bare. After
+RISK-080, the signature became `GET(req: Request)` with a *required* `req`; calling it with none
+means `requireAdministratorAccess(undefined)` → `requireStaffAccess(undefined)` throws on
+`req.headers.get(...)`, which that function's own `try/catch` turns into
+`{ error: "Unable to verify staff access.", status: 500 }` rather than letting it propagate.
+
+The sweep's `'public'` assertion is `expect(res.status).not.toBe(401); expect(res.status).not.toBe(403);`
+— deliberately weak (it never checks for an actual 200), because some public routes return other
+non-error shapes. A 500 satisfies "not 401, not 403" exactly as well as a 200 would. So the row kept
+passing, silently proving nothing, for the entire week between RISK-080 landing and this pass —
+`SECURITY.md` and `TEST_COVERAGE_INVENTORY.md` also both still listed `/api/health/supabase` in
+their "confirmed intentionally public" prose, compounding the drift: the test, the docs, and the
+route's actual behavior had all quietly diverged from each other.
+
+**Fix:** re-pointed the registry row to `M('GET', HealthSupabase.GET, 'admin')` — the sweep now
+actually exercises the real signature and asserts the real boundary (401 with no token, 403 for an
+authenticated non-staff/patient token). Total registered rows unchanged (153, the sweep's own
+sanity check); assertion count went from 294 to 295 (one `'public'` row's single "stays public"
+check replaced by an `'admin'` row's two boundary checks). Corrected the matching stale prose in
+both `SECURITY.md` §3 (full per-route re-verification while at it — every route that file's 2026-08-03
+snapshot listed as unauthenticated has since been fixed; see RISK-078/RISK-080 references added
+there) and `TEST_COVERAGE_INVENTORY.md` §10.
+
+**Verification:** `npx vitest run tests/routes/auth-sweep.test.ts` — 295 passing (was 294). Full
+suite: 762 passing / 6 expected-fail (was 761/6). `npx tsc --noEmit` clean.
+
+**Lesson for future sweep rows:** a `'public'` assertion this weak is only safe for routes that are
+*supposed* to stay unauthenticated forever (marketing/booking-widget reads). Any row added because a
+route *doesn't have a guard yet* — as opposed to *deliberately never will* — is a landmine: the
+moment someone adds a guard and doesn't update the registry, the row keeps "passing" instead of
+failing loudly, exactly backwards from what a regression-catching test should do.
 
 ---
 
