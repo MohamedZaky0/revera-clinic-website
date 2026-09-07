@@ -703,6 +703,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // CORRUPT-U06: the public booking flow now lets a patient add more than one service to the
+    // same session. serviceId stays the required "primary" service (every existing caller, and
+    // every downstream single-service assumption elsewhere in this file, keeps working unchanged);
+    // additionalServiceIds is the new, optional list of extra services on top of it.
+    const additionalServiceIds: number[] = Array.isArray(body.additionalServiceIds)
+      ? body.additionalServiceIds.map((id: any) => Number(id)).filter((id: number) => Number.isFinite(id) && id !== Number(serviceId))
+      : [];
+    const allServiceIds = [Number(serviceId), ...additionalServiceIds];
+
     // 1. Reject past dates / times
     if (requestedTime && isPastDateTime(date, requestedTime)) {
       return NextResponse.json(
@@ -864,59 +873,73 @@ export async function POST(req: Request) {
       console.error('Customer integration error:', custErr);
     }
 
-    // Fetch compatible rooms for this service
+    // Fetch compatible rooms — a multi-service session needs a room every selected service maps
+    // to (intersection), not just the primary one.
     let compRoomIds: string[] = [];
     try {
       const { data: sRooms } = await supabaseServer
         .from('service_rooms')
-        .select('room_id')
-        .eq('service_id', Number(serviceId));
+        .select('room_id, service_id')
+        .in('service_id', allServiceIds);
       if (sRooms && sRooms.length > 0) {
-        compRoomIds = sRooms.map((sr: any) => sr.room_id);
+        const byService = new Map<number, string[]>();
+        for (const sr of sRooms as any[]) {
+          const list = byService.get(sr.service_id) || [];
+          list.push(sr.room_id);
+          byService.set(sr.service_id, list);
+        }
+        const roomIdSets = allServiceIds.map((id) => byService.get(id) || []).filter((ids) => ids.length > 0);
+        if (roomIdSets.length > 0) {
+          compRoomIds = roomIdSets.reduce((acc, ids) => acc.filter((id) => ids.includes(id)));
+        }
       }
     } catch (e) {
       console.warn("Could not load service compatible rooms:", e);
     }
 
-    // Fetch service details for price calculation
+    // Resolve branch name once, reused for every selected service's price lookup below.
+    let targetBranchName: string | null = null;
+    if (branchId) {
+      // Two bugs lived here, and together they meant branch pricing was never applied
+      // server-side (RISK-011): the filter was `.eq('id', Number(branchId))` against a
+      // uuid column, which is always NaN, and it selected a `name` column that does not
+      // exist — branches has name_en / name_ar. The query error was discarded, which is
+      // why it stayed invisible.
+      try {
+        const { data: bObj, error: branchErr } = await supabaseServer
+          .from('branches')
+          .select('name_en, name_ar')
+          .eq('id', branchId)
+          .maybeSingle();
+
+        if (branchErr) {
+          console.error('Branch lookup for pricing failed:', branchErr.message);
+        } else if (bObj) {
+          targetBranchName = bObj.name_en || bObj.name_ar || null;
+        } else {
+          console.warn('No branch found for pricing lookup:', branchId);
+        }
+      } catch (e) {
+        console.error('Branch lookup for pricing failed:', e);
+      }
+    }
+
+    // Fetch service details for price + duration — summed across every selected service
+    // (CORRUPT-U06: a session can now carry more than one service).
     let servicePrice = 0;
     let bookingDurationMinutes = 30;
     try {
-      const { data: svc } = await supabaseServer
+      const { data: svcs } = await supabaseServer
         .from('services')
-        .select('price, branch_pricing, duration, duration_minutes')
-        .eq('id', Number(serviceId))
-        .maybeSingle();
-      if (svc) {
-        bookingDurationMinutes = getServiceDurationMinutes(svc);
-        let targetBranchName: string | null = null;
-        if (branchId) {
-          // Two bugs lived here, and together they meant branch pricing was never applied
-          // server-side (RISK-011): the filter was `.eq('id', Number(branchId))` against a
-          // uuid column, which is always NaN, and it selected a `name` column that does not
-          // exist — branches has name_en / name_ar. The query error was discarded, which is
-          // why it stayed invisible.
-          const { data: bObj, error: branchErr } = await supabaseServer
-            .from('branches')
-            .select('name_en, name_ar')
-            .eq('id', branchId)
-            .maybeSingle();
+        .select('id, price, branch_pricing, duration, duration_minutes')
+        .in('id', allServiceIds);
 
-          if (branchErr) {
-            console.error('Branch lookup for pricing failed:', branchErr.message);
-          } else if (bObj) {
-            targetBranchName = bObj.name_en || bObj.name_ar || null;
-          } else {
-            console.warn('No branch found for pricing lookup:', branchId);
-          }
-        }
-
-        const mappedService = {
-          price: svc.price !== null ? Number(svc.price) : 0,
-          branchPricing: svc.branch_pricing
-        };
-
-        servicePrice = getEffectiveServicePrice(mappedService, targetBranchName);
+      if (svcs && svcs.length > 0) {
+        bookingDurationMinutes = svcs.reduce((sum: number, s: any) => sum + getServiceDurationMinutes(s), 0);
+        servicePrice = svcs.reduce((sum: number, s: any) => {
+          const mappedService = { price: s.price !== null ? Number(s.price) : 0, branchPricing: s.branch_pricing };
+          return sum + getEffectiveServicePrice(mappedService, targetBranchName);
+        }, 0);
       }
     } catch (e) {
       console.error("Could not fetch service details for price calculation:", e);
@@ -1012,6 +1035,7 @@ export async function POST(req: Request) {
     // 2. Insert reservation linked to customer
     const insertPayload: any = {
       service_id: Number(serviceId),
+      service_ids: allServiceIds,
       date,
       requested_time: requestedTime || null,
       name,

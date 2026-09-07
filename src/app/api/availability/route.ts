@@ -155,6 +155,14 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const params = url.searchParams;
   const serviceId = params.get('serviceId');
+  // CORRUPT-U06: the public booking flow now supports selecting more than one service in a single
+  // session (serviceIds, comma-separated) alongside the original single-service serviceId. Falls
+  // back to [serviceId] when serviceIds isn't passed, so every existing single-service caller is
+  // unaffected.
+  const serviceIdsParam = params.get('serviceIds');
+  const requestedServiceIds = serviceIdsParam
+    ? serviceIdsParam.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n))
+    : (serviceId ? [Number(serviceId)] : []);
   const branchId = params.get('branchId');
   const sessionType = params.get('sessionType') || 'in_person';
 
@@ -183,29 +191,40 @@ export async function GET(req: Request) {
     }
 
     let targetDuration = 30; // default 30 mins
-    let selectedServiceNameEn = '';
-    if (serviceId) {
-      const selectedSvc = dbServices.find((s: any) => s.id === Number(serviceId));
-      if (selectedSvc) {
-        if (selectedSvc.duration_minutes || selectedSvc.duration) {
-          targetDuration = getServiceDurationMinutes(selectedSvc);
-        }
-        selectedServiceNameEn = selectedSvc.en || selectedSvc.name || '';
-        if (!selectedServiceNameEn) {
-          try {
-            const { data: fullSvc } = await supabaseServer
-              .from('services')
-              .select('en, name')
-              .eq('id', Number(serviceId))
-              .maybeSingle();
-            if (fullSvc) {
-              selectedServiceNameEn = (fullSvc as any).en || (fullSvc as any).name || '';
-            }
-          } catch (e) {
-            console.warn("Could not load service details for name:", e);
+    const selectedServiceNamesEn: string[] = [];
+    if (requestedServiceIds.length > 0) {
+      let summedDuration = 0;
+      const selectedSvcs = requestedServiceIds
+        .map((id) => dbServices.find((s: any) => s.id === id))
+        .filter((s): s is any => Boolean(s));
+
+      for (const s of selectedSvcs) {
+        summedDuration += getServiceDurationMinutes(s);
+        const name = s.en || s.name || '';
+        if (name) selectedServiceNamesEn.push(name);
+      }
+
+      // A requested id not found in the cached services list (rare — cache staleness) falls back
+      // to a per-id lookup, same as the original single-service code did.
+      const missingIds = requestedServiceIds.filter((id) => !selectedSvcs.some((s) => s.id === id));
+      for (const missingId of missingIds) {
+        try {
+          const { data: fullSvc } = await supabaseServer
+            .from('services')
+            .select('en, name, duration, duration_minutes')
+            .eq('id', missingId)
+            .maybeSingle();
+          if (fullSvc) {
+            const name = (fullSvc as any).en || (fullSvc as any).name || '';
+            if (name) selectedServiceNamesEn.push(name);
+            summedDuration += getServiceDurationMinutes(fullSvc);
           }
+        } catch (e) {
+          console.warn("Could not load service details for name:", e);
         }
       }
+
+      if (summedDuration > 0) targetDuration = summedDuration;
     }
 
     // Fetch service hours for this branch
@@ -217,12 +236,15 @@ export async function GET(req: Request) {
       dbRooms = [{ id: '00000000-0000-0000-0000-000000000000', name: 'Virtual Clinical Room', branch_id: branchId }];
     }
 
-    // Fetch service rooms compatibility (cached)
+    // Fetch service rooms compatibility (cached) — a multi-service session needs one room that
+    // every selected service is mapped to (intersection), not just any one of them.
     let activeCompRooms: { id: string; name: string }[] = [];
-    if (serviceId) {
-      const compRoomIds = await fetchCachedServiceRooms(Number(serviceId));
-      if (compRoomIds.length > 0) {
-        activeCompRooms = dbRooms.filter((r: any) => compRoomIds.includes(r.id));
+    if (requestedServiceIds.length > 0) {
+      const roomIdSets = await Promise.all(requestedServiceIds.map((id) => fetchCachedServiceRooms(id)));
+      const nonEmptySets = roomIdSets.filter((ids) => ids.length > 0);
+      if (nonEmptySets.length > 0) {
+        const intersection = nonEmptySets.reduce((acc, ids) => acc.filter((id: string) => ids.includes(id)));
+        activeCompRooms = dbRooms.filter((r: any) => intersection.includes(r.id));
       }
       if (activeCompRooms.length === 0) {
         activeCompRooms = dbRooms;
@@ -254,9 +276,10 @@ export async function GET(req: Request) {
           return false;
         }
       }
-      // Service compatibility check
-      if (selectedServiceNameEn && provider.services && provider.services.length > 0) {
-        if (!provider.services.includes(selectedServiceNameEn)) {
+      // Service compatibility check — a multi-service session needs one doctor who covers every
+      // selected service, not just the first one.
+      if (selectedServiceNamesEn.length > 0 && provider.services && provider.services.length > 0) {
+        if (!selectedServiceNamesEn.every((name) => provider.services.includes(name))) {
           return false;
         }
       }

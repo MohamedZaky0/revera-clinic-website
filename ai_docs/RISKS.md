@@ -27,7 +27,7 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 - [RISK-020](#risk-020) — Migrations Are Not Tracked As Applied, And Two Databases Have Diverged
 - [RISK-053](#risk-053) — New Cairo Branch's Working Hours Were Never Actually Configured
 - [RISK-058](#risk-058) — Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
-- [RISK-081](#risk-081) — `SYSTEM_CORRUPTIONS_AND_AUDIT.md` Marks 10 Of Its 30 Cataloged Defects "Fixed" When They Are Not (partially — `U06` and the scope-decision items remain open)
+- [RISK-081](#risk-081) — `SYSTEM_CORRUPTIONS_AND_AUDIT.md` Marks 10 Of Its 30 Cataloged Defects "Fixed" When They Are Not (partially — `A01`/`A05`/`A06`/`A07` scope decisions remain open)
 
 ## RISK-001: Duplication Friction (hardcoded Revera-specific values)
 
@@ -453,6 +453,25 @@ table:
    useState<number | null>(...)` — a single scalar, not an array. The public booking flow cannot
    book multiple services in one session; `/admin` and `/api/reservations` still support arrays
    that the public UI has no way to populate.
+   **RESOLVED (commit pending push).** Added `additionalServiceIds: number[]` alongside the
+   existing required `serviceId` (kept as the "primary" service so every downstream single-service
+   assumption in this 1900-line component stays correct) — a pill picker under the service dropdown
+   lets a patient add more services to the same session. `totalDurationMinutes` and
+   `effectiveServicePrice` now sum across every selected service; the two doctor-compatibility
+   filters (`getDayOperatingHours`, `getAvailableDoctors`) now require a doctor cover *all* selected
+   services, not just the primary. `src/app/api/availability/route.ts` accepts a new
+   `serviceIds` (comma-separated) param — sums duration, requires one doctor covering every
+   requested service, and intersects each service's compatible-rooms list (a room must support all
+   of them). `POST /api/reservations` accepts `additionalServiceIds`, sums price/duration across
+   `[serviceId, ...additionalServiceIds]`, writes the full `service_ids` array (the column
+   `/admin` and the PATCH handler already read), and the room-intersection logic there was extended
+   the same way. Verified end-to-end in a live browser: selecting 2 services showed a combined
+   "Total duration: 60 min · Total: EGP 220" (60 = 30+30, 220 = 170+50 for the two seeded services),
+   the `/api/availability` network requests correctly carried `serviceIds=1,2`, the confirmation
+   screen listed both service names, the deposit (5%) was computed against the combined total, and
+   the created reservation's response showed `serviceId:1, serviceIds:[1,2], amountLeft:220`. 4 new
+   backend tests (`reservations-multi-service.test.ts`) cover price/duration summation, dedup of a
+   duplicate id, and that `serviceId` stays the first entry for single-service readers.
 
 **Also worth recording — `CORRUPT-D07`'s stated root cause is fabricated.** The doc claims the 9
 failing tests in `tests/components/doctor/DoctorProfileDetailsView.test.tsx` were caused by
@@ -471,11 +490,10 @@ observed.
 counter. Treat this file's status column as a claim to verify, not a fact, same as any commit
 message.
 
-**Fix:** in progress — tracked by CORRUPT-ID above. `A03` and `D03` are resolved (see their
-sub-entries above). `A01` and `A05`/`A06`/`A07` are scope decisions (component decomposition; atomic
-ledger redesign; already-deferred P&L wiring) rather than contained bug fixes, and are being
-sequenced with Mohamed rather than rushed. `U06` (public booking is still single-service) and `A10`
-(RISK-078's ~7-file API enforcement gap) remain open.
+**Fix:** in progress — tracked by CORRUPT-ID above. `A03`, `D03`, `A10` (RISK-078), and `U06` are
+resolved (see their sub-entries above). `A01` and `A05`/`A06`/`A07` are scope decisions (component
+decomposition; atomic ledger redesign; already-deferred P&L wiring) rather than contained bug fixes,
+and remain open, sequenced with Mohamed rather than rushed.
 
 ---
 
