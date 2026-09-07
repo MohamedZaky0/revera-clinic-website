@@ -111,18 +111,26 @@ export default function ReceptionDashboardView({
     fetchDashboardData();
   }, [employeeId, email, accessToken]);
 
-  // Real-time live timer calculated strictly from the recorded check-in timestamp
-  // Works seamlessly when switching tabs, minimizing browser, or refreshing page
+  // Real-time live timer calculated from cumulative shift intervals and current session start
+  // Works seamlessly across multiple shifts per day, tab switching, and minimizing browser
   useEffect(() => {
-    const checkInTimeIso = dashboardData?.shift?.checkInTime;
-    if (dashboardData?.shift?.status !== "started" || !checkInTimeIso) return;
+    const shiftStatus = dashboardData?.shift?.status;
+    const sessionStartIso = dashboardData?.shift?.currentSessionStart || dashboardData?.shift?.checkInTime;
+    const pastSeconds = Number(dashboardData?.shift?.pastSessionsSeconds || 0);
+
+    if (shiftStatus !== "started" || !sessionStartIso) {
+      if (dashboardData?.shift?.elapsedSeconds !== undefined) {
+        setLiveElapsedSeconds(dashboardData.shift.elapsedSeconds);
+      }
+      return;
+    }
 
     const calculateElapsed = () => {
-      const checkInMs = new Date(checkInTimeIso).getTime();
-      if (isNaN(checkInMs)) return;
+      const sessionStartMs = new Date(sessionStartIso).getTime();
+      if (isNaN(sessionStartMs)) return;
       const nowMs = Date.now();
-      const elapsedSec = Math.max(0, Math.floor((nowMs - checkInMs) / 1000));
-      setLiveElapsedSeconds(elapsedSec);
+      const currentSessionSec = Math.max(0, Math.floor((nowMs - sessionStartMs) / 1000));
+      setLiveElapsedSeconds(pastSeconds + currentSessionSec);
     };
 
     calculateElapsed();
@@ -142,18 +150,59 @@ export default function ReceptionDashboardView({
       window.removeEventListener("pageshow", handleSync);
       document.removeEventListener("visibilitychange", handleSync);
     };
-  }, [dashboardData?.shift?.status, dashboardData?.shift?.checkInTime]);
+  }, [
+    dashboardData?.shift?.status,
+    dashboardData?.shift?.currentSessionStart,
+    dashboardData?.shift?.checkInTime,
+    dashboardData?.shift?.pastSessionsSeconds,
+    dashboardData?.shift?.elapsedSeconds
+  ]);
 
-  // Execute Start Shift with geolocation check
-  const handleStartShiftWithLocation = () => {
+  // Execute Start Shift with geolocation check (or instant start if GPS check is disabled)
+  const handleStartShiftWithLocation = async () => {
     setLocationError(null);
+    setShiftProcessing(true);
 
-    if (typeof window === "undefined" || !navigator.geolocation) {
-      setLocationError("permission_denied");
+    const isGpsRequired = dashboardData?.shift?.gpsShiftEnabled !== false;
+
+    // Direct shift start if GPS verification is disabled in settings
+    if (!isGpsRequired) {
+      try {
+        const res = await fetch("/api/reception/dashboard", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+          },
+          body: JSON.stringify({
+            action: "start_shift",
+            employeeId,
+            email
+          })
+        });
+
+        const result = await res.json();
+        if (result.success) {
+          setShowStartShiftPopup(false);
+          setLocationError(null);
+          await fetchDashboardData();
+        } else {
+          setLocationError(result.error || result.message || "generic");
+        }
+      } catch (err) {
+        console.error("Direct start shift error:", err);
+        setLocationError("generic");
+      } finally {
+        setShiftProcessing(false);
+      }
       return;
     }
 
-    setShiftProcessing(true);
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setLocationError("permission_denied");
+      setShiftProcessing(false);
+      return;
+    }
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
@@ -186,7 +235,7 @@ export default function ReceptionDashboardView({
             } else if (result.error === "location_permission_denied" || (result.message && result.message.includes("permission"))) {
               setLocationError("permission_denied");
             } else {
-              setLocationError("generic");
+              setLocationError(result.error || result.message || "generic");
             }
           }
         } catch (err: any) {
@@ -200,6 +249,10 @@ export default function ReceptionDashboardView({
         setShiftProcessing(false);
         if (geoErr.code === geoErr.PERMISSION_DENIED || geoErr.code === 1) {
           setLocationError("permission_denied");
+        } else if (geoErr.code === geoErr.POSITION_UNAVAILABLE || geoErr.code === 2) {
+          setLocationError("position_unavailable");
+        } else if (geoErr.code === geoErr.TIMEOUT || geoErr.code === 3) {
+          setLocationError("timeout");
         } else {
           setLocationError("permission_denied");
         }
@@ -767,7 +820,9 @@ export default function ReceptionDashboardView({
                 {tr.startShiftGreeting ?? "Hi,"} {effectiveName} <span className="inline-block text-xl">👋</span>
               </h3>
               <p className="text-xs sm:text-sm text-[#5A6A51] leading-relaxed max-w-[260px] mx-auto">
-                {tr.startShiftPrompt ?? "Start your shift now to track your work and stay organized."}
+                {shiftInfo.status === "ended"
+                  ? (tr.resumeShiftPrompt ?? "Resume or start your shift now to track your work and stay organized.")
+                  : (tr.startShiftPrompt ?? "Start your shift now to track your work and stay organized.")}
               </p>
             </div>
 

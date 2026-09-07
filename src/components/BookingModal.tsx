@@ -65,6 +65,16 @@ type BookingModalProps = {
   initialServiceId?: number | null;
 };
 
+function isServiceCompatibleWithSession(service: ServiceItem, sessionType: "in_person" | "online"): boolean {
+  let allowedType = service.unit?.toLowerCase() || "both";
+  if (allowedType !== "both" && allowedType !== "in_clinic" && allowedType !== "online") {
+    allowedType = "both";
+  }
+  return sessionType === "online"
+    ? (allowedType === "online" || allowedType === "both")
+    : (allowedType === "in_clinic" || allowedType === "both");
+}
+
 export function BookingModal({ variant = "modal", initialServiceId = null }: BookingModalProps = {}) {
   const { t, isRTL } = useLanguage();
   const router = useRouter();
@@ -74,6 +84,9 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
   const [step, setStep] = useState<Step>(1);
   const [selectedCategory, setSelectedCategory] = useState<Category>("dermatology");
   const [serviceId, setServiceId] = useState<number | null>(null);
+  // CORRUPT-U06: a session can now include more than one service. serviceId stays the required
+  // "primary" service everything else in this component keys off of; these are the extra ones.
+  const [additionalServiceIds, setAdditionalServiceIds] = useState<number[]>([]);
   const [serviceToggles, setServiceToggles] = useState<ServiceToggleState>({});
   const [dynamicServices, setDynamicServices] = useState<ServiceItem[]>([]);
   const [dynamicCategories, setDynamicCategories] = useState<LocalCategory[]>([]);
@@ -141,6 +154,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
     setStep(1);
     setSelectedCategory("dermatology");
     setServiceId(null);
+    setAdditionalServiceIds([]);
     setBranchId(branches[0]?.id ?? null);
     setSelectedDate(null);
     setSelectedTime(null);
@@ -189,6 +203,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
       const detail = (e as CustomEvent).detail as { serviceId?: number } | null;
       const id = detail?.serviceId ?? null;
       setServiceId(id);
+      setAdditionalServiceIds([]);
       if (id) {
         const selected = dynamicServices.find((service) => service.id === id);
         setSelectedCategory(selected?.cat ?? dynamicCategories[0]?.key ?? "dermatology");
@@ -244,26 +259,40 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
 
   // Derived from dynamicServices — must be declared before useEffects that depend on it
   const selectedService = serviceId ? dynamicServices.find((service) => service.id === serviceId) : undefined;
-  // Resolves branch-scoped price + any active promotion — never the raw, undiscounted service.price
-  const effectiveServicePrice = selectedService ? getEffectiveServicePrice(selectedService, branchId, branches) : 0;
+  const allSelectedServices = useMemo(() => {
+    if (!selectedService) return [];
+    const additional = additionalServiceIds
+      .map((id) => dynamicServices.find((service) => service.id === id))
+      .filter((s): s is ServiceItem => Boolean(s));
+    return [selectedService, ...additional];
+  }, [selectedService, additionalServiceIds, dynamicServices]);
+  // Resolves branch-scoped price + any active promotion — never the raw, undiscounted service.price.
+  // Sums across every selected service (CORRUPT-U06: a session can now include more than one).
+  const effectiveServicePrice = allSelectedServices.reduce(
+    (sum, s) => sum + getEffectiveServicePrice(s, branchId, branches),
+    0
+  );
+  const totalDurationMinutes = allSelectedServices.reduce(
+    (sum, s) => sum + (Number((s as any).duration_minutes) || Number((s as any).duration) || 30),
+    0
+  );
 
-  // Clear serviceId if it doesn't support the selected sessionType
+  // Clear serviceId (and any additional service no longer valid for this session type)
   useEffect(() => {
     if (serviceId !== null) {
       const selected = dynamicServices.find(s => s.id === serviceId);
-      if (selected) {
-        let allowedType = selected.unit?.toLowerCase() || "both";
-        if (allowedType !== "both" && allowedType !== "in_clinic" && allowedType !== "online") {
-          allowedType = "both";
-        }
-        const isValidForSession = sessionType === "online" 
-          ? (allowedType === "online" || allowedType === "both")
-          : (allowedType === "in_clinic" || allowedType === "both");
-        if (!isValidForSession) {
-          setServiceId(null);
-        }
+      if (selected && !isServiceCompatibleWithSession(selected, sessionType)) {
+        setServiceId(null);
+        setAdditionalServiceIds([]);
+        return;
       }
     }
+    setAdditionalServiceIds((prev) =>
+      prev.filter((id) => {
+        const svc = dynamicServices.find((s) => s.id === id);
+        return svc ? isServiceCompatibleWithSession(svc, sessionType) : true;
+      })
+    );
   }, [sessionType, serviceId, dynamicServices]);
 
   useEffect(() => {
@@ -368,38 +397,45 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
       .catch(() => {});
   }, []);
 
+  // Comma-joined ids for every selected service, appended to every availability request so the
+  // server sums duration / requires one doctor+room covering all of them (CORRUPT-U06). Empty
+  // when there are no additional services — every existing single-service request is unaffected.
+  const serviceIdsQuery = additionalServiceIds.length > 0 && serviceId
+    ? `&serviceIds=${[serviceId, ...additionalServiceIds].join(',')}`
+    : "";
+
   // Prefetch 30-day availability
   useEffect(() => {
     if (!serviceId) return;
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    const url = `/api/availability?serviceId=${serviceId}&days=30${branchQuery}&sessionType=${sessionType}`;
+    const url = `/api/availability?serviceId=${serviceId}&days=30${branchQuery}&sessionType=${sessionType}${serviceIdsQuery}`;
     prefetchUrl(url, 30000);
-  }, [serviceId, branchId, sessionType]);
+  }, [serviceId, branchId, sessionType, serviceIdsQuery]);
 
   // Consume cached 30-day availability
   useEffect(() => {
     if (!open || !serviceId) return;
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    cachedFetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}&sessionType=${sessionType}`).then((data) => {
+    cachedFetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}&sessionType=${sessionType}${serviceIdsQuery}`).then((data) => {
       const map: Record<string, number> = {};
       if (Array.isArray(data)) {
-        data.forEach((d: { date: string; approvedCount: number; isAvailable?: boolean }) => { 
-          map[d.date] = d.isAvailable === false ? 99 : 0; 
+        data.forEach((d: { date: string; approvedCount: number; isAvailable?: boolean }) => {
+          map[d.date] = d.isAvailable === false ? 99 : 0;
         });
       } else {
         console.error("Fetch availability expected array, got", data);
       }
       setDisabledDates(map);
     }).catch(()=>{});
-  }, [open, serviceId, branchId, sessionType]);
+  }, [open, serviceId, branchId, sessionType, serviceIdsQuery]);
 
   // Prefetch slots for selected date
   useEffect(() => {
     if (!serviceId || !selectedDate) return;
     const date = toLocalDateStr(selectedDate);
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    prefetchUrl(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}&sessionType=${sessionType}`, 5000);
-  }, [serviceId, selectedDate, branchId, sessionType]);
+    prefetchUrl(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}&sessionType=${sessionType}${serviceIdsQuery}`, 5000);
+  }, [serviceId, selectedDate, branchId, sessionType, serviceIdsQuery]);
 
   // Fetch taken time slots for selected date
   useEffect(() => {
@@ -415,7 +451,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
     }
     const date = toLocalDateStr(selectedDate);
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    cachedFetch(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}&sessionType=${sessionType}`, 5000)
+    cachedFetch(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}&sessionType=${sessionType}${serviceIdsQuery}`, 5000)
       .then((data) => {
         if (active) {
           if (data && Array.isArray(data.unavailableSlots)) {
@@ -435,7 +471,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
     return () => {
       active = false;
     };
-  }, [serviceId, selectedDate, branchId, selectedService, sessionType]);
+  }, [serviceId, selectedDate, branchId, selectedService, sessionType, serviceIdsQuery]);
 
   // Close on Escape key — modal variant only; a page has no "close" to dismiss into, and
   // Escape shouldn't silently wipe a patient's in-progress booking form.
@@ -507,11 +543,11 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
         }
       }
       
-      // Check service
+      // Check service — a multi-service session needs a doctor who covers every selected service.
       if (doc.services && doc.services.length > 0) {
-        if (!doc.services.includes(selectedService.en)) return;
+        if (!allSelectedServices.every((s) => doc.services.includes(s.en))) return;
       }
- 
+
       // Check working days & hours
       if (doc.workingDaysHours) {
         const wdh = doc.workingDaysHours;
@@ -584,7 +620,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
       start: formatMins(minStart),
       end: formatMins(maxEnd)
     };
-  }, [doctors, branchId, selectedService, t, branches, serviceHours]);
+  }, [doctors, branchId, selectedService, t, branches, serviceHours, allSelectedServices]);
 
   const getAvailableDoctors = useCallback(() => {
     if (!selectedDate || !selectedTime || !selectedService) return [];
@@ -609,7 +645,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
       }
  
       if (doctor.services && doctor.services.length > 0) {
-        if (!doctor.services.includes(selectedService.en)) {
+        if (!allSelectedServices.every((s) => doctor.services.includes(s.en))) {
           return false;
         }
       }
@@ -672,7 +708,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
 
       return !hasOverlap;
     });
-  }, [selectedDate, selectedTime, selectedService, doctors, branchId, reservationsForDate, dynamicServices, sessionType]);
+  }, [selectedDate, selectedTime, selectedService, doctors, branchId, reservationsForDate, dynamicServices, sessionType, allSelectedServices]);
 
   function handleConfirm() {
     if (!serviceId || !selectedDate || !selectedTime || !name || !email || !phone) return;
@@ -689,6 +725,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
       // originally-picked service/date while the UI shows the new ones.
       const payload = {
         serviceId,
+        serviceIds: serviceId ? [serviceId, ...additionalServiceIds] : undefined,
         date: toLocalDateStr(selectedDate),
         requestedTime: selectedTime,
         name, email, phone, notes: finalNotes,
@@ -724,6 +761,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
       : `${notes ? notes + "\n" : ""}[WhatsApp: ${whatsappNumber}]`;
     const payload = {
       serviceId,
+      additionalServiceIds,
       date: toLocalDateStr(selectedDate),
       requestedTime: selectedTime,
       name, email, phone, notes: finalNotes,
@@ -780,7 +818,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
       : `[${methodLabel} Sent From: ${customerPaymentSender}]`;
 
     const formattedDate = selectedDate ? formatDate(selectedDate) : "";
-    const svcName = isRTL ? selectedService.ar : selectedService.en;
+    const svcName = allSelectedServices.map((s) => (isRTL ? s.ar : s.en)).join(isRTL ? "، " : ", ");
     
     const textMessage = `Hello Revera Clinics,
 
@@ -795,8 +833,13 @@ I have paid the reservation deposit for my booking:
 
 Attached is my payment transaction receipt photo.`;
 
-    const cleanWhatsapp = clinicWhatsapp.replace(/[^0-9]/g, "");
-    const whatsappLink = `https://wa.me/${cleanWhatsapp || CLIENT.whatsappNumber}?text=${encodeURIComponent(textMessage)}`;
+    let cleanWhatsapp = (clinicWhatsapp || CLIENT.whatsappNumber || "").replace(/[^0-9]/g, "");
+    if (cleanWhatsapp.startsWith("200")) {
+      cleanWhatsapp = "20" + cleanWhatsapp.slice(3);
+    } else if (cleanWhatsapp.startsWith("0")) {
+      cleanWhatsapp = "20" + cleanWhatsapp.slice(1);
+    }
+    const whatsappLink = `https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(textMessage)}`;
 
     setTimeout(() => {
       fetch(`/api/reservations?id=${createdReservation.id}`, {
@@ -846,19 +889,27 @@ Attached is my payment transaction receipt photo.`;
     if (!selectedDate) return [];
     const { start, end } = getDayOperatingHours(selectedDate);
 
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const nowCairo = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
+    const todayStr = `${nowCairo.getFullYear()}-${String(nowCairo.getMonth() + 1).padStart(2, '0')}-${String(nowCairo.getDate()).padStart(2, '0')}`;
     const selStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
     const isToday = selStr === todayStr;
-    const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const currentHHMM = `${String(nowCairo.getHours()).padStart(2, '0')}:${String(nowCairo.getMinutes()).padStart(2, '0')}`;
+
+    const svcDuration = selectedService ? totalDurationMinutes : 30;
+    const [endH, endM] = end.split(":").map(Number);
+    const endMinutes = (endH || 0) * 60 + (endM || 0);
 
     return TIME_SLOTS.filter((slot) => {
       const slot24 = normaliseTo24hSlot(slot) ?? "";
       const taken = takenSlots.includes(slot24);
       const isPast = isToday && slot24 <= currentHHMM;
-      return slot24 >= start && slot24 < end && !taken && !isPast;
+      const [sH, sM] = slot24.split(":").map(Number);
+      const slotStartMinutes = (sH || 0) * 60 + (sM || 0);
+      const fitsWithinHours = (slotStartMinutes + svcDuration) <= endMinutes;
+
+      return slot24 >= start && fitsWithinHours && !taken && !isPast;
     });
-  }, [selectedDate, getDayOperatingHours, takenSlots]);
+  }, [selectedDate, getDayOperatingHours, takenSlots, selectedService, totalDurationMinutes]);
 
   // Auto-select first available time slot when valid slots load
   useEffect(() => {
@@ -1149,7 +1200,13 @@ Attached is my payment transaction receipt photo.`;
                   </div>
                   <select
                     value={serviceId ?? ""}
-                    onChange={(e) => setServiceId(e.target.value ? Number(e.target.value) : null)}
+                    onChange={(e) => {
+                      const newId = e.target.value ? Number(e.target.value) : null;
+                      setServiceId(newId);
+                      if (newId !== null) {
+                        setAdditionalServiceIds((prev) => prev.filter((id) => id !== newId));
+                      }
+                    }}
                     className="cr-input"
                     style={{
                       appearance: "none",
@@ -1172,6 +1229,49 @@ Attached is my payment transaction receipt photo.`;
                     ))}
                   </select>
                 </div>
+
+                {/* Add more services to the same session — CORRUPT-U06 */}
+                {serviceId !== null && (
+                  <div>
+                    <p className="mb-2 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
+                      {isRTL ? "أضف خدمات أخرى لنفس الجلسة (اختياري)" : "Add more services to this session (optional)"}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {activeServices
+                        .filter((service) => service.id !== serviceId && isServiceCompatibleWithSession(service, sessionType))
+                        .map((service) => {
+                          const isSelected = additionalServiceIds.includes(service.id);
+                          return (
+                            <button
+                              key={service.id}
+                              type="button"
+                              onClick={() => {
+                                setAdditionalServiceIds((prev) =>
+                                  isSelected ? prev.filter((id) => id !== service.id) : [...prev, service.id]
+                                );
+                              }}
+                              className="rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors"
+                              style={{
+                                backgroundColor: isSelected ? "var(--cr-primary)" : "var(--cr-secondary)",
+                                color: isSelected ? "var(--cr-white)" : "var(--cr-primary)",
+                                border: isSelected ? "none" : "1px solid rgba(65, 78, 54, 0.18)",
+                              }}
+                            >
+                              {isSelected ? "✓ " : "+ "}
+                              {isRTL ? service.ar : service.en}
+                            </button>
+                          );
+                        })}
+                    </div>
+                    {additionalServiceIds.length > 0 && (
+                      <p className="mt-2 text-xs" style={{ color: "var(--cr-primary)", opacity: 0.75 }}>
+                        {isRTL
+                          ? `إجمالي المدة: ${totalDurationMinutes} دقيقة · الإجمالي: ${effectiveServicePrice} جنيه`
+                          : `Total duration: ${totalDurationMinutes} min · Total: EGP ${effectiveServicePrice}`}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Inline MD3 Date & Time Pickers */}
                 {serviceId !== null && (
@@ -1216,7 +1316,7 @@ Attached is my payment transaction receipt photo.`;
                   {selectedService && (
                     <p className="mb-0">
                       <span className="font-semibold">{t.booking.labels.service}: </span>
-                      {isRTL ? selectedService.ar : selectedService.en}
+                      {allSelectedServices.map((s) => (isRTL ? s.ar : s.en)).join(isRTL ? "، " : ", ")}
                     </p>
                   )}
                   {branchId && (

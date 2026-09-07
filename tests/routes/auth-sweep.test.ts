@@ -183,7 +183,14 @@ const REGISTRY: RouteEntry[] = [
   { path: '/api/finance/service-margin', methods: [M('GET', FinanceServiceMargin.GET, 'staff')] },
   { path: '/api/finance/service-mix', methods: [M('GET', FinanceServiceMix.GET, 'staff')] },
   { path: '/api/finance/trend', methods: [M('GET', FinanceTrend.GET, 'staff')] },
-  { path: '/api/health/supabase', methods: [M('GET', HealthSupabase.GET, 'public', { noArgs: true })] },
+  // RISK-080: this used to be GET() with no auth at all (hence 'public', { noArgs: true }).
+  // It now requires an admin/superadmin session via requireAdministratorAccess(req) — GET(req)
+  // takes a required Request, so noArgs would call it with `req: undefined` and 500 out of the
+  // try/catch in requireStaffAccess() rather than genuinely proving anything. A 500 satisfies the
+  // old 'public' assertion's weak "not 401, not 403" check, which is exactly how this row went
+  // stale silently instead of failing loudly — moved to 'admin' so the sweep asserts the real
+  // 401-with-no-token / 403-for-a-patient-token boundary this route now has.
+  { path: '/api/health/supabase', methods: [M('GET', HealthSupabase.GET, 'admin')] },
   { path: '/api/hr/alerts', methods: [M('GET', HrAlerts.GET, 'hr'), M('POST', HrAlerts.POST, 'staff'), M('PATCH', HrAlerts.PATCH, 'hr')] },
   { path: '/api/hr/attendance', methods: [M('GET', HrAttendance.GET, 'hr'), M('POST', HrAttendance.POST, 'staff'), M('PATCH', HrAttendance.PATCH, 'staff')] },
   { path: '/api/hr/doctor-payroll', methods: [M('GET', HrDoctorPayroll.GET, 'hr'), M('POST', HrDoctorPayroll.POST, 'hr'), M('PATCH', HrDoctorPayroll.PATCH, 'hr')] },

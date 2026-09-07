@@ -1,6 +1,6 @@
 # SECURITY.md — Current Security Posture
 
-> **Last Updated:** 2026-08-03
+> **Last Updated:** 2026-09-07
 > **Audited from:** `src/middleware.ts`, `src/lib/access.ts`, every `src/app/api/**/route.ts`,
 > `supabase/migrations/`, and `ai_docs/RISKS.md`.
 > **Purpose:** a single, current answer to "is X protected, and how" — so nobody has to re-derive
@@ -35,7 +35,13 @@ Three server-side helpers exist in `src/lib/access.ts`:
 
 `hasStaffPermission(access, perm)` treats **every** `admin`/`superadmin` as having every staff
 permission — it cannot express "admins may not see X." `hasFinancePermission(access, perm)` is
-the one exception: only `superadmin` or an explicit permission grant passes, `admin` alone does not.
+the one exception until RISK-078/A10: only `superadmin` or an explicit permission grant passes,
+`admin` alone does not. `hasGranularPermission(access, permKey)` (added for RISK-078/A10, 2026-09-07)
+follows the same stricter shape — `superadmin` bypasses, `admin` does not automatically — and mirrors
+the coarse-category + create/edit/delete fallback chains from the client's `hasPermission()` for
+`providers`/`services`/`inventory`/`customers`, so a role granted the coarse category in Role
+Management (every pre-existing role, including the live `admin` accounts) keeps working exactly as
+it did under the old any-staff guard.
 
 Patient-facing routes (`/api/customers`) use a different, narrower check:
 `isOwnIdentity()` in `src/lib/customerIdentity.ts` — a patient may read/write **their own** record
@@ -75,51 +81,69 @@ authorization exists for those routes is entirely up to the individual route han
 
 ## 3. Per-route authorization — the real, current inventory
 
-Grounded in a direct grep of all 69 `route.ts` files for `requireStaffAccess` /
-`requireAdministratorAccess` / `requireAuthenticatedUser` / `isOwnIdentity`, done 2026-08-03.
+Re-verified 2026-09-07 by direct grep of every route named in the 2026-08-03 audit below, plus the
+5 routes hardened by RISK-078/A10. **Every route this file previously listed as having "no auth of
+any kind" (§3c, as it stood on 2026-08-03) has since been fixed** — see the RISK entries cited
+inline. Only `auth/employee-email` remains genuinely open, and that is a documented, deliberate
+exception (RISK-080), not a gap.
 
 ### 3a. Server-side role-gated (import a helper from `access.ts`, route level)
-`assets`, `assets/post-depreciation`, `customers` (identity-scoped, not blanket), `customers/package-redemptions`,
-`customers/packages`, `customers/products`, `customers/reconcile`, `employees`, `employees/notes`,
-`expenses`, `expenses/categories`, `expenses/generate-due`, `expenses/recurring`,
-`finance/*` (all 12 sub-routes), `inventory/devices` (+ `[id]/reset-pulses`, `audit-logs`),
-`inventory/products` (+ `reconcile`), `inventory/products/sales`, `loans`, `packages` (+ `consume`,
-`extend`, `sell`), `purchases`, `reservations` (staff-only for every mutating action except the
-one deliberately-anonymous deposit self-report — see RISK-018), `roles`, `service-consumables`,
-`service-devices`, `services`, `suppliers`.
+`assets`, `assets/post-depreciation`, `branches` (GET public/intentional, POST/DELETE
+`requireAdministratorAccess` — RISK-080), `categories` (GET `requireStaffAccess`,
+POST/DELETE `requireAdministratorAccess` — RISK-080), `clinic-settings` (GET `requireStaffAccess`,
+POST `requireAdministratorAccess` — RISK-080), `customers` (identity-scoped, not blanket),
+`customers/package-redemptions`, `customers/packages`, `customers/products`, `customers/reconcile`,
+`employees`, `employees/notes`, `expenses`, `expenses/categories`, `expenses/generate-due`,
+`expenses/recurring`, `finance/*` (all 12 sub-routes), `health/supabase`
+(`requireAdministratorAccess` — RISK-080; previously public and leaked the first characters of the
+Supabase service-role key, now reports presence/source-var-name only), `inventory/devices`
+(+ `[id]/reset-pulses`, `audit-logs`), `inventory/products` (+ `reconcile`),
+`inventory/products/sales`, `loans`, `medical-records` (`requireStaffAccess` — RISK-080; PHI, was
+previously fully public), `packages` (+ `consume`, `extend`, `sell`), `page-settings` (GET
+deliberately dual-mode — staff get the full blob, everyone else gets `stripInternalFields()`'d
+public CMS content; POST `requireAdministratorAccess` — RISK-067), `customer-avatars` (GET
+public/intentional, POST `requireStaffAccess` — RISK-080), `prescriptions`
+(`requireStaffAccess` — RISK-080; PHI, was previously fully public), `provider-attendance`,
+`providers` (GET public/intentional, POST/PATCH/DELETE `requireStaffAccess` +
+`hasGranularPermission` — RISK-080/RISK-078), `purchases`, `reservations` (staff-only for every
+mutating action except the one deliberately-anonymous deposit self-report — see RISK-018),
+`reservations/previous` (`requireStaffAccess` on GET and POST — RISK-080; GET returns up to 50
+reservations with real patient names/phones, POST creates patient + booking records, both were
+previously public), `rooms`, `roles`, `service-consumables`, `service-devices`, `service-rooms`,
+`services` (GET public/intentional, POST/DELETE `requireStaffAccess` + `hasGranularPermission` —
+RISK-078), `suppliers`, `terms` (GET public/intentional — public Terms & Conditions page —
+POST/PUT/DELETE `requireAdministratorAccess` — RISK-080), `translate`.
+
+**Granular permission layer on top of `requireStaffAccess` (RISK-078/A10, 2026-09-07):** for
+`providers` (POST/PATCH/DELETE), `services` (POST/DELETE), `inventory/products`
+(POST/PUT/DELETE), `inventory/devices` (POST/PUT), and `customers/products` (POST/PATCH), passing
+`requireStaffAccess` (any staff role) is no longer sufficient — the handler also calls
+`hasGranularPermission(access.access, '<key>')`, matching the specific action-level permission
+Role Management's UI already claims to enforce (e.g. `providers.delete`, `inventory.manage_devices`).
+Before this, any authenticated employee's token could call these mutating endpoints regardless of
+what their role's `permissions` array said, even though the 3-dots menus correctly hid the buttons
+in the browser — see RISK-078 for the original finding and RISK-081/CORRUPT-A10 for the fix.
+`employees` and `roles` were deliberately **not** given this treatment: they stay
+`requireAdministratorAccess`-only (superadmin/admin, no granular distinction), which is intentional
+per RISK-069, not an oversight.
 
 ### 3b. Middleware-only (authenticated-user check, no role check)
 `hr/alerts`, `hr/attendance`, `hr/doctor-payroll`, `hr/leaves`, `hr/payroll`, `hr/performance`,
 `providers/schedule-audit-logs`. **Any authenticated Supabase user — including a patient — passes.**
+Unchanged since 2026-08-03 — still open, not yet given its own `RISKS.md` fix.
 
-### 3c. No auth of any kind (open to the public internet, method-by-method)
+### 3c. No auth of any kind (open to the public internet)
 
-| Route | Methods | Risk if abused |
+| Route | Methods | Status |
 |---|---|---|
-| `medical-records` | GET/POST/DELETE | **PHI.** Anyone who knows/guesses a `customer_id` can read, overwrite, or delete another patient's medical intake form and uploaded reports. |
-| `prescriptions` | GET/POST/DELETE | **PHI.** Same shape of exposure — diagnosis, medication, follow-up per customer. |
-| `branches` | GET/POST/DELETE | Anyone can create/delete clinic branches. |
-| `categories` | GET/POST/DELETE | Anyone can create/delete service categories. |
-| `providers` | GET/POST/PATCH/DELETE | Anyone can create/edit/delete doctor records. |
-| `rooms` | GET/POST/PATCH/DELETE | Anyone can create/edit/delete physical rooms. |
-| `service-rooms` | GET/POST | Anyone can rewrite which rooms a service can use. |
-| `terms` | GET/POST/PUT/DELETE | Anyone can rewrite the public Terms & Conditions text. |
-| `clinic-settings` | GET/POST | Anyone can overwrite CMS content (defacement). |
-| `page-settings` | GET/POST | Same — this is the underlying store `clinic-settings` aliases. |
-| `customer-avatars` | GET/POST | Anyone can overwrite any customer's avatar image. |
-| `provider-attendance` | GET/POST | Anyone can forge a doctor check-in/out record. |
-| `translate` | POST | If this proxies a paid third-party translation API, it's an open cost-abuse vector. |
+| `auth/employee-email` | GET | **Accepted, not fixed (RISK-080).** Load-bearing for the `/admin` sign-in flow itself — it resolves an employee ID to an email *before* any session exists, so a session-based guard would lock out every staff login. Remains an enumeration surface (maps employee IDs to staff email addresses — useful for phishing), but an email alone grants no access; Supabase Auth rate-limits the password endpoint it feeds into. Revisit if staff report targeted phishing. |
 | `availability` | GET | **Intentionally public** — the public booking widget needs slot availability with no login. |
-| `auth/me`, `auth/employee-email` | GET | Auth-support routes; validate the token they're given internally. Not a blanket data-exposure risk on their own, but worth re-checking if their internal logic changes. |
-| `health/supabase` | GET | Env/diagnostics endpoint. Low sensitivity, but there's no reason it needs to be reachable in production — consider gating or removing before a real client goes live. |
+| `auth/me` | GET | Auth-support route; validates the token it's given internally. Not a blanket exposure risk on its own. |
 
-**This table is new as of this audit (2026-08-03) — it is not yet logged in `RISKS.md`.**
-`RISKS.md` → RISK-018 documented the *finance-relevant* unauthenticated routes and their fix; it
-never covered `medical-records`, `prescriptions`, or the config/CMS routes above, because the
-original 2026-07-25/26 pass was scoped to money-mutating routes only. The medical-records and
-prescriptions rows are the ones that matter most — PHI with zero server-side authorization. **This
-should get its own `RISKS.md` entry (next number: RISK-036) before it's treated as "known and
-accepted"; it is currently just "known."**
+Every other route this section previously listed (`medical-records`, `prescriptions`, `branches`,
+`categories`, `providers`, `rooms`, `service-rooms`, `terms`, `clinic-settings`, `page-settings`,
+`customer-avatars`, `provider-attendance`, `translate`, `health/supabase`) has since moved to §3a —
+see the RISK references there for what changed and when.
 
 ---
 

@@ -97,22 +97,40 @@ async function resolveProviderId(doctorName?: string | null): Promise<string | n
   const name = (doctorName || '').trim();
   if (!name) return null;
 
-  const { data, error } = await supabaseServer
-    .from('providers')
-    .select('id, name')
-    .ilike('name', name);
+  try {
+    const { data: exactMatch } = await supabaseServer
+      .from('providers')
+      .select('id, name')
+      .ilike('name', name);
 
-  if (error) {
-    console.error('Provider lookup failed for doctor_name:', name, error.message);
-    return null;
-  }
-  if (!data || data.length !== 1) {
-    if (data && data.length > 1) {
-      console.warn('Ambiguous doctor_name matched multiple providers, left unlinked:', name);
+    if (exactMatch && exactMatch.length === 1) {
+      return exactMatch[0].id;
     }
-    return null;
+
+    const cleanName = name.replace(/^Dr\.?\s*/i, '').trim();
+    if (cleanName && cleanName !== name) {
+      const { data: cleanMatch } = await supabaseServer
+        .from('providers')
+        .select('id, name')
+        .ilike('name', cleanName);
+      if (cleanMatch && cleanMatch.length === 1) {
+        return cleanMatch[0].id;
+      }
+    }
+
+    if (cleanName) {
+      const { data: fuzzyMatch } = await supabaseServer
+        .from('providers')
+        .select('id, name')
+        .ilike('name', `%${cleanName}%`);
+      if (fuzzyMatch && fuzzyMatch.length >= 1) {
+        return fuzzyMatch[0].id;
+      }
+    }
+  } catch (err) {
+    console.error('Provider lookup failed for doctor_name:', name, err);
   }
-  return data[0].id;
+  return null;
 }
 
 /**
@@ -535,6 +553,8 @@ export async function GET(req: Request) {
   const phone = params.get('phone');
   const customerId = params.get('customerId');
   const createdByEmployeeId = params.get('createdByEmployeeId');
+  const doctorId = params.get('doctorId');
+  const doctorName = params.get('doctorName');
 
   // This route has the same two caller populations as /api/customers: staff (unrestricted) and
   // patients reading their own booking history (profile/page.tsx). Unlike /api/customers, there
@@ -588,6 +608,12 @@ export async function GET(req: Request) {
     if (phone) q = q.eq('phone', phone);
     if (customerId) q = q.eq('customer_id', customerId);
     if (createdByEmployeeId) q = q.eq('created_by_employee_id', createdByEmployeeId);
+    if (doctorId) {
+      q = q.eq('provider_id', doctorId);
+    } else if (doctorName) {
+      const cleanDoc = doctorName.replace(/^Dr\.?\s*/i, '').trim();
+      q = q.ilike('doctor_name', `%${cleanDoc}%`);
+    }
     // Include bookings that match this branch OR have no branch set (website bookings without branch)
     if (branchId) q = q.or(`branch_id.eq.${branchId},branch_id.is.null`);
 
@@ -676,6 +702,15 @@ export async function POST(req: Request) {
     if (!serviceId || !date || !name || !email || !phone) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+
+    // CORRUPT-U06: the public booking flow now lets a patient add more than one service to the
+    // same session. serviceId stays the required "primary" service (every existing caller, and
+    // every downstream single-service assumption elsewhere in this file, keeps working unchanged);
+    // additionalServiceIds is the new, optional list of extra services on top of it.
+    const additionalServiceIds: number[] = Array.isArray(body.additionalServiceIds)
+      ? body.additionalServiceIds.map((id: any) => Number(id)).filter((id: number) => Number.isFinite(id) && id !== Number(serviceId))
+      : [];
+    const allServiceIds = [Number(serviceId), ...additionalServiceIds];
 
     // 1. Reject past dates / times
     if (requestedTime && isPastDateTime(date, requestedTime)) {
@@ -838,57 +873,73 @@ export async function POST(req: Request) {
       console.error('Customer integration error:', custErr);
     }
 
-    // Fetch compatible rooms for this service
+    // Fetch compatible rooms — a multi-service session needs a room every selected service maps
+    // to (intersection), not just the primary one.
     let compRoomIds: string[] = [];
     try {
       const { data: sRooms } = await supabaseServer
         .from('service_rooms')
-        .select('room_id')
-        .eq('service_id', Number(serviceId));
+        .select('room_id, service_id')
+        .in('service_id', allServiceIds);
       if (sRooms && sRooms.length > 0) {
-        compRoomIds = sRooms.map((sr: any) => sr.room_id);
+        const byService = new Map<number, string[]>();
+        for (const sr of sRooms as any[]) {
+          const list = byService.get(sr.service_id) || [];
+          list.push(sr.room_id);
+          byService.set(sr.service_id, list);
+        }
+        const roomIdSets = allServiceIds.map((id) => byService.get(id) || []).filter((ids) => ids.length > 0);
+        if (roomIdSets.length > 0) {
+          compRoomIds = roomIdSets.reduce((acc, ids) => acc.filter((id) => ids.includes(id)));
+        }
       }
     } catch (e) {
       console.warn("Could not load service compatible rooms:", e);
     }
 
-    // Fetch service details for price calculation
-    let servicePrice = 0;
-    try {
-      const { data: svc } = await supabaseServer
-        .from('services')
-        .select('price, branch_pricing')
-        .eq('id', Number(serviceId))
-        .maybeSingle();
-      if (svc) {
-        let targetBranchName: string | null = null;
-        if (branchId) {
-          // Two bugs lived here, and together they meant branch pricing was never applied
-          // server-side (RISK-011): the filter was `.eq('id', Number(branchId))` against a
-          // uuid column, which is always NaN, and it selected a `name` column that does not
-          // exist — branches has name_en / name_ar. The query error was discarded, which is
-          // why it stayed invisible.
-          const { data: bObj, error: branchErr } = await supabaseServer
-            .from('branches')
-            .select('name_en, name_ar')
-            .eq('id', branchId)
-            .maybeSingle();
+    // Resolve branch name once, reused for every selected service's price lookup below.
+    let targetBranchName: string | null = null;
+    if (branchId) {
+      // Two bugs lived here, and together they meant branch pricing was never applied
+      // server-side (RISK-011): the filter was `.eq('id', Number(branchId))` against a
+      // uuid column, which is always NaN, and it selected a `name` column that does not
+      // exist — branches has name_en / name_ar. The query error was discarded, which is
+      // why it stayed invisible.
+      try {
+        const { data: bObj, error: branchErr } = await supabaseServer
+          .from('branches')
+          .select('name_en, name_ar')
+          .eq('id', branchId)
+          .maybeSingle();
 
-          if (branchErr) {
-            console.error('Branch lookup for pricing failed:', branchErr.message);
-          } else if (bObj) {
-            targetBranchName = bObj.name_en || bObj.name_ar || null;
-          } else {
-            console.warn('No branch found for pricing lookup:', branchId);
-          }
+        if (branchErr) {
+          console.error('Branch lookup for pricing failed:', branchErr.message);
+        } else if (bObj) {
+          targetBranchName = bObj.name_en || bObj.name_ar || null;
+        } else {
+          console.warn('No branch found for pricing lookup:', branchId);
         }
+      } catch (e) {
+        console.error('Branch lookup for pricing failed:', e);
+      }
+    }
 
-        const mappedService = {
-          price: svc.price !== null ? Number(svc.price) : 0,
-          branchPricing: svc.branch_pricing
-        };
+    // Fetch service details for price + duration — summed across every selected service
+    // (CORRUPT-U06: a session can now carry more than one service).
+    let servicePrice = 0;
+    let bookingDurationMinutes = 30;
+    try {
+      const { data: svcs } = await supabaseServer
+        .from('services')
+        .select('id, price, branch_pricing, duration, duration_minutes')
+        .in('id', allServiceIds);
 
-        servicePrice = getEffectiveServicePrice(mappedService, targetBranchName);
+      if (svcs && svcs.length > 0) {
+        bookingDurationMinutes = svcs.reduce((sum: number, s: any) => sum + getServiceDurationMinutes(s), 0);
+        servicePrice = svcs.reduce((sum: number, s: any) => {
+          const mappedService = { price: s.price !== null ? Number(s.price) : 0, branchPricing: s.branch_pricing };
+          return sum + getEffectiveServicePrice(mappedService, targetBranchName);
+        }, 0);
       }
     } catch (e) {
       console.error("Could not fetch service details for price calculation:", e);
@@ -920,17 +971,80 @@ export async function POST(req: Request) {
       initialAmountLeft = servicePrice;
     }
 
+    let assignedRoomId: string | null = null;
+    if (isManualBooking && (sessionType || 'in_person') !== 'online') {
+      if (body.roomId || body.room_id) {
+        assignedRoomId = body.roomId || body.room_id;
+      } else if (compRoomIds && compRoomIds.length > 0) {
+        // CORRUPT-A03 / RISK-081: picking compRoomIds[0] unconditionally let two manual bookings
+        // land in the same room at overlapping times with no warning. Prefer a room with no
+        // existing overlapping booking on this date; fall back to the first compatible room only
+        // if every one of them is genuinely occupied, so reception can still save the booking.
+        assignedRoomId = compRoomIds[0];
+        const normReqTime = requestedTime ? normaliseTo24hSlot(requestedTime) : null;
+        if (date && normReqTime) {
+          try {
+            const startIdx = ALL_15MIN_SLOTS.indexOf(normReqTime);
+            const targetSlotsCount = Math.max(1, Math.ceil(bookingDurationMinutes / 15));
+            const { data: dayRoomBookingsRaw } = await supabaseServer
+              .from('reservations')
+              .select('room_id, time_slot, service_id, status')
+              .eq('date', date)
+              .in('room_id', compRoomIds);
+            const dayRoomBookings = (dayRoomBookingsRaw || []).filter(
+              (b: any) => b.status !== 'cancelled' && b.status !== 'rejected'
+            );
+
+            if (startIdx !== -1 && dayRoomBookings.length > 0) {
+              const svcIds = Array.from(new Set(dayRoomBookings.map((b: any) => b.service_id).filter((id: any) => id != null)));
+              const durationMap = new Map<number, number>();
+              if (svcIds.length > 0) {
+                const { data: svcRows } = await supabaseServer
+                  .from('services')
+                  .select('id, duration, duration_minutes')
+                  .in('id', svcIds);
+                (svcRows || []).forEach((s: any) => durationMap.set(s.id, getServiceDurationMinutes(s)));
+              }
+
+              const isRoomFree = (roomId: string) => {
+                const roomBookings = dayRoomBookings.filter((b: any) => b.room_id === roomId);
+                return !roomBookings.some((rb: any) => {
+                  const rbNorm = normaliseTo24hSlot(rb.time_slot);
+                  if (!rbNorm) return false;
+                  const rbIdx = ALL_15MIN_SLOTS.indexOf(rbNorm);
+                  if (rbIdx === -1) return false;
+                  const rbSlotsCount = Math.max(1, Math.ceil((durationMap.get(rb.service_id) ?? 30) / 15));
+                  return rbIdx < startIdx + targetSlotsCount && startIdx < rbIdx + rbSlotsCount;
+                });
+              };
+
+              const freeRoom = compRoomIds.find(isRoomFree);
+              if (freeRoom) {
+                assignedRoomId = freeRoom;
+              } else {
+                console.warn('No free compatible room for manual booking at', date, normReqTime, '- assigning first compatible room anyway:', compRoomIds[0]);
+              }
+            }
+          } catch (e) {
+            console.warn('Room collision check failed for manual booking, assigning first compatible room:', e);
+          }
+        }
+      }
+    }
+
     // 2. Insert reservation linked to customer
     const insertPayload: any = {
       service_id: Number(serviceId),
+      service_ids: allServiceIds,
       date,
       requested_time: requestedTime || null,
       name,
       email,
       phone,
       notes: notes || '',
-      status: initialStatus,
-      time_slot: null,
+      status: isManualBooking ? 'approved' : initialStatus,
+      time_slot: isManualBooking && requestedTime ? requestedTime : null,
+      room_id: assignedRoomId,
       session_type: sessionType || 'in_person',
       branch_id: branchId || null,
       customer_id: customerId,

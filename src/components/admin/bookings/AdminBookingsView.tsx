@@ -298,7 +298,9 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         service_variant: sVariant,
         doctor_name: doc,
         room: rm,
-        status: st,
+        status: r.status || st,
+        raw_status: r.status || st,
+        display_status: st,
         paymentStatus: paySt,
         isStaleSession: staleness.isStale,
         staleElapsedLabel: staleness.elapsedLabel

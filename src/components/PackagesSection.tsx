@@ -41,7 +41,12 @@ function PackageCard({ pkg, alacarteTotal, isRTL, lang }: PackageCardProps) {
     const message = isRTL
       ? `مرحباً، أنا مهتم بباقة "${title}".`
       : `Hello, I'm interested in the "${title}" package.`;
-    const cleanWhatsapp = CLIENT.whatsappNumber.replace(/[^0-9]/g, "");
+    let cleanWhatsapp = (CLIENT.whatsappNumber || "").replace(/[^0-9]/g, "");
+    if (cleanWhatsapp.startsWith("200")) {
+      cleanWhatsapp = "20" + cleanWhatsapp.slice(3);
+    } else if (cleanWhatsapp.startsWith("0")) {
+      cleanWhatsapp = "20" + cleanWhatsapp.slice(1);
+    }
     window.open(`https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(message)}`, "_blank");
   };
 

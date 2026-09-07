@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
-import { requireStaffAccess } from '@/lib/access';
+import { requireStaffAccess, hasGranularPermission } from '@/lib/access';
 import { getDurationInMinutes } from '@/lib/services';
 
 function fmtCreatedAt(val: unknown): string {
@@ -81,6 +81,9 @@ export async function POST(req: Request) {
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
+  if (!hasGranularPermission(access.access, 'services.create')) {
+    return NextResponse.json({ error: 'You do not have permission to create or edit services.' }, { status: 403 });
+  }
 
   try {
     const body = await req.json();
@@ -116,6 +119,9 @@ export async function DELETE(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+  if (!hasGranularPermission(access.access, 'services.delete')) {
+    return NextResponse.json({ error: 'You do not have permission to delete services.' }, { status: 403 });
   }
 
   const url = new URL(req.url);

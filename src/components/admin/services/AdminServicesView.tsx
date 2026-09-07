@@ -822,18 +822,32 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
             </div>
             <div className="flex flex-col gap-4">
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">{t.categoryNameEnLabel}</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">{t.categoryNameEnLabel || "Category Name (English)"}</label>
                 <input
                   value={newCategoryNameEn}
                   onChange={(e) => setNewCategoryNameEn(e.target.value)}
-                  placeholder={t.categoryNameEnPlaceholder}
+                  placeholder={t.categoryNameEnPlaceholder || "e.g. Dermatology & Aesthetic"}
                   className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">{(t as any).categoryNameArLabel || "Category Name (Arabic)"}</label>
+                <input
+                  value={newCategoryNameAr}
+                  onChange={(e) => setNewCategoryNameAr(e.target.value)}
+                  placeholder={(t as any).categoryNameArPlaceholder || "e.g. الجلدية والتجميل"}
+                  className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                  dir="rtl"
                 />
               </div>
             </div>
             <div className="mt-6 flex items-center justify-end gap-3">
               <button
-                onClick={() => setShowAddCategoryModal(false)}
+                onClick={() => {
+                  setNewCategoryNameEn("");
+                  setNewCategoryNameAr("");
+                  setShowAddCategoryModal(false);
+                }}
                 className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
               >
                 {t.cancelBtn}
@@ -842,11 +856,13 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 onClick={() => {
                   if (!newCategoryNameEn.trim()) return;
                   const key = newCategoryNameEn.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
-                  const updated = [...localCategories, { key, en: newCategoryNameEn.trim(), ar: "" }];
+                  const arName = newCategoryNameAr.trim() || newCategoryNameEn.trim();
+                  const updated = [...localCategories, { key, en: newCategoryNameEn.trim(), ar: arName }];
                   setLocalCategories(updated);
                   saveDynamicCategories(updated);
                   setExpandedCategories(prev => ({ ...prev, [key]: true }));
                   setNewCategoryNameEn("");
+                  setNewCategoryNameAr("");
                   setShowAddCategoryModal(false);
                 }}
                 className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"

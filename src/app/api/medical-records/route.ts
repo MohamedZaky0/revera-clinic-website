@@ -40,21 +40,31 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get('customerId') || searchParams.get('customer_id');
+    const reservationId = searchParams.get('reservationId') || searchParams.get('reservation_id');
 
     let form: any = null;
     let reports: any[] = [];
 
     // Try Supabase first for intake form
     try {
-      let formQuery = supabaseServer.from('medical_records').select('*');
       if (customerId && customerId !== 'all') {
-        formQuery = formQuery.eq('customer_id', String(customerId));
-        const { data: formData, error: formErr } = await formQuery.single();
-        if (!formErr && formData) {
-          form = formData;
+        // RISK-081 / CORRUPT-D03: medical_records can now hold one row per visit
+        // (reservation_id) plus one reservation_id-less "patient profile" row, so a plain
+        // customer_id filter can match more than one row. `.single()` used to error whenever that
+        // happened, which the surrounding try/catch silently swallowed into "no record found" -
+        // exactly the kind of regression a schema change here must not introduce. A specific
+        // reservationId asks for that visit's own row; otherwise return whichever row was touched
+        // most recently, so doctor prefill still sees the patient's latest baseline.
+        let formQuery = supabaseServer.from('medical_records').select('*').eq('customer_id', String(customerId));
+        formQuery = reservationId
+          ? formQuery.eq('reservation_id', String(reservationId))
+          : formQuery.order('updated_at', { ascending: false }).limit(1);
+        const { data: formRows, error: formErr } = await formQuery;
+        if (!formErr && formRows && formRows.length > 0) {
+          form = formRows[0];
         }
       } else {
-        const { data: formData, error: formErr } = await formQuery;
+        const { data: formData, error: formErr } = await supabaseServer.from('medical_records').select('*');
         if (!formErr && formData) {
           form = formData;
         }
@@ -67,7 +77,10 @@ export async function GET(req: Request) {
     if (!form) {
       const localForms = readLocalData(FORMS_LOCAL_PATH);
       if (customerId && customerId !== 'all') {
-        form = localForms.find((f: any) => String(f.customer_id) === String(customerId)) || null;
+        const matches = localForms.filter((f: any) => String(f.customer_id) === String(customerId));
+        form = reservationId
+          ? matches.find((f: any) => String(f.reservation_id) === String(reservationId)) || null
+          : [...matches].sort((a: any, b: any) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))[0] || null;
       } else {
         form = localForms;
       }
@@ -163,8 +176,10 @@ export async function POST(req: Request) {
       // Upsert Medical Intake Form
       const now = new Date().toISOString();
       const responsesData = recordData.responses || recordData.template_responses || {};
+      const reservationId = body.reservationId || body.reservation_id || recordData.reservation_id || null;
       const updatedForm = {
         customer_id: String(customerId),
+        reservation_id: reservationId ? String(reservationId) : null,
         template_id: recordData.template_id || recordData.templateId || null,
         responses: responsesData,
         skin_type: recordData.skin_type || responsesData.skin_type || responsesData.fitzpatrick_scale || 'Normal',
@@ -184,11 +199,46 @@ export async function POST(req: Request) {
 
       // Try Supabase upsert
       try {
-        const { data, error } = await supabaseServer
-          .from('medical_records')
-          .upsert([updatedForm], { onConflict: 'customer_id' })
-          .select()
-          .single();
+        // RISK-081 / CORRUPT-D03: medical_records used to be UNIQUE(customer_id), so a second
+        // visit's intake silently overwrote the first visit's baseline data with no way to recover
+        // it. It is now UNIQUE(customer_id, reservation_id) instead, so each visit gets its own
+        // row while the same visit's repeated auto-saves keep updating that one row.
+        //
+        // Postgres never matches NULL against NULL for ON CONFLICT purposes, so a save with no
+        // reservationId (the patient-profile-level edit from MedicalFormModal, not tied to any
+        // visit) can't use .upsert(onConflict:...) — it would INSERT a brand new row every single
+        // time instead of updating the one profile-level row. Emulate upsert manually for that case.
+        let data: any = null;
+        let error: any = null;
+        if (reservationId) {
+          ({ data, error } = await supabaseServer
+            .from('medical_records')
+            .upsert([updatedForm], { onConflict: 'customer_id,reservation_id' })
+            .select()
+            .single());
+        } else {
+          const { data: existingProfileRow } = await supabaseServer
+            .from('medical_records')
+            .select('id')
+            .eq('customer_id', String(customerId))
+            .is('reservation_id', null)
+            .maybeSingle();
+
+          if (existingProfileRow?.id) {
+            ({ data, error } = await supabaseServer
+              .from('medical_records')
+              .update(updatedForm)
+              .eq('id', existingProfileRow.id)
+              .select()
+              .single());
+          } else {
+            ({ data, error } = await supabaseServer
+              .from('medical_records')
+              .insert([updatedForm])
+              .select()
+              .single());
+          }
+        }
 
         if (!error && data) {
           return NextResponse.json({ success: true, form: data });
@@ -197,25 +247,30 @@ export async function POST(req: Request) {
         console.warn('Supabase medical_records upsert failed, falling back to JSON local file');
       }
 
-      // Local storage fallback
+      // Local storage fallback — same customer_id + reservation_id matching as the Supabase path
       const localForms = readLocalData(FORMS_LOCAL_PATH);
-      const existingIndex = localForms.findIndex((f: any) => String(f.customer_id) === String(customerId));
-      
+      const existingIndex = localForms.findIndex(
+        (f: any) => String(f.customer_id) === String(customerId) && (f.reservation_id || null) === (updatedForm.reservation_id || null)
+      );
+      let savedId: string;
+
       if (existingIndex >= 0) {
         localForms[existingIndex] = {
           ...localForms[existingIndex],
           ...updatedForm,
         };
+        savedId = localForms[existingIndex].id;
       } else {
+        savedId = `MED-${Date.now()}`;
         localForms.push({
-          id: `MED-${Date.now()}`,
+          id: savedId,
           created_at: now,
           ...updatedForm,
         });
       }
 
       writeLocalData(FORMS_LOCAL_PATH, localForms);
-      const finalForm = localForms.find((f: any) => String(f.customer_id) === String(customerId));
+      const finalForm = localForms.find((f: any) => f.id === savedId);
 
       return NextResponse.json({ success: true, form: finalForm });
     }

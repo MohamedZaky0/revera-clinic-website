@@ -14,12 +14,23 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// Component defaults to a "This Month" filter computed from the real system clock. Fixtures that
+// don't care about month-boundary behavior use a day within the real current month (via this
+// helper) so they don't silently go dark once wall-clock time rolls past whatever month the
+// fixture date was hardcoded to. The one test that DOES care about month boundaries
+// (below, "date filter boundary") pins the clock itself with vi.setSystemTime and doesn't use
+// userEvent, so it's unaffected by the userEvent/fake-timers interaction hang this helper avoids.
+function thisMonthDate(day: number): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 const DOCTOR_SARA = { id: 'doc-1', name: 'Dr. Sara Adel', specialty: 'Dermatology' };
 
 function reservation(overrides: Record<string, any>) {
   return {
     id: 'res-1',
-    date: '2026-08-10',
+    date: thisMonthDate(10),
     customer_name: 'Patient A',
     customer_phone: '0100',
     service_name: 'Botox',
@@ -93,7 +104,7 @@ describe('date filter boundary — "This Month" (default)', () => {
 describe('pagination', () => {
   it('paginates at 5 rows per page and reports the correct "Showing X to Y of Z" range', () => {
     const reservations = Array.from({ length: 7 }, (_, i) =>
-      reservation({ id: `r${i}`, doctor_id: 'doc-1', customer_name: `Patient ${i}`, date: '2026-08-10' })
+      reservation({ id: `r${i}`, doctor_id: 'doc-1', customer_name: `Patient ${i}`, date: thisMonthDate(10) })
     );
     render(<DoctorProfileDetailsView doctor={DOCTOR_SARA} onBack={vi.fn()} reservations={reservations} />);
     // "Showing 1 to 5 of 7 results" is split across sibling <span>s inside one <div>, so it's
@@ -108,7 +119,7 @@ describe('pagination', () => {
 
   it('changing rows-per-page shows more rows on a single page', async () => {
     const reservations = Array.from({ length: 7 }, (_, i) =>
-      reservation({ id: `r${i}`, doctor_id: 'doc-1', customer_name: `Patient ${i}`, date: '2026-08-10' })
+      reservation({ id: `r${i}`, doctor_id: 'doc-1', customer_name: `Patient ${i}`, date: thisMonthDate(10) })
     );
     const user = userEvent.setup();
     render(<DoctorProfileDetailsView doctor={DOCTOR_SARA} onBack={vi.fn()} reservations={reservations} />);
@@ -118,7 +129,7 @@ describe('pagination', () => {
 
   it('page 2 shows the remaining rows', async () => {
     const reservations = Array.from({ length: 7 }, (_, i) =>
-      reservation({ id: `r${i}`, doctor_id: 'doc-1', customer_name: `Patient ${i}`, date: '2026-08-10' })
+      reservation({ id: `r${i}`, doctor_id: 'doc-1', customer_name: `Patient ${i}`, date: thisMonthDate(10) })
     );
     const user = userEvent.setup();
     render(<DoctorProfileDetailsView doctor={DOCTOR_SARA} onBack={vi.fn()} reservations={reservations} />);
@@ -137,8 +148,8 @@ describe('CSV export', () => {
     });
 
     const reservations = [
-      reservation({ id: 'r1', doctor_id: 'doc-1', customer_name: 'Mona Ali', date: '2026-08-10' }),
-      reservation({ id: 'r2', doctor_id: 'doc-1', customer_name: 'Hana Sami', date: '2026-08-11', status: 'cancelled' }),
+      reservation({ id: 'r1', doctor_id: 'doc-1', customer_name: 'Mona Ali', date: thisMonthDate(10) }),
+      reservation({ id: 'r2', doctor_id: 'doc-1', customer_name: 'Hana Sami', date: thisMonthDate(11), status: 'cancelled' }),
     ];
     const user = userEvent.setup();
     render(<DoctorProfileDetailsView doctor={DOCTOR_SARA} onBack={vi.fn()} reservations={reservations} />);

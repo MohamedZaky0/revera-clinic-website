@@ -167,15 +167,31 @@ export async function POST(req: Request) {
     }
   }
 
+  let targetPrescriptionId = id;
+  if (!targetPrescriptionId && cleanBookingId) {
+    try {
+      const { data: existingRx } = await supabaseServer
+        .from('prescriptions')
+        .select('id')
+        .eq('booking_id', cleanBookingId)
+        .maybeSingle();
+      if (existingRx?.id) {
+        targetPrescriptionId = existingRx.id;
+      }
+    } catch (_) {
+      // Ignore lookup error
+    }
+  }
+
   try {
     try {
       let result;
-      if (id) {
+      if (targetPrescriptionId) {
         // Update
         let { data, error } = await supabaseServer
           .from('prescriptions')
           .update(prescriptionData)
-          .eq('id', id)
+          .eq('id', targetPrescriptionId)
           .select()
           .single();
 
@@ -190,7 +206,7 @@ export async function POST(req: Request) {
           const retry = await supabaseServer
             .from('prescriptions')
             .update(prescriptionData)
-            .eq('id', id)
+            .eq('id', targetPrescriptionId)
             .select()
             .single();
           data = retry.data;

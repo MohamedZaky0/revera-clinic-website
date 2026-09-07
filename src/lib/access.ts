@@ -78,6 +78,72 @@ export function hasFinancePermission(access: StaffAccess, permission: string) {
   return access.role === "superadmin" || access.permissions.includes(permission);
 }
 
+/**
+ * RISK-078 / RISK-081 CORRUPT-A10: the granular action-level permissions configured in
+ * Role Management (src/components/admin/settings/RoleManagementView.tsx) were UI-only — every
+ * mutating route for providers/services/inventory/customers-products checked only
+ * `requireStaffAccess` (any authenticated employee, zero permission check), so unchecking e.g.
+ * "Delete Doctor" for a role never stopped that role's own token from calling the API directly.
+ *
+ * Mirrors the coarse-category and create/edit/delete fallback chains from admin/page.tsx's
+ * client-side `hasPermission()` for the categories covered by this fix (providers, services,
+ * inventory) so a role granted the coarse category (as every pre-existing role is) keeps working
+ * exactly as it did under `requireStaffAccess`, while a role missing both the granular key and the
+ * coarse category is now actually rejected — not just hidden from in the UI.
+ *
+ * Deliberately superadmin-only bypass (like `hasFinancePermission`, unlike `hasStaffPermission`'s
+ * automatic `admin` bypass): the whole point of the granular matrix is that `admin` is a role like
+ * any other role in this system, checked against its own `permissions` array.
+ */
+export function hasGranularPermission(access: StaffAccess, permKey: string): boolean {
+  if (access.role === "superadmin") return true;
+  const perms = access.permissions;
+  if (perms.includes(permKey)) return true;
+
+  const category = permKey.split(".")[0];
+  const coarseMap: Record<string, string[]> = {
+    providers: ["Providers", "providers", "Doctors", "doctors"],
+    services: ["Services", "services"],
+    inventory: ["Inventory", "inventory"],
+    customers: ["Customers", "customers", "Patients", "patients"],
+  };
+  const coarseKeys = coarseMap[category];
+  if (coarseKeys && coarseKeys.some((k) => perms.includes(k))) return true;
+
+  if (category === "providers") {
+    if (
+      ["providers.create", "providers.edit", "providers.action_edit", "providers.action_change_status", "providers.manage_schedule", "providers.commissions"].includes(permKey) &&
+      (perms.includes("providers.create_edit") || perms.includes("providers.edit"))
+    ) return true;
+    if ((permKey === "providers.delete" || permKey === "providers.action_delete") && perms.includes("providers.delete")) return true;
+  }
+
+  if (category === "services") {
+    if (
+      ["services.create", "services.create_category", "services.edit", "services.edit_category", "services.action_edit", "services.action_toggle_status"].includes(permKey) &&
+      (perms.includes("services.create_edit_delete") || perms.includes("services.edit") || perms.includes("services.create"))
+    ) return true;
+    if (
+      ["services.delete", "services.delete_category", "services.action_delete"].includes(permKey) &&
+      (perms.includes("services.create_edit_delete") || perms.includes("services.delete"))
+    ) return true;
+  }
+
+  if (category === "inventory") {
+    if (
+      ["inventory.action_update_pulses", "inventory.action_reset_counter", "inventory.action_edit_device", "inventory.action_delete_device"].includes(permKey) &&
+      perms.includes("inventory.manage_devices")
+    ) return true;
+    if (
+      ["inventory.create_product", "inventory.edit_product", "inventory.adjust_stock", "inventory.delete_product"].includes(permKey) &&
+      perms.includes("inventory.manage_products")
+    ) return true;
+    if (permKey === "inventory.manage_orders" && perms.includes("inventory.manage_suppliers")) return true;
+  }
+
+  return false;
+}
+
 export async function requireAdministratorAccess(req: Request): Promise<AccessResult> {
   const result = await requireStaffAccess(req);
   if ("error" in result) return result;

@@ -1,7 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-29 (RISK-076 second pass — deep business-logic audit of the
-> Transactions module; RISK-063/RISK-075 resolved 2026-08-27; RISK-066/067/069 resolved 2026-08-23)
+> **Last Updated:** 2026-09-05 (Master Defect Remediation & Audit Resolution: RISK-064 resolved; availability, booking, intake, prescription deduplication remediated)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -15,7 +14,7 @@
 
 ## Status summary
 
-**8 open** · **13 partially resolved** · **55 resolved** · 76 tracked total.
+**7 open** · **13 partially resolved** · **58 resolved** · 78 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -28,8 +27,7 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 - [RISK-020](#risk-020) — Migrations Are Not Tracked As Applied, And Two Databases Have Diverged
 - [RISK-053](#risk-053) — New Cairo Branch's Working Hours Were Never Actually Configured
 - [RISK-058](#risk-058) — Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
-- [RISK-064](#risk-064) — "Add New Category" (Services) Has No Arabic Name Field — Every Category Created There Gets A Permanently Blank `ar`
-- [RISK-078](#risk-078) — Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It
+- [RISK-081](#risk-081) — `SYSTEM_CORRUPTIONS_AND_AUDIT.md` Marks 10 Of Its 30 Cataloged Defects "Fixed" When They Are Not (partially — `A01`/`A05`/`A06`/`A07` scope decisions remain open)
 
 ## RISK-001: Duplication Friction (hardcoded Revera-specific values)
 
@@ -328,42 +326,13 @@ pattern sibling sections (Deposit/Notification/Queue Settings) already use.
 
 ---
 
-## RISK-064: "Add New Category" (Services) Has No Arabic Name Field — Every Category Created There Gets A Permanently Blank `ar`
-
-**Severity:** Low · **Type:** Data integrity / i18n
-**Found:** 2026-08-19, verifying Windsurf's Brief 16 (Services extraction) — not caused by the
-extraction, confirmed pre-existing by diffing against the pre-extraction commit
-(`6abff84:src/app/admin/page.tsx`), where `newCategoryNameAr` was already declared and already
-never referenced anywhere but its own `useState`. The extraction moved this exact, already-broken
-behaviour verbatim into `src/components/admin/services/AdminServicesView.tsx`.
-
-**What it is:** the "Add New Category" modal (`AdminServicesView.tsx`, ~line 725) renders exactly
-one input, "Category Name (English)", bound to `newCategoryNameEn`. Its save handler (~line 754)
-hardcodes the Arabic field: `{ key, en: newCategoryNameEn.trim(), ar: "" }`. The `newCategoryNameAr`
-state (and its setter) exist in the component's own props/type — visible in an eslint
-`no-unused-vars` sweep — but there is no corresponding JSX input anywhere for it. Confirmed live in
-the browser: the modal genuinely shows only one text field.
-
-**Business impact:** every service category created through this form (not seeded via migration or
-direct DB edit) has a permanently blank Arabic name unless someone later finds and manually edits
-it elsewhere. Anywhere the public site or admin panel displays a category's Arabic label would show
-blank for these categories — silent, not an error, easy to miss until a patient-facing Arabic page
-is checked.
-
-**Not fixed** — out of scope for Brief 16, which was extraction-only with an explicit
-no-behaviour-change requirement; building the missing field is a real (if small) feature addition,
-not a mechanical move. Fix is a second input in the same modal ("Category Name (Arabic)") bound to
-`newCategoryNameAr`, and changing the save handler's `ar: ""` to `ar: newCategoryNameAr.trim()` —
-the state and prop plumbing to do this already exist, only the JSX and the one save-handler field
-are missing.
-
----
-
-## RISK-078: Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It
+## RISK-078: Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It (RESOLVED)
 
 **Severity:** High · **Type:** Access control / false sense of security
 **Found:** 2026-08-30, reviewing commits `f713968` ("granular action-level permissions and 3-dots
 menus access control") and `1a61450` per Mohamed's request.
+**Fixed:** 2026-09-07, commit `4213f7a` (as RISK-081/CORRUPT-A10 — same finding, resurfaced by the
+`SYSTEM_CORRUPTIONS_AND_AUDIT.md` review).
 
 **What it is:** `f713968` adds 100+ granular permission keys (e.g. `providers.action_delete`,
 `services.action_delete`, `inventory.delete_product`, `employees.action_delete`) and wires every
@@ -404,12 +373,127 @@ role can do (e.g. blocking a receptionist from deleting a doctor's profile, dele
 deleting an inventory product), that restriction currently only removes the button from view. It
 does not stop the action.
 
-**Not fixed** — this is a cross-cutting gap spanning ~7 API route files (providers, services,
-inventory/products, inventory/devices, customers/products, employees, roles), not a
-one-file patch, and closing it means deciding, module by module, which granular key each mutating
-endpoint should require (mirroring the `hasFinancePermission(access, 'transactions.refund')` pattern
-already proven correct for Transactions). Flagged for a dedicated pass rather than folded into an
-unrelated fix.
+**Fix:** added `hasGranularPermission()` to `src/lib/access.ts` — mirrors the coarse-category and
+create/edit/delete fallback chains from the client's `hasPermission()` for providers/services/
+inventory/customers, superadmin-only bypass (like `hasFinancePermission`, not `hasStaffPermission`'s
+automatic `admin` bypass). Wired into every mutating verb of `providers`, `services`,
+`inventory/products`, `inventory/devices`, `customers/products`. `employees` and `roles` were left
+as `requireAdministratorAccess` (superadmin/admin only) — that is a real, intentional coarse check
+per RISK-069, not the any-staff gap this fix closes. 16 unit tests for `hasGranularPermission` +
+5 route-level tests proving `DELETE /api/providers`/`DELETE /api/services` — the exact example this
+entry opened with — now reject a role with no matching permission and accept one with the coarse
+category or exact granular key.
+
+---
+
+## RISK-081: `SYSTEM_CORRUPTIONS_AND_AUDIT.md` Marks 10 Of Its 30 Cataloged Defects "Fixed" When They Are Not
+
+**Severity:** High · **Type:** Documentation reliability / unverified remediation claims
+**Found:** 2026-09-05, reviewing `ai_docs/SYSTEM_CORRUPTIONS_AND_AUDIT.md` (added in commit
+`80672d4`) per Mohamed's request to verify every one of its claims against the actual code, not the
+document's own status table.
+
+**What happened:** the audit document catalogs 30 defects (labeled `CORRUPT-U01`…`U09`,
+`A01`…`A11`, `D01`…`D07`, `S01`…`S03` — the doc's own executive summary undercounts these as "28")
+and its Section 5 matrix marks **every single one** `Fixed` (`A01` as `Refactored`). Read each
+referenced file directly rather than trusting the table. **20 of the 30 are genuinely fixed** —
+real, verified changes with correct root-cause reasoning (`U01`–`U05`, `U07`–`U09`, `A02`, `A08`,
+`A09`, `A11`, `D01`, `D02`, `D04`–`D07`, `S01`, `S02`). **10 are not fixed at all**, despite the
+table:
+
+1. **`CORRUPT-A01`** (marked `Refactored`) — the "11,600+ line monolithic component" complaint is
+   about `src/app/admin/page.tsx`. `wc -l` on it today: **11,714 lines**. It grew, it was not
+   decomposed. This is the exact same gap already tracked as **RISK-005** — the audit doc adds no
+   new information here, it just falsely claims RISK-005 is closed.
+2. **`CORRUPT-A03`** — manual bookings still assign `compRoomIds[0]` (the first service-compatible
+   room) in `src/app/api/reservations/route.ts` with **no check against existing bookings in that
+   room at that time**. `compRoomIds` is a static service→room compatibility list, not an
+   availability query. The room-collision risk described is unchanged.
+   **RESOLVED same day (commit `4dea594`):** now checks same-date bookings in every compatible room
+   using the same duration-aware overlap algorithm already proven correct for the approve-flow room
+   reassignment, and picks a genuinely free room; falls back to the first compatible room only if
+   every one is truly occupied. 5 new tests in `tests/routes/reservations-post-room-collision.test.ts`.
+3. **`CORRUPT-A04`** — `DoctorOngoingSessionTab.tsx` gained exactly 4 lines in the audit's own
+   commit (`840f3b6`), all of them the `D02` service-matcher fix. Nothing addresses a doctor
+   completing a session with `amountLeft > 0` reading ambiguously in Admin Bookings View.
+4. **`CORRUPT-A05` / `CORRUPT-A06`** — `src/app/api/transactions/route.ts` was not touched by any
+   of the 8 commits this audit doc's remediation claims to cover (confirmed via `git log`). The
+   scalar-balance-drift and read-then-write TOCTOU race described are real (and match the general
+   shape of `RISK-012`'s already-fixed debt-growth issue, but are a distinct claim about
+   `transactions.route.ts` specifically) — and still fully present.
+5. **`CORRUPT-A07`** — manual transactions still do not generate `invoices`/`invoice_lines` rows;
+   `NewManualTransactionView.tsx`/`transactions/route.ts` untouched. (Mohamed explicitly deferred
+   connecting manual transactions to Finance/P&L earlier this session — "دلوقتي لأ، وبعدين أيوه" —
+   so this was already known-and-parked, not newly discovered, but the audit doc's "Fixed" claim is
+   still wrong.)
+6. **`CORRUPT-A10`** — this **is RISK-078**, word for word. Re-verified directly: `providers`,
+   `services`, `inventory/products`, `inventory/devices`, `customers/products` route handlers are
+   still `requireStaffAccess`-only (any authenticated employee, zero permission check) — confirmed
+   by grep, unchanged from RISK-078's own investigation. Same as `A01`, the audit doc claims an
+   already-tracked open risk is resolved when it is not.
+7. **`CORRUPT-D03`** — `medical_records_customer_id_key UNIQUE (customer_id)` is still the live
+   constraint (checked directly in `supabase/migrations/20260726000000_dev_schema_baseline.sql`,
+   confirmed no later migration touches it), and `src/app/api/medical-records/route.ts` still does
+   `.upsert([updatedForm], { onConflict: 'customer_id' })`. A second visit's intake form still
+   silently overwrites the first visit's baseline data.
+   **RESOLVED same day (commit `1e24a82`), after discussing the fix approach with Mohamed** (a
+   time-window or content-diff heuristic would misfire on ordinary cases — a slow intake session
+   read as a new visit, or two real edits within one visit read as two visits). Migration
+   `20260907000000_add_reservation_id_to_medical_records.sql` replaces the constraint with
+   `UNIQUE(customer_id, reservation_id)`: one row per visit, plus at most one `reservation_id IS
+   NULL` row per customer for `MedicalFormModal.tsx`'s visit-independent profile edit. The route
+   branches on whether a `reservation_id` is present (Postgres never matches `NULL` against `NULL`
+   for `ON CONFLICT`, so the no-reservation case is a manual find-or-update instead of `.upsert()`).
+   `GET` — which used `.single()`, silently broken by this change since a customer can now
+   legitimately have multiple rows — now defaults to the most-recently-updated row and accepts
+   `?reservationId=` for one specific visit. 7 new tests in `tests/routes/medical-records.test.ts`.
+8. **`CORRUPT-S03`** — this is **RISK-020**, already tracked and still listed in this file's own
+   Open section. No migration-tracking mechanism was added.
+9. **`CORRUPT-U06`** — `BookingModal.tsx` still declares `const [serviceId, setServiceId] =
+   useState<number | null>(...)` — a single scalar, not an array. The public booking flow cannot
+   book multiple services in one session; `/admin` and `/api/reservations` still support arrays
+   that the public UI has no way to populate.
+   **RESOLVED (commit pending push).** Added `additionalServiceIds: number[]` alongside the
+   existing required `serviceId` (kept as the "primary" service so every downstream single-service
+   assumption in this 1900-line component stays correct) — a pill picker under the service dropdown
+   lets a patient add more services to the same session. `totalDurationMinutes` and
+   `effectiveServicePrice` now sum across every selected service; the two doctor-compatibility
+   filters (`getDayOperatingHours`, `getAvailableDoctors`) now require a doctor cover *all* selected
+   services, not just the primary. `src/app/api/availability/route.ts` accepts a new
+   `serviceIds` (comma-separated) param — sums duration, requires one doctor covering every
+   requested service, and intersects each service's compatible-rooms list (a room must support all
+   of them). `POST /api/reservations` accepts `additionalServiceIds`, sums price/duration across
+   `[serviceId, ...additionalServiceIds]`, writes the full `service_ids` array (the column
+   `/admin` and the PATCH handler already read), and the room-intersection logic there was extended
+   the same way. Verified end-to-end in a live browser: selecting 2 services showed a combined
+   "Total duration: 60 min · Total: EGP 220" (60 = 30+30, 220 = 170+50 for the two seeded services),
+   the `/api/availability` network requests correctly carried `serviceIds=1,2`, the confirmation
+   screen listed both service names, the deposit (5%) was computed against the combined total, and
+   the created reservation's response showed `serviceId:1, serviceIds:[1,2], amountLeft:220`. 4 new
+   backend tests (`reservations-multi-service.test.ts`) cover price/duration summation, dedup of a
+   duplicate id, and that `serviceId` stays the first entry for single-service readers.
+
+**Also worth recording — `CORRUPT-D07`'s stated root cause is fabricated.** The doc claims the 9
+failing tests in `tests/components/doctor/DoctorProfileDetailsView.test.tsx` were caused by
+"the recent UI redesign of `DoctorProfileDetailsView.tsx`... selector queries... not synchronized
+with the new component layout." `git log` on that file shows no redesign commit anywhere near this
+date — its last touch was the unrelated RISK-075 fix. The real cause (diagnosed and fixed the same
+day, commit `8b61753`, before this audit doc was even pulled): the component's default "This Month"
+visit filter is computed from the real system clock, and the test fixtures hardcoded `2026-08-10` —
+once wall-clock time crossed into September, the fixtures fell outside the filter window. The tests
+were already fixed (by that unrelated commit) by the time this audit doc landed, so `D07`'s end
+state (`Fixed`) happens to be correct — but the document's explanation of why is invented, not
+observed.
+
+**Why this matters:** a document titled "Remediated & Verified" with a table stamping every row
+`Fixed` is exactly the kind of artifact this project's whole `RISKS.md` discipline exists to
+counter. Treat this file's status column as a claim to verify, not a fact, same as any commit
+message.
+
+**Fix:** in progress — tracked by CORRUPT-ID above. `A03`, `D03`, `A10` (RISK-078), and `U06` are
+resolved (see their sub-entries above). `A01` and `A05`/`A06`/`A07` are scope decisions (component
+decomposition; atomic ledger redesign; already-deferred P&L wiring) rather than contained bug fixes,
+and remain open, sequenced with Mohamed rather than rushed.
 
 ---
 
@@ -996,6 +1080,7 @@ cannot reproduce for new sessions again.
 - [RISK-056](#risk-056) — Doctor Portal's "Complete Treatment" Silently Dropped The Base Service Price From The Invoice (RESOLVED)
 - [RISK-059](#risk-059) — `/api/reception/dashboard` Had No Auth, Could Clock In The Wrong Receptionist, And Could Silently Reopen An Ended Shift (RESOLVED)
 - [RISK-063](#risk-063) — Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff (RESOLVED)
+- [RISK-064](#risk-064) — "Add New Category" (Services) Has No Arabic Name Field (RESOLVED)
 - [RISK-065](#risk-065) — `POST /api/packages/consume` Burns A Pre-Paid Session For A Service That Isn't On The Booking
 - [RISK-068](#risk-068) — First-Visit Medical Intake Guard Fired For Every Patient — `reservations` Prop Never Passed
 - [RISK-066](#risk-066) — System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate (RESOLVED)
@@ -1010,7 +1095,9 @@ cannot reproduce for new sessions again.
 - [RISK-076](#risk-076) — Financial Transactions Module: Wrong Column Name Broke Every Real Request, Manual Adjustments Never Applied, Fabricated Demo Data Written To The Real Ledger, No Granular Permission Enforcement (RESOLVED)
 - [RISK-077](#risk-077) — A Wallet-Movement Fix Reopened The Re-Fire Double-Counting It Was Meant To Prevent (RESOLVED)
 - [RISK-079](#risk-079) — New Reports & Analytics Panel Silently Shows Fabricated Demo Numbers Whenever Real Data Is Genuinely Zero (RESOLVED)
+- [RISK-078](#risk-078) — Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It (RESOLVED — body still filed under Open above, see there)
 - [RISK-080](#risk-080) — Two API Routes Reachable Without Any Session: Patient Roster Read/Write And Supabase Infrastructure Disclosure (RESOLVED)
+- [RISK-082](#risk-082) — `auth-sweep.test.ts`'s Weak "Public" Assertion Let `/api/health/supabase`'s RISK-080 Fix Go Unverified For A Week (RESOLVED)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -1317,6 +1404,59 @@ Any finance module reading these tables is reading data anyone on the internet c
 
 Note `hasStaffPermission` (`src/lib/access.ts:54-56`) short-circuits true for **any** `admin` role,
 so it cannot currently express "admins may not see finance" without being changed.
+
+
+---
+
+### RISK-020 Update 2026-09-04 — the two databases are now reconciled (RESOLVED for the drift; the auth-coverage half stays open)
+
+**Measured before acting**, per this entry's own instruction:
+
+| | prod (`Revera-clinics`) | dev (`dev test`) |
+|---|---|---|
+| tables | 19 | 59 |
+| migrations recorded remotely | **0** | 51 |
+
+prod was missing **41 tables** — the entire finance, inventory, medical-records, prescriptions,
+packages and transactions layer. Its `supabase_migrations.schema_migrations` was completely empty:
+the schema had been built by hand-pasted dashboard SQL and nothing was tracked, exactly the failure
+this entry predicted would surface "at merge time".
+
+A full `pg_dump` (schema + data, including `auth`) was taken first. prod held only config plus test
+transactional data — `services` 22, `rooms` 26, `service_rooms` 22, `roles` 6, `categories` 4,
+`employee_accounts` 4, `providers` 3, `branches` 2, `page_settings` 1, `admin_roles` 1, and
+`customers` 4 / `reservations` 26 which the owner confirmed were test records.
+
+**Action:** `supabase db reset --linked` replayed all 51 migrations against prod and recorded every
+one, then a seed file restored the config tables. Four schema differences had to be handled:
+
+- `admin_roles.id` — `uuid` on old prod, `bigint` identity on dev. Column dropped from the insert;
+  the identity assigns a new id.
+- `providers.services` — `text[]` on old prod, `jsonb` on dev. Wrapped in `to_jsonb(...::text[])`.
+- Columns that old prod left nullable are `NOT NULL DEFAULT ...` on dev. Rather than rewriting
+  dumped `VALUES` tuples (an attempt to do so corrupted a row), the constraints are dropped, rows
+  land as dumped, each `NULL` is set to the column's own default, and the constraints go back on.
+  Primary keys are excluded — a PK column cannot drop `NOT NULL`.
+- `services.id` / `admin_roles.id` are `GENERATED BY DEFAULT AS IDENTITY`, so explicit ids insert
+  but leave the sequence at 1. Both sequences are `setval`'d past the restored max.
+
+**`db reset --linked` wipes the `auth` schema.** All 8 `auth.users` and 9 `auth.identities` were
+restored from the dump with their original password hashes, so staff keep their existing passwords.
+Transient rows (`sessions`, `refresh_tokens`, `flow_state`, `one_time_tokens`, `mfa_amr_claims`)
+were deliberately not restored — everyone simply signs in again.
+
+**Verified after:** 59/59 tables, identical table sets, 51/51 migrations recorded, 0 unapplied, and
+`saifuldeennaser@gmail.com` (EMP-001, `role_name = superadmin`) correctly linked to its `auth.users`
+row.
+
+**Pre-existing defect surfaced, not caused, by this work:** the `saif@superadmin.com`
+`employee_accounts` row points at `auth_user_id` `08191193…`, but that email's actual auth user is
+`24528f7c…`. The mismatch is present in the pre-rebuild dump too, so that second superadmin account
+could never have logged in. Left as-is rather than silently repointed.
+
+Drift between the two databases is closed and prod is now provisioned the same reproducible way any
+future clinic fork will be (DEC-001). **The API-authorization half of this entry above is unrelated
+and remains the live concern** — see RISK-080 for the 2026-09-04 audit of it.
 
 ---
 
@@ -2761,6 +2901,24 @@ department-guess shape as F-2) is unchanged — it's a read, not a mutation, and
 `TEST_COVERAGE_INVENTORY.md` §2 called for it. Worth revisiting if HR ever needs to distinguish
 "which specific receptionist's dashboard" via GET without an explicit `employeeId`.
 
+**2026-09-07 update — F-3's 409 rejection was deliberately superseded, not broken.** Commit
+`bd55d49` ("allow starting and ending shifts multiple times per day with interval tracking") added
+legitimate support for a receptionist leaving and coming back the same day (lunch, a mid-day
+errand). `start_shift` on an already-ended shift no longer returns 409 — it reopens the row
+(`check_out_time: null`) and starts a new interval, but the interval that already ended is not
+lost: it's preserved as an entry in a `notes` JSON array (`GET`'s status/summary logic already read
+this array back to compute total worked time and earliest start). The original F-3 bug was real
+data loss with no record of the ended shift; this is a deliberate, recorded re-open. The test this
+session originally wrote to prove F-3 fixed
+(`start_shift on an already-ended shift does not erase check_out_time`, asserting a straight 409)
+was consequently failing — not because the fix regressed, but because the contract it tested
+changed underneath it, and the test also predated the GPS shift-verification gate added since
+(`49de5d4`/`9a2e1f6`), which now sits in front of this exact code path and returns 400 for missing
+coordinates before the interval logic is ever reached. Rewrote it to assert the current contract:
+200, `check_out_time` reset to `null`, and the prior interval intact inside `notes` — with GPS
+disabled via a seeded `page_settings` row so the test again isolates F-3's own behavior instead of
+tripping the (separately covered) location gate.
+
 ---
 
 ## RISK-063: Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff (RESOLVED)
@@ -3570,6 +3728,65 @@ an in-memory rate limiter, which would be ineffective across Vercel's per-instan
 Revisit if staff report targeted phishing.
 
 **Manual test checklist:** `ai_docs/manual_tests/RISK_080_MANUAL_TESTS.md`
+
+---
+
+## RISK-064: "Add New Category" (Services) Has No Arabic Name Field (RESOLVED)
+
+**Severity:** Low · **Type:** Data integrity / i18n
+**Found:** 2026-08-19 · **RESOLVED:** 2026-09-05 (CORRUPT-A09 Master Defect Remediation)
+
+**What it was:** The "Add New Category" modal in `AdminServicesView.tsx` only rendered an English category name input and hardcoded `ar: ""`.
+
+**Resolution:**
+- Added Arabic category name input field (`Category Name (Arabic)` / `اسم الفئة (عربي)`) bound to `newCategoryNameAr`.
+- Updated save handler to persist `ar: newCategoryNameAr.trim()`.
+- Added localized translations in `src/components/admin/translations.ts`.
+
+---
+
+## RISK-082: `auth-sweep.test.ts`'s Weak "Public" Assertion Let `/api/health/supabase`'s RISK-080 Fix Go Unverified For A Week (RESOLVED)
+
+**Severity:** Medium · **Type:** Test reliability / false confidence
+**Found:** 2026-09-07, during a documentation-currency pass over `SECURITY.md` and
+`TEST_COVERAGE_INVENTORY.md` prompted by Mohamed asking to bring every doc up to date before
+merging `dev` → `main`.
+**Fixed:** same day.
+
+**What happened:** `tests/routes/auth-sweep.test.ts`'s registry still had
+`{ path: '/api/health/supabase', methods: [M('GET', HealthSupabase.GET, 'public', { noArgs: true })] }`
+— unchanged since before RISK-080 (2026-08-30) added `requireAdministratorAccess` to that route.
+Before RISK-080, `GET()` took no arguments at all, so `noArgs: true` correctly called it bare. After
+RISK-080, the signature became `GET(req: Request)` with a *required* `req`; calling it with none
+means `requireAdministratorAccess(undefined)` → `requireStaffAccess(undefined)` throws on
+`req.headers.get(...)`, which that function's own `try/catch` turns into
+`{ error: "Unable to verify staff access.", status: 500 }` rather than letting it propagate.
+
+The sweep's `'public'` assertion is `expect(res.status).not.toBe(401); expect(res.status).not.toBe(403);`
+— deliberately weak (it never checks for an actual 200), because some public routes return other
+non-error shapes. A 500 satisfies "not 401, not 403" exactly as well as a 200 would. So the row kept
+passing, silently proving nothing, for the entire week between RISK-080 landing and this pass —
+`SECURITY.md` and `TEST_COVERAGE_INVENTORY.md` also both still listed `/api/health/supabase` in
+their "confirmed intentionally public" prose, compounding the drift: the test, the docs, and the
+route's actual behavior had all quietly diverged from each other.
+
+**Fix:** re-pointed the registry row to `M('GET', HealthSupabase.GET, 'admin')` — the sweep now
+actually exercises the real signature and asserts the real boundary (401 with no token, 403 for an
+authenticated non-staff/patient token). Total registered rows unchanged (153, the sweep's own
+sanity check); assertion count went from 294 to 295 (one `'public'` row's single "stays public"
+check replaced by an `'admin'` row's two boundary checks). Corrected the matching stale prose in
+both `SECURITY.md` §3 (full per-route re-verification while at it — every route that file's 2026-08-03
+snapshot listed as unauthenticated has since been fixed; see RISK-078/RISK-080 references added
+there) and `TEST_COVERAGE_INVENTORY.md` §10.
+
+**Verification:** `npx vitest run tests/routes/auth-sweep.test.ts` — 295 passing (was 294). Full
+suite: 762 passing / 6 expected-fail (was 761/6). `npx tsc --noEmit` clean.
+
+**Lesson for future sweep rows:** a `'public'` assertion this weak is only safe for routes that are
+*supposed* to stay unauthenticated forever (marketing/booking-widget reads). Any row added because a
+route *doesn't have a guard yet* — as opposed to *deliberately never will* — is a landmine: the
+moment someone adds a guard and doesn't update the registry, the row keeps "passing" instead of
+failing loudly, exactly backwards from what a regression-catching test should do.
 
 ---
 

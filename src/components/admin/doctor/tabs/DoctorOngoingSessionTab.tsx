@@ -167,7 +167,11 @@ export default function DoctorOngoingSessionTab({
     const matchedSrv = servicesList?.find(
       (s) =>
         String(s.id) === String(activeSessionBooking.serviceId || activeSessionBooking.service_id) ||
+        (s.en && s.en === serviceName) ||
+        (s.ar && s.ar === serviceName) ||
         (s.name && s.name === serviceName) ||
+        (s.name_en && s.name_en === serviceName) ||
+        (s.name_ar && s.name_ar === serviceName) ||
         (s.title && s.title === serviceName) ||
         (s.title_en && s.title_en === serviceName)
     );

@@ -109,8 +109,9 @@ export default function ProfilePage() {
     }
   };
 
-  // Fetch localstorage user on mount
+  // Fetch localstorage user or Supabase Auth session on mount
   useEffect(() => {
+    let active = true;
     const stored = localStorage.getItem("revera_user");
     if (stored) {
       try {
@@ -119,11 +120,40 @@ export default function ProfilePage() {
         setFullName(u.name || "");
         setEmail(u.email || "");
         setMobileAndPreloadData(u);
+        setLoadingAuth(false);
+        return;
       } catch (err) {
         console.error("Failed to parse user session:", err);
       }
     }
-    setLoadingAuth(false);
+
+    if (supabase) {
+      supabase.auth.getSession().then(({ data: { session } }: any) => {
+        if (!active) return;
+        if (session?.user) {
+          const authUser = {
+            id: session.user.id,
+            email: session.user.email,
+            phone: session.user.phone,
+            name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || "Patient",
+          };
+          setUser(authUser);
+          setFullName(authUser.name);
+          setEmail(authUser.email || "");
+          setMobileAndPreloadData(authUser);
+          localStorage.setItem("revera_user", JSON.stringify(authUser));
+        }
+        setLoadingAuth(false);
+      }).catch(() => {
+        if (active) setLoadingAuth(false);
+      });
+    } else {
+      setLoadingAuth(false);
+    }
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Fetch reference lists (services and branches)

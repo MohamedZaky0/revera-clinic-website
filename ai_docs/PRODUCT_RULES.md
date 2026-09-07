@@ -308,7 +308,7 @@ The following are **not currently enforced in code**:
 ---
 
 ## Role-Based Access Control (RBAC) & Granular Action-Level Permissions Rules
-**Enforced in:** `src/app/admin/page.tsx`, `src/components/admin/settings/RoleManagementView.tsx`, `src/components/admin/translations.ts`, and individual view components.
+**Enforced in:** `src/app/admin/page.tsx`, `src/components/admin/settings/RoleManagementView.tsx`, `src/components/admin/translations.ts`, and individual view components (UI visibility) — **and, as of RISK-078/RISK-081 CORRUPT-A10 (2026-09-07), `src/lib/access.ts`'s `hasGranularPermission()` at the route level for `providers`, `services`, `inventory/products`, `inventory/devices`, and `customers/products`** (mutating verbs only). Before that fix, every rule below described UI behavior only — a role could have a button hidden and still perform the action via a direct API call. `employees` and `roles` remain `requireAdministratorAccess`-gated only (no granular distinction), which is intentional per RISK-069, not an oversight. See `ai_docs/SECURITY.md` §3a for the current per-route inventory.
 
 1. **Superadmin Immunity**:
    - Users with `adminRole === 'superadmin'` possess blanket authorization across all navigation sections, APIs, action buttons, and 3-dots menus regardless of the `permissions` array.
@@ -322,3 +322,32 @@ The following are **not currently enforced in code**:
    - De-selecting all child actions automatically deselects the parent, ensuring the stored `permissions` array accurately reflects granular intent.
 5. **Coverage Across All 15 Subsystems**:
    - RBAC rules strictly cover all 15 clinic categories: Dashboard & Reception, Bookings Management, Patient Management, Doctor Management, Services Catalog, Inventory & Devices, Employees & Staff, HR & Payroll, Financial Transactions, Marketing & Campaigns, Customer Support, Reports & Analytics, Finance & Accounting, Doctor Portal & Clinical Intake, and Settings & System Control.
+
+---
+
+## Multi-Service Public Booking (RISK-081 CORRUPT-U06)
+**Enforced in:** `src/components/BookingModal.tsx`, `src/app/api/availability/route.ts`, `src/app/api/reservations/route.ts`.
+
+1. **One Primary Service, Any Number Of Additional Services**:
+   - The public booking flow requires exactly one primary service (`serviceId`) and accepts zero or more `additionalServiceIds` on top of it, added via a pill picker shown once a primary service is chosen.
+   - Every downstream single-service assumption in `BookingModal.tsx` (doctor filtering, operating-hours calculation) keys off the *combined* set of selected services, not just the primary.
+2. **Combined Price & Duration**:
+   - Price and duration shown to the patient, the deposit calculated from them, and the amount charged server-side are all summed across every selected service — never the primary service alone.
+3. **One Doctor, One Room, Covers Every Selected Service**:
+   - A doctor is only offered as a choice (client-side) or matched (server-side, `/api/availability`) if their `services` list covers *every* selected service, not just one.
+   - A room is only assigned if it is mapped (`service_rooms`) to *every* selected service (intersection), both for automatic availability computation and for a manual/reception-created booking's room assignment.
+4. **`service_ids` Is The Source Of Truth**:
+   - The created `reservations` row stores the full, deduped list in `service_ids` (with `service_id` kept as the first entry for backward compatibility with any code still reading it as a scalar) — the same column `/admin` and the booking PATCH/checkout flow already read for admin-created multi-service bookings.
+
+---
+
+## Medical Records Are Per-Visit, Not Per-Customer (RISK-081 CORRUPT-D03)
+**Enforced in:** `src/app/api/medical-records/route.ts`, `supabase/migrations/20260907000000_add_reservation_id_to_medical_records.sql`.
+
+1. **A Visit's Intake Form Is Scoped To That Visit**:
+   - When a save includes a `reservation_id` (the doctor's active-session intake save), the row is keyed on `(customer_id, reservation_id)` — a second visit never overwrites the first visit's baseline data; it creates its own row.
+2. **A Patient-Profile Edit Has No `reservation_id`**:
+   - `MedicalFormModal.tsx` (opened from the customer profile page, not tied to any specific visit) saves with `reservation_id` omitted, and is upserted against the single `reservation_id IS NULL` row for that customer — this is deliberately a different concept from a visit's clinical intake.
+3. **Reads Default To "Most Recent"**:
+   - `GET /api/medical-records?customerId=` with no `reservationId` returns whichever row (profile or any visit) was most recently updated, so doctor-session prefill still shows the patient's latest known baseline.
+   - Pass `?reservationId=` to fetch one specific visit's intake data.

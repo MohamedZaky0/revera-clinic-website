@@ -715,17 +715,6 @@ export default function CustomerProfileDrawer({
               <div className="flex items-center gap-1 bg-[#F2EFE9] p-1 rounded-xl">
                 <button
                   type="button"
-                  onClick={() => setCustomerRecordsSubTab("intake")}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    customerRecordsSubTab === "intake"
-                      ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
-                      : "text-[#5A6A51] hover:text-[#414E36]"
-                  }`}
-                >
-                  📋 {t.subtabIntake}
-                </button>
-                <button
-                  type="button"
                   onClick={() => setCustomerRecordsSubTab("prescriptions")}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
                     customerRecordsSubTab === "prescriptions"
@@ -746,17 +735,18 @@ export default function CustomerProfileDrawer({
                 >
                   📄 {t.subtabReports} ({medicalReports.length})
                 </button>
-              </div>
-
-              {customerRecordsSubTab === "intake" && (
                 <button
                   type="button"
-                  onClick={handleOpenMedicalFormModal}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm shrink-0"
+                  onClick={() => setCustomerRecordsSubTab("intake")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    customerRecordsSubTab === "intake"
+                      ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
+                      : "text-[#5A6A51] hover:text-[#414E36]"
+                  }`}
                 >
-                  <Pencil size={13} /> {medicalRecordForm ? t.editIntakeBtn : t.fillIntakeBtn}
+                  📋 {t.subtabIntake}
                 </button>
-              )}
+              </div>
 
               {customerRecordsSubTab === "prescriptions" && !prescriptionEditMode && (adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor") && (
                 <button
@@ -777,6 +767,16 @@ export default function CustomerProfileDrawer({
                   <Plus size={14} /> {t.uploadReportBtn}
                 </button>
               )}
+
+              {customerRecordsSubTab === "intake" && (
+                <button
+                  type="button"
+                  onClick={handleOpenMedicalFormModal}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm shrink-0"
+                >
+                  <Pencil size={13} /> {medicalRecordForm ? t.editIntakeBtn : t.fillIntakeBtn}
+                </button>
+              )}
             </div>
 
             {/* Sub-tab 1: Medical Intake & History */}
@@ -784,18 +784,9 @@ export default function CustomerProfileDrawer({
               <div className="space-y-4">
                 {medicalRecordForm ? (
                   <div className="bg-white rounded-2xl border border-[#414E36]/10 p-6 space-y-6">
-                    <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-                      <div>
-                        <h4 className="text-sm font-bold text-[#1F251A]">{t.intakeFormTitle}</h4>
-                        <p className="text-xs text-[#5A6A51]">{t.intakeFormSubtitle}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleOpenMedicalFormModal}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
-                      >
-                        <Pencil size={12} /> {t.editFormBtn}
-                      </button>
+                    <div className="border-b border-[#414E36]/10 pb-3">
+                      <h4 className="text-sm font-bold text-[#1F251A]">{t.intakeFormTitle}</h4>
+                      <p className="text-xs text-[#5A6A51]">{t.intakeFormSubtitle}</p>
                     </div>
 
                     <div className="space-y-6 text-sm">

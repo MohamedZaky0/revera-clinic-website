@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-08-29 (DEC-046)
+> **Last Updated:** 2026-09-06 (DEC-051)
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -1741,3 +1741,128 @@ Receptionists and Clinic Admins need to manually record historical bookings that
 3. Created `GET /api/reservations/previous` and integrated test case `TC-038` into the Admin Settings System Test Suite (`/admin` -> Settings -> System Test Suite).
 4. Provided full bilingual localization (EN/AR) in `src/components/admin/translations.ts`.
 
+---
+
+## DEC-047: Master Defect Catalog Remediation & System Verification Suite Expansion
+
+**Date:** 2026-09-05
+**Status:** Decided & Implemented
+
+**Context:**
+A comprehensive audit documented 28 core defects across User View, Admin View, Doctor View, and Database/API Architecture (`ai_docs/SYSTEM_CORRUPTIONS_AND_AUDIT.md`).
+
+**Decisions & Remediations:**
+1. **Availability Engine & Inactive Doctor Filter (`CORRUPT-U01`, `CORRUPT-A08`, `CORRUPT-U02`, `CORRUPT-U03`):**
+   - Updated `fetchCachedServices` to select `duration` and `duration_minutes` explicitly.
+   - Updated service matching logic to check `selectedSvc.en || selectedSvc.name` with bilingual fallback.
+   - Excluded inactive doctors (`provider.active === false || provider.status === 'inactive'`) from slot calculation and provider rosters.
+   - Enforced operating hours boundaries for multi-slot services so slots exceeding clinic closing times are excluded.
+2. **Booking Modal & Egyptian WhatsApp Normalization (`CORRUPT-U02`, `CORRUPT-U05`, `CORRUPT-U07`):**
+   - Added service duration cutoff logic (`slotStartMinutes + svcDuration <= endMinutes`).
+   - Fixed Egyptian trunk prefix bugs on `wa.me` links (`2001...` -> `201...`, `01...` -> `201...`).
+   - Aligned past-slot time comparisons to `Africa/Cairo` timezone.
+3. **Patient Auth & Customer Phone Queries (`CORRUPT-U08`, `CORRUPT-U09`):**
+   - Added session hydration fallback in `/profile` when `localStorage` is missing.
+   - Added `normalizeEgyptMobile` and multi-prefix variant querying (`010...`, `+2010...`, `2010...`, `002010...`) in `GET /api/customers`.
+4. **Admin Bookings Real Status & Category Localization (`CORRUPT-A02`, `CORRUPT-A09`):**
+   - Preserved `status: r.status || st` alongside `display_status: st` in `AdminBookingsView`.
+   - Added Arabic category name input to `AdminServicesView` category modal, saving `ar: newCategoryNameAr.trim()` (resolves `RISK-064`).
+5. **Reception Geofence Guard (`CORRUPT-A11`):**
+   - Ensured `POST /api/reception/dashboard` Start Shift rejects with 400 `out_of_location` when branch coordinates are resolved and distance exceeds 800m.
+6. **Doctor Intake Matching & Prescription Deduplication (`CORRUPT-D02`, `CORRUPT-D04`, `CORRUPT-D06`):**
+   - Enhanced medical intake template service matching across `s.en`, `s.ar`, `s.name_en`, `s.name_ar`.
+   - In `POST /api/prescriptions`, when `booking_id` is provided without `id`, upserts the existing prescription for that booking rather than creating duplicate rows.
+   - Added `doctor_name` selection and fallback matching in `GET /api/hr/doctor-payroll`.
+7. **System Test Suite Diagnostic Test Cases:**
+   - Registered `TC-040` (Availability Doctor & Inactive Status Filtering), `TC-041` (Prescription Deduplication & Clinical Intake Mapping), and `TC-042` (Reception Shift Location Verification & Geofence Guard) under `/admin` -> Settings -> System Test Suite.
+
+---
+
+## DEC-048: Staff Shift GPS Location Verification Toggle in Settings & Geofence Tolerance Resolution
+
+**Date:** 2026-09-06
+**Status:** Decided & Implemented
+
+**Context:**
+Receptionists and staff clock into daily shifts via the Reception Dashboard (`/api/reception/dashboard`). In urban medical buildings and indoor clinics, GPS drift can produce coordinates offset by a few hundred meters. Furthermore, clinic management needed the ability to enable or disable the GPS location check requirement dynamically from Admin Settings (e.g. during technical issues, remote work, or GPS unavailability).
+
+**Decisions & Implementation:**
+1. **Admin Settings Toggle:**
+   - Added `enableGpsShift` toggle under `/admin` -> Settings -> Booking Settings (`BookingSettingsView.tsx`), with interactive Info explanation popup.
+   - Hydrated and saved under `page_settings` payload (`booking.enableGpsShift`), maintaining backward compatibility with `shift.gpsShiftEnabled`.
+   - Localized bilingual translations (EN/AR) in `src/components/admin/translations.ts`.
+2. **Reception Dashboard Dynamic GPS Handling:**
+   - `GET /api/reception/dashboard` returns `gpsShiftEnabled` in shift metadata.
+   - `ReceptionDashboardView.tsx`: If `gpsShiftEnabled === false`, completely bypasses browser geolocation prompts and starts shift immediately.
+   - `POST /api/reception/dashboard` (`start_shift` action): If `gpsShiftEnabled === false`, skips all location checks and records attendance.
+   - If `gpsShiftEnabled === true`, validates coordinates against assigned branch and all active clinic branches with a 1000m tolerance threshold.
+3. **Geofence Coordinate Parser & Fallbacks (`src/lib/geo.ts`):**
+   - Expanded Google Maps regex to decode embed, place pin, query, center, and coordinate URLs (`!2d`, `!3d`, `!4d`, `@lat,lng`, `q=lat,lng`, `place/lat,lng`, `daddr`, `ll`).
+   - Added known clinic branch coordinate fallbacks (Sheikh Zayed: `30.0131, 30.9876`, New Cairo: `30.0263, 31.4913`, Heliopolis, Maadi, Alexandria) if external maps link is missing or unresolvable.
+4. **Diagnostic Verification:**
+   - Added test case `TC-043` (`Staff Shift & GPS Geofence Settings Engine`) to `/admin` -> Settings -> System Test Suite.
+
+---
+
+## DEC-049: Relocate GPS Shift Verification to Inactivity Settings & Error Resolution Hardening
+
+**Date:** 2026-09-06
+**Status:** Decided & Implemented
+
+**Context:**
+The GPS Location Check for shifts is an attendance, staff tracking, and inactivity/presence control rather than a booking rule. Placing it under Booking Settings was unintuitive. Additionally, non-geofence errors during shift start were previously misattributed to "out of location" due to a catch-all translation fallback on `generic`.
+
+**Decisions & Implementation:**
+1. **Relocated Setting UI to Inactivity Settings:**
+   - Moved `enableGpsShift` control from `BookingSettingsView.tsx` to `InactivitySettingsView.tsx` (`/admin` -> Settings -> Inactivity Settings).
+   - Designed a dedicated card with modern toggle switch, Info dialog modal (`setActiveInfoFeature`), and dual-status visual cards (Geofencing Active vs Location Bypass Active).
+   - Saved and hydrated `enableGpsShift` under `inactivity` object in `page_settings` (`inactivity.enableGpsShift`), while maintaining fallback resolution across legacy `booking.enableGpsShift` and `shift.gpsShiftEnabled`.
+2. **Shift Start Error Resolution & Localization:**
+   - Fixed `ReceptionDashboardView.tsx` so literal server error messages (`result.error` / `result.message`) are accurately surfaced rather than blindly overridden with a location error string.
+   - Updated `generic` error copy in `translations.ts` (EN & AR) to clearly indicate a general system/network issue rather than a false "You must be in a working location" message.
+   - Added specific translation strings for `position_unavailable` and `timeout`.
+
+---
+
+## DEC-050: Fix Availability Schedule Resolution for Unconfigured Doctors & General Services
+
+**Date:** 2026-09-06
+**Status:** Decided & Implemented
+
+**Context:**
+In the website booking date picker (`MaterialDatePicker.tsx` & `BookingModal.tsx`), weekdays (Monday through Saturday) were incorrectly grayed out and closed.
+
+**Root Cause:**
+In `src/app/api/availability/route.ts`:
+1. When doctor `working_days_hours` was `null` (default in DB), `getDoctorDayConfig` returned `null`, causing the slot loop to treat active doctors as closed on all weekdays.
+2. Services without explicit doctor service tags in `providers.services` evaluated `activeCompProviders.length === 0`, which triggered a premature `isAvailable: false` on all days.
+3. Fallback service hours cache read a legacy page settings footer entry where Thursday was marked closed.
+
+**Decisions & Implementation:**
+1. **Inherit Clinic Hours for Unconfigured Doctors:**
+   - `getDoctorDayConfig` now defaults to the clinic's operating hours (`{ isOpen: true, start: clinicStart, end: clinicEnd }`) when a doctor's custom `working_days_hours` is not explicitly configured in the database.
+2. **General Service Availability Fallback:**
+   - When no specific provider is restricted to a service (`activeCompProviders.length === 0`), availability evaluates against clinical room capacity and clinic operating hours.
+
+---
+
+## DEC-051: Multi-Shift Daily Start/End Cycle & Cumulative Interval Tracking
+
+**Date:** 2026-09-06
+**Status:** Decided & Implemented
+
+**Context:**
+Clinic receptionists and staff may have split shifts, mid-day breaks, or need to close and reopen their working shift multiple times within the same calendar day. Previously, `POST /api/reception/dashboard` with `start_shift` rejected any second start with a 409 conflict ("Today's shift has already ended and cannot be restarted").
+
+**Decisions & Implementation:**
+1. **Support Repeated Start/End Shift Actions in Same Day:**
+   - Removed the single-shift restriction on `start_shift`. Employees can now start, end, and restart their shifts multiple times per day.
+   - When restarting an ended shift, the system preserves the initial check-in timestamp (`actualStartingTime`) for daily reference and appends a new interval to `notes` (`[{ start: t1, end: t2 }, { start: t3, end: null }]`), clearing `check_out_time` to signify an active session.
+2. **Cumulative Elapsed Time & Work Hours:**
+   - On shift end (`end_shift`), the active interval is closed, and total daily duration across all closed intervals is summed into `work_hours` (e.g., `(t2-t1) + (t4-t3)`), ignoring break gaps.
+   - `GET /api/reception/dashboard` calculates cumulative elapsed seconds (`pastSessionsSeconds + liveActiveSessionSeconds`) ensuring 100% accurate time reporting without including time spent off-shift.
+3. **Live UI Synchronization in ReceptionDashboardView:**
+   - Updated the live timer in `ReceptionDashboardView.tsx` to compute elapsed time using `pastSessionsSeconds` plus the current sub-shift elapsed time.
+   - Updated modal prompt copy dynamically: when a shift was previously ended, the modal indicates resuming/starting a new shift session.
+4. **Diagnostic Verification:**
+   - Added test case `TC-044` (`Multi-Shift Daily Cycle & Interval Tracking Engine`) to `/admin` -> Settings -> System Test Suite.

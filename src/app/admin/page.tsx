@@ -2509,7 +2509,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-036', name: 'Doctor Status Management & Availability Lifecycle Engine', category: 'Services & Bookings', endpoint: '/api/providers', description: 'Verifies doctor status modal dialog, Active/Inactive status changes, and real-time synchronization across providers and linked employee accounts.', status: 'idle' },
     { id: 'TC-037', name: 'Financial Transactions & Daily Ledger Engine', category: 'Finance & Accounting', endpoint: '/api/transactions', description: 'Verifies the clinic financial transactions dashboard, daily net payments, outstanding debts, wallet balances, and manual transaction logging.', status: 'idle' },
     { id: 'TC-038', name: 'Historical & Previous Bookings Intake Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies recording of previous historical clinic bookings, patient matching/creation, and booking history preservation.', status: 'idle' },
-    { id: 'TC-039', name: 'Granular Role Permissions & Action-Level Access Control Engine', category: 'HR & Payroll', endpoint: '/api/roles', description: 'Validates system roles retrieval, permission structure integrity, and granular action-level access control matrix.', status: 'idle' }
+    { id: 'TC-039', name: 'Granular Role Permissions & Action-Level Access Control Engine', category: 'HR & Payroll', endpoint: '/api/roles', description: 'Validates system roles retrieval, permission structure integrity, and granular action-level access control matrix.', status: 'idle' },
+    { id: 'TC-040', name: 'Availability Doctor & Inactive Status Filtering Engine', category: 'Services & Bookings', endpoint: '/api/availability', description: 'Verifies doctor slot availability engine, service name resolution, and inactive doctor exclusions.', status: 'idle' },
+    { id: 'TC-041', name: 'Prescription Deduplication & Clinical Intake Engine', category: 'Medical & Patients', endpoint: '/api/prescriptions', description: 'Verifies doctor prescription generation, duplicate prevention on repeated saves, and intake templates.', status: 'idle' },
+    { id: 'TC-042', name: 'Shift Location Verification & Geofence Guard Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies strict geolocation boundary checks preventing out-of-location shift starts.', status: 'idle' },
+    { id: 'TC-043', name: 'Staff Shift & GPS Geofence Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies GPS shift check enable/disable setting configuration and reception dashboard GPS requirement toggle.', status: 'idle' },
+    { id: 'TC-044', name: 'Multi-Shift Daily Cycle & Interval Tracking Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies starting, ending, and restarting multiple shifts in the same day with cumulative worked interval tracking.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -3207,6 +3212,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   const [bookingMaxPerSlot, setBookingMaxPerSlot] = useState(3);
   const [bookingInstantApproval, setBookingInstantApproval] = useState(false);
   const [bookingShowDoctorNotes, setBookingShowDoctorNotes] = useState(true);
+  const [enableGpsShift, setEnableGpsShift] = useState(true);
   const [bookingDepositPercentage, setBookingDepositPercentage] = useState(20);
   const [savingBookingSettings, setSavingBookingSettings] = useState(false);
   
@@ -4044,6 +4050,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           if (data.inactivity) {
             setInactivityThreshold(data.inactivity.threshold ?? 30);
             setInactivityCountdown(data.inactivity.countdown ?? 10);
+            if (data.inactivity.enableGpsShift !== undefined) {
+              setEnableGpsShift(Boolean(data.inactivity.enableGpsShift));
+            }
+          }
+
+          // Fallback resolution for enableGpsShift if not set in inactivity
+          if (data.inactivity?.enableGpsShift === undefined) {
+            setEnableGpsShift(data.booking?.enableGpsShift ?? data.shift?.gpsShiftEnabled ?? true);
           }
 
           if (data.notifications) {
@@ -4225,7 +4239,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         body: JSON.stringify({
           inactivity: {
             threshold: Number(inactivityThreshold),
-            countdown: Number(inactivityCountdown)
+            countdown: Number(inactivityCountdown),
+            enableGpsShift: enableGpsShift
           }
         }),
       });
@@ -4469,6 +4484,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       },
       footer: {
         serviceHours: sHours
+      },
+      inactivity: {
+        threshold: Number(inactivityThreshold),
+        countdown: Number(inactivityCountdown),
+        enableGpsShift: enableGpsShift
       },
       booking: {
         minAdvance: bookingMinAdvance,
@@ -6889,8 +6909,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               setInactivityThreshold={setInactivityThreshold}
               inactivityCountdown={inactivityCountdown}
               setInactivityCountdown={setInactivityCountdown}
+              enableGpsShift={enableGpsShift}
+              setEnableGpsShift={setEnableGpsShift}
               handleSaveInactivitySettings={handleSaveInactivitySettings}
               savingInactivitySettings={savingInactivitySettings}
+              setActiveInfoFeature={setActiveInfoFeature}
               lang={lang}
               t={adminTranslations[lang].settingsScreens.inactivitySettings}
             />

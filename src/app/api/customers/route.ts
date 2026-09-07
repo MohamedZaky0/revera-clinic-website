@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireAdministratorAccess, requireAuthenticatedUser, requireStaffAccess } from '@/lib/access';
-import { isOwnIdentity } from '@/lib/customerIdentity';
+import { isOwnIdentity, normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordWalletMovement, setAbsoluteWalletBalance } from '@/lib/wallet';
 
 /**
@@ -51,9 +51,22 @@ export async function GET(req: Request) {
 
     if (mobile || email) {
       let query = supabaseServer.from('customers').select('*');
-      query = mobile ? query.eq('mobile', mobile) : query.eq('email', email!);
-      const { data, error } = await query.maybeSingle();
+      if (mobile) {
+        const cleanMobile = normalizeEgyptMobile(mobile);
+        const mobileVariants = Array.from(new Set([
+          mobile.trim(),
+          cleanMobile,
+          cleanMobile ? '+20' + cleanMobile.replace(/^0/, '') : '',
+          cleanMobile ? '20' + cleanMobile.replace(/^0/, '') : '',
+          cleanMobile ? '0020' + cleanMobile.replace(/^0/, '') : ''
+        ])).filter(Boolean);
+        query = query.in('mobile', mobileVariants);
+      } else {
+        query = query.eq('email', email!);
+      }
+      const { data: rows, error } = await query.limit(1);
       if (error) throw error;
+      const data = rows && rows.length > 0 ? rows[0] : null;
 
       if (caller.kind === 'patient') {
         if (!isOwnIdentity(caller.user, data)) {

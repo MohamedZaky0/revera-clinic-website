@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { requireStaffAccess } from '@/lib/access';
+import { requireStaffAccess, hasGranularPermission } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -125,6 +125,9 @@ export async function POST(req: Request) {
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
+  if (!hasGranularPermission(access.access, 'inventory.manage_products') && !hasGranularPermission(access.access, 'customers.edit')) {
+    return NextResponse.json({ error: 'You do not have permission to record product sales for patients.' }, { status: 403 });
+  }
 
   try {
     const body = await req.json();
@@ -243,6 +246,9 @@ export async function PATCH(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+  if (!hasGranularPermission(access.access, 'inventory.manage_products') && !hasGranularPermission(access.access, 'customers.edit')) {
+    return NextResponse.json({ error: 'You do not have permission to update patient product balances.' }, { status: 403 });
   }
 
   try {

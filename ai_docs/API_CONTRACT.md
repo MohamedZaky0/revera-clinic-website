@@ -223,9 +223,16 @@ Returns reservations. Filterable by query params.
 Creates a new reservation. Status is `'pending'`, or `'pending_deposit'` when a deposit
 percentage is configured and the booking isn't manual (`isManual` not set).
 
-**Body:** `{ serviceId, date, requestedTime?, name, email, phone, notes?, sessionType?, branchId?, doctorName?, createdByEmployeeId?, isManual?, customerId? }`
+**Body:** `{ serviceId, additionalServiceIds?, date, requestedTime?, name, email, phone, notes?, sessionType?, branchId?, doctorName?, createdByEmployeeId?, isManual?, customerId? }`
 
 Required: serviceId, date, name, email, phone.
+
+`additionalServiceIds` (optional, `number[]`) — CORRUPT-U06/RISK-081: lets a single session book
+more than one service. `serviceId` stays the required "primary" service; price and duration are
+summed across `[serviceId, ...additionalServiceIds]` and written to the `service_ids` array column
+(deduped, `serviceId` first). Pass the same combined set as `serviceIds` (comma-separated) to
+`GET /api/availability` first so slot computation reflects the combined duration and requires one
+doctor + room covering every selected service.
 
 `customerId`, if provided and it resolves to a real existing customer, links the reservation to
 that customer directly — bypassing the phone-based lookup/creation below entirely (used by the
@@ -323,6 +330,12 @@ Returns availability for the next `days` days (default 30) for a given service +
 
 For each date: counts approved bookings, calculates whether at least one contiguous block
 of free 15-minute slots exists to fit the service's duration. Uses branch-specific service hours if available.
+
+`serviceIds` (optional, comma-separated, e.g. `serviceIds=3,7`) — CORRUPT-U06/RISK-081: a
+multi-service session. When present, duration is summed across every listed service, a
+compatible doctor must cover *all* of them (not just one), and the compatible-rooms list is the
+intersection across every service (a room must support all of them, not just one). Falls back to
+`[serviceId]` when omitted — every existing single-service caller is unaffected.
 
 **Response:** Array of `{ date, approvedCount, approvedSlots, isAvailable }`
 
