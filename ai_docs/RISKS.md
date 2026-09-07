@@ -404,6 +404,10 @@ table:
    room) in `src/app/api/reservations/route.ts` with **no check against existing bookings in that
    room at that time**. `compRoomIds` is a static service→room compatibility list, not an
    availability query. The room-collision risk described is unchanged.
+   **RESOLVED same day (commit `4dea594`):** now checks same-date bookings in every compatible room
+   using the same duration-aware overlap algorithm already proven correct for the approve-flow room
+   reassignment, and picks a genuinely free room; falls back to the first compatible room only if
+   every one is truly occupied. 5 new tests in `tests/routes/reservations-post-room-collision.test.ts`.
 3. **`CORRUPT-A04`** — `DoctorOngoingSessionTab.tsx` gained exactly 4 lines in the audit's own
    commit (`840f3b6`), all of them the `D02` service-matcher fix. Nothing addresses a doctor
    completing a session with `amountLeft > 0` reading ambiguously in Admin Bookings View.
@@ -427,6 +431,17 @@ table:
    confirmed no later migration touches it), and `src/app/api/medical-records/route.ts` still does
    `.upsert([updatedForm], { onConflict: 'customer_id' })`. A second visit's intake form still
    silently overwrites the first visit's baseline data.
+   **RESOLVED same day (commit `1e24a82`), after discussing the fix approach with Mohamed** (a
+   time-window or content-diff heuristic would misfire on ordinary cases — a slow intake session
+   read as a new visit, or two real edits within one visit read as two visits). Migration
+   `20260907000000_add_reservation_id_to_medical_records.sql` replaces the constraint with
+   `UNIQUE(customer_id, reservation_id)`: one row per visit, plus at most one `reservation_id IS
+   NULL` row per customer for `MedicalFormModal.tsx`'s visit-independent profile edit. The route
+   branches on whether a `reservation_id` is present (Postgres never matches `NULL` against `NULL`
+   for `ON CONFLICT`, so the no-reservation case is a manual find-or-update instead of `.upsert()`).
+   `GET` — which used `.single()`, silently broken by this change since a customer can now
+   legitimately have multiple rows — now defaults to the most-recently-updated row and accepts
+   `?reservationId=` for one specific visit. 7 new tests in `tests/routes/medical-records.test.ts`.
 8. **`CORRUPT-S03`** — this is **RISK-020**, already tracked and still listed in this file's own
    Open section. No migration-tracking mechanism was added.
 9. **`CORRUPT-U06`** — `BookingModal.tsx` still declares `const [serviceId, setServiceId] =
@@ -451,10 +466,11 @@ observed.
 counter. Treat this file's status column as a claim to verify, not a fact, same as any commit
 message.
 
-**Fix:** in progress — tracked by CORRUPT-ID above. `A01` and `A05`/`A06`/`A07` are scope decisions
-(component decomposition; atomic ledger redesign; already-deferred P&L wiring) rather than
-contained bug fixes, and are being sequenced with Mohamed rather than rushed. `A03`, `D03`, `U06`,
-and `A10` (RISK-078) are being worked as normal bug fixes in the same pass.
+**Fix:** in progress — tracked by CORRUPT-ID above. `A03` and `D03` are resolved (see their
+sub-entries above). `A01` and `A05`/`A06`/`A07` are scope decisions (component decomposition; atomic
+ledger redesign; already-deferred P&L wiring) rather than contained bug fixes, and are being
+sequenced with Mohamed rather than rushed. `U06` (public booking is still single-service) and `A10`
+(RISK-078's ~7-file API enforcement gap) remain open.
 
 ---
 
