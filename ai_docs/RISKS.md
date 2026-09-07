@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **56 resolved** · 76 tracked total.
+**8 open** · **13 partially resolved** · **56 resolved** · 77 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -28,6 +28,7 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 - [RISK-053](#risk-053) — New Cairo Branch's Working Hours Were Never Actually Configured
 - [RISK-058](#risk-058) — Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
 - [RISK-078](#risk-078) — Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It
+- [RISK-081](#risk-081) — `SYSTEM_CORRUPTIONS_AND_AUDIT.md` Marks 10 Of Its 30 Cataloged Defects "Fixed" When They Are Not
 
 ## RISK-001: Duplication Friction (hardcoded Revera-specific values)
 
@@ -377,6 +378,83 @@ one-file patch, and closing it means deciding, module by module, which granular 
 endpoint should require (mirroring the `hasFinancePermission(access, 'transactions.refund')` pattern
 already proven correct for Transactions). Flagged for a dedicated pass rather than folded into an
 unrelated fix.
+
+---
+
+## RISK-081: `SYSTEM_CORRUPTIONS_AND_AUDIT.md` Marks 10 Of Its 30 Cataloged Defects "Fixed" When They Are Not
+
+**Severity:** High · **Type:** Documentation reliability / unverified remediation claims
+**Found:** 2026-09-05, reviewing `ai_docs/SYSTEM_CORRUPTIONS_AND_AUDIT.md` (added in commit
+`80672d4`) per Mohamed's request to verify every one of its claims against the actual code, not the
+document's own status table.
+
+**What happened:** the audit document catalogs 30 defects (labeled `CORRUPT-U01`…`U09`,
+`A01`…`A11`, `D01`…`D07`, `S01`…`S03` — the doc's own executive summary undercounts these as "28")
+and its Section 5 matrix marks **every single one** `Fixed` (`A01` as `Refactored`). Read each
+referenced file directly rather than trusting the table. **20 of the 30 are genuinely fixed** —
+real, verified changes with correct root-cause reasoning (`U01`–`U05`, `U07`–`U09`, `A02`, `A08`,
+`A09`, `A11`, `D01`, `D02`, `D04`–`D07`, `S01`, `S02`). **10 are not fixed at all**, despite the
+table:
+
+1. **`CORRUPT-A01`** (marked `Refactored`) — the "11,600+ line monolithic component" complaint is
+   about `src/app/admin/page.tsx`. `wc -l` on it today: **11,714 lines**. It grew, it was not
+   decomposed. This is the exact same gap already tracked as **RISK-005** — the audit doc adds no
+   new information here, it just falsely claims RISK-005 is closed.
+2. **`CORRUPT-A03`** — manual bookings still assign `compRoomIds[0]` (the first service-compatible
+   room) in `src/app/api/reservations/route.ts` with **no check against existing bookings in that
+   room at that time**. `compRoomIds` is a static service→room compatibility list, not an
+   availability query. The room-collision risk described is unchanged.
+3. **`CORRUPT-A04`** — `DoctorOngoingSessionTab.tsx` gained exactly 4 lines in the audit's own
+   commit (`840f3b6`), all of them the `D02` service-matcher fix. Nothing addresses a doctor
+   completing a session with `amountLeft > 0` reading ambiguously in Admin Bookings View.
+4. **`CORRUPT-A05` / `CORRUPT-A06`** — `src/app/api/transactions/route.ts` was not touched by any
+   of the 8 commits this audit doc's remediation claims to cover (confirmed via `git log`). The
+   scalar-balance-drift and read-then-write TOCTOU race described are real (and match the general
+   shape of `RISK-012`'s already-fixed debt-growth issue, but are a distinct claim about
+   `transactions.route.ts` specifically) — and still fully present.
+5. **`CORRUPT-A07`** — manual transactions still do not generate `invoices`/`invoice_lines` rows;
+   `NewManualTransactionView.tsx`/`transactions/route.ts` untouched. (Mohamed explicitly deferred
+   connecting manual transactions to Finance/P&L earlier this session — "دلوقتي لأ، وبعدين أيوه" —
+   so this was already known-and-parked, not newly discovered, but the audit doc's "Fixed" claim is
+   still wrong.)
+6. **`CORRUPT-A10`** — this **is RISK-078**, word for word. Re-verified directly: `providers`,
+   `services`, `inventory/products`, `inventory/devices`, `customers/products` route handlers are
+   still `requireStaffAccess`-only (any authenticated employee, zero permission check) — confirmed
+   by grep, unchanged from RISK-078's own investigation. Same as `A01`, the audit doc claims an
+   already-tracked open risk is resolved when it is not.
+7. **`CORRUPT-D03`** — `medical_records_customer_id_key UNIQUE (customer_id)` is still the live
+   constraint (checked directly in `supabase/migrations/20260726000000_dev_schema_baseline.sql`,
+   confirmed no later migration touches it), and `src/app/api/medical-records/route.ts` still does
+   `.upsert([updatedForm], { onConflict: 'customer_id' })`. A second visit's intake form still
+   silently overwrites the first visit's baseline data.
+8. **`CORRUPT-S03`** — this is **RISK-020**, already tracked and still listed in this file's own
+   Open section. No migration-tracking mechanism was added.
+9. **`CORRUPT-U06`** — `BookingModal.tsx` still declares `const [serviceId, setServiceId] =
+   useState<number | null>(...)` — a single scalar, not an array. The public booking flow cannot
+   book multiple services in one session; `/admin` and `/api/reservations` still support arrays
+   that the public UI has no way to populate.
+
+**Also worth recording — `CORRUPT-D07`'s stated root cause is fabricated.** The doc claims the 9
+failing tests in `tests/components/doctor/DoctorProfileDetailsView.test.tsx` were caused by
+"the recent UI redesign of `DoctorProfileDetailsView.tsx`... selector queries... not synchronized
+with the new component layout." `git log` on that file shows no redesign commit anywhere near this
+date — its last touch was the unrelated RISK-075 fix. The real cause (diagnosed and fixed the same
+day, commit `8b61753`, before this audit doc was even pulled): the component's default "This Month"
+visit filter is computed from the real system clock, and the test fixtures hardcoded `2026-08-10` —
+once wall-clock time crossed into September, the fixtures fell outside the filter window. The tests
+were already fixed (by that unrelated commit) by the time this audit doc landed, so `D07`'s end
+state (`Fixed`) happens to be correct — but the document's explanation of why is invented, not
+observed.
+
+**Why this matters:** a document titled "Remediated & Verified" with a table stamping every row
+`Fixed` is exactly the kind of artifact this project's whole `RISKS.md` discipline exists to
+counter. Treat this file's status column as a claim to verify, not a fact, same as any commit
+message.
+
+**Fix:** in progress — tracked by CORRUPT-ID above. `A01` and `A05`/`A06`/`A07` are scope decisions
+(component decomposition; atomic ledger redesign; already-deferred P&L wiring) rather than
+contained bug fixes, and are being sequenced with Mohamed rather than rushed. `A03`, `D03`, `U06`,
+and `A10` (RISK-078) are being worked as normal bug fixes in the same pass.
 
 ---
 
