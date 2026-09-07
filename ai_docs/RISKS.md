@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**8 open** · **13 partially resolved** · **56 resolved** · 77 tracked total.
+**7 open** · **13 partially resolved** · **57 resolved** · 77 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -27,8 +27,7 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 - [RISK-020](#risk-020) — Migrations Are Not Tracked As Applied, And Two Databases Have Diverged
 - [RISK-053](#risk-053) — New Cairo Branch's Working Hours Were Never Actually Configured
 - [RISK-058](#risk-058) — Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
-- [RISK-078](#risk-078) — Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It
-- [RISK-081](#risk-081) — `SYSTEM_CORRUPTIONS_AND_AUDIT.md` Marks 10 Of Its 30 Cataloged Defects "Fixed" When They Are Not
+- [RISK-081](#risk-081) — `SYSTEM_CORRUPTIONS_AND_AUDIT.md` Marks 10 Of Its 30 Cataloged Defects "Fixed" When They Are Not (partially — `U06` and the scope-decision items remain open)
 
 ## RISK-001: Duplication Friction (hardcoded Revera-specific values)
 
@@ -327,11 +326,13 @@ pattern sibling sections (Deposit/Notification/Queue Settings) already use.
 
 ---
 
-## RISK-078: Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It
+## RISK-078: Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It (RESOLVED)
 
 **Severity:** High · **Type:** Access control / false sense of security
 **Found:** 2026-08-30, reviewing commits `f713968` ("granular action-level permissions and 3-dots
 menus access control") and `1a61450` per Mohamed's request.
+**Fixed:** 2026-09-07, commit `4213f7a` (as RISK-081/CORRUPT-A10 — same finding, resurfaced by the
+`SYSTEM_CORRUPTIONS_AND_AUDIT.md` review).
 
 **What it is:** `f713968` adds 100+ granular permission keys (e.g. `providers.action_delete`,
 `services.action_delete`, `inventory.delete_product`, `employees.action_delete`) and wires every
@@ -372,12 +373,16 @@ role can do (e.g. blocking a receptionist from deleting a doctor's profile, dele
 deleting an inventory product), that restriction currently only removes the button from view. It
 does not stop the action.
 
-**Not fixed** — this is a cross-cutting gap spanning ~7 API route files (providers, services,
-inventory/products, inventory/devices, customers/products, employees, roles), not a
-one-file patch, and closing it means deciding, module by module, which granular key each mutating
-endpoint should require (mirroring the `hasFinancePermission(access, 'transactions.refund')` pattern
-already proven correct for Transactions). Flagged for a dedicated pass rather than folded into an
-unrelated fix.
+**Fix:** added `hasGranularPermission()` to `src/lib/access.ts` — mirrors the coarse-category and
+create/edit/delete fallback chains from the client's `hasPermission()` for providers/services/
+inventory/customers, superadmin-only bypass (like `hasFinancePermission`, not `hasStaffPermission`'s
+automatic `admin` bypass). Wired into every mutating verb of `providers`, `services`,
+`inventory/products`, `inventory/devices`, `customers/products`. `employees` and `roles` were left
+as `requireAdministratorAccess` (superadmin/admin only) — that is a real, intentional coarse check
+per RISK-069, not the any-staff gap this fix closes. 16 unit tests for `hasGranularPermission` +
+5 route-level tests proving `DELETE /api/providers`/`DELETE /api/services` — the exact example this
+entry opened with — now reject a role with no matching permission and accept one with the coarse
+category or exact granular key.
 
 ---
 
@@ -1072,6 +1077,7 @@ cannot reproduce for new sessions again.
 - [RISK-076](#risk-076) — Financial Transactions Module: Wrong Column Name Broke Every Real Request, Manual Adjustments Never Applied, Fabricated Demo Data Written To The Real Ledger, No Granular Permission Enforcement (RESOLVED)
 - [RISK-077](#risk-077) — A Wallet-Movement Fix Reopened The Re-Fire Double-Counting It Was Meant To Prevent (RESOLVED)
 - [RISK-079](#risk-079) — New Reports & Analytics Panel Silently Shows Fabricated Demo Numbers Whenever Real Data Is Genuinely Zero (RESOLVED)
+- [RISK-078](#risk-078) — Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It (RESOLVED — body still filed under Open above, see there)
 - [RISK-080](#risk-080) — Two API Routes Reachable Without Any Session: Patient Roster Read/Write And Supabase Infrastructure Disclosure (RESOLVED)
 
 ## RISK-003: Patient Auth Is Non-Functional
