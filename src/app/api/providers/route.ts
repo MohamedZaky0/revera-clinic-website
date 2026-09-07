@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { requireStaffAccess } from '@/lib/access';
+import { requireStaffAccess, hasGranularPermission } from '@/lib/access';
 import { normalizeServiceCommissions } from '@/lib/providerCommissions';
 import fs from 'fs';
 import path from 'path';
@@ -183,6 +183,9 @@ export async function POST(req: Request) {
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
+  if (!hasGranularPermission(access.access, 'providers.create')) {
+    return NextResponse.json({ error: 'You do not have permission to add doctors.' }, { status: 403 });
+  }
 
   let body: any;
   try {
@@ -342,6 +345,9 @@ export async function PATCH(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+  if (!hasGranularPermission(access.access, 'providers.edit')) {
+    return NextResponse.json({ error: 'You do not have permission to edit doctors.' }, { status: 403 });
   }
 
   const url = new URL(req.url);
@@ -523,6 +529,9 @@ export async function DELETE(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+  if (!hasGranularPermission(access.access, 'providers.delete')) {
+    return NextResponse.json({ error: 'You do not have permission to delete doctors.' }, { status: 403 });
   }
 
   const url = new URL(req.url);

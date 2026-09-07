@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { requireStaffAccess } from '@/lib/access';
+import { requireStaffAccess, hasGranularPermission } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -348,6 +348,9 @@ export async function POST(req: Request) {
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
+  if (!hasGranularPermission(access.access, 'inventory.create_product')) {
+    return NextResponse.json({ error: 'You do not have permission to add products.' }, { status: 403 });
+  }
 
   try {
     const body = await req.json();
@@ -423,6 +426,9 @@ export async function PUT(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+  if (!hasGranularPermission(access.access, 'inventory.edit_product') && !hasGranularPermission(access.access, 'inventory.adjust_stock')) {
+    return NextResponse.json({ error: 'You do not have permission to edit products.' }, { status: 403 });
   }
 
   try {
@@ -509,6 +515,9 @@ export async function DELETE(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+  if (!hasGranularPermission(access.access, 'inventory.delete_product')) {
+    return NextResponse.json({ error: 'You do not have permission to delete products.' }, { status: 403 });
   }
 
   try {

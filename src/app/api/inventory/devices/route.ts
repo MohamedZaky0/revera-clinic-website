@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { requireStaffAccess } from '@/lib/access';
+import { requireStaffAccess, hasGranularPermission } from '@/lib/access';
 
 import { recordDeviceAuditLog } from './audit-logs/route';
 
@@ -278,6 +278,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+  if (!hasGranularPermission(access.access, 'inventory.manage_devices')) {
+    return NextResponse.json({ error: 'You do not have permission to add devices.' }, { status: 403 });
+  }
 
   try {
     const body = await req.json();
@@ -346,6 +349,9 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+  if (!hasGranularPermission(access.access, 'inventory.manage_devices')) {
+    return NextResponse.json({ error: 'You do not have permission to manage devices.' }, { status: 403 });
+  }
 
   try {
     const body = await req.json();
