@@ -7956,9 +7956,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         let targetInvoiceTotal = baseAndAttachedTotal;
 
         if (viewingBooking.notes) {
-          const invMatch = String(viewingBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+          const invMatch = String(viewingBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP|Invoice Value:\s*(\d+(?:\.\d+)?)\s*EGP/i);
           if (invMatch) {
-            const notedTotal = Number(invMatch[1]);
+            const notedTotal = Number(invMatch[1] || invMatch[2]);
             if (notedTotal > targetInvoiceTotal) {
               targetInvoiceTotal = notedTotal;
             }
@@ -7966,14 +7966,22 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         }
 
         const rawPaid = Number(viewingBooking.amountPaid || (viewingBooking as any).amount_paid || 0);
+        const rawLeft = (viewingBooking as any).amountLeft ?? (viewingBooking as any).amount_left;
         const additionalServicesCost = additionalServicesList.reduce((sum, s) => sum + s.total, 0);
         const productsCost = productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
-        const totalPrice = servicesCost + additionalServicesCost + productsCost;
+        const calculatedTotal = servicesCost + additionalServicesCost + productsCost;
+        const totalPrice = Math.max(
+          calculatedTotal,
+          targetInvoiceTotal,
+          rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
+        );
 
         const sessionPaid = rawPaid;
-        const sessionLeft = Math.max(0, totalPrice - sessionPaid);
+        const sessionLeft = (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)))
+          ? Number(rawLeft)
+          : Math.max(0, totalPrice - sessionPaid);
 
-        const isInvoicePaid = sessionLeft <= 0 || (sessionPaid >= totalPrice && totalPrice > 0);
+        const isInvoicePaid = (rawLeft !== null && rawLeft !== undefined && Number(rawLeft) <= 0 && sessionPaid > 0) || (sessionLeft <= 0 && sessionPaid > 0) || (sessionPaid >= totalPrice && totalPrice > 0);
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 sm:p-5 animate-fadeIn">

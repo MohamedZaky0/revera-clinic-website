@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { normalizeEgyptMobile } from '@/lib/customerIdentity';
+import { recordTransaction } from '@/lib/transactionLedger';
 
 function isValidPhoneNumber(phoneStr: string): boolean {
   if (!phoneStr) return false;
@@ -176,12 +177,59 @@ export async function POST(req: Request) {
 
     const cleanMobile = cleanPhoneForDb(rawPhone);
 
-    // Parse financial values
-    const rawVal = serviceValue ?? value ?? price ?? 0;
+    // Parse financial values (support invoiceValue and actualSpent from front-end)
+    const rawVal = invoiceValue ?? serviceValue ?? value ?? price ?? 0;
     const parsedValue = Math.max(0, isNaN(Number(rawVal)) ? 0 : Number(rawVal));
 
-    const rawPaid = amountPaid ?? payment ?? 0;
+    const rawPaid = actualSpent ?? amountPaid ?? payment ?? 0;
     const parsedPaid = Math.max(0, isNaN(Number(rawPaid)) ? 0 : Number(rawPaid));
+
+    // Resolve product metadata & prices
+    let productPrice = 0;
+    let resolvedProductName = productName || null;
+    if (productId) {
+      const { data: prodRow } = await supabaseServer
+        .from('products')
+        .select('id, name, selling_price, price, arabic_name')
+        .eq('id', productId)
+        .maybeSingle();
+      if (prodRow) {
+        productPrice = Number(prodRow.selling_price ?? prodRow.price ?? 0);
+        if (!resolvedProductName) resolvedProductName = prodRow.name || prodRow.arabic_name;
+      }
+    }
+
+    // Resolve package metadata & prices
+    let packagePrice = 0;
+    let resolvedPackageName = packageName || null;
+    let packageRecord: any = null;
+    if (packageId) {
+      const { data: pkgRow } = await supabaseServer
+        .from('packages')
+        .select('id, name, name_ar, price, validity_days')
+        .eq('id', packageId)
+        .maybeSingle();
+      if (pkgRow) {
+        packageRecord = pkgRow;
+        packagePrice = Number(pkgRow.price ?? 0);
+        if (!resolvedPackageName) resolvedPackageName = pkgRow.name || pkgRow.name_ar;
+      }
+    }
+
+    // Resolve service metadata
+    let resolvedServiceId = serviceId ? Number(serviceId) : null;
+    if (isNaN(resolvedServiceId as number)) resolvedServiceId = null;
+    let resolvedServiceName = serviceName || null;
+    if (resolvedServiceId) {
+      const { data: srvRow } = await supabaseServer
+        .from('services')
+        .select('id, en, ar, price')
+        .eq('id', resolvedServiceId)
+        .maybeSingle();
+      if (srvRow) {
+        if (!resolvedServiceName) resolvedServiceName = srvRow.en || srvRow.ar;
+      }
+    }
 
     // 4. Patient Matching & Financial Ledger Reconciliation
     let customerId: string | null = null;
@@ -336,16 +384,12 @@ export async function POST(req: Request) {
       if (prov?.id) resolvedDoctorId = prov.id;
     }
 
-    // 6. Service details resolution
-    let resolvedServiceId = serviceId ? Number(serviceId) : null;
-    if (isNaN(resolvedServiceId as number)) resolvedServiceId = null;
-
-    // 7. Prepare historical reservation payload
+    // 6. Prepare historical reservation payload
     const historicalTag = '[Historical Booking]';
-    const srvNote = serviceName ? ` Service: ${serviceName}.` : '';
-    const pkgNote = packageName ? ` Package: ${packageName}.` : '';
-    const prodNote = productName ? ` Product: ${productName}.` : '';
-    const valNote = parsedValue > 0 ? ` Invoice Value: ${parsedValue} EGP.` : '';
+    const srvNote = resolvedServiceName ? ` Service: ${resolvedServiceName}.` : '';
+    const pkgNote = resolvedPackageName ? ` Package: ${resolvedPackageName}.` : '';
+    const prodNote = resolvedProductName ? ` Product: ${resolvedProductName}.` : '';
+    const valNote = parsedValue > 0 ? ` [Invoice Total]: ${parsedValue} EGP.` : '';
     const spentNote = ` Actual Spent: ${parsedPaid} EGP.`;
     const paymentNote = paymentType ? ` Payment Method: ${paymentType}.` : '';
     const userNote = notes ? ` ${notes}` : '';
@@ -401,6 +445,149 @@ export async function POST(req: Request) {
         { error: 'Failed to create historical booking in database.', details: insertError.message },
         { status: 500 }
       );
+    }
+
+    // 7. Attach Line Items to `reservation_products` (DEC-042)
+    const staffEmployeeId = (access as any).access?.employee?.id || null;
+    const staffEmployeeName = (access as any).access?.employee?.name || (access as any).access?.employee?.email?.split('@')[0] || 'Receptionist';
+
+    // 7a. Insert product into reservation_products
+    if (productId || resolvedProductName) {
+      try {
+        await supabaseServer.from('reservation_products').insert({
+          reservation_id: newReservation.id,
+          line_type: 'product',
+          product_id: productId || null,
+          description: resolvedProductName || 'Product',
+          qty: 1,
+          unit_price: productPrice,
+          total: productPrice,
+          added_by_employee_id: staffEmployeeId,
+          added_by_role: 'receptionist'
+        });
+      } catch (rpErr: any) {
+        console.warn('Could not insert reservation_products for product (non-fatal):', rpErr?.message);
+      }
+
+      // Also record in product_sales table for inventory sales history
+      if (customerId) {
+        try {
+          await supabaseServer.from('product_sales').insert({
+            product_id: productId || null,
+            product_name: resolvedProductName || 'Product',
+            quantity: 1,
+            unit_price: productPrice,
+            total_price: productPrice,
+            customer_id: customerId,
+            customer_name: rawName,
+            customer_phone: cleanMobile,
+            cashier_name: staffEmployeeName,
+            payment_method: paymentType || 'cash',
+            notes: `[Historical Booking on ${rawDate.slice(0, 10)}]`,
+            sale_date: `${rawDate.slice(0, 10)}T12:00:00Z`
+          });
+        } catch (psErr: any) {
+          console.warn('Could not insert product_sales record (non-fatal):', psErr?.message);
+        }
+      }
+    }
+
+    // 7b. Insert package into reservation_products and customer_packages
+    if (packageId || resolvedPackageName) {
+      try {
+        await supabaseServer.from('reservation_products').insert({
+          reservation_id: newReservation.id,
+          line_type: 'additional_service',
+          description: resolvedPackageName ? `Package: ${resolvedPackageName}` : 'Package',
+          qty: 1,
+          unit_price: packagePrice,
+          total: packagePrice,
+          added_by_employee_id: staffEmployeeId,
+          added_by_role: 'receptionist'
+        });
+      } catch (rpErr: any) {
+        console.warn('Could not insert reservation_products for package (non-fatal):', rpErr?.message);
+      }
+
+      // Create active package record for patient profile
+      if (customerId && (packageId || packageRecord?.id)) {
+        const pId = packageId || packageRecord?.id;
+        const validityDays = Number(packageRecord?.validity_days || 365);
+        const expiresAt = new Date(rawDate);
+        expiresAt.setUTCDate(expiresAt.getUTCDate() + validityDays);
+
+        try {
+          const { data: cp, error: cpErr } = await supabaseServer
+            .from('customer_packages')
+            .insert({
+              customer_id: customerId,
+              package_id: pId,
+              purchased_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
+              expires_at: expiresAt.toISOString(),
+              price_paid: packagePrice,
+              status: 'active'
+            })
+            .select('id')
+            .maybeSingle();
+
+          if (cp?.id) {
+            const { data: pkgItems } = await supabaseServer
+              .from('package_items')
+              .select('service_id, qty')
+              .eq('package_id', pId);
+
+            if (pkgItems && pkgItems.length > 0) {
+              await supabaseServer.from('customer_package_items').insert(
+                pkgItems.map((item: any) => ({
+                  customer_package_id: cp.id,
+                  service_id: item.service_id,
+                  qty_total: item.qty,
+                  qty_used: 0,
+                  qty_remaining: item.qty
+                }))
+              );
+            }
+          }
+        } catch (cpErr: any) {
+          console.warn('Could not insert customer_packages record (non-fatal):', cpErr?.message);
+        }
+      }
+    }
+
+    // 8. Record Financial Transaction (RISK-076) in `transactions` table
+    if (parsedPaid > 0 && customerId) {
+      let standardMethod = 'cash';
+      if (paymentType) {
+        const pLower = paymentType.toLowerCase();
+        if (pLower.includes('card') || pLower.includes('visa') || pLower.includes('mastercard')) standardMethod = 'card';
+        else if (pLower.includes('instapay')) standardMethod = 'instapay';
+        else if (pLower.includes('wallet')) standardMethod = 'wallet';
+        else if (pLower.includes('transfer')) standardMethod = 'transfer';
+        else if (pLower.includes('vodafone') || pLower.includes('cash')) standardMethod = 'cash';
+        else standardMethod = paymentType;
+      }
+
+      const descItems: string[] = [];
+      if (resolvedServiceName) descItems.push(`Service: ${resolvedServiceName}`);
+      if (resolvedPackageName) descItems.push(`Package: ${resolvedPackageName}`);
+      if (resolvedProductName) descItems.push(`Product: ${resolvedProductName}`);
+      const itemsDesc = descItems.length > 0 ? ` (${descItems.join(', ')})` : '';
+
+      await recordTransaction({
+        type: 'payment',
+        amount: parsedPaid,
+        description: `Payment for historical booking on ${rawDate.slice(0, 10)}${itemsDesc}`,
+        customerId: customerId,
+        branchId: branchId || null,
+        reservationId: newReservation.id,
+        paymentMethod: standardMethod,
+        status: 'completed',
+        source: 'manual',
+        reason: notes || 'Historical booking payment',
+        createdByEmployeeId: staffEmployeeId,
+        createdByName: staffEmployeeName,
+        occurredAt: `${rawDate.slice(0, 10)}T12:00:00Z`
+      });
     }
 
     return NextResponse.json({
