@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
   Phone,
   User,
   Layers,
+  Package as PackageIcon,
+  ShoppingBag,
+  Receipt,
   CreditCard,
   Info,
   Save,
@@ -16,7 +19,10 @@ import {
   ChevronDown,
   Clock,
   Sparkles,
-  Stethoscope
+  Stethoscope,
+  Wallet,
+  FileText,
+  Coins
 } from "lucide-react";
 import { adminTranslations } from "@/components/admin/translations";
 import { getAuthHeaders } from "@/lib/authHeaders";
@@ -41,6 +47,23 @@ interface CustomerItem {
   name?: string;
   mobile?: string;
   phone?: string;
+  outstanding?: number;
+  wallet_balance?: number;
+}
+
+interface PackageItem {
+  id: string | number;
+  name: string;
+  nameAr?: string | null;
+  price?: number;
+}
+
+interface ProductItem {
+  id: string | number;
+  name: string;
+  arabic_name?: string;
+  selling_price?: number;
+  price?: number;
 }
 
 interface AdminAddPreviousBookingViewProps {
@@ -49,6 +72,8 @@ interface AdminAddPreviousBookingViewProps {
   services?: any[];
   providers?: any[];
   customers?: any[];
+  packages?: any[];
+  products?: any[];
   branches?: any[];
   activeBranchId?: string;
   lang?: "en" | "ar";
@@ -83,6 +108,8 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
   services = [],
   providers = [],
   customers = [],
+  packages = [],
+  products = [],
   branches = [],
   activeBranchId,
   lang = "en",
@@ -90,13 +117,56 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 }) => {
   const tr = t || adminTranslations[lang].bookings.adminAddPreviousBooking;
 
-  // Form State
+  // Row 1 State: Patient Phone *, Patient Name *, Doctor (Optional)
   const [patientPhone, setPatientPhone] = useState("");
   const [patientName, setPatientName] = useState("");
+  const [selectedDoctorId, setSelectedDoctorId] = useState("");
+
+  // Row 2 State: Date *, Service (Optional), Package (Optional), Products (Optional)
   const [bookingDate, setBookingDate] = useState("");
   const [selectedServiceId, setSelectedServiceId] = useState("");
-  const [selectedDoctorId, setSelectedDoctorId] = useState("");
+  const [selectedPackageId, setSelectedPackageId] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState("");
+
+  // Row 3 State: Invoice Value, Actual Spent, Payment Method
+  const [invoiceValue, setInvoiceValue] = useState<string>("");
+  const [actualSpent, setActualSpent] = useState<string>("");
   const [selectedPaymentType, setSelectedPaymentType] = useState("");
+  const [hasManuallyEditedSpent, setHasManuallyEditedSpent] = useState(false);
+
+  // Row 4 State: Notes (Optional)
+  const [notes, setNotes] = useState("");
+
+  // Packages & Products Catalog State (auto-fetch if not passed as props)
+  const [pkgList, setPkgList] = useState<PackageItem[]>(packages);
+  const [prodList, setProdList] = useState<ProductItem[]>(products);
+
+  useEffect(() => {
+    if (packages && packages.length > 0) {
+      setPkgList(packages);
+    } else {
+      fetch("/api/packages")
+        .then(res => (res.ok ? res.json() : []))
+        .then((data: any) => {
+          if (Array.isArray(data)) setPkgList(data);
+        })
+        .catch(() => {});
+    }
+  }, [packages]);
+
+  useEffect(() => {
+    if (products && products.length > 0) {
+      setProdList(products);
+    } else {
+      fetch("/api/inventory/products")
+        .then(res => (res.ok ? res.json() : null))
+        .then((data: any) => {
+          if (data && Array.isArray(data.products)) setProdList(data.products);
+          else if (Array.isArray(data)) setProdList(data);
+        })
+        .catch(() => {});
+    }
+  }, [products]);
 
   // UI & Feedback State
   const [saving, setSaving] = useState(false);
@@ -144,6 +214,37 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     return s.en || s.name || s.title || `Service #${s.id}`;
   };
 
+  // Helper to extract package name cleanly
+  const getPackageName = (p: PackageItem) => {
+    if (lang === "ar" && p.nameAr) return p.nameAr;
+    return p.name || `Package #${p.id}`;
+  };
+
+  // Helper to extract product name cleanly
+  const getProductName = (pr: ProductItem) => {
+    if (lang === "ar" && pr.arabic_name) return pr.arabic_name;
+    return pr.name || `Product #${pr.id}`;
+  };
+
+  // Recalculate invoice value when Service, Package, or Product changes
+  const recalculateInvoice = (nextSrvId: string, nextPkgId: string, nextProdId: string) => {
+    const srv = services.find(s => String(s.id) === String(nextSrvId));
+    const pkg = pkgList.find(p => String(p.id) === String(nextPkgId));
+    const prod = prodList.find(pr => String(pr.id) === String(nextProdId));
+
+    const srvPrice = Number(srv?.price || 0);
+    const pkgPrice = Number(pkg?.price || 0);
+    const prodPrice = Number(prod?.selling_price ?? prod?.price ?? 0);
+
+    const total = srvPrice + pkgPrice + prodPrice;
+    const totalStr = total > 0 ? String(total) : "";
+
+    setInvoiceValue(totalStr);
+    if (!hasManuallyEditedSpent) {
+      setActualSpent(totalStr);
+    }
+  };
+
   // Form Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,7 +252,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
     const newErrors: typeof errors = {};
 
-    // Validate Phone
+    // Validate Phone (Required)
     const trimmedPhone = patientPhone.trim();
     if (!trimmedPhone) {
       newErrors.phone = tr.requiredField;
@@ -159,13 +260,13 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       newErrors.phone = tr.invalidPhone;
     }
 
-    // Validate Name
+    // Validate Name (Required)
     const trimmedName = patientName.trim();
     if (!trimmedName) {
       newErrors.name = tr.requiredField;
     }
 
-    // Validate Date
+    // Validate Date (Required)
     if (!bookingDate) {
       newErrors.date = tr.requiredField;
     }
@@ -182,6 +283,11 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     try {
       const selectedDoc = providers.find(p => String(p.id) === String(selectedDoctorId));
       const selectedSrv = services.find(s => String(s.id) === String(selectedServiceId));
+      const selectedPkg = pkgList.find(p => String(p.id) === String(selectedPackageId));
+      const selectedProd = prodList.find(pr => String(pr.id) === String(selectedProductId));
+
+      const parsedInvoiceVal = invoiceValue !== "" ? parseFloat(invoiceValue) : 0;
+      const parsedSpentVal = actualSpent !== "" ? parseFloat(actualSpent) : 0;
 
       const payload = {
         patientPhone: trimmedPhone,
@@ -191,13 +297,18 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         doctorName: selectedDoc?.name || null,
         serviceId: selectedServiceId ? Number(selectedServiceId) : null,
         serviceName: selectedSrv ? getServiceName(selectedSrv) : null,
+        packageId: selectedPackageId || null,
+        packageName: selectedPkg ? getPackageName(selectedPkg) : null,
+        productId: selectedProductId || null,
+        productName: selectedProd ? getProductName(selectedProd) : null,
+        invoiceValue: isNaN(parsedInvoiceVal) ? 0 : parsedInvoiceVal,
+        actualSpent: isNaN(parsedSpentVal) ? 0 : parsedSpentVal,
         paymentType: selectedPaymentType || null,
-        branchId: activeBranchId || null,
-        amountPaid: selectedPaymentType && selectedSrv?.price ? selectedSrv.price : 0
+        notes: notes.trim() || null,
+        branchId: activeBranchId || null
       };
 
-      // POST /api/reservations/previous is staff-gated, so the bearer token is required — a
-      // plain Content-Type-only fetch now 401s and the form would silently fail to save.
+      // POST /api/reservations/previous is staff-gated
       const res = await fetch("/api/reservations/previous", {
         method: "POST",
         headers: await getAuthHeaders(),
@@ -274,8 +385,10 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
       {/* ── FORM CARD ── */}
       <form onSubmit={handleSubmit} className="rounded-3xl border border-gray-200/80 bg-white p-6 sm:p-8 shadow-xs space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* FIELD 1: PATIENT PHONE */}
+        
+        {/* ── ROW 1: 3 FIELDS (PATIENT PHONE *, PATIENT NAME *, DOCTOR OPTIONAL) ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* FIELD 1: PATIENT PHONE (REQUIRED) */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label htmlFor="patientPhone" className="text-xs sm:text-sm font-bold text-[#111827] flex items-center gap-1">
@@ -316,7 +429,70 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             )}
           </div>
 
-          {/* FIELD 2: DATE */}
+          {/* FIELD 2: PATIENT NAME (REQUIRED) */}
+          <div className="space-y-1.5">
+            <label htmlFor="patientName" className="text-xs sm:text-sm font-bold text-[#111827] flex items-center gap-1">
+              {tr.patientNameLabel} <span className="text-red-500">*</span>
+            </label>
+            <div className="relative flex items-center">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+                <User size={17} />
+              </div>
+              <input
+                id="patientName"
+                type="text"
+                value={patientName}
+                onChange={(e) => {
+                  setPatientName(e.target.value);
+                  if (errors.name) setErrors(prev => ({ ...prev, name: undefined }));
+                }}
+                placeholder={tr.patientNamePlaceholder}
+                className={`w-full rounded-xl border bg-white py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] ${
+                  errors.name
+                    ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                    : "border-gray-200 focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
+                }`}
+              />
+            </div>
+            {errors.name && (
+              <p className="text-xs font-semibold text-rose-600 flex items-center gap-1 mt-1">
+                <AlertCircle size={13} /> {errors.name}
+              </p>
+            )}
+          </div>
+
+          {/* FIELD 3: DOCTOR (OPTIONAL) */}
+          <div className="space-y-1.5">
+            <label htmlFor="doctorSelect" className="text-xs sm:text-sm font-bold text-[#111827]">
+              {tr.doctorOptional || tr.doctorLabel}
+            </label>
+            <div className="relative flex items-center">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+                <Stethoscope size={17} />
+              </div>
+              <select
+                id="doctorSelect"
+                value={selectedDoctorId}
+                onChange={(e) => setSelectedDoctorId(e.target.value)}
+                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 cursor-pointer"
+              >
+                <option value="">{tr.selectDoctorPlaceholder}</option>
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} {p.specialty ? `— ${p.specialty}` : ""}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] z-10">
+                <ChevronDown size={17} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── ROW 2: 4 FIELDS (DATE *, SERVICE, PACKAGE, PRODUCTS) ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* FIELD 4: DATE (REQUIRED) */}
           <div className="space-y-1.5">
             <label htmlFor="bookingDate" className="text-xs sm:text-sm font-bold text-[#111827] flex items-center gap-1">
               {tr.dateLabel} <span className="text-red-500">*</span>
@@ -352,39 +528,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             )}
           </div>
 
-          {/* FIELD 3: PATIENT NAME */}
-          <div className="space-y-1.5">
-            <label htmlFor="patientName" className="text-xs sm:text-sm font-bold text-[#111827] flex items-center gap-1">
-              {tr.patientNameLabel} <span className="text-red-500">*</span>
-            </label>
-            <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
-                <User size={17} />
-              </div>
-              <input
-                id="patientName"
-                type="text"
-                value={patientName}
-                onChange={(e) => {
-                  setPatientName(e.target.value);
-                  if (errors.name) setErrors(prev => ({ ...prev, name: undefined }));
-                }}
-                placeholder={tr.patientNamePlaceholder}
-                className={`w-full rounded-xl border bg-white py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] ${
-                  errors.name
-                    ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
-                    : "border-gray-200 focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
-                }`}
-              />
-            </div>
-            {errors.name && (
-              <p className="text-xs font-semibold text-rose-600 flex items-center gap-1 mt-1">
-                <AlertCircle size={13} /> {errors.name}
-              </p>
-            )}
-          </div>
-
-          {/* FIELD 4: SERVICE (OPTIONAL) */}
+          {/* FIELD 5: SERVICE (OPTIONAL) - No price written beside name */}
           <div className="space-y-1.5">
             <label htmlFor="serviceSelect" className="text-xs sm:text-sm font-bold text-[#111827]">
               {tr.serviceOptional || tr.serviceLabel}
@@ -396,13 +540,17 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               <select
                 id="serviceSelect"
                 value={selectedServiceId}
-                onChange={(e) => setSelectedServiceId(e.target.value)}
+                onChange={(e) => {
+                  const sId = e.target.value;
+                  setSelectedServiceId(sId);
+                  recalculateInvoice(sId, selectedPackageId, selectedProductId);
+                }}
                 className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 cursor-pointer"
               >
                 <option value="">{tr.selectServicePlaceholder}</option>
                 {services.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {getServiceName(s)} {s.price ? `(${s.price} EGP)` : ""}
+                    {getServiceName(s)}
                   </option>
                 ))}
               </select>
@@ -412,25 +560,29 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             </div>
           </div>
 
-          {/* FIELD 5: DOCTOR (OPTIONAL) */}
+          {/* FIELD 6: PACKAGE (OPTIONAL) */}
           <div className="space-y-1.5">
-            <label htmlFor="doctorSelect" className="text-xs sm:text-sm font-bold text-[#111827]">
-              {tr.doctorOptional || tr.doctorLabel}
+            <label htmlFor="packageSelect" className="text-xs sm:text-sm font-bold text-[#111827]">
+              {tr.packageOptional || tr.packageLabel}
             </label>
             <div className="relative flex items-center">
               <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
-                <Stethoscope size={17} />
+                <PackageIcon size={17} />
               </div>
               <select
-                id="doctorSelect"
-                value={selectedDoctorId}
-                onChange={(e) => setSelectedDoctorId(e.target.value)}
+                id="packageSelect"
+                value={selectedPackageId}
+                onChange={(e) => {
+                  const pId = e.target.value;
+                  setSelectedPackageId(pId);
+                  recalculateInvoice(selectedServiceId, pId, selectedProductId);
+                }}
                 className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 cursor-pointer"
               >
-                <option value="">{tr.selectDoctorPlaceholder}</option>
-                {providers.map((p) => (
+                <option value="">{tr.selectPackagePlaceholder}</option>
+                {pkgList.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} {p.specialty ? `— ${p.specialty}` : ""}
+                    {getPackageName(p)}
                   </option>
                 ))}
               </select>
@@ -440,7 +592,97 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             </div>
           </div>
 
-          {/* FIELD 6: PAYMENT TYPE (OPTIONAL) */}
+          {/* FIELD 7: PRODUCTS (OPTIONAL) */}
+          <div className="space-y-1.5">
+            <label htmlFor="productSelect" className="text-xs sm:text-sm font-bold text-[#111827]">
+              {tr.productsOptional || tr.productsLabel}
+            </label>
+            <div className="relative flex items-center">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+                <ShoppingBag size={17} />
+              </div>
+              <select
+                id="productSelect"
+                value={selectedProductId}
+                onChange={(e) => {
+                  const prId = e.target.value;
+                  setSelectedProductId(prId);
+                  recalculateInvoice(selectedServiceId, selectedPackageId, prId);
+                }}
+                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 cursor-pointer"
+              >
+                <option value="">{tr.selectProductPlaceholder}</option>
+                {prodList.map((pr) => (
+                  <option key={pr.id} value={pr.id}>
+                    {getProductName(pr)}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] z-10">
+                <ChevronDown size={17} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── ROW 3: 3 FIELDS (INVOICE VALUE, ACTUAL SPENT, PAYMENT METHOD) ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* FIELD 8: INVOICE VALUE (EDITABLE, AUTO-CALCULATED) */}
+          <div className="space-y-1.5">
+            <label htmlFor="invoiceValue" className="text-xs sm:text-sm font-bold text-[#111827]">
+              {tr.invoiceValueLabel || "Invoice Value (EGP)"}
+            </label>
+            <div className="relative flex items-center">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+                <Receipt size={17} />
+              </div>
+              <input
+                id="invoiceValue"
+                type="number"
+                min="0"
+                step="any"
+                value={invoiceValue}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setInvoiceValue(val);
+                  if (!hasManuallyEditedSpent) {
+                    setActualSpent(val);
+                  }
+                }}
+                placeholder={tr.invoiceValuePlaceholder || "0.00"}
+                title={tr.invoiceValueTooltip}
+                className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
+              />
+            </div>
+          </div>
+
+          {/* FIELD 9: ACTUAL SPENT (AMOUNT PAID) */}
+          <div className="space-y-1.5">
+            <label htmlFor="actualSpent" className="text-xs sm:text-sm font-bold text-[#111827]">
+              {tr.actualSpentLabel || "Actual Spent (EGP)"}
+            </label>
+            <div className="relative flex items-center">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+                <Wallet size={17} />
+              </div>
+              <input
+                id="actualSpent"
+                type="number"
+                min="0"
+                step="any"
+                value={actualSpent}
+                onChange={(e) => {
+                  setActualSpent(e.target.value);
+                  setHasManuallyEditedSpent(true);
+                }}
+                placeholder={tr.actualSpentPlaceholder || "0.00"}
+                title={tr.actualSpentTooltip}
+                className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
+              />
+            </div>
+          </div>
+
+          {/* FIELD 10: PAYMENT METHOD (OPTIONAL) */}
           <div className="space-y-1.5">
             <label htmlFor="paymentTypeSelect" className="text-xs sm:text-sm font-bold text-[#111827]">
               {tr.paymentTypeOptional || tr.paymentTypeLabel}
@@ -468,6 +710,63 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             </div>
           </div>
         </div>
+
+        {/* ── ROW 4: NOTES (FULL WIDTH) ── */}
+        <div className="space-y-1.5">
+          <label htmlFor="bookingNotes" className="text-xs sm:text-sm font-bold text-[#111827] flex items-center gap-1.5">
+            <FileText size={15} className="text-[#5A6A51]" />
+            <span>{tr.notesLabel || "Notes (Optional)"}</span>
+          </label>
+          <div className="relative flex items-start">
+            <textarea
+              id="bookingNotes"
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={tr.notesPlaceholder || "Enter any notes or remarks regarding this historical booking..."}
+              className="w-full rounded-xl border border-gray-200 bg-white p-3 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 resize-y"
+            />
+          </div>
+        </div>
+
+        {/* ── DYNAMIC FINANCIAL LEDGER IMPACT PREVIEW ── */}
+        {(() => {
+          const numInvoice = parseFloat(invoiceValue) || 0;
+          const numSpent = parseFloat(actualSpent) || 0;
+          const diff = numInvoice - numSpent;
+
+          if (numInvoice === 0 && numSpent === 0) return null;
+
+          return (
+            <div className="rounded-2xl border border-gray-200/80 bg-[#F9FBF8] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+              <div className="flex items-center gap-2 font-semibold text-[#374151]">
+                <Coins size={16} className="text-[#414E36] shrink-0" />
+                <span>{tr.ledgerImpact || "Financial Ledger Preview:"}</span>
+                <span className="text-[#6B7280] font-normal">
+                  (Invoice: {numInvoice.toLocaleString()} EGP | Spent: {numSpent.toLocaleString()} EGP)
+                </span>
+              </div>
+              <div>
+                {diff > 0 ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 border border-rose-200 px-3 py-1 font-bold text-rose-700">
+                    <span>+{diff.toLocaleString()} EGP</span>
+                    <span className="font-medium text-[11px] text-rose-600">({tr.ledgerDebt || "Added to Outstanding Debt"})</span>
+                  </span>
+                ) : diff < 0 ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 font-bold text-emerald-700">
+                    <span>+{Math.abs(diff).toLocaleString()} EGP</span>
+                    <span className="font-medium text-[11px] text-emerald-600">({tr.ledgerCredit || "Settles Debt & Credits Wallet"})</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 font-bold text-emerald-700">
+                    <CheckCircle2 size={13} />
+                    <span>{tr.ledgerExact || "Fully Settled (0 EGP Debt)"}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── SAGE CALLOUT BANNER ── */}
         <div className="rounded-2xl border border-[#D5DFD1] bg-[#F3F7F1] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -525,3 +824,5 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 };
 
 export default AdminAddPreviousBookingView;
+
+

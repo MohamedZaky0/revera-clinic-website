@@ -124,10 +124,20 @@ export async function POST(req: Request) {
       doctorName,
       serviceId,
       serviceName,
+      packageId,
+      packageName,
+      productId,
+      productName,
+      invoiceValue,
+      serviceValue,
+      value,
+      price,
+      actualSpent,
+      amountPaid,
+      payment,
       paymentType,
       branchId,
-      notes,
-      amountPaid
+      notes
     } = body;
 
     const rawPhone = (patientPhone || phone || '').trim();
@@ -166,7 +176,14 @@ export async function POST(req: Request) {
 
     const cleanMobile = cleanPhoneForDb(rawPhone);
 
-    // 4. Patient Matching & Creation
+    // Parse financial values
+    const rawVal = serviceValue ?? value ?? price ?? 0;
+    const parsedValue = Math.max(0, isNaN(Number(rawVal)) ? 0 : Number(rawVal));
+
+    const rawPaid = amountPaid ?? payment ?? 0;
+    const parsedPaid = Math.max(0, isNaN(Number(rawPaid)) ? 0 : Number(rawPaid));
+
+    // 4. Patient Matching & Financial Ledger Reconciliation
     let customerId: string | null = null;
     let isNewPatient = false;
     let customerRecord: any = null;
@@ -181,22 +198,82 @@ export async function POST(req: Request) {
       console.warn('Customer lookup error in previous booking:', searchError.message);
     }
 
+    let currentOutstanding = 0;
+    let currentWallet = 0;
+    let currentSpent = 0;
+    let currentBookings = 0;
+
     if (existingCustomers && existingCustomers.length > 0) {
-      // Existing patient found: link customer
+      // Existing patient found
       customerRecord = existingCustomers[0];
       customerId = customerRecord.id;
+      currentOutstanding = Number(customerRecord.outstanding || 0);
+      currentWallet = Number(customerRecord.wallet_balance || 0);
+      currentSpent = Number(customerRecord.spent_amount || 0);
+      currentBookings = Number(customerRecord.number_of_bookings || 0);
+    }
 
-      // Increment number of bookings
-      const currentBookings = Number(customerRecord.number_of_bookings || 0);
-      await supabaseServer
+    // ── FINANCIAL LEDGER BALANCE CALCULATIONS ──
+    // diff > 0: underpaid (cost exceeds payment) -> debt added to outstanding
+    // diff < 0: overpaid (payment exceeds cost) -> settles outstanding debt first, excess credited to wallet
+    // diff === 0: exact payment -> no change to debt or wallet
+    let newOutstanding = currentOutstanding;
+    let newWallet = currentWallet;
+    let newSpent = currentSpent + parsedPaid;
+
+    const diff = parsedValue - parsedPaid;
+
+    if (diff > 0) {
+      // Patient owes `diff`. If they have existing wallet credit, utilize wallet first.
+      if (newWallet > 0) {
+        if (newWallet >= diff) {
+          newWallet = newWallet - diff;
+        } else {
+          const remainingDebt = diff - newWallet;
+          newWallet = 0;
+          newOutstanding = newOutstanding + remainingDebt;
+        }
+      } else {
+        newOutstanding = newOutstanding + diff;
+      }
+    } else if (diff < 0) {
+      // Patient overpaid by `overpaid`. Settle existing outstanding debt first, remainder goes to wallet.
+      const overpaid = -diff;
+      if (newOutstanding > 0) {
+        if (overpaid <= newOutstanding) {
+          newOutstanding = newOutstanding - overpaid;
+        } else {
+          const remainder = overpaid - newOutstanding;
+          newOutstanding = 0;
+          newWallet = newWallet + remainder;
+        }
+      } else {
+        newWallet = newWallet + overpaid;
+      }
+    }
+
+    if (customerRecord) {
+      // Update existing customer profile balances
+      const { data: updatedCustomer, error: updateCustError } = await supabaseServer
         .from('customers')
         .update({
           number_of_bookings: currentBookings + 1,
+          spent_amount: newSpent,
+          outstanding: newOutstanding,
+          wallet_balance: newWallet,
           updated_at: new Date().toISOString()
         })
-        .eq('id', customerId);
+        .eq('id', customerId)
+        .select()
+        .single();
+
+      if (updateCustError) {
+        console.error('Failed to update customer balance for historical booking:', updateCustError.message);
+      } else if (updatedCustomer) {
+        customerRecord = updatedCustomer;
+      }
     } else {
-      // No patient found: create a new customer record automatically
+      // No patient found: create a new customer record with initial balances
       isNewPatient = true;
       const { data: newCustomer, error: createCustError } = await supabaseServer
         .from('customers')
@@ -206,9 +283,9 @@ export async function POST(req: Request) {
           active: true,
           registration_date: new Date().toISOString(),
           number_of_bookings: 1,
-          spent_amount: 0,
-          outstanding: 0,
-          wallet_balance: 0,
+          spent_amount: newSpent,
+          outstanding: newOutstanding,
+          wallet_balance: newWallet,
           note: `[Auto-created from Add Previous Booking on ${new Date().toISOString().slice(0, 10)}]`
         })
         .select()
@@ -219,6 +296,23 @@ export async function POST(req: Request) {
       } else if (newCustomer) {
         customerRecord = newCustomer;
         customerId = newCustomer.id;
+      }
+    }
+
+    // Record wallet ledger transaction if wallet balance changed
+    if (customerId && newWallet !== currentWallet) {
+      const walletDelta = newWallet - currentWallet;
+      try {
+        await supabaseServer.from('wallet_txns').insert({
+          customer_id: customerId,
+          direction: walletDelta > 0 ? 'in' : 'out',
+          amount: Math.abs(walletDelta),
+          reason: walletDelta > 0
+            ? `Credit surplus from historical booking on ${rawDate.slice(0, 10)}`
+            : `Used against historical booking on ${rawDate.slice(0, 10)}`
+        });
+      } catch (wErr: any) {
+        console.warn('Could not insert wallet_txns entry:', wErr?.message);
       }
     }
 
@@ -248,9 +342,14 @@ export async function POST(req: Request) {
 
     // 7. Prepare historical reservation payload
     const historicalTag = '[Historical Booking]';
-    const paymentNote = paymentType ? ` Payment Type: ${paymentType}.` : '';
+    const srvNote = serviceName ? ` Service: ${serviceName}.` : '';
+    const pkgNote = packageName ? ` Package: ${packageName}.` : '';
+    const prodNote = productName ? ` Product: ${productName}.` : '';
+    const valNote = parsedValue > 0 ? ` Invoice Value: ${parsedValue} EGP.` : '';
+    const spentNote = ` Actual Spent: ${parsedPaid} EGP.`;
+    const paymentNote = paymentType ? ` Payment Method: ${paymentType}.` : '';
     const userNote = notes ? ` ${notes}` : '';
-    const receptionNote = `${historicalTag} Added manually for historical records.${paymentNote}${userNote}`.trim();
+    const receptionNote = `${historicalTag} Added manually for historical records.${srvNote}${pkgNote}${prodNote}${valNote}${spentNote}${paymentNote}${userNote}`.trim();
 
     const reservationPayload: Record<string, any> = {
       customer_id: customerId,
@@ -268,8 +367,8 @@ export async function POST(req: Request) {
       branch_id: branchId || null,
       reception_notes: receptionNote,
       notes: receptionNote,
-      amount_paid: Number(amountPaid || 0),
-      amount_left: 0,
+      amount_paid: parsedPaid,
+      amount_left: Math.max(0, parsedValue - parsedPaid),
       completed_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
       created_at: new Date().toISOString()
     };
@@ -309,6 +408,11 @@ export async function POST(req: Request) {
       message: 'Historical booking added successfully.',
       booking: newReservation,
       customer: customerRecord,
+      balances: {
+        spent_amount: newSpent,
+        outstanding: newOutstanding,
+        wallet_balance: newWallet
+      },
       isNewPatient
     });
   } catch (err: any) {
