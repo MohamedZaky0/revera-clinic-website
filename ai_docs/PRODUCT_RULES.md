@@ -392,4 +392,26 @@ The following are **not currently enforced in code**:
 3. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-046` (`Customer Portal Header Login Settings Engine`).
 
+---
+
+## Core System-Locked Roles & Permissions Protection
+**Enforced in:** `src/components/admin/settings/RoleManagementView.tsx`, `src/app/api/roles/route.ts`.
+
+1. **System Roles Are Permanently Locked**:
+   - The core operational roles (`superadmin`, `admin`, `doctor`, `receptionist`, `reception`) are system-locked.
+   - Deletion buttons are disabled and replaced with the `System Locked` indicator in Role Management.
+   - `DELETE /api/roles` rejects deletion attempts targeting system roles with a `400 Bad Request` error.
+
+---
+
+## Superadmin Dual Deletion Engine (Soft Delete vs Hard Delete)
+**Enforced in:** `src/contexts/AlertConfirmContext.tsx`, `src/app/api/customers/route.ts`, `src/app/api/employees/route.ts`, `src/app/api/providers/route.ts`, `src/app/api/services/route.ts`, `src/app/api/reservations/route.ts`, `src/app/admin/page.tsx`.
+
+1. **Dual Deletion Options for Super Administrators**:
+   - When a Super Admin triggers a delete action on core entities (Patients, Employees, Doctors, Services, Bookings), they are presented with two explicit choices:
+     - **Soft Delete (Deactivate / Archive)**: Deactivates and archives the record while preserving all associated financial transactions, historical bookings, medical reports, prescriptions, invoices, and audit logs.
+     - **Hard Delete (Permanent Removal)**: Permanently purges the record from Supabase tables and auth systems.
+2. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-048` (`Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine`).
+
 

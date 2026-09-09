@@ -568,7 +568,7 @@ function PatientPackagePromoBanner({
 }
 
 export default function AdminPage() {
-  const { showConfirm } = useAlertConfirm();
+  const { showConfirm, showDeleteConfirm } = useAlertConfirm();
   const { isRTL } = useLanguage();
   // Auth state
   const [session, setSession] = useState<any>(null);
@@ -2358,9 +2358,21 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   }
 
   async function handleDeleteEmployee(id: string) {
-    if (!(await showConfirm("Are you sure you want to delete this employee account? They will lose access to the admin panel immediately."))) return;
+    const targetEmp = employeesList.find(e => e.id === id);
+    const deleteChoice = await showDeleteConfirm({
+      title: "Delete Employee Account",
+      itemName: targetEmp?.name || targetEmp?.email || "Employee",
+      itemType: "employee",
+      isSuperAdmin: adminRole === "superadmin",
+      message: adminRole === "superadmin"
+        ? undefined
+        : "Are you sure you want to delete this employee account? They will lose access to the admin panel immediately."
+    });
+    if (!deleteChoice) return;
+
     try {
-      const res = await fetch(`/api/employees?id=${encodeURIComponent(id)}`, {
+      const mode = deleteChoice === "soft" ? "soft" : "hard";
+      const res = await fetch(`/api/employees?id=${encodeURIComponent(id)}&mode=${mode}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${session?.access_token || ''}` },
       });
@@ -2369,7 +2381,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         fetchRolesAndEmployees();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to revoke credentials.");
+        alert(data.error || "Failed to delete account.");
       }
     } catch (err: any) {
       alert("Error deleting account: " + err.message);
@@ -2550,7 +2562,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-044', name: 'Multi-Shift Daily Cycle & Interval Tracking Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies starting, ending, and restarting multiple shifts in the same day with cumulative worked interval tracking.', status: 'idle' },
     { id: 'TC-045', name: 'Role-Based URL Routing & Account Navigation Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies dynamic role slug generation and link routing (/admin/reception, /admin/doctor, /admin/superadmin) based on logged account role.', status: 'idle' },
     { id: 'TC-046', name: 'Customer Portal Header Login Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies header customer login button toggle activation/deactivation in Page Settings and public navbar.', status: 'idle' },
-    { id: 'TC-047', name: 'Multi-Access Point Previous Booking & Patient Auto-Prefill Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies launching Add Previous Booking from patient profile (auto-populating phone and name) and from financial transactions page.', status: 'idle' }
+    { id: 'TC-047', name: 'Multi-Access Point Previous Booking & Patient Auto-Prefill Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies launching Add Previous Booking from patient profile (auto-populating phone and name) and from financial transactions page.', status: 'idle' },
+    { id: 'TC-048', name: 'Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine', category: 'System & Settings', endpoint: '/api/roles', description: 'Validates system locking for reception/admin/doctor/superadmin roles and dual deletion modes (soft/hard) for administrative management.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -3052,6 +3065,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     session,
     authenticatedJsonHeaders,
     showConfirm,
+    showDeleteConfirm,
     fetchRolesAndEmployees,
     getDoctorFirstReservationDate,
     allReservations,
@@ -5163,9 +5177,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     setImportLog([]);
   };
 
-  function handleDeleteCustomer(id: string) {
+  function handleDeleteCustomer(id: string, mode: 'soft' | 'hard' = 'hard') {
     setDeletingCustomer(true);
-    fetch(`/api/customers?id=${id}`, {
+    fetch(`/api/customers?id=${id}&mode=${mode}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${session?.access_token || ""}` }
     })
@@ -6018,7 +6032,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       <button
                         onClick={() => {
                           setShowQuickActionMenu(false);
-                          setShowAddBookingModal(true);
+                          setActiveNav("Bookings");
+                          setShowFullViewNewBooking(true);
                         }}
                         className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
                       >
@@ -6029,6 +6044,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       <button
                         onClick={() => {
                           setShowQuickActionMenu(false);
+                          setActiveNav("Patients");
+                          setViewingCustomerProfile(null);
                           handleOpenAddCustomer();
                         }}
                         className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
@@ -6036,21 +6053,25 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <Plus size={14} className="text-[#C4AE7C]" /> New Patient
                       </button>
                     )}
-                    {hasPermission("providers.create") && (
+                    {(hasPermission("employees.create") || hasPermission("providers.create")) && (
                       <button
                         onClick={() => {
                           setShowQuickActionMenu(false);
-                          openAddProviderModal();
+                          setActiveNav("Employees");
+                          setViewingEmployee(null);
+                          setEditingEmployee(null);
+                          setIsEditingEmployeeModalOpen(true);
                         }}
                         className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
                       >
-                        <Plus size={14} className="text-[#C4AE7C]" /> New Doctor / Provider
+                        <Plus size={14} className="text-[#C4AE7C]" /> New Employee
                       </button>
                     )}
                     {hasPermission("services.create") && (
                       <button
                         onClick={() => {
                           setShowQuickActionMenu(false);
+                          setActiveNav("Services");
                           setShowAddCategoryModal(true);
                         }}
                         className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
@@ -10361,37 +10382,91 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       {/* ── DELETE CUSTOMER CONFIRMATION MODAL ── */}
       {deleteCustomerTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md rounded-2xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
-            <div className="mb-5 flex items-start gap-4">
+          <div className="w-full max-w-lg rounded-2xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
+            <div className="mb-4 flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 border border-red-100">
                 <Trash2 size={24} />
               </div>
               <div>
                 <h3 className="text-lg font-bold text-[#1F251A]">Delete Customer?</h3>
-                <p className="mt-2 text-sm text-[#5A6A51] leading-relaxed">
-                  Are you sure you want to delete the customer profile for{" "}
-                  <span className="font-semibold text-[#1F251A]">{deleteCustomerTarget.name}</span>?
-                  This action will permanently remove their records from Supabase. Any linked reservations will be unlinked (set to guest status).
+                <p className="mt-1 text-xs text-[#5A6A51] leading-relaxed">
+                  You are deleting the customer profile for{" "}
+                  <span className="font-bold text-[#1F251A]">{deleteCustomerTarget.name}</span>.
                 </p>
               </div>
             </div>
+
+            {adminRole === 'superadmin' ? (
+              <div className="space-y-3 mb-5">
+                <p className="text-xs font-semibold text-[#1F251A]">
+                  As a <strong>Super Admin</strong>, select your deletion method:
+                </p>
+                <div className="grid grid-cols-1 gap-2.5">
+                  <button
+                    type="button"
+                    disabled={deletingCustomer}
+                    onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!, 'soft')}
+                    className="flex items-start gap-3 p-3 rounded-xl border border-emerald-600/30 bg-emerald-50/60 hover:bg-emerald-50 text-start transition cursor-pointer disabled:opacity-50"
+                  >
+                    <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
+                      <Archive size={16} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-emerald-950">Soft Delete (Deactivate)</span>
+                        <span className="text-[9px] font-bold uppercase bg-emerald-200/70 text-emerald-900 px-2 py-0.5 rounded-full">Preserves Records</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-900/80 mt-0.5">
+                        Deactivates the patient while safely keeping their visit history, invoices, and ledger records.
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={deletingCustomer}
+                    onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!, 'hard')}
+                    className="flex items-start gap-3 p-3 rounded-xl border border-rose-300 bg-rose-50/60 hover:bg-rose-50 text-start transition cursor-pointer disabled:opacity-50"
+                  >
+                    <div className="h-8 w-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
+                      <Trash2 size={16} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-rose-950">Hard Delete (Permanent Removal)</span>
+                        <span className="text-[9px] font-bold uppercase bg-rose-200/70 text-rose-900 px-2 py-0.5 rounded-full">Irreversible</span>
+                      </div>
+                      <p className="text-[11px] text-rose-900/80 mt-0.5">
+                        Permanently removes this profile from the database. Linked appointments are unlinked.
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-[#5A6A51] mb-5 leading-relaxed">
+                This action will permanently delete the customer profile. Linked reservations will be set to guest status.
+              </p>
+            )}
 
             <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
               <button
                 type="button"
                 onClick={() => setDeleteCustomerTarget(null)}
-                className="rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+                className="rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-xs font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!)}
-                disabled={deletingCustomer}
-                className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {deletingCustomer ? "Deleting..." : "Yes, Delete Customer"}
-              </button>
+              {adminRole !== 'superadmin' && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!, 'hard')}
+                  disabled={deletingCustomer}
+                  className="rounded-lg bg-red-600 px-5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {deletingCustomer ? "Deleting..." : "Yes, Delete Customer"}
+                </button>
+              )}
             </div>
           </div>
         </div>

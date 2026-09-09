@@ -126,9 +126,24 @@ export async function DELETE(req: Request) {
 
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
+  const mode = url.searchParams.get('mode') || 'hard';
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
   try {
+    if (mode === 'soft') {
+      const { data, error } = await getSupabaseServer()
+        .from('services')
+        .update({ active: false, visible: false })
+        .eq('id', Number(id))
+        .select();
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, message: 'Service deactivated (soft delete)' });
+    }
+
     const { data, error } = await getSupabaseServer()
       .from('services')
       .delete()
@@ -139,7 +154,7 @@ export async function DELETE(req: Request) {
     if (!data || data.length === 0) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    return NextResponse.json({ success: true, message: 'Service deleted' });
+    return NextResponse.json({ success: true, message: 'Service permanently deleted' });
   } catch (err) {
     console.error('DELETE /api/services error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });

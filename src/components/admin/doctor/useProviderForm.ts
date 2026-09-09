@@ -10,6 +10,7 @@ interface UseProviderFormParams {
   session: any;
   authenticatedJsonHeaders: { "Content-Type": string; Authorization: string };
   showConfirm: (message: string, title?: string) => Promise<boolean>;
+  showDeleteConfirm?: (options: any) => Promise<"soft" | "hard" | false>;
   fetchRolesAndEmployees: () => void;
   getDoctorFirstReservationDate: (docName: string, resList: any[]) => string | null;
   allReservations: any[];
@@ -43,6 +44,7 @@ export function useProviderForm({
   session,
   authenticatedJsonHeaders,
   showConfirm,
+  showDeleteConfirm,
   fetchRolesAndEmployees,
   getDoctorFirstReservationDate,
   allReservations,
@@ -544,25 +546,41 @@ export function useProviderForm({
   // ── handleDeleteProvider ──
   async function handleDeleteProvider(id: string) {
     if (!id) return;
-    if (await showConfirm("Are you sure you want to delete this provider?")) {
-      fetch(`/api/providers?id=${id}`, {
-        method: "DELETE",
-        headers: authenticatedJsonHeaders,
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data && data.success) {
-            fetchProviders();
-            alert("Provider deleted successfully!");
-          } else {
-            alert("Failed to delete provider.");
-          }
-        })
-        .catch((err) => {
-          console.error("handleDeleteProvider error:", err);
-          alert("Error deleting provider.");
-        });
+    const doc = providers.find((p: any) => String(p.id) === String(id));
+    let deleteChoice: any = false;
+    if (showDeleteConfirm) {
+      deleteChoice = await showDeleteConfirm({
+        title: "Delete Doctor Profile",
+        itemName: doc?.name || "Doctor",
+        itemType: "doctor",
+        isSuperAdmin: adminRole === "superadmin",
+        message: adminRole === "superadmin"
+          ? undefined
+          : `Are you sure you want to delete ${doc?.name || 'this doctor'}?`
+      });
+    } else {
+      deleteChoice = (await showConfirm(`Are you sure you want to delete ${doc?.name || 'this doctor'}?`)) ? "hard" : false;
     }
+    if (!deleteChoice) return;
+
+    const mode = deleteChoice === "soft" ? "soft" : "hard";
+    fetch(`/api/providers?id=${id}&mode=${mode}`, {
+      method: "DELETE",
+      headers: authenticatedJsonHeaders,
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success) {
+          fetchProviders();
+          alert(mode === "soft" ? "Doctor deactivated successfully (soft delete)!" : "Doctor deleted permanently!");
+        } else {
+          alert("Failed to delete doctor.");
+        }
+      })
+      .catch((err) => {
+        console.error("handleDeleteProvider error:", err);
+        alert("Error deleting doctor.");
+      });
   }
 
   return {

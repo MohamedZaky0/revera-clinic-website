@@ -416,6 +416,7 @@ export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const mode = searchParams.get('mode') || 'hard';
 
     if (!id) {
       return NextResponse.json({ error: 'Employee account ID is required' }, { status: 400 });
@@ -436,6 +437,19 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Cannot delete superadmin account' }, { status: 400 });
     }
 
+    if (mode === 'soft') {
+      // Soft delete: deactivate role / mark inactive to revoke operational access while preserving payroll, attendance & historical records
+      const { data: updated, error: softErr } = await supabaseServer
+        .from('employee_accounts')
+        .update({ role_name: 'inactive' })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (softErr) throw softErr;
+      return NextResponse.json({ message: 'Employee account soft-deleted (deactivated) successfully', data: updated });
+    }
+
     if (employee.auth_user_id) {
       const { error: deleteAuthError } = await supabaseServer.auth.admin.deleteUser(employee.auth_user_id);
       if (deleteAuthError) {
@@ -450,7 +464,7 @@ export async function DELETE(req: Request) {
 
     if (deleteDbError) throw deleteDbError;
 
-    return NextResponse.json({ message: 'Employee account deleted successfully' });
+    return NextResponse.json({ message: 'Employee account permanently deleted successfully' });
   } catch (err: any) {
     console.error('DELETE /api/employees error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });

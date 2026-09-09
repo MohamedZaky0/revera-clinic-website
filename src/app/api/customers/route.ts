@@ -297,9 +297,22 @@ export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const mode = searchParams.get('mode') || 'hard';
 
     if (!id) {
       return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
+    }
+
+    if (mode === 'soft') {
+      const { data: updated, error: softErr } = await supabaseServer
+        .from('customers')
+        .update({ active: false })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (softErr) throw softErr;
+      return NextResponse.json({ message: 'Customer soft-deleted (deactivated) successfully', data: updated });
     }
 
     // 1. Fetch customer email and mobile before deleting them
@@ -353,7 +366,7 @@ export async function DELETE(req: Request) {
 
     if (deleteError) throw deleteError;
 
-    return NextResponse.json({ message: 'Customer deleted successfully' });
+    return NextResponse.json({ message: 'Customer permanently deleted successfully' });
   } catch (err: any) {
     console.error('DELETE /api/customers error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });

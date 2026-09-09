@@ -1314,6 +1314,48 @@ export default function AdminNewBookingView({
                 </div>
               </div>
 
+              {/* Session Type (In Person vs Online) */}
+              <div>
+                <label className="block font-bold text-[#1F251A] mb-2">{tr.sessionTypeLabel}</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label
+                    onClick={() => setSessionType("in_person")}
+                    className={`flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition ${
+                      sessionType === "in_person"
+                        ? "border-emerald-700 bg-emerald-50/50 ring-2 ring-emerald-700/20"
+                        : "border-[#414E36]/15 bg-white hover:bg-[#FBFBF9]"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="session_type"
+                      checked={sessionType === "in_person"}
+                      onChange={() => setSessionType("in_person")}
+                      className="text-emerald-700 focus:ring-emerald-600 cursor-pointer"
+                    />
+                    <span className="font-extrabold text-[#1F251A]">{tr.inPersonLabel}</span>
+                  </label>
+
+                  <label
+                    onClick={() => setSessionType("online")}
+                    className={`flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition ${
+                      sessionType === "online"
+                        ? "border-emerald-700 bg-emerald-50/50 ring-2 ring-emerald-700/20"
+                        : "border-[#414E36]/15 bg-white hover:bg-[#FBFBF9]"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="session_type"
+                      checked={sessionType === "online"}
+                      onChange={() => setSessionType("online")}
+                      className="text-emerald-700 focus:ring-emerald-600 cursor-pointer"
+                    />
+                    <span className="font-extrabold text-[#1F251A]">{tr.onlineLabel}</span>
+                  </label>
+                </div>
+              </div>
+
               {/* REAL DYNAMIC TIME SLOTS DROPDOWN */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -1371,48 +1413,6 @@ export default function AdminNewBookingView({
                     </span>
                   </div>
                 )}
-              </div>
-
-              {/* Session Type (In Person vs Online) */}
-              <div>
-                <label className="block font-bold text-[#1F251A] mb-2">{tr.sessionTypeLabel}</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label
-                    onClick={() => setSessionType("in_person")}
-                    className={`flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition ${
-                      sessionType === "in_person"
-                        ? "border-emerald-700 bg-emerald-50/50 ring-2 ring-emerald-700/20"
-                        : "border-[#414E36]/15 bg-white hover:bg-[#FBFBF9]"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="session_type"
-                      checked={sessionType === "in_person"}
-                      onChange={() => setSessionType("in_person")}
-                      className="text-emerald-700 focus:ring-emerald-600 cursor-pointer"
-                    />
-                    <span className="font-extrabold text-[#1F251A]">{tr.inPersonLabel}</span>
-                  </label>
-
-                  <label
-                    onClick={() => setSessionType("online")}
-                    className={`flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition ${
-                      sessionType === "online"
-                        ? "border-emerald-700 bg-emerald-50/50 ring-2 ring-emerald-700/20"
-                        : "border-[#414E36]/15 bg-white hover:bg-[#FBFBF9]"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="session_type"
-                      checked={sessionType === "online"}
-                      onChange={() => setSessionType("online")}
-                      className="text-emerald-700 focus:ring-emerald-600 cursor-pointer"
-                    />
-                    <span className="font-extrabold text-[#1F251A]">{tr.onlineLabel}</span>
-                  </label>
-                </div>
               </div>
 
               {/* Notes (Optional) */}
