@@ -2548,7 +2548,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-042', name: 'Shift Location Verification & Geofence Guard Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies strict geolocation boundary checks preventing out-of-location shift starts.', status: 'idle' },
     { id: 'TC-043', name: 'Staff Shift & GPS Geofence Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies GPS shift check enable/disable setting configuration and reception dashboard GPS requirement toggle.', status: 'idle' },
     { id: 'TC-044', name: 'Multi-Shift Daily Cycle & Interval Tracking Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies starting, ending, and restarting multiple shifts in the same day with cumulative worked interval tracking.', status: 'idle' },
-    { id: 'TC-045', name: 'Role-Based URL Routing & Account Navigation Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies dynamic role slug generation and link routing (/admin/reception, /admin/doctor, /admin/superadmin) based on logged account role.', status: 'idle' }
+    { id: 'TC-045', name: 'Role-Based URL Routing & Account Navigation Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies dynamic role slug generation and link routing (/admin/reception, /admin/doctor, /admin/superadmin) based on logged account role.', status: 'idle' },
+    { id: 'TC-046', name: 'Customer Portal Header Login Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies header customer login button toggle activation/deactivation in Page Settings and public navbar.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -3185,6 +3186,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
   const [loadingPageSettings, setLoadingPageSettings] = useState(false);
   const [savingPageSettings, setSavingPageSettings] = useState(false);
+  const [showCustomerLogin, setShowCustomerLogin] = useState<boolean>(false);
 
   const [serviceHours, setServiceHours] = useState<Array<{ day: string; dayAr: string; isOpen: boolean; openTime: string; closeTime: string }>>([
     { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
@@ -3953,6 +3955,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           setAboutImage1(data.about?.image1 || "");
           setAboutImage2(data.about?.image2 || "");
           setAboutImage3(data.about?.image3 || "");
+          setShowCustomerLogin(data.header?.showCustomerLogin === true || data.showCustomerLogin === true);
           setBeforeAfterPairs(data.results?.pairs || [
             { id: 1, before: "/images/before-after/1-before.jpeg", after: "/images/before-after/1-after.jpeg" },
             { id: 2, before: "/images/before-after/2-before.jpeg", after: "/images/before-after/2-after.jpeg" },
@@ -4466,8 +4469,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     const wcuImage2Val = overrideData?.whyChooseUs?.image2 !== undefined ? overrideData.whyChooseUs.image2 : wcuImage2;
 
     const sHours = overrideData?.footer?.serviceHours !== undefined ? overrideData.footer.serviceHours : serviceHours;
+    const showCustomerLoginVal = overrideData?.header?.showCustomerLogin !== undefined ? overrideData.header.showCustomerLogin : showCustomerLogin;
 
     const fullPayload = {
+      header: {
+        showCustomerLogin: showCustomerLoginVal
+      },
       hero: {
         slides: heroSlides,
         slides_ar: heroSlidesAr
@@ -6630,6 +6637,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 <HomePageSettingsView
                   homeHeroSlides={homeHeroSlides}
                   homeHeroSlidesAr={homeHeroSlidesAr}
+                  showCustomerLogin={showCustomerLogin}
+                  setShowCustomerLogin={setShowCustomerLogin}
                   pageSettingsLangTab={pageSettingsLangTab}
                   setPageSettingsLangTab={setPageSettingsLangTab}
                   loadingPageSettings={loadingPageSettings}

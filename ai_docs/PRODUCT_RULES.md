@@ -371,3 +371,17 @@ The following are **not currently enforced in code**:
 3. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-045` (`Role-Based URL Routing & Account Navigation Engine`).
 
+---
+
+## Customer Portal Header Login Button Visibility & Page Settings Toggle
+**Enforced in:** `src/components/Navbar.tsx`, `src/components/admin/settings/HomePageSettingsView.tsx`, `src/app/admin/page.tsx`, `src/app/api/page-settings/route.ts`, `data/page_settings.json`.
+
+1. **Deactivated by Default in Customer View**:
+   - The customer login and profile button in the public website header (`Navbar.tsx` desktop and mobile menus) is deactivated (`showCustomerLogin: false`) by default.
+2. **Dynamic Admin Page Settings Toggle**:
+   - Administrators can activate or deactivate the customer login button via Admin Settings -> Pages Settings -> Home (`Customer Portal & Login Button` switch card).
+   - Saved under `header.showCustomerLogin` in `page_settings` (`/api/page-settings`).
+3. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-046` (`Customer Portal Header Login Settings Engine`).
+
+

@@ -78,6 +78,9 @@ const DEFAULT_SETTINGS = {
       instantApproval: false,
       showDoctorNotes: false,
       depositPercentage: 20
+    },
+    header: {
+      showCustomerLogin: false
     }
   }
 };
