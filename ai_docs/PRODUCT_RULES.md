@@ -414,4 +414,21 @@ The following are **not currently enforced in code**:
 2. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-048` (`Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine`).
 
+---
+
+## New Booking Multi-Slot Selection & Financial Calculation Rules
+**Enforced in:** `src/components/admin/bookings/AdminNewBookingView.tsx`, `src/app/api/reservations/route.ts`.
+
+1. **Multi-Slot Selection Engine**:
+   - Receptionists and admins can select one or multiple time slots for an appointment from interactive time chips.
+   - Selected slots automatically calculate and display the total session duration (e.g. 2 slots = 60 mins).
+   - The selected slots are joined and stored in `requested_time` and `time_slot`.
+2. **Form Field Ordering**:
+   - In Appointment Details (Card 2), **Available Time** is positioned directly before **Session Type** (In Person vs Online).
+3. **Financial Section & Breakdown**:
+   - Side-by-side **Booking Value (EGP)** and **Amount Paid Now (EGP)** inputs with browser spin arrows removed and clean visual placeholders.
+   - Auto-calculates `bookingValue = servicePrice * slotsCount` with support for manual receptionist override.
+   - Live **Remaining Value** (`bookingValue - amountPaidNow`) displayed in real-time with status badges (Fully Settled / Due on Visit / Credit Balance) and detailed in the Booking Confirmation Summary modal.
+
+
 
