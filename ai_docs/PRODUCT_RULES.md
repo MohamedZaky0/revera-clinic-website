@@ -351,3 +351,23 @@ The following are **not currently enforced in code**:
 3. **Reads Default To "Most Recent"**:
    - `GET /api/medical-records?customerId=` with no `reservationId` returns whichever row (profile or any visit) was most recently updated, so doctor-session prefill still shows the patient's latest known baseline.
    - Pass `?reservationId=` to fetch one specific visit's intake data.
+
+---
+
+## Role-Based Dynamic URL Routing & Link Synchronization
+**Enforced in:** `src/lib/roleUtils.ts`, `src/app/admin/page.tsx`, `src/app/admin/[role]/page.tsx`, `next.config.ts`.
+
+1. **Dynamic URL Suffix by Account Role**:
+   - The admin URL dynamically reflects the role of the signed-in account:
+     - Receptionist accounts: `/admin/reception`
+     - Doctor accounts: `/admin/doctor`
+     - Superadmin accounts: `/admin/superadmin`
+     - Admin accounts: `/admin/admin`
+     - Custom staff roles: `/admin/[role-slug]` (e.g. `/admin/nurse`, `/admin/hr`, `/admin/accountant`).
+2. **Seamless Session Navigation**:
+   - On login, URL updates to `/admin/[role-slug]` without full page reload.
+   - On logout or session expiration, the URL safely reverts back to `/admin`.
+   - Direct visits to `/admin/reception`, `/admin/doctor`, `/admin/[role]` or root shortcuts (`/reception`, `/doctor`, `/superadmin`) load the admin interface and synchronize to the account's verified authenticated role.
+3. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-045` (`Role-Based URL Routing & Account Navigation Engine`).
+

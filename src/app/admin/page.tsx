@@ -17,6 +17,7 @@ import { printInvoice, printPrescription } from "@/lib/printUtils";
 import { Branch } from "@/types";
 import { translations } from "@/lib/translations";
 import { CLIENT } from "@/config/client";
+import { getRoleSlug } from "@/lib/roleUtils";
 import { adminTranslations } from "@/components/admin/translations";
 import UserProfileView from "@/components/admin/UserProfileView";
 import ClinicProfileSettingsView from "@/components/admin/settings/ClinicProfileSettingsView";
@@ -1733,6 +1734,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         setAdminDbId("");
         if (typeof window !== "undefined") {
           sessionStorage.removeItem("revera_admin_session_active");
+          if (window.location.pathname.startsWith('/admin/') && window.location.pathname !== '/admin') {
+            window.history.replaceState(null, "", "/admin" + window.location.search);
+          }
         }
         setAuthChecking(false);
         return;
@@ -1761,6 +1765,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           setAdminEmployeeId(authData.employeeId || "");
           setAdminDbId(authData.id || "");
 
+          if (typeof window !== "undefined") {
+            const roleSlug = getRoleSlug(authData.role);
+            if (roleSlug) {
+              const targetPath = `/admin/${roleSlug}`;
+              if (window.location.pathname !== targetPath) {
+                window.history.replaceState(null, "", targetPath + window.location.search);
+              }
+            }
+          }
+
           // Pre-fetch employee accounts list so doctor role is known immediately before rendering
           await fetchRolesAndEmployees();
         } else {
@@ -1772,6 +1786,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           setAdminEmail("");
           setAdminEmployeeId("");
           setAdminDbId("");
+          if (typeof window !== "undefined" && window.location.pathname.startsWith('/admin/') && window.location.pathname !== '/admin') {
+            window.history.replaceState(null, "", "/admin" + window.location.search);
+          }
         }
       } catch (err) {
         console.error("Error retrieving admin permissions:", err);
@@ -2180,8 +2197,24 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     if (supabase) {
       await triggerCheckout();
       await supabase.auth.signOut();
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", "/admin");
+      }
     }
   }
+
+  // Synchronize browser URL to end with the user's role slug (/admin/[role])
+  useEffect(() => {
+    if (session && adminRole && typeof window !== "undefined") {
+      const roleSlug = getRoleSlug(adminRole);
+      if (roleSlug) {
+        const targetPath = `/admin/${roleSlug}`;
+        if (window.location.pathname !== targetPath) {
+          window.history.replaceState(null, "", targetPath + window.location.search);
+        }
+      }
+    }
+  }, [session, adminRole]);
 
   // Geolocation Check-In on login resolution (Disabled for now per user request)
   useEffect(() => {
@@ -2514,7 +2547,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-041', name: 'Prescription Deduplication & Clinical Intake Engine', category: 'Medical & Patients', endpoint: '/api/prescriptions', description: 'Verifies doctor prescription generation, duplicate prevention on repeated saves, and intake templates.', status: 'idle' },
     { id: 'TC-042', name: 'Shift Location Verification & Geofence Guard Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies strict geolocation boundary checks preventing out-of-location shift starts.', status: 'idle' },
     { id: 'TC-043', name: 'Staff Shift & GPS Geofence Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies GPS shift check enable/disable setting configuration and reception dashboard GPS requirement toggle.', status: 'idle' },
-    { id: 'TC-044', name: 'Multi-Shift Daily Cycle & Interval Tracking Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies starting, ending, and restarting multiple shifts in the same day with cumulative worked interval tracking.', status: 'idle' }
+    { id: 'TC-044', name: 'Multi-Shift Daily Cycle & Interval Tracking Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies starting, ending, and restarting multiple shifts in the same day with cumulative worked interval tracking.', status: 'idle' },
+    { id: 'TC-045', name: 'Role-Based URL Routing & Account Navigation Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies dynamic role slug generation and link routing (/admin/reception, /admin/doctor, /admin/superadmin) based on logged account role.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);

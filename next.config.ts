@@ -12,6 +12,22 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/reception',
+        destination: '/admin/reception',
+      },
+      {
+        source: '/doctor',
+        destination: '/admin/doctor',
+      },
+      {
+        source: '/superadmin',
+        destination: '/admin/superadmin',
+      },
+    ];
+  },
 };
 
 export default nextConfig;
