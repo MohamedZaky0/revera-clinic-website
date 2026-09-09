@@ -288,22 +288,30 @@ The following are **not currently enforced in code**:
 ---
 
 ## Historical & Previous Bookings Rules
-**Enforced in:** `/api/reservations/previous`, `src/components/admin/bookings/AdminAddPreviousBookingView.tsx`, `AdminBookingsView.tsx`
+**Enforced in:** `/api/reservations/previous`, `src/components/admin/bookings/AdminAddPreviousBookingView.tsx`, `AdminBookingsView.tsx`, `CustomerProfileDrawer.tsx`, `TransactionsView.tsx`, `src/app/admin/page.tsx`
 
-1. **Non-Disruption of Live Scheduling**:
+1. **Multi-Access Point Launching**:
+   - Accessible from 3 distinct locations across the administrative workspace:
+     1. **Bookings Page**: via the 3-dots (`MoreVertical`) dropdown menu beside `+ New Booking`.
+     2. **Patient Profile Drawer (`CustomerProfileDrawer.tsx`)**: via the dedicated `[🕒 Add Previous Booking]` top header action button and the Booking History tab header.
+     3. **Transactions Page (`TransactionsView.tsx`)**: via the top action button group directly beside `New Transaction` and `Audit Logs`.
+2. **Automatic Patient Data Prefill**:
+   - When launched from a patient profile, `AdminAddPreviousBookingView` receives the customer object (`initialCustomer`) and automatically pre-populates and binds the patient's **Phone** (`mobile` / `phone`) and **Name** (`name`), immediately triggering the matching badge (`✓ Existing patient found: [Name]`) without requiring manual re-entry.
+3. **Non-Disruption of Live Scheduling**:
    - Historical bookings are saved with `status = 'completed'`, `is_manual = true`, and `is_historical = true`.
    - Historical bookings never generate pending approval cards, upcoming appointment slot reservations, or doctor live calendar conflicts.
-2. **Original Historical Date Preservation**:
+4. **Original Historical Date Preservation**:
    - The user-specified historical date (even years prior to system deployment) is preserved verbatim in `reservations.date` and `reservations.completed_at`.
-3. **Patient Matching & Automatic Profile Creation**:
+5. **Patient Matching & Automatic Profile Creation**:
    - Matches existing patients by phone number (normalizing Egyptian formats `+201...`, `00201...`, `201...` to `01...`).
    - If matched, links the historical reservation to `customer_id` and increments `number_of_bookings`.
    - If no patient matches the phone number, a new patient record is automatically created in `customers` (`active = true`, `number_of_bookings = 1`) and linked.
-4. **Field Optionality**:
+6. **Field Optionality**:
    - `patientPhone`, `patientName`, and `date` are mandatory.
    - `doctor`, `service`, and `paymentType` are optional and can remain empty without failing creation.
-5. **Patient & Booking History Visibility**:
-   - The historical reservation is displayed in the patient's Profile Booking History and the All Appointments directory.
+7. **Patient & Booking History Visibility & Automated Verification**:
+   - The historical reservation is displayed in the patient's Profile Booking History, the Transactions list, and the All Appointments directory.
+   - Verified under System Test Suite `TC-038` and `TC-047`.
 
 ---
 

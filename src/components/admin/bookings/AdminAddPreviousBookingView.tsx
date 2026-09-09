@@ -69,6 +69,9 @@ interface ProductItem {
 interface AdminAddPreviousBookingViewProps {
   onClose: () => void;
   onBookingCreated?: () => void;
+  initialCustomer?: CustomerItem | any;
+  initialPatientPhone?: string;
+  initialPatientName?: string;
   services?: any[];
   providers?: any[];
   customers?: any[];
@@ -105,6 +108,9 @@ function isValidPhone(raw: string): boolean {
 export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewProps> = ({
   onClose,
   onBookingCreated,
+  initialCustomer,
+  initialPatientPhone,
+  initialPatientName,
   services = [],
   providers = [],
   customers = [],
@@ -117,10 +123,20 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 }) => {
   const tr = t || adminTranslations[lang].bookings.adminAddPreviousBooking;
 
+  const initPhone = initialPatientPhone || initialCustomer?.mobile || initialCustomer?.phone || "";
+  const initName = initialPatientName || initialCustomer?.name || "";
+
   // Row 1 State: Patient Phone *, Patient Name *, Doctor (Optional)
-  const [patientPhone, setPatientPhone] = useState("");
-  const [patientName, setPatientName] = useState("");
+  const [patientPhone, setPatientPhone] = useState(initPhone);
+  const [patientName, setPatientName] = useState(initName);
   const [selectedDoctorId, setSelectedDoctorId] = useState("");
+
+  useEffect(() => {
+    const nextPhone = initialPatientPhone || initialCustomer?.mobile || initialCustomer?.phone;
+    const nextName = initialPatientName || initialCustomer?.name;
+    if (nextPhone) setPatientPhone(nextPhone);
+    if (nextName) setPatientName(nextName);
+  }, [initialCustomer, initialPatientPhone, initialPatientName]);
 
   // Row 2 State: Date *, Service (Optional), Package (Optional), Products (Optional)
   const [bookingDate, setBookingDate] = useState("");
@@ -180,13 +196,19 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
   // Live match patient against customers array
   const matchedCustomer = useMemo(() => {
-    if (!patientPhone || patientPhone.trim().length < 8) return null;
-    const cleanInput = cleanPhone(patientPhone);
-    return customers.find(c => {
-      const cMobile = cleanPhone(c.mobile || c.phone || "");
-      return cMobile && cMobile === cleanInput;
-    }) || null;
-  }, [patientPhone, customers]);
+    if (patientPhone && patientPhone.trim().length >= 8) {
+      const cleanInput = cleanPhone(patientPhone);
+      const found = customers.find(c => {
+        const cMobile = cleanPhone(c.mobile || c.phone || "");
+        return cMobile && cMobile === cleanInput;
+      });
+      if (found) return found;
+    }
+    if (initialCustomer && initialCustomer.name && (initialCustomer.mobile || initialCustomer.phone)) {
+      return initialCustomer;
+    }
+    return null;
+  }, [patientPhone, customers, initialCustomer]);
 
   // Handle phone change & auto-populate name if patient matched
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {

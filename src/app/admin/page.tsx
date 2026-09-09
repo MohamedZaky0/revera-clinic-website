@@ -2549,11 +2549,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-043', name: 'Staff Shift & GPS Geofence Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies GPS shift check enable/disable setting configuration and reception dashboard GPS requirement toggle.', status: 'idle' },
     { id: 'TC-044', name: 'Multi-Shift Daily Cycle & Interval Tracking Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies starting, ending, and restarting multiple shifts in the same day with cumulative worked interval tracking.', status: 'idle' },
     { id: 'TC-045', name: 'Role-Based URL Routing & Account Navigation Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies dynamic role slug generation and link routing (/admin/reception, /admin/doctor, /admin/superadmin) based on logged account role.', status: 'idle' },
-    { id: 'TC-046', name: 'Customer Portal Header Login Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies header customer login button toggle activation/deactivation in Page Settings and public navbar.', status: 'idle' }
+    { id: 'TC-046', name: 'Customer Portal Header Login Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies header customer login button toggle activation/deactivation in Page Settings and public navbar.', status: 'idle' },
+    { id: 'TC-047', name: 'Multi-Access Point Previous Booking & Patient Auto-Prefill Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies launching Add Previous Booking from patient profile (auto-populating phone and name) and from financial transactions page.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
-  const [transactionsSubView, setTransactionsSubView] = useState<'list' | 'new'>('list');
+  const [transactionsSubView, setTransactionsSubView] = useState<'list' | 'new' | 'previous_booking'>('list');
+  const [previousBookingCustomer, setPreviousBookingCustomer] = useState<any>(null);
   const [transactionPreSelectedPatient, setTransactionPreSelectedPatient] = useState<{ id: string; name: string } | null>(null);
   const [runningAllDiagnostics, setRunningAllDiagnostics] = useState(false);
   const [testCategoryFilter, setTestCategoryFilter] = useState<string>('all');
@@ -6370,7 +6372,29 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
           {/* ── TRANSACTIONS VIEW ── */}
           {activeNav === "Transactions" && (
-            transactionsSubView === "new" ? (
+            transactionsSubView === "previous_booking" ? (
+              <AdminAddPreviousBookingView
+                onClose={() => {
+                  setTransactionsSubView("list");
+                  setPreviousBookingCustomer(null);
+                }}
+                onBookingCreated={() => {
+                  clearFetchCache();
+                  fetchAllReservations();
+                  fetchCustomers();
+                  setTransactionsSubView("list");
+                  setPreviousBookingCustomer(null);
+                }}
+                initialCustomer={previousBookingCustomer}
+                services={localServices}
+                providers={providers}
+                customers={dbCustomers}
+                branches={branches}
+                activeBranchId={branch}
+                lang={lang}
+                t={adminTranslations[lang].bookings.adminAddPreviousBooking}
+              />
+            ) : transactionsSubView === "new" ? (
               <NewManualTransactionView
                 onBack={() => {
                   setTransactionsSubView("list");
@@ -6395,6 +6419,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 onNewTransaction={() => {
                   setTransactionsSubView("new");
                   setTransactionPreSelectedPatient(null);
+                }}
+                onAddPreviousBooking={() => {
+                  setPreviousBookingCustomer(null);
+                  setTransactionsSubView("previous_booking");
                 }}
                 staffName={loggedEmpAccount?.name || adminEmail.split("@")[0] || "Staff User"}
                 branches={branches}
@@ -6437,6 +6465,29 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
           {/* ── CUSTOMERS VIEW ── */}
           {activeNav === "Patients" && (
+            showAddPreviousBooking ? (
+              <AdminAddPreviousBookingView
+                onClose={() => {
+                  setShowAddPreviousBooking(false);
+                  setPreviousBookingCustomer(null);
+                }}
+                onBookingCreated={() => {
+                  clearFetchCache();
+                  fetchAllReservations();
+                  fetchCustomers();
+                  setShowAddPreviousBooking(false);
+                  setPreviousBookingCustomer(null);
+                }}
+                initialCustomer={previousBookingCustomer}
+                services={localServices}
+                providers={providers}
+                customers={dbCustomers}
+                branches={branches}
+                activeBranchId={branch}
+                lang={lang}
+                t={adminTranslations[lang].bookings.adminAddPreviousBooking}
+              />
+            ) : (
             <div>
 
               {/* ── INLINE: View Customer Profile ── */}
@@ -6446,6 +6497,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     setActiveNav("Transactions");
                     setTransactionsSubView("new");
                     setTransactionPreSelectedPatient({ id: patientId, name: patientName });
+                  }}
+                  onAddPreviousBooking={(patient) => {
+                    setPreviousBookingCustomer(patient);
+                    setShowAddPreviousBooking(true);
                   }}
                   viewingCustomerProfile={viewingCustomerProfile}
                   setViewingCustomerProfile={setViewingCustomerProfile}
@@ -6591,6 +6646,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               />
               )}
             </div>
+            )
           )}
 
 
@@ -7506,13 +7562,18 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               />
             ) : showAddPreviousBooking ? (
               <AdminAddPreviousBookingView
-                onClose={() => setShowAddPreviousBooking(false)}
+                onClose={() => {
+                  setShowAddPreviousBooking(false);
+                  setPreviousBookingCustomer(null);
+                }}
                 onBookingCreated={() => {
                   clearFetchCache();
                   fetchAllReservations();
                   fetchCustomers();
                   setShowAddPreviousBooking(false);
+                  setPreviousBookingCustomer(null);
                 }}
+                initialCustomer={previousBookingCustomer}
                 services={localServices}
                 providers={providers}
                 customers={dbCustomers}
@@ -7533,7 +7594,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 lang={lang}
                 t={adminTranslations[lang].bookings.adminBookingsView}
                 onNewBooking={() => setShowFullViewNewBooking(true)}
-                onAddPreviousBooking={() => setShowAddPreviousBooking(true)}
+                onAddPreviousBooking={() => {
+                  setPreviousBookingCustomer(null);
+                  setShowAddPreviousBooking(true);
+                }}
                 onPendingApprovalsClick={() => {
                   const el = document.getElementById("pending-approvals-section");
                   if (el) el.scrollIntoView({ behavior: "smooth" });

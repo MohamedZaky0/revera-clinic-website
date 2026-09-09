@@ -15,6 +15,7 @@ import {
   Calendar,
   User,
   ReceiptText,
+  History,
 } from "lucide-react";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
@@ -24,6 +25,7 @@ import type { Customer } from "@/components/admin/patients/useCustomerProfile";
 
 interface CustomerProfileDrawerProps {
   onNavigateToNewTransaction?: (patientId: string, patientName: string) => void;
+  onAddPreviousBooking?: (patient: Customer) => void;
   // Hook state
   viewingCustomerProfile: Customer | null;
   setViewingCustomerProfile: (v: Customer | null) => void;
@@ -131,6 +133,7 @@ interface CustomerProfileDrawerProps {
 
 export default function CustomerProfileDrawer({
   onNavigateToNewTransaction,
+  onAddPreviousBooking,
   viewingCustomerProfile,
   setViewingCustomerProfile,
   medicalRecordForm,
@@ -376,7 +379,7 @@ export default function CustomerProfileDrawer({
 
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="space-y-6 animate-fadeIn">
-      {/* Back button */}
+      {/* Back button & Action buttons */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => setViewingCustomerProfile(null)}
@@ -384,17 +387,29 @@ export default function CustomerProfileDrawer({
         >
           <ArrowLeft size={14} /> {t.backBtn}
         </button>
-        {hasPermission("customers.edit") && (
-          <button
-            onClick={() => {
-              handleOpenEditCustomer(viewingCustomerProfile);
-              setViewingCustomerProfile(null);
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
-          >
-            <Pencil size={12} /> {t.editProfileBtn}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {(!hasPermission || hasPermission("bookings.action_add_previous") || hasPermission("bookings.create")) && onAddPreviousBooking && (
+            <button
+              onClick={() => onAddPreviousBooking(viewingCustomerProfile)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+              title={t.addPreviousBookingBtn || "Add Previous Booking"}
+            >
+              <History size={12} className="shrink-0 text-[#414E36]" />
+              <span>{t.addPreviousBookingBtn || "Add Previous Booking"}</span>
+            </button>
+          )}
+          {hasPermission("customers.edit") && (
+            <button
+              onClick={() => {
+                handleOpenEditCustomer(viewingCustomerProfile);
+                setViewingCustomerProfile(null);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+            >
+              <Pencil size={12} /> {t.editProfileBtn}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Profile Header Banner */}
@@ -620,7 +635,17 @@ export default function CustomerProfileDrawer({
         {/* Tab 2: History */}
         {customerProfileTab === "history" && (
           <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
-            <div className="flex items-center justify-end pb-1">
+            <div className="flex items-center justify-between pb-1">
+              {(!hasPermission || hasPermission("bookings.action_add_previous") || hasPermission("bookings.create")) && onAddPreviousBooking ? (
+                <button
+                  type="button"
+                  onClick={() => onAddPreviousBooking(viewingCustomerProfile)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+                >
+                  <History size={12} className="shrink-0 text-[#414E36]" />
+                  <span>{t.addPreviousBookingBtn || "Add Previous Booking"}</span>
+                </button>
+              ) : <div />}
               <span className="text-xs font-semibold bg-[#EDF1EC] text-[#414E36] px-2.5 py-1 rounded-md">
                 {t.totalLabel} {
                   allReservations.filter(

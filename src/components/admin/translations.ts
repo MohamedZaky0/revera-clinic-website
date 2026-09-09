@@ -187,6 +187,7 @@ export const adminTranslations = {
       customerProfileDrawer: {
         backBtn: "Back to Patients",
         editProfileBtn: "Edit Profile",
+        addPreviousBookingBtn: "Add Previous Booking",
         uploadPhotoTitle: "Upload/Change Profile Picture",
         removePhotoTitle: "Remove Photo",
         activePatientBadge: "Active Patient",
@@ -2631,6 +2632,7 @@ export const adminTranslations = {
       customerProfileDrawer: {
         backBtn: "العودة للمرضى",
         editProfileBtn: "تعديل الملف الشخصي",
+        addPreviousBookingBtn: "إضافة حجز سابق",
         uploadPhotoTitle: "رفع/تغيير الصورة الشخصية",
         removePhotoTitle: "إزالة الصورة",
         activePatientBadge: "مريض نشط",
