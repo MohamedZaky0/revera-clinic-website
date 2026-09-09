@@ -362,21 +362,24 @@ The following are **not currently enforced in code**:
 
 ---
 
-## Role-Based Dynamic URL Routing & Link Synchronization
-**Enforced in:** `src/lib/roleUtils.ts`, `src/app/admin/page.tsx`, `src/app/admin/[role]/page.tsx`, `next.config.ts`.
+## Role-Based Dynamic URL Routing & Portal Login Isolation
+**Enforced in:** `src/lib/roleUtils.ts`, `src/app/[role]/page.tsx`, `src/app/admin/page.tsx`.
 
-1. **Dynamic URL Suffix by Account Role**:
-   - The admin URL dynamically reflects the role of the signed-in account:
-     - Receptionist accounts: `/admin/reception`
-     - Doctor accounts: `/admin/doctor`
-     - Superadmin accounts: `/admin/superadmin`
-     - Admin accounts: `/admin/admin`
-     - Custom staff roles: `/admin/[role-slug]` (e.g. `/admin/nurse`, `/admin/hr`, `/admin/accountant`).
-2. **Seamless Session Navigation**:
-   - On login, URL updates to `/admin/[role-slug]` without full page reload.
-   - On logout or session expiration, the URL safely reverts back to `/admin`.
-   - Direct visits to `/admin/reception`, `/admin/doctor`, `/admin/[role]` or root shortcuts (`/reception`, `/doctor`, `/superadmin`) load the admin interface and synchronize to the account's verified authenticated role.
-3. **Automated Diagnostic Verification**:
+1. **Direct Role Portal URLs (`/<role>`)**:
+   - The system routes staff directly to their clean role portal without `/admin/` prefix:
+     - Receptionist accounts: `/reception`
+     - Doctor accounts: `/doctor`
+     - Superadmin accounts: `/superadmin`
+     - Admin accounts: `/admin`
+     - Custom staff roles: `/<role-slug>` (e.g. `/hr`, `/nurse`, `/accountant`).
+2. **Role Portal Login Isolation**:
+   - Staff navigating to a specific role portal (e.g. `/reception` or `/doctor`) can only log in if their assigned role matches that portal.
+   - If an account attempts to log in from a non-matching portal (e.g., a Doctor logging in at `/reception`), access is strictly rejected with an explicit error: `"Access denied: This portal is exclusively for Reception accounts. Please sign in at your designated portal (/doctor)."`.
+   - `superadmin` accounts retain universal access across all portals.
+3. **Seamless Session Synchronization**:
+   - On login, the browser URL cleanly reflects `/${roleSlug}` (or `/admin` for admins).
+   - On logout from a role portal, the URL preserves the portal path (e.g. `/reception`) for convenient re-login.
+4. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-045` (`Role-Based URL Routing & Account Navigation Engine`).
 
 ---

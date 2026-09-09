@@ -17,7 +17,7 @@ import { printInvoice, printPrescription } from "@/lib/printUtils";
 import { Branch } from "@/types";
 import { translations } from "@/lib/translations";
 import { CLIENT } from "@/config/client";
-import { getRoleSlug } from "@/lib/roleUtils";
+import { getRoleSlug, getRoleDisplayName, isPortalRoleMatch } from "@/lib/roleUtils";
 import { adminTranslations } from "@/components/admin/translations";
 import UserProfileView from "@/components/admin/UserProfileView";
 import ClinicProfileSettingsView from "@/components/admin/settings/ClinicProfileSettingsView";
@@ -567,7 +567,7 @@ function PatientPackagePromoBanner({
   );
 }
 
-export default function AdminPage() {
+export default function AdminPage({ portalRole }: { portalRole?: string } = {}) {
   const { showConfirm, showDeleteConfirm } = useAlertConfirm();
   const { isRTL } = useLanguage();
   // Auth state
@@ -1734,7 +1734,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         setAdminDbId("");
         if (typeof window !== "undefined") {
           sessionStorage.removeItem("revera_admin_session_active");
-          if (window.location.pathname.startsWith('/admin/') && window.location.pathname !== '/admin') {
+          if (!portalRole && window.location.pathname.startsWith('/admin/') && window.location.pathname !== '/admin') {
             window.history.replaceState(null, "", "/admin" + window.location.search);
           }
         }
@@ -1758,6 +1758,27 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
         if (res.ok) {
           const authData = await res.json();
+
+          // Role Portal Restriction: Enforce that users can only log in from their matching role portal
+          if (portalRole && !isPortalRoleMatch(authData.role, portalRole)) {
+            console.warn(`Role mismatch: user is ${authData.role} but attempted to access ${portalRole} portal.`);
+            await supabase.auth.signOut();
+            setAdminRole(null);
+            setAdminDepartment("");
+            setAdminPermissions([]);
+            setAdminEmail("");
+            setAdminEmployeeId("");
+            setAdminDbId("");
+            const userSlug = getRoleSlug(authData.role);
+            const userPortalPath = userSlug === 'admin' ? '/admin' : `/${userSlug}`;
+            setLoginError(`Access denied: This portal is exclusively for ${getRoleDisplayName(portalRole)} accounts. Please sign in at your designated portal (${userPortalPath}).`);
+            if (typeof window !== "undefined") {
+              sessionStorage.removeItem("revera_admin_session_active");
+            }
+            setAuthChecking(false);
+            return;
+          }
+
           setAdminRole(authData.role);
           setAdminDepartment(authData.department || "");
           setAdminPermissions(authData.permissions || []);
@@ -1768,7 +1789,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           if (typeof window !== "undefined") {
             const roleSlug = getRoleSlug(authData.role);
             if (roleSlug) {
-              const targetPath = `/admin/${roleSlug}`;
+              const targetPath = roleSlug === 'admin' ? '/admin' : `/${roleSlug}`;
               if (window.location.pathname !== targetPath) {
                 window.history.replaceState(null, "", targetPath + window.location.search);
               }
@@ -1786,8 +1807,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           setAdminEmail("");
           setAdminEmployeeId("");
           setAdminDbId("");
-          if (typeof window !== "undefined" && window.location.pathname.startsWith('/admin/') && window.location.pathname !== '/admin') {
-            window.history.replaceState(null, "", "/admin" + window.location.search);
+          if (typeof window !== "undefined") {
+            sessionStorage.removeItem("revera_admin_session_active");
+            if (!portalRole && window.location.pathname.startsWith('/admin/') && window.location.pathname !== '/admin') {
+              window.history.replaceState(null, "", "/admin" + window.location.search);
+            }
           }
         }
       } catch (err) {
@@ -2198,17 +2222,18 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       await triggerCheckout();
       await supabase.auth.signOut();
       if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", "/admin");
+        const targetPath = portalRole ? (portalRole === 'admin' ? '/admin' : `/${portalRole}`) : '/admin';
+        window.history.replaceState(null, "", targetPath);
       }
     }
   }
 
-  // Synchronize browser URL to end with the user's role slug (/admin/[role])
+  // Synchronize browser URL to end with the user's role slug (/[role] or /admin)
   useEffect(() => {
     if (session && adminRole && typeof window !== "undefined") {
       const roleSlug = getRoleSlug(adminRole);
       if (roleSlug) {
-        const targetPath = `/admin/${roleSlug}`;
+        const targetPath = roleSlug === 'admin' ? '/admin' : `/${roleSlug}`;
         if (window.location.pathname !== targetPath) {
           window.history.replaceState(null, "", targetPath + window.location.search);
         }
@@ -2560,7 +2585,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-042', name: 'Shift Location Verification & Geofence Guard Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies strict geolocation boundary checks preventing out-of-location shift starts.', status: 'idle' },
     { id: 'TC-043', name: 'Staff Shift & GPS Geofence Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies GPS shift check enable/disable setting configuration and reception dashboard GPS requirement toggle.', status: 'idle' },
     { id: 'TC-044', name: 'Multi-Shift Daily Cycle & Interval Tracking Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies starting, ending, and restarting multiple shifts in the same day with cumulative worked interval tracking.', status: 'idle' },
-    { id: 'TC-045', name: 'Role-Based URL Routing & Account Navigation Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies dynamic role slug generation and link routing (/admin/reception, /admin/doctor, /admin/superadmin) based on logged account role.', status: 'idle' },
+    { id: 'TC-045', name: 'Role-Based URL Routing & Account Navigation Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies dynamic role slug generation, direct role portal routing (/reception, /doctor, /superadmin, /admin), and login portal isolation.', status: 'idle' },
     { id: 'TC-046', name: 'Customer Portal Header Login Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies header customer login button toggle activation/deactivation in Page Settings and public navbar.', status: 'idle' },
     { id: 'TC-048', name: 'Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine', category: 'System & Settings', endpoint: '/api/roles', description: 'Validates system locking for reception/admin/doctor/superadmin roles and dual deletion modes (soft/hard) for administrative management.', status: 'idle' },
     { id: 'TC-049', name: 'New Booking Multi-Slot Selection & Financial Calculation Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Validates multi-slot time selection, duration aggregation, side-by-side Booking Value and Amount Paid Now inputs, and remaining value calculation.', status: 'idle' }
@@ -5562,8 +5587,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 style={{ objectFit: "contain", width: "100%", height: "100%" }}
               />
             </div>
-            <p className="text-xs uppercase tracking-[0.3em] text-[#5A6A51]/80 font-bold mb-1">Revera Clinics</p>
-            <h2 className="text-2xl font-bold text-[#1F251A]">Admin Access Control</h2>
+            <p className="text-xs uppercase tracking-[0.3em] text-[#5A6A51]/80 font-bold mb-1">
+              {portalRole ? `${getRoleDisplayName(portalRole)} Portal` : 'Revera Clinics'}
+            </p>
+            <h2 className="text-2xl font-bold text-[#1F251A]">
+              {portalRole ? `${getRoleDisplayName(portalRole)} Login` : 'Admin Access Control'}
+            </h2>
           </div>
 
           <form onSubmit={handleAdminLogin} className="space-y-5" noValidate>
