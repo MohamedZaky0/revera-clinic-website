@@ -288,22 +288,30 @@ The following are **not currently enforced in code**:
 ---
 
 ## Historical & Previous Bookings Rules
-**Enforced in:** `/api/reservations/previous`, `src/components/admin/bookings/AdminAddPreviousBookingView.tsx`, `AdminBookingsView.tsx`
+**Enforced in:** `/api/reservations/previous`, `src/components/admin/bookings/AdminAddPreviousBookingView.tsx`, `AdminBookingsView.tsx`, `CustomerProfileDrawer.tsx`, `TransactionsView.tsx`, `src/app/admin/page.tsx`
 
-1. **Non-Disruption of Live Scheduling**:
+1. **Multi-Access Point Launching**:
+   - Accessible from 3 distinct locations across the administrative workspace:
+     1. **Bookings Page**: via the 3-dots (`MoreVertical`) dropdown menu beside `+ New Booking`.
+     2. **Patient Profile Drawer (`CustomerProfileDrawer.tsx`)**: via the dedicated `[🕒 Add Previous Booking]` top header action button and the Booking History tab header.
+     3. **Transactions Page (`TransactionsView.tsx`)**: via the top action button group directly beside `New Transaction` and `Audit Logs`.
+2. **Automatic Patient Data Prefill**:
+   - When launched from a patient profile, `AdminAddPreviousBookingView` receives the customer object (`initialCustomer`) and automatically pre-populates and binds the patient's **Phone** (`mobile` / `phone`) and **Name** (`name`), immediately triggering the matching badge (`✓ Existing patient found: [Name]`) without requiring manual re-entry.
+3. **Non-Disruption of Live Scheduling**:
    - Historical bookings are saved with `status = 'completed'`, `is_manual = true`, and `is_historical = true`.
    - Historical bookings never generate pending approval cards, upcoming appointment slot reservations, or doctor live calendar conflicts.
-2. **Original Historical Date Preservation**:
+4. **Original Historical Date Preservation**:
    - The user-specified historical date (even years prior to system deployment) is preserved verbatim in `reservations.date` and `reservations.completed_at`.
-3. **Patient Matching & Automatic Profile Creation**:
+5. **Patient Matching & Automatic Profile Creation**:
    - Matches existing patients by phone number (normalizing Egyptian formats `+201...`, `00201...`, `201...` to `01...`).
    - If matched, links the historical reservation to `customer_id` and increments `number_of_bookings`.
    - If no patient matches the phone number, a new patient record is automatically created in `customers` (`active = true`, `number_of_bookings = 1`) and linked.
-4. **Field Optionality**:
+6. **Field Optionality**:
    - `patientPhone`, `patientName`, and `date` are mandatory.
    - `doctor`, `service`, and `paymentType` are optional and can remain empty without failing creation.
-5. **Patient & Booking History Visibility**:
-   - The historical reservation is displayed in the patient's Profile Booking History and the All Appointments directory.
+7. **Patient & Booking History Visibility & Automated Verification**:
+   - The historical reservation is displayed in the patient's Profile Booking History, the Transactions list, and the All Appointments directory.
+   - Verified under System Test Suite `TC-038` and `TC-047`.
 
 ---
 
@@ -351,3 +359,79 @@ The following are **not currently enforced in code**:
 3. **Reads Default To "Most Recent"**:
    - `GET /api/medical-records?customerId=` with no `reservationId` returns whichever row (profile or any visit) was most recently updated, so doctor-session prefill still shows the patient's latest known baseline.
    - Pass `?reservationId=` to fetch one specific visit's intake data.
+
+---
+
+## Role-Based Dynamic URL Routing & Portal Login Isolation
+**Enforced in:** `src/lib/roleUtils.ts`, `src/app/[role]/page.tsx`, `src/app/admin/page.tsx`.
+
+1. **Direct Role Portal URLs (`/<role>`)**:
+   - The system routes staff directly to their clean role portal without `/admin/` prefix:
+     - Receptionist accounts: `/reception`
+     - Doctor accounts: `/doctor`
+     - Superadmin accounts: `/superadmin`
+     - Admin accounts: `/admin`
+     - Custom staff roles: `/<role-slug>` (e.g. `/hr`, `/nurse`, `/accountant`).
+2. **Role Portal Login Isolation**:
+   - Staff navigating to a specific role portal (e.g. `/reception` or `/doctor`) can only log in if their assigned role matches that portal.
+   - If an account attempts to log in from a non-matching portal (e.g., a Doctor logging in at `/reception`), access is strictly rejected with an explicit error: `"Access denied: This portal is exclusively for Reception accounts. Please sign in at your designated portal (/doctor)."`.
+   - `superadmin` accounts retain universal access across all portals.
+3. **Seamless Session Synchronization**:
+   - On login, the browser URL cleanly reflects `/${roleSlug}` (or `/admin` for admins).
+   - On logout from a role portal, the URL preserves the portal path (e.g. `/reception`) for convenient re-login.
+4. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-045` (`Role-Based URL Routing & Account Navigation Engine`).
+
+---
+
+## Customer Portal Header Login Button Visibility & Page Settings Toggle
+**Enforced in:** `src/components/Navbar.tsx`, `src/components/admin/settings/HomePageSettingsView.tsx`, `src/app/admin/page.tsx`, `src/app/api/page-settings/route.ts`, `data/page_settings.json`.
+
+1. **Deactivated by Default in Customer View**:
+   - The customer login and profile button in the public website header (`Navbar.tsx` desktop and mobile menus) is deactivated (`showCustomerLogin: false`) by default.
+2. **Dynamic Admin Page Settings Toggle**:
+   - Administrators can activate or deactivate the customer login button via Admin Settings -> Pages Settings -> Home (`Customer Portal & Login Button` switch card).
+   - Saved under `header.showCustomerLogin` in `page_settings` (`/api/page-settings`).
+3. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-046` (`Customer Portal Header Login Settings Engine`).
+
+---
+
+## Core System-Locked Roles & Permissions Protection
+**Enforced in:** `src/components/admin/settings/RoleManagementView.tsx`, `src/app/api/roles/route.ts`.
+
+1. **System Roles Are Permanently Locked**:
+   - The core operational roles (`superadmin`, `admin`, `doctor`, `receptionist`, `reception`) are system-locked.
+   - Deletion buttons are disabled and replaced with the `System Locked` indicator in Role Management.
+   - `DELETE /api/roles` rejects deletion attempts targeting system roles with a `400 Bad Request` error.
+
+---
+
+## Superadmin Dual Deletion Engine (Soft Delete vs Hard Delete)
+**Enforced in:** `src/contexts/AlertConfirmContext.tsx`, `src/app/api/customers/route.ts`, `src/app/api/employees/route.ts`, `src/app/api/providers/route.ts`, `src/app/api/services/route.ts`, `src/app/api/reservations/route.ts`, `src/app/admin/page.tsx`.
+
+1. **Dual Deletion Options for Super Administrators**:
+   - When a Super Admin triggers a delete action on core entities (Patients, Employees, Doctors, Services, Bookings), they are presented with two explicit choices:
+     - **Soft Delete (Deactivate / Archive)**: Deactivates and archives the record while preserving all associated financial transactions, historical bookings, medical reports, prescriptions, invoices, and audit logs.
+     - **Hard Delete (Permanent Removal)**: Permanently purges the record from Supabase tables and auth systems.
+2. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-048` (`Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine`).
+
+---
+
+## New Booking Multi-Slot Selection & Financial Calculation Rules
+**Enforced in:** `src/components/admin/bookings/AdminNewBookingView.tsx`, `src/app/api/reservations/route.ts`.
+
+1. **Multi-Slot Selection Engine**:
+   - Receptionists and admins can select one or multiple time slots for an appointment from interactive time chips.
+   - Selected slots automatically calculate and display the total session duration (e.g. 2 slots = 60 mins).
+   - The selected slots are joined and stored in `requested_time` and `time_slot`.
+2. **Form Field Ordering**:
+   - In Appointment Details (Card 2), **Available Time** is positioned directly before **Session Type** (In Person vs Online).
+3. **Financial Section & Breakdown**:
+   - Side-by-side **Booking Value (EGP)** and **Amount Paid Now (EGP)** inputs with browser spin arrows removed and clean visual placeholders.
+   - Auto-calculates `bookingValue = servicePrice * slotsCount` with support for manual receptionist override.
+   - Live **Remaining Value** (`bookingValue - amountPaidNow`) displayed in real-time with status badges (Fully Settled / Due on Visit / Credit Balance) and detailed in the Booking Confirmation Summary modal.
+
+
+
