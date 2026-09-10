@@ -29,6 +29,7 @@ interface CustomerProfileDrawerProps {
   // Hook state
   viewingCustomerProfile: Customer | null;
   setViewingCustomerProfile: (v: Customer | null) => void;
+  setPrescriptionBookingContext: (v: string | null) => void;
   medicalRecordForm: any;
   setMedicalRecordForm: React.Dispatch<React.SetStateAction<any>>;
   medicalReports: any[];
@@ -122,6 +123,8 @@ interface CustomerProfileDrawerProps {
   handleAvatarRemove: (id: string) => void;
   allReservations: any[];
   localServices: any[];
+  rooms: any[];
+  onViewBooking?: (booking: any) => void;
   getStatusBadgeClass: (status: string) => string;
   productSalesHistory: any[];
   inventoryProducts: any[];
@@ -136,6 +139,7 @@ export default function CustomerProfileDrawer({
   onAddPreviousBooking,
   viewingCustomerProfile,
   setViewingCustomerProfile,
+  setPrescriptionBookingContext,
   medicalRecordForm,
   setMedicalRecordForm,
   medicalReports,
@@ -225,6 +229,8 @@ export default function CustomerProfileDrawer({
   handleAvatarRemove,
   allReservations,
   localServices,
+  rooms,
+  onViewBooking,
   getStatusBadgeClass,
   productSalesHistory,
   inventoryProducts,
@@ -261,7 +267,12 @@ export default function CustomerProfileDrawer({
         const sPhone = (s.customer_phone || s.phone || '').trim().replace(/\D/g, '');
         if (s.customer_id === custId || (custCleanPhone && sPhone && sPhone === custCleanPhone)) {
           sales.push({
-            id: String(s.id || Math.random()),
+            // A composite of the sale's own fields, matching the `${res.id}-${name}` ids the
+            // reservation branches below build. It used to fall back to Math.random(), which is
+            // impure during render and, because it always returns something truthy, also defeated
+            // the `key={sale.id || idx}` fallback at the render site: every recompute of this memo
+            // handed those rows brand-new keys, so React remounted them instead of updating them.
+            id: String(s.id || `pos-${s.created_at || s.date || ''}-${s.product_name || s.name || 'Product'}`),
             date: s.created_at || s.date || '',
             product_name: s.product_name || s.name || 'Product',
             quantity: Number(s.quantity) || 1,
@@ -382,7 +393,10 @@ export default function CustomerProfileDrawer({
       {/* Back button & Action buttons */}
       <div className="flex items-center justify-between">
         <button
-          onClick={() => setViewingCustomerProfile(null)}
+          onClick={() => {
+            setViewingCustomerProfile(null);
+            setPrescriptionBookingContext(null);
+          }}
           className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider"
         >
           <ArrowLeft size={14} /> {t.backBtn}
@@ -403,6 +417,7 @@ export default function CustomerProfileDrawer({
               onClick={() => {
                 handleOpenEditCustomer(viewingCustomerProfile);
                 setViewingCustomerProfile(null);
+                setPrescriptionBookingContext(null);
               }}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
             >
@@ -663,8 +678,8 @@ export default function CustomerProfileDrawer({
                     <th className="px-4 py-3 text-start">{t.colDateSlot}</th>
                     <th className="px-4 py-3 text-start">{t.colService}</th>
                     <th className="px-4 py-3 text-start">{t.colProvider}</th>
-                    <th className="px-4 py-3 text-end">{t.colPaid}</th>
-                    <th className="px-4 py-3 text-end">{t.colLeft}</th>
+                    <th className="px-4 py-3 text-start">{t.colRoom}</th>
+                    <th className="px-4 py-3 text-center">{t.colPayment}</th>
                     <th className="px-4 py-3 text-center">{t.colStatus}</th>
                   </tr>
                 </thead>
@@ -699,16 +714,31 @@ export default function CustomerProfileDrawer({
                       const spent = res.amountPaid ?? 0;
                       const left = res.amountLeft !== undefined && res.amountLeft !== null ? res.amountLeft : Math.max(0, serviceCost - spent);
                       const redemptions = customerPackageRedemptions.filter((r: any) => r.reservationId === res.id);
+                      const roomName = rooms.find((rm: any) => rm.id === res.roomId)?.name || "—";
+                      const paymentStatus: "paid" | "partial" | "unpaid" = spent <= 0 ? "unpaid" : (left > 0 ? "partial" : "paid");
+                      const paymentBadgeClass =
+                        paymentStatus === "paid"
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                          : paymentStatus === "partial"
+                            ? "bg-amber-100 text-amber-800 border border-amber-200"
+                            : "bg-red-50 text-red-700 border border-red-200";
                       return (
-                        <tr key={res.id} className="hover:bg-[#F9F9F7]">
+                        <tr
+                          key={res.id}
+                          onClick={() => onViewBooking && onViewBooking(res)}
+                          className={`hover:bg-[#F9F9F7] ${onViewBooking ? "cursor-pointer" : ""}`}
+                        >
                           <td className="px-4 py-3">
                             <span className="block font-semibold text-[#1F251A]">{formattedDate}</span>
                             <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "—"}</span>
                           </td>
                           <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
                           <td className="px-4 py-3">{res.doctorName || "—"}</td>
-                          <td className="px-4 py-3 text-end font-medium text-green-700">
-                            {spent} EGP
+                          <td className="px-4 py-3">{roomName}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${paymentBadgeClass}`}>
+                              {t.paymentStatusLabels[paymentStatus]}
+                            </span>
                             {redemptions.map((r: any, idx: number) => (
                               <span key={idx} className="block text-[9px] font-semibold text-[#C4AE7C] mt-0.5 whitespace-nowrap">
                                 {t.viaLabel} {r.packageName}
@@ -716,7 +746,6 @@ export default function CustomerProfileDrawer({
                               </span>
                             ))}
                           </td>
-                          <td className="px-4 py-3 text-end font-medium text-red-600">{left} EGP</td>
                           <td className="px-4 py-3 text-center">
                             <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${statusClass}`}>
                               {(t.statusLabels as Record<string, string>)[res.status] || res.status}

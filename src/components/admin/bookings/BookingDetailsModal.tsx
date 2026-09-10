@@ -52,6 +52,7 @@ interface BookingDetailsModalProps {
   saveNotes: (newNotes: string) => Promise<void>;
   setActiveNav: (nav: string) => void;
   setViewingCustomerProfile: (c: any) => void;
+  setPrescriptionBookingContext: (v: string | null) => void;
   setCheckoutBooking: (b: any) => void;
   setInvoiceBooking: (b: any) => void;
   setPostponeBooking: (b: any) => void;
@@ -80,6 +81,7 @@ export default function BookingDetailsModal({
   saveNotes,
   setActiveNav,
   setViewingCustomerProfile,
+  setPrescriptionBookingContext,
   setCheckoutBooking,
   setInvoiceBooking,
   setPostponeBooking,
@@ -730,6 +732,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                           onClose();
                           setActiveNav("Patients");
+                          setPrescriptionBookingContext(booking.id);
                           setViewingCustomerProfile(targetCustomer);
                         }}
                         className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
