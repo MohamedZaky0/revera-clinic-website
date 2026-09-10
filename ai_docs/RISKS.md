@@ -1097,6 +1097,7 @@ cannot reproduce for new sessions again.
 - [RISK-079](#risk-079) — New Reports & Analytics Panel Silently Shows Fabricated Demo Numbers Whenever Real Data Is Genuinely Zero (RESOLVED)
 - [RISK-078](#risk-078) — Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It (RESOLVED — body still filed under Open above, see there)
 - [RISK-080](#risk-080) — Two API Routes Reachable Without Any Session: Patient Roster Read/Write And Supabase Infrastructure Disclosure (RESOLVED)
+- [RISK-081](#risk-081) — Staff Onboarding Depended Entirely On Invitation Email Delivery, Stranding Every New Hire On "Invited" (RESOLVED)
 - [RISK-082](#risk-082) — `auth-sweep.test.ts`'s Weak "Public" Assertion Let `/api/health/supabase`'s RISK-080 Fix Go Unverified For A Week (RESOLVED)
 
 ## RISK-003: Patient Auth Is Non-Functional
@@ -3787,6 +3788,67 @@ suite: 762 passing / 6 expected-fail (was 761/6). `npx tsc --noEmit` clean.
 route *doesn't have a guard yet* — as opposed to *deliberately never will* — is a landmine: the
 moment someone adds a guard and doesn't update the registry, the row keeps "passing" instead of
 failing loudly, exactly backwards from what a regression-catching test should do.
+
+---
+
+## RISK-081: Staff Onboarding Depended Entirely On Invitation Email Delivery, Stranding Every New Hire On "Invited" (RESOLVED)
+
+**Severity:** High · **Type:** Operational / Onboarding
+**Found:** 2026-09-05, during the production cutover — reported as "why isn't the account Active,
+and why does the right password say Invalid Login Credentials?"
+**Resolved:** 2026-09-05
+
+**Context:**
+`POST /api/employees` created staff accounts with `supabaseServer.auth.admin.inviteUserByEmail()`.
+That call creates an `auth.users` row with **no password** and `email_confirmed_at = null`, and
+emails a link to `/auth/callback?next=/auth/setup`. A password is set in exactly one place in the
+whole codebase — `supabase.auth.updateUser({ password })` at `src/app/auth/setup/page.tsx` — which
+only runs when the invitee opens that emailed link.
+
+**Why it looked like two separate bugs:**
+- **"The account isn't Active."** The roster badge reads `email_confirmed_at`
+  (`AdminEmployeesView.tsx`): null renders amber *Invited*, set renders green *Active*. It cannot
+  turn Active until the invitee accepts.
+- **"Correct credentials are rejected."** There were no correct credentials. The admin never sets a
+  password anywhere in this flow, so whatever the admin handed the new hire was guaranteed to fail
+  with `Invalid Login Credentials`.
+
+Both are the same root cause, and neither is a code defect on its own — the flow works exactly as
+designed. The defect is the **dependency**: onboarding is only as reliable as the project's outbound
+email, and Supabase's built-in sender is development-grade (a few messages an hour, and on new
+projects it will not reliably deliver to addresses outside the project team). The `redirectTo` URL
+must also be allowlisted under Authentication → URL Configuration or the link fails even when it
+lands. For a clinic that hires reception and doctors **in person**, requiring a working mailbox
+round-trip to create a login is the wrong gate — and with SMTP unconfigured it is not a slow gate,
+it is a closed one. The **Resend invite** action offers no escape, since it re-enters the same path.
+
+**Resolution:**
+`POST /api/employees` now takes an optional `password`:
+- **Given** — `auth.admin.createUser({ email, password, email_confirm: true, user_metadata })`.
+  The account is confirmed on creation, so the roster shows *Active* immediately and the person
+  signs in with the password the admin hands them, no email involved.
+- **Omitted** — the original `inviteUserByEmail` path, unchanged, so nothing that worked before
+  changed behaviour.
+
+Strength is enforced server-side by `STRONG_PASSWORD_RE` in the route, deliberately mirroring the
+regex at `/auth/setup` so an admin-set password and a self-set one can never diverge; the form
+checks the same rule first so a weak entry never becomes a 400. The existing rollback
+(`auth.admin.deleteUser` when the `employee_accounts` insert fails) covers the new path too.
+
+Staff change their own password afterwards at Profile → Password (`handleSavePersonalPassword`,
+`src/app/admin/page.tsx`), which already existed.
+
+**Related, already in the record:** the orphaned `saif@superadmin.com` account found during the
+RISK-020 rebuild — an `employee_accounts` row pointing at an `auth_user_id` with no matching
+`auth.users` row — is the same failure shape this rollback exists to prevent.
+
+**Still outstanding — this fix removes the dependency, it does not repair email.** Custom SMTP
+(Project Settings → Authentication → SMTP Settings) is still required before **any** mail-dependent
+flow can be trusted in production: the invite path, password recovery, and anything added later.
+Password recovery in particular has no in-person workaround — a staff member who forgets their
+password still needs an admin to reset it in the Supabase dashboard until SMTP is configured.
+
+**Manual test checklist:** `ai_docs/manual_tests/EMPLOYEE_INITIAL_PASSWORD_MANUAL_TESTS.md`
 
 ---
 

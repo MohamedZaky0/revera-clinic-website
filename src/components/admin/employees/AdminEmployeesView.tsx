@@ -140,6 +140,9 @@ export default function AdminEmployeesView({
   lang,
   t,
 }: AdminEmployeesViewProps) {
+  // Optional. When filled, POST /api/employees creates a confirmed account with this password
+  // instead of emailing an invite, so the hire can sign in straight away.
+  const [newEmployeePassword, setNewEmployeePassword] = useState("");
   const [newEmployeePhone, setNewEmployeePhone] = useState("");
   const [newEmployeeDepartment, setNewEmployeeDepartment] = useState("Receptionist");
   const [newEmployeeShift, setNewEmployeeShift] = useState("Day");
@@ -893,6 +896,7 @@ export default function AdminEmployeesView({
             setNewEmployeeName("");
             setNewEmployeeEmail("");
             setNewEmployeeRole("");
+            setNewEmployeePassword("");
             setNewEmployeePhone("");
             setNewEmployeeDepartment("Reception");
             updateShiftState("Day");
@@ -1330,6 +1334,12 @@ export default function AdminEmployeesView({
                       alert(t.form.emailRequired);
                       return;
                     }
+                    // Same rule the server enforces; checked here too so a weak password is caught
+                    // before the request rather than coming back as a 400.
+                    if (newEmployeePassword && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(newEmployeePassword)) {
+                      alert(t.form.passwordTooWeak);
+                      return;
+                    }
                     const res = await fetch("/api/employees", {
                       method: "POST",
                       headers: {
@@ -1338,6 +1348,7 @@ export default function AdminEmployeesView({
                       },
                       body: JSON.stringify({
                         email: newEmployeeEmail.trim().toLowerCase(),
+                        password: newEmployeePassword || undefined,
                         name: newEmployeeName.trim(),
                         roleName: newEmployeeRole,
                         phone: newEmployeePhone.trim(),
@@ -1370,6 +1381,7 @@ export default function AdminEmployeesView({
                       }),
                     });
                     if (res.ok) {
+                      setNewEmployeePassword("");
                       setIsEditingEmployeeModalOpen(false);
                       clearFetchCache();
                       fetchRolesAndEmployees();
@@ -1410,6 +1422,21 @@ export default function AdminEmployeesView({
                   />
                 </div>
               </div>
+
+              {!editingEmployee && (
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.initialPassword}</label>
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    placeholder={t.form.initialPasswordPlaceholder}
+                    value={newEmployeePassword}
+                    onChange={(e) => setNewEmployeePassword(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-[#5A6A51]">{t.form.initialPasswordHint}</p>
+                </div>
+              )}
     
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
