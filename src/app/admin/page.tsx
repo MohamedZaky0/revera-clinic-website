@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, useCallback, useRef, Fragment } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
-import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
+import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, getDurationLabel, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
 import { 
   getServiceToggles, 
   setServiceToggle, 
@@ -1454,8 +1454,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     setServiceCategory(svc.cat);
     setServiceNameEn(svc.en);
     setServiceNameAr(svc.ar || "");
-    setServiceDuration(svc.duration || "1:00 Hours");
-    setServiceDurationMinutes(getServiceDurationMinutes(svc));
+    const editMinutes = getServiceDurationMinutes(svc);
+    setServiceDurationMinutes(editMinutes);
+    setServiceDuration(getDurationLabel(editMinutes));
     let unitTypeVal = svc.unit || "both";
     if (unitTypeVal !== "in_clinic" && unitTypeVal !== "online" && unitTypeVal !== "both") {
       unitTypeVal = "both";
