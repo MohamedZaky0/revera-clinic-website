@@ -230,6 +230,7 @@ export default function AdminNewBookingView({
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [sameAsPhone, setSameAsPhone] = useState(true);
+  const [formErrors, setFormErrors] = useState<{ phone?: boolean; firstName?: boolean; service?: boolean; doctor?: boolean; time?: boolean }>({});
 
   // Customer Lookup state
   const [patientFound, setPatientFound] = useState<boolean | null>(null);
@@ -680,6 +681,7 @@ export default function AdminNewBookingView({
   }, [bookingDate, selectedDoctorId, selectedServiceId, selectedBranchId, isBranchClosedToday, isDoctorClosedToday]);
 
   const toggleTimeSlot = (slot: string) => {
+    setFormErrors((prev) => ({ ...prev, time: false }));
     setSelectedTimes((prev) => {
       let next: string[];
       if (prev.includes(slot)) {
@@ -731,15 +733,19 @@ export default function AdminNewBookingView({
   }, [bookingDate]);
 
   const handleOpenSummaryModal = () => {
+    setFormErrors({});
     if (!phone || !firstName) {
+      setFormErrors({ phone: !phone, firstName: !firstName });
       alert(tr.phoneFirstNameAlert);
       return;
     }
     if (!selectedServiceId) {
+      setFormErrors({ service: true });
       alert(tr.selectServiceAlert);
       return;
     }
     if (!selectedDoctorId) {
+      setFormErrors({ doctor: true });
       alert(tr.selectDoctorAlert);
       return;
     }
@@ -752,6 +758,7 @@ export default function AdminNewBookingView({
       return;
     }
     if (selectedTimes.length === 0) {
+      setFormErrors({ time: true });
       alert(tr.selectTimeAlert || "Please select at least one available time slot.");
       return;
     }
@@ -953,7 +960,9 @@ export default function AdminNewBookingView({
                   </button>
                 </div>
 
-                <div className="flex items-center rounded-2xl border border-[#414E36]/20 bg-white overflow-hidden shadow-xs focus-within:border-emerald-700">
+                <div className={`flex items-center rounded-2xl border bg-white overflow-hidden shadow-xs focus-within:border-emerald-700 ${
+                  formErrors.phone ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/20"
+                }`}>
                   <div className="flex items-center gap-1.5 px-3 py-2.5 bg-[#FBFBF9] border-e border-[#414E36]/10 font-bold text-[#1F251A]">
                     <span className="text-base">🇪🇬</span>
                     <select
@@ -976,6 +985,7 @@ export default function AdminNewBookingView({
                     }}
                     onChange={(e) => {
                       setPhone(e.target.value);
+                      if (e.target.value) setFormErrors((prev) => ({ ...prev, phone: false }));
                       if (customerList.length > 0) setShowCustomerDropdown(true);
                     }}
                     placeholder={tr.phonePlaceholder}
@@ -996,6 +1006,9 @@ export default function AdminNewBookingView({
                     </button>
                   ) : null}
                 </div>
+                {formErrors.phone && (
+                  <p className="mt-1 text-[11px] font-bold text-red-600">{tr.requiredField}</p>
+                )}
 
                 {/* Scrollable Floating Customer List Dropdown */}
                 {showCustomerDropdown && customerList.length > 0 && (
@@ -1051,10 +1064,18 @@ export default function AdminNewBookingView({
                     type="text"
                     required
                     value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
+                    onChange={(e) => {
+                      setFirstName(e.target.value);
+                      if (e.target.value) setFormErrors((prev) => ({ ...prev, firstName: false }));
+                    }}
                     placeholder={tr.firstNamePlaceholder}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700"
+                    className={`w-full rounded-2xl border bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 ${
+                      formErrors.firstName ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/20"
+                    }`}
                   />
+                  {formErrors.firstName && (
+                    <p className="mt-1 text-[11px] font-bold text-red-600">{tr.requiredField}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block font-bold text-[#1F251A] mb-1.5">{tr.lastNameLabel}</label>
@@ -1309,8 +1330,13 @@ export default function AdminNewBookingView({
                   <label className="block font-bold text-[#1F251A] mb-1.5">{tr.serviceLabel}</label>
                   <select
                     value={selectedServiceId}
-                    onChange={(e) => setSelectedServiceId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                    onChange={(e) => {
+                      setSelectedServiceId(e.target.value);
+                      if (e.target.value) setFormErrors((prev) => ({ ...prev, service: false }));
+                    }}
+                    className={`w-full rounded-2xl border bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 ${
+                      formErrors.service ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/20"
+                    }`}
                   >
                     {dbServices.map(s => (
                       <option key={s.id} value={s.id}>
@@ -1318,19 +1344,30 @@ export default function AdminNewBookingView({
                       </option>
                     ))}
                   </select>
+                  {formErrors.service && (
+                    <p className="mt-1 text-[11px] font-bold text-red-600">{tr.requiredField}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block font-bold text-[#1F251A] mb-1.5">{tr.doctorLabel}</label>
                   <select
                     value={selectedDoctorId}
-                    onChange={(e) => setSelectedDoctorId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                    onChange={(e) => {
+                      setSelectedDoctorId(e.target.value);
+                      if (e.target.value) setFormErrors((prev) => ({ ...prev, doctor: false }));
+                    }}
+                    className={`w-full rounded-2xl border bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 ${
+                      formErrors.doctor ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/20"
+                    }`}
                   >
                     {filteredDoctors.map(d => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                   </select>
+                  {formErrors.doctor && (
+                    <p className="mt-1 text-[11px] font-bold text-red-600">{tr.requiredField}</p>
+                  )}
                 </div>
 
                 <div>
@@ -1389,7 +1426,9 @@ export default function AdminNewBookingView({
 
                 {/* Slots Grid */}
                 {availableTimeSlots.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 max-h-56 overflow-y-auto p-1.5 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9]/50">
+                  <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 max-h-56 overflow-y-auto p-1.5 rounded-2xl border bg-[#FBFBF9]/50 ${
+                    formErrors.time ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/15"
+                  }`}>
                     {availableTimeSlots.map((tSlot) => {
                       const isSelected = selectedTimes.includes(tSlot);
                       return (
@@ -1413,7 +1452,11 @@ export default function AdminNewBookingView({
                       );
                     })}
                   </div>
-                ) : (
+                ) : null}
+                {formErrors.time && (
+                  <p className="mt-1.5 text-[11px] font-bold text-red-600">{tr.selectTimeAlert || "Please select at least one available time slot."}</p>
+                )}
+                {availableTimeSlots.length === 0 && (
                   /* Banner alert if closed day or 0 slots available */
                   <div className="rounded-2xl bg-amber-50 border border-amber-200/80 p-3.5 flex items-start gap-2.5 text-xs text-amber-900">
                     <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
