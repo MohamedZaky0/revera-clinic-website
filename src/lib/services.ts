@@ -59,6 +59,22 @@ export function getServiceDurationMinutes(
 }
 
 /**
+ * Human-readable "H:MM Hours" label for a minutes value — the inverse of getDurationInMinutes().
+ *
+ * The legacy free-text `duration` column used to be entered independently of `duration_minutes`
+ * (a dropdown next to a number field), which let the two drift apart — some services showed
+ * "1:00 Hours" in the label while `duration_minutes` (the value actually used for availability
+ * and collision checks) was 30. This derives the label from the number instead, so the two can
+ * never disagree.
+ */
+export function getDurationLabel(minutes: number): string {
+  const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : 30;
+  const hrs = Math.floor(safeMinutes / 60);
+  const mins = safeMinutes % 60;
+  return `${hrs}:${String(mins).padStart(2, "0")} Hours`;
+}
+
+/**
  * How long a session may sit in `started` before it is treated as forgotten rather than active.
  *
  * RISK-043: `reservations.started_at` was added so a staleness check could exist at all, but

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, useCallback, useRef, Fragment } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
-import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
+import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, getDurationLabel, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
 import { 
   getServiceToggles, 
   setServiceToggle, 
@@ -819,7 +819,21 @@ export default function AdminPage({ portalRole }: { portalRole?: string } = {}) 
       const prefix = parentScreenMap[item.label];
       if (prefix && (adminPermissions.includes(prefix) || adminPermissions.some(p => p.startsWith(prefix + ".")))) return true;
       if (prefix && hasPermission(prefix)) return true;
-      
+
+      // Legacy roles (created before the granular permission keys existed) store coarse labels like
+      // "Customers" and "Providers". Three of those five happen to equal a sidebar label exactly
+      // -- Bookings, Services, Settings -- so they resolve on the includes(item.label) check above.
+      // The other two never match anything: this sidebar calls them "Patients" and "Doctors", the
+      // includes() checks are case-sensitive, and hasPermission(prefix) is passed a bare category
+      // with no dot, so its own dotted fallbacks are skipped. The result was a role holding
+      // "Customers" and "Providers" silently losing both screens. Map the old names onto the
+      // current ones rather than leaving that to look like a permissions decision.
+      const legacyLabelAliases: Record<string, string[]> = {
+        "Patients": ["Customers", "customers"],
+        "Doctors": ["Providers", "providers"],
+      };
+      if (legacyLabelAliases[item.label]?.some(alias => adminPermissions.includes(alias))) return true;
+
       return false;
     });
   }, [adminRole, adminPermissions, hasPermission]);
@@ -1454,8 +1468,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     setServiceCategory(svc.cat);
     setServiceNameEn(svc.en);
     setServiceNameAr(svc.ar || "");
-    setServiceDuration(svc.duration || "1:00 Hours");
-    setServiceDurationMinutes(getServiceDurationMinutes(svc));
+    const editMinutes = getServiceDurationMinutes(svc);
+    setServiceDurationMinutes(editMinutes);
+    setServiceDuration(getDurationLabel(editMinutes));
     let unitTypeVal = svc.unit || "both";
     if (unitTypeVal !== "in_clinic" && unitTypeVal !== "online" && unitTypeVal !== "both") {
       unitTypeVal = "both";

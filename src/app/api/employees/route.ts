@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { requireAdministratorAccess } from '@/lib/access';
+import { requireAdministratorAccess, requireSuperadminAccess } from '@/lib/access';
 import { normalizeServiceCommissions } from '@/lib/providerCommissions';
+
+
+// Mirrors the rule enforced at /auth/setup (src/app/auth/setup/page.tsx) so an admin-set password
+// and a self-set one can never diverge in strength.
+const STRONG_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
 export async function GET(req: Request) {
   const access = await requireAdministratorAccess(req);
@@ -50,7 +55,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType } = body;
+    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType, password: rawPassword } = body;
 
     if (!email || !name || !roleName) {
       return NextResponse.json(
@@ -109,25 +114,70 @@ export async function POST(req: Request) {
       );
     }
 
-    const requestUrl = new URL(req.url);
-    const siteUrl = requestUrl.origin;
-    console.log('Sending invitation to:', cleanEmail, 'with redirectTo:', `${siteUrl}/auth/callback?next=/auth/setup`);
-    const { data: inviteData, error: inviteError } = await supabaseServer.auth.admin.inviteUserByEmail(
-      cleanEmail,
-      {
-        redirectTo: `${siteUrl}/auth/callback?next=/auth/setup`,
-        data: {
+    // Two ways to create the auth user:
+    //
+    //   password given -> create it outright, already confirmed. The account is usable the moment
+    //                     this request returns: `email_confirmed_at` is set, so the roster shows
+    //                     Active rather than Invited, and the person can sign in with the password
+    //                     the admin hands them. They change it themselves later from
+    //                     Profile -> Password.
+    //   no password    -> the original invite flow: Supabase emails a link, the invitee sets their
+    //                     own password at /auth/setup, and only then does the account confirm.
+    //
+    // The password path exists because the invite path is only as reliable as the project's SMTP.
+    // On Supabase's built-in sender, invites to non-team addresses are throttled and quietly fail
+    // to arrive, which strands every new hire on Invited with no way to sign in. Reception and
+    // doctors are onboarded in person anyway, so requiring a working mailbox is a poor gate.
+    let authUserId: string | undefined;
+
+    if (rawPassword) {
+      if (typeof rawPassword !== 'string' || !STRONG_PASSWORD_RE.test(rawPassword)) {
+        return NextResponse.json(
+          {
+            error:
+              'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol.',
+            field: 'password',
+          },
+          { status: 400 }
+        );
+      }
+
+      const { data: createdUser, error: createError } = await supabaseServer.auth.admin.createUser({
+        email: cleanEmail,
+        password: rawPassword,
+        email_confirm: true,
+        user_metadata: {
           full_name: cleanName,
           role: roleName,
         },
+      });
+
+      if (createError) throw createError;
+      authUserId = createdUser.user?.id;
+      if (!authUserId) {
+        throw new Error('Failed to retrieve user ID from the created account.');
       }
-    );
+    } else {
+      const requestUrl = new URL(req.url);
+      const siteUrl = requestUrl.origin;
+      console.log('Sending invitation to:', cleanEmail, 'with redirectTo:', `${siteUrl}/auth/callback?next=/auth/setup`);
+      const { data: inviteData, error: inviteError } = await supabaseServer.auth.admin.inviteUserByEmail(
+        cleanEmail,
+        {
+          redirectTo: `${siteUrl}/auth/callback?next=/auth/setup`,
+          data: {
+            full_name: cleanName,
+            role: roleName,
+          },
+        }
+      );
 
-    if (inviteError) throw inviteError;
+      if (inviteError) throw inviteError;
 
-    const authUserId = inviteData.user?.id;
-    if (!authUserId) {
-      throw new Error('Failed to retrieve user ID from invitation.');
+      authUserId = inviteData.user?.id;
+      if (!authUserId) {
+        throw new Error('Failed to retrieve user ID from invitation.');
+      }
     }
 
     const { data: newEmployee, error: insertError } = await supabaseServer
@@ -410,7 +460,10 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  // Soft (deactivate) and hard (permanent) delete are both superadmin-only — an `admin` caller
+  // would otherwise pass requireAdministratorAccess and be able to permanently remove an employee
+  // account, contradicting the documented "superadmin can choose" boundary.
+  const access = await requireSuperadminAccess(req);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   try {

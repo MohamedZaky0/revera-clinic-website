@@ -14,7 +14,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import { ServiceItem, getDurationInMinutes } from "@/lib/services";
+import { ServiceItem, getDurationLabel } from "@/lib/services";
 import {
   LocalCategory,
   saveDynamicCategories,
@@ -455,7 +455,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       setServiceCategory(cat.key);
                       setServiceNameEn("");
                       setServiceNameAr("");
-                      setServiceDuration("1:00 Hours");
+                      setServiceDuration(getDurationLabel(60));
                       setServiceDurationMinutes(60);
                       setServiceUnitType("both");
                       setServiceDescEn("");
@@ -959,32 +959,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                   </select>
                 </div>
 
-                {/* Duration */}
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                    {t.durationLabel} <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={serviceDuration}
-                    onChange={(e) => {
-                      const text = e.target.value;
-                      setServiceDuration(text);
-                      setServiceDurationMinutes(getDurationInMinutes(text));
-                    }}
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
-                  >
-                    <option value="0:15 Hours">0:15 Hours</option>
-                    <option value="0:30 Hours">0:30 Hours</option>
-                    <option value="0:45 Hours">0:45 Hours</option>
-                    <option value="1:00 Hours">1:00 Hours</option>
-                    <option value="1:30 Hours">1:30 Hours</option>
-                    <option value="2:00 Hours">2:00 Hours</option>
-                    <option value="2:30 Hours">2:30 Hours</option>
-                    <option value="3:00 Hours">3:00 Hours</option>
-                  </select>
-                </div>
-
-                {/* Duration (minutes) */}
+                {/* Duration (minutes) — the single source of truth; the label below is derived from it */}
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
                     {t.durationMinutesLabel} <span className="text-red-500">*</span>
@@ -997,13 +972,20 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     onChange={(e) => {
                       const minutes = Number(e.target.value) || 0;
                       setServiceDurationMinutes(minutes);
-                      const matches = ["0:15 Hours", "0:30 Hours", "0:45 Hours", "1:00 Hours", "1:30 Hours", "2:00 Hours", "2:30 Hours", "3:00 Hours"].find(
-                        (opt) => getDurationInMinutes(opt) === minutes
-                      );
-                      if (matches) setServiceDuration(matches);
+                      setServiceDuration(getDurationLabel(minutes));
                     }}
                     className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
                   />
+                </div>
+
+                {/* Duration — read-only label derived from the minutes value above, never edited independently */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
+                    {t.durationLabel}
+                  </label>
+                  <div className="w-full rounded-lg border border-[#414E36]/15 bg-[#F1F1ED] px-4 py-2.5 text-sm text-[#5A6A51] font-medium">
+                    {getDurationLabel(serviceDurationMinutes)}
+                  </div>
                 </div>
 
                 {/* Session Type */}

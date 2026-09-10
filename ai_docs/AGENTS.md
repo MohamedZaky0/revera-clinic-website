@@ -1,6 +1,6 @@
 # AGENTS.md — AI Agent Instructions for Revera Clinics
 
-> **Last Updated:** 2026-07-21
+> **Last Updated:** 2026-09-10
 
 ## Read First
 
@@ -32,6 +32,24 @@ Before making any code changes:
 - The `translations.ts` file is the single source of truth for all UI copy (EN/AR). Do not hardcode strings in components.
 - Brand colors are defined as CSS custom properties in `globals.css`. Use `var(--cr-primary)` and `var(--cr-accent)` — do not add new raw hex inline values.
 - `superadmin@revera.com` is a hardcoded admin bypass; change it when forking.
+- **Do not assume migration files reflect live DB state.** Dev and `main` have diverged; verify the actual database state by querying it. Migration files alone do not guarantee schema or data parity.
+
+## Deployment Cutover Status
+
+- `main` is **not in production** and will not go live until the Finance Section is complete.
+- Defer main database reconciliation/cutover until Finance work is finished on the verified dev baseline.
+- After Finance is complete, cut `main` over and validate parity before production launch.
+
+## Finance Workstream Status
+
+- Finance PROPOSAL-002 is approved.
+- Phase 1+ (management accounting) is **not implemented**: immutable invoices, lines, payments, wallet transactions, packages/deferred revenue, cost recipes, stock movements, assets/depreciation, then SQL reporting/capacity.
+- Existing DB data is mock; no transaction-history backfill — only a real opening-balance import.
+- Phase 0 fixes are done: branch pricing, stock double deduction, customer settlement arithmetic, product-sales mapping.
+- Migration pipeline is still WIP; `provider_id`/`duration_minutes` migration needs DB application.
+- Reservation PATCH authorization is partial — admin callers currently lack auth headers.
+- Current high-priority finance risks: absent immutable pricing ledger, unauthenticated reservation PATCH/customer API, migration drift, `localStorage` service/category primary state, and the oversized `/admin` page.
+- Project documentation may contain stale internal contradictions; for finance status, trust `FINANCE_TRACKER` and later `DEC-014..026` / `RISK-010..020` entries.
 
 ## Fork-per-Client Context
 
