@@ -9,7 +9,7 @@ import { requireAdministratorAccess, requireSuperadminAccess } from '@/lib/acces
  * delete it, and no account can reach Role Management again to undo it. These two names are the
  * floor under that -- the toggle and the delete guard both refuse them.
  */
-const UNDELETABLE_ROLES = ['superadmin', 'admin'];
+const UNDELETABLE_ROLES = ['superadmin'];
 
 async function isRoleLocked(name: string): Promise<boolean> {
   const { data, error } = await supabaseServer
