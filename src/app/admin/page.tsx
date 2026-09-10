@@ -162,7 +162,7 @@ import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
 
-type Req = {
+export type Req = {
   id: string;
   serviceId: number;
   serviceIds?: number[];
