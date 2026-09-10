@@ -1,0 +1,195 @@
+[
+  {
+    "id": "tmpl-general",
+    "title": "General Aesthetic & Medical Intake",
+    "description": "Standard clinical and aesthetic intake form for general consultations, checkups, and unassigned services.",
+    "service_ids": [],
+    "is_default": true,
+    "fields": [
+      {
+        "id": "skin_type",
+        "label": "Skin Type",
+        "type": "select",
+        "options": [
+          "Normal",
+          "Dry",
+          "Oily",
+          "Sensitive",
+          "Combination",
+          "Acne-Prone"
+        ],
+        "required": true
+      },
+      {
+        "id": "allergies",
+        "label": "Known Allergies & Drug Sensitivities",
+        "type": "text",
+        "placeholder": "e.g. Latex, Aspirin, Penicillin, None",
+        "required": false
+      },
+      {
+        "id": "medications",
+        "label": "Current Daily Medications",
+        "type": "text",
+        "placeholder": "e.g. Blood thinners, Roaccutane, None",
+        "required": false
+      },
+      {
+        "id": "medical_conditions",
+        "label": "Chronic Conditions (Diabetes, Thyroid, Heart, etc.)",
+        "type": "text",
+        "placeholder": "e.g. Hypertension, Diabetes, None",
+        "required": false
+      },
+      {
+        "id": "previous_treatments",
+        "label": "Previous Cosmetic & Medical Treatments",
+        "type": "textarea",
+        "placeholder": "Describe past peels, surgeries, laser, or filler sessions...",
+        "required": false
+      },
+      {
+        "id": "general_notes",
+        "label": "Additional Clinical Remarks",
+        "type": "textarea",
+        "placeholder": "Doctor or patient remarks...",
+        "required": false
+      }
+    ],
+    "created_at": "2026-08-23T16:33:46.877Z",
+    "updated_at": "2026-08-23T16:33:46.877Z"
+  },
+  {
+    "id": "tmpl-laser",
+    "title": "Laser Hair Removal & Skin Rejuvenation Intake",
+    "description": "Specialized intake form for laser sessions, assessing skin tone, photo-sensitivity, tanning history, and pulse tolerance.",
+    "service_ids": [],
+    "is_default": false,
+    "fields": [
+      {
+        "id": "fitzpatrick_scale",
+        "label": "Fitzpatrick Skin Phototype",
+        "type": "select",
+        "options": [
+          "Type I (Very Pale / Always Burns)",
+          "Type II (Fair / Usually Burns)",
+          "Type III (Medium / Sometimes Mild Burn)",
+          "Type IV (Olive / Rarely Burns)",
+          "Type V (Brown / Very Rarely Burns)",
+          "Type VI (Dark Brown / Never Burns)"
+        ],
+        "required": true
+      },
+      {
+        "id": "recent_sun_exposure",
+        "label": "Sun Exposure / Tanning / Solarium in Last 4 Weeks",
+        "type": "select",
+        "options": [
+          "No Sun Exposure",
+          "Mild Sun Exposure",
+          "Active Sun Tan / Solarium"
+        ],
+        "required": true
+      },
+      {
+        "id": "photosensitizing_drugs",
+        "label": "Taking Photosensitizing Medication (Roaccutane / Isotretinoin, Doxycycline)",
+        "type": "text",
+        "placeholder": "Specify medication or \"None\"",
+        "required": false
+      },
+      {
+        "id": "skin_lesions_tattoos",
+        "label": "Tattoos, Open Wounds, or Suspicious Lesions in Area",
+        "type": "text",
+        "placeholder": "Specify area or \"None\"",
+        "required": false
+      },
+      {
+        "id": "pain_tolerance",
+        "label": "Pain & Heat Sensitivity Tolerance",
+        "type": "select",
+        "options": [
+          "Normal Tolerance",
+          "High Sensitivity",
+          "High Tolerance"
+        ],
+        "required": false
+      },
+      {
+        "id": "laser_contraindications",
+        "label": "Contraindications (Pregnancy, Epilepsy, Pacemaker)",
+        "type": "text",
+        "placeholder": "e.g. None",
+        "required": false
+      }
+    ],
+    "created_at": "2026-08-23T16:33:46.877Z",
+    "updated_at": "2026-08-23T16:33:46.877Z"
+  },
+  {
+    "id": "tmpl-injectables",
+    "title": "Injectables, Botox & Dermal Fillers Intake",
+    "description": "Specialized pre-injection assessment for Botox, hyaluronic acid fillers, skin boosters, and facial contouring.",
+    "service_ids": [],
+    "is_default": false,
+    "fields": [
+      {
+        "id": "previous_injectables",
+        "label": "Previous Injections History & Brands Used",
+        "type": "textarea",
+        "placeholder": "e.g. Juvederm in lips 6 mos ago, Botox forehead 4 mos ago...",
+        "required": false
+      },
+      {
+        "id": "bleeding_disorders",
+        "label": "Bleeding Disorders or Anticoagulants (Aspirin, Warfarin, Ibuprofen)",
+        "type": "select",
+        "options": [
+          "No Bleeding Disorders / No Blood Thinners",
+          "Taking Aspirin / NSAIDs",
+          "Diagnosed Coagulation Disorder"
+        ],
+        "required": true
+      },
+      {
+        "id": "active_facial_infection",
+        "label": "Active Facial Cold Sores / Herpes / Skin Infection",
+        "type": "select",
+        "options": [
+          "No Active Infection",
+          "History of Cold Sores (Prophylaxis Needed)",
+          "Active Infection Present (Postpone)"
+        ],
+        "required": true
+      },
+      {
+        "id": "pregnancy_nursing",
+        "label": "Pregnancy or Breastfeeding Status",
+        "type": "select",
+        "options": [
+          "Not Pregnant / Not Nursing",
+          "Currently Pregnant",
+          "Currently Breastfeeding"
+        ],
+        "required": true
+      },
+      {
+        "id": "facial_surgeries",
+        "label": "Previous Facial Surgeries, Implants, or Permanent Threads",
+        "type": "text",
+        "placeholder": "e.g. Rhinoplasty in 2024, None",
+        "required": false
+      },
+      {
+        "id": "aesthetic_goals",
+        "label": "Patient Desired Aesthetic Goals & Target Areas",
+        "type": "textarea",
+        "placeholder": "Detail target treatment areas and expected outcome...",
+        "required": false
+      }
+    ],
+    "created_at": "2026-08-23T16:33:46.877Z",
+    "updated_at": "2026-08-23T16:33:46.877Z"
+  }
+]
