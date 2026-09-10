@@ -39,10 +39,9 @@ export function getRoleDisplayName(roleSlugOrName: string | null | undefined): s
 }
 
 export function isPortalRoleMatch(userRole: string | null | undefined, portalRole: string | null | undefined): boolean {
-  if (!portalRole) return true;
+  const targetPortal = portalRole || 'admin';
   const userSlug = getRoleSlug(userRole);
-  const portalSlug = getRoleSlug(portalRole);
-  if (!portalSlug) return true;
+  const portalSlug = getRoleSlug(targetPortal);
   if (userSlug === 'superadmin') return true;
   return userSlug === portalSlug;
 }
