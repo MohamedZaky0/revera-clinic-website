@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Lock, Unlock } from "lucide-react";
 import { clearFetchCache } from "@/lib/fetchCache";
 import { adminTranslations } from "@/components/admin/translations";
 
@@ -389,6 +389,29 @@ export default function RoleManagementView({
     }
   }
 
+  async function handleToggleRoleLock(name: string, currentlyLocked: boolean) {
+    const nextLocked = !currentlyLocked;
+    const confirmText = nextLocked
+      ? t.defineRoles.lockRoleConfirm(name)
+      : t.defineRoles.unlockRoleConfirm(name);
+    if (!(await showConfirm(confirmText))) return;
+    try {
+      const res = await fetch('/api/roles', {
+        method: 'PATCH',
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify({ name, locked: nextLocked }),
+      });
+      if (res.ok) {
+        fetchRolesAndEmployees();
+      } else {
+        const data = await res.json();
+        alert(data.error || t.defineRoles.lockRoleFailed);
+      }
+    } catch (err: any) {
+      alert(t.defineRoles.lockRoleFailed + " " + err.message);
+    }
+  }
+
   async function handleCreateEmployee(e: React.FormEvent) {
     e.preventDefault();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -600,16 +623,31 @@ export default function RoleManagementView({
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {!['superadmin', 'admin', 'doctor', 'receptionist', 'reception'].includes(r.name?.toLowerCase()) ? (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRole(r.name)}
-                          className="text-red-600 hover:text-red-800 transition"
-                          title={t.defineRoles.deleteRoleTitle}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      ) : <span className="text-xs text-gray-400 font-semibold italic">{t.defineRoles.systemLocked}</span>}
+                      {/* The lock now comes from the row, not a hardcoded name list, so this badge
+                          and the API's delete guard can no longer drift apart. `superadmin` and
+                          `admin` stay permanently locked -- the API refuses to unlock them. */}
+                      <div className="flex items-center justify-center gap-3">
+                        {adminRole === "superadmin" && !['superadmin', 'admin'].includes(r.name?.toLowerCase()) && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleRoleLock(r.name, Boolean(r.locked))}
+                            className="text-gray-500 hover:text-[#414E36] transition"
+                            title={r.locked ? t.defineRoles.unlockRoleTitle : t.defineRoles.lockRoleTitle}
+                          >
+                            {r.locked ? <Lock size={16} /> : <Unlock size={16} />}
+                          </button>
+                        )}
+                        {!r.locked && !['superadmin', 'admin'].includes(r.name?.toLowerCase()) ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRole(r.name)}
+                            className="text-red-600 hover:text-red-800 transition"
+                            title={t.defineRoles.deleteRoleTitle}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        ) : <span className="text-xs text-gray-400 font-semibold italic">{t.defineRoles.systemLocked}</span>}
+                      </div>
                     </td>
                   </tr>
                 ))}

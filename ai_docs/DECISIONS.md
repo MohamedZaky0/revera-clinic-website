@@ -1866,3 +1866,52 @@ Clinic receptionists and staff may have split shifts, mid-day breaks, or need to
    - Updated modal prompt copy dynamically: when a shift was previously ended, the modal indicates resuming/starting a new shift session.
 4. **Diagnostic Verification:**
    - Added test case `TC-044` (`Multi-Shift Daily Cycle & Interval Tracking Engine`) to `/admin` -> Settings -> System Test Suite.
+
+---
+
+## DEC-052: Role Lock Is Row Data, Toggled Only By A Superadmin
+
+**Date:** 2026-09-10
+**Status:** Decided — active
+
+**Context:**
+"System Locked" was a hardcoded array, `['superadmin','admin','doctor','receptionist','reception']`,
+duplicated in two files: the `DELETE` guard in `src/app/api/roles/route.ts` and the badge in
+`src/components/admin/settings/RoleManagementView.tsx`. Two problems followed from that. The two
+copies could drift, so the badge could claim a role was protected while the API happily deleted it
+(or the reverse). And a clinic could not protect a role it had created itself — only those five
+names were ever safe, and a fork whose roles are named differently got no protection at all.
+
+The lock was also weaker than its label implied: it was checked only on `DELETE`. `POST` had no
+check, so `admin` could be stripped to zero permissions while still being undeletable.
+
+**Alternatives Considered:**
+- Keep the hardcoded list, extract it to one shared constant imported by both files
+- Move the lock into the `roles` row as a `locked` column, editable through the API
+
+**Chosen Option:** `roles.locked` boolean, toggled by `PATCH /api/roles`, superadmin only.
+
+**Reason:**
+- A shared constant fixes the drift but not the real limitation — clinics still can't lock their own
+  roles, and every fork inherits Revera's five names (contradicts the generic-product goal).
+- Toggling is restricted to superadmin rather than administrator, which is the level the rest of the
+  file uses. Deciding what an admin may no longer touch is exactly the call an admin should not be
+  able to make for itself; an admin who could unlock a role could hand itself anything.
+- Locking now freezes **both** permission edits and deletion. A lock that still allowed permission
+  edits protects very little.
+
+**Trade-offs:**
+- Makes the lock toggleable, which introduces a lockout path that did not exist before: unlock
+  `superadmin`, delete it, and nobody can reach Role Management to undo it. Mitigated by
+  `UNDELETABLE_ROLES = ['superadmin','admin']` — the API refuses to unlock or delete those two
+  regardless of the column, and the UI hides the toggle for them. The column is honoured for every
+  other role, including a clinic's own.
+- `doctor`, `receptionist` and `reception` are no longer permanently protected: they are backfilled
+  to `locked = true` by the migration, but a superadmin can now unlock and delete them. That is the
+  intended new capability, not a regression — a clinic that does not use a `doctor` role should be
+  able to remove it.
+
+**Impact on Codebase:**
+`supabase/migrations/20260910000000_add_locked_to_roles.sql` adds the column and backfills the five
+legacy names. Both former copies of the hardcoded array are gone.
+**Manual test checklist:** `ai_docs/manual_tests/ROLE_LOCK_UNLOCK_MANUAL_TESTS.md`
