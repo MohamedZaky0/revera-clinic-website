@@ -373,8 +373,8 @@ The following are **not currently enforced in code**:
      - Admin accounts: `/admin`
      - Custom staff roles: `/<role-slug>` (e.g. `/hr`, `/nurse`, `/accountant`).
 2. **Role Portal Login Isolation**:
-   - Staff navigating to a specific role portal (e.g. `/reception` or `/doctor`) can only log in if their assigned role matches that portal.
-   - If an account attempts to log in from a non-matching portal (e.g., a Doctor logging in at `/reception`), access is strictly rejected with an explicit error: `"Access denied: This portal is exclusively for Reception accounts. Please sign in at your designated portal (/doctor)."`.
+   - Staff navigating to a specific role portal (e.g. `/admin`, `/reception`, `/doctor`, `/superadmin`, or `/<role-slug>`) can only log in if their assigned role matches that portal.
+   - The `/admin` portal strictly accepts **Admin** accounts (and **Superadmin**), rejecting non-admin staff (e.g., Receptionist or Doctor logging in at `/admin`) with: `"Access denied: This portal is exclusively for Admin accounts. Please sign in at your designated portal (/reception)."`.
    - `superadmin` accounts retain universal access across all portals.
 3. **Seamless Session Synchronization**:
    - On login, the browser URL cleanly reflects `/${roleSlug}` (or `/admin` for admins).

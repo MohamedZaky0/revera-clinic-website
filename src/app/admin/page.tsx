@@ -567,7 +567,7 @@ function PatientPackagePromoBanner({
   );
 }
 
-export default function AdminPage({ portalRole }: { portalRole?: string } = {}) {
+export default function AdminPage({ portalRole = 'admin' }: { portalRole?: string } = {}) {
   const { showConfirm, showDeleteConfirm } = useAlertConfirm();
   const { isRTL } = useLanguage();
   // Auth state
@@ -1775,8 +1775,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const authData = await res.json();
 
           // Role Portal Restriction: Enforce that users can only log in from their matching role portal
-          if (portalRole && !isPortalRoleMatch(authData.role, portalRole)) {
-            console.warn(`Role mismatch: user is ${authData.role} but attempted to access ${portalRole} portal.`);
+          const effectivePortal = portalRole || 'admin';
+          if (!isPortalRoleMatch(authData.role, effectivePortal)) {
+            console.warn(`Role mismatch: user is ${authData.role} but attempted to access ${effectivePortal} portal.`);
             await supabase.auth.signOut();
             setAdminRole(null);
             setAdminDepartment("");
@@ -1786,7 +1787,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             setAdminDbId("");
             const userSlug = getRoleSlug(authData.role);
             const userPortalPath = userSlug === 'admin' ? '/admin' : `/${userSlug}`;
-            setLoginError(`Access denied: This portal is exclusively for ${getRoleDisplayName(portalRole)} accounts. Please sign in at your designated portal (${userPortalPath}).`);
+            setLoginError(`Access denied: This portal is exclusively for ${getRoleDisplayName(effectivePortal)} accounts. Please sign in at your designated portal (${userPortalPath}).`);
             if (typeof window !== "undefined") {
               sessionStorage.removeItem("revera_admin_session_active");
             }
