@@ -2292,6 +2292,8 @@ failed booking can present as a successful one.
 - Payment capture added: `amountPaid` and `amountLeft` fields now sent in the payload, populated
   from a payment input in the form.
 
+**Follow-up UI manual test checklist:** `ai_docs/manual_tests/ADMIN_NEW_BOOKING_AVAILABLE_TIME_MANUAL_TESTS.md`.
+
 ---
 
 ## RISK-042: Wallet And Package Sales Bypass The Customer Balance Fields Entirely (RESOLVED)
@@ -3900,6 +3902,59 @@ same class of silent loss.
 
 **Manual test checklist:** `ai_docs/manual_tests/EMPLOYEE_INITIAL_PASSWORD_MANUAL_TESTS.md`
 (Section 2)
+
+---
+
+## RISK-085: `POST /api/employees` Had No Role-Tier Guard, So An Admin Could Create Itself A Superadmin (RESOLVED)
+
+**Severity:** High · **Type:** Security / Privilege escalation
+**Found:** 2026-09-10 (review of the account-creation flow before onboarding real staff)
+**Resolved:** 2026-09-10
+
+**Context:**
+RISK-069 established the boundary: an admin may assign and edit any operational role, but only a
+superadmin may grant the `admin`/`superadmin` tier. That guard was implemented in **`PATCH`
+/api/employees only**. `POST` validated that the requested role exists in the `roles` table and
+nothing more.
+
+**The escalation:** an admin could not *promote* an existing employee to superadmin, but could
+create a *new* employee at `roleName: 'superadmin'` — and, via the password path added in `061e872`,
+set that account's password themselves. The account is created with `email_confirm: true`, so it is
+usable immediately. Two requests from an admin session yield a working superadmin login.
+
+The role `<select>` in `RoleManagementView.tsx` filters `admin`/`superadmin` out for non-superadmin
+callers, but that is a UI filter — a direct POST bypasses it entirely. No test covered the POST
+path; `tests/routes/roles-employees.test.ts` covered only PATCH.
+
+**Second finding in the same review — doctor → `providers` sync:**
+The sync matched with `.or(name.ilike.<name>, phone.eq.<phone>)` then `.maybeSingle()`.
+
+- **Name matching overwrote a different doctor.** Two doctors named "Ahmed Mohamed" is ordinary. A
+  name hit made this `UPDATE` the existing provider row, silently replacing the first doctor's
+  commission configuration, services, branch and salary with the new hire's.
+- **Ambiguous matches produced an invisible doctor.** `.maybeSingle()` throws when more than one row
+  matches. That throw landed in a `catch` that only called `console.error`, and the request still
+  returned **201**. The employee existed; the `providers` row did not — so the doctor never appeared
+  in booking or the schedule, and reception had no signal as to why.
+
+**Resolution:**
+- `deniesRoleGrant(callerRole, targetRole)` extracted in `src/app/api/employees/route.ts` and called
+  by **both** `POST` and `PATCH`, so the two cannot drift again. Case-insensitive.
+- Provider matching now uses identifiers that belong to one person — `national_id`, then `phone` —
+  and never `name`. `.limit(2)` detects ambiguity explicitly instead of relying on `.maybeSingle()`
+  throwing, and an ambiguous match is refused with a message naming the duplicate. This is the rule
+  the codebase already applies to `reservations.provider_id` (RISK-015): refuse to guess, because a
+  wrong link corrupts attribution silently.
+- A failed provider sync now **rolls the whole creation back** (employee row, then auth user) and
+  returns an error, rather than returning 201 over a half-created doctor.
+
+**Tests:** `tests/routes/employees-post-escalation.test.ts` — 10 cases. The 5 covering these two
+bugs were confirmed to fail against the pre-fix code and pass after; the other 5 pass in both and
+exist to catch over-correction (a superadmin must still be able to create an admin, an admin must
+still be able to create ordinary staff, a doctor with no national ID or phone must still get a
+provider row, and a non-doctor hire must not touch `providers`).
+
+**Manual test checklist:** `ai_docs/manual_tests/EMPLOYEE_CREATION_ROLE_GUARD_MANUAL_TESTS.md`
 
 ---
 

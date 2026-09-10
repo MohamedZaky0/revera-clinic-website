@@ -353,6 +353,7 @@ against the actual auth-check call sites.
 | `id` | UUID | Primary key |
 | `name` | text | Unique. Role name, e.g., 'superadmin', 'admin', 'receptionist' — this is what `employee_accounts.role_name` references |
 | `permissions` | text[] | Array of permission strings |
+| `locked` | boolean | NOT NULL DEFAULT false. When true the role's permissions cannot be edited and it cannot be deleted. Only a superadmin can toggle it (`PATCH /api/roles`). Added by `supabase/migrations/20260910000000_add_locked_to_roles.sql`, which backfills `true` for any existing `superadmin`/`admin`/`doctor`/`receptionist`/`reception` row so the previous hardcoded behaviour carries over. See DEC-052. |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 

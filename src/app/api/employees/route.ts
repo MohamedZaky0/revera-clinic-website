@@ -8,6 +8,22 @@ import { normalizeServiceCommissions } from '@/lib/providerCommissions';
 // and a self-set one can never diverge in strength.
 const STRONG_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
+const PRIVILEGED_ROLES = ['admin', 'superadmin'];
+
+/**
+ * RISK-069: an admin may assign and edit any operational role, but only a superadmin may grant the
+ * admin/superadmin tier itself.
+ *
+ * Shared by POST and PATCH deliberately. PATCH carried this check and POST did not, so an admin who
+ * could not promote an existing employee could just create a new one at `superadmin` instead --
+ * with a password of their choosing, since the account is created already confirmed. The role
+ * dropdown hides those two options from non-superadmins, but that is a UI filter, not a guard.
+ */
+function deniesRoleGrant(callerRole: string, targetRole: unknown): boolean {
+  if (typeof targetRole !== 'string' || !targetRole) return false;
+  return PRIVILEGED_ROLES.includes(targetRole.trim().toLowerCase()) && callerRole !== 'superadmin';
+}
+
 export async function GET(req: Request) {
   const access = await requireAdministratorAccess(req);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
@@ -83,6 +99,13 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: `Role '${roleName}' does not exist. Please create it first.` },
         { status: 400 }
+      );
+    }
+
+    if (deniesRoleGrant(access.access.role, roleName)) {
+      return NextResponse.json(
+        { error: 'Only the superadmin can grant admin or superadmin access.' },
+        { status: 403 }
       );
     }
 
@@ -220,7 +243,13 @@ export async function POST(req: Request) {
       bonusType: newEmployee.bonus_type || 'percentage'
     } : null;
 
-    // Sync with providers table if department/role is Doctor
+    // Sync with providers table if department/role is Doctor.
+    //
+    // A doctor who exists in employee_accounts but not in providers is invisible to booking and to
+    // the schedule, so this step is part of creating the doctor, not a nice-to-have afterwards.
+    // It used to be wrapped in a catch that only logged, which meant that failure returned 201 and
+    // reception had no way to know the doctor would never appear. It now rolls the whole creation
+    // back instead -- see the catch at the end of this block.
     const isDoctor = (department && (department.toLowerCase().includes('doc') || department.toLowerCase() === 'doctors')) || (roleName && roleName.toLowerCase().includes('doc'));
     if (isDoctor) {
       try {
@@ -243,19 +272,66 @@ export async function POST(req: Request) {
           more_count: Math.max(0, (body.services || []).length - 2)
         };
 
-        const { data: existingProvider } = await supabaseServer
-          .from('providers')
-          .select('id')
-          .or(`name.ilike.${cleanName},phone.eq.${phone || 'none'}`)
-          .maybeSingle();
+        // Match only on identifiers that belong to one human: national ID first, then phone.
+        //
+        // The previous matcher was `.or(name.ilike.<name>, phone.eq.<phone>)`, which matched on
+        // name. Two doctors called "Ahmed Mohamed" is ordinary in a clinic, and a name hit made
+        // this UPDATE the existing provider -- silently overwriting the first doctor's commission
+        // config, services, branch and salary with the second one's. It also used `.maybeSingle()`,
+        // which throws when more than one row matches; that throw landed in the log-only catch and
+        // the request still returned 201.
+        //
+        // Same rule the codebase already applies to `reservations.provider_id` (RISK-015): refuse
+        // to guess when the match is ambiguous, because a wrong link corrupts attribution silently.
+        const cleanNationalId = typeof nationalId === 'string' ? nationalId.trim() : '';
+        const cleanPhone = typeof phone === 'string' ? phone.trim() : '';
 
-        if (existingProvider) {
-          await supabaseServer.from('providers').update(providerPayload).eq('id', existingProvider.id);
-        } else {
-          await supabaseServer.from('providers').insert(providerPayload);
+        let existingProviderId: string | null = null;
+        for (const [column, value] of [['national_id', cleanNationalId], ['phone', cleanPhone]] as const) {
+          if (!value) continue;
+          const { data: matches, error: matchError } = await supabaseServer
+            .from('providers')
+            .select('id')
+            .eq(column, value)
+            .limit(2);
+          if (matchError) throw matchError;
+          if (!matches || matches.length === 0) continue;
+          if (matches.length > 1) {
+            throw new Error(
+              `More than one doctor already has ${column} '${value}'. Resolve the duplicate in Doctors before adding this employee.`
+            );
+          }
+          existingProviderId = matches[0].id;
+          break;
         }
-      } catch (provErr) {
+
+        if (existingProviderId) {
+          const { error: updateError } = await supabaseServer
+            .from('providers')
+            .update(providerPayload)
+            .eq('id', existingProviderId);
+          if (updateError) throw updateError;
+        } else {
+          const { error: providerInsertError } = await supabaseServer
+            .from('providers')
+            .insert(providerPayload);
+          if (providerInsertError) throw providerInsertError;
+        }
+      } catch (provErr: any) {
+        // Roll the whole creation back rather than leaving a doctor who can never be booked.
+        // Order matters: remove the employee row first, then the auth user, so a failure partway
+        // through cannot leave an employee_accounts row pointing at a deleted auth user.
+        await supabaseServer.from('employee_accounts').delete().eq('id', newEmployee.id);
+        if (authUserId) await supabaseServer.auth.admin.deleteUser(authUserId);
         console.error('Failed to sync doctor employee to providers table:', provErr);
+        return NextResponse.json(
+          {
+            error:
+              provErr?.message ||
+              'The employee was created but could not be registered as a doctor, so nothing was saved. Please try again.',
+          },
+          { status: 500 }
+        );
       }
     }
 
@@ -295,10 +371,8 @@ export async function PATCH(req: Request) {
         if (employee.employee_id === 'superadmin') {
           return NextResponse.json({ error: 'Cannot modify the role of the system owner account.' }, { status: 400 });
         }
-        // RISK-069: admin and superadmin are otherwise equivalent for role/permission management
-        // (admin can assign and edit any operational role), but only superadmin may grant the
-        // admin/superadmin tier itself — that boundary is the actual privilege-escalation guard.
-        if ((roleName === 'admin' || roleName === 'superadmin') && access.access.role !== 'superadmin') {
+        // RISK-069, via the same helper POST uses — see deniesRoleGrant above.
+        if (deniesRoleGrant(access.access.role, roleName)) {
           return NextResponse.json({ error: 'Only the superadmin can grant admin or superadmin access.' }, { status: 403 });
         }
         const { data: roleExists, error: roleCheckError } = await supabaseServer
