@@ -162,7 +162,7 @@ import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
 
-type Req = {
+export type Req = {
   id: string;
   serviceId: number;
   serviceIds?: number[];
@@ -2602,7 +2602,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-044', name: 'Multi-Shift Daily Cycle & Interval Tracking Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies starting, ending, and restarting multiple shifts in the same day with cumulative worked interval tracking.', status: 'idle' },
     { id: 'TC-045', name: 'Role-Based URL Routing & Account Navigation Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies dynamic role slug generation, direct role portal routing (/reception, /doctor, /superadmin, /admin), and login portal isolation.', status: 'idle' },
     { id: 'TC-046', name: 'Customer Portal Header Login Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies header customer login button toggle activation/deactivation in Page Settings and public navbar.', status: 'idle' },
-    { id: 'TC-048', name: 'Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine', category: 'System & Settings', endpoint: '/api/roles', description: 'Validates system locking for reception/admin/doctor/superadmin roles and dual deletion modes (soft/hard) for administrative management.', status: 'idle' },
+    { id: 'TC-048', name: 'Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine', category: 'System & Settings', endpoint: '/api/roles', description: 'Validates system locking for superadmin role and dual deletion modes (soft/hard) for administrative management.', status: 'idle' },
     { id: 'TC-049', name: 'New Booking Multi-Slot Selection & Financial Calculation Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Validates multi-slot time selection, duration aggregation, side-by-side Booking Value and Amount Paid Now inputs, and remaining value calculation.', status: 'idle' }
   ];
 

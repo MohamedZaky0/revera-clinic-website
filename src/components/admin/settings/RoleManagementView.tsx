@@ -623,11 +623,8 @@ export default function RoleManagementView({
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {/* The lock now comes from the row, not a hardcoded name list, so this badge
-                          and the API's delete guard can no longer drift apart. `superadmin` and
-                          `admin` stay permanently locked -- the API refuses to unlock them. */}
                       <div className="flex items-center justify-center gap-3">
-                        {adminRole === "superadmin" && !['superadmin', 'admin'].includes(r.name?.toLowerCase()) && (
+                        {adminRole === "superadmin" && r.name?.toLowerCase() !== 'superadmin' && (
                           <button
                             type="button"
                             onClick={() => handleToggleRoleLock(r.name, Boolean(r.locked))}
@@ -637,7 +634,7 @@ export default function RoleManagementView({
                             {r.locked ? <Lock size={16} /> : <Unlock size={16} />}
                           </button>
                         )}
-                        {!r.locked && !['superadmin', 'admin'].includes(r.name?.toLowerCase()) ? (
+                        {!r.locked && r.name?.toLowerCase() !== 'superadmin' ? (
                           <button
                             type="button"
                             onClick={() => handleDeleteRole(r.name)}

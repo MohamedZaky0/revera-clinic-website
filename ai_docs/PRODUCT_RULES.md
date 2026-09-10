@@ -400,10 +400,11 @@ The following are **not currently enforced in code**:
 ## Core System-Locked Roles & Permissions Protection
 **Enforced in:** `src/components/admin/settings/RoleManagementView.tsx`, `src/app/api/roles/route.ts`.
 
-1. **System Roles Are Permanently Locked**:
-   - The core operational roles (`superadmin`, `admin`, `doctor`, `receptionist`, `reception`) are system-locked.
-   - Deletion buttons are disabled and replaced with the `System Locked` indicator in Role Management.
-   - `DELETE /api/roles` rejects deletion attempts targeting system roles with a `400 Bad Request` error.
+1. **Superadmin Root Role Is Permanently Locked**:
+   - The root owner role (`superadmin`) is permanently locked from deletion to guarantee system access integrity.
+   - Operational roles (`admin`, `reception`, `receptionist`, `doctor`, and all custom roles) are fully unlocked, customizable, and manageable by administrators in Role Management.
+   - Deletion buttons for `superadmin` are disabled and replaced with the `System Locked` indicator in Role Management.
+   - `DELETE /api/roles?name=superadmin` rejects deletion attempts targeting `superadmin` with a `400 Bad Request` error.
 
 ---
 
