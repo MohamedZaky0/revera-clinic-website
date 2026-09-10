@@ -67,8 +67,9 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Role name is required' }, { status: 400 });
     }
 
-    if (name === 'superadmin') {
-      return NextResponse.json({ error: 'Cannot delete superadmin role' }, { status: 400 });
+    const LOCKED_SYSTEM_ROLES = ['superadmin', 'admin', 'doctor', 'receptionist', 'reception'];
+    if (LOCKED_SYSTEM_ROLES.includes(name.toLowerCase())) {
+      return NextResponse.json({ error: `Cannot delete system locked role: ${name}` }, { status: 400 });
     }
 
     const { error } = await supabaseServer

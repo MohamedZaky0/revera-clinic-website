@@ -17,6 +17,7 @@ import { printInvoice, printPrescription } from "@/lib/printUtils";
 import { Branch } from "@/types";
 import { translations } from "@/lib/translations";
 import { CLIENT } from "@/config/client";
+import { getRoleSlug, getRoleDisplayName, isPortalRoleMatch } from "@/lib/roleUtils";
 import { adminTranslations } from "@/components/admin/translations";
 import UserProfileView from "@/components/admin/UserProfileView";
 import ClinicProfileSettingsView from "@/components/admin/settings/ClinicProfileSettingsView";
@@ -566,8 +567,8 @@ function PatientPackagePromoBanner({
   );
 }
 
-export default function AdminPage() {
-  const { showConfirm } = useAlertConfirm();
+export default function AdminPage({ portalRole }: { portalRole?: string } = {}) {
+  const { showConfirm, showDeleteConfirm } = useAlertConfirm();
   const { isRTL } = useLanguage();
   // Auth state
   const [session, setSession] = useState<any>(null);
@@ -1733,6 +1734,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         setAdminDbId("");
         if (typeof window !== "undefined") {
           sessionStorage.removeItem("revera_admin_session_active");
+          if (!portalRole && window.location.pathname.startsWith('/admin/') && window.location.pathname !== '/admin') {
+            window.history.replaceState(null, "", "/admin" + window.location.search);
+          }
         }
         setAuthChecking(false);
         return;
@@ -1754,12 +1758,43 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
         if (res.ok) {
           const authData = await res.json();
+
+          // Role Portal Restriction: Enforce that users can only log in from their matching role portal
+          if (portalRole && !isPortalRoleMatch(authData.role, portalRole)) {
+            console.warn(`Role mismatch: user is ${authData.role} but attempted to access ${portalRole} portal.`);
+            await supabase.auth.signOut();
+            setAdminRole(null);
+            setAdminDepartment("");
+            setAdminPermissions([]);
+            setAdminEmail("");
+            setAdminEmployeeId("");
+            setAdminDbId("");
+            const userSlug = getRoleSlug(authData.role);
+            const userPortalPath = userSlug === 'admin' ? '/admin' : `/${userSlug}`;
+            setLoginError(`Access denied: This portal is exclusively for ${getRoleDisplayName(portalRole)} accounts. Please sign in at your designated portal (${userPortalPath}).`);
+            if (typeof window !== "undefined") {
+              sessionStorage.removeItem("revera_admin_session_active");
+            }
+            setAuthChecking(false);
+            return;
+          }
+
           setAdminRole(authData.role);
           setAdminDepartment(authData.department || "");
           setAdminPermissions(authData.permissions || []);
           setAdminEmail(authData.email || "");
           setAdminEmployeeId(authData.employeeId || "");
           setAdminDbId(authData.id || "");
+
+          if (typeof window !== "undefined") {
+            const roleSlug = getRoleSlug(authData.role);
+            if (roleSlug) {
+              const targetPath = roleSlug === 'admin' ? '/admin' : `/${roleSlug}`;
+              if (window.location.pathname !== targetPath) {
+                window.history.replaceState(null, "", targetPath + window.location.search);
+              }
+            }
+          }
 
           // Pre-fetch employee accounts list so doctor role is known immediately before rendering
           await fetchRolesAndEmployees();
@@ -1772,6 +1807,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           setAdminEmail("");
           setAdminEmployeeId("");
           setAdminDbId("");
+          if (typeof window !== "undefined") {
+            sessionStorage.removeItem("revera_admin_session_active");
+            if (!portalRole && window.location.pathname.startsWith('/admin/') && window.location.pathname !== '/admin') {
+              window.history.replaceState(null, "", "/admin" + window.location.search);
+            }
+          }
         }
       } catch (err) {
         console.error("Error retrieving admin permissions:", err);
@@ -2180,8 +2221,25 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     if (supabase) {
       await triggerCheckout();
       await supabase.auth.signOut();
+      if (typeof window !== "undefined") {
+        const targetPath = portalRole ? (portalRole === 'admin' ? '/admin' : `/${portalRole}`) : '/admin';
+        window.history.replaceState(null, "", targetPath);
+      }
     }
   }
+
+  // Synchronize browser URL to end with the user's role slug (/[role] or /admin)
+  useEffect(() => {
+    if (session && adminRole && typeof window !== "undefined") {
+      const roleSlug = getRoleSlug(adminRole);
+      if (roleSlug) {
+        const targetPath = roleSlug === 'admin' ? '/admin' : `/${roleSlug}`;
+        if (window.location.pathname !== targetPath) {
+          window.history.replaceState(null, "", targetPath + window.location.search);
+        }
+      }
+    }
+  }, [session, adminRole]);
 
   // Geolocation Check-In on login resolution (Disabled for now per user request)
   useEffect(() => {
@@ -2325,9 +2383,21 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   }
 
   async function handleDeleteEmployee(id: string) {
-    if (!(await showConfirm("Are you sure you want to delete this employee account? They will lose access to the admin panel immediately."))) return;
+    const targetEmp = employeesList.find(e => e.id === id);
+    const deleteChoice = await showDeleteConfirm({
+      title: "Delete Employee Account",
+      itemName: targetEmp?.name || targetEmp?.email || "Employee",
+      itemType: "employee",
+      isSuperAdmin: adminRole === "superadmin",
+      message: adminRole === "superadmin"
+        ? undefined
+        : "Are you sure you want to delete this employee account? They will lose access to the admin panel immediately."
+    });
+    if (!deleteChoice) return;
+
     try {
-      const res = await fetch(`/api/employees?id=${encodeURIComponent(id)}`, {
+      const mode = deleteChoice === "soft" ? "soft" : "hard";
+      const res = await fetch(`/api/employees?id=${encodeURIComponent(id)}&mode=${mode}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${session?.access_token || ''}` },
       });
@@ -2336,7 +2406,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         fetchRolesAndEmployees();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to revoke credentials.");
+        alert(data.error || "Failed to delete account.");
       }
     } catch (err: any) {
       alert("Error deleting account: " + err.message);
@@ -2514,11 +2584,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-041', name: 'Prescription Deduplication & Clinical Intake Engine', category: 'Medical & Patients', endpoint: '/api/prescriptions', description: 'Verifies doctor prescription generation, duplicate prevention on repeated saves, and intake templates.', status: 'idle' },
     { id: 'TC-042', name: 'Shift Location Verification & Geofence Guard Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies strict geolocation boundary checks preventing out-of-location shift starts.', status: 'idle' },
     { id: 'TC-043', name: 'Staff Shift & GPS Geofence Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies GPS shift check enable/disable setting configuration and reception dashboard GPS requirement toggle.', status: 'idle' },
-    { id: 'TC-044', name: 'Multi-Shift Daily Cycle & Interval Tracking Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies starting, ending, and restarting multiple shifts in the same day with cumulative worked interval tracking.', status: 'idle' }
+    { id: 'TC-044', name: 'Multi-Shift Daily Cycle & Interval Tracking Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies starting, ending, and restarting multiple shifts in the same day with cumulative worked interval tracking.', status: 'idle' },
+    { id: 'TC-045', name: 'Role-Based URL Routing & Account Navigation Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies dynamic role slug generation, direct role portal routing (/reception, /doctor, /superadmin, /admin), and login portal isolation.', status: 'idle' },
+    { id: 'TC-046', name: 'Customer Portal Header Login Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies header customer login button toggle activation/deactivation in Page Settings and public navbar.', status: 'idle' },
+    { id: 'TC-048', name: 'Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine', category: 'System & Settings', endpoint: '/api/roles', description: 'Validates system locking for reception/admin/doctor/superadmin roles and dual deletion modes (soft/hard) for administrative management.', status: 'idle' },
+    { id: 'TC-049', name: 'New Booking Multi-Slot Selection & Financial Calculation Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Validates multi-slot time selection, duration aggregation, side-by-side Booking Value and Amount Paid Now inputs, and remaining value calculation.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
-  const [transactionsSubView, setTransactionsSubView] = useState<'list' | 'new'>('list');
+  const [transactionsSubView, setTransactionsSubView] = useState<'list' | 'new' | 'previous_booking'>('list');
+  const [previousBookingCustomer, setPreviousBookingCustomer] = useState<any>(null);
   const [transactionPreSelectedPatient, setTransactionPreSelectedPatient] = useState<{ id: string; name: string } | null>(null);
   const [runningAllDiagnostics, setRunningAllDiagnostics] = useState(false);
   const [testCategoryFilter, setTestCategoryFilter] = useState<string>('all');
@@ -3015,6 +3090,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     session,
     authenticatedJsonHeaders,
     showConfirm,
+    showDeleteConfirm,
     fetchRolesAndEmployees,
     getDoctorFirstReservationDate,
     allReservations,
@@ -3151,6 +3227,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
   const [loadingPageSettings, setLoadingPageSettings] = useState(false);
   const [savingPageSettings, setSavingPageSettings] = useState(false);
+  const [showCustomerLogin, setShowCustomerLogin] = useState<boolean>(false);
 
   const [serviceHours, setServiceHours] = useState<Array<{ day: string; dayAr: string; isOpen: boolean; openTime: string; closeTime: string }>>([
     { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
@@ -3919,6 +3996,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           setAboutImage1(data.about?.image1 || "");
           setAboutImage2(data.about?.image2 || "");
           setAboutImage3(data.about?.image3 || "");
+          setShowCustomerLogin(data.header?.showCustomerLogin === true || data.showCustomerLogin === true);
           setBeforeAfterPairs(data.results?.pairs || [
             { id: 1, before: "/images/before-after/1-before.jpeg", after: "/images/before-after/1-after.jpeg" },
             { id: 2, before: "/images/before-after/2-before.jpeg", after: "/images/before-after/2-after.jpeg" },
@@ -4432,8 +4510,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     const wcuImage2Val = overrideData?.whyChooseUs?.image2 !== undefined ? overrideData.whyChooseUs.image2 : wcuImage2;
 
     const sHours = overrideData?.footer?.serviceHours !== undefined ? overrideData.footer.serviceHours : serviceHours;
+    const showCustomerLoginVal = overrideData?.header?.showCustomerLogin !== undefined ? overrideData.header.showCustomerLogin : showCustomerLogin;
 
     const fullPayload = {
+      header: {
+        showCustomerLogin: showCustomerLoginVal
+      },
       hero: {
         slides: heroSlides,
         slides_ar: heroSlidesAr
@@ -5120,9 +5202,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     setImportLog([]);
   };
 
-  function handleDeleteCustomer(id: string) {
+  function handleDeleteCustomer(id: string, mode: 'soft' | 'hard' = 'hard') {
     setDeletingCustomer(true);
-    fetch(`/api/customers?id=${id}`, {
+    fetch(`/api/customers?id=${id}&mode=${mode}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${session?.access_token || ""}` }
     })
@@ -5505,8 +5587,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 style={{ objectFit: "contain", width: "100%", height: "100%" }}
               />
             </div>
-            <p className="text-xs uppercase tracking-[0.3em] text-[#5A6A51]/80 font-bold mb-1">Revera Clinics</p>
-            <h2 className="text-2xl font-bold text-[#1F251A]">Admin Access Control</h2>
+            <p className="text-xs uppercase tracking-[0.3em] text-[#5A6A51]/80 font-bold mb-1">
+              {portalRole ? `${getRoleDisplayName(portalRole)} Portal` : 'Revera Clinics'}
+            </p>
+            <h2 className="text-2xl font-bold text-[#1F251A]">
+              {portalRole ? `${getRoleDisplayName(portalRole)} Login` : 'Admin Access Control'}
+            </h2>
           </div>
 
           <form onSubmit={handleAdminLogin} className="space-y-5" noValidate>
@@ -5975,7 +6061,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       <button
                         onClick={() => {
                           setShowQuickActionMenu(false);
-                          setShowAddBookingModal(true);
+                          setActiveNav("Bookings");
+                          setShowFullViewNewBooking(true);
                         }}
                         className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
                       >
@@ -5986,6 +6073,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       <button
                         onClick={() => {
                           setShowQuickActionMenu(false);
+                          setActiveNav("Patients");
+                          setViewingCustomerProfile(null);
                           handleOpenAddCustomer();
                         }}
                         className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
@@ -5993,21 +6082,25 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <Plus size={14} className="text-[#C4AE7C]" /> New Patient
                       </button>
                     )}
-                    {hasPermission("providers.create") && (
+                    {(hasPermission("employees.create") || hasPermission("providers.create")) && (
                       <button
                         onClick={() => {
                           setShowQuickActionMenu(false);
-                          openAddProviderModal();
+                          setActiveNav("Employees");
+                          setViewingEmployee(null);
+                          setEditingEmployee(null);
+                          setIsEditingEmployeeModalOpen(true);
                         }}
                         className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
                       >
-                        <Plus size={14} className="text-[#C4AE7C]" /> New Doctor / Provider
+                        <Plus size={14} className="text-[#C4AE7C]" /> New Employee
                       </button>
                     )}
                     {hasPermission("services.create") && (
                       <button
                         onClick={() => {
                           setShowQuickActionMenu(false);
+                          setActiveNav("Services");
                           setShowAddCategoryModal(true);
                         }}
                         className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
@@ -6329,7 +6422,29 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
           {/* ── TRANSACTIONS VIEW ── */}
           {activeNav === "Transactions" && (
-            transactionsSubView === "new" ? (
+            transactionsSubView === "previous_booking" ? (
+              <AdminAddPreviousBookingView
+                onClose={() => {
+                  setTransactionsSubView("list");
+                  setPreviousBookingCustomer(null);
+                }}
+                onBookingCreated={() => {
+                  clearFetchCache();
+                  fetchAllReservations();
+                  fetchCustomers();
+                  setTransactionsSubView("list");
+                  setPreviousBookingCustomer(null);
+                }}
+                initialCustomer={previousBookingCustomer}
+                services={localServices}
+                providers={providers}
+                customers={dbCustomers}
+                branches={branches}
+                activeBranchId={branch}
+                lang={lang}
+                t={adminTranslations[lang].bookings.adminAddPreviousBooking}
+              />
+            ) : transactionsSubView === "new" ? (
               <NewManualTransactionView
                 onBack={() => {
                   setTransactionsSubView("list");
@@ -6354,6 +6469,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 onNewTransaction={() => {
                   setTransactionsSubView("new");
                   setTransactionPreSelectedPatient(null);
+                }}
+                onAddPreviousBooking={() => {
+                  setPreviousBookingCustomer(null);
+                  setTransactionsSubView("previous_booking");
                 }}
                 staffName={loggedEmpAccount?.name || adminEmail.split("@")[0] || "Staff User"}
                 branches={branches}
@@ -6396,6 +6515,29 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
           {/* ── CUSTOMERS VIEW ── */}
           {activeNav === "Patients" && (
+            showAddPreviousBooking ? (
+              <AdminAddPreviousBookingView
+                onClose={() => {
+                  setShowAddPreviousBooking(false);
+                  setPreviousBookingCustomer(null);
+                }}
+                onBookingCreated={() => {
+                  clearFetchCache();
+                  fetchAllReservations();
+                  fetchCustomers();
+                  setShowAddPreviousBooking(false);
+                  setPreviousBookingCustomer(null);
+                }}
+                initialCustomer={previousBookingCustomer}
+                services={localServices}
+                providers={providers}
+                customers={dbCustomers}
+                branches={branches}
+                activeBranchId={branch}
+                lang={lang}
+                t={adminTranslations[lang].bookings.adminAddPreviousBooking}
+              />
+            ) : (
             <div>
 
               {/* ── INLINE: View Customer Profile ── */}
@@ -6405,6 +6547,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     setActiveNav("Transactions");
                     setTransactionsSubView("new");
                     setTransactionPreSelectedPatient({ id: patientId, name: patientName });
+                  }}
+                  onAddPreviousBooking={(patient) => {
+                    setPreviousBookingCustomer(patient);
+                    setShowAddPreviousBooking(true);
                   }}
                   viewingCustomerProfile={viewingCustomerProfile}
                   setViewingCustomerProfile={setViewingCustomerProfile}
@@ -6550,6 +6696,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               />
               )}
             </div>
+            )
           )}
 
 
@@ -6596,6 +6743,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 <HomePageSettingsView
                   homeHeroSlides={homeHeroSlides}
                   homeHeroSlidesAr={homeHeroSlidesAr}
+                  showCustomerLogin={showCustomerLogin}
+                  setShowCustomerLogin={setShowCustomerLogin}
                   pageSettingsLangTab={pageSettingsLangTab}
                   setPageSettingsLangTab={setPageSettingsLangTab}
                   loadingPageSettings={loadingPageSettings}
@@ -7463,13 +7612,18 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               />
             ) : showAddPreviousBooking ? (
               <AdminAddPreviousBookingView
-                onClose={() => setShowAddPreviousBooking(false)}
+                onClose={() => {
+                  setShowAddPreviousBooking(false);
+                  setPreviousBookingCustomer(null);
+                }}
                 onBookingCreated={() => {
                   clearFetchCache();
                   fetchAllReservations();
                   fetchCustomers();
                   setShowAddPreviousBooking(false);
+                  setPreviousBookingCustomer(null);
                 }}
+                initialCustomer={previousBookingCustomer}
                 services={localServices}
                 providers={providers}
                 customers={dbCustomers}
@@ -7490,7 +7644,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 lang={lang}
                 t={adminTranslations[lang].bookings.adminBookingsView}
                 onNewBooking={() => setShowFullViewNewBooking(true)}
-                onAddPreviousBooking={() => setShowAddPreviousBooking(true)}
+                onAddPreviousBooking={() => {
+                  setPreviousBookingCustomer(null);
+                  setShowAddPreviousBooking(true);
+                }}
                 onPendingApprovalsClick={() => {
                   const el = document.getElementById("pending-approvals-section");
                   if (el) el.scrollIntoView({ behavior: "smooth" });
@@ -7956,9 +8113,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         let targetInvoiceTotal = baseAndAttachedTotal;
 
         if (viewingBooking.notes) {
-          const invMatch = String(viewingBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+          const invMatch = String(viewingBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP|Invoice Value:\s*(\d+(?:\.\d+)?)\s*EGP/i);
           if (invMatch) {
-            const notedTotal = Number(invMatch[1]);
+            const notedTotal = Number(invMatch[1] || invMatch[2]);
             if (notedTotal > targetInvoiceTotal) {
               targetInvoiceTotal = notedTotal;
             }
@@ -7966,14 +8123,22 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         }
 
         const rawPaid = Number(viewingBooking.amountPaid || (viewingBooking as any).amount_paid || 0);
+        const rawLeft = (viewingBooking as any).amountLeft ?? (viewingBooking as any).amount_left;
         const additionalServicesCost = additionalServicesList.reduce((sum, s) => sum + s.total, 0);
         const productsCost = productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
-        const totalPrice = servicesCost + additionalServicesCost + productsCost;
+        const calculatedTotal = servicesCost + additionalServicesCost + productsCost;
+        const totalPrice = Math.max(
+          calculatedTotal,
+          targetInvoiceTotal,
+          rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
+        );
 
         const sessionPaid = rawPaid;
-        const sessionLeft = Math.max(0, totalPrice - sessionPaid);
+        const sessionLeft = (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)))
+          ? Number(rawLeft)
+          : Math.max(0, totalPrice - sessionPaid);
 
-        const isInvoicePaid = sessionLeft <= 0 || (sessionPaid >= totalPrice && totalPrice > 0);
+        const isInvoicePaid = (rawLeft !== null && rawLeft !== undefined && Number(rawLeft) <= 0 && sessionPaid > 0) || (sessionLeft <= 0 && sessionPaid > 0) || (sessionPaid >= totalPrice && totalPrice > 0);
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 sm:p-5 animate-fadeIn">
@@ -10246,37 +10411,91 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       {/* ── DELETE CUSTOMER CONFIRMATION MODAL ── */}
       {deleteCustomerTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md rounded-2xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
-            <div className="mb-5 flex items-start gap-4">
+          <div className="w-full max-w-lg rounded-2xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
+            <div className="mb-4 flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 border border-red-100">
                 <Trash2 size={24} />
               </div>
               <div>
                 <h3 className="text-lg font-bold text-[#1F251A]">Delete Customer?</h3>
-                <p className="mt-2 text-sm text-[#5A6A51] leading-relaxed">
-                  Are you sure you want to delete the customer profile for{" "}
-                  <span className="font-semibold text-[#1F251A]">{deleteCustomerTarget.name}</span>?
-                  This action will permanently remove their records from Supabase. Any linked reservations will be unlinked (set to guest status).
+                <p className="mt-1 text-xs text-[#5A6A51] leading-relaxed">
+                  You are deleting the customer profile for{" "}
+                  <span className="font-bold text-[#1F251A]">{deleteCustomerTarget.name}</span>.
                 </p>
               </div>
             </div>
+
+            {adminRole === 'superadmin' ? (
+              <div className="space-y-3 mb-5">
+                <p className="text-xs font-semibold text-[#1F251A]">
+                  As a <strong>Super Admin</strong>, select your deletion method:
+                </p>
+                <div className="grid grid-cols-1 gap-2.5">
+                  <button
+                    type="button"
+                    disabled={deletingCustomer}
+                    onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!, 'soft')}
+                    className="flex items-start gap-3 p-3 rounded-xl border border-emerald-600/30 bg-emerald-50/60 hover:bg-emerald-50 text-start transition cursor-pointer disabled:opacity-50"
+                  >
+                    <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
+                      <Archive size={16} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-emerald-950">Soft Delete (Deactivate)</span>
+                        <span className="text-[9px] font-bold uppercase bg-emerald-200/70 text-emerald-900 px-2 py-0.5 rounded-full">Preserves Records</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-900/80 mt-0.5">
+                        Deactivates the patient while safely keeping their visit history, invoices, and ledger records.
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={deletingCustomer}
+                    onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!, 'hard')}
+                    className="flex items-start gap-3 p-3 rounded-xl border border-rose-300 bg-rose-50/60 hover:bg-rose-50 text-start transition cursor-pointer disabled:opacity-50"
+                  >
+                    <div className="h-8 w-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
+                      <Trash2 size={16} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-rose-950">Hard Delete (Permanent Removal)</span>
+                        <span className="text-[9px] font-bold uppercase bg-rose-200/70 text-rose-900 px-2 py-0.5 rounded-full">Irreversible</span>
+                      </div>
+                      <p className="text-[11px] text-rose-900/80 mt-0.5">
+                        Permanently removes this profile from the database. Linked appointments are unlinked.
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-[#5A6A51] mb-5 leading-relaxed">
+                This action will permanently delete the customer profile. Linked reservations will be set to guest status.
+              </p>
+            )}
 
             <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
               <button
                 type="button"
                 onClick={() => setDeleteCustomerTarget(null)}
-                className="rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+                className="rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-xs font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!)}
-                disabled={deletingCustomer}
-                className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {deletingCustomer ? "Deleting..." : "Yes, Delete Customer"}
-              </button>
+              {adminRole !== 'superadmin' && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!, 'hard')}
+                  disabled={deletingCustomer}
+                  className="rounded-lg bg-red-600 px-5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {deletingCustomer ? "Deleting..." : "Yes, Delete Customer"}
+                </button>
+              )}
             </div>
           </div>
         </div>

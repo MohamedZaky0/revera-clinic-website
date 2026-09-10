@@ -1814,6 +1814,7 @@ export async function DELETE(req: Request) {
 
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
+  const mode = url.searchParams.get('mode') || 'hard';
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
   try {
@@ -1827,6 +1828,20 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ success: true, message: 'All reservations cleared' });
     }
 
+    if (mode === 'soft') {
+      const { data: updated, error: softErr } = await supabaseServer
+        .from('reservations')
+        .update({ status: 'cancelled' })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (softErr || !updated) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, message: 'Reservation cancelled (soft delete)', data: updated });
+    }
+
     const { data: deleted, error: deleteError } = await supabaseServer
       .from('reservations')
       .delete()
@@ -1837,7 +1852,7 @@ export async function DELETE(req: Request) {
     if (deleteError || !deleted) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    return NextResponse.json({ success: true, message: 'Reservation deleted' });
+    return NextResponse.json({ success: true, message: 'Reservation permanently deleted' });
   } catch (err) {
     console.error('DELETE /api/reservations error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });

@@ -1,13 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { Plus, Trash2, Upload, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Trash2, Upload, ArrowUp, ArrowDown, User } from "lucide-react";
 import { compressImage } from "@/lib/image";
 
 interface HomePageSettingsViewProps {
   // Hero slides
   homeHeroSlides: any[];
   homeHeroSlidesAr: any[];
+
+  // Customer Login button in navbar
+  showCustomerLogin?: boolean;
+  setShowCustomerLogin?: (v: boolean) => void;
 
   // Language tab
   pageSettingsLangTab: "en" | "ar";
@@ -45,6 +49,8 @@ interface HomePageSettingsViewProps {
 export default function HomePageSettingsView({
   homeHeroSlides,
   homeHeroSlidesAr,
+  showCustomerLogin = false,
+  setShowCustomerLogin,
   pageSettingsLangTab,
   setPageSettingsLangTab,
   loadingPageSettings,
@@ -64,6 +70,59 @@ export default function HomePageSettingsView({
 
   return (
     <div className="space-y-6">
+      {/* Customer Login in Navbar Toggle Setting */}
+      <div className="rounded-[32px] bg-white p-6 sm:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#414E36]/10 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#414E36]/10 text-[#414E36] shrink-0">
+            <User size={24} />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-[#1F251A]">
+              {pageSettingsLangTab === "ar" ? "زر تسجيل دخول العملاء في الموقع" : "Customer Portal & Login Button"}
+            </h3>
+            <p className="text-xs sm:text-sm text-[#5A6A51] mt-0.5 max-w-xl">
+              {pageSettingsLangTab === "ar"
+                ? "تفعيل أو تعطيل زر تسجيل الدخول والملف الشخصي للعملاء في شريط التنقل العلوي (Navbar) للموقع العام."
+                : "Enable or disable the customer login and profile button in the public website header navbar."}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span
+            className={`text-xs font-bold px-3 py-1 rounded-full ${
+              showCustomerLogin
+                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                : "bg-gray-100 text-gray-600 border border-gray-300"
+            }`}
+          >
+            {showCustomerLogin ? (pageSettingsLangTab === "ar" ? "مفعل" : "Active") : (pageSettingsLangTab === "ar" ? "معطل" : "Deactivated")}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showCustomerLogin}
+            disabled={savingPageSettings}
+            onClick={async () => {
+              const nextVal = !showCustomerLogin;
+              setShowCustomerLogin?.(nextVal);
+              await savePageSettings({ header: { showCustomerLogin: nextVal } });
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("revera-settings-change"));
+              }
+            }}
+            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              showCustomerLogin ? "bg-[#414E36]" : "bg-gray-300"
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                showCustomerLogin ? "translate-x-5" : "translate-x-0"
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
         <div>
           <h3 className="text-2xl font-bold text-[#1F251A]">Hero Slider Editor</h3>

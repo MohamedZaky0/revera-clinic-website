@@ -600,7 +600,7 @@ export default function RoleManagementView({
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {r.name !== 'superadmin' ? (
+                      {!['superadmin', 'admin', 'doctor', 'receptionist', 'reception'].includes(r.name?.toLowerCase()) ? (
                         <button
                           type="button"
                           onClick={() => handleDeleteRole(r.name)}

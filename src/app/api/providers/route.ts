@@ -536,7 +536,32 @@ export async function DELETE(req: Request) {
 
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
+  const mode = url.searchParams.get('mode') || 'hard';
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+  if (mode === 'soft') {
+    try {
+      const { data: updated, error } = await supabaseServer
+        .from('providers')
+        .update({ active: false })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (!error && updated) {
+        // Also sync active = false / inactive to matching employee account if exists
+        if (updated.name) {
+          await supabaseServer
+            .from('employee_accounts')
+            .update({ role_name: 'inactive' })
+            .ilike('name', updated.name);
+        }
+        return NextResponse.json({ success: true, message: 'Doctor deactivated successfully (soft delete)', data: mapProvider(updated) });
+      }
+    } catch (e) {
+      console.error("Soft delete provider error:", e);
+    }
+  }
 
   try {
     const { error } = await supabaseServer
@@ -545,7 +570,7 @@ export async function DELETE(req: Request) {
       .eq('id', id);
 
     if (!error) {
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true, message: 'Doctor permanently deleted' });
     } else {
       console.warn("Supabase providers delete error, falling back to JSON:", error);
     }
@@ -559,7 +584,7 @@ export async function DELETE(req: Request) {
       const list = JSON.parse(fs.readFileSync(JSON_FILE_PATH, 'utf-8'));
       const filtered = list.filter((p: any) => p.id !== id);
       fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(filtered, null, 2));
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true, message: 'Doctor permanently deleted' });
     }
   } catch (err) {
     console.error("JSON fallback delete error:", err);

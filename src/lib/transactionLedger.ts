@@ -74,13 +74,15 @@ export async function recordTransaction({
     if (!amount || Number.isNaN(Number(amount))) return;
 
     const { data: seqVal, error: seqErr } = await supabaseServer.rpc('next_transaction_seq');
+    const txnId = (seqErr || seqVal == null)
+      ? `TXN-${String(Date.now()).slice(-6)}`
+      : `TXN-${String(Number(seqVal)).padStart(6, '0')}`;
     if (seqErr || seqVal == null) {
-      console.error('recordTransaction: next_transaction_seq failed (transaction not recorded):', seqErr);
-      return;
+      console.warn('recordTransaction: next_transaction_seq failed, using fallback transaction ID:', seqErr);
     }
 
     const { error: insertErr } = await supabaseServer.from('transactions').insert({
-      transaction_id: `TXN-${String(Number(seqVal)).padStart(6, '0')}`,
+      transaction_id: txnId,
       branch_id: branchId ?? null,
       customer_id: customerId ?? null,
       invoice_id: invoiceId ?? null,

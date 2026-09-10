@@ -933,33 +933,33 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 </button>
 
                 {isMoreMenuOpen && (
-                  <div className="absolute end-0 top-full z-30 mt-2 w-52 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
+                  <div className="absolute end-0 top-full z-30 mt-2 min-w-56 w-max overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
                     {canPrint && (
                       <button
                         onClick={() => { onPrint?.(); setIsMoreMenuOpen(false); }}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer"
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer whitespace-nowrap"
                       >
-                        <Printer size={15} className="text-[#6B7280]" />
-                        {tr.printScheduleBtn}
+                        <Printer size={15} className="text-[#6B7280] shrink-0" />
+                        <span>{tr.printScheduleBtn}</span>
                       </button>
                     )}
                     {canPrint && (canExport || canAddPrev) && <div className="mx-4 border-t border-gray-100" />}
                     {canExport && (
                       <button
                         onClick={() => { onExportCSV?.(); setIsMoreMenuOpen(false); }}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer"
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer whitespace-nowrap"
                       >
-                        <Download size={15} className="text-[#6B7280]" />
-                        {tr.exportCsvBtn}
+                        <Download size={15} className="text-[#6B7280] shrink-0" />
+                        <span>{tr.exportCsvBtn}</span>
                       </button>
                     )}
                     {canExport && canAddPrev && <div className="mx-4 border-t border-gray-100" />}
                     {canAddPrev && (
                       <button
                         onClick={() => { onAddPreviousBooking?.(); setIsMoreMenuOpen(false); }}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-[#F4F7F2] hover:text-[#2D3F2A] transition cursor-pointer"
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-[#F4F7F2] hover:text-[#2D3F2A] transition cursor-pointer whitespace-nowrap"
                       >
-                        <History size={15} className="text-[#3D5A45]" />
+                        <History size={15} className="text-[#3D5A45] shrink-0" />
                         <span>{tr.addPreviousBookingBtn || "Add Previous Booking"}</span>
                       </button>
                     )}

@@ -886,9 +886,12 @@ describe('transaction history written on checkout', () => {
     expect(customer.outstanding).toBe(0);
   });
 
-  it('a ledger failure does not break the checkout — the money still moves', async () => {
+  it('a sequence-RPC failure does not break the checkout, and still records history via a fallback ID', async () => {
     // The transaction recorder is deliberately non-fatal: a patient is at the desk and the
-    // invoice/payment/balance writes have already happened.
+    // invoice/payment/balance writes have already happened. It used to skip the ledger row
+    // entirely when the sequence RPC failed; commit 581d558 changed that to fall back to a
+    // timestamp-derived TXN- id instead of losing the history row outright — a missing sequence
+    // number is recoverable, a missing record of the money moving is not.
     fake.setRpc('next_transaction_seq', () => ({ data: null, error: { message: 'sequence unavailable' } }));
     fake.seed('reservations', [baseReservation({ status: 'confirmed', amount_paid: 0, amount_left: null })]);
 
@@ -897,7 +900,12 @@ describe('transaction history written on checkout', () => {
     expect(res.status).toBe(200);
     expect(fake.rows('invoices').filter((i) => i.reservation_id === RES_ID)).toHaveLength(1);
     expect(fake.rows('customers').find((c) => c.id === CUSTOMER_ID)!.spent_amount).toBe(500);
-    expect(fake.rows('transactions')).toHaveLength(0); // recorded nothing, broke nothing
+
+    const txns = fake.rows('transactions');
+    expect(txns).toHaveLength(2); // service_charge + payment, same as the happy path
+    for (const t of txns) {
+      expect(t.transaction_id).toMatch(/^TXN-\d{6}$/); // fallback id, not the RPC's sequential one
+    }
   });
 });
 

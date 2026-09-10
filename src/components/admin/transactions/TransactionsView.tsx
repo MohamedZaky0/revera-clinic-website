@@ -26,7 +26,8 @@ import {
   AlertCircle,
   XCircle,
   RefreshCw,
-  Coins
+  Coins,
+  History
 } from "lucide-react";
 import {
   TransactionItem,
@@ -42,6 +43,7 @@ import { TransactionAuditLogsModal } from "./TransactionAuditLogsModal";
 
 interface TransactionsViewProps {
   onNewTransaction: () => void;
+  onAddPreviousBooking?: () => void;
   staffName?: string;
   branches?: { id: string; name_en: string; name_ar?: string }[];
   currentBranchId?: string;
@@ -51,6 +53,7 @@ interface TransactionsViewProps {
 
 export const TransactionsView: React.FC<TransactionsViewProps> = ({
   onNewTransaction,
+  onAddPreviousBooking,
   staffName = "Staff User",
   branches = [],
   currentBranchId,
@@ -288,6 +291,17 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
+          {(!hasPermission || hasPermission("bookings.action_add_previous") || hasPermission("bookings.create")) && onAddPreviousBooking && (
+            <button
+              type="button"
+              onClick={onAddPreviousBooking}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-[#F4F7F2] hover:text-[#2D3F2A] text-gray-700 font-bold text-xs shadow-2xs transition-colors"
+            >
+              <History size={15} className="text-[#3D5A45]" />
+              <span>{lang === "ar" ? "إضافة حجز سابق" : "Add Previous Booking"}</span>
+            </button>
+          )}
+
           {(!hasPermission || hasPermission("transactions.create")) && (
             <button
               type="button"

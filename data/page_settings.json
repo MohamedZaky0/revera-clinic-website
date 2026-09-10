@@ -59,6 +59,9 @@
       }
     ]
   },
+  "header": {
+    "showCustomerLogin": false
+  },
   "about": {
     "image1": "",
     "image2": "",

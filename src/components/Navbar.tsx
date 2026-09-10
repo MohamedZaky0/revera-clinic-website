@@ -24,10 +24,36 @@ export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [user, setUser] = useState<{ id?: string; name?: string; mobile?: string; email?: string; gender?: string | null } | null>(null);
+  const [showCustomerLogin, setShowCustomerLogin] = useState(false);
   const isProfileIncomplete = !!(user && (!user.gender || !user.mobile || user.mobile.startsWith("guest_")));
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadHeaderSettings = async () => {
+      try {
+        const res = await fetch("/api/page-settings", { cache: "no-store" });
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setShowCustomerLogin(data?.header?.showCustomerLogin === true || data?.showCustomerLogin === true);
+        }
+      } catch (err) {
+        console.warn("Failed to load header settings:", err);
+      }
+    };
+    loadHeaderSettings();
+
+    const handleSettingsChange = () => {
+      loadHeaderSettings();
+    };
+    window.addEventListener("revera-settings-change", handleSettingsChange);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("revera-settings-change", handleSettingsChange);
+    };
+  }, []);
 
   useEffect(() => {
     const checkUser = () => {
@@ -373,44 +399,73 @@ export function Navbar() {
             </div>
 
             {/* Login / User info button */}
-            {user ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <Link
-                  href="/profile"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    background: "rgba(90,61,52,0.05)",
-                    padding: "8px 14px",
-                    borderRadius: "8px",
-                    color: "var(--cr-primary)",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    textDecoration: "none",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.1)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.05)";
-                  }}
-                >
-                  <User size={16} />
-                  <span>{user.name || user.mobile}</span>
-                </Link>
-                {isProfileIncomplete && (
+            {showCustomerLogin && (
+              user ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <Link
+                    href="/profile"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      background: "rgba(90,61,52,0.05)",
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      color: "var(--cr-primary)",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.1)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.05)";
+                    }}
+                  >
+                    <User size={16} />
+                    <span>{user.name || user.mobile}</span>
+                  </Link>
+                  {isProfileIncomplete && (
+                    <button
+                      onClick={handleCompleteProfile}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        background: "rgba(196,174,124,0.15)",
+                        color: "var(--cr-primary)",
+                        border: "1.5px solid var(--cr-accent)",
+                        padding: "8px 14px",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-accent)";
+                        (e.currentTarget as HTMLButtonElement).style.color = "white";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background = "rgba(196,174,124,0.15)";
+                        (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
+                      }}
+                    >
+                      <span>{isRTL ? "إكمال الملف" : "Complete Profile"}</span>
+                    </button>
+                  )}
                   <button
-                    onClick={handleCompleteProfile}
+                    onClick={handleLogout}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       gap: "6px",
-                      background: "rgba(196,174,124,0.15)",
+                      background: "transparent",
                       color: "var(--cr-primary)",
-                      border: "1.5px solid var(--cr-accent)",
+                      border: "1.5px solid var(--cr-primary)",
                       padding: "8px 14px",
                       borderRadius: "8px",
                       cursor: "pointer",
@@ -419,19 +474,21 @@ export function Navbar() {
                       transition: "all 0.2s ease",
                     }}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-accent)";
-                      (e.currentTarget as HTMLButtonElement).style.color = "white";
+                      (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-primary)";
+                      (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-white)";
                     }}
                     onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(196,174,124,0.15)";
+                      (e.currentTarget as HTMLButtonElement).style.background = "transparent";
                       (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
                     }}
                   >
-                    <span>{isRTL ? "إكمال الملف" : "Complete Profile"}</span>
+                    <LogOut size={14} />
+                    <span>{isRTL ? "خروج" : "Logout"}</span>
                   </button>
-                )}
+                </div>
+              ) : (
                 <button
-                  onClick={handleLogout}
+                  onClick={handleAuth}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -439,12 +496,13 @@ export function Navbar() {
                     background: "transparent",
                     color: "var(--cr-primary)",
                     border: "1.5px solid var(--cr-primary)",
-                    padding: "8px 14px",
-                    borderRadius: "8px",
+                    padding: "10px 20px",
+                    borderRadius: "6px",
                     cursor: "pointer",
                     fontSize: "14px",
                     fontWeight: 600,
                     transition: "all 0.2s ease",
+                    whiteSpace: "nowrap",
                   }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-primary)";
@@ -455,40 +513,10 @@ export function Navbar() {
                     (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
                   }}
                 >
-                  <LogOut size={14} />
-                  <span>{isRTL ? "خروج" : "Logout"}</span>
+                  <User size={16} />
+                  <span>{t.nav.login}</span>
                 </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleAuth}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  background: "transparent",
-                  color: "var(--cr-primary)",
-                  border: "1.5px solid var(--cr-primary)",
-                  padding: "10px 20px",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  transition: "all 0.2s ease",
-                  whiteSpace: "nowrap",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-primary)";
-                  (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-white)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                  (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
-                }}
-              >
-                <User size={16} />
-                <span>{t.nav.login}</span>
-              </button>
+              )
             )}
           </div>
 
@@ -694,66 +722,91 @@ export function Navbar() {
               </div>
 
               {/* Mobile login / user info button */}
-              {user ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  <Link
-                    href="/profile"
-                    onClick={() => setMenuOpen(false)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      background: "rgba(90,61,52,0.05)",
-                      padding: "12px 16px",
-                      borderRadius: "6px",
-                      color: "var(--cr-primary)",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      textDecoration: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <User size={16} />
-                    <span>{user.name || user.mobile}</span>
-                  </Link>
-                  {isProfileIncomplete && (
+              {showCustomerLogin && (
+                user ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    <Link
+                      href="/profile"
+                      onClick={() => setMenuOpen(false)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        background: "rgba(90,61,52,0.05)",
+                        padding: "12px 16px",
+                        borderRadius: "6px",
+                        color: "var(--cr-primary)",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        textDecoration: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <User size={16} />
+                      <span>{user.name || user.mobile}</span>
+                    </Link>
+                    {isProfileIncomplete && (
+                      <button
+                        onClick={() => {
+                          handleCompleteProfile();
+                          setMenuOpen(false);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px",
+                          background: "rgba(196,174,124,0.15)",
+                          color: "var(--cr-primary)",
+                          border: "1.5px solid var(--cr-accent)",
+                          padding: "12px 16px",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          width: "100%",
+                        }}
+                      >
+                        <span>{isRTL ? "إكمال الملف الشخصي" : "Complete Profile"}</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => {
-                        handleCompleteProfile();
+                        handleLogout();
                         setMenuOpen(false);
                       }}
                       style={{
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: "6px",
-                        background: "rgba(196,174,124,0.15)",
+                        gap: "8px",
+                        background: "transparent",
                         color: "var(--cr-primary)",
-                        border: "1.5px solid var(--cr-accent)",
-                        padding: "12px 16px",
+                        border: "1.5px solid var(--cr-primary)",
+                        padding: "12px 20px",
                         borderRadius: "6px",
                         cursor: "pointer",
                         fontSize: "14px",
                         fontWeight: 600,
+                        transition: "all 0.2s ease",
                         width: "100%",
                       }}
                     >
-                      <span>{isRTL ? "إكمال الملف الشخصي" : "Complete Profile"}</span>
+                      <LogOut size={16} />
+                      <span>{isRTL ? "تسجيل الخروج" : "Logout"}</span>
                     </button>
-                  )}
+                  </div>
+                ) : (
                   <button
-                    onClick={() => {
-                      handleLogout();
-                      setMenuOpen(false);
-                    }}
+                    onClick={handleAuth}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: "8px",
-                      background: "transparent",
-                      color: "var(--cr-primary)",
-                      border: "1.5px solid var(--cr-primary)",
+                      gap: "6px",
+                      background: "var(--cr-primary)",
+                      color: "var(--cr-white)",
+                      border: "none",
                       padding: "12px 20px",
                       borderRadius: "6px",
                       cursor: "pointer",
@@ -763,33 +816,10 @@ export function Navbar() {
                       width: "100%",
                     }}
                   >
-                    <LogOut size={16} />
-                    <span>{isRTL ? "تسجيل الخروج" : "Logout"}</span>
+                    <User size={16} />
+                    <span>{t.nav.login}</span>
                   </button>
-                </div>
-              ) : (
-                <button
-                  onClick={handleAuth}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
-                    background: "var(--cr-primary)",
-                    color: "var(--cr-white)",
-                    border: "none",
-                    padding: "12px 20px",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    transition: "all 0.2s ease",
-                    width: "100%",
-                  }}
-                >
-                  <User size={16} />
-                  <span>{t.nav.login}</span>
-                </button>
+                )
               )}
             </div>
           </div>

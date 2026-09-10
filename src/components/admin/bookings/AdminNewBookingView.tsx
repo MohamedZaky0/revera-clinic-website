@@ -230,6 +230,7 @@ export default function AdminNewBookingView({
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [sameAsPhone, setSameAsPhone] = useState(true);
+  const [formErrors, setFormErrors] = useState<{ phone?: boolean; firstName?: boolean; service?: boolean; doctor?: boolean; time?: boolean }>({});
 
   // Customer Lookup state
   const [patientFound, setPatientFound] = useState<boolean | null>(null);
@@ -268,14 +269,15 @@ export default function AdminNewBookingView({
   const [bookingDate, setBookingDate] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
-  const [selectedTime, setSelectedTime] = useState<string>("09:00 AM");
+  const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [bookedTimeSlots, setBookedTimeSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [sessionType, setSessionType] = useState<"in_person" | "online">("in_person");
   const [notes, setNotes] = useState<string>("");
-  const [amountPaidNow, setAmountPaidNow] = useState<number>(0);
+  const [customBookingValue, setCustomBookingValue] = useState<number | null>(null);
+  const [amountPaidNow, setAmountPaidNow] = useState<number | "">("");
 
   // DB Lists
   const [dbServices, setDbServices] = useState<ServiceItem[]>(services);
@@ -573,7 +575,7 @@ export default function AdminNewBookingView({
       // If branch or doctor is closed on this day, no available slots
       if (isBranchClosedToday || isDoctorClosedToday) {
         setAvailableTimeSlots([]);
-        setSelectedTime("");
+        setSelectedTimes([]);
         setBookedTimeSlots([]);
         setLoadingSlots(false);
         return;
@@ -630,13 +632,11 @@ export default function AdminNewBookingView({
           });
 
           setAvailableTimeSlots(validFutureSlots);
-          if (validFutureSlots.length > 0) {
-            if (!validFutureSlots.includes(selectedTime)) {
-              setSelectedTime(validFutureSlots[0]);
-            }
-          } else {
-            setSelectedTime("");
-          }
+          setSelectedTimes((prev) => {
+            const stillValid = prev.filter(s => validFutureSlots.includes(s));
+            if (stillValid.length > 0) return stillValid;
+            return validFutureSlots.length > 0 ? [validFutureSlots[0]] : [];
+          });
           setLoadingSlots(false);
           return;
         }
@@ -669,18 +669,41 @@ export default function AdminNewBookingView({
       });
 
       setAvailableTimeSlots(generated);
-      if (generated.length > 0) {
-        if (!generated.includes(selectedTime)) {
-          setSelectedTime(generated[0]);
-        }
-      } else {
-        setSelectedTime("");
-      }
+      setSelectedTimes((prev) => {
+        const stillValid = prev.filter(s => generated.includes(s));
+        if (stillValid.length > 0) return stillValid;
+        return generated.length > 0 ? [generated[0]] : [];
+      });
       setLoadingSlots(false);
     }
 
     fetchActualTimeSlots();
   }, [bookingDate, selectedDoctorId, selectedServiceId, selectedBranchId, isBranchClosedToday, isDoctorClosedToday]);
+
+  const toggleTimeSlot = (slot: string) => {
+    setFormErrors((prev) => ({ ...prev, time: false }));
+    setSelectedTimes((prev) => {
+      let next: string[];
+      if (prev.includes(slot)) {
+        next = prev.filter((s) => s !== slot);
+      } else {
+        next = [...prev, slot];
+      }
+      return next.sort((a, b) => {
+        const idxA = availableTimeSlots.indexOf(a);
+        const idxB = availableTimeSlots.indexOf(b);
+        return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+      });
+    });
+  };
+
+  const handleSelectAllSlots = () => {
+    setSelectedTimes([...availableTimeSlots]);
+  };
+
+  const handleClearSlots = () => {
+    setSelectedTimes([]);
+  };
 
   const selectedServiceName = getServiceName(selectedServiceObj, lang);
   const selectedDoctorName = selectedDoctorObj?.name || "Doctor";
@@ -688,6 +711,14 @@ export default function AdminNewBookingView({
   const selectedRoomName = selectedRoomObj?.name || "Room 1 (Auto)";
 
   const fullPatientName = `${firstName} ${lastName}`.trim() || "Patient Name";
+
+  const baseServicePrice = Number(selectedServiceObj?.price || 0);
+  const autoBookingValue = baseServicePrice * Math.max(1, selectedTimes.length);
+  const bookingValue = customBookingValue !== null && customBookingValue !== undefined ? Number(customBookingValue) : autoBookingValue;
+  const numAmountPaid = typeof amountPaidNow === "number" ? amountPaidNow : 0;
+  const remainingValue = bookingValue - numAmountPaid;
+  const selectedTime = selectedTimes.join(", ");
+  const totalDurationMinutes = selectedTimes.length * (Number(selectedServiceObj?.duration || (selectedServiceObj as any)?.duration_minutes) || 30);
 
   // Formatted date string (e.g. 03 Aug 2026 (Mon))
   const formattedDateStr = useMemo(() => {
@@ -702,15 +733,19 @@ export default function AdminNewBookingView({
   }, [bookingDate]);
 
   const handleOpenSummaryModal = () => {
+    setFormErrors({});
     if (!phone || !firstName) {
+      setFormErrors({ phone: !phone, firstName: !firstName });
       alert(tr.phoneFirstNameAlert);
       return;
     }
     if (!selectedServiceId) {
+      setFormErrors({ service: true });
       alert(tr.selectServiceAlert);
       return;
     }
     if (!selectedDoctorId) {
+      setFormErrors({ doctor: true });
       alert(tr.selectDoctorAlert);
       return;
     }
@@ -722,16 +757,19 @@ export default function AdminNewBookingView({
       alert(tr.doctorUnavailableAlert || `${selectedDoctorName} is not available on ${weekdayName}s. Please choose another date or doctor.`);
       return;
     }
-    if (!selectedTime) {
-      alert(tr.selectTimeAlert || "Please select an available time slot.");
+    if (selectedTimes.length === 0) {
+      setFormErrors({ time: true });
+      alert(tr.selectTimeAlert || "Please select at least one available time slot.");
       return;
     }
-    if (isSlotInPast(selectedTime, bookingDate)) {
-      alert(tr.slotInPastAlert || "The selected time slot has already passed. Please select a future time slot.");
+    const hasPast = selectedTimes.some(slot => isSlotInPast(slot, bookingDate));
+    if (hasPast) {
+      alert(tr.slotInPastAlert || "One or more selected time slots have already passed. Please select future time slots.");
       return;
     }
-    if (bookedTimeSlots.includes(normalizeTimeSlot(selectedTime))) {
-      alert(tr.slotAlreadyBookedAlert || "The selected time slot is already booked. Please choose another slot.");
+    const hasBooked = selectedTimes.some(slot => bookedTimeSlots.includes(normalizeTimeSlot(slot)));
+    if (hasBooked) {
+      alert(tr.slotAlreadyBookedAlert || "One or more selected time slots are already booked. Please choose other slots.");
       return;
     }
     setShowConfirmModal(true);
@@ -803,8 +841,8 @@ export default function AdminNewBookingView({
         isManual: true,
         status: "approved",
         explicitCustomerId: resolvedCustomerId,
-        amountPaid: amountPaidNow,
-        amountLeft: Number(selectedServiceObj?.price || 0) - amountPaidNow
+        amountPaid: numAmountPaid,
+        amountLeft: Math.max(0, remainingValue)
       };
 
       const res = await fetch("/api/reservations", {
@@ -922,7 +960,9 @@ export default function AdminNewBookingView({
                   </button>
                 </div>
 
-                <div className="flex items-center rounded-2xl border border-[#414E36]/20 bg-white overflow-hidden shadow-xs focus-within:border-emerald-700">
+                <div className={`flex items-center rounded-2xl border bg-white overflow-hidden shadow-xs focus-within:border-emerald-700 ${
+                  formErrors.phone ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/20"
+                }`}>
                   <div className="flex items-center gap-1.5 px-3 py-2.5 bg-[#FBFBF9] border-e border-[#414E36]/10 font-bold text-[#1F251A]">
                     <span className="text-base">🇪🇬</span>
                     <select
@@ -945,6 +985,7 @@ export default function AdminNewBookingView({
                     }}
                     onChange={(e) => {
                       setPhone(e.target.value);
+                      if (e.target.value) setFormErrors((prev) => ({ ...prev, phone: false }));
                       if (customerList.length > 0) setShowCustomerDropdown(true);
                     }}
                     placeholder={tr.phonePlaceholder}
@@ -965,6 +1006,9 @@ export default function AdminNewBookingView({
                     </button>
                   ) : null}
                 </div>
+                {formErrors.phone && (
+                  <p className="mt-1 text-[11px] font-bold text-red-600">{tr.requiredField}</p>
+                )}
 
                 {/* Scrollable Floating Customer List Dropdown */}
                 {showCustomerDropdown && customerList.length > 0 && (
@@ -1020,10 +1064,18 @@ export default function AdminNewBookingView({
                     type="text"
                     required
                     value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
+                    onChange={(e) => {
+                      setFirstName(e.target.value);
+                      if (e.target.value) setFormErrors((prev) => ({ ...prev, firstName: false }));
+                    }}
                     placeholder={tr.firstNamePlaceholder}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700"
+                    className={`w-full rounded-2xl border bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 ${
+                      formErrors.firstName ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/20"
+                    }`}
                   />
+                  {formErrors.firstName && (
+                    <p className="mt-1 text-[11px] font-bold text-red-600">{tr.requiredField}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block font-bold text-[#1F251A] mb-1.5">{tr.lastNameLabel}</label>
@@ -1278,8 +1330,13 @@ export default function AdminNewBookingView({
                   <label className="block font-bold text-[#1F251A] mb-1.5">{tr.serviceLabel}</label>
                   <select
                     value={selectedServiceId}
-                    onChange={(e) => setSelectedServiceId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                    onChange={(e) => {
+                      setSelectedServiceId(e.target.value);
+                      if (e.target.value) setFormErrors((prev) => ({ ...prev, service: false }));
+                    }}
+                    className={`w-full rounded-2xl border bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 ${
+                      formErrors.service ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/20"
+                    }`}
                   >
                     {dbServices.map(s => (
                       <option key={s.id} value={s.id}>
@@ -1287,19 +1344,30 @@ export default function AdminNewBookingView({
                       </option>
                     ))}
                   </select>
+                  {formErrors.service && (
+                    <p className="mt-1 text-[11px] font-bold text-red-600">{tr.requiredField}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block font-bold text-[#1F251A] mb-1.5">{tr.doctorLabel}</label>
                   <select
                     value={selectedDoctorId}
-                    onChange={(e) => setSelectedDoctorId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                    onChange={(e) => {
+                      setSelectedDoctorId(e.target.value);
+                      if (e.target.value) setFormErrors((prev) => ({ ...prev, doctor: false }));
+                    }}
+                    className={`w-full rounded-2xl border bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 ${
+                      formErrors.doctor ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/20"
+                    }`}
                   >
                     {filteredDoctors.map(d => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                   </select>
+                  {formErrors.doctor && (
+                    <p className="mt-1 text-[11px] font-bold text-red-600">{tr.requiredField}</p>
+                  )}
                 </div>
 
                 <div>
@@ -1314,53 +1382,83 @@ export default function AdminNewBookingView({
                 </div>
               </div>
 
-              {/* REAL DYNAMIC TIME SLOTS DROPDOWN */}
+              {/* ── 1. AVAILABLE TIME (MULTI-SLOT SELECTION) ── */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block font-bold text-[#1F251A]">{tr.availableTimeLabel}</label>
-                  {loadingSlots && (
-                    <span className="flex items-center gap-1 text-[11px] text-[#5A6A51]">
-                      <Loader2 size={12} className="animate-spin text-emerald-700" /> {tr.fetchingSlotsLabel}
-                    </span>
-                  )}
-                </div>
-
-                <div className="relative">
-                  <select
-                    value={selectedTime}
-                    disabled={isBranchClosedToday || isDoctorClosedToday || availableTimeSlots.length === 0}
-                    onChange={(e) => setSelectedTime(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white ps-10 pe-10 py-3 font-extrabold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 shadow-xs appearance-none disabled:bg-gray-50 disabled:text-gray-400"
-                  >
-                    {availableTimeSlots.length === 0 ? (
-                      <option value="" disabled>
-                        {isBranchClosedToday
-                          ? `${selectedBranchName} is closed on this day`
-                          : isDoctorClosedToday
-                          ? `${selectedDoctorName} is not available on this day`
-                          : (tr.noSlotsAvailableWarning || "No available slots on this date")}
-                      </option>
-                    ) : (
-                      availableTimeSlots.map((tSlot) => (
-                        <option key={tSlot} value={tSlot} className="font-extrabold text-[#1F251A]">
-                          {tSlot}
-                        </option>
-                      ))
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <label className="block font-bold text-[#1F251A]">{tr.availableTimeLabel}</label>
+                    {selectedTimes.length > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100/80 text-emerald-900 font-bold text-[11px]">
+                        <Clock size={11} className="text-emerald-700" />
+                        {selectedTimes.length} {selectedTimes.length === 1 ? (tr.slotSelectedSuffix || "slot selected") : (tr.slotsSelectedSuffix || "slots selected")}
+                        {totalDurationMinutes > 0 && ` • ${totalDurationMinutes} mins`}
+                      </span>
                     )}
-                  </select>
-
-                  <div className="absolute start-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-700">
-                    <Clock size={16} />
                   </div>
 
-                  <div className="absolute end-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#5A6A51]">
-                    <ChevronDown size={16} />
+                  <div className="flex items-center gap-2 text-xs">
+                    {loadingSlots ? (
+                      <span className="flex items-center gap-1 text-[11px] text-[#5A6A51]">
+                        <Loader2 size={12} className="animate-spin text-emerald-700" /> {tr.fetchingSlotsLabel}
+                      </span>
+                    ) : availableTimeSlots.length > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSelectAllSlots}
+                          className="text-[11px] font-bold text-[#0F3826] hover:underline bg-[#EBF2EB] px-2.5 py-1 rounded-lg transition cursor-pointer"
+                        >
+                          {tr.selectAllSlotsBtn || "Select All"}
+                        </button>
+                        {selectedTimes.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleClearSlots}
+                            className="text-[11px] font-bold text-rose-700 hover:underline bg-rose-50 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                          >
+                            {tr.clearSlotsBtn || "Clear"}
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
-                {/* Banner alert if closed day or 0 slots available */}
-                {(isBranchClosedToday || isDoctorClosedToday || (!loadingSlots && availableTimeSlots.length === 0)) && (
-                  <div className="rounded-2xl bg-amber-50 border border-amber-200/80 p-3.5 flex items-start gap-2.5 text-xs text-amber-900 mt-2.5">
+                {/* Slots Grid */}
+                {availableTimeSlots.length > 0 ? (
+                  <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 max-h-56 overflow-y-auto p-1.5 rounded-2xl border bg-[#FBFBF9]/50 ${
+                    formErrors.time ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/15"
+                  }`}>
+                    {availableTimeSlots.map((tSlot) => {
+                      const isSelected = selectedTimes.includes(tSlot);
+                      return (
+                        <button
+                          key={tSlot}
+                          type="button"
+                          onClick={() => toggleTimeSlot(tSlot)}
+                          className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-between gap-1.5 cursor-pointer select-none ${
+                            isSelected
+                              ? "bg-[#1E3A2B] text-white border-[#1E3A2B] shadow-xs ring-2 ring-emerald-700/20"
+                              : "bg-white hover:bg-emerald-50/70 text-[#1F251A] border-[#414E36]/15 hover:border-emerald-700/40"
+                          }`}
+                        >
+                          <span className="font-mono text-[11px] font-bold tracking-tight">{tSlot}</span>
+                          {isSelected ? (
+                            <Check size={13} className="text-emerald-400 shrink-0" />
+                          ) : (
+                            <Clock size={12} className="text-[#5A6A51]/50 shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+                {formErrors.time && (
+                  <p className="mt-1.5 text-[11px] font-bold text-red-600">{tr.selectTimeAlert || "Please select at least one available time slot."}</p>
+                )}
+                {availableTimeSlots.length === 0 && (
+                  /* Banner alert if closed day or 0 slots available */
+                  <div className="rounded-2xl bg-amber-50 border border-amber-200/80 p-3.5 flex items-start gap-2.5 text-xs text-amber-900">
                     <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
                     <span className="font-bold">
                       {isBranchClosedToday
@@ -1373,7 +1471,7 @@ export default function AdminNewBookingView({
                 )}
               </div>
 
-              {/* Session Type (In Person vs Online) */}
+              {/* ── 2. SESSION TYPE (IN PERSON VS ONLINE) ── */}
               <div>
                 <label className="block font-bold text-[#1F251A] mb-2">{tr.sessionTypeLabel}</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1431,20 +1529,73 @@ export default function AdminNewBookingView({
                 />
               </div>
 
-              {/* Amount Paid Now */}
-              <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <label className="font-bold text-[#1F251A]">{tr.amountPaidLabel}</label>
-                  <span className="text-[11px] text-[#5A6A51] font-mono">{tr.egpLabel}</span>
+              {/* ── 3. FINANCIAL FIELDS (BOOKING VALUE & AMOUNT PAID NOW) ── */}
+              <div className="pt-2 border-t border-[#414E36]/10 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Booking Value */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="font-bold text-[#1F251A]">{tr.bookingValueLabel || "Booking Value"}</label>
+                      <span className="text-[11px] text-[#5A6A51] font-mono">{tr.egpLabel || "EGP"}</span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={0}
+                        value={bookingValue === 0 ? "" : bookingValue}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCustomBookingValue(val === "" ? 0 : Math.max(0, Number(val)));
+                        }}
+                        placeholder="0"
+                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white p-3.5 text-xs font-bold text-[#1F251A] outline-none focus:border-emerald-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Amount Paid Now */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="font-bold text-[#1F251A]">{tr.amountPaidLabel || "Amount Paid Now"}</label>
+                      <span className="text-[11px] text-[#5A6A51] font-mono">{tr.egpLabel || "EGP"}</span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={0}
+                        value={amountPaidNow === 0 ? "" : amountPaidNow}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setAmountPaidNow(val === "" ? "" : Math.max(0, Number(val)));
+                        }}
+                        placeholder="0"
+                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white p-3.5 text-xs font-bold text-[#1F251A] outline-none focus:border-emerald-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <input
-                  type="number"
-                  min={0}
-                  value={amountPaidNow}
-                  onChange={(e) => setAmountPaidNow(Math.max(0, Number(e.target.value) || 0))}
-                  className="w-full rounded-2xl border border-[#414E36]/20 bg-white p-3.5 text-xs text-[#1F251A] outline-none focus:border-emerald-700"
-                  placeholder="0"
-                />
+
+                {/* Live Remaining Balance Calculation Callout */}
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-[#5A6A51]">{tr.remainingValueLabel || "Remaining Value"}:</span>
+                    <span className="text-[11px] text-[#5A6A51]">({tr.bookingValueLabel || "Booking Value"} - {tr.actualPaidLabel || "Actual Paid"})</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-black text-sm ${remainingValue > 0 ? "text-amber-800" : remainingValue < 0 ? "text-blue-800" : "text-emerald-800"}`}>
+                      {remainingValue} {tr.egpLabel || "EGP"}
+                    </span>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                      remainingValue === 0 
+                        ? "bg-emerald-100 text-emerald-800" 
+                        : remainingValue > 0 
+                        ? "bg-amber-100 text-amber-800" 
+                        : "bg-blue-100 text-blue-800"
+                    }`}>
+                      {remainingValue === 0 ? (tr.fullySettledBadge || "Fully Settled") : remainingValue > 0 ? (tr.dueOnVisitBadge || "Due on Visit") : (tr.creditBalanceBadge || "Credit Balance")}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1504,7 +1655,7 @@ export default function AdminNewBookingView({
         {/* Single Full Create Booking Button */}
         <button
           type="button"
-          disabled={submitting || !selectedTime || isBranchClosedToday || isDoctorClosedToday || availableTimeSlots.length === 0}
+          disabled={submitting || selectedTimes.length === 0 || isBranchClosedToday || isDoctorClosedToday || availableTimeSlots.length === 0}
           onClick={handleOpenSummaryModal}
           className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[#1E3A2B] text-white font-extrabold text-xs hover:bg-[#162C20] transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs cursor-pointer"
         >
@@ -1567,11 +1718,16 @@ export default function AdminNewBookingView({
                 </span>
               </div>
 
-              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
+              <div className="flex justify-between items-start pb-2.5 border-b border-[#414E36]/10">
                 <span className="text-[#5A6A51] font-semibold">{tr.dateTimeLabel}</span>
-                <span className="font-extrabold text-emerald-800 text-end">
-                  {formattedDateStr} {tr.atWord} {selectedTime}
-                </span>
+                <div className="text-end">
+                  <span className="font-extrabold text-emerald-800 block">
+                    {formattedDateStr}
+                  </span>
+                  <span className="text-[11px] font-bold text-[#1F251A] block mt-0.5">
+                    {selectedTimes.join(", ")} ({selectedTimes.length} {selectedTimes.length === 1 ? (tr.slotSelectedSuffix || 'slot') : (tr.slotsSelectedSuffix || 'slots')})
+                  </span>
+                </div>
               </div>
 
               <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
@@ -1587,9 +1743,28 @@ export default function AdminNewBookingView({
                   <span>{tr.activePackagePriceLabel}</span>
                 </div>
               ) : (
-                <div className="flex justify-between items-center pt-0.5 font-extrabold text-[#1F251A]">
-                  <span className="text-[#5A6A51] font-semibold">{tr.servicePriceLabel}</span>
-                  <span className="text-emerald-800">{selectedServiceObj?.price || 500} {tr.egpLabel}</span>
+                <div className="space-y-2 pt-1">
+                  <div className="flex justify-between items-center font-extrabold text-[#1F251A]">
+                    <span className="text-[#5A6A51] font-semibold">{tr.bookingValueLabel || "Booking Value"}</span>
+                    <span className="text-[#1F251A] font-extrabold">{bookingValue} {tr.egpLabel}</span>
+                  </div>
+                  <div className="flex justify-between items-center font-extrabold text-[#1F251A]">
+                    <span className="text-[#5A6A51] font-semibold">{tr.actualPaidLabel || tr.amountPaidLabel || "Amount Paid Now"}</span>
+                    <span className="text-emerald-800 font-extrabold">{numAmountPaid} {tr.egpLabel}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-[#414E36]/10 font-extrabold">
+                    <span className="text-[#5A6A51] font-semibold">{tr.remainingValueLabel || "Remaining Value"}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`font-black ${remainingValue > 0 ? "text-amber-800" : "text-emerald-800"}`}>
+                        {remainingValue} {tr.egpLabel}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        remainingValue === 0 ? "bg-emerald-100 text-emerald-800" : remainingValue > 0 ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"
+                      }`}>
+                        {remainingValue === 0 ? (tr.fullySettledBadge || "Fully Settled") : remainingValue > 0 ? (tr.dueOnVisitBadge || "Due on Visit") : (tr.creditBalanceBadge || "Credit Balance")}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )}
 
