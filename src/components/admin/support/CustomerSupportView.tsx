@@ -164,7 +164,7 @@ export default function CustomerSupportView({ lang = "en", hasPermission }: Prop
   };
 
   return (
-    <div className="space-y-6 animate-fadeIn" dir={isAr ? "rtl" : "ltr"}>
+    <div className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -441,8 +441,15 @@ export default function CustomerSupportView({ lang = "en", hasPermission }: Prop
 
       {/* New Ticket Modal */}
       {showNewTicketModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl animate-scaleUp">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          {/* Backdrop Sibling Layer - Pure dark overlay, NO blur filter */}
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={() => setShowNewTicketModal(false)}
+          />
+
+          {/* Modal Container */}
+          <div className="relative z-10 w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-[#414E36]/10 text-left" dir={isAr ? "rtl" : "ltr"}>
             <h3 className="text-lg font-bold text-[#1F251A]">
               {isAr ? "إنشاء تذكرة دعم جديدة" : "Create New Support Ticket"}
             </h3>
@@ -459,7 +466,7 @@ export default function CustomerSupportView({ lang = "en", hasPermission }: Prop
                   value={newPatientName}
                   onChange={(e) => setNewPatientName(e.target.value)}
                   placeholder="e.g. Nouran Mansour"
-                  className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-[#C4AE7C]"
+                  className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-[#C4AE7C] bg-white text-[#1F251A]"
                 />
               </div>
 
@@ -470,7 +477,7 @@ export default function CustomerSupportView({ lang = "en", hasPermission }: Prop
                   value={newPatientPhone}
                   onChange={(e) => setNewPatientPhone(e.target.value)}
                   placeholder="+201..."
-                  className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-[#C4AE7C]"
+                  className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-[#C4AE7C] bg-white text-[#1F251A]"
                 />
               </div>
 
@@ -482,7 +489,7 @@ export default function CustomerSupportView({ lang = "en", hasPermission }: Prop
                   value={newSubject}
                   onChange={(e) => setNewSubject(e.target.value)}
                   placeholder="e.g. Appointment rescheduling request"
-                  className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-[#C4AE7C]"
+                  className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-[#C4AE7C] bg-white text-[#1F251A]"
                 />
               </div>
 
@@ -492,7 +499,7 @@ export default function CustomerSupportView({ lang = "en", hasPermission }: Prop
                   <select
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value as any)}
-                    className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-[#C4AE7C]"
+                    className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-[#C4AE7C] bg-white text-[#1F251A]"
                   >
                     <option value="General">General</option>
                     <option value="Booking">Booking</option>
@@ -506,7 +513,7 @@ export default function CustomerSupportView({ lang = "en", hasPermission }: Prop
                   <select
                     value={newChannel}
                     onChange={(e) => setNewChannel(e.target.value as any)}
-                    className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-[#C4AE7C]"
+                    className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-[#C4AE7C] bg-white text-[#1F251A]"
                   >
                     <option value="WhatsApp">WhatsApp</option>
                     <option value="Call">Call</option>
