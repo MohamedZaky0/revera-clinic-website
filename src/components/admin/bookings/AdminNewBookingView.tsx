@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { adminTranslations } from "@/components/admin/translations";
+import { getServiceDurationMinutes } from "@/lib/services";
 
 interface ServiceItem {
   id: string | number;
@@ -36,7 +37,9 @@ interface ServiceItem {
   title_en?: string;
   ar?: string;
   price?: number;
-  duration?: number;
+  /** Free-text legacy field, e.g. "1:30 Hours". Prefer duration_minutes via getServiceDurationMinutes(). */
+  duration?: string;
+  duration_minutes?: number | null;
 }
 
 interface ProviderItem {
@@ -718,7 +721,7 @@ export default function AdminNewBookingView({
   const numAmountPaid = typeof amountPaidNow === "number" ? amountPaidNow : 0;
   const remainingValue = bookingValue - numAmountPaid;
   const selectedTime = selectedTimes.join(", ");
-  const totalDurationMinutes = selectedTimes.length * (Number(selectedServiceObj?.duration || (selectedServiceObj as any)?.duration_minutes) || 30);
+  const totalDurationMinutes = selectedTimes.length * getServiceDurationMinutes(selectedServiceObj);
 
   // Formatted date string (e.g. 03 Aug 2026 (Mon))
   const formattedDateStr = useMemo(() => {
