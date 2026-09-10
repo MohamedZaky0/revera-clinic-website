@@ -67,6 +67,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
     type: "all",
     paymentMethod: "all",
     status: "all",
+    source: "all",
     branchId: currentBranchId || "all",
     amountRange: "all",
     sortBy: "date",
@@ -82,8 +83,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   const [loading, setLoading] = useState(true);
 
   // Overview Stats
-  // Zeroed until the real figures load — never seeded with placeholder numbers, which previously
-  // meant the cards showed convincing-but-fabricated totals whenever the fetch failed (RISK-076).
   const [stats, setStats] = useState<TransactionStats>({
     todayNetPayments: 0,
     todayPaymentsCount: 0,
@@ -117,6 +116,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       if (filters.type !== "all") params.set("type", filters.type);
       if (filters.paymentMethod !== "all") params.set("paymentMethod", filters.paymentMethod);
       if (filters.status !== "all") params.set("status", filters.status);
+      if (filters.source !== "all") params.set("source", filters.source);
       if (filters.branchId !== "all") params.set("branchId", filters.branchId);
       if (filters.amountRange !== "all") params.set("amountRange", filters.amountRange);
       params.set("sortBy", filters.sortBy);
@@ -153,6 +153,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       type: "all",
       paymentMethod: "all",
       status: "all",
+      source: "all",
       branchId: "all",
       amountRange: "all",
       sortBy: "date",
@@ -172,7 +173,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
   const handleExportCSV = () => {
     if (transactions.length === 0) return;
-    const headers = ["Transaction ID", "Date", "Patient", "Phone", "Type", "Description", "Payment Method", "Amount", "Status", "Source"];
+    const headers = ["Transaction ID", "Date", "Patient", "Phone", "Type", "Description", "Payment Method", "Amount", "Status", "Source", "Reference"];
     const rows = transactions.map((t) => [
       t.transaction_id,
       new Date(t.occurred_at).toLocaleDateString(),
@@ -184,6 +185,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       t.amount,
       t.status,
       t.source || "manual",
+      t.reference_no || t.invoice_no || "",
     ]);
 
     const csvContent = [headers.join(","), ...rows.map((r) => r.map((c) => `"${c}"`).join(","))].join("\n");
@@ -278,15 +280,15 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="space-y-6 animate-in fade-in duration-200" dir={lang === "ar" ? "rtl" : "ltr"}>
       {/* ── Page Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-[#1F251A]">
-            Transactions
+            {lang === "ar" ? "المعاملات المالية" : "Transactions"}
           </h2>
           <p className="text-xs text-gray-500">
-            Track and manage all clinic financial transactions
+            {lang === "ar" ? "تتبع وإدارة جميع المعاملات المالية بالعيادة" : "Track and manage all clinic financial transactions"}
           </p>
         </div>
 
@@ -309,7 +311,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#313A28] hover:bg-[#1F251A] text-[#FBFBF9] font-bold text-xs shadow-sm transition-all"
             >
               <Plus size={15} />
-              <span>New Transaction</span>
+              <span>{lang === "ar" ? "معاملة جديدة" : "New Transaction"}</span>
             </button>
           )}
 
@@ -319,7 +321,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-2xs transition-colors"
           >
             <ShieldCheck size={15} className="text-gray-500" />
-            <span>Audit Logs</span>
+            <span>{lang === "ar" ? "سجل التدقيق" : "Audit Logs"}</span>
           </button>
         </div>
       </div>
@@ -333,19 +335,19 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           </div>
           <div className="space-y-1">
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
-              Today's Payments
+              {lang === "ar" ? "مدفوعات اليوم (الخزينة)" : "Today's Payments"}
             </span>
             <div className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
               EGP {stats.todayNetPayments.toLocaleString()}
             </div>
             <p className="text-xs text-gray-400 font-medium">
-              {stats.todayPaymentsCount} transactions
+              {stats.todayPaymentsCount} {lang === "ar" ? "معاملات" : "transactions"}
             </p>
             {stats.todayEstimatedTotal !== undefined && stats.todayEstimatedTotal > 0 && (
               <p className="text-[11px] font-semibold text-gray-500">
-                Estimated today:{" "}
+                {lang === "ar" ? "المقدر لليوم: " : "Estimated today: "}
                 <span className="text-gray-700">EGP {stats.todayEstimatedTotal.toLocaleString()}</span>
-                <span className="font-normal text-gray-400"> charged</span>
+                <span className="font-normal text-gray-400"> {lang === "ar" ? "تمت فوترته" : "charged"}</span>
               </p>
             )}
           </div>
@@ -358,31 +360,34 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           </div>
           <div className="space-y-1">
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
-              Outstanding
+              {lang === "ar" ? "المبالغ المستحقة" : "Outstanding"}
             </span>
             <div className="text-2xl sm:text-3xl font-black text-rose-600 tracking-tight">
               EGP {stats.totalOutstanding.toLocaleString()}
             </div>
             <p className="text-xs text-gray-400 font-medium">
-              {stats.outstandingCount} patients
+              {stats.outstandingCount} {lang === "ar" ? "مرضى" : "patients"}
             </p>
           </div>
         </div>
 
         {/* Card 3: Wallet Balance */}
-        <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
+        <div
+          className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow"
+          title={lang === "ar" ? "إجمالي الأرصدة المتاحة في محافظ المرضى بالعيادة" : "Total active patient wallet credit across all patients"}
+        >
           <div className="h-12 w-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold shrink-0">
             <Coins size={24} />
           </div>
           <div className="space-y-1">
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
-              Wallet Balance
+              {lang === "ar" ? "أرصدة المحافظ" : "Wallet Balance"}
             </span>
             <div className="text-2xl sm:text-3xl font-black text-sky-600 tracking-tight">
               EGP {stats.totalWalletBalance.toLocaleString()}
             </div>
             <p className="text-xs text-gray-400 font-medium">
-              {stats.activeWalletCount} patients
+              {stats.activeWalletCount} {lang === "ar" ? "مرضى لديهم رصيد" : "patients"}
             </p>
           </div>
         </div>
@@ -397,10 +402,10 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               type="text"
               value={filters.search}
               onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value, page: 1 }))}
-              placeholder="Search patient, transaction or invoice..."
+              placeholder={lang === "ar" ? "ابحث بالمريض أو المعاملة أو الفاتورة أو المرجع..." : "Search patient, transaction, invoice, or reference..."}
               className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 pe-10 text-xs font-medium text-gray-800 placeholder-gray-400 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all shadow-2xs"
             />
-            <div className="absolute right-3.5 top-3 text-gray-400">
+            <div className={`absolute top-3 text-gray-400 ${lang === "ar" ? "left-3.5" : "right-3.5"}`}>
               <Search size={15} />
             </div>
           </div>
@@ -417,7 +422,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               }`}
             >
               <Filter size={14} />
-              <span>Filters</span>
+              <span>{lang === "ar" ? "تصفية" : "Filters"}</span>
             </button>
 
             <button
@@ -426,7 +431,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-2xs transition-colors"
             >
               <Download size={14} />
-              <span>Export</span>
+              <span>{lang === "ar" ? "تصدير" : "Export"}</span>
             </button>
           </div>
         </div>
@@ -434,106 +439,120 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         {/* Filter Dropdowns Row */}
         {showFilterDrawer && (
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-xs space-y-3 animate-in fade-in duration-150">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 text-xs">
               {/* Date Filter */}
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Date</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">{lang === "ar" ? "التاريخ" : "Date"}</label>
                 <select
                   value={filters.dateRange}
                   onChange={(e) => setFilters((prev) => ({ ...prev, dateRange: e.target.value as any, page: 1 }))}
                   className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
-                  <option value="all">All Dates</option>
-                  <option value="today">Today</option>
-                  <option value="yesterday">Yesterday</option>
-                  <option value="week">Last 7 Days</option>
-                  <option value="month">This Month</option>
+                  <option value="all">{lang === "ar" ? "كل التواريخ" : "All Dates"}</option>
+                  <option value="today">{lang === "ar" ? "اليوم" : "Today"}</option>
+                  <option value="yesterday">{lang === "ar" ? "أمس" : "Yesterday"}</option>
+                  <option value="week">{lang === "ar" ? "آخر 7 أيام" : "Last 7 Days"}</option>
+                  <option value="month">{lang === "ar" ? "هذا الشهر" : "This Month"}</option>
                 </select>
               </div>
 
               {/* Transaction Type Filter */}
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Transaction Type</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">{lang === "ar" ? "نوع المعاملة" : "Transaction Type"}</label>
                 <select
                   value={filters.type}
                   onChange={(e) => setFilters((prev) => ({ ...prev, type: e.target.value as any, page: 1 }))}
                   className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
-                  <option value="all">All Types</option>
-                  <option value="payment">Payment</option>
-                  <option value="outstanding_payment">Outstanding Payment</option>
-                  <option value="wallet_topup">Wallet Top-up</option>
-                  <option value="wallet_deduction">Wallet Deduction</option>
-                  <option value="service_charge">Service Charge</option>
-                  <option value="product_purchase">Product Purchase</option>
-                  <option value="refund">Refund</option>
-                  <option value="adjustment">Adjustment</option>
+                  <option value="all">{lang === "ar" ? "كل الأنواع" : "All Types"}</option>
+                  <option value="payment">{lang === "ar" ? "دفع (Payment)" : "Payment"}</option>
+                  <option value="outstanding_payment">{lang === "ar" ? "سداد مديونية" : "Outstanding Payment"}</option>
+                  <option value="wallet_topup">{lang === "ar" ? "إيداع محفظة" : "Wallet Top-up"}</option>
+                  <option value="wallet_deduction">{lang === "ar" ? "سحب محفظة" : "Wallet Deduction"}</option>
+                  <option value="service_charge">{lang === "ar" ? "رسوم خدمة" : "Service Charge"}</option>
+                  <option value="product_purchase">{lang === "ar" ? "شراء منتج / باقة" : "Product Purchase"}</option>
+                  <option value="refund">{lang === "ar" ? "استرداد" : "Refund"}</option>
+                  <option value="adjustment">{lang === "ar" ? "تسوية" : "Adjustment"}</option>
                 </select>
               </div>
 
               {/* Payment Method Filter */}
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Payment Method</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">{lang === "ar" ? "طريقة الدفع" : "Payment Method"}</label>
                 <select
                   value={filters.paymentMethod}
                   onChange={(e) => setFilters((prev) => ({ ...prev, paymentMethod: e.target.value as any, page: 1 }))}
                   className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
-                  <option value="all">All Methods</option>
-                  <option value="cash">Cash</option>
-                  <option value="card">Visa / Card</option>
+                  <option value="all">{lang === "ar" ? "كل الطرق" : "All Methods"}</option>
+                  <option value="cash">{lang === "ar" ? "نقدي (Cash)" : "Cash"}</option>
+                  <option value="card">{lang === "ar" ? "فيزا / بطاقة" : "Visa / Card"}</option>
                   <option value="instapay">Instapay</option>
                   <option value="vodafone_cash">Vodafone Cash</option>
-                  <option value="wallet">Wallet</option>
-                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="wallet">{lang === "ar" ? "محفظة" : "Wallet"}</option>
+                  <option value="bank_transfer">{lang === "ar" ? "تحويل بنكي" : "Bank Transfer"}</option>
                 </select>
               </div>
 
               {/* Status Filter */}
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Status</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">{lang === "ar" ? "الحالة" : "Status"}</label>
                 <select
                   value={filters.status}
                   onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value as any, page: 1 }))}
                   className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
-                  <option value="all">All Statuses</option>
-                  <option value="completed">Completed</option>
-                  <option value="pending">Pending</option>
-                  <option value="outstanding">Outstanding</option>
-                  <option value="refunded">Refunded</option>
-                  <option value="failed">Failed</option>
+                  <option value="all">{lang === "ar" ? "كل الحالات" : "All Statuses"}</option>
+                  <option value="completed">{lang === "ar" ? "مكتمل (Completed)" : "Completed"}</option>
+                  <option value="pending">{lang === "ar" ? "معلق (Pending)" : "Pending"}</option>
+                  <option value="outstanding">{lang === "ar" ? "مستحق (Outstanding)" : "Outstanding"}</option>
+                  <option value="refunded">{lang === "ar" ? "مسترد (Refunded)" : "Refunded"}</option>
+                  <option value="failed">{lang === "ar" ? "فاشل (Failed)" : "Failed"}</option>
+                </select>
+              </div>
+
+              {/* Source Filter */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">{lang === "ar" ? "المصدر" : "Source"}</label>
+                <select
+                  value={filters.source}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, source: e.target.value as any, page: 1 }))}
+                  className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
+                >
+                  <option value="all">{lang === "ar" ? "كل المصادر" : "All Sources"}</option>
+                  <option value="manual">{lang === "ar" ? "يدوي (Manual)" : "Manual"}</option>
+                  <option value="automatic">{lang === "ar" ? "تلقائي (Automatic)" : "Automatic"}</option>
                 </select>
               </div>
 
               {/* Branch Filter */}
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Branch</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">{lang === "ar" ? "الفرع" : "Branch"}</label>
                 <select
                   value={filters.branchId}
                   onChange={(e) => setFilters((prev) => ({ ...prev, branchId: e.target.value, page: 1 }))}
                   className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
-                  <option value="all">All Branches</option>
+                  <option value="all">{lang === "ar" ? "كل الفروع" : "All Branches"}</option>
                   {branches.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name_en}</option>
+                    <option key={b.id} value={b.id}>{lang === "ar" && b.name_ar ? b.name_ar : b.name_en}</option>
                   ))}
                 </select>
               </div>
 
               {/* Amount Range Filter */}
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Amount</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">{lang === "ar" ? "نطاق المبلغ" : "Amount Range"}</label>
                 <select
                   value={filters.amountRange}
                   onChange={(e) => setFilters((prev) => ({ ...prev, amountRange: e.target.value as any, page: 1 }))}
                   className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
-                  <option value="all">All Amounts</option>
-                  <option value="under500">Under 500 EGP</option>
-                  <option value="500_1000">500 - 1,000 EGP</option>
-                  <option value="1000_5000">1,000 - 5,000 EGP</option>
-                  <option value="above5000">Above 5,000 EGP</option>
+                  <option value="all">{lang === "ar" ? "كل المبالغ" : "All Amounts"}</option>
+                  <option value="under500">{lang === "ar" ? "أقل من 500 ج.م" : "Under 500 EGP"}</option>
+                  <option value="500_1000">{lang === "ar" ? "500 - 1,000 ج.م" : "500 - 1,000 EGP"}</option>
+                  <option value="1000_5000">{lang === "ar" ? "1,000 - 5,000 ج.م" : "1,000 - 5,000 EGP"}</option>
+                  <option value="above5000">{lang === "ar" ? "أكثر من 5,000 ج.م" : "Above 5,000 EGP"}</option>
                 </select>
               </div>
             </div>
@@ -546,7 +565,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 className="text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1.5 transition-colors"
               >
                 <RefreshCw size={12} />
-                <span>Clear Filters</span>
+                <span>{lang === "ar" ? "إعادة تعيين الفلاتر" : "Clear Filters"}</span>
               </button>
             </div>
           </div>
@@ -565,33 +584,41 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     onClick={toggleSortOrder}
                     className="flex items-center gap-1 text-gray-600 hover:text-gray-900 transition-colors uppercase font-bold"
                   >
-                    <span>Date & Time</span>
+                    <span>{lang === "ar" ? "التاريخ والوقت" : "Date & Time"}</span>
                     <ArrowUpDown size={12} />
                   </button>
                 </th>
-                <th className="py-3.5 px-4 text-start">Patient</th>
-                <th className="py-3.5 px-4 text-start">Transaction Type</th>
-                <th className="py-3.5 px-4 text-start">Description</th>
-                <th className="py-3.5 px-4 text-start">Payment Method</th>
-                <th className="py-3.5 px-4 text-start">Amount</th>
-                <th className="py-3.5 px-4 text-start">Status</th>
-                <th className="py-3.5 px-4 text-center">Action</th>
+                <th className="py-3.5 px-4 text-start">{lang === "ar" ? "المريض" : "Patient"}</th>
+                <th className="py-3.5 px-4 text-start" title={lang === "ar" ? "نوع الحركة المالية المسجلة" : "Financial transaction type"}>
+                  {lang === "ar" ? "نوع المعاملة" : "Transaction Type"}
+                </th>
+                <th className="py-3.5 px-4 text-start">{lang === "ar" ? "الوصف" : "Description"}</th>
+                <th className="py-3.5 px-4 text-start">{lang === "ar" ? "طريقة الدفع" : "Payment Method"}</th>
+                <th className="py-3.5 px-4 text-start">{lang === "ar" ? "المبلغ" : "Amount"}</th>
+                <th className="py-3.5 px-4 text-start">{lang === "ar" ? "الحالة" : "Status"}</th>
+                <th className="py-3.5 px-4 text-start" title={lang === "ar" ? "يدوي (بواسطة موظف) أو تلقائي (حركة نظام)" : "Manual (entered by staff) or Automatic (system event)"}>
+                  {lang === "ar" ? "المصدر" : "Source"}
+                </th>
+                <th className="py-3.5 px-4 text-start" title={lang === "ar" ? "رقم المرجع أو كود الحجز أو الفاتورة" : "Reference code, booking ID, or invoice number"}>
+                  {lang === "ar" ? "المرجع" : "Reference"}
+                </th>
+                <th className="py-3.5 px-4 text-center">{lang === "ar" ? "الإجراء" : "Action"}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-gray-400">
+                  <td colSpan={10} className="py-16 text-center text-gray-400">
                     <Loader2 className="animate-spin mx-auto mb-2" size={24} />
-                    <span>Loading transactions...</span>
+                    <span>{lang === "ar" ? "جاري تحميل المعاملات..." : "Loading transactions..."}</span>
                   </td>
                 </tr>
               ) : transactions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-gray-400">
+                  <td colSpan={10} className="py-16 text-center text-gray-400">
                     <AlertCircle className="mx-auto mb-2 text-gray-300" size={32} />
-                    <p className="font-bold text-gray-600">No transactions found.</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Try clearing filters or recording a new transaction.</p>
+                    <p className="font-bold text-gray-600">{lang === "ar" ? "لم يتم العثور على أي معاملات." : "No transactions found."}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{lang === "ar" ? "جرب تغيير الفلاتر أو تسجيل معاملة جديدة." : "Try clearing filters or recording a new transaction."}</p>
                   </td>
                 </tr>
               ) : (
@@ -600,6 +627,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                   const isNegative = Number(tx.amount) < 0;
                   const absAmt = Math.abs(Number(tx.amount || 0));
                   const isDropdownOpen = activeDropdownTxnId === tx.id;
+                  const isManual = tx.source === "manual";
 
                   return (
                     <tr
@@ -632,7 +660,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                           </div>
                           <div>
                             <div className="font-bold text-gray-900">
-                              {tx.customer?.name || "Clinic General Patient"}
+                              {tx.customer?.name || (lang === "ar" ? "مريض عام" : "Clinic General Patient")}
                             </div>
                             <div className="text-[11px] text-gray-400">
                               {tx.customer?.phone || "—"}
@@ -653,11 +681,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                         <div className="font-semibold text-gray-900 line-clamp-1">
                           {tx.description}
                         </div>
-                        {tx.reference_no && (
-                          <div className="text-[10px] text-gray-400 font-mono">
-                            Ref: {tx.reference_no}
-                          </div>
-                        )}
                       </td>
 
                       {/* Payment Method */}
@@ -676,6 +699,27 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold capitalize ${getStatusBadge(tx.status)}`}>
                           {tx.status}
+                        </span>
+                      </td>
+
+                      {/* Source */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
+                            isManual
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                              : "bg-sky-50 text-sky-700 border border-sky-200/60"
+                          }`}
+                          title={isManual ? "Manually created by staff" : "Automatically created by system event"}
+                        >
+                          {isManual ? (lang === "ar" ? "يدوي" : "Manual") : (lang === "ar" ? "آلي" : "Automatic")}
+                        </span>
+                      </td>
+
+                      {/* Reference */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-mono text-[11px] text-gray-500">
+                          {tx.reference_no || tx.invoice_no || tx.reservation_id || "—"}
                         </span>
                       </td>
 
@@ -704,7 +748,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
                               {/* 3-Dots Dropdown */}
                               {isDropdownOpen && (
-                                <div className="absolute right-4 top-10 z-30 w-44 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-xl text-xs text-start animate-in fade-in duration-100">
+                                <div className={`absolute ${lang === "ar" ? "left-4" : "right-4"} top-10 z-30 w-44 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-xl text-xs text-start animate-in fade-in duration-100`}>
                                   {canView && (
                                     <button
                                       type="button"
@@ -715,7 +759,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                                       className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-gray-700 hover:bg-[#F9F9F7] font-semibold"
                                     >
                                       <Eye size={14} className="text-gray-500" />
-                                      <span>View Details</span>
+                                      <span>{lang === "ar" ? "عرض التفاصيل" : "View Details"}</span>
                                     </button>
                                   )}
 
@@ -729,7 +773,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                                       className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-gray-700 hover:bg-[#F9F9F7] font-semibold"
                                     >
                                       <Printer size={14} className="text-gray-500" />
-                                      <span>Print Receipt</span>
+                                      <span>{lang === "ar" ? "طباعة الإيصال" : "Print Receipt"}</span>
                                     </button>
                                   )}
                                 </div>

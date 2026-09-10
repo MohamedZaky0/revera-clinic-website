@@ -96,6 +96,7 @@ export interface TransactionFilterState {
   type: 'all' | TransactionType;
   paymentMethod: 'all' | PaymentMethod;
   status: 'all' | TransactionStatus;
+  source: 'all' | TransactionSource;
   branchId: 'all' | string;
   amountRange: 'all' | 'under500' | '500_1000' | '1000_5000' | 'above5000';
   sortBy: 'date' | 'amount';
@@ -116,6 +117,11 @@ export interface NewManualTransactionInput {
   related_transaction_id?: string;
   description?: string;
   reason?: string;
+  item_type?: 'product' | 'package';
+  item_id?: string;
+  item_name?: string;
+  quantity?: number;
+  unit_price?: number;
   adjustment_direction?: 'increase' | 'decrease';
   /** Refunds only — cash handed back, or credited to the patient's wallet. */
   refund_destination?: 'cash' | 'wallet';

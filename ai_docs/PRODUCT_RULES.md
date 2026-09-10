@@ -270,20 +270,26 @@ The following are **not currently enforced in code**:
 
 1. **Immutability of Financial Records**:
    - Completed financial transactions are **never modified or directly deleted**.
-   - If an adjustment or refund is made, a **new transaction** is inserted on the actual date the refund/adjustment occurs, preserving historical daily net totals for earlier dates.
-2. **Today's Net Payments**:
+   - If an adjustment or refund is made, a **new transaction** is inserted on the actual date the refund occurs, preserving historical daily net totals for earlier dates.
+2. **Strictly Limited Manual Transaction Creation (3 Allowed Types)**:
+   - Staff manual transaction creation via `/admin -> Transactions -> New Transaction` or `Patient Profile -> Add Transaction` is strictly limited to 3 business options:
+     1. **Refund**: Refunds positive completed payments (either to Cash Back or Wallet Credit). Requires selecting an existing completed transaction for the patient, with validation ensuring the refund amount does not exceed the remaining unrefunded balance. Decreases patient lifetime `spent_amount`.
+     2. **Service Charge**: Standalone ad-hoc clinic charges (e.g. consultation, cancellation fee, administration charge). Requires patient, amount, payment method, and description. Increases patient lifetime `spent_amount`.
+     3. **Product / Package Purchase**: Direct retail purchase of skincare products (`/api/inventory/products`) or clinic packages (`/api/packages`). Supports product/package selector, auto-calculated total (`price * quantity`), payment method, reference, and item metadata logging. Increases patient lifetime `spent_amount`.
+   - **Explicitly Forbidden in Manual Creation**: Direct `Payment`, `Outstanding Payment` (settlement), `Wallet Top-up` / `Deposit`, `Wallet Withdrawal` / `Deduction`, and `Adjustment` are strictly rejected by the API (`POST /api/transactions`) and hidden in the UI. These are automated system actions handled exclusively via booking checkout, patient profile Settle Balance, or dedicated wallet workflows to prevent ledger desynchronization.
+3. **Transaction Source Tracking & Filtering**:
+   - Every transaction is tagged with `source: 'manual' | 'automatic'`.
+   - System displays a distinct visual badge (`Source: Manual` vs `Source: Automatic`) in the transactions table, patient transaction history tab, and audit trail.
+   - Filter bar supports `Source: All / Manual / Automatic`.
+4. **Today's Net Payments**:
    - `Today's Net Payments = Completed Payments Today − Completed Refunds Today`.
    - Excludes pending and failed transactions.
-3. **Outstanding Balance**:
+5. **Outstanding Balance**:
    - `Outstanding = Sum of active unpaid customer debt obligations`.
-   - Recording an `outstanding_payment` transaction decreases the patient's outstanding balance up to the maximum current debt.
-4. **Wallet Balance Calculations**:
-   - `Wallet Top-up` / `Wallet Deposit` increases the patient's wallet balance.
-   - `Wallet Deduction` / `Wallet Withdrawal` decreases the patient's wallet balance and cannot exceed available wallet funds.
-5. **Refund Validation**:
-   - Requires selecting a completed original transaction.
-   - Refund amount cannot exceed the original eligible payment.
-   - Mandatory refund reason recorded in audit trail.
+6. **Wallet Balance & Refund Destinations**:
+   - If a refund's destination is `wallet`, the refund amount is credited to `customers.wallet_balance` and logged to `wallet_txns` with `direction: 'in'`.
+   - If `cash`, patient wallet is untouched.
+   - Lifetime total spent (`spent_amount`) is decremented regardless of destination, clamped at 0.
 
 ---
 

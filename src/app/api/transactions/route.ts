@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Transactions access is required.' }, { status: 403 });
   }
 
-  const { searchParams } = new URL(req.url);
+  const searchParams = new URL(req.url).searchParams;
   const search = (searchParams.get('search') || '').trim().toLowerCase();
   const dateRange = searchParams.get('dateRange') || 'all';
   const startDateParam = searchParams.get('startDate');
@@ -30,6 +30,7 @@ export async function GET(req: Request) {
   const typeFilter = searchParams.get('type') || 'all';
   const paymentMethodFilter = searchParams.get('paymentMethod') || 'all';
   const statusFilter = searchParams.get('status') || 'all';
+  const sourceFilter = searchParams.get('source') || 'all';
   const branchId = searchParams.get('branchId') || 'all';
   const amountRange = searchParams.get('amountRange') || 'all';
   const sortBy = searchParams.get('sortBy') || 'date';
@@ -67,6 +68,10 @@ export async function GET(req: Request) {
 
     if (statusFilter !== 'all') {
       query = query.eq('status', statusFilter);
+    }
+
+    if (sourceFilter !== 'all' && (sourceFilter === 'manual' || sourceFilter === 'automatic')) {
+      query = query.eq('source', sourceFilter);
     }
 
     // Date range filter
@@ -124,7 +129,7 @@ export async function GET(req: Request) {
       } : null,
     }));
 
-    // Client-side search filtering (for joined customer name/phone or description)
+    // Client-side search filtering (for joined customer name/phone, description, ref, or reservation)
     if (search) {
       items = items.filter((t: any) => {
         const tId = (t.transaction_id || '').toLowerCase();
@@ -133,13 +138,15 @@ export async function GET(req: Request) {
         const cPhone = (t.customer?.phone || '').toLowerCase();
         const invNo = (t.invoice_no || '').toLowerCase();
         const refNo = (t.reference_no || '').toLowerCase();
+        const resId = (t.reservation_id || '').toLowerCase();
         return (
           tId.includes(search) ||
           desc.includes(search) ||
           cName.includes(search) ||
           cPhone.includes(search) ||
           invNo.includes(search) ||
-          refNo.includes(search)
+          refNo.includes(search) ||
+          resId.includes(search)
         );
       });
     }
@@ -163,9 +170,7 @@ export async function GET(req: Request) {
     // 2. Compute Quick Overview Statistics
     // NOTE: `customers` has no `branch_id` column — a patient is not owned by a branch, they can
     // book at any of them. So the Outstanding / Wallet Balance totals below are always
-    // clinic-wide, even when a branch filter is applied to the transaction list itself. An
-    // earlier version filtered on `customers.branch_id`, which silently errored and zeroed both
-    // cards whenever a branch was selected (RISK-076).
+    // clinic-wide, even when a branch filter is applied to the transaction list itself.
     const { data: allCustomers, error: custErr } = await supabaseServer
       .from('customers')
       .select('id, wallet_balance, outstanding, spent_amount');
@@ -207,12 +212,6 @@ export async function GET(req: Request) {
     const { data: todayTxns, error: todayTxnsErr } = await todayTxnsQuery;
     if (todayTxnsErr) console.error('today txns fetch error:', todayTxnsErr.message);
 
-    // "Today's Payments" is a till figure — the cash that actually moved in or out today, which is
-    // what reception reconciles the drawer against at close. Only these types represent real money
-    // changing hands; `service_charge`/`product_purchase` are charges raised (billed, not
-    // collected) and `wallet_deduction` spends credit the clinic already banked at top-up time.
-    // Counting all types indiscriminately, as an earlier version did, inflated the figure with
-    // non-cash rows and subtracted wallet spend that never left the drawer (RISK-076).
     const CASH_IN_TYPES = new Set(['payment', 'outstanding_payment', 'wallet_topup']);
     let todayNetPayments = 0;
     let todayPaymentsCount = 0;
@@ -223,15 +222,11 @@ export async function GET(req: Request) {
         todayNetPayments += amt;
         todayPaymentsCount += 1;
       } else if (tx.type === 'refund') {
-        // Already stored negative; adding it subtracts the cash handed back.
         todayNetPayments += amt;
         todayPaymentsCount += 1;
       }
     });
 
-    // "Estimated" sits under the till figure as a comparison: the full value of everything charged
-    // today, whether or not it has been collected yet. A patient booking a 30,000 course and paying
-    // 5,000 up front shows 5,000 collected against 30,000 charged.
     let todayEstimatedTotal = 0;
     (todayTxns || []).forEach((tx: any) => {
       if (tx.type === 'service_charge' || tx.type === 'product_purchase') {
@@ -305,36 +300,56 @@ export async function POST(req: Request) {
       related_transaction_id,
       description,
       reason,
-      adjustment_direction = 'increase',
       refund_destination = 'cash',
       occurred_at,
       notes,
+      item_type,
+      item_id,
+      item_name,
+      quantity,
+      unit_price,
     } = body;
 
     if (!transaction_type) {
       return NextResponse.json({ error: 'Transaction Type is required.' }, { status: 400 });
     }
-    if (!VALID_TRANSACTION_TYPES.includes(transaction_type)) {
-      return NextResponse.json({ error: `Unknown transaction type "${transaction_type}".` }, { status: 400 });
-    }
 
-    // Settling an old balance has to be applied to the patient's actual unpaid bookings, or it
-    // only moves the aggregate `customers.outstanding` while the reservations still read as
-    // unpaid — and the next touch of those bookings recomputes from them and double-counts
-    // (RISK-076). That allocation lives in POST /api/customers/settle-debt. Enforced here, not
-    // just hidden in the UI, so the weaker path cannot be reached at all. Automatic
-    // `outstanding_payment` rows are written directly via recordTransaction by flows that *have*
-    // already settled the underlying booking, and do not come through this route.
-    if (transaction_type === 'outstanding_payment') {
+    // Explicitly reject types that must only be created through system automation or specific sub-workflows
+    if (transaction_type === 'payment') {
       return NextResponse.json({
-        error: 'Outstanding balances are settled from the patient\'s profile (Settle Balance), which applies the payment to their unpaid bookings.',
+        error: 'Direct payments are recorded automatically when bookings are confirmed or settled.',
       }, { status: 400 });
     }
 
-    // Refunds and manual balance adjustments are gated separately from ordinary transaction
-    // creation, per the transactions.refund permission defined in RoleManagementView.
-    if ((transaction_type === 'refund' || transaction_type === 'adjustment') && !hasFinancePermission(access.access, 'transactions.refund')) {
-      return NextResponse.json({ error: 'Permission to process refunds/adjustments is required.' }, { status: 403 });
+    if (transaction_type === 'outstanding_payment') {
+      return NextResponse.json({
+        error: "Outstanding balances are settled from the patient's profile (Settle Balance), which applies the payment to their unpaid bookings.",
+      }, { status: 400 });
+    }
+
+    if (transaction_type === 'wallet_topup' || transaction_type === 'wallet_deduction') {
+      return NextResponse.json({
+        error: 'Wallet deposits and deductions are automated system operations handled through the patient wallet workflow.',
+      }, { status: 400 });
+    }
+
+    if (transaction_type === 'adjustment') {
+      return NextResponse.json({
+        error: 'Manual balance adjustments are not permitted directly through transactions. Use patient balance adjustments or wallet workflows.',
+      }, { status: 400 });
+    }
+
+    // Only manual types: refund, service_charge, product_purchase
+    const ALLOWED_MANUAL_TYPES = ['refund', 'service_charge', 'product_purchase'];
+    if (!ALLOWED_MANUAL_TYPES.includes(transaction_type)) {
+      return NextResponse.json({
+        error: `Manual transaction type "${transaction_type}" is not supported. Allowed types are: Refund, Service Charge, Product / Package Purchase.`,
+      }, { status: 400 });
+    }
+
+    // Refunds require granular transactions.refund permission
+    if (transaction_type === 'refund' && !hasFinancePermission(access.access, 'transactions.refund')) {
+      return NextResponse.json({ error: 'Permission to process refunds is required.' }, { status: 403 });
     }
 
     const parsedAmount = Number(amount);
@@ -342,37 +357,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Please enter a valid positive amount in EGP.' }, { status: 400 });
     }
 
-    // Patient required validation for patient-related operations
-    const requiresPatient = [
-      'payment',
-      'outstanding_payment',
-      'refund',
-      'wallet_topup',
-      'wallet_deduction',
-      'adjustment'
-    ].includes(transaction_type);
-
-    if (requiresPatient && !customer_id) {
+    // Patient is strictly required for all manual transactions
+    if (!customer_id) {
       return NextResponse.json({ error: 'Please select a patient for this transaction.' }, { status: 400 });
     }
 
-    // Retrieve patient record if selected
-    let customer: any = null;
-    if (customer_id) {
-      const { data: custData, error: custErr } = await supabaseServer
-        .from('customers')
-        .select('id, name, mobile, wallet_balance, outstanding, spent_amount')
-        .eq('id', customer_id)
-        .maybeSingle();
+    // Retrieve patient record
+    const { data: customer, error: custErr } = await supabaseServer
+      .from('customers')
+      .select('id, name, mobile, wallet_balance, outstanding, spent_amount')
+      .eq('id', customer_id)
+      .maybeSingle();
 
-      if (custErr) {
-        console.error('customer lookup error:', custErr.message);
-        return NextResponse.json({ error: 'Could not look up the selected patient.' }, { status: 500 });
-      }
-      if (!custData) {
-        return NextResponse.json({ error: 'Selected patient could not be found.' }, { status: 404 });
-      }
-      customer = custData;
+    if (custErr) {
+      console.error('customer lookup error:', custErr.message);
+      return NextResponse.json({ error: 'Could not look up the selected patient.' }, { status: 500 });
+    }
+    if (!customer) {
+      return NextResponse.json({ error: 'Selected patient could not be found.' }, { status: 404 });
     }
 
     // Business Logic Validations per Transaction Type
@@ -380,31 +382,14 @@ export async function POST(req: Request) {
     let finalStatus = 'completed';
     let finalDescription = description?.trim() || '';
 
-    if (transaction_type === 'outstanding_payment') {
-      const currentOutstanding = Number(customer?.outstanding || 0);
-      if (parsedAmount > currentOutstanding) {
-        return NextResponse.json({
-          error: `Amount exceeds the patient's outstanding balance of EGP ${currentOutstanding.toLocaleString()}.`
-        }, { status: 400 });
-      }
-      finalDescription = finalDescription || 'Outstanding balance payment';
-    } else if (transaction_type === 'wallet_topup') {
-      finalDescription = finalDescription || 'Wallet deposit / top-up';
-    } else if (transaction_type === 'wallet_deduction') {
-      const currentWallet = Number(customer?.wallet_balance || 0);
-      if (parsedAmount > currentWallet) {
-        return NextResponse.json({
-          error: `Insufficient wallet balance. Available: EGP ${currentWallet.toLocaleString()}.`
-        }, { status: 400 });
-      }
-      finalAmount = -parsedAmount;
-      finalDescription = finalDescription || 'Wallet withdrawal';
-    } else if (transaction_type === 'refund') {
+    if (transaction_type === 'refund') {
       finalAmount = -parsedAmount;
       finalStatus = 'refunded';
+
       if (!reason?.trim()) {
         return NextResponse.json({ error: 'A reason is required for refunds.' }, { status: 400 });
       }
+
       if (related_transaction_id) {
         const { data: origTxn, error: origErr } = await supabaseServer
           .from('transactions')
@@ -419,21 +404,21 @@ export async function POST(req: Request) {
         if (!origTxn) {
           return NextResponse.json({ error: 'The original transaction could not be found.' }, { status: 404 });
         }
-        // A refund must be issued against the same patient's own payment — without this, a
-        // transaction id belonging to a different patient is silently accepted (RISK-076).
-        if (origTxn.customer_id && customer_id && origTxn.customer_id !== customer_id) {
+
+        // A refund must be issued against the same patient's own payment
+        if (origTxn.customer_id && origTxn.customer_id !== customer_id) {
           return NextResponse.json({
-            error: 'That transaction belongs to a different patient.'
+            error: 'That transaction belongs to a different patient.',
           }, { status: 400 });
         }
 
-        // Cap against what is left to refund, not the original amount — otherwise the same
-        // payment can be refunded repeatedly, each time up to its full value (RISK-076).
+        // Cap against what is left to refund, not just the original amount
         const { data: priorRefunds, error: priorErr } = await supabaseServer
           .from('transactions')
           .select('amount')
           .eq('related_transaction_id', related_transaction_id)
           .eq('type', 'refund');
+
         if (priorErr) {
           console.error('prior refunds lookup error:', priorErr.message);
           return NextResponse.json({ error: 'Could not verify previous refunds.' }, { status: 500 });
@@ -448,33 +433,41 @@ export async function POST(req: Request) {
 
         if (refundable <= 0) {
           return NextResponse.json({
-            error: `That payment of EGP ${origAmt.toLocaleString()} has already been fully refunded.`
+            error: `That payment of EGP ${origAmt.toLocaleString()} has already been fully refunded.`,
           }, { status: 400 });
         }
         if (parsedAmount > refundable) {
           return NextResponse.json({
             error: alreadyRefunded > 0
               ? `Only EGP ${refundable.toLocaleString()} is left to refund on that payment (EGP ${alreadyRefunded.toLocaleString()} already refunded).`
-              : `Refund amount cannot exceed the original payment of EGP ${origAmt.toLocaleString()}.`
+              : `Refund amount cannot exceed the original payment of EGP ${origAmt.toLocaleString()}.`,
           }, { status: 400 });
         }
       }
-      finalDescription = finalDescription || `Refund: ${reason}`;
-    } else if (transaction_type === 'adjustment') {
-      if (!description?.trim() && !reason?.trim()) {
-        return NextResponse.json({ error: 'A description is required explaining why the adjustment was made.' }, { status: 400 });
+
+      finalDescription = finalDescription || `Refund: ${reason.trim()}`;
+    } else if (transaction_type === 'service_charge') {
+      if (!description?.trim()) {
+        return NextResponse.json({ error: 'A description is required for service charges.' }, { status: 400 });
       }
-      if (adjustment_direction === 'decrease') {
-        finalAmount = -parsedAmount;
+      finalAmount = parsedAmount;
+      finalStatus = 'completed';
+      finalDescription = description.trim();
+    } else if (transaction_type === 'product_purchase') {
+      finalAmount = parsedAmount;
+      finalStatus = 'completed';
+      const cleanItemName = item_name?.trim();
+      const qty = Number(quantity) || 1;
+      if (finalDescription) {
+        // Keep custom description if provided
+      } else if (cleanItemName) {
+        finalDescription = `${cleanItemName} (Qty: ${qty})`;
+      } else {
+        finalDescription = 'Product / Package Purchase';
       }
-      finalDescription = finalDescription || `Adjustment: ${reason || description}`;
-    } else if (transaction_type === 'payment') {
-      finalDescription = finalDescription || 'Manual payment receipt';
     }
 
-    // Generate formatted transaction ID from the real transaction_seq sequence (atomic,
-    // race-condition-free — a random number here would collide against transaction_id's UNIQUE
-    // constraint at realistic transaction volume).
+    // Generate formatted transaction ID from the real transaction_seq sequence
     const { data: seqVal, error: seqErr } = await supabaseServer.rpc('next_transaction_seq');
     if (seqErr || seqVal == null) {
       console.error('next_transaction_seq RPC error:', seqErr);
@@ -488,7 +481,7 @@ export async function POST(req: Request) {
     const newTxnRow = {
       transaction_id: txnIdString,
       branch_id: branch_id || null,
-      customer_id: customer_id || null,
+      customer_id: customer_id,
       invoice_id: invoice_id || null,
       reservation_id: reservation_id || null,
       type: transaction_type,
@@ -518,79 +511,35 @@ export async function POST(req: Request) {
     }
 
     // Update Customer scalar balances
-    if (customer_id && customer) {
-      let newWallet = customer.wallet_balance || 0;
-      let newOutstanding = customer.outstanding || 0;
-      let newSpent = customer.spent_amount || 0;
+    let newWallet = Number(customer.wallet_balance || 0);
+    let newOutstanding = Number(customer.outstanding || 0);
+    let newSpent = Number(customer.spent_amount || 0);
 
-      if (transaction_type === 'wallet_topup') {
+    if (transaction_type === 'refund') {
+      newSpent = Math.max(0, newSpent - parsedAmount);
+      if (refund_destination === 'wallet') {
         newWallet += parsedAmount;
         await supabaseServer.from('wallet_txns').insert({
           customer_id,
           direction: 'in',
           amount: parsedAmount,
-          reason: finalDescription || 'Manual wallet top-up',
-          invoice_id: invoice_id || null,
-        });
-      } else if (transaction_type === 'wallet_deduction') {
-        newWallet = Math.max(0, newWallet - parsedAmount);
-        await supabaseServer.from('wallet_txns').insert({
-          customer_id,
-          direction: 'out',
-          amount: parsedAmount,
-          reason: finalDescription || 'Manual wallet withdrawal',
-          invoice_id: invoice_id || null,
-        });
-      } else if (transaction_type === 'outstanding_payment') {
-        newOutstanding = Math.max(0, newOutstanding - parsedAmount);
-        newSpent += parsedAmount;
-      } else if (transaction_type === 'payment') {
-        newSpent += parsedAmount;
-      } else if (transaction_type === 'refund') {
-        newSpent = Math.max(0, newSpent - parsedAmount);
-        // Where the money actually goes is the receptionist's call at the counter: handed back as
-        // cash, or credited to the patient's wallet for a future visit. Before this, a refund
-        // lowered lifetime spend and the money went nowhere at all (RISK-076).
-        if (refund_destination === 'wallet') {
-          newWallet += parsedAmount;
-          await supabaseServer.from('wallet_txns').insert({
-            customer_id,
-            direction: 'in',
-            amount: parsedAmount,
-            reason: finalDescription || 'Refund credited to wallet',
-            invoice_id: invoice_id || null,
-          });
-        }
-      } else if (transaction_type === 'adjustment') {
-        // No target-field selector exists in the UI for "Adjustment" — adjustment_direction
-        // mirrors wallet_topup/wallet_deduction's exact shape, so this treats a manual adjustment
-        // as a wallet correction (the most common interpretation, and consistent with every other
-        // signed-amount type here moving a real balance). Revisit if a different target field is
-        // ever intended.
-        if (adjustment_direction === 'decrease') {
-          newWallet = Math.max(0, newWallet - parsedAmount);
-        } else {
-          newWallet += parsedAmount;
-        }
-        await supabaseServer.from('wallet_txns').insert({
-          customer_id,
-          direction: adjustment_direction === 'decrease' ? 'out' : 'in',
-          amount: parsedAmount,
-          reason: finalDescription || 'Manual balance adjustment',
+          reason: finalDescription || 'Refund credited to wallet',
           invoice_id: invoice_id || null,
         });
       }
-
-      await supabaseServer
-        .from('customers')
-        .update({
-          wallet_balance: newWallet,
-          outstanding: newOutstanding,
-          spent_amount: newSpent,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', customer_id);
+    } else if (transaction_type === 'service_charge' || transaction_type === 'product_purchase') {
+      newSpent += parsedAmount;
     }
+
+    await supabaseServer
+      .from('customers')
+      .update({
+        wallet_balance: newWallet,
+        outstanding: newOutstanding,
+        spent_amount: newSpent,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', customer_id);
 
     // Insert Audit Log Record
     await supabaseServer.from('transaction_audit_logs').insert({
@@ -604,6 +553,11 @@ export async function POST(req: Request) {
         payment_method,
         customer_name: customer?.name || null,
         description: finalDescription,
+        item_type: item_type || null,
+        item_id: item_id || null,
+        item_name: item_name || null,
+        quantity: quantity || null,
+        unit_price: unit_price || null,
       },
     });
 

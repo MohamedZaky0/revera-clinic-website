@@ -18,23 +18,22 @@ import {
   RotateCcw,
   Sliders,
   DollarSign,
-  FileText
+  FileText,
+  Package as PackageIcon,
+  ShoppingBag,
+  HelpCircle,
+  Coins,
 } from "lucide-react";
 import {
   TransactionType,
   PaymentMethod,
   NewManualTransactionInput,
-  TransactionItem
+  TransactionItem,
 } from "./types";
 import { getAuthHeaders } from "@/lib/authHeaders";
 
 /**
  * Combines the date and time the user actually picked into an ISO timestamp.
- *
- * Built as a *local* Date (no trailing `Z`) then converted, so the moment stored is the one the
- * staff member meant in clinic time rather than being reinterpreted as UTC. An earlier version
- * hardcoded `T12:00:00.000Z` and silently discarded the time field entirely, while the form's own
- * confirmation line still echoed the picked time back to the user (RISK-076).
  */
 function buildOccurredAt(dateStr: string, timeStr: string): string {
   const match = (timeStr || "").trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
@@ -54,44 +53,18 @@ function buildOccurredAt(dateStr: string, timeStr: string): string {
 }
 
 /**
- * Types offerable in the manual form.
- *
- * `outstanding_payment` is deliberately absent. Settling an old balance has to be applied to the
- * patient's actual unpaid bookings, otherwise it only moves the aggregate `customers.outstanding`
- * while the reservations still say they are unpaid — and the next touch of those bookings
- * recomputes from them and double-counts (RISK-076). That allocation lives in the Settle Balance
- * flow on the Patients screen (`POST /api/customers/settle-debt`); offering a second, weaker path
- * here would just reintroduce the bug. The API rejects the type on this route for the same reason.
+ * Manual transaction types strictly limited to 3 options per specification:
+ * 1. Refund
+ * 2. Service Charge
+ * 3. Product / Package Purchase
+ * Direct payments and wallet balance adjustments are automated system operations.
  */
-const TRANSACTION_TYPE_OPTIONS = [
-  { id: "payment", label: "Payment" },
-  { id: "refund", label: "Refund" },
-  { id: "wallet_topup", label: "Wallet Deposit (Top-up)" },
-  { id: "wallet_deduction", label: "Wallet Withdrawal" },
-  { id: "adjustment", label: "Adjustment" },
-  { id: "service_charge", label: "Service Charge" },
-  { id: "product_purchase", label: "Product Purchase" },
+const MANUAL_TRANSACTION_TYPES = [
+  { id: "refund", labelEn: "Refund", labelAr: "استرداد" },
+  { id: "service_charge", labelEn: "Service Charge", labelAr: "رسوم خدمة" },
+  { id: "product_purchase", labelEn: "Product / Package Purchase", labelAr: "شراء منتج / باقة" },
 ] as const;
 
-/**
- * Why a type cannot be picked for the currently selected patient, or null if it can.
- *
- * Surfaced on the option itself rather than as an error after the fact — letting someone choose
- * "Wallet Withdrawal", type an amount and only then be told the wallet is empty is a worse
- * experience than showing it is unavailable up front.
- */
-function disabledReasonFor(
-  typeId: string,
-  customer: { wallet_balance?: number } | null
-): string | null {
-  if (!customer) return null; // nothing selected yet; nothing to validate against
-  if (typeId === "wallet_deduction" && Number(customer.wallet_balance || 0) <= 0) {
-    return "wallet is empty";
-  }
-  return null;
-}
-
-/** Shape returned by `GET /api/customers` — raw `customers` rows (`mobile`, `outstanding`). */
 interface CustomerOption {
   id: string;
   name: string;
@@ -99,6 +72,23 @@ interface CustomerOption {
   wallet_balance?: number;
   outstanding?: number;
   spent_amount?: number;
+}
+
+interface InventoryProductOption {
+  id: string;
+  name: string;
+  arabic_name?: string;
+  selling_price: number;
+  stock_quantity: number;
+  sku?: string;
+}
+
+interface PackageOption {
+  id: string;
+  name: string;
+  nameAr?: string | null;
+  price: number;
+  active: boolean;
 }
 
 interface NewManualTransactionViewProps {
@@ -122,8 +112,12 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
   onAddNewPatient,
   lang = "en",
 }) => {
-  // Form State
-  const [transactionType, setTransactionType] = useState<TransactionType>("payment");
+  const isAr = lang === "ar";
+
+  // Form Type State (default to refund or service_charge)
+  const [transactionType, setTransactionType] = useState<"refund" | "service_charge" | "product_purchase">("refund");
+  
+  // Patient Selection State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(preSelectedCustomerId || "");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null);
   const [patientSearch, setPatientSearch] = useState<string>(preSelectedCustomerName || "");
@@ -131,15 +125,24 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
 
+  // Common Fields
   const [amount, setAmount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [branchId, setBranchId] = useState<string>(branches[0]?.id || "");
   const [referenceNo, setReferenceNo] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [reason, setReason] = useState<string>("");
-  const [adjustmentDirection, setAdjustmentDirection] = useState<"increase" | "decrease">("increase");
   const [refundDestination, setRefundDestination] = useState<"cash" | "wallet">("cash");
-  
+
+  // Product / Package Purchase Fields
+  const [itemType, setItemType] = useState<"product" | "package">("product");
+  const [productsList, setProductsList] = useState<InventoryProductOption[]>([]);
+  const [packagesList, setPackagesList] = useState<PackageOption[]>([]);
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<string>("");
+  const [quantity, setQuantity] = useState<number>(1);
+  const [unitPrice, setUnitPrice] = useState<number>(0);
+
   // Date & Time states
   const now = new Date();
   const defaultDate = now.toISOString().split("T")[0];
@@ -151,7 +154,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
   const [txnTime, setTxnTime] = useState<string>(`${defaultHours}:${defaultMinutes} ${defaultPeriod}`);
 
   // Original Transactions for Refund selection
-  const [completedTxns, setCompletedTxns] = useState<TransactionItem[]>([]);
+  const [patientTxns, setPatientTxns] = useState<TransactionItem[]>([]);
   const [selectedOriginalTxnId, setSelectedOriginalTxnId] = useState<string>("");
   const [loadingOriginalTxns, setLoadingOriginalTxns] = useState(false);
 
@@ -162,7 +165,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
+  // Close patient dropdown on outside click
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -184,7 +187,6 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
           `/api/customers?search=${encodeURIComponent(patientSearch)}&limit=8`,
           { headers }
         );
-        // GET /api/customers returns a bare array of customer rows, not { customers: [...] }.
         const data = await res.json();
         const list: CustomerOption[] = Array.isArray(data) ? data : [];
         setCustomerOptions(list);
@@ -206,21 +208,21 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
     return () => clearTimeout(timeout);
   }, [patientSearch, preSelectedCustomerId]);
 
-  // Fetch patient completed transactions for refund
+  // Fetch patient completed transactions for refund lookup
   useEffect(() => {
     if (transactionType === "refund" && selectedCustomerId) {
       const fetchPatientTxns = async () => {
         try {
           setLoadingOriginalTxns(true);
           const headers = await getAuthHeaders();
-          const res = await fetch(`/api/transactions?customerId=${selectedCustomerId}&limit=20`, { headers });
+          const res = await fetch(`/api/transactions?customerId=${selectedCustomerId}&limit=50`, { headers });
           const data = await res.json();
           if (data.transactions) {
+            setPatientTxns(data.transactions);
             const eligible = data.transactions.filter(
               (t: TransactionItem) => t.status === "completed" && Number(t.amount) > 0
             );
-            setCompletedTxns(eligible);
-            if (eligible.length > 0) {
+            if (eligible.length > 0 && !selectedOriginalTxnId) {
               setSelectedOriginalTxnId(eligible[0].id);
             }
           }
@@ -234,28 +236,121 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
     }
   }, [transactionType, selectedCustomerId]);
 
-  // Selected Original Transaction
+  // Fetch products and packages catalog when product_purchase is selected
+  useEffect(() => {
+    if (transactionType === "product_purchase") {
+      const fetchCatalog = async () => {
+        try {
+          setLoadingCatalog(true);
+          const headers = await getAuthHeaders();
+          const [prodRes, pkgRes] = await Promise.all([
+            fetch("/api/inventory/products", { headers }),
+            fetch("/api/packages", { headers }),
+          ]);
+          
+          if (prodRes.ok) {
+            const prodData = await prodRes.json();
+            const list = Array.isArray(prodData) ? prodData : (prodData.products || []);
+            setProductsList(list);
+          }
+          if (pkgRes.ok) {
+            const pkgData = await pkgRes.json();
+            const list = Array.isArray(pkgData) ? pkgData : (pkgData.packages || []);
+            setPackagesList(list);
+          }
+        } catch (err) {
+          console.error("Error fetching catalog items:", err);
+        } finally {
+          setLoadingCatalog(false);
+        }
+      };
+      fetchCatalog();
+    }
+  }, [transactionType]);
+
+  // Compute eligible positive transactions for refund and remaining refundable amount
+  const eligibleCompletedPayments = useMemo(() => {
+    return patientTxns.filter((t) => t.status === "completed" && Number(t.amount) > 0);
+  }, [patientTxns]);
+
   const selectedOriginalTxn = useMemo(() => {
-    return completedTxns.find((t) => t.id === selectedOriginalTxnId) || null;
-  }, [completedTxns, selectedOriginalTxnId]);
+    return eligibleCompletedPayments.find((t) => t.id === selectedOriginalTxnId) || null;
+  }, [eligibleCompletedPayments, selectedOriginalTxnId]);
 
-  // Dynamic Balance Calculations
-  const numericAmount = Math.max(0, parseFloat(amount) || 0);
-  const currentWalletBalance = Number(selectedCustomer?.wallet_balance || 0);
-  const currentOutstanding = Number(selectedCustomer?.outstanding || 0);
+  const refundableAmount = useMemo(() => {
+    if (!selectedOriginalTxn) return 0;
+    const origAmt = Math.abs(Number(selectedOriginalTxn.amount || 0));
+    // Find all refunds linked to this original transaction
+    const priorRefunds = patientTxns.filter(
+      (t) => t.related_transaction_id === selectedOriginalTxn.id && t.type === "refund"
+    );
+    const totalRefunded = priorRefunds.reduce((sum, r) => sum + Math.abs(Number(r.amount || 0)), 0);
+    return Math.max(0, origAmt - totalRefunded);
+  }, [selectedOriginalTxn, patientTxns]);
 
-  const projectedWalletBalance = useMemo(() => {
-    if (transactionType === "wallet_topup") {
-      return currentWalletBalance + numericAmount;
+  // When selecting an original transaction in Refund, default amount to refundable amount
+  useEffect(() => {
+    if (transactionType === "refund" && refundableAmount > 0 && !amount) {
+      setAmount(String(refundableAmount));
     }
-    if (transactionType === "wallet_deduction") {
-      return Math.max(0, currentWalletBalance - numericAmount);
+  }, [transactionType, refundableAmount]);
+
+  // Handle Product / Package selection change
+  const handleItemSelect = (id: string) => {
+    setSelectedItemId(id);
+    if (!id) {
+      setUnitPrice(0);
+      setAmount("");
+      return;
     }
-    if (transactionType === "refund" && refundDestination === "wallet") {
-      return currentWalletBalance + numericAmount;
+
+    if (itemType === "product") {
+      const prod = productsList.find((p) => p.id === id);
+      if (prod) {
+        const price = Number(prod.selling_price || 0);
+        setUnitPrice(price);
+        const total = price * quantity;
+        setAmount(total > 0 ? String(total) : "");
+        const nameText = isAr && prod.arabic_name ? prod.arabic_name : prod.name;
+        setDescription(`${nameText} (Qty: ${quantity})`);
+      }
+    } else {
+      const pkg = packagesList.find((p) => p.id === id);
+      if (pkg) {
+        const price = Number(pkg.price || 0);
+        setUnitPrice(price);
+        const total = price * quantity;
+        setAmount(total > 0 ? String(total) : "");
+        const nameText = isAr && pkg.nameAr ? pkg.nameAr : pkg.name;
+        setDescription(`${nameText} (Qty: ${quantity})`);
+      }
     }
-    return currentWalletBalance;
-  }, [transactionType, currentWalletBalance, numericAmount, refundDestination]);
+  };
+
+  // When quantity changes, update calculated total amount
+  const handleQuantityChange = (newQty: number) => {
+    const validQty = Math.max(1, newQty || 1);
+    setQuantity(validQty);
+    if (unitPrice > 0) {
+      setAmount(String(unitPrice * validQty));
+    }
+    // Update description qty if applicable
+    if (selectedItemId) {
+      if (itemType === "product") {
+        const prod = productsList.find((p) => p.id === selectedItemId);
+        if (prod) {
+          const nameText = isAr && prod.arabic_name ? prod.arabic_name : prod.name;
+          setDescription(`${nameText} (Qty: ${validQty})`);
+        }
+      } else {
+        const pkg = packagesList.find((p) => p.id === selectedItemId);
+        if (pkg) {
+          const nameText = isAr && pkg.nameAr ? pkg.nameAr : pkg.name;
+          setDescription(`${nameText} (Qty: ${validQty})`);
+        }
+      }
+    }
+  };
 
   const handleSelectCustomer = (cust: CustomerOption) => {
     setSelectedCustomer(cust);
@@ -263,13 +358,11 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
     setPatientSearch(cust.name);
     setShowCustomerDropdown(false);
     setErrorMsg(null);
-    // The chosen type may not be valid for this patient (e.g. Wallet Withdrawal picked before a
-    // patient with an empty wallet was selected) — fall back rather than leaving the form in a
-    // state that can only fail on submit.
-    if (disabledReasonFor(transactionType, cust)) {
-      setTransactionType("payment");
-    }
   };
+
+  const numericAmount = Math.max(0, parseFloat(amount) || 0);
+  const currentWalletBalance = Number(selectedCustomer?.wallet_balance || 0);
+  const currentOutstanding = Number(selectedCustomer?.outstanding || 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -277,37 +370,44 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
 
     // Validations
     if (!selectedCustomerId) {
-      setErrorMsg("Please select a patient for this transaction.");
+      setErrorMsg(isAr ? "يرجى اختيار مريض لهذه المعاملة." : "Please select a patient for this transaction.");
       return;
     }
 
     if (numericAmount <= 0) {
-      setErrorMsg("Please enter a valid amount greater than 0 EGP.");
-      return;
-    }
-
-    if (transactionType === "wallet_deduction" && numericAmount > currentWalletBalance) {
-      setErrorMsg(`Insufficient wallet balance. Available: EGP ${currentWalletBalance.toLocaleString()}.`);
+      setErrorMsg(isAr ? "يرجى إدخال مبلغ صحيح أكبر من 0 ج.م." : "Please enter a valid amount greater than 0 EGP.");
       return;
     }
 
     if (transactionType === "refund") {
       if (!reason.trim()) {
-        setErrorMsg("A reason is required for refunds.");
+        setErrorMsg(isAr ? "سبب الاسترداد مطلوب." : "A reason is required for refunds.");
         return;
       }
-      if (selectedOriginalTxn) {
-        const origAmt = Number(selectedOriginalTxn.amount);
-        if (numericAmount > origAmt) {
-          setErrorMsg(`Refund amount cannot exceed the original payment of EGP ${origAmt.toLocaleString()}.`);
-          return;
-        }
+      if (selectedOriginalTxn && numericAmount > refundableAmount) {
+        setErrorMsg(
+          isAr
+            ? `مبلغ الاسترداد لا يمكن أن يتجاوز المبلغ المتبقي القابل للاسترداد (${refundableAmount.toLocaleString()} ج.م).`
+            : `Refund amount cannot exceed the remaining refundable amount of EGP ${refundableAmount.toLocaleString()}.`
+        );
+        return;
       }
     }
 
-    if (transactionType === "adjustment" && !description.trim() && !reason.trim()) {
-      setErrorMsg("A description explaining the adjustment is required.");
+    if (transactionType === "service_charge" && !description.trim()) {
+      setErrorMsg(isAr ? "وصف رسوم الخدمة مطلوب." : "A description is required for service charges.");
       return;
+    }
+
+    let selectedItemName: string | undefined;
+    if (transactionType === "product_purchase" && selectedItemId) {
+      if (itemType === "product") {
+        const p = productsList.find((x) => x.id === selectedItemId);
+        if (p) selectedItemName = isAr && p.arabic_name ? p.arabic_name : p.name;
+      } else {
+        const pk = packagesList.find((x) => x.id === selectedItemId);
+        if (pk) selectedItemName = isAr && pk.nameAr ? pk.nameAr : pk.name;
+      }
     }
 
     try {
@@ -319,11 +419,15 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
         payment_method: paymentMethod,
         branch_id: branchId || undefined,
         reference_no: referenceNo || undefined,
-        related_transaction_id: selectedOriginalTxnId || undefined,
+        related_transaction_id: transactionType === "refund" ? (selectedOriginalTxnId || undefined) : undefined,
         description: description || undefined,
         reason: reason || undefined,
-        adjustment_direction: adjustmentDirection,
-        refund_destination: refundDestination,
+        refund_destination: transactionType === "refund" ? refundDestination : undefined,
+        item_type: transactionType === "product_purchase" ? itemType : undefined,
+        item_id: transactionType === "product_purchase" ? selectedItemId || undefined : undefined,
+        item_name: selectedItemName,
+        quantity: transactionType === "product_purchase" ? quantity : undefined,
+        unit_price: transactionType === "product_purchase" ? unitPrice : undefined,
         occurred_at: buildOccurredAt(txnDate, txnTime),
       };
 
@@ -336,39 +440,42 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
 
       const data = await res.json();
       if (!res.ok || data.error) {
-        setErrorMsg(data.error || "Transaction could not be created. Please try again.");
+        setErrorMsg(data.error || (isAr ? "فشل إنشاء المعاملة." : "Transaction could not be created. Please try again."));
         return;
       }
 
-      setSuccessMsg("Transaction created successfully!");
+      setSuccessMsg(isAr ? "تم تسجيل المعاملة بنجاح!" : "Transaction created successfully!");
       setTimeout(() => {
         onSuccess();
       }, 800);
     } catch (err: any) {
       console.error("Create transaction error:", err);
-      setErrorMsg("An unexpected error occurred while creating the transaction.");
+      setErrorMsg(isAr ? "حدث خطأ غير متوقع أثناء تسجيل المعاملة." : "An unexpected error occurred while creating the transaction.");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12 animate-in fade-in duration-200">
+    <div className="space-y-6 max-w-5xl mx-auto pb-12 animate-in fade-in duration-200" dir={isAr ? "rtl" : "ltr"}>
       {/* Top Navigation & Title */}
       <div className="flex items-center gap-4 border-b border-gray-100 pb-4">
         <button
           type="button"
           onClick={onBack}
           className="h-10 w-10 rounded-2xl bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition-colors shadow-2xs"
+          title={isAr ? "رجوع" : "Back"}
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={18} className={isAr ? "rotate-180" : ""} />
         </button>
         <div>
           <h2 className="text-2xl font-bold text-[#1F251A]">
-            New Manual Transaction
+            {isAr ? "إضافة معاملة يدوية" : "Add Manual Transaction"}
           </h2>
           <p className="text-xs text-gray-500">
-            Create a manual financial transaction
+            {isAr
+              ? "تسجيل معاملة مالية يدوية (استرداد، رسوم خدمة، شراء منتج / باقة)"
+              : "Record a manual financial transaction (Refund, Service Charge, Product / Package Purchase)"}
           </p>
         </div>
       </div>
@@ -398,10 +505,12 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
             </div>
             <div>
               <h3 className="text-sm font-bold text-[#1F251A]">
-                Transaction Information
+                {isAr ? "بيانات المعاملة" : "Transaction Information"}
               </h3>
               <p className="text-xs text-gray-500">
-                Record a manual financial transaction.
+                {isAr
+                  ? "حدد نوع المعاملة والمريض والبيانات المالية المطلوبة."
+                  : "Specify transaction type, patient, and financial details."}
               </p>
             </div>
           </div>
@@ -409,32 +518,42 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Transaction Type Dropdown */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-gray-700">
-                Transaction Type <span className="text-rose-500">*</span>
-              </label>
+              <div className="flex items-center gap-1.5">
+                <label className="block text-xs font-bold text-gray-700">
+                  {isAr ? "نوع المعاملة" : "Transaction Type"} <span className="text-rose-500">*</span>
+                </label>
+                <div
+                  className="group relative cursor-pointer"
+                  title={
+                    isAr
+                      ? "المعاملات اليدوية تقتصر على الاسترداد ورسوم الخدمات وشراء المنتجات/الباقات. المدفوعات المباشرة وحركات المحفظة تتم تلقائياً."
+                      : "Manual transactions are strictly limited to Refunds, Service Charges, and Product/Package Purchases. Direct payments and wallet adjustments are automated via bookings."
+                  }
+                >
+                  <HelpCircle size={13} className="text-gray-400 hover:text-gray-600 transition-colors" />
+                </div>
+              </div>
               <div className="relative">
                 <select
                   value={transactionType}
                   onChange={(e) => {
-                    setTransactionType(e.target.value as TransactionType);
+                    setTransactionType(e.target.value as any);
                     setErrorMsg(null);
                   }}
                   className="w-full appearance-none rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 text-xs font-semibold text-gray-800 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
                 >
-                  {TRANSACTION_TYPE_OPTIONS.map((opt) => {
-                    const blockedReason = disabledReasonFor(opt.id, selectedCustomer);
-                    return (
-                      <option key={opt.id} value={opt.id} disabled={Boolean(blockedReason)}>
-                        {opt.label}{blockedReason ? ` — ${blockedReason}` : ""}
-                      </option>
-                    );
-                  })}
+                  {MANUAL_TRANSACTION_TYPES.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {isAr ? opt.labelAr : opt.labelEn}
+                    </option>
+                  ))}
                 </select>
-                <ChevronDown size={15} className="pointer-events-none absolute right-3.5 top-3.5 text-gray-400" />
+                <ChevronDown size={15} className={`pointer-events-none absolute top-3.5 text-gray-400 ${isAr ? "left-3.5" : "right-3.5"}`} />
               </div>
-              <p className="text-[10px] text-gray-500">
-                Settling an old balance? Use <strong>Settle Balance</strong> on the patient in the
-                Patients screen — it applies the payment to their actual unpaid bookings.
+              <p className="text-[10px] text-gray-400">
+                {isAr
+                  ? "ملاحظة: المدفوعات المباشرة وحركات المحفظة تُسجل آلياً عبر مسارات الحجوزات وملفات المرضى."
+                  : "Direct payments & wallet deposits/withdrawals are automated system operations."}
               </p>
             </div>
 
@@ -442,7 +561,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
             <div className="space-y-1.5 relative" ref={dropdownRef}>
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-gray-700">
-                  Patient <span className="text-rose-500">*</span>
+                  {isAr ? "المريض" : "Patient"} <span className="text-rose-500">*</span>
                 </label>
                 {onAddNewPatient && (
                   <button
@@ -451,7 +570,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                     className="text-[11px] font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1"
                   >
                     <Plus size={12} />
-                    Add New Patient
+                    {isAr ? "إضافة مريض جديد" : "Add New Patient"}
                   </button>
                 )}
               </div>
@@ -468,10 +587,10 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                     }
                   }}
                   onFocus={() => setShowCustomerDropdown(true)}
-                  placeholder="Search patient by name or phone..."
+                  placeholder={isAr ? "ابحث بالاسم أو رقم الهاتف..." : "Search patient by name or phone..."}
                   className="w-full rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 pe-10 text-xs font-semibold text-gray-800 placeholder-gray-400 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
                 />
-                <div className="absolute right-3.5 top-3.5 text-gray-400">
+                <div className={`absolute top-3.5 text-gray-400 ${isAr ? "left-3.5" : "right-3.5"}`}>
                   {loadingCustomers ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
                 </div>
               </div>
@@ -491,9 +610,13 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                         <div className="text-[11px] text-gray-400">{c.mobile}</div>
                       </div>
                       <div className="text-end text-[11px]">
-                        <div className="text-emerald-700 font-semibold">Wallet: EGP {(c.wallet_balance || 0).toLocaleString()}</div>
+                        <div className="text-emerald-700 font-semibold">
+                          {isAr ? "المحفظة:" : "Wallet:"} EGP {(c.wallet_balance || 0).toLocaleString()}
+                        </div>
                         {Number(c.outstanding || 0) > 0 && (
-                          <div className="text-rose-600 font-semibold">Due: EGP {(c.outstanding || 0).toLocaleString()}</div>
+                          <div className="text-rose-600 font-semibold">
+                            {isAr ? "مستحق:" : "Due:"} EGP {(c.outstanding || 0).toLocaleString()}
+                          </div>
                         )}
                       </div>
                     </button>
@@ -503,108 +626,241 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
             </div>
           </div>
 
-          {/* ── Dynamic Calculation Cards based on Transaction Type ── */}
+          {/* Selected Patient Banner with Wallet Info */}
           {selectedCustomer && (
-            <div className="rounded-2xl bg-[#F7F9F6] p-4 border border-emerald-100 text-xs space-y-2 animate-in fade-in">
-              {transactionType === "outstanding_payment" && (
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-gray-600">Patient Outstanding Balance:</span>
-                  <span className="text-sm font-black text-rose-600">
-                    EGP {currentOutstanding.toLocaleString()}
-                  </span>
+            <div className="rounded-2xl bg-[#F7F9F6] p-4 border border-emerald-100 text-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center">
+                  <User size={15} />
                 </div>
-              )}
-
-              {transactionType === "wallet_topup" && (
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="p-2 rounded-xl bg-white border border-gray-100">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase block">Current Balance</span>
-                    <span className="font-bold text-gray-700">EGP {currentWalletBalance.toLocaleString()}</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-white border border-gray-100">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase block">Deposit Amount</span>
-                    <span className="font-bold text-emerald-600">+ EGP {numericAmount.toLocaleString()}</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200">
-                    <span className="text-[10px] text-emerald-800 font-bold uppercase block">New Wallet Balance</span>
-                    <span className="font-extrabold text-emerald-700">EGP {projectedWalletBalance.toLocaleString()}</span>
-                  </div>
+                <div>
+                  <div className="font-bold text-gray-900">{selectedCustomer.name}</div>
+                  <div className="text-[11px] text-gray-500">{selectedCustomer.mobile || "—"}</div>
                 </div>
-              )}
+              </div>
 
-              {transactionType === "wallet_deduction" && (
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="p-2 rounded-xl bg-white border border-gray-100">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase block">Current Balance</span>
-                    <span className="font-bold text-gray-700">EGP {currentWalletBalance.toLocaleString()}</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-white border border-gray-100">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase block">Withdrawal</span>
-                    <span className="font-bold text-rose-600">- EGP {numericAmount.toLocaleString()}</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-purple-50 border border-purple-200">
-                    <span className="text-[10px] text-purple-800 font-bold uppercase block">New Wallet Balance</span>
-                    <span className="font-extrabold text-purple-700">EGP {projectedWalletBalance.toLocaleString()}</span>
-                  </div>
+              <div className="flex items-center gap-4">
+                <div
+                  className="flex items-center gap-1.5 text-xs text-emerald-800 font-bold bg-white px-3 py-1.5 rounded-xl border border-emerald-100 shadow-2xs"
+                  title={isAr ? "الرصيد المتاح في محفظة المريض" : "Available credit in patient wallet"}
+                >
+                  <Coins size={14} className="text-emerald-600" />
+                  <span>{isAr ? "رصيد المحفظة:" : "Wallet Balance:"}</span>
+                  <span className="font-extrabold text-emerald-700">EGP {currentWalletBalance.toLocaleString()}</span>
                 </div>
-              )}
 
-              {transactionType === "refund" && (
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-gray-700">
-                      Original Transaction <span className="text-rose-500">*</span>
-                    </label>
+                {currentOutstanding > 0 && (
+                  <div className="text-xs text-rose-700 font-bold bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100">
+                    <span>{isAr ? "المبلغ المستحق:" : "Outstanding:"}</span>{" "}
+                    <span>EGP {currentOutstanding.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Type 1: REFUND Specific Section ── */}
+          {transactionType === "refund" && (
+            <div className="space-y-4 rounded-2xl bg-[#FBFBF9] p-5 border border-gray-200/80 animate-in fade-in">
+              <div className="flex items-center gap-2 text-xs font-bold text-rose-800 pb-1 border-b border-gray-200">
+                <RotateCcw size={15} />
+                <span>{isAr ? "بيانات الاسترداد" : "Refund Details"}</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Original Transaction Selector */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-gray-700">
+                    {isAr ? "المعاملة الأصلية" : "Original Transaction"} <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
                     <select
                       value={selectedOriginalTxnId}
-                      onChange={(e) => setSelectedOriginalTxnId(e.target.value)}
-                      className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-800"
+                      onChange={(e) => {
+                        setSelectedOriginalTxnId(e.target.value);
+                        setAmount("");
+                      }}
+                      className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-800 focus:border-[#414E36] focus:outline-none"
                     >
-                      {completedTxns.length === 0 ? (
-                        <option value="">No completed payments found for this patient</option>
+                      {eligibleCompletedPayments.length === 0 ? (
+                        <option value="">
+                          {selectedCustomerId
+                            ? isAr ? "لا توجد مدفوعات مكتملة لهذا المريض" : "No completed payments found for this patient"
+                            : isAr ? "اختر مريضاً أولاً لعرض المعاملات" : "Select a patient first to view transactions"}
+                        </option>
                       ) : (
-                        completedTxns.map((t) => (
+                        eligibleCompletedPayments.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.transaction_id} — {t.description} (EGP {Number(t.amount).toLocaleString()})
                           </option>
                         ))
                       )}
                     </select>
+                    <ChevronDown size={14} className={`pointer-events-none absolute top-3 text-gray-400 ${isAr ? "left-3" : "right-3"}`} />
                   </div>
-                  {selectedOriginalTxn && (
-                    <div className="flex items-center justify-between text-xs pt-1">
-                      <span className="text-gray-500">Original Amount: <strong>EGP {Number(selectedOriginalTxn.amount).toLocaleString()}</strong></span>
-                      <span className="text-emerald-700 font-bold">Refundable Amount: EGP {Number(selectedOriginalTxn.amount).toLocaleString()}</span>
-                    </div>
-                  )}
+                </div>
 
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-gray-700">
-                      Refund To <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {([
-                        { id: "cash", label: "Cash Back", hint: "Handed to the patient" },
-                        { id: "wallet", label: "Wallet Credit", hint: "Kept for a future visit" },
-                      ] as const).map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setRefundDestination(opt.id)}
-                          className={`rounded-xl border px-3 py-2 text-start transition cursor-pointer ${
-                            refundDestination === opt.id
-                              ? "border-[#414E36] bg-[#F3F6F1]"
-                              : "border-gray-200 bg-white hover:bg-gray-50"
-                          }`}
-                        >
-                          <span className="block text-xs font-bold text-gray-800">{opt.label}</span>
-                          <span className="block text-[10px] text-gray-500">{opt.hint}</span>
-                        </button>
-                      ))}
-                    </div>
+                {/* Refund Destination */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-gray-700">
+                    {isAr ? "طريقة استرجاع المبلغ" : "Refund Destination"} <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { id: "cash", labelEn: "Cash Back", labelAr: "استرداد نقدي", hintEn: "Handed to patient", hintAr: "تسليم نقدي للمريض" },
+                      { id: "wallet", labelEn: "Wallet Credit", labelAr: "إيداع في المحفظة", hintEn: "Kept for future visit", hintAr: "رصيد لزيارة قادمة" },
+                    ] as const).map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setRefundDestination(opt.id)}
+                        className={`rounded-xl border px-3 py-2 text-start transition cursor-pointer ${
+                          refundDestination === opt.id
+                            ? "border-[#414E36] bg-[#F3F6F1]"
+                            : "border-gray-200 bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <span className="block text-xs font-bold text-gray-800">
+                          {isAr ? opt.labelAr : opt.labelEn}
+                        </span>
+                        <span className="block text-[10px] text-gray-500">
+                          {isAr ? opt.hintAr : opt.hintEn}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Original & Refundable Amount Summary */}
+              {selectedOriginalTxn && (
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-white border border-gray-100 text-xs">
+                  <div>
+                    <span className="text-gray-400 font-bold uppercase text-[10px] block">
+                      {isAr ? "المبلغ الأصلي للمدفوعات" : "Original Payment Amount"}
+                    </span>
+                    <span className="font-extrabold text-gray-800">
+                      EGP {Number(selectedOriginalTxn.amount).toLocaleString()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 font-bold uppercase text-[10px] block">
+                      {isAr ? "المبلغ القابل للاسترداد" : "Refundable Amount"}
+                    </span>
+                    <span className="font-extrabold text-emerald-700">
+                      EGP {refundableAmount.toLocaleString()}
+                    </span>
                   </div>
                 </div>
               )}
+
+              {/* Refund Reason */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-700">
+                  {isAr ? "سبب الاسترداد" : "Refund Reason"} <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder={isAr ? "مثال: إلغاء الحجز، عدم الرضا عن الخدمة، خطأ في الحساب..." : "e.g. Appointment cancelled, service dissatisfaction, billing correction..."}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-800 placeholder-gray-400 focus:border-[#414E36] focus:outline-none"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ── Type 2: PRODUCT / PACKAGE PURCHASE Specific Section ── */}
+          {transactionType === "product_purchase" && (
+            <div className="space-y-4 rounded-2xl bg-[#FBFBF9] p-5 border border-gray-200/80 animate-in fade-in">
+              <div className="flex items-center gap-2 text-xs font-bold text-teal-800 pb-1 border-b border-gray-200">
+                <ShoppingBag size={15} />
+                <span>{isAr ? "تفاصيل شراء المنتج أو الباقة" : "Product / Package Purchase Details"}</span>
+              </div>
+
+              {/* Item Type Switcher (Product vs Package) */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-gray-600">{isAr ? "نوع العنصر:" : "Item Type:"}</span>
+                <div className="flex rounded-xl bg-white border border-gray-200 p-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setItemType("product");
+                      setSelectedItemId("");
+                      setUnitPrice(0);
+                      setAmount("");
+                    }}
+                    className={`px-3 py-1 rounded-lg font-bold transition-colors ${
+                      itemType === "product" ? "bg-[#313A28] text-white shadow-xs" : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    {isAr ? "منتج تجميلي / علاجي" : "Retail Product"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setItemType("package");
+                      setSelectedItemId("");
+                      setUnitPrice(0);
+                      setAmount("");
+                    }}
+                    className={`px-3 py-1 rounded-lg font-bold transition-colors ${
+                      itemType === "package" ? "bg-[#313A28] text-white shadow-xs" : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    {isAr ? "باقة جلسات" : "Treatment Package"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Item Selector Dropdown */}
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="block text-xs font-bold text-gray-700">
+                    {itemType === "product" ? (isAr ? "اختر المنتج" : "Select Product") : (isAr ? "اختر الباقة" : "Select Package")}
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedItemId}
+                      onChange={(e) => handleItemSelect(e.target.value)}
+                      className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-800 focus:border-[#414E36] focus:outline-none"
+                    >
+                      <option value="">
+                        {loadingCatalog
+                          ? (isAr ? "جاري تحميل القائمة..." : "Loading catalog...")
+                          : (isAr ? "-- اختر من القائمة --" : "-- Select from catalog --")}
+                      </option>
+                      {itemType === "product"
+                        ? productsList.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {isAr && p.arabic_name ? p.arabic_name : p.name} — EGP {Number(p.selling_price).toLocaleString()} ({p.stock_quantity} in stock)
+                            </option>
+                          ))
+                        : packagesList.map((pkg) => (
+                            <option key={pkg.id} value={pkg.id}>
+                              {isAr && pkg.nameAr ? pkg.nameAr : pkg.name} — EGP {Number(pkg.price).toLocaleString()}
+                            </option>
+                          ))}
+                    </select>
+                    <ChevronDown size={14} className={`pointer-events-none absolute top-3 text-gray-400 ${isAr ? "left-3" : "right-3"}`} />
+                  </div>
+                </div>
+
+                {/* Quantity */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-gray-700">
+                    {isAr ? "الكمية" : "Quantity"} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={quantity}
+                    onChange={(e) => handleQuantityChange(parseInt(e.target.value, 10))}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-bold text-gray-800 focus:border-[#414E36] focus:outline-none"
+                  />
+                </div>
+              </div>
             </div>
           )}
 
@@ -612,7 +868,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-gray-700">
-                Amount <span className="text-rose-500">*</span>
+                {isAr ? "المبلغ" : "Amount"} <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <input
@@ -624,7 +880,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                   placeholder="0.00"
                   className="w-full rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 pe-14 text-xs font-extrabold text-gray-900 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
                 />
-                <span className="pointer-events-none absolute right-4 top-3 text-xs font-extrabold text-gray-400">
+                <span className={`pointer-events-none absolute top-3 text-xs font-extrabold text-gray-400 ${isAr ? "left-4" : "right-4"}`}>
                   EGP
                 </span>
               </div>
@@ -632,7 +888,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
 
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-gray-700">
-                Payment Method <span className="text-rose-500">*</span>
+                {isAr ? "طريقة الدفع" : "Payment Method"} <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <select
@@ -640,16 +896,16 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                   onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
                   className="w-full appearance-none rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 text-xs font-semibold text-gray-800 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
                 >
-                  <option value="cash">Cash</option>
-                  <option value="card">Card (Visa / Mastercard)</option>
+                  <option value="cash">{isAr ? "نقدي (Cash)" : "Cash"}</option>
+                  <option value="card">{isAr ? "بطاقة بنكية (Visa / Card)" : "Card (Visa / Mastercard)"}</option>
                   <option value="instapay">Instapay</option>
                   <option value="vodafone_cash">Vodafone Cash</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="wallet">Wallet Balance</option>
-                  <option value="online_payment">Online Payment</option>
-                  <option value="other">Other</option>
+                  <option value="bank_transfer">{isAr ? "تحويل بنكي" : "Bank Transfer"}</option>
+                  <option value="wallet">{isAr ? "رصيد المحفظة" : "Wallet Balance"}</option>
+                  <option value="online_payment">{isAr ? "دفع أونلاين" : "Online Payment"}</option>
+                  <option value="other">{isAr ? "أخرى" : "Other"}</option>
                 </select>
-                <ChevronDown size={15} className="pointer-events-none absolute right-3.5 top-3.5 text-gray-400" />
+                <ChevronDown size={15} className={`pointer-events-none absolute top-3.5 text-gray-400 ${isAr ? "left-3.5" : "right-3.5"}`} />
               </div>
             </div>
           </div>
@@ -657,14 +913,22 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
           {/* Reference & Description */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-gray-700">
-                Reference (Booking / Invoice / Receipt)
-              </label>
+              <div className="flex items-center gap-1.5">
+                <label className="block text-xs font-bold text-gray-700">
+                  {isAr ? "المرجع (حجز / فاتورة / إيصال)" : "Reference (Booking / Invoice / Receipt)"}
+                </label>
+                <div
+                  className="cursor-pointer text-gray-400 hover:text-gray-600"
+                  title={isAr ? "أدخل رقم مرجعي مثل كود الحجز أو رقم الإيصال للتتبع" : "Enter a reference number such as booking ID or invoice receipt"}
+                >
+                  <HelpCircle size={13} />
+                </div>
+              </div>
               <input
                 type="text"
                 value={referenceNo}
                 onChange={(e) => setReferenceNo(e.target.value)}
-                placeholder="e.g. REC-10023 or INV-002048"
+                placeholder={isAr ? "مثال: REC-10023 أو INV-002048" : "e.g. REC-10023 or INV-002048"}
                 className="w-full rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 text-xs font-semibold text-gray-800 placeholder-gray-400 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
               />
             </div>
@@ -672,7 +936,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-gray-700">
-                  Description {transactionType === "adjustment" ? <span className="text-rose-500">*</span> : "(Optional)"}
+                  {isAr ? "الوصف" : "Description"} {transactionType === "service_charge" ? <span className="text-rose-500">*</span> : (isAr ? "(اختياري)" : "(Optional)")}
                 </label>
                 <span className="text-[10px] text-gray-400">{description.length} / 250</span>
               </div>
@@ -681,7 +945,11 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                 maxLength={250}
                 rows={2}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Add a description for this transaction..."
+                placeholder={
+                  transactionType === "service_charge"
+                    ? (isAr ? "أدخل وصف رسوم الخدمة (مطلوب)..." : "Enter service charge description (required)...")
+                    : (isAr ? "أضف وصفاً لهذه المعاملة..." : "Add a description for this transaction...")
+                }
                 className="w-full rounded-2xl border border-gray-200 bg-[#FBFBF9] p-3 text-xs font-medium text-gray-800 placeholder-gray-400 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all resize-none"
               />
             </div>
@@ -691,7 +959,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-gray-700">
-                Transaction Date <span className="text-rose-500">*</span>
+                {isAr ? "تاريخ المعاملة" : "Transaction Date"} <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <input
@@ -705,7 +973,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
 
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-gray-700">
-                Transaction Time <span className="text-rose-500">*</span>
+                {isAr ? "وقت المعاملة" : "Transaction Time"} <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <input
@@ -720,7 +988,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
           </div>
         </div>
 
-        {/* Card 2: Transaction Summary */}
+        {/* Card 2: Transaction Summary & System Generated Metadata */}
         <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm space-y-6">
           <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
             <div className="h-10 w-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
@@ -728,10 +996,12 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
             </div>
             <div>
               <h3 className="text-sm font-bold text-[#1F251A]">
-                Transaction Summary
+                {isAr ? "ملخص المعاملة وبيانات النظام" : "Transaction Summary & System Metadata"}
               </h3>
               <p className="text-xs text-gray-500">
-                Review the transaction details before saving.
+                {isAr
+                  ? "مراجعة التفاصيل وبيانات التتبع التي سيولدها النظام تلقائياً."
+                  : "Review the transaction details and system-generated audit metadata."}
               </p>
             </div>
           </div>
@@ -740,38 +1010,54 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
             {/* Metadata Table */}
             <div className="md:col-span-2 rounded-2xl bg-[#F9F9F7] p-4 border border-gray-100 grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
               <div>
-                <span className="text-gray-400 font-bold uppercase text-[10px] block">Transaction Type</span>
-                <span className="font-bold text-gray-800 capitalize">{transactionType.replace(/_/g, " ")}</span>
+                <span className="text-gray-400 font-bold uppercase text-[10px] block">
+                  {isAr ? "معرف المعاملة" : "Transaction ID"}
+                </span>
+                <span className="font-mono font-bold text-gray-700">Auto (TXN-XXXXXX)</span>
               </div>
 
               <div>
-                <span className="text-gray-400 font-bold uppercase text-[10px] block">Status (System will set)</span>
-                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                  {transactionType === "refund" ? "Refunded" : "Completed"}
+                <span className="text-gray-400 font-bold uppercase text-[10px] block">
+                  {isAr ? "نوع المعاملة" : "Transaction Type"}
+                </span>
+                <span className="font-bold text-gray-800 capitalize">
+                  {MANUAL_TRANSACTION_TYPES.find((t) => t.id === transactionType)?.[isAr ? "labelAr" : "labelEn"]}
                 </span>
               </div>
 
               <div>
-                <span className="text-gray-400 font-bold uppercase text-[10px] block">Action</span>
+                <span className="text-gray-400 font-bold uppercase text-[10px] block">
+                  {isAr ? "المصدر" : "Source"}
+                </span>
                 <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Manual
+                  {isAr ? "يدوي (Manual)" : "Manual"}
                 </span>
               </div>
 
               <div>
-                <span className="text-gray-400 font-bold uppercase text-[10px] block">Created By</span>
+                <span className="text-gray-400 font-bold uppercase text-[10px] block">
+                  {isAr ? "الحالة (يحددها النظام)" : "Status (System-set)"}
+                </span>
+                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  transactionType === "refund"
+                    ? "bg-purple-50 text-purple-800 border border-purple-200"
+                    : "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                }`}>
+                  {transactionType === "refund" ? (isAr ? "مسترد (Refunded)" : "Refunded") : (isAr ? "مكتمل (Completed)" : "Completed")}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-gray-400 font-bold uppercase text-[10px] block">
+                  {isAr ? "أنشئت بواسطة" : "Created By"}
+                </span>
                 <span className="font-bold text-gray-800">{staffName}</span>
               </div>
 
               <div>
-                <span className="text-gray-400 font-bold uppercase text-[10px] block">Source</span>
-                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Manual
+                <span className="text-gray-400 font-bold uppercase text-[10px] block">
+                  {isAr ? "تاريخ ووقت الإنشاء" : "Created Date & Time"}
                 </span>
-              </div>
-
-              <div>
-                <span className="text-gray-400 font-bold uppercase text-[10px] block">Created Date & Time</span>
                 <span className="font-semibold text-gray-700">{txnDate}, {txnTime}</span>
               </div>
             </div>
@@ -780,12 +1066,12 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
             <div className="rounded-2xl bg-[#F7F9F6] p-4 border border-emerald-100 text-xs space-y-2">
               <div className="flex items-center gap-1.5 font-bold text-emerald-800">
                 <Info size={14} />
-                <span>Note</span>
+                <span>{isAr ? "إرشادات هامة" : "Important Note"}</span>
               </div>
               <ul className="space-y-1 text-[11px] text-gray-600 list-disc ps-4 leading-relaxed">
-                <li>Status is set automatically by the system.</li>
-                <li>You can only create manual transactions here.</li>
-                <li>Automatic transactions are created by the system based on events.</li>
+                <li>{isAr ? "يتم تعيين الحالة ومعرف المعاملة آلياً بواسطة النظام." : "Status & Transaction ID are assigned automatically."}</li>
+                <li>{isAr ? "تسجيل المبيعات والاستردادات يحدث أثراً مباشراً في السجل المالي للمريض." : "Purchases and refunds immediately update the patient financial ledger."}</li>
+                <li>{isAr ? "المدفوعات المباشرة تُسجل آلياً عند تأكيد الحجوزات أو تسويتها." : "Direct booking payments are automatically recorded via the booking flow."}</li>
               </ul>
             </div>
           </div>
@@ -798,7 +1084,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
             onClick={onBack}
             className="px-6 py-2.5 rounded-2xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-bold text-xs transition-colors shadow-2xs"
           >
-            Cancel
+            {isAr ? "إلغاء" : "Cancel"}
           </button>
           <button
             type="submit"
@@ -808,12 +1094,12 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
             {submitting ? (
               <>
                 <Loader2 size={14} className="animate-spin" />
-                <span>Saving Transaction...</span>
+                <span>{isAr ? "جاري الحفظ..." : "Saving Transaction..."}</span>
               </>
             ) : (
               <>
                 <Wallet size={14} />
-                <span>Create Transaction</span>
+                <span>{isAr ? "تسجيل المعاملة" : "Create Transaction"}</span>
               </>
             )}
           </button>
