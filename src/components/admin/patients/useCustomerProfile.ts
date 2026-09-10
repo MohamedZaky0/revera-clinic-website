@@ -60,6 +60,12 @@ export function useCustomerProfile({
   // ── Customer Profile details drawer state ──
   const [viewingCustomerProfile, setViewingCustomerProfile] = useState<Customer | null>(null);
 
+  // Which booking (if any) the caller was looking at right before opening this patient's profile
+  // (e.g. "View Patient" from a Booking Details modal). A prescription written from the
+  // Prescriptions tab while this is set gets that booking's id, so it shows up under that specific
+  // booking in Booking Details instead of only being reachable from the patient's own record.
+  const [prescriptionBookingContext, setPrescriptionBookingContext] = useState<string | null>(null);
+
   // ── Medical Record Center & Intake Form states ──
   const [medicalRecordForm, setMedicalRecordForm] = useState<any | null>(null);
   const [medicalReports, setMedicalReports] = useState<any[]>([]);
@@ -414,7 +420,7 @@ export function useCustomerProfile({
     if (!viewingCustomerProfile?.id) return;
     setSavingPrescription(true);
 
-    const payload = {
+    const payload: Record<string, any> = {
       id: editingPrescription?.id || undefined,
       customer_id: viewingCustomerProfile.id,
       patient_name: viewingCustomerProfile.name,
@@ -425,6 +431,13 @@ export function useCustomerProfile({
       doctor_notes: rxDocNotes.trim() || null,
       follow_up_date: rxFollowUpDate || null
     };
+
+    // Only stamp booking_id on a brand-new prescription. An edit never touches booking_id here
+    // (the field is simply omitted from the payload), so a prescription already linked to a
+    // booking keeps that link regardless of what the caller was viewing when they hit Save.
+    if (!editingPrescription && prescriptionBookingContext) {
+      payload.booking_id = prescriptionBookingContext;
+    }
 
     try {
       const res = await fetch("/api/prescriptions", {
@@ -447,6 +460,7 @@ export function useCustomerProfile({
 
       setPrescriptionEditMode(false);
       setEditingPrescription(null);
+      setPrescriptionBookingContext(null);
     } catch (err: any) {
       console.error("handleSavePrescription error:", err);
       alert(err.message || "An error occurred while saving the prescription.");
@@ -696,6 +710,8 @@ export function useCustomerProfile({
     // State
     viewingCustomerProfile,
     setViewingCustomerProfile,
+    prescriptionBookingContext,
+    setPrescriptionBookingContext,
     medicalRecordForm,
     setMedicalRecordForm,
     medicalReports,

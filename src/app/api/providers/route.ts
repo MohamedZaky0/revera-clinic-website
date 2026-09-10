@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { requireStaffAccess, hasGranularPermission } from '@/lib/access';
+import { requireStaffAccess, hasGranularPermission, requireSuperadminAccess } from '@/lib/access';
 import { normalizeServiceCommissions } from '@/lib/providerCommissions';
 import fs from 'fs';
 import path from 'path';
@@ -526,12 +526,12 @@ export async function PATCH(req: Request) {
 export const PUT = PATCH;
 
 export async function DELETE(req: Request) {
-  const access = await requireStaffAccess(req);
+  // Soft (deactivate) and hard (permanent) delete are both superadmin-only — `providers.delete`
+  // granted to a non-superadmin role (via hasGranularPermission) used to reach this same endpoint,
+  // contradicting the documented "superadmin can choose" boundary for this destructive action.
+  const access = await requireSuperadminAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
-  }
-  if (!hasGranularPermission(access.access, 'providers.delete')) {
-    return NextResponse.json({ error: 'You do not have permission to delete doctors.' }, { status: 403 });
   }
 
   const url = new URL(req.url);

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { requireAdministratorAccess, requireAuthenticatedUser, requireStaffAccess } from '@/lib/access';
+import { requireAdministratorAccess, requireAuthenticatedUser, requireStaffAccess, requireSuperadminAccess } from '@/lib/access';
 import { isOwnIdentity, normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordWalletMovement, setAbsoluteWalletBalance } from '@/lib/wallet';
 
@@ -289,7 +289,10 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  // Soft (deactivate) and hard (permanent) delete are both superadmin-only — an `admin` caller
+  // would otherwise pass requireAdministratorAccess and be able to permanently remove a patient
+  // record, contradicting the documented "superadmin can choose" boundary.
+  const access = await requireSuperadminAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }

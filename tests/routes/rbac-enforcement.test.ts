@@ -39,7 +39,12 @@ beforeEach(() => {
 });
 
 describe('DELETE /api/providers — permission enforcement', () => {
-  it('a receptionist role with no providers permission at all is rejected with 403, not staff-only-any-role', async () => {
+  // Provider delete (soft archive or hard permanent removal, both via this one endpoint) was
+  // narrowed to superadmin-only: it used to accept any role granted the coarse "Providers"
+  // category or the granular "providers.delete" key via hasGranularPermission, which contradicted
+  // the documented "superadmin can choose between soft/hard delete" boundary for this specific
+  // destructive action. See requireSuperadminAccess in src/lib/access.ts.
+  it('a receptionist role with no providers permission at all is rejected with 403', async () => {
     seedStaff('receptionist', []);
     fake.seed('providers', [{ id: 'doc-1', name: 'Dr. Sara' }]);
     const res = await deleteProvider(delReq('/api/providers', 'doc-1'));
@@ -47,12 +52,19 @@ describe('DELETE /api/providers — permission enforcement', () => {
     expect(fake.db.providers.find((p: any) => p.id === 'doc-1')).toBeTruthy();
   });
 
-  it('a role granted the coarse "Providers" category can delete, matching what Role Management shows it as able to do', async () => {
+  it('a role granted the coarse "Providers" category is still rejected — only superadmin may delete a doctor', async () => {
     seedStaff('front-desk-lead', ['Providers']);
     fake.seed('providers', [{ id: 'doc-1', name: 'Dr. Sara' }]);
     const res = await deleteProvider(delReq('/api/providers', 'doc-1'));
-    expect(res.status).toBe(200);
-    expect(fake.db.providers.find((p: any) => p.id === 'doc-1')).toBeFalsy();
+    expect(res.status).toBe(403);
+    expect(fake.db.providers.find((p: any) => p.id === 'doc-1')).toBeTruthy();
+  });
+
+  it('an "admin" role (not superadmin) is also rejected', async () => {
+    seedStaff('admin', ['Providers', 'providers.delete']);
+    fake.seed('providers', [{ id: 'doc-1', name: 'Dr. Sara' }]);
+    const res = await deleteProvider(delReq('/api/providers', 'doc-1'));
+    expect(res.status).toBe(403);
   });
 
   it('superadmin can always delete regardless of permissions array', async () => {

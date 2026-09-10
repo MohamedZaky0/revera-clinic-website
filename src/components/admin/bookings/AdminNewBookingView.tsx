@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { adminTranslations } from "@/components/admin/translations";
-import { getServiceDurationMinutes } from "@/lib/services";
+import { ALL_15MIN_SLOTS, getServiceDurationMinutes, normaliseTo24hSlot } from "@/lib/services";
 
 interface ServiceItem {
   id: string | number;
@@ -123,6 +123,11 @@ function formatSlotTo12h(timeStr: string): string {
 
 function normalizeTimeSlot(t: string): string {
   return formatSlotTo12h(t).trim().toUpperCase();
+}
+
+function getSlotIndex(t: string | undefined): number {
+  const normalized = normaliseTo24hSlot(t);
+  return normalized ? ALL_15MIN_SLOTS.indexOf(normalized) : -1;
 }
 
 function isSlotInPast(tSlot: string, bookingDateStr: string): boolean {
@@ -273,6 +278,7 @@ export default function AdminNewBookingView({
     new Date().toISOString().split("T")[0]
   );
   const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
+  const [allTimeSlots, setAllTimeSlots] = useState<string[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [bookedTimeSlots, setBookedTimeSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -473,7 +479,7 @@ export default function AdminNewBookingView({
   }, [phone, allCustomers]);
 
   // Handle Select Customer from List
-  const handleSelectCustomer = async (cust: any) => {
+  async function handleSelectCustomer(cust: any) {
     setFoundCustomer(cust);
     setPatientFound(true);
     const p = cust.mobile || cust.phone || "";
@@ -536,7 +542,7 @@ export default function AdminNewBookingView({
     } catch (e) {
       console.error("Error loading customer package:", e);
     }
-  };
+  }
 
   const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
   const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
@@ -577,6 +583,7 @@ export default function AdminNewBookingView({
 
       // If branch or doctor is closed on this day, no available slots
       if (isBranchClosedToday || isDoctorClosedToday) {
+        setAllTimeSlots([]);
         setAvailableTimeSlots([]);
         setSelectedTimes([]);
         setBookedTimeSlots([]);
@@ -584,7 +591,7 @@ export default function AdminNewBookingView({
         return;
       }
 
-      let booked: string[] = [];
+      const booked: string[] = [];
       try {
         // Query existing reservations for selected date & doctor to calculate booked slots
         if (bookingDate) {
@@ -601,12 +608,23 @@ export default function AdminNewBookingView({
 
           const { data: resData } = await qRes;
           if (resData) {
-            booked = resData
-              .map((r: any) => normalizeTimeSlot(r.time_slot || r.requested_time || r.start_time || ""))
-              .filter(Boolean);
+            resData.forEach((r: any) => {
+              const start = r.time_slot || r.requested_time || r.start_time || "";
+              const startIndex = getSlotIndex(start);
+              if (startIndex < 0) return;
+
+              const durationMinutes = getServiceDurationMinutes(
+                dbServices.find((service) => String(service.id) === String(r.service_id))
+              );
+              const slotsNeeded = Math.max(1, Math.ceil(durationMinutes / 15));
+              for (let slotOffset = 0; slotOffset < slotsNeeded; slotOffset += 1) {
+                const occupiedSlot = ALL_15MIN_SLOTS[startIndex + slotOffset];
+                if (occupiedSlot) booked.push(normalizeTimeSlot(occupiedSlot));
+              }
+            });
           }
         }
-        setBookedTimeSlots(booked);
+        setBookedTimeSlots(Array.from(new Set(booked)));
 
         // Try /api/availability endpoint
         const params = new URLSearchParams();
@@ -614,30 +632,36 @@ export default function AdminNewBookingView({
         if (bookingDate) params.append("date", bookingDate);
         if (selectedBranchId) params.append("branchId", String(selectedBranchId));
         if (selectedDoctorId) params.append("doctorId", String(selectedDoctorId));
+        params.append("sessionType", sessionType);
 
         const res = await fetch(`/api/availability?${params.toString()}`);
         if (res.ok) {
           const apiData = await res.json();
-          let rawList: string[] = [];
+          let rawAvailableSlots: string[] = [];
+          let rawUnavailableSlots: string[] = [];
           if (Array.isArray(apiData)) {
-            rawList = apiData.map(formatSlotTo12h);
+            rawAvailableSlots = apiData.map(formatSlotTo12h);
           } else if (apiData && typeof apiData === "object") {
-            const list = apiData[bookingDate] || apiData.slots || apiData.availableSlots;
-            if (Array.isArray(list)) {
-              rawList = list.map(formatSlotTo12h);
-            }
+            const availableList = apiData[bookingDate]?.availableSlots || apiData.availableSlots || apiData.slots;
+            const unavailableList = apiData[bookingDate]?.unavailableSlots || apiData.unavailableSlots;
+            if (Array.isArray(availableList)) rawAvailableSlots = availableList.map(formatSlotTo12h);
+            if (Array.isArray(unavailableList)) rawUnavailableSlots = unavailableList.map(formatSlotTo12h);
           }
 
-          const validFutureSlots = rawList.filter((slot) => {
+          const displaySlots = Array.from(new Set([...rawAvailableSlots, ...rawUnavailableSlots]))
+            .filter((slot) => !isSlotInPast(slot, bookingDate))
+            .sort((a, b) => getSlotIndex(a) - getSlotIndex(b));
+          const validFutureSlots = rawAvailableSlots.filter((slot) => {
             const isPast = isSlotInPast(slot, bookingDate);
             const isBooked = booked.includes(normalizeTimeSlot(slot));
             return !isPast && !isBooked;
           });
 
+          setAllTimeSlots(displaySlots);
           setAvailableTimeSlots(validFutureSlots);
           setSelectedTimes((prev) => {
             const stillValid = prev.filter(s => validFutureSlots.includes(s));
-            if (stillValid.length > 0) return stillValid;
+            if (stillValid.length > 0) return [stillValid[0]];
             return validFutureSlots.length > 0 ? [validFutureSlots[0]] : [];
           });
           setLoadingSlots(false);
@@ -648,60 +672,48 @@ export default function AdminNewBookingView({
       }
 
       // Standard doctor shifts fallback with strict past and booked filtering
-      const generated: string[] = [];
       const shiftRanges = [
-        { start: 9, end: 14 },
-        { start: 17, end: 21 }
+        { start: "09:00", end: "14:00" },
+        { start: "17:00", end: "21:00" }
       ];
+      const serviceDurationMinutes = getServiceDurationMinutes(selectedServiceObj);
+      const slotsNeeded = Math.max(1, Math.ceil(serviceDurationMinutes / 15));
+      const generated = ALL_15MIN_SLOTS
+        .filter((slot) => shiftRanges.some((range) => slot >= range.start && slot < range.end))
+        .map(formatSlotTo12h);
+      const validFallbackSlots = generated.filter((slot) => {
+        const startIndex = getSlotIndex(slot);
+        const start24 = normaliseTo24hSlot(slot);
+        const lastRequiredSlot = ALL_15MIN_SLOTS[startIndex + slotsNeeded - 1];
+        const fitsShift = Boolean(start24 && lastRequiredSlot) && shiftRanges.some(
+          (range) => start24 !== null && lastRequiredSlot !== undefined && start24 >= range.start && lastRequiredSlot < range.end
+        );
+        if (!fitsShift || isSlotInPast(slot, bookingDate)) return false;
 
-      shiftRanges.forEach((range) => {
-        for (let hour = range.start; hour < range.end; hour++) {
-          for (const min of [0, 30]) {
-            const hour12 = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-            const ampm = hour >= 12 ? "PM" : "AM";
-            const hh = String(hour12).padStart(2, "0");
-            const mm = String(min).padStart(2, "0");
-            const slotStr = `${hh}:${mm} ${ampm}`;
-            const isPast = isSlotInPast(slotStr, bookingDate);
-            const isBooked = booked.includes(normalizeTimeSlot(slotStr));
-            if (!isPast && !isBooked) {
-              generated.push(slotStr);
-            }
-          }
+        for (let slotOffset = 0; slotOffset < slotsNeeded; slotOffset += 1) {
+          const requiredSlot = ALL_15MIN_SLOTS[startIndex + slotOffset];
+          if (!requiredSlot || booked.includes(normalizeTimeSlot(requiredSlot))) return false;
         }
+        return true;
       });
 
-      setAvailableTimeSlots(generated);
+      setAllTimeSlots(generated.filter((slot) => !isSlotInPast(slot, bookingDate)));
+      setAvailableTimeSlots(validFallbackSlots);
       setSelectedTimes((prev) => {
-        const stillValid = prev.filter(s => generated.includes(s));
-        if (stillValid.length > 0) return stillValid;
-        return generated.length > 0 ? [generated[0]] : [];
+        const stillValid = prev.filter(s => validFallbackSlots.includes(s));
+        if (stillValid.length > 0) return [stillValid[0]];
+        return validFallbackSlots.length > 0 ? [validFallbackSlots[0]] : [];
       });
       setLoadingSlots(false);
     }
 
     fetchActualTimeSlots();
-  }, [bookingDate, selectedDoctorId, selectedServiceId, selectedBranchId, isBranchClosedToday, isDoctorClosedToday]);
+  }, [bookingDate, selectedDoctorId, selectedServiceId, selectedBranchId, sessionType, isBranchClosedToday, isDoctorClosedToday]);
 
   const toggleTimeSlot = (slot: string) => {
+    if (!availableTimeSlots.includes(slot) || bookedTimeSlots.includes(normalizeTimeSlot(slot))) return;
     setFormErrors((prev) => ({ ...prev, time: false }));
-    setSelectedTimes((prev) => {
-      let next: string[];
-      if (prev.includes(slot)) {
-        next = prev.filter((s) => s !== slot);
-      } else {
-        next = [...prev, slot];
-      }
-      return next.sort((a, b) => {
-        const idxA = availableTimeSlots.indexOf(a);
-        const idxB = availableTimeSlots.indexOf(b);
-        return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
-      });
-    });
-  };
-
-  const handleSelectAllSlots = () => {
-    setSelectedTimes([...availableTimeSlots]);
+    setSelectedTimes((prev) => (prev[0] === slot ? [] : [slot]));
   };
 
   const handleClearSlots = () => {
@@ -720,8 +732,9 @@ export default function AdminNewBookingView({
   const bookingValue = customBookingValue !== null && customBookingValue !== undefined ? Number(customBookingValue) : autoBookingValue;
   const numAmountPaid = typeof amountPaidNow === "number" ? amountPaidNow : 0;
   const remainingValue = bookingValue - numAmountPaid;
-  const selectedTime = selectedTimes.join(", ");
-  const totalDurationMinutes = selectedTimes.length * getServiceDurationMinutes(selectedServiceObj);
+  const selectedTime = selectedTimes[0] || "";
+  const totalDurationMinutes = getServiceDurationMinutes(selectedServiceObj);
+  const requiredSlotCount = Math.max(1, Math.ceil(totalDurationMinutes / 15));
 
   // Formatted date string (e.g. 03 Aug 2026 (Mon))
   const formattedDateStr = useMemo(() => {
@@ -1387,90 +1400,107 @@ export default function AdminNewBookingView({
 
               {/* ── 1. AVAILABLE TIME (MULTI-SLOT SELECTION) ── */}
               <div>
-                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <label className="block font-bold text-[#1F251A]">{tr.availableTimeLabel}</label>
-                    {selectedTimes.length > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100/80 text-emerald-900 font-bold text-[11px]">
-                        <Clock size={11} className="text-emerald-700" />
-                        {selectedTimes.length} {selectedTimes.length === 1 ? (tr.slotSelectedSuffix || "slot selected") : (tr.slotsSelectedSuffix || "slots selected")}
-                        {totalDurationMinutes > 0 && ` • ${totalDurationMinutes} mins`}
-                      </span>
-                    )}
-                  </div>
+                <label className="block font-bold text-[#1F251A] mb-2">{tr.availableTimeLabel}</label>
+                <div ref={timeDropdownRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowTimeDropdown((open) => !open)}
+                    aria-expanded={showTimeDropdown}
+                    className={`w-full max-w-md rounded-2xl border-2 bg-[var(--cr-white)] px-4 py-3.5 flex items-center gap-3 text-sm font-extrabold text-[var(--cr-dark)] transition ${
+                      formErrors.time ? "border-red-500 ring-2 ring-red-200" : "border-[var(--cr-primary)] hover:bg-white"
+                    }`}
+                  >
+                    <Clock size={22} className="text-[var(--cr-primary)] shrink-0" />
+                    <span className="flex-1 text-start">
+                      {selectedTime || tr.showAvailableTimeLabel}
+                    </span>
+                    <ChevronDown size={22} className={`text-[var(--cr-primary)] transition-transform ${showTimeDropdown ? "rotate-180" : ""}`} />
+                  </button>
 
-                  <div className="flex items-center gap-2 text-xs">
-                    {loadingSlots ? (
-                      <span className="flex items-center gap-1 text-[11px] text-[#5A6A51]">
-                        <Loader2 size={12} className="animate-spin text-emerald-700" /> {tr.fetchingSlotsLabel}
-                      </span>
-                    ) : availableTimeSlots.length > 0 ? (
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handleSelectAllSlots}
-                          className="text-[11px] font-bold text-[#0F3826] hover:underline bg-[#EBF2EB] px-2.5 py-1 rounded-lg transition cursor-pointer"
-                        >
-                          {tr.selectAllSlotsBtn || "Select All"}
-                        </button>
-                        {selectedTimes.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={handleClearSlots}
-                            className="text-[11px] font-bold text-rose-700 hover:underline bg-rose-50 px-2.5 py-1 rounded-lg transition cursor-pointer"
-                          >
-                            {tr.clearSlotsBtn || "Clear"}
-                          </button>
+                  {showTimeDropdown && (
+                    <div className="absolute start-0 end-0 top-full z-40 mt-4 rounded-2xl border border-[var(--cr-primary)]/15 bg-white p-5 shadow-xl sm:max-w-4xl">
+                      <span className="absolute -top-3 start-8 h-6 w-6 rotate-45 border-l border-t border-[var(--cr-primary)]/15 bg-white" />
+                      <div className="relative space-y-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <h3 className="text-lg font-black text-[var(--cr-dark)]">{tr.availableTimeHeading}</h3>
+                          <div className="flex items-center justify-between gap-3 sm:justify-end">
+                            <span className="text-sm font-semibold text-[var(--cr-secondary)]">
+                              {totalDurationMinutes} {tr.minutesPerSlotLabel}
+                            </span>
+                            {selectedTimes.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={handleClearSlots}
+                                className="rounded-xl bg-[var(--cr-secondary)] px-3.5 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-50"
+                              >
+                                {tr.clearSlotsBtn}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {loadingSlots ? (
+                          <div className="flex items-center justify-center gap-2 py-8 text-sm font-semibold text-[#5A6A51]">
+                            <Loader2 size={18} className="animate-spin text-emerald-700" /> {tr.fetchingSlotsLabel}
+                          </div>
+                        ) : allTimeSlots.length > 0 ? (
+                          <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 ${
+                            formErrors.time ? "rounded-2xl border border-red-500 p-2 ring-2 ring-red-200" : ""
+                          }`}>
+                            {allTimeSlots.map((tSlot) => {
+                              const isSelected = selectedTime === tSlot;
+                              const selectedStartIndex = getSlotIndex(selectedTime);
+                              const currentSlotIndex = getSlotIndex(tSlot);
+                              const isInsideSelectedService = selectedStartIndex >= 0
+                                && currentSlotIndex > selectedStartIndex
+                                && currentSlotIndex < selectedStartIndex + requiredSlotCount;
+                              const isBooked = bookedTimeSlots.includes(normalizeTimeSlot(tSlot));
+                              const isAvailableStart = availableTimeSlots.includes(tSlot) && !isBooked;
+                              const isDisabled = !isAvailableStart || isInsideSelectedService;
+
+                              return (
+                                <button
+                                  key={tSlot}
+                                  type="button"
+                                  disabled={isDisabled && !isSelected}
+                                  onClick={() => toggleTimeSlot(tSlot)}
+                                  title={isDisabled && !isSelected ? tr.slotUnavailableTitle : undefined}
+                                  className={`min-h-16 rounded-2xl border px-3.5 py-3 text-sm font-extrabold transition flex items-center justify-between gap-2 select-none ${
+                                    isSelected
+                                      ? "border-[var(--cr-primary)] bg-[var(--cr-primary)] text-white shadow-sm ring-2 ring-emerald-700/20"
+                                      : isDisabled
+                                      ? "cursor-not-allowed border-[var(--cr-divider)] bg-[var(--cr-white)] text-[var(--cr-secondary)] opacity-70"
+                                      : "cursor-pointer border-[var(--cr-divider)] bg-white text-[var(--cr-dark)] hover:border-[var(--cr-primary)] hover:bg-[var(--cr-secondary)]"
+                                  }`}
+                                >
+                                  <span>{tSlot}</span>
+                                  {isSelected ? (
+                                    <Check size={20} className="shrink-0 text-white" />
+                                  ) : (
+                                    <Clock size={20} className="shrink-0 text-[var(--cr-secondary)]" />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200/80 bg-amber-50 p-3.5 text-xs text-amber-900">
+                            <AlertCircle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+                            <span className="font-bold">
+                              {isBranchClosedToday
+                                ? (tr.branchClosedAlert || `${selectedBranchName} is closed on ${weekdayName}s. Please choose an open date.`)
+                                : isDoctorClosedToday
+                                ? (tr.doctorUnavailableAlert || `${selectedDoctorName} is not available on ${weekdayName}s. Please choose another date or doctor.`)
+                                : (tr.noSlotsAvailableWarning || "No available time slots on this date (clinic is closed or all slots are booked/past). Please choose another date.")}
+                            </span>
+                          </div>
                         )}
                       </div>
-                    ) : null}
-                  </div>
+                    </div>
+                  )}
                 </div>
-
-                {/* Slots Grid */}
-                {availableTimeSlots.length > 0 ? (
-                  <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 max-h-56 overflow-y-auto p-1.5 rounded-2xl border bg-[#FBFBF9]/50 ${
-                    formErrors.time ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/15"
-                  }`}>
-                    {availableTimeSlots.map((tSlot) => {
-                      const isSelected = selectedTimes.includes(tSlot);
-                      return (
-                        <button
-                          key={tSlot}
-                          type="button"
-                          onClick={() => toggleTimeSlot(tSlot)}
-                          className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-between gap-1.5 cursor-pointer select-none ${
-                            isSelected
-                              ? "bg-[#1E3A2B] text-white border-[#1E3A2B] shadow-xs ring-2 ring-emerald-700/20"
-                              : "bg-white hover:bg-emerald-50/70 text-[#1F251A] border-[#414E36]/15 hover:border-emerald-700/40"
-                          }`}
-                        >
-                          <span className="font-mono text-[11px] font-bold tracking-tight">{tSlot}</span>
-                          {isSelected ? (
-                            <Check size={13} className="text-emerald-400 shrink-0" />
-                          ) : (
-                            <Clock size={12} className="text-[#5A6A51]/50 shrink-0" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
                 {formErrors.time && (
-                  <p className="mt-1.5 text-[11px] font-bold text-red-600">{tr.selectTimeAlert || "Please select at least one available time slot."}</p>
-                )}
-                {availableTimeSlots.length === 0 && (
-                  /* Banner alert if closed day or 0 slots available */
-                  <div className="rounded-2xl bg-amber-50 border border-amber-200/80 p-3.5 flex items-start gap-2.5 text-xs text-amber-900">
-                    <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-                    <span className="font-bold">
-                      {isBranchClosedToday
-                        ? (tr.branchClosedAlert || `${selectedBranchName} is closed on ${weekdayName}s. Please choose an open date.`)
-                        : isDoctorClosedToday
-                        ? (tr.doctorUnavailableAlert || `${selectedDoctorName} is not available on ${weekdayName}s. Please choose another date or doctor.`)
-                        : (tr.noSlotsAvailableWarning || "No available time slots on this date (clinic is closed or all slots are booked/past). Please choose another date.")}
-                    </span>
-                  </div>
+                  <p className="mt-1.5 text-[11px] font-bold text-red-600">{tr.selectTimeAlert || "Please select an available time slot."}</p>
                 )}
               </div>
 
@@ -1728,7 +1758,7 @@ export default function AdminNewBookingView({
                     {formattedDateStr}
                   </span>
                   <span className="text-[11px] font-bold text-[#1F251A] block mt-0.5">
-                    {selectedTimes.join(", ")} ({selectedTimes.length} {selectedTimes.length === 1 ? (tr.slotSelectedSuffix || 'slot') : (tr.slotsSelectedSuffix || 'slots')})
+                    {selectedTime} ({totalDurationMinutes} {tr.minutesLabel})
                   </span>
                 </div>
               </div>
