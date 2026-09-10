@@ -152,3 +152,23 @@ export async function requireAdministratorAccess(req: Request): Promise<AccessRe
   }
   return result;
 }
+
+/**
+ * Superadmin-only, no `admin` equivalence — unlike `requireAdministratorAccess`. Reserved for
+ * permanent, irreversible destructive actions (hard-deleting a customer/provider/employee record)
+ * where the soft-delete alternative exists precisely so routine account management doesn't need
+ * this power. Added because the DELETE handlers for `customers`/`providers`/`employees` had grown
+ * a `mode=soft|hard` split (see PRODUCT_RULES.md) that was documented as "superadmin can choose
+ * between archiving and permanent removal" but was actually reachable by any `admin`
+ * (`customers`/`employees`, via `requireAdministratorAccess`) or by any role granted the
+ * `providers.delete` permission (`providers`, via `hasGranularPermission`) — the UI/docs claim and
+ * the server's actual boundary had drifted apart, same shape as RISK-078.
+ */
+export async function requireSuperadminAccess(req: Request): Promise<AccessResult> {
+  const result = await requireStaffAccess(req);
+  if ("error" in result) return result;
+  if (result.access.role !== "superadmin") {
+    return { error: "Superadmin access is required for this action.", status: 403 };
+  }
+  return result;
+}
