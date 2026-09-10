@@ -4,7 +4,7 @@
 > **Environment:** run against dev first. The production repeat matters here — the whole point of
 > this change is that production SMTP is unreliable, so "works on dev" proves little on its own.
 >
-> Full reasoning and code pointers are in `ai_docs/RISKS.md` → **RISK-081**. This file is just the
+> Full reasoning and code pointers are in `ai_docs/RISKS.md` → **RISK-083**. This file is just the
 > click-through checklist referenced from there.
 
 ## Evidence log
@@ -78,3 +78,43 @@
 
 - [ ] Switch the admin panel to Arabic. Confirm the Initial Password label, placeholder, hint, and
       the strength error are all translated and read correctly right-to-left.
+
+---
+
+## Section 2 — Legacy role labels resolve to the right sidebar screens (RISK-084)
+
+> Added 2026-09-05 after a production report: an account on the `admin` role saw only Bookings,
+> Services, Settings and Logout. See `ai_docs/RISKS.md` → **RISK-084**.
+
+### Reproduce the original fault (do this first, on a role you can throw away)
+
+- [ ] In Role Management create a role whose permissions are exactly the five legacy labels:
+      `Bookings`, `Customers`, `Providers`, `Services`, `Settings`.
+- [ ] Assign it to a test employee and sign in as them.
+- [ ] **Before the fix** the sidebar shows only Bookings, Services, Settings, Logout — Patients and
+      Doctors are missing even though `Customers` and `Providers` are granted.
+
+### Confirm the fix
+
+- [ ] With the same legacy role, confirm the sidebar now also shows **Patients** and **Doctors**.
+- [ ] Open both screens and confirm they load rather than bouncing to another tab.
+- [ ] Confirm the still-ungranted screens stay hidden — Inventory, Employees, HR, Transactions,
+      Reports, Finance, Marketing, Customer Support, Dashboard. The fix must widen exactly two
+      screens, not open everything.
+
+### Confirm nothing else regressed
+
+- [ ] A role with modern granular keys only (e.g. `customers.view`, `providers.edit`) still sees
+      Patients and Doctors, exactly as before.
+- [ ] A role with **neither** `Customers`/`customers` nor any `customers.*` key does **not** see
+      Patients. Same for Doctors/providers.
+- [ ] `superadmin` still sees every screen.
+- [ ] A receptionist-style role sees only its own screens — no Finance, no HR.
+- [ ] Sign in as a role with no permissions at all and confirm the app lands somewhere sane
+      (first permitted item / Logout) rather than a blank screen.
+
+### The proper cure for the data
+
+- [ ] Open Role Management → `admin` → re-tick the intended permissions and save. Confirm the role's
+      stored `permissions` now contain granular dotted keys, not the legacy coarse labels.
+- [ ] Re-check that account's sidebar reflects exactly what was ticked.

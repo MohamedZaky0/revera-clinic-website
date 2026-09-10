@@ -1097,7 +1097,8 @@ cannot reproduce for new sessions again.
 - [RISK-079](#risk-079) — New Reports & Analytics Panel Silently Shows Fabricated Demo Numbers Whenever Real Data Is Genuinely Zero (RESOLVED)
 - [RISK-078](#risk-078) — Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It (RESOLVED — body still filed under Open above, see there)
 - [RISK-080](#risk-080) — Two API Routes Reachable Without Any Session: Patient Roster Read/Write And Supabase Infrastructure Disclosure (RESOLVED)
-- [RISK-081](#risk-081) — Staff Onboarding Depended Entirely On Invitation Email Delivery, Stranding Every New Hire On "Invited" (RESOLVED)
+- [RISK-083](#risk-083) — Staff Onboarding Depended Entirely On Invitation Email Delivery, Stranding Every New Hire On "Invited" (RESOLVED)
+- [RISK-084](#risk-084) — Legacy Role Labels `Customers` And `Providers` Silently Hid The Patients And Doctors Screens (RESOLVED)
 - [RISK-082](#risk-082) — `auth-sweep.test.ts`'s Weak "Public" Assertion Let `/api/health/supabase`'s RISK-080 Fix Go Unverified For A Week (RESOLVED)
 
 ## RISK-003: Patient Auth Is Non-Functional
@@ -3791,7 +3792,7 @@ failing loudly, exactly backwards from what a regression-catching test should do
 
 ---
 
-## RISK-081: Staff Onboarding Depended Entirely On Invitation Email Delivery, Stranding Every New Hire On "Invited" (RESOLVED)
+## RISK-083: Staff Onboarding Depended Entirely On Invitation Email Delivery, Stranding Every New Hire On "Invited" (RESOLVED)
 
 **Severity:** High · **Type:** Operational / Onboarding
 **Found:** 2026-09-05, during the production cutover — reported as "why isn't the account Active,
@@ -3849,6 +3850,56 @@ Password recovery in particular has no in-person workaround — a staff member w
 password still needs an admin to reset it in the Supabase dashboard until SMTP is configured.
 
 **Manual test checklist:** `ai_docs/manual_tests/EMPLOYEE_INITIAL_PASSWORD_MANUAL_TESTS.md`
+
+---
+
+## RISK-084: Legacy Role Labels `Customers` And `Providers` Silently Hid The Patients And Doctors Screens (RESOLVED)
+
+**Severity:** Medium · **Type:** Access control / Data-code drift
+**Found:** 2026-09-05 in production — an account on the `admin` role saw only Bookings, Services,
+Settings and Logout.
+**Resolved:** 2026-09-05
+
+**Context:**
+`8e3a8e5` removed the hardcoded sidebar bypass so nav strictly respects role permissions. Only
+`superadmin` short-circuits now (`hasPermission`, `src/app/admin/page.tsx`); `admin` is filtered like
+any other role. That is correct, and it exposed stale data underneath.
+
+The `admin` and `superadmin` rows in `roles` still carry the coarse June-2026 labels
+`{Bookings, Customers, Providers, Services, Settings}`, from before granular dotted keys existed.
+
+**Why exactly three screens survived:**
+`permittedSidebarItems` checks `adminPermissions.includes(item.label)` first. Three of the five
+legacy labels happen to equal a sidebar label character-for-character — **Bookings**, **Services**,
+**Settings** — so they passed. The other two never matched anything:
+
+- the sidebar calls those screens **Patients** and **Doctors**, not `Customers` and `Providers`;
+- `adminPermissions.includes(prefix)` looks for lowercase `customers`/`providers`, and the stored
+  values are capitalised;
+- `adminPermissions.some(p => p.startsWith(prefix + "."))` finds nothing, since there are no dotted
+  keys at all;
+- the last resort, `hasPermission(prefix)`, is passed a **bare category with no dot**, so every
+  `permKey.startsWith("customers.")` fallback inside it is skipped. It falls through to
+  `parentScreenMap["customers"] = "Patients"` and checks `includes("Patients")` — which the role
+  does not have.
+
+So a role explicitly granted `Customers` and `Providers` lost both screens, and it read as a
+deliberate permissions decision rather than a name mismatch. The compatibility layer intended to
+support legacy labels; it simply had two of them wrong.
+
+**Resolution:**
+`permittedSidebarItems` now maps the legacy names onto the current sidebar labels
+(`Patients` ← `Customers`/`customers`, `Doctors` ← `Providers`/`providers`) as a final check. The
+fix widens exactly those two screens; every other ungranted screen stays hidden and `superadmin`
+is untouched.
+
+**The data is still the real problem.** This makes legacy roles behave sanely, but the durable cure
+is to open Role Management → `admin` → re-tick the intended permissions and save, which rewrites the
+role with granular dotted keys. Any role still holding coarse labels is one rename away from the
+same class of silent loss.
+
+**Manual test checklist:** `ai_docs/manual_tests/EMPLOYEE_INITIAL_PASSWORD_MANUAL_TESTS.md`
+(Section 2)
 
 ---
 

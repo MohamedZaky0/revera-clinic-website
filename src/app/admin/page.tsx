@@ -819,7 +819,21 @@ export default function AdminPage({ portalRole }: { portalRole?: string } = {}) 
       const prefix = parentScreenMap[item.label];
       if (prefix && (adminPermissions.includes(prefix) || adminPermissions.some(p => p.startsWith(prefix + ".")))) return true;
       if (prefix && hasPermission(prefix)) return true;
-      
+
+      // Legacy roles (created before the granular permission keys existed) store coarse labels like
+      // "Customers" and "Providers". Three of those five happen to equal a sidebar label exactly
+      // -- Bookings, Services, Settings -- so they resolve on the includes(item.label) check above.
+      // The other two never match anything: this sidebar calls them "Patients" and "Doctors", the
+      // includes() checks are case-sensitive, and hasPermission(prefix) is passed a bare category
+      // with no dot, so its own dotted fallbacks are skipped. The result was a role holding
+      // "Customers" and "Providers" silently losing both screens. Map the old names onto the
+      // current ones rather than leaving that to look like a permissions decision.
+      const legacyLabelAliases: Record<string, string[]> = {
+        "Patients": ["Customers", "customers"],
+        "Doctors": ["Providers", "providers"],
+      };
+      if (legacyLabelAliases[item.label]?.some(alias => adminPermissions.includes(alias))) return true;
+
       return false;
     });
   }, [adminRole, adminPermissions, hasPermission]);
