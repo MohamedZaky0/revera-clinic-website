@@ -75,6 +75,32 @@ function isServiceCompatibleWithSession(service: ServiceItem, sessionType: "in_p
     : (allowedType === "in_clinic" || allowedType === "both");
 }
 
+// navigator.clipboard.writeText can reject with NotAllowedError (permission denied by the
+// browser/embedding context) rather than being merely unavailable. Callers must not show a
+// "Copied!" state unless this actually resolves true — a patient pasting a payment address/wallet
+// number that silently failed to copy is a real payment-failure risk, not just a UX nit.
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
 export function BookingModal({ variant = "modal", initialServiceId = null }: BookingModalProps = {}) {
   const { t, isRTL } = useLanguage();
   const router = useRouter();
@@ -1610,10 +1636,11 @@ Attached is my payment transaction receipt photo.`;
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(instapayAddress);
-                          setCopiedAddress(true);
-                          setTimeout(() => setCopiedAddress(false), 2000);
+                        onClick={async () => {
+                          if (await copyToClipboard(instapayAddress)) {
+                            setCopiedAddress(true);
+                            setTimeout(() => setCopiedAddress(false), 2000);
+                          }
                         }}
                         className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition cursor-pointer"
                       >
@@ -1661,10 +1688,11 @@ Attached is my payment transaction receipt photo.`;
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(walletNumber);
-                          setCopiedAddress(true);
-                          setTimeout(() => setCopiedAddress(false), 2000);
+                        onClick={async () => {
+                          if (await copyToClipboard(walletNumber)) {
+                            setCopiedAddress(true);
+                            setTimeout(() => setCopiedAddress(false), 2000);
+                          }
                         }}
                         className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition cursor-pointer"
                       >
