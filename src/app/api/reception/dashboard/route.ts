@@ -168,7 +168,30 @@ export async function GET(req: Request) {
       }
     }
 
-    // 3. Compute Real Target & Monthly Performance from DB
+    // 3. Resolve Branch Information
+    let branchNameEn = "New Cairo Branch";
+    let branchNameAr = "فرع التجمع الخامس";
+    let branchId = emp?.branch_id || null;
+
+    const { data: branchRows } = await supabaseServer
+      .from("branches")
+      .select("id, name_en, name_ar")
+      .limit(10);
+    
+    if (Array.isArray(branchRows) && branchRows.length > 0) {
+      if (branchId) {
+        const matchingBranch = branchRows.find((b: any) => b.id === branchId);
+        if (matchingBranch) {
+          branchNameEn = matchingBranch.name_en || branchNameEn;
+          branchNameAr = matchingBranch.name_ar || branchNameAr;
+        }
+      } else {
+        branchNameEn = branchRows[0].name_en || branchNameEn;
+        branchNameAr = branchRows[0].name_ar || branchNameAr;
+      }
+    }
+
+    // 3.5 Compute Real Target & Monthly Performance from DB
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     const startOfMonthStr = startOfMonth.toISOString().split("T")[0];
@@ -199,55 +222,276 @@ export async function GET(req: Request) {
       : (monthlyAchieved > 0 ? 100 : 0);
     const remainingTarget = Math.max(0, targetAmount - monthlyAchieved);
 
-    // 4. Fetch Real Services for title resolution
-    const { data: servicesData } = await supabaseServer
-      .from("services")
-      .select("id, en, name, ar, title");
+    // 4. Fetch Real Providers (Doctors) for Details & Avatars
+    const { data: providersData } = await supabaseServer
+      .from("providers")
+      .select("id, name, specialty, image");
 
-    const servicesMap = new Map<string, string>();
-    if (Array.isArray(servicesData)) {
-      servicesData.forEach((s: any) => {
-        const title = s.en || s.name || s.title || s.ar || `Service #${s.id}`;
-        servicesMap.set(String(s.id), title);
+    const providersMap = new Map<string, any>();
+    if (Array.isArray(providersData)) {
+      providersData.forEach((p: any) => {
+        if (p.id) providersMap.set(String(p.id), p);
+        if (p.name) providersMap.set(String(p.name).toLowerCase().trim(), p);
       });
     }
 
-    // 5. Fetch Real Today's Bookings from DB
+    // 5. Fetch Real Services for title & pricing resolution
+    const { data: servicesData } = await supabaseServer
+      .from("services")
+      .select("id, en, name, ar, title, price");
+
+    const servicesMap = new Map<string, any>();
+    if (Array.isArray(servicesData)) {
+      servicesData.forEach((s: any) => {
+        servicesMap.set(String(s.id), s);
+      });
+    }
+
+    // 6. Fetch Real Today's Bookings from DB
     const { data: reservationsToday } = await supabaseServer
       .from("reservations")
       .select("*")
       .eq("date", todayStr)
-      .order("created_at", { ascending: true });
+      .order("time_slot", { ascending: true });
 
     const realTodayBookings = Array.isArray(reservationsToday) ? reservationsToday : [];
 
+    // Helper for formatting time (e.g. 10:00 AM)
+    const formatTimeSlot = (timeStr?: string): string => {
+      if (!timeStr) return "09:00 AM";
+      const trimmed = String(timeStr).trim();
+      if (!trimmed) return "09:00 AM";
+      if (trimmed.toLowerCase().includes("am") || trimmed.toLowerCase().includes("pm")) {
+        return trimmed;
+      }
+      const startPart = trimmed.split("-")[0].trim();
+      const parts = startPart.split(":");
+      if (parts.length >= 2) {
+        let hours = parseInt(parts[0], 10);
+        const minutes = parts[1].slice(0, 2);
+        if (!isNaN(hours)) {
+          const period = hours >= 12 ? "PM" : "AM";
+          hours = hours % 12 || 12;
+          const formattedHours = String(hours).padStart(2, "0");
+          return `${formattedHours}:${minutes} ${period}`;
+        }
+      }
+      return trimmed;
+    };
+
+    // Calculate Expected Payments from Today's active bookings
+    let expectedPaymentsTotal = 0;
+
+    const formattedBookings = realTodayBookings.map((r: any) => {
+      let resolvedServiceTitle = r.notes || "General Consultation";
+      let basePrice = 0;
+
+      if (r.service_id && servicesMap.has(String(r.service_id))) {
+        const s = servicesMap.get(String(r.service_id));
+        resolvedServiceTitle = s.en || s.name || s.title || s.ar || `Service #${s.id}`;
+        basePrice = Number(s.price || 0);
+      } else if (Array.isArray(r.service_ids) && r.service_ids.length > 0) {
+        const titles: string[] = [];
+        r.service_ids.forEach((id: any) => {
+          const s = servicesMap.get(String(id));
+          if (s) {
+            titles.push(s.en || s.name || s.title || s.ar || `Service #${s.id}`);
+            basePrice += Number(s.price || 0);
+          }
+        });
+        if (titles.length > 0) resolvedServiceTitle = titles.join(", ");
+      }
+
+      // Doctor details resolution
+      let docName = r.doctor_name || "Dr. Unassigned";
+      let docSpecialty = "Specialist";
+      let docImage: string | null = null;
+
+      const targetProvId = r.provider_id ? String(r.provider_id) : null;
+      if (targetProvId && providersMap.has(targetProvId)) {
+        const p = providersMap.get(targetProvId);
+        docName = p.name || docName;
+        docSpecialty = p.specialty || docSpecialty;
+        docImage = p.image || null;
+      } else if (r.doctor_name && providersMap.has(String(r.doctor_name).toLowerCase().trim())) {
+        const p = providersMap.get(String(r.doctor_name).toLowerCase().trim());
+        docSpecialty = p.specialty || docSpecialty;
+        docImage = p.image || null;
+      }
+
+      // Financials for this booking
+      const amountPaid = Number(r.amount_paid || 0);
+      const amountLeft = r.amount_left !== null && r.amount_left !== undefined ? Number(r.amount_left) : null;
+      const effectiveTotal = amountLeft !== null ? (amountPaid + amountLeft) : (basePrice > 0 ? basePrice : amountPaid);
+
+      const statusLower = String(r.status || "confirmed").toLowerCase();
+      if (statusLower !== "cancelled" && statusLower !== "rejected") {
+        expectedPaymentsTotal += effectiveTotal;
+      }
+
+      // Payment Status Badge
+      let paymentStatus = "Unpaid";
+      if (amountPaid > 0) {
+        if (amountLeft === 0 || (amountLeft === null && amountPaid >= basePrice && basePrice > 0)) {
+          paymentStatus = "Paid";
+        } else if (amountLeft && amountLeft > 0) {
+          paymentStatus = "Partial";
+        } else {
+          paymentStatus = "Paid";
+        }
+      } else {
+        paymentStatus = "Unpaid";
+      }
+
+      return {
+        id: r.id,
+        time: formatTimeSlot(r.time_slot || r.requested_time),
+        patientName: r.name || r.patient_name || "Patient",
+        patientPhone: r.phone || "—",
+        doctorName: docName,
+        doctorSpecialty: docSpecialty,
+        doctorImage: docImage,
+        service: resolvedServiceTitle,
+        status: r.status || "confirmed",
+        paymentStatus,
+        amountPaid,
+        amountLeft,
+        totalPrice: effectiveTotal,
+        raw: r
+      };
+    });
+
+    // Overview KPIs
     const todayBookingsCount = realTodayBookings.length;
     const pendingApprovalCount = realTodayBookings.filter(
       (r: any) => String(r.status || "").toLowerCase() === "pending" || String(r.status || "").toLowerCase() === "pending_approval"
     ).length;
 
-    const formattedBookings = realTodayBookings.map((r: any) => {
-      let resolvedServiceTitle = r.notes || "General Service";
-      if (r.service_id && servicesMap.has(String(r.service_id))) {
-        resolvedServiceTitle = servicesMap.get(String(r.service_id))!;
-      } else if (Array.isArray(r.service_ids) && r.service_ids.length > 0) {
-        const titles = r.service_ids
-          .map((id: any) => servicesMap.get(String(id)))
-          .filter(Boolean);
-        if (titles.length > 0) resolvedServiceTitle = titles.join(", ");
+    // Upcoming confirmations (scheduled in upcoming window or not checked in)
+    const upcomingConfirmationsCount = realTodayBookings.filter((r: any) => {
+      const st = String(r.status || "").toLowerCase();
+      return st === "confirmed" || st === "approved";
+    }).length;
+
+    // Performance KPIs (End of Day)
+    const completedBookingsCount = realTodayBookings.filter(
+      (r: any) => String(r.status || "").toLowerCase() === "completed"
+    ).length;
+    const cancelledBookingsCount = realTodayBookings.filter(
+      (r: any) => String(r.status || "").toLowerCase() === "cancelled" || String(r.status || "").toLowerCase() === "rejected"
+    ).length;
+    const noShowsCount = realTodayBookings.filter(
+      (r: any) => String(r.status || "").toLowerCase() === "no_show"
+    ).length;
+
+    // Incomplete / Pending Bookings remaining for today
+    const pendingItemsCount = realTodayBookings.filter((r: any) => {
+      const st = String(r.status || "").toLowerCase();
+      return st !== "completed" && st !== "cancelled" && st !== "rejected" && st !== "no_show";
+    }).length;
+
+    // 7. Aggregate Payments Received Today from Real Database Transactions & Payments
+    let cashPayments = 0;
+    let visaPayments = 0;
+    let instapayPayments = 0;
+    let walletPayments = 0;
+
+    const startOfTodayIso = `${todayStr}T00:00:00.000Z`;
+    const endOfTodayIso = `${todayStr}T23:59:59.999Z`;
+
+    // A) Query transactions table
+    const { data: todayTxns } = await supabaseServer
+      .from("transactions")
+      .select("amount, payment_method, type, status")
+      .gte("occurred_at", startOfTodayIso)
+      .lte("occurred_at", endOfTodayIso)
+      .eq("status", "completed");
+
+    if (Array.isArray(todayTxns) && todayTxns.length > 0) {
+      todayTxns.forEach((tx: any) => {
+        const amt = Math.max(0, Number(tx.amount || 0));
+        const method = String(tx.payment_method || "").toLowerCase();
+        if (method === "cash") {
+          cashPayments += amt;
+        } else if (method === "card" || method === "visa" || method === "credit_card") {
+          visaPayments += amt;
+        } else if (method === "instapay") {
+          instapayPayments += amt;
+        } else if (method === "wallet") {
+          walletPayments += amt;
+        } else {
+          cashPayments += amt;
+        }
+      });
+    }
+
+    // B) Query payments table for receipts today
+    const { data: todayReceipts } = await supabaseServer
+      .from("payments")
+      .select("amount, method")
+      .gte("received_at", startOfTodayIso)
+      .lte("received_at", endOfTodayIso);
+
+    if (Array.isArray(todayReceipts) && todayReceipts.length > 0) {
+      // If transactions didn't already capture payments, add distinct payments
+      if (!todayTxns || todayTxns.length === 0) {
+        todayReceipts.forEach((p: any) => {
+          const amt = Math.max(0, Number(p.amount || 0));
+          const method = String(p.method || "").toLowerCase();
+          if (method === "cash") {
+            cashPayments += amt;
+          } else if (method === "card" || method === "visa") {
+            visaPayments += amt;
+          } else if (method === "instapay") {
+            instapayPayments += amt;
+          } else if (method === "wallet") {
+            walletPayments += amt;
+          } else {
+            cashPayments += amt;
+          }
+        });
       }
+    }
 
-      return {
-        id: r.id,
-        time: r.time_slot || r.requested_time || "--:--",
-        patientName: r.name || r.patient_name || "Patient",
-        doctorName: r.doctor_name || "Unassigned",
-        service: resolvedServiceTitle,
-        status: r.status || "confirmed"
-      };
-    });
+    // C) If no transactions/payments recorded yet, check today's completed reservations amount_paid
+    if (cashPayments === 0 && visaPayments === 0 && instapayPayments === 0 && walletPayments === 0) {
+      realTodayBookings.forEach((r: any) => {
+        const amt = Number(r.amount_paid || 0);
+        if (amt > 0) {
+          cashPayments += amt;
+        }
+      });
+    }
 
-    // 6. Fetch Real Inventory Products and Equipment Devices for Live Notifications & Alerts
+    const totalPaymentsReceived = cashPayments + visaPayments + instapayPayments + walletPayments;
+
+    // 8. Shift timings and total working hours calculation
+    let actualEndingTime = "—";
+    if (attendanceRecord?.check_out_time) {
+      const checkOutDate = new Date(attendanceRecord.check_out_time);
+      if (!isNaN(checkOutDate.getTime())) {
+        actualEndingTime = checkOutDate.toLocaleTimeString("en-US", {
+          timeZone: "Africa/Cairo",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true
+        });
+      }
+    }
+
+    let totalWorkingHoursFormatted = "0h 0m";
+    if (attendanceRecord?.work_hours !== null && attendanceRecord?.work_hours !== undefined) {
+      const totalSec = Math.round(Number(attendanceRecord.work_hours) * 3600);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      totalWorkingHoursFormatted = `${h}h ${m}m`;
+    } else if (elapsedSeconds > 0) {
+      const h = Math.floor(elapsedSeconds / 3600);
+      const m = Math.floor((elapsedSeconds % 3600) / 60);
+      totalWorkingHoursFormatted = `${h}h ${m}m`;
+    }
+
+    // 9. Fetch Real Inventory Products and Equipment Devices for Live Notifications & Alerts
     const notifications: any[] = [];
 
     try {
@@ -372,14 +616,21 @@ export async function GET(req: Request) {
         id: empId,
         name: receptionistName,
         role: receptionistRole,
-        shiftSchedule
+        shiftSchedule,
+        branchId,
+        branchNameEn,
+        branchNameAr
       },
       shift: {
         scheduleHours: "8 Hours",
         shiftFromTo: shiftSchedule,
+        scheduledStart: "09:00 AM",
+        scheduledEnd: "06:00 PM",
         actualStartingTime,
+        actualEndingTime,
         elapsedTime,
         elapsedSeconds,
+        totalWorkingHours: totalWorkingHoursFormatted,
         pastSessionsSeconds,
         currentSessionStart,
         status: shiftStatus,
@@ -387,6 +638,28 @@ export async function GET(req: Request) {
         checkOutTime: attendanceRecord?.check_out_time || null,
         gpsShiftEnabled,
         intervalsCount: intervals.length
+      },
+      overview: {
+        todayBookingsCount,
+        pendingApprovalCount,
+        upcomingConfirmationsCount,
+        expectedPayments: expectedPaymentsTotal
+      },
+      performance: {
+        completedCount: completedBookingsCount,
+        cancelledCount: cancelledBookingsCount,
+        noShowsCount
+      },
+      payments: {
+        cash: cashPayments,
+        visa: visaPayments,
+        instapay: instapayPayments,
+        wallet: walletPayments,
+        totalPayments: totalPaymentsReceived
+      },
+      pendingItems: {
+        pendingBookingsCount: pendingItemsCount,
+        pendingApprovalCount
       },
       target: {
         targetAmount,

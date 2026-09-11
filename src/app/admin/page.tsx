@@ -2341,7 +2341,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-045', name: 'Role-Based URL Routing & Account Navigation Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies dynamic role slug generation, direct role portal routing (/reception, /doctor, /superadmin, /admin), and login portal isolation.', status: 'idle' },
     { id: 'TC-046', name: 'Customer Portal Header Login Settings Engine', category: 'System & Settings', endpoint: '/api/page-settings', description: 'Verifies header customer login button toggle activation/deactivation in Page Settings and public navbar.', status: 'idle' },
     { id: 'TC-048', name: 'Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine', category: 'System & Settings', endpoint: '/api/roles', description: 'Validates system locking for superadmin role and dual deletion modes (soft/hard) for administrative management.', status: 'idle' },
-    { id: 'TC-049', name: 'New Booking Multi-Slot Selection & Financial Calculation Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Validates multi-slot time selection, duration aggregation, side-by-side Booking Value and Amount Paid Now inputs, and remaining value calculation.', status: 'idle' }
+    { id: 'TC-049', name: 'New Booking Multi-Slot Selection & Financial Calculation Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Validates multi-slot time selection, duration aggregation, side-by-side Booking Value and Amount Paid Now inputs, and remaining value calculation.', status: 'idle' },
+    { id: 'TC-050', name: 'Reception Dashboard Shift State & Performance Metrics Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies 3 shift states (Not Started, In Progress, Completed), live performance counters (completed, cancelled, no-shows), and payment breakdown aggregation.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -7343,7 +7344,32 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               employeeId={loggedEmpAccount?.id || adminDbId}
               email={adminEmail}
               accessToken={session?.access_token}
+              branchId={branch}
+              activeBranchName={branches.find((b) => b.id === branch)?.name_en || "Main Branch"}
+              activeBranchNameAr={branches.find((b) => b.id === branch)?.name_ar || "الفرع الرئيسي"}
               onNavigateTab={(tabName) => setActiveNav(tabName)}
+              onNewBooking={() => {
+                setActiveNav("Bookings");
+                setShowFullViewNewBooking(true);
+              }}
+              onNewPatient={() => {
+                setActiveNav("Patients");
+                handleOpenAddCustomer();
+              }}
+              onViewBookingDetails={(booking) => {
+                const raw = allReservations.find((r: any) => String(r.id) === String(booking?.id));
+                setViewingBooking((raw || booking) as any);
+              }}
+              onViewTransactions={() => {
+                setActiveNav("Finance");
+              }}
+              onPendingApprovalsClick={() => {
+                setActiveNav("Bookings");
+                setTimeout(() => {
+                  const el = document.getElementById("pending-approvals-section");
+                  if (el) el.scrollIntoView({ behavior: "smooth" });
+                }, 100);
+              }}
               onLogout={handleLogout}
               lang={lang}
               t={adminTranslations[lang].reception.dashboard}

@@ -1915,3 +1915,28 @@ check, so `admin` could be stripped to zero permissions while still being undele
 `supabase/migrations/20260910000000_add_locked_to_roles.sql` adds the column and backfills the five
 legacy names. Both former copies of the hardcoded array are gone.
 **Manual test checklist:** `ai_docs/manual_tests/ROLE_LOCK_UNLOCK_MANUAL_TESTS.md`
+
+---
+
+## DEC-053: Dynamic Reception Dashboard Shift States & Live Performance/Payment Settlement
+
+**Date:** 2026-09-12
+**Status:** Decided & Implemented
+
+**Context:**
+The clinic reception dashboard required dynamic responsiveness to shift state (Not Started, In Progress, Completed), live timers, operational actions, pending warnings, and real end-of-shift reconciliation with zero fake data.
+
+**Decisions & Implementation:**
+1. **Dynamic Shift State Architecture:**
+   - Designed a single unified dashboard component (`ReceptionDashboardView.tsx`) dynamically morphing across State 1 (Start of Day), State 2 (During Day), and State 3 (End of Day).
+   - In State 1 & 2: Renders Today's Overview cards (`Today's Bookings`, `Pending Approval`, `Expected Payments`), Quick Actions (`+ New Booking`, `+ New Patient`), Attention Needed alerts, and Today's Bookings table with 3-dots actions dropdown (`View Booking Details`, `View Transactions`, `Pending Approvals`).
+   - In State 3: Switches to End of Day review displaying total worked duration, Today's Performance (Completed, Cancelled, No-Shows), and Payments Received breakdown.
+2. **Real Database Aggregation & Zero Fake Data:**
+   - Replaced all static estimates with live queries against Supabase tables (`hr_attendance`, `reservations`, `transactions`, `payments`, `employee_accounts`, `providers`, `services`).
+   - Payment method breakdown aggregates real transactions and receipts across Cash, InstaPay, Visa/Card, and Wallet balances without double counting.
+3. **End Shift Confirmation Dialog:**
+   - Displays live summary, performance breakdown, payments received by payment method, and a yellow warning banner for uncompleted bookings before confirming shift termination.
+4. **Bilingual Parity (EN/AR):**
+   - Full localization under `adminTranslations[lang].reception.dashboard` supporting RTL and LTR viewports.
+5. **System Test Verification:**
+   - Added test suite `TC-050` (`Reception Dashboard Shift State & Performance Metrics Engine`) to the diagnostic test suite.

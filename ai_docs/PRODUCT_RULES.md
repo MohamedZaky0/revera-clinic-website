@@ -440,5 +440,25 @@ The following are **not currently enforced in code**:
    - Auto-calculates `bookingValue = servicePrice * slotsCount` with support for manual receptionist override.
    - Live **Remaining Value** (`bookingValue - amountPaidNow`) displayed in real-time with status badges (Fully Settled / Due on Visit / Credit Balance) and detailed in the Booking Confirmation Summary modal.
 
+---
 
+## Reception Dashboard Shift Lifecycle & Operational Rules
+**Enforced in:** `src/components/admin/reception/ReceptionDashboardView.tsx`, `src/app/api/reception/dashboard/route.ts`, `src/components/admin/translations.ts`.
 
+1. **Dynamic Shift State Architecture**:
+   - One unified dashboard dynamically adapting across 3 distinct shift states:
+     - **State 1 (Not Started / Start of Day)**: Displays greeting, scheduled shift hours, Overview KPIs, Quick Actions (`+ New Booking`, `+ New Patient`), Attention Needed alerts, today's bookings table with 3-dots action menu, and a prominent green `Start Shift` button.
+     - **State 2 (In Progress / During Day)**: Displays live elapsed shift timer, actual clock-in time, real-time KPI metrics, operational action grid, today's schedule table with 3-dots action menu, and an `End Shift` button.
+     - **State 3 (Completed / End of Day)**: Replaces live operational queues with a comprehensive End of Day Review including total worked duration, Today's Performance cards (Completed, Cancelled, No-Shows), and Payments Received breakdown (Cash, InstaPay, Visa, Wallet, Total).
+2. **End Shift Confirmation Dialog**:
+   - Opening the End Shift modal calculates and renders live shift analytics:
+     - **Shift Summary**: Actual start/end time and total worked duration.
+     - **Today's Performance**: Real database counts for Completed, Cancelled, and No-Shows.
+     - **Payments Received**: Real breakdown aggregated across `transactions` and `payments` tables for Cash, InstaPay, Visa/Card, Wallet, and Total Payments.
+     - **Warning Alert Banner**: Displays warning if uncompleted/pending bookings remain.
+3. **Zero Fake Data Policy**:
+   - All KPIs, booking rows, doctors, services, performance metrics, and payment amounts are queried live from Supabase tables (`hr_attendance`, `reservations`, `transactions`, `payments`, `employee_accounts`, `providers`, `services`).
+4. **Bilingual Localization (EN / AR)**:
+   - Complete dictionary parity across English and Arabic under `reception.dashboard` in `translations.ts` with RTL layout support.
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-050` (`Reception Dashboard Shift State & Performance Metrics Engine`).
