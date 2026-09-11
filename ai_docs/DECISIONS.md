@@ -1975,3 +1975,23 @@ The clinic reception dashboard required dynamic responsiveness to shift state (N
 5. **System Test Suite Integration:**
    - Added `TC-051` (`Unified Staff Login & Customer Dropdown Real-Time Sync Engine`) to `INITIAL_SYSTEM_TEST_SUITES`.
 
+---
+
+## DEC-055: Strict Floating WhatsApp Button Staff/Admin Isolation & Dashboard Date Timezone Alignment
+
+**Date:** 2026-09-12
+**Status:** Decided & Implemented
+
+**Context:**
+1. The floating WhatsApp customer contact widget was inadvertently rendering on role-based staff routes (`/doctor`, `/reception`, `/superadmin`, `/login`, etc.) when only `/admin` was explicitly suppressed in the legacy check.
+2. Reception Dashboard was showing "No bookings scheduled for today" when bookings existed for today due to UTC timezone truncation (`toISOString().split('T')[0]`), which lagged behind local Egypt time (`Africa/Cairo`, UTC+2/UTC+3) after midnight.
+
+**Decisions & Implementation:**
+1. **Strict Customer-Only Page Allowlist for WhatsApp Floating Button:**
+   - Updated `src/components/WhatsappButton.tsx` to strictly allow rendering only on public customer marketing routes (`/`, `/about`, `/services`, `/contact`, `/book`, `/blog`, `/terms`, `/profile`).
+   - Suppressed completely for `/login`, `/admin`, `/doctor`, `/reception`, `/superadmin`, `/hr`, `/auth/*`, any active staff session (`revera_admin_session_active`), or when `.admin-view` / `#admin-root` is present in the DOM.
+2. **Timezone-Aligned Date Matching for Today's Bookings:**
+   - Updated `/api/reception/dashboard/route.ts` to compute local Egypt date (`toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' })`) alongside UTC and query with `.in("date", dateCandidates)` to eliminate timezone discrepancies.
+   - Updated `ReceptionDashboardView.tsx` to pass the local client date parameter (`?date=YYYY-MM-DD`), listen to booking updates, and bind props fallback (`todayReservations={allReservations}`).
+
+

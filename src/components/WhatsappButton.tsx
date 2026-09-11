@@ -16,9 +16,33 @@ export function WhatsappButton() {
 
   if (!mounted) return null;
 
-  // Hide WhatsApp button on admin panels or employee setup pages
-  if (pathname?.startsWith("/admin") || pathname?.startsWith("/auth/setup")) {
+  // Strict check: Only show WhatsApp floating button on public customer pages
+  const publicCustomerPages = ["/", "/about", "/services", "/contact", "/book", "/blog", "/terms", "/profile"];
+  const isPublicPage = publicCustomerPages.includes(pathname || "");
+
+  // Hide WhatsApp button on all admin/staff portals, login, setup, doctor, reception, etc.
+  if (
+    !isPublicPage ||
+    pathname?.startsWith("/admin") ||
+    pathname?.startsWith("/auth") ||
+    pathname === "/login" ||
+    pathname === "/doctor" ||
+    pathname === "/reception" ||
+    pathname === "/superadmin" ||
+    pathname === "/hr"
+  ) {
     return null;
+  }
+
+  // Double check session or DOM for staff views
+  if (typeof window !== "undefined") {
+    if (
+      sessionStorage.getItem("revera_admin_session_active") === "true" ||
+      document.getElementById("admin-root") ||
+      document.querySelector(".admin-view")
+    ) {
+      return null;
+    }
   }
 
   const whatsappUrl = `https://api.whatsapp.com/send/?phone=${CLIENT.whatsappNumber}&text=${encodeURIComponent(CLIENT.whatsappGreeting)}&type=phone_number&app_absent=0`;

@@ -46,6 +46,7 @@ interface ReceptionDashboardViewProps {
   activeBranchName?: string;
   activeBranchNameAr?: string;
   branchId?: string | null;
+  todayReservations?: any[];
   lang?: "en" | "ar";
   t?: any;
 }
@@ -66,6 +67,7 @@ export default function ReceptionDashboardView({
   activeBranchName = "New Cairo Branch",
   activeBranchNameAr = "فرع التجمع الخامس",
   branchId,
+  todayReservations,
   lang = "en",
   t
 }: ReceptionDashboardViewProps) {
@@ -73,10 +75,12 @@ export default function ReceptionDashboardView({
   const effectiveName = dashboardData?.receptionist?.name || receptionistName || "Employee";
   const [loading, setLoading] = useState(true);
   const [shiftProcessing, setShiftProcessing] = useState(false);
-  const [liveElapsedSeconds, setLiveElapsedSeconds] = useState(0);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [showStartShiftPopup, setShowStartShiftPopup] = useState(false);
   const [showEndShiftModal, setShowEndShiftModal] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
+  const [showAllAlertsModal, setShowAllAlertsModal] = useState(false);
+  const [alertsFilter, setAlertsFilter] = useState<string>("all");
+  const [liveElapsedSeconds, setLiveElapsedSeconds] = useState(0);
   const [hasAutoPrompted, setHasAutoPrompted] = useState(false);
   const [activeBookingMenuId, setActiveBookingMenuId] = useState<string | number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -99,6 +103,12 @@ export default function ReceptionDashboardView({
       const params = new URLSearchParams();
       if (employeeId) params.set("employeeId", employeeId);
       if (email) params.set("email", email);
+      if (branchId && branchId !== "All") params.set("branchId", branchId);
+
+      // Send local client date in YYYY-MM-DD
+      const now = new Date();
+      const localTodayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      params.set("date", localTodayStr);
 
       const res = await fetch(`/api/reception/dashboard?${params.toString()}`, {
         cache: "no-store",
@@ -125,7 +135,19 @@ export default function ReceptionDashboardView({
   useEffect(() => {
     if (!accessToken) return;
     fetchDashboardData();
-  }, [employeeId, email, accessToken]);
+
+    const handleRefresh = () => {
+      fetchDashboardData();
+    };
+
+    window.addEventListener("focus", handleRefresh);
+    window.addEventListener("revera-booking-change", handleRefresh);
+
+    return () => {
+      window.removeEventListener("focus", handleRefresh);
+      window.removeEventListener("revera-booking-change", handleRefresh);
+    };
+  }, [employeeId, email, accessToken, branchId]);
 
   // Real-time live timer calculated from shift interval start
   useEffect(() => {
@@ -380,8 +402,45 @@ export default function ReceptionDashboardView({
     });
   }, []);
 
+  // Fallback today bookings from props if dashboard API is loading or returned empty
+  const fallbackBookingsList = useMemo(() => {
+    if (!Array.isArray(todayReservations) || todayReservations.length === 0) return [];
+    const now = new Date();
+    const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const egyptToday = now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
+    const utcToday = now.toISOString().split("T")[0];
+
+    return todayReservations
+      .filter((r: any) => {
+        if (!r.date) return false;
+        const dStr = String(r.date).slice(0, 10);
+        return dStr === localToday || dStr === egyptToday || dStr === utcToday;
+      })
+      .map((r: any) => ({
+        id: r.id,
+        time: r.timeSlot || r.time_slot || r.requestedTime || r.requested_time || "09:00 AM",
+        patientName: r.name || r.patient_name || r.patientName || "Patient",
+        patientPhone: r.phone || r.mobile || "—",
+        doctorName: r.doctorName || r.doctor_name || "Dr. Assigned",
+        doctorSpecialty: r.specialty || "Specialist",
+        doctorImage: null,
+        service: r.serviceName || r.service || (r.serviceId ? `Service #${r.serviceId}` : "Consultation"),
+        status: r.status || "confirmed",
+        paymentStatus: r.amountPaid && Number(r.amountPaid) > 0 ? "Paid" : "Unpaid",
+        amountPaid: Number(r.amountPaid || r.amount_paid || 0),
+        amountLeft: Number(r.amountLeft || r.amount_left || 0),
+        totalPrice: Number(r.cost || r.totalPrice || r.amountPaid || 0),
+        raw: r
+      }));
+  }, [todayReservations]);
+
+  // Bookings list
+  const bookingsList = (Array.isArray(dashboardData?.bookings?.list) && dashboardData.bookings.list.length > 0)
+    ? dashboardData.bookings.list
+    : fallbackBookingsList;
+
   // Overview metrics
-  const todayBookingsCount = dashboardData?.overview?.todayBookingsCount ?? dashboardData?.bookings?.todayCount ?? 0;
+  const todayBookingsCount = dashboardData?.overview?.todayBookingsCount ?? dashboardData?.bookings?.todayCount ?? bookingsList.length;
   const pendingApprovalCount = dashboardData?.overview?.pendingApprovalCount ?? dashboardData?.bookings?.pendingCount ?? 0;
   const expectedPayments = dashboardData?.overview?.expectedPayments ?? 0;
   const upcomingConfirmationsCount = dashboardData?.overview?.upcomingConfirmationsCount ?? 0;
@@ -402,9 +461,6 @@ export default function ReceptionDashboardView({
 
   // Pending items count
   const pendingItemsCount = dashboardData?.pendingItems?.pendingBookingsCount ?? pendingApprovalCount;
-
-  // Bookings list
-  const bookingsList = Array.isArray(dashboardData?.bookings?.list) ? dashboardData.bookings.list : [];
 
   const resolveLocationError = (code: string | null) => {
     if (!code) return null;

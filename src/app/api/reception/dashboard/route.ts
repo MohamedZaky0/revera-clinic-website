@@ -50,8 +50,16 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const employeeIdParam = searchParams.get("employeeId");
     const emailParam = searchParams.get("email");
+    const dateParam = searchParams.get("date");
+    const branchIdParam = searchParams.get("branchId");
 
-    const todayStr = new Date().toISOString().split("T")[0];
+    // Local Egypt (Africa/Cairo) and UTC date handling to eliminate timezone offset discrepancies
+    const now = new Date();
+    const egyptTodayStr = now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
+    const utcTodayStr = now.toISOString().split("T")[0];
+    const targetDateStr = (dateParam && dateParam.trim()) ? dateParam.trim() : utcTodayStr;
+    const dateCandidates = Array.from(new Set([targetDateStr, egyptTodayStr, utcTodayStr].filter(Boolean)));
+    const todayStr = targetDateStr;
 
     // 1. Resolve Receptionist Employee Account from DB
     let employeeQuery = supabaseServer.from("employee_accounts").select("*");
@@ -81,7 +89,9 @@ export async function GET(req: Request) {
         .from("hr_attendance")
         .select("*")
         .eq("employee_id", empId)
-        .eq("date", todayStr)
+        .in("date", dateCandidates)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
       attendanceRecord = att;
     }
@@ -248,13 +258,39 @@ export async function GET(req: Request) {
     }
 
     // 6. Fetch Real Today's Bookings from DB
-    const { data: reservationsToday } = await supabaseServer
+    let resQuery = supabaseServer
       .from("reservations")
       .select("*")
-      .eq("date", todayStr)
+      .in("date", dateCandidates)
+      .neq("is_historical", true)
       .order("time_slot", { ascending: true });
 
-    const realTodayBookings = Array.isArray(reservationsToday) ? reservationsToday : [];
+    if (branchIdParam && branchIdParam !== "All" && branchIdParam !== "") {
+      resQuery = resQuery.or(`branch_id.eq.${branchIdParam},branch_id.is.null`);
+    }
+
+    const { data: reservationsToday } = await resQuery;
+
+    let realTodayBookings = Array.isArray(reservationsToday) ? reservationsToday : [];
+
+    // Fallback if no direct match: query dates starting with todayStr prefix
+    if (realTodayBookings.length === 0) {
+      let fallbackQuery = supabaseServer
+        .from("reservations")
+        .select("*")
+        .ilike("date", `${todayStr}%`)
+        .neq("is_historical", true)
+        .order("time_slot", { ascending: true });
+
+      if (branchIdParam && branchIdParam !== "All" && branchIdParam !== "") {
+        fallbackQuery = fallbackQuery.or(`branch_id.eq.${branchIdParam},branch_id.is.null`);
+      }
+
+      const { data: fallbackReservations } = await fallbackQuery;
+      if (Array.isArray(fallbackReservations) && fallbackReservations.length > 0) {
+        realTodayBookings = fallbackReservations;
+      }
+    }
 
     // Helper for formatting time (e.g. 10:00 AM)
     const formatTimeSlot = (timeStr?: string): string => {
@@ -722,7 +758,12 @@ export async function POST(req: Request) {
 
     const isSuperadmin = (employeeRecord?.role_name || role || "").toLowerCase() === "superadmin";
 
-    const todayStr = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const egyptTodayStr = now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
+    const utcTodayStr = now.toISOString().split("T")[0];
+    const targetDateStr = (body.date && String(body.date).trim()) ? String(body.date).trim() : utcTodayStr;
+    const dateCandidates = Array.from(new Set([targetDateStr, egyptTodayStr, utcTodayStr].filter(Boolean)));
+    const todayStr = targetDateStr;
     const nowIso = new Date().toISOString();
 
     if (action === "start_shift") {
@@ -730,7 +771,9 @@ export async function POST(req: Request) {
         .from("hr_attendance")
         .select("*")
         .eq("employee_id", empId)
-        .eq("date", todayStr)
+        .in("date", dateCandidates)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (fetchError) throw fetchError;
@@ -916,7 +959,9 @@ export async function POST(req: Request) {
         .from("hr_attendance")
         .select("*")
         .eq("employee_id", empId)
-        .eq("date", todayStr)
+        .in("date", dateCandidates)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (fetchError) throw fetchError;
