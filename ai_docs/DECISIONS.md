@@ -1915,3 +1915,63 @@ check, so `admin` could be stripped to zero permissions while still being undele
 `supabase/migrations/20260910000000_add_locked_to_roles.sql` adds the column and backfills the five
 legacy names. Both former copies of the hardcoded array are gone.
 **Manual test checklist:** `ai_docs/manual_tests/ROLE_LOCK_UNLOCK_MANUAL_TESTS.md`
+
+---
+
+## DEC-053: Dynamic Reception Dashboard Shift States & Live Performance/Payment Settlement
+
+**Date:** 2026-09-12
+**Status:** Decided & Implemented
+
+**Context:**
+The clinic reception dashboard required dynamic responsiveness to shift state (Not Started, In Progress, Completed), live timers, operational actions, pending warnings, and real end-of-shift reconciliation with zero fake data.
+
+**Decisions & Implementation:**
+1. **Dynamic Shift State Architecture:**
+   - Designed a single unified dashboard component (`ReceptionDashboardView.tsx`) dynamically morphing across State 1 (Start of Day), State 2 (During Day), and State 3 (End of Day).
+   - In State 1 & 2: Renders Today's Overview cards (`Today's Bookings`, `Pending Approval`, `Expected Payments`), Quick Actions (`+ New Booking`, `+ New Patient`), Attention Needed alerts, and Today's Bookings table with 3-dots actions dropdown (`View Booking Details`, `View Transactions`, `Pending Approvals`).
+   - In State 3: Switches to End of Day review displaying total worked duration, Today's Performance (Completed, Cancelled, No-Shows), and Payments Received breakdown.
+2. **Real Database Aggregation & Zero Fake Data:**
+   - Replaced all static estimates with live queries against Supabase tables (`hr_attendance`, `reservations`, `transactions`, `payments`, `employee_accounts`, `providers`, `services`).
+   - Payment method breakdown aggregates real transactions and receipts across Cash, InstaPay, Visa/Card, and Wallet balances without double counting.
+3. **End Shift Confirmation Dialog:**
+   - Displays live summary, performance breakdown, payments received by payment method, and a yellow warning banner for uncompleted bookings before confirming shift termination.
+4. **Bilingual Parity (EN/AR):**
+   - Full localization under `adminTranslations[lang].reception.dashboard` supporting RTL and LTR viewports.
+5. **System Test Verification:**
+   - Added test suite `TC-050` (`Reception Dashboard Shift State & Performance Metrics Engine`) to the diagnostic test suite.
+
+---
+
+## DEC-054: Unified Staff Login Portal (`/login`) & Shaded Customer Login Navigation Dropdown
+
+**Date:** 2026-09-12
+**Status:** Decided & Implemented
+
+**Context:**
+1. When deactivating customer login from Admin Settings -> Pages Settings -> Home, users requested that the customer login option remain visible but shaded/grayed out rather than removed entirely, ensuring consistent layout and clear affordance.
+2. Changes to settings needed to reflect instantly in open tabs and customer view without requiring page reloads.
+3. The public navigation login trigger required a dropdown providing two distinct entry points: Patient/Customer Login and Clinic Staff & Doctors Login.
+4. All clinic staff needed a single unified login portal at `/login` that automatically routes them to their authorized role portal (`/admin`, `/doctor`, `/reception`, `/superadmin`, or `/<role-slug>`).
+
+**Decisions & Implementation:**
+1. **Shaded Customer Login Preservation:**
+   - Updated `Navbar.tsx` (desktop and mobile) so that when `showCustomerLogin === false`, the Customer Login option is rendered with `opacity-50`, disabled cursor, and an informative "Deactivated" / "معطل" badge instead of disappearing.
+2. **Instant Multi-Channel Real-Time Sync:**
+   - Enhanced `HomePageSettingsView.tsx` with 3-tier real-time broadcast:
+     - Custom DOM Event: `window.dispatchEvent(new CustomEvent("revera-settings-change", { detail: { showCustomerLogin } }))`
+     - Broadcast Channel: `new BroadcastChannel("revera_channel").postMessage(...)`
+     - LocalStorage Sync: `localStorage.setItem("revera_settings_sync", ...)`
+   - `Navbar.tsx` registers event, broadcast, and storage listeners with fallback focus checks, updating the navigation state in real time across all open tabs.
+3. **Public Navigation Login Dropdown:**
+   - Replaced single login button with an elegant luxury dropdown:
+     - **Option 1**: Patient & Customer Login (opens auth modal/profile, shaded when disabled).
+     - **Option 2**: Clinic Staff & Doctors (links directly to `/login`).
+4. **Unified Staff Login Portal (`src/app/login/page.tsx`):**
+   - Implemented a branded login portal at `/login` accepting Email or Employee ID (`REV-XXXX`).
+   - Customer account guard blocks patient emails from accessing staff portals.
+   - On successful authentication, inspects user role via `/api/auth/me`, sets session indicator, and auto-routes staff to `/${getRoleSlug(role)}` (e.g. `/doctor`, `/reception`, `/admin`).
+   - Automatically detects existing valid staff sessions and forwards directly to their workspace.
+5. **System Test Suite Integration:**
+   - Added `TC-051` (`Unified Staff Login & Customer Dropdown Real-Time Sync Engine`) to `INITIAL_SYSTEM_TEST_SUITES`.
+

@@ -26,21 +26,74 @@ Diagnostics: checks which Supabase env vars are present and previews their value
 
 ## GET /api/reception/dashboard
 
-Returns Reception Dashboard metrics for today including shift status, elapsed work duration, personal revenue target calculations, and today's bookings overview.
+Returns Reception Dashboard metrics for today including shift status, live elapsed work duration, overview KPIs (`todayBookingsCount`, `pendingApprovalCount`, `expectedPayments`, `upcomingConfirmationsCount`), performance metrics (`completedCount`, `cancelledCount`, `noShowsCount`), real payment breakdown across `transactions` and `payments` (`cash`, `visa`, `instapay`, `wallet`, `totalPayments`), pending uncompleted bookings count (`pendingBookingsCount`), and enriched today's bookings list.
 
-**Query Params:** `employeeId` (optional), `email` (optional)
+**Query Params:** `employeeId` (optional), `email` (optional), `branchId` (optional)
 
-**Response:** `{ success: true, receptionist: {...}, shift: {...}, target: {...}, bookings: {...} }`
+**Response:**
+```json
+{
+  "success": true,
+  "receptionist": { "id": "string", "name": "string", "role": "string", "branch": "string", "email": "string" },
+  "shift": {
+    "status": "not_started" | "in_progress" | "completed",
+    "scheduledStart": "string",
+    "scheduledEnd": "string",
+    "actualStartingTime": "string",
+    "actualEndingTime": "string",
+    "totalWorkingHours": "string",
+    "elapsedSeconds": number,
+    "gpsShiftEnabled": boolean
+  },
+  "overview": {
+    "todayBookingsCount": number,
+    "pendingApprovalCount": number,
+    "expectedPayments": number,
+    "upcomingConfirmationsCount": number
+  },
+  "performance": {
+    "completedCount": number,
+    "cancelledCount": number,
+    "noShowsCount": number
+  },
+  "payments": {
+    "cash": number,
+    "visa": number,
+    "instapay": number,
+    "wallet": number,
+    "totalPayments": number
+  },
+  "pendingBookingsCount": number,
+  "bookings": {
+    "today": [
+      {
+        "id": "string",
+        "time": "string",
+        "patientName": "string",
+        "patientPhone": "string",
+        "doctorName": "string",
+        "doctorSpecialty": "string",
+        "doctorImage": "string",
+        "service": "string",
+        "status": "string",
+        "paymentStatus": "Paid" | "Unpaid" | "Partial",
+        "raw": object
+      }
+    ]
+  }
+}
+```
 
 ---
 
 ## POST /api/reception/dashboard
 
-Starts or ends receptionist daily shift attendance persisted to `hr_attendance`.
+Starts or ends receptionist daily shift attendance persisted to `hr_attendance` with GPS boundary checks and multi-session interval tracking.
 
-**Body:** `{ action: "start_shift" | "end_shift", employeeId?: string, email?: string }`
+**Body:** `{ action: "start_shift" | "end_shift", employeeId?: string, email?: string, latitude?: number, longitude?: number, accuracy?: number }`
 
-**Response:** `{ success: true, action: string, attendance: object }`
+**Response:** `{ success: true, action: "start_shift" | "end_shift", attendance: object }`
+
 
 ---
 

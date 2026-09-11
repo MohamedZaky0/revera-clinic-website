@@ -2254,11 +2254,30 @@ export const adminTranslations = {
     },
     reception: {
       dashboard: {
-        // Today's Shift
+        // Page & Greetings
+        receptionDashboard: "Reception Dashboard",
+        goodMorning: "Good Morning",
+        goodAfternoon: "Good Afternoon",
+        goodEvening: "Good Evening",
+        morningSubtitle: "Let's make today a great day at Revera Clinics.",
+        afternoonSubtitle: "You're doing great! Keep it up.",
+        shiftCompletedGreeting: "Shift Completed",
+        shiftCompletedSubtitle: "Great work today! Here's a summary of your shift.",
+
+        // Today's Shift & Shift Summary Card
         shiftTitle: "Today's Shift",
+        shiftSummaryTitle: "Shift Summary",
         shiftSubtitle: "Your scheduled working hours",
+        todayDate: "Today's Date",
+        shiftStart: "Shift Start",
+        shiftEnd: "Shift End",
+        workingHours: "Working Hours",
         startShift: "Start Shift",
         endShift: "End Shift",
+        shiftInProgress: "Shift in Progress",
+        shiftCompleted: "Shift Completed",
+        completedStatus: "Completed",
+        notStarted: "Not Started",
         updating: "Updating...",
         collapseSection: "Collapse section",
         expandSection: "Expand section",
@@ -2267,7 +2286,71 @@ export const adminTranslations = {
         status: "Status",
         shiftStarted: "Shift Started",
         shiftEnded: "Shift Ended",
-        notStarted: "Not Started",
+
+        // Today's Overview
+        todaysOverview: "Today's Overview",
+        todaysBookings: "Today's Bookings",
+        scheduledForToday: "Scheduled for today",
+        pendingApproval: "Pending Approval",
+        bookingsWaitingForAction: "Bookings waiting for action",
+        expectedPayments: "Expected Payments",
+        toBeCollectedToday: "To be collected today",
+
+        // Quick Actions & Attention Needed
+        quickActions: "Quick Actions",
+        newBooking: "New Booking",
+        newPatient: "New Patient",
+        attentionNeeded: "Attention Needed",
+        viewAll: "View All",
+        bookingsPendingApproval: "bookings pending approval",
+        needYourConfirmation: "Need your confirmation",
+        upcomingConfirmations: "upcoming confirmations",
+        inTheNext30Minutes: "In the next 30 minutes",
+
+        // Today's Bookings Table
+        time: "Time",
+        patient: "Patient",
+        doctor: "Doctor",
+        service: "Service",
+        payment: "Payment",
+        paymentStatus: "Payment Status",
+        action: "Action",
+        viewBookingDetails: "View Booking Details",
+        noBookingsToday: "No bookings scheduled for today.",
+        paid: "Paid",
+        unpaid: "Unpaid",
+        partial: "Partial",
+
+        // Today's Performance (End of Day)
+        todaysPerformance: "Today's Performance",
+        completedBookings: "Completed Bookings",
+        bookingsFinished: "Bookings finished",
+        cancelled: "Cancelled",
+        bookingsCancelled: "Bookings cancelled",
+        noShows: "No Shows",
+        didNotAttend: "Did not attend",
+
+        // Payments Received
+        paymentsReceived: "Payments Received",
+        cash: "Cash",
+        visa: "Visa",
+        instapay: "InstaPay",
+        wallet: "Wallet",
+        totalPayments: "Total Payments",
+        totalPaymentsReceived: "Total Payments Received",
+        viewDetails: "View Details",
+
+        // Pending Items Bar
+        pendingItems: "Pending Items",
+        pendingBookingsAlert: "There are {count} pending bookings that were not completed today.",
+        view: "View",
+
+        // End Shift Confirmation Modal
+        endShiftModalTitle: "End Shift",
+        endShiftModalSubtitle: "Are you sure you want to end your shift? Please review the summary below before confirming.",
+        currentTime: "Current Time",
+        endShiftWarningIncomplete: "You have {count} pending bookings that were not completed.",
+        cancel: "Cancel",
 
         // Notifications & Alerts
         notificationsTitle: "Notifications & Alerts",
@@ -2275,24 +2358,7 @@ export const adminTranslations = {
         viewAllAlerts: "View All Alerts",
         noActiveAlerts: "No active notifications or alerts.",
 
-        // Bookings
-        bookingsTitle: "Bookings",
-        bookingsSubtitle: "Quick overview of today's bookings",
-        viewAllBookings: "View All Bookings",
-        totalBookings: "Total Bookings",
-        pendingApproval: "Pending Approval",
-        confirmed: "Confirmed",
-        completed: "Completed",
-        cancelled: "Cancelled",
-        time: "Time",
-        patient: "Patient",
-        doctor: "Doctor",
-        service: "Service",
-        confirmedBadge: "Confirmed",
-        pendingBadge: "Pending Approval",
-        noBookingsToday: "No bookings scheduled for today.",
-
-        // Today's Summary
+        // Legacy / Target / Summary
         summaryTitle: "Today's Summary",
         summarySubtitle: "Overview of your daily performance",
         scheduledToday: "Scheduled Today",
@@ -2300,17 +2366,19 @@ export const adminTranslations = {
         currentStatus: "Current Status",
         active: "Active",
         idle: "Idle",
-
-        // Recent Activities
-        activitiesTitle: "Recent Activities",
-        activitiesSubtitle: "Your latest actions and updates",
-        noRecentActivities: "No recent actions recorded today.",
+        totalBookings: "Total Bookings",
+        confirmed: "Confirmed",
+        completed: "Completed",
+        confirmedBadge: "Confirmed",
+        pendingBadge: "Pending Approval",
+        viewAllBookings: "View All Bookings",
+        bookingsTitle: "Bookings",
+        bookingsSubtitle: "Quick overview of today's bookings",
 
         // Start Shift Popup
         startShiftGreeting: "Hi,",
         startShiftPrompt: "Start your shift now to track your work and stay organized.",
         verifyingLocation: "Verifying Location...",
-        cancel: "Cancel",
 
         // Location errors (resolved at render from error codes)
         errors: {
@@ -4729,10 +4797,30 @@ export const adminTranslations = {
     },
     reception: {
       dashboard: {
+        // Page & Greetings
+        receptionDashboard: "لوحة تحكم الاستقبال",
+        goodMorning: "صباح الخير",
+        goodAfternoon: "مساء الخير",
+        goodEvening: "مساء الخير",
+        morningSubtitle: "لنصنع يوماً رائعاً اليوم في عيادات ريفيرا.",
+        afternoonSubtitle: "أنت تقوم بعمل رائع! استمر في ذلك.",
+        shiftCompletedGreeting: "انتهت الوردية",
+        shiftCompletedSubtitle: "عمل رائع اليوم! إليك ملخص ورديتك.",
+
+        // Today's Shift & Shift Summary Card
         shiftTitle: "وردية اليوم",
+        shiftSummaryTitle: "ملخص الوردية",
         shiftSubtitle: "ساعات عملك المجدولة",
+        todayDate: "تاريخ اليوم",
+        shiftStart: "بداية الوردية",
+        shiftEnd: "نهاية الوردية",
+        workingHours: "ساعات العمل",
         startShift: "بدء الوردية",
         endShift: "إنهاء الوردية",
+        shiftInProgress: "الوردية جارية",
+        shiftCompleted: "انتهت الوردية",
+        completedStatus: "مكتمل",
+        notStarted: "لم تبدأ",
         updating: "جارٍ التحديث...",
         collapseSection: "طي القسم",
         expandSection: "توسيع القسم",
@@ -4741,29 +4829,79 @@ export const adminTranslations = {
         status: "الحالة",
         shiftStarted: "الوردية بدأت",
         shiftEnded: "الوردية انتهت",
-        notStarted: "لم تبدأ",
 
+        // Today's Overview
+        todaysOverview: "ملخص اليوم",
+        todaysBookings: "حجوزات اليوم",
+        scheduledForToday: "المجدولة لليوم",
+        pendingApproval: "في انتظار الموافقة",
+        bookingsWaitingForAction: "حجوزات في انتظار الإجراء",
+        expectedPayments: "المدفوعات المتوقعة",
+        toBeCollectedToday: "المتوقع تحصيله اليوم",
+
+        // Quick Actions & Attention Needed
+        quickActions: "الإجراءات السريعة",
+        newBooking: "حجز جديد",
+        newPatient: "مريض جديد",
+        attentionNeeded: "يحتاج إلى إجراء",
+        viewAll: "عرض الكل",
+        bookingsPendingApproval: "حجوزات في انتظار الموافقة",
+        needYourConfirmation: "يحتاج لتأكيدك",
+        upcomingConfirmations: "تأكيدات قادمة",
+        inTheNext30Minutes: "في الـ 30 دقيقة القادمة",
+
+        // Today's Bookings Table
+        time: "الوقت",
+        patient: "المريض",
+        doctor: "الطبيب",
+        service: "الخدمة",
+        payment: "الدفع",
+        paymentStatus: "حالة الدفع",
+        action: "الإجراء",
+        viewBookingDetails: "عرض تفاصيل الحجز",
+        noBookingsToday: "لا توجد حجوزات مجدولة اليوم.",
+        paid: "مدفوع",
+        unpaid: "غير مدفوع",
+        partial: "جزئي",
+
+        // Today's Performance (End of Day)
+        todaysPerformance: "أداء اليوم",
+        completedBookings: "الحجوزات المكتملة",
+        bookingsFinished: "الحجوزات المنتهية",
+        cancelled: "ملغى",
+        bookingsCancelled: "الحجوزات الملغاة",
+        noShows: "لم يحضر",
+        didNotAttend: "لم يحضروا",
+
+        // Payments Received
+        paymentsReceived: "المدفوعات المستلمة",
+        cash: "نقدي",
+        visa: "فيزا",
+        instapay: "إنستا باي",
+        wallet: "المحفظة",
+        totalPayments: "إجمالي المدفوعات",
+        totalPaymentsReceived: "إجمالي المدفوعات المستلمة",
+        viewDetails: "عرض التفاصيل",
+
+        // Pending Items Bar
+        pendingItems: "عناصر معلقة",
+        pendingBookingsAlert: "يوجد {count} حجوزات معلقة لم تكتمل اليوم.",
+        view: "عرض",
+
+        // End Shift Confirmation Modal
+        endShiftModalTitle: "إنهاء الوردية",
+        endShiftModalSubtitle: "هل أنت متأكد من رغبتك في إنهاء ورديتك؟ يرجى مراجعة الملخص أدناه قبل التأكيد.",
+        currentTime: "الوقت الحالي",
+        endShiftWarningIncomplete: "لديك {count} حجوزات معلقة لم تكتمل بعد.",
+        cancel: "إلغاء",
+
+        // Notifications & Alerts
         notificationsTitle: "الإشعارات والتنبيهات",
         notificationsSubtitle: "تحديثات مهمة تتطلب انتباهك",
         viewAllAlerts: "عرض كل التنبيهات",
         noActiveAlerts: "لا توجد إشعارات أو تنبيهات نشطة.",
 
-        bookingsTitle: "الحجوزات",
-        bookingsSubtitle: "نظرة سريعة على حجوزات اليوم",
-        viewAllBookings: "عرض كل الحجوزات",
-        totalBookings: "إجمالي الحجوزات",
-        pendingApproval: "بانتظار الموافقة",
-        confirmed: "مؤكد",
-        completed: "مكتمل",
-        cancelled: "ملغي",
-        time: "الوقت",
-        patient: "المريض",
-        doctor: "الطبيب",
-        service: "الخدمة",
-        confirmedBadge: "مؤكد",
-        pendingBadge: "بانتظار الموافقة",
-        noBookingsToday: "لا توجد حجوزات مجدولة اليوم.",
-
+        // Legacy / Target / Summary
         summaryTitle: "ملخص اليوم",
         summarySubtitle: "نظرة عامة على أدائك اليومي",
         scheduledToday: "مجدول اليوم",
@@ -4771,15 +4909,19 @@ export const adminTranslations = {
         currentStatus: "الحالة الحالية",
         active: "نشط",
         idle: "خامل",
+        totalBookings: "إجمالي الحجوزات",
+        confirmed: "مؤكد",
+        completed: "مكتمل",
+        confirmedBadge: "مؤكد",
+        pendingBadge: "بانتظار الموافقة",
+        viewAllBookings: "عرض كل الحجوزات",
+        bookingsTitle: "الحجوزات",
+        bookingsSubtitle: "نظرة سريعة على حجوزات اليوم",
 
-        activitiesTitle: "الأنشطة الأخيرة",
-        activitiesSubtitle: "آخر إجراءاتك وتحديثاتك",
-        noRecentActivities: "لا توجد إجراءات حديثة مسجلة اليوم.",
-
+        // Start Shift Popup
         startShiftGreeting: "مرحباً،",
         startShiftPrompt: "ابدأ ورديتك الآن لتتبع عملك وتبقى منظماً.",
         verifyingLocation: "جارٍ التحقق من الموقع...",
-        cancel: "إلغاء",
 
         errors: {
           permission_denied: "يجب السماح بالوصول إلى الموقع لبدء ورديتك.",

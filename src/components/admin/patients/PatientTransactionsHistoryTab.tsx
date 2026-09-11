@@ -246,7 +246,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
                   }}
                   className={`w-full text-start px-3 py-1.5 rounded-xl font-semibold ${typeFilter === "all" ? "bg-emerald-50 text-emerald-800" : "text-gray-700 hover:bg-gray-50"}`}
                 >
-                  All Types
+                  {lang === "ar" ? "كل الأنواع" : "All Types"}
                 </button>
                 <button
                   type="button"
@@ -256,7 +256,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
                   }}
                   className={`w-full text-start px-3 py-1.5 rounded-xl font-semibold ${typeFilter === "payment" ? "bg-emerald-50 text-emerald-800" : "text-gray-700 hover:bg-gray-50"}`}
                 >
-                  Payment
+                  {lang === "ar" ? "دفع (Payment)" : "Payment"}
                 </button>
                 <button
                   type="button"
@@ -266,7 +266,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
                   }}
                   className={`w-full text-start px-3 py-1.5 rounded-xl font-semibold ${typeFilter === "outstanding_payment" ? "bg-emerald-50 text-emerald-800" : "text-gray-700 hover:bg-gray-50"}`}
                 >
-                  Outstanding Payment
+                  {lang === "ar" ? "سداد مديونية" : "Outstanding Payment"}
                 </button>
                 <button
                   type="button"
@@ -276,7 +276,27 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
                   }}
                   className={`w-full text-start px-3 py-1.5 rounded-xl font-semibold ${typeFilter === "wallet_topup" ? "bg-emerald-50 text-emerald-800" : "text-gray-700 hover:bg-gray-50"}`}
                 >
-                  Wallet Deposit
+                  {lang === "ar" ? "إيداع محفظة" : "Wallet Deposit"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTypeFilter("service_charge");
+                    setShowFilterDropdown(false);
+                  }}
+                  className={`w-full text-start px-3 py-1.5 rounded-xl font-semibold ${typeFilter === "service_charge" ? "bg-emerald-50 text-emerald-800" : "text-gray-700 hover:bg-gray-50"}`}
+                >
+                  {lang === "ar" ? "رسوم خدمة" : "Service Charge"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTypeFilter("product_purchase");
+                    setShowFilterDropdown(false);
+                  }}
+                  className={`w-full text-start px-3 py-1.5 rounded-xl font-semibold ${typeFilter === "product_purchase" ? "bg-emerald-50 text-emerald-800" : "text-gray-700 hover:bg-gray-50"}`}
+                >
+                  {lang === "ar" ? "شراء منتج / باقة" : "Product / Package Purchase"}
                 </button>
                 <button
                   type="button"
@@ -286,7 +306,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
                   }}
                   className={`w-full text-start px-3 py-1.5 rounded-xl font-semibold ${typeFilter === "refund" ? "bg-emerald-50 text-emerald-800" : "text-gray-700 hover:bg-gray-50"}`}
                 >
-                  Refund
+                  {lang === "ar" ? "استرداد" : "Refund"}
                 </button>
               </div>
             )}
@@ -300,7 +320,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
           className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#313A28] hover:bg-[#1F251A] text-[#FBFBF9] font-bold text-xs shadow-sm transition-all shrink-0"
         >
           <Plus size={14} />
-          <span>Add Transaction</span>
+          <span>{lang === "ar" ? "إضافة معاملة" : "Add Transaction"}</span>
         </button>
       </div>
 
@@ -316,33 +336,34 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
                     onClick={toggleSortOrder}
                     className="flex items-center gap-1 text-gray-600 hover:text-gray-900 transition-colors uppercase font-bold"
                   >
-                    <span>Date & Time</span>
+                    <span>{lang === "ar" ? "التاريخ والوقت" : "Date & Time"}</span>
                     <ArrowUpDown size={11} />
                   </button>
                 </th>
-                <th className="py-3 px-4 text-start">Transaction Type</th>
-                <th className="py-3 px-4 text-start">Description</th>
-                <th className="py-3 px-4 text-start">Payment Method</th>
-                <th className="py-3 px-4 text-start">Amount</th>
-                <th className="py-3 px-4 text-start">Status</th>
-                <th className="py-3 px-4 text-start">Source</th>
-                <th className="py-3 px-4 text-center">Actions</th>
+                <th className="py-3 px-4 text-start">{lang === "ar" ? "نوع المعاملة" : "Transaction Type"}</th>
+                <th className="py-3 px-4 text-start">{lang === "ar" ? "الوصف" : "Description"}</th>
+                <th className="py-3 px-4 text-start">{lang === "ar" ? "طريقة الدفع" : "Payment Method"}</th>
+                <th className="py-3 px-4 text-start">{lang === "ar" ? "المبلغ" : "Amount"}</th>
+                <th className="py-3 px-4 text-start">{lang === "ar" ? "الحالة" : "Status"}</th>
+                <th className="py-3 px-4 text-start">{lang === "ar" ? "المصدر" : "Source"}</th>
+                <th className="py-3 px-4 text-start">{lang === "ar" ? "المرجع" : "Reference"}</th>
+                <th className="py-3 px-4 text-center">{lang === "ar" ? "الإجراءات" : "Actions"}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400">
+                  <td colSpan={9} className="py-12 text-center text-gray-400">
                     <Loader2 className="animate-spin mx-auto mb-2" size={20} />
-                    <span>Loading patient transactions...</span>
+                    <span>{lang === "ar" ? "جاري تحميل المعاملات..." : "Loading patient transactions..."}</span>
                   </td>
                 </tr>
               ) : transactions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400">
+                  <td colSpan={9} className="py-12 text-center text-gray-400">
                     <AlertCircle className="mx-auto mb-2 text-gray-300" size={28} />
-                    <p className="font-bold text-gray-600">No transactions yet</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">This patient doesn't have any financial transactions.</p>
+                    <p className="font-bold text-gray-600">{lang === "ar" ? "لا توجد معاملات بعد" : "No transactions yet"}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{lang === "ar" ? "ليس لهذا المريض أي حركات مالية مسجلة." : "This patient doesn't have any financial transactions."}</p>
                   </td>
                 </tr>
               ) : (
@@ -350,6 +371,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
                   const isNegative = Number(tx.amount) < 0;
                   const absAmt = Math.abs(Number(tx.amount || 0));
                   const isDropdownOpen = activeDropdownTxnId === tx.id;
+                  const isManual = tx.source === "manual";
 
                   return (
                     <tr
@@ -406,8 +428,21 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
 
                       {/* Source */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold capitalize bg-gray-100 text-gray-700">
-                          {tx.source || "Manual"}
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
+                            isManual
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                              : "bg-sky-50 text-sky-700 border border-sky-200/60"
+                          }`}
+                        >
+                          {isManual ? (lang === "ar" ? "يدوي" : "Manual") : (lang === "ar" ? "آلي" : "Automatic")}
+                        </span>
+                      </td>
+
+                      {/* Reference */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-mono text-[11px] text-gray-500">
+                          {tx.reference_no || tx.invoice_no || tx.reservation_id || "—"}
                         </span>
                       </td>
 
@@ -428,7 +463,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
                         </button>
 
                         {isDropdownOpen && (
-                          <div className="absolute right-4 top-10 z-30 w-40 rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl text-xs text-start animate-in fade-in duration-100">
+                          <div className={`absolute ${lang === "ar" ? "left-4" : "right-4"} top-10 z-30 w-40 rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl text-xs text-start animate-in fade-in duration-100`}>
                             <button
                               type="button"
                               onClick={() => {
@@ -438,7 +473,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
                               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-gray-700 hover:bg-[#F9F9F7] font-semibold"
                             >
                               <Eye size={13} className="text-gray-500" />
-                              <span>View Transaction</span>
+                              <span>{lang === "ar" ? "عرض المعاملة" : "View Transaction"}</span>
                             </button>
                           </div>
                         )}

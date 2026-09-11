@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Phone, ChevronDown, User, LogOut } from "lucide-react";
+import { Phone, ChevronDown, User, LogOut, ShieldCheck, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { CLIENT } from "@/config/client";
 
@@ -23,6 +23,7 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [loginDropdownOpen, setLoginDropdownOpen] = useState(false);
   const [user, setUser] = useState<{ id?: string; name?: string; mobile?: string; email?: string; gender?: string | null } | null>(null);
   const [showCustomerLogin, setShowCustomerLogin] = useState(false);
   const isProfileIncomplete = !!(user && (!user.gender || !user.mobile || user.mobile.startsWith("guest_")));
@@ -45,13 +46,59 @@ export function Navbar() {
     };
     loadHeaderSettings();
 
-    const handleSettingsChange = () => {
+    const handleSettingsChange = (e?: any) => {
+      if (e?.detail?.showCustomerLogin !== undefined) {
+        setShowCustomerLogin(e.detail.showCustomerLogin);
+      } else {
+        loadHeaderSettings();
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "revera_settings_sync" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed.showCustomerLogin !== undefined) {
+            setShowCustomerLogin(parsed.showCustomerLogin);
+            return;
+          }
+        } catch {}
+        loadHeaderSettings();
+      }
+    };
+
+    window.addEventListener("revera-settings-change", handleSettingsChange);
+    window.addEventListener("storage", handleStorage);
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        bc = new BroadcastChannel("revera_channel");
+        bc.onmessage = (ev) => {
+          if (ev.data?.type === "settings_updated") {
+            if (ev.data.showCustomerLogin !== undefined) {
+              setShowCustomerLogin(ev.data.showCustomerLogin);
+            } else {
+              loadHeaderSettings();
+            }
+          }
+        };
+      } catch {}
+    }
+
+    const handleFocus = () => {
       loadHeaderSettings();
     };
-    window.addEventListener("revera-settings-change", handleSettingsChange);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
     return () => {
       isMounted = false;
       window.removeEventListener("revera-settings-change", handleSettingsChange);
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+      if (bc) bc.close();
     };
   }, []);
 
@@ -97,14 +144,18 @@ export function Navbar() {
   }, []);
 
   useEffect(() => {
-    const handleClickOutside = () => {
-      setLangOpen(false);
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && !target.closest(".lang-dropdown-container")) {
+        setLangOpen(false);
+      }
+      if (target && !target.closest(".login-dropdown-container")) {
+        setLoginDropdownOpen(false);
+      }
     };
-    if (langOpen) {
-      document.addEventListener("click", handleClickOutside);
-    }
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, [langOpen]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleBooking = () => {
     window.dispatchEvent(new CustomEvent("open-booking"));
@@ -273,7 +324,7 @@ export function Navbar() {
             )}
 
             {/* Language dropdown */}
-            <div style={{ position: "relative" }}>
+            <div className="lang-dropdown-container" style={{ position: "relative" }}>
               <button
                 onClick={() => setLangOpen(!langOpen)}
                 style={{
@@ -399,73 +450,44 @@ export function Navbar() {
             </div>
 
             {/* Login / User info button */}
-            {showCustomerLogin && (
-              user ? (
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <Link
-                    href="/profile"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      background: "rgba(90,61,52,0.05)",
-                      padding: "8px 14px",
-                      borderRadius: "8px",
-                      color: "var(--cr-primary)",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      textDecoration: "none",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.1)";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.05)";
-                    }}
-                  >
-                    <User size={16} />
-                    <span>{user.name || user.mobile}</span>
-                  </Link>
-                  {isProfileIncomplete && (
-                    <button
-                      onClick={handleCompleteProfile}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        background: "rgba(196,174,124,0.15)",
-                        color: "var(--cr-primary)",
-                        border: "1.5px solid var(--cr-accent)",
-                        padding: "8px 14px",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        fontWeight: 600,
-                        transition: "all 0.2s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-accent)";
-                        (e.currentTarget as HTMLButtonElement).style.color = "white";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.background = "rgba(196,174,124,0.15)";
-                        (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
-                      }}
-                    >
-                      <span>{isRTL ? "إكمال الملف" : "Complete Profile"}</span>
-                    </button>
-                  )}
+            {user ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <Link
+                  href="/profile"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: "rgba(90,61,52,0.05)",
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    color: "var(--cr-primary)",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.05)";
+                  }}
+                >
+                  <User size={16} />
+                  <span>{user.name || user.mobile}</span>
+                </Link>
+                {isProfileIncomplete && (
                   <button
-                    onClick={handleLogout}
+                    onClick={handleCompleteProfile}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       gap: "6px",
-                      background: "transparent",
+                      background: "rgba(196,174,124,0.15)",
                       color: "var(--cr-primary)",
-                      border: "1.5px solid var(--cr-primary)",
+                      border: "1.5px solid var(--cr-accent)",
                       padding: "8px 14px",
                       borderRadius: "8px",
                       cursor: "pointer",
@@ -474,21 +496,19 @@ export function Navbar() {
                       transition: "all 0.2s ease",
                     }}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-primary)";
-                      (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-white)";
+                      (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-accent)";
+                      (e.currentTarget as HTMLButtonElement).style.color = "white";
                     }}
                     onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(196,174,124,0.15)";
                       (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
                     }}
                   >
-                    <LogOut size={14} />
-                    <span>{isRTL ? "خروج" : "Logout"}</span>
+                    <span>{isRTL ? "إكمال الملف" : "Complete Profile"}</span>
                   </button>
-                </div>
-              ) : (
+                )}
                 <button
-                  onClick={handleAuth}
+                  onClick={handleLogout}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -496,13 +516,12 @@ export function Navbar() {
                     background: "transparent",
                     color: "var(--cr-primary)",
                     border: "1.5px solid var(--cr-primary)",
-                    padding: "10px 20px",
-                    borderRadius: "6px",
+                    padding: "8px 14px",
+                    borderRadius: "8px",
                     cursor: "pointer",
                     fontSize: "14px",
                     fontWeight: 600,
                     transition: "all 0.2s ease",
-                    whiteSpace: "nowrap",
                   }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-primary)";
@@ -513,10 +532,211 @@ export function Navbar() {
                     (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
                   }}
                 >
+                  <LogOut size={14} />
+                  <span>{isRTL ? "خروج" : "Logout"}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="login-dropdown-container" style={{ position: "relative" }}>
+                <button
+                  onClick={() => setLoginDropdownOpen((v) => !v)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: loginDropdownOpen ? "var(--cr-primary)" : "transparent",
+                    color: loginDropdownOpen ? "var(--cr-white)" : "var(--cr-primary)",
+                    border: "1.5px solid var(--cr-primary)",
+                    padding: "9px 18px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    transition: "all 0.2s ease",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loginDropdownOpen) {
+                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(65, 78, 54, 0.08)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!loginDropdownOpen) {
+                      (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                    }
+                  }}
+                >
                   <User size={16} />
                   <span>{t.nav.login}</span>
+                  <ChevronDown
+                    size={14}
+                    style={{
+                      transform: loginDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 0.2s ease",
+                    }}
+                  />
                 </button>
-              )
+
+                {loginDropdownOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      right: isRTL ? "auto" : 0,
+                      left: isRTL ? 0 : "auto",
+                      marginTop: "10px",
+                      background: "#FFFFFF",
+                      border: "1px solid #EBE8E0",
+                      borderRadius: "16px",
+                      boxShadow: "0 12px 36px rgba(31, 37, 26, 0.12)",
+                      zIndex: 1000,
+                      minWidth: "290px",
+                      padding: "8px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    {/* Option 1: Customer Login */}
+                    <div
+                      onClick={() => {
+                        if (showCustomerLogin) {
+                          setLoginDropdownOpen(false);
+                          handleAuth();
+                        }
+                      }}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        cursor: showCustomerLogin ? "pointer" : "not-allowed",
+                        opacity: showCustomerLogin ? 1 : 0.45,
+                        background: showCustomerLogin ? "transparent" : "#F9F9F7",
+                        transition: "all 0.2s ease",
+                        textAlign: isRTL ? "right" : "left",
+                        userSelect: "none",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (showCustomerLogin) {
+                          (e.currentTarget as HTMLDivElement).style.background = "#F4F6F2";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (showCustomerLogin) {
+                          (e.currentTarget as HTMLDivElement).style.background = "transparent";
+                        }
+                      }}
+                      title={!showCustomerLogin ? (t.nav.loginDisabledNotice || "Customer login is temporarily disabled by administration") : undefined}
+                    >
+                      <div
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "10px",
+                          background: showCustomerLogin ? "#EBF0E6" : "#EBEBEB",
+                          color: showCustomerLogin ? "#414E36" : "#888888",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <User size={18} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+                          <span style={{ fontSize: "13px", fontWeight: 700, color: "#1F251A" }}>
+                            {t.nav.customerLogin || "Patient & Customer Login"}
+                          </span>
+                          {!showCustomerLogin && (
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                padding: "2px 6px",
+                                borderRadius: "6px",
+                                background: "#E5E7EB",
+                                color: "#6B7280",
+                              }}
+                            >
+                              {isRTL ? "معطل" : "Deactivated"}
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: "11px", color: "#788272", margin: "2px 0 0 0", lineHeight: "1.3" }}>
+                          {t.nav.customerLoginDesc || "Access your appointments, profile & medical wallet"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Subtle Divider */}
+                    <div style={{ height: "1px", background: "#F0EEE6", margin: "2px 4px" }} />
+
+                    {/* Option 2: Staff Login */}
+                    <Link
+                      href="/login"
+                      onClick={() => setLoginDropdownOpen(false)}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        cursor: "pointer",
+                        textDecoration: "none",
+                        transition: "all 0.2s ease",
+                        textAlign: isRTL ? "right" : "left",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.background = "#F4F6F2";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.background = "transparent";
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "10px",
+                          background: "#FAF0E6",
+                          color: "#C4AE7C",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <ShieldCheck size={18} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+                          <span style={{ fontSize: "13px", fontWeight: 700, color: "#1F251A" }}>
+                            {t.nav.staffLogin || "Clinic Staff & Doctors"}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              padding: "2px 6px",
+                              borderRadius: "6px",
+                              background: "rgba(65, 78, 54, 0.1)",
+                              color: "#414E36",
+                            }}
+                          >
+                            Portal
+                          </span>
+                        </div>
+                        <p style={{ fontSize: "11px", color: "#788272", margin: "2px 0 0 0", lineHeight: "1.3" }}>
+                          {t.nav.staffLoginDesc || "Admin, doctor & reception portal"}
+                        </p>
+                      </div>
+                    </Link>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -722,91 +942,66 @@ export function Navbar() {
               </div>
 
               {/* Mobile login / user info button */}
-              {showCustomerLogin && (
-                user ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    <Link
-                      href="/profile"
-                      onClick={() => setMenuOpen(false)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        background: "rgba(90,61,52,0.05)",
-                        padding: "12px 16px",
-                        borderRadius: "6px",
-                        color: "var(--cr-primary)",
-                        fontSize: "14px",
-                        fontWeight: 600,
-                        textDecoration: "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <User size={16} />
-                      <span>{user.name || user.mobile}</span>
-                    </Link>
-                    {isProfileIncomplete && (
-                      <button
-                        onClick={() => {
-                          handleCompleteProfile();
-                          setMenuOpen(false);
-                        }}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "6px",
-                          background: "rgba(196,174,124,0.15)",
-                          color: "var(--cr-primary)",
-                          border: "1.5px solid var(--cr-accent)",
-                          padding: "12px 16px",
-                          borderRadius: "6px",
-                          cursor: "pointer",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          width: "100%",
-                        }}
-                      >
-                        <span>{isRTL ? "إكمال الملف الشخصي" : "Complete Profile"}</span>
-                      </button>
-                    )}
+              {user ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <Link
+                    href="/profile"
+                    onClick={() => setMenuOpen(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      background: "rgba(90,61,52,0.05)",
+                      padding: "12px 16px",
+                      borderRadius: "6px",
+                      color: "var(--cr-primary)",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <User size={16} />
+                    <span>{user.name || user.mobile}</span>
+                  </Link>
+                  {isProfileIncomplete && (
                     <button
                       onClick={() => {
-                        handleLogout();
+                        handleCompleteProfile();
                         setMenuOpen(false);
                       }}
                       style={{
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: "8px",
-                        background: "transparent",
+                        gap: "6px",
+                        background: "rgba(196,174,124,0.15)",
                         color: "var(--cr-primary)",
-                        border: "1.5px solid var(--cr-primary)",
-                        padding: "12px 20px",
+                        border: "1.5px solid var(--cr-accent)",
+                        padding: "12px 16px",
                         borderRadius: "6px",
                         cursor: "pointer",
                         fontSize: "14px",
                         fontWeight: 600,
-                        transition: "all 0.2s ease",
                         width: "100%",
                       }}
                     >
-                      <LogOut size={16} />
-                      <span>{isRTL ? "تسجيل الخروج" : "Logout"}</span>
+                      <span>{isRTL ? "إكمال الملف الشخصي" : "Complete Profile"}</span>
                     </button>
-                  </div>
-                ) : (
+                  )}
                   <button
-                    onClick={handleAuth}
+                    onClick={() => {
+                      handleLogout();
+                      setMenuOpen(false);
+                    }}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: "6px",
-                      background: "var(--cr-primary)",
-                      color: "var(--cr-white)",
-                      border: "none",
+                      gap: "8px",
+                      background: "transparent",
+                      color: "var(--cr-primary)",
+                      border: "1.5px solid var(--cr-primary)",
                       padding: "12px 20px",
                       borderRadius: "6px",
                       cursor: "pointer",
@@ -816,10 +1011,108 @@ export function Navbar() {
                       width: "100%",
                     }}
                   >
-                    <User size={16} />
-                    <span>{t.nav.login}</span>
+                    <LogOut size={16} />
+                    <span>{isRTL ? "تسجيل الخروج" : "Logout"}</span>
                   </button>
-                )
+
+                  <Link
+                    href="/login"
+                    onClick={() => setMenuOpen(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      background: "transparent",
+                      color: "var(--cr-primary)",
+                      border: "1px dashed var(--cr-divider)",
+                      padding: "10px 16px",
+                      borderRadius: "6px",
+                      textDecoration: "none",
+                      fontSize: "13px",
+                      fontWeight: 500,
+                      marginTop: "4px",
+                    }}
+                  >
+                    <ShieldCheck size={15} />
+                    <span>{t.nav.staffLogin || "Clinic Staff & Doctors"}</span>
+                  </Link>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {/* Option 1: Customer Login */}
+                  <button
+                    onClick={() => {
+                      if (showCustomerLogin) {
+                        handleAuth();
+                        setMenuOpen(false);
+                      }
+                    }}
+                    disabled={!showCustomerLogin}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "8px",
+                      background: showCustomerLogin ? "var(--cr-primary)" : "#F3F4F6",
+                      color: showCustomerLogin ? "var(--cr-white)" : "#9CA3AF",
+                      border: showCustomerLogin ? "none" : "1px solid #E5E7EB",
+                      padding: "12px 16px",
+                      borderRadius: "6px",
+                      cursor: showCustomerLogin ? "pointer" : "not-allowed",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      opacity: showCustomerLogin ? 1 : 0.65,
+                      transition: "all 0.2s ease",
+                      width: "100%",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <User size={16} />
+                      <span>{t.nav.customerLogin || "Patient & Customer Login"}</span>
+                    </div>
+                    {!showCustomerLogin && (
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          background: "#E5E7EB",
+                          color: "#6B7280",
+                        }}
+                      >
+                        {isRTL ? "معطل" : "Deactivated"}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Option 2: Staff Login */}
+                  <Link
+                    href="/login"
+                    onClick={() => setMenuOpen(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      background: "rgba(65, 78, 54, 0.08)",
+                      color: "var(--cr-primary)",
+                      border: "1px solid rgba(65, 78, 54, 0.2)",
+                      padding: "12px 16px",
+                      borderRadius: "6px",
+                      textDecoration: "none",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      transition: "all 0.2s ease",
+                      width: "100%",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <ShieldCheck size={16} />
+                    <span>{t.nav.staffLogin || "Clinic Staff & Doctors Portal"}</span>
+                  </Link>
+                </div>
               )}
             </div>
           </div>
