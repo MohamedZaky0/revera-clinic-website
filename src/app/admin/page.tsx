@@ -5351,7 +5351,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             <img
               src="/images/main_logo.png"
               alt="Revera Clinics"
-              style={{ objectFit: "contain", width: "100%", height: "100%" }}
+              className="w-full h-full object-contain brightness-0 invert"
             />
           </div>
           <p className="text-xs uppercase tracking-[0.3em] text-[#5A6A51]/80 font-bold mb-1">
