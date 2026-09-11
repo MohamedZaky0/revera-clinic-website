@@ -209,9 +209,6 @@ export default function UnifiedStaffLoginPage() {
                 Email Address or Employee ID
               </label>
               <div className="relative flex items-center">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#5A6A51]">
-                  <Mail size={18} />
-                </div>
                 <input
                   type="text"
                   required
@@ -224,6 +221,9 @@ export default function UnifiedStaffLoginPage() {
                   }}
                   className="w-full rounded-2xl border border-[#D9D3C7] bg-white pl-11 pr-4 py-3.5 text-sm font-medium text-[#1F251A] placeholder-[#8B9882] shadow-2xs outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/15"
                 />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#5A6A51] z-10">
+                  <Mail size={18} />
+                </div>
               </div>
             </div>
 
@@ -234,9 +234,6 @@ export default function UnifiedStaffLoginPage() {
                 </label>
               </div>
               <div className="relative flex items-center">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#5A6A51]">
-                  <Lock size={18} />
-                </div>
                 <input
                   type={showPassword ? "text" : "password"}
                   required
@@ -248,10 +245,13 @@ export default function UnifiedStaffLoginPage() {
                   }}
                   className="w-full rounded-2xl border border-[#D9D3C7] bg-white pl-11 pr-11 py-3.5 text-sm font-medium text-[#1F251A] placeholder-[#8B9882] shadow-2xs outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/15"
                 />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#5A6A51] z-10">
+                  <Lock size={18} />
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#8B9882] hover:text-[#1F251A] cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#8B9882] hover:text-[#1F251A] cursor-pointer z-10"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
