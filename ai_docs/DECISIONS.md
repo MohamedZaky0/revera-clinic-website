@@ -1994,4 +1994,25 @@ The clinic reception dashboard required dynamic responsiveness to shift state (N
    - Updated `/api/reception/dashboard/route.ts` to compute local Egypt date (`toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' })`) alongside UTC and query with `.in("date", dateCandidates)` to eliminate timezone discrepancies.
    - Updated `ReceptionDashboardView.tsx` to pass the local client date parameter (`?date=YYYY-MM-DD`), listen to booking updates, and bind props fallback (`todayReservations={allReservations}`).
 
+---
+
+## DEC-056: Exclusive Staff Authentication via `/login` and Universal Logout Redirection
+
+**Date:** 2026-09-12
+**Status:** Decided & Implemented
+
+**Context:**
+1. All clinic staff (doctors, receptionists, HR, admins, superadmins) must authenticate strictly through the unified `/login` portal.
+2. Logging out from any staff screen or dashboard must consistently redirect back to `/login`.
+3. Embedded login forms on staff sub-paths (`/admin`, `/[role]`, etc.) are eliminated in favor of automatic forward redirection to `/login`.
+
+**Decisions & Implementation:**
+1. **Universal Staff Logout Redirect to `/login`:**
+   - Updated `handleLogout` across all dashboards, sidebars, and views (`admin/page.tsx`, `DoctorSidebar.tsx`, `DoctorAccountView.tsx`, etc.) to clear `sessionStorage` (`revera_admin_session_active`), invoke `triggerCheckout()` + `supabase.auth.signOut()`, and immediately redirect to `/login`.
+2. **Session Guard & Unauthenticated Forwarding:**
+   - When an unauthenticated user or stale session accesses `/admin` or `/[role]`, `AdminPage` automatically clears stale flags and redirects to `/login`.
+   - Inactivity timeout (1 hour) and portal mismatch guards route directly to `/login`.
+3. **Customer Auth Modal Isolation:**
+   - `AuthModal.tsx` blocks any staff email attempting customer authentication and notifies them to log in via `/login`.
+
 

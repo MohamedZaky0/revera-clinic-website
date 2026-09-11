@@ -174,7 +174,7 @@ export function AuthModal() {
             if (exists) {
               const loginInProgress = typeof window !== "undefined" && sessionStorage.getItem("customer_login_in_progress");
               if (loginInProgress) {
-                alert("This email is registered as an administrator/employee account and cannot be used for customer access.");
+                alert("This email is registered as a clinic staff/employee account and cannot be used for patient access. Please sign in via the Staff Portal at /login.");
                 await supabase.auth.signOut();
                 localStorage.removeItem("revera_user");
                 window.dispatchEvent(new CustomEvent("revera-auth-change"));

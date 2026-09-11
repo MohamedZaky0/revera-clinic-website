@@ -1215,60 +1215,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                     {/* Action Flow Buttons */}
                     <div className="space-y-2 pt-1">
-                      {booking.status === 'approved' && (
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                const res = await fetch(`/api/reservations?id=${booking.id}`, {
-                                  method: 'PATCH',
-                                  headers: authenticatedJsonHeaders,
-                                  body: JSON.stringify({ status: 'confirmed' })
-                                });
-                                if (res.ok) {
-                                  const updated = await res.json();
-                                  setBooking(prev => prev ? { ...prev, ...updated, status: 'confirmed' } : null);
-                                  fetchRequests();
-                                  fetchAllReservations();
-                                }
-                              } catch (err) {
-                                console.error(err);
-                              }
-                            }}
-                            className="w-full rounded-2xl border border-[#414E36]/20 bg-white py-3 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
-                          >
-                            <Check size={14} className="text-[#0F3826]" />
-                            <span>Confirm</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                const res = await fetch(`/api/reservations?id=${booking.id}`, {
-                                  method: 'PATCH',
-                                  headers: authenticatedJsonHeaders,
-                                  body: JSON.stringify({ status: 'checked_in' })
-                                });
-                                if (res.ok) {
-                                  const updated = await res.json();
-                                  setBooking(prev => prev ? { ...prev, ...updated } : null);
-                                  fetchRequests();
-                                  fetchAllReservations();
-                                }
-                              } catch (err) {
-                                console.error(err);
-                              }
-                            }}
-                            className="w-full rounded-2xl bg-[#0F3826] text-white py-3 text-xs font-bold hover:bg-[#0A271A] transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
-                          >
-                            <User size={14} />
-                            <span>Check In</span>
-                          </button>
-                        </div>
-                      )}
-
-                      {booking.status === 'confirmed' && (
+                      {(booking.status === 'approved' || booking.status === 'confirmed') && (
                         <button
                           type="button"
                           onClick={async () => {
