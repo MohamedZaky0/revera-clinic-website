@@ -1450,9 +1450,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         console.log("Stale login session detected (tab reopened). Logging out.");
         supabase.auth.signOut().then(() => {
           setAuthChecking(false);
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+          }
         }).catch((err: any) => {
           console.warn("signOut error:", err);
           setAuthChecking(false);
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+          }
         });
       } else {
         if (cachedSession) {
@@ -1486,9 +1492,6 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         setAdminDbId("");
         if (typeof window !== "undefined") {
           sessionStorage.removeItem("revera_admin_session_active");
-          if (!portalRole && window.location.pathname.startsWith('/admin/') && window.location.pathname !== '/admin') {
-            window.history.replaceState(null, "", "/admin" + window.location.search);
-          }
         }
         setAuthChecking(false);
         return;
@@ -1522,11 +1525,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             setAdminEmail("");
             setAdminEmployeeId("");
             setAdminDbId("");
-            const userSlug = getRoleSlug(authData.role);
-            const userPortalPath = userSlug === 'admin' ? '/admin' : `/${userSlug}`;
-            setLoginError(`Access denied: This portal is exclusively for ${getRoleDisplayName(effectivePortal)} accounts. Please sign in at your designated portal (${userPortalPath}).`);
             if (typeof window !== "undefined") {
               sessionStorage.removeItem("revera_admin_session_active");
+              window.location.href = "/login";
             }
             setAuthChecking(false);
             return;
@@ -1562,9 +1563,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           setAdminDbId("");
           if (typeof window !== "undefined") {
             sessionStorage.removeItem("revera_admin_session_active");
-            if (!portalRole && window.location.pathname.startsWith('/admin/') && window.location.pathname !== '/admin') {
-              window.history.replaceState(null, "", "/admin" + window.location.search);
-            }
+            window.location.href = "/login";
           }
         }
       } catch (err) {
@@ -1607,7 +1606,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         }
         triggerCheckout().finally(() => {
           supabase.auth.signOut().then(() => {
-            alert("Your session has expired due to 1 hour of inactivity. Please log in again.");
+            if (typeof window !== "undefined") {
+              window.location.href = "/login";
+            }
           });
         });
       }
@@ -1974,12 +1975,23 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     if (supabase) {
       await triggerCheckout();
       await supabase.auth.signOut();
-      if (typeof window !== "undefined") {
-        const targetPath = portalRole ? (portalRole === 'admin' ? '/admin' : `/${portalRole}`) : '/admin';
-        window.history.replaceState(null, "", targetPath);
-      }
+    }
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("revera_admin_session_active");
+      localStorage.removeItem("revera_staff_auth");
+      window.location.href = "/login";
     }
   }
+
+  // If session is missing after auth checking, redirect to /login
+  useEffect(() => {
+    if (!authChecking && (!session || !adminRole)) {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("revera_admin_session_active");
+        window.location.replace("/login");
+      }
+    }
+  }, [authChecking, session, adminRole]);
 
   // Synchronize browser URL to end with the user's role slug (/[role] or /admin)
   useEffect(() => {
@@ -5333,69 +5345,30 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   if (!session || !adminRole) {
     return (
       <div id="admin-root" className="admin-view flex min-h-screen items-center justify-center bg-[#F2EFE9] px-4">
-        <div className="w-full max-w-md rounded-[32px] bg-[#FBFBF9] p-8 shadow-[0_20px_60px_rgba(31,37,26,0.15)]">
-          <div className="mb-8 flex flex-col items-center">
-            <div className="mb-4 relative h-16 w-16 overflow-hidden rounded-2xl bg-[#414E36] p-2.5 shadow-md">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/main_logo.png"
-                alt="Revera Clinics"
-                style={{ objectFit: "contain", width: "100%", height: "100%" }}
-              />
-            </div>
-            <p className="text-xs uppercase tracking-[0.3em] text-[#5A6A51]/80 font-bold mb-1">
-              {portalRole ? `${getRoleDisplayName(portalRole)} Portal` : 'Revera Clinics'}
-            </p>
-            <h2 className="text-2xl font-bold text-[#1F251A]">
-              {portalRole ? `${getRoleDisplayName(portalRole)} Login` : 'Admin Access Control'}
-            </h2>
+        <div className="w-full max-w-md rounded-[32px] bg-[#FBFBF9] p-8 shadow-[0_20px_60px_rgba(31,37,26,0.15)] text-center space-y-4">
+          <div className="mx-auto relative h-16 w-16 overflow-hidden rounded-2xl bg-[#414E36] p-2.5 shadow-md">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/main_logo.png"
+              alt="Revera Clinics"
+              style={{ objectFit: "contain", width: "100%", height: "100%" }}
+            />
           </div>
-
-          <form onSubmit={handleAdminLogin} className="space-y-5" noValidate>
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Email Address or Employee ID</label>
-              <input
-                type="text"
-                required
-                placeholder="Enter email or employee ID"
-                value={loginEmail}
-                onChange={(e) => {
-                  setLoginEmail(e.target.value);
-                  if (loginError) setLoginError("");
-                }}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Password</label>
-              <input
-                type="password"
-                required
-                placeholder="Enter password"
-                value={loginPassword}
-                onChange={(e) => {
-                  setLoginPassword(e.target.value);
-                  if (loginError) setLoginError("");
-                }}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-              />
-            </div>
-
-            {loginError && (
-              <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-xl p-3">
-                ⚠️ {loginError}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loginLoading}
-              className="w-full rounded-2xl bg-[#414E36] py-3.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {loginLoading ? "Authenticating..." : "Access Dashboard"}
-            </button>
-          </form>
+          <p className="text-xs uppercase tracking-[0.3em] text-[#5A6A51]/80 font-bold mb-1">
+            Revera Clinics Staff Portal
+          </p>
+          <h2 className="text-2xl font-bold text-[#1F251A]">
+            Staff Authentication Required
+          </h2>
+          <p className="text-xs text-[#5A6A51] font-medium leading-relaxed">
+            All staff, doctors, receptionists, and administrators must authenticate through the unified Staff Login portal. Redirecting...
+          </p>
+          <a
+            href="/login"
+            className="mt-4 inline-flex items-center justify-center w-full rounded-2xl bg-[#414E36] py-3.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
+          >
+            Go to Staff Login
+          </a>
         </div>
       </div>
     );
@@ -5699,10 +5672,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   onClick={async () => {
                     if (isComingSoon) return;
                     if (item.label === "Logout") {
-                      if (supabase) {
-                        await triggerCheckout();
-                        await supabase.auth.signOut();
-                      }
+                      handleLogout();
                     } else {
                       setActiveNav(item.label);
                     }
@@ -7324,9 +7294,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 </div>
                 <button
                   onClick={async () => {
-                    if (supabase) {
-                      await supabase.auth.signOut();
-                    }
+                    handleLogout();
                     setLocationWarningOpen(false);
                   }}
                   className="w-full rounded-2xl bg-rose-600 py-3 text-sm font-bold text-white hover:bg-rose-700 transition shadow-md"
