@@ -162,21 +162,21 @@ export default function UnifiedStaffLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#F4F1EA] text-[#1F251A] px-4 py-8">
+    <div className="min-h-screen flex flex-col justify-between bg-[#F4F1EA] text-[#1F251A] py-6 px-6 sm:px-10 lg:px-12">
       {/* Top Bar */}
-      <div className="max-w-6xl w-full mx-auto flex items-center justify-between">
+      <header className="w-full flex items-center justify-between">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-[#5A6A51] hover:text-[#1F251A] transition-colors py-2 px-3 rounded-lg hover:bg-white/50"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-[#5A6A51] hover:text-[#1F251A] transition-colors py-2 px-3.5 rounded-xl hover:bg-white/60 shadow-2xs border border-transparent hover:border-[#D9D3C7]"
         >
           <ArrowLeft size={16} />
           <span>Return to Website</span>
         </Link>
-        <div className="flex items-center gap-2 text-xs font-semibold text-[#8B9882]">
+        <div className="flex items-center gap-2 text-xs font-semibold text-[#8B9882] py-2 px-3.5">
           <ShieldCheck size={16} className="text-[#C4AE7C]" />
           <span>Secure Staff Portal</span>
         </div>
-      </div>
+      </header>
 
       {/* Main Form Container */}
       <div className="max-w-md w-full mx-auto my-auto py-6">
