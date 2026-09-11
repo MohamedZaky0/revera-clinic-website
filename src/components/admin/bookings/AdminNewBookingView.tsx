@@ -271,12 +271,13 @@ export default function AdminNewBookingView({
 
   // Appointment Details State
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+  const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
-  const [selectedRoomId, setSelectedRoomId] = useState<string>("");
-  const [bookingDate, setBookingDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
-  );
+  const [bookingDate, setBookingDate] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
+  });
   const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
   const [allTimeSlots, setAllTimeSlots] = useState<string[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
@@ -547,7 +548,6 @@ export default function AdminNewBookingView({
   const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
   const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
   const selectedBranchObj = dbBranches.find(b => String(b.id) === String(selectedBranchId)) || dbBranches[0];
-  const selectedRoomObj = dbRooms.find(r => String(r.id) === String(selectedRoomId));
 
   const weekdayName = useMemo(() => {
     if (!bookingDate) return "";
@@ -723,7 +723,7 @@ export default function AdminNewBookingView({
   const selectedServiceName = getServiceName(selectedServiceObj, lang);
   const selectedDoctorName = selectedDoctorObj?.name || "Doctor";
   const selectedBranchName = selectedBranchObj?.name_en || selectedBranchObj?.name || selectedBranchObj?.name_ar || "Clinic Branch";
-  const selectedRoomName = selectedRoomObj?.name || "Room 1 (Auto)";
+  const selectedRoomName = dbRooms.length > 0 ? (dbRooms[0]?.name || "Room 1 (Auto)") : "Room 1 (Auto)";
 
   const fullPatientName = `${firstName} ${lastName}`.trim() || "Patient Name";
 

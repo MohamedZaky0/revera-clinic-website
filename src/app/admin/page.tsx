@@ -7372,6 +7372,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 }, 100);
               }}
               onLogout={handleLogout}
+              todayReservations={allReservations}
               lang={lang}
               t={adminTranslations[lang].reception.dashboard}
             />

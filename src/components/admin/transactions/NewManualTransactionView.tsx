@@ -145,7 +145,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
 
   // Date & Time states
   const now = new Date();
-  const defaultDate = now.toISOString().split("T")[0];
+  const defaultDate = now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
   const defaultHours = String(now.getHours() % 12 || 12).padStart(2, "0");
   const defaultMinutes = String(now.getMinutes()).padStart(2, "0");
   const defaultPeriod = now.getHours() >= 12 ? "PM" : "AM";
