@@ -13,6 +13,11 @@ export const translations: Record<"en" | "ar", Translation> = {
       login: "Login",
       logout: "Logout",
       user: "User",
+      customerLogin: "Patient & Customer Login",
+      customerLoginDesc: "Access your appointments, profile & medical wallet",
+      staffLogin: "Clinic Staff & Doctors",
+      staffLoginDesc: "Admin, doctor & reception portal",
+      loginDisabledNotice: "Customer login is temporarily disabled by administration",
     },
     hero: {
       slides: [
@@ -385,6 +390,11 @@ export const translations: Record<"en" | "ar", Translation> = {
       login: "تسجيل الدخول",
       logout: "تسجيل الخروج",
       user: "المستخدم",
+      customerLogin: "تسجيل دخول المرضى والعملاء",
+      customerLoginDesc: "الوصول إلى مواعيدك والملف الشخصي والمحفظة",
+      staffLogin: "تسجيل دخول الموظفين والأطباء",
+      staffLoginDesc: "بوابة الإدارة والأطباء والاستقبال",
+      loginDisabledNotice: "تسجيل دخول العملاء معطل حالياً من قبل الإدارة",
     },
     hero: {
       slides: [

@@ -450,6 +450,201 @@ The following are **not currently enforced in code**:
      - **State 1 (Not Started / Start of Day)**: Displays greeting, scheduled shift hours, Overview KPIs, Quick Actions (`+ New Booking`, `+ New Patient`), Attention Needed alerts, today's bookings table with 3-dots action menu, and a prominent green `Start Shift` button.
      - **State 2 (In Progress / During Day)**: Displays live elapsed shift timer, actual clock-in time, real-time KPI metrics, operational action grid, today's schedule table with 3-dots action menu, and an `End Shift` button.
      - **State 3 (Completed / End of Day)**: Replaces live operational queues with a comprehensive End of Day Review including total worked duration, Today's Performance cards (Completed, Cancelled, No-Shows), and Payments Received breakdown (Cash, InstaPay, Visa, Wallet, Total).
+     - **Total Spent (All Visits)**: Customer's total spent across all completed visits (`customerRecord.spent_amount`).
+     - **Outstanding (All Visits)**: Customer's total debt across all visits (`customerRecord.outstanding`).
+   - **Price Details & Session Financials Card**: Displays this specific session's breakdown:
+     - **Total Price**: Total cost for the session services and add-ons (`cost EGP`).
+     - **Session Paid**: Actual amount paid so far for this specific session (`amountPaid EGP`).
+     - **Session Outstanding**: Remaining balance owed for this specific session (`amountLeft EGP` / `cost - amountPaid EGP`).
+    - Upon completing payment settlement checkout, Session Paid is updated to total price, Session Outstanding drops to 0 EGP, Customer Total Spent increases by settled payment, and Customer Outstanding is reduced by settled amount.
+
+---
+
+## Financial Transactions & Manual Ledger Rules
+**Enforced in:** `/api/transactions`, `src/components/admin/transactions/`, `src/components/admin/patients/PatientTransactionsHistoryTab.tsx`
+
+1. **Immutability of Financial Records**:
+   - Completed financial transactions are **never modified or directly deleted**.
+   - If an adjustment or refund is made, a **new transaction** is inserted on the actual date the refund occurs, preserving historical daily net totals for earlier dates.
+2. **Strictly Limited Manual Transaction Creation (3 Allowed Types)**:
+   - Staff manual transaction creation via `/admin -> Transactions -> New Transaction` or `Patient Profile -> Add Transaction` is strictly limited to 3 business options:
+     1. **Refund**: Refunds positive completed payments (either to Cash Back or Wallet Credit). Requires selecting an existing completed transaction for the patient, with validation ensuring the refund amount does not exceed the remaining unrefunded balance. Decreases patient lifetime `spent_amount`.
+     2. **Service Charge**: Standalone ad-hoc clinic charges (e.g. consultation, cancellation fee, administration charge). Requires patient, amount, payment method, and description. Increases patient lifetime `spent_amount`.
+     3. **Product / Package Purchase**: Direct retail purchase of skincare products (`/api/inventory/products`) or clinic packages (`/api/packages`). Supports product/package selector, auto-calculated total (`price * quantity`), payment method, reference, and item metadata logging. Increases patient lifetime `spent_amount`.
+   - **Explicitly Forbidden in Manual Creation**: Direct `Payment`, `Outstanding Payment` (settlement), `Wallet Top-up` / `Deposit`, `Wallet Withdrawal` / `Deduction`, and `Adjustment` are strictly rejected by the API (`POST /api/transactions`) and hidden in the UI. These are automated system actions handled exclusively via booking checkout, patient profile Settle Balance, or dedicated wallet workflows to prevent ledger desynchronization.
+3. **Transaction Source Tracking & Filtering**:
+   - Every transaction is tagged with `source: 'manual' | 'automatic'`.
+   - System displays a distinct visual badge (`Source: Manual` vs `Source: Automatic`) in the transactions table, patient transaction history tab, and audit trail.
+   - Filter bar supports `Source: All / Manual / Automatic`.
+4. **Today's Net Payments**:
+   - `Today's Net Payments = Completed Payments Today − Completed Refunds Today`.
+   - Excludes pending and failed transactions.
+5. **Outstanding Balance**:
+   - `Outstanding = Sum of active unpaid customer debt obligations`.
+6. **Wallet Balance & Refund Destinations**:
+   - If a refund's destination is `wallet`, the refund amount is credited to `customers.wallet_balance` and logged to `wallet_txns` with `direction: 'in'`.
+   - If `cash`, patient wallet is untouched.
+   - Lifetime total spent (`spent_amount`) is decremented regardless of destination, clamped at 0.
+
+---
+
+## Historical & Previous Bookings Rules
+**Enforced in:** `/api/reservations/previous`, `src/components/admin/bookings/AdminAddPreviousBookingView.tsx`, `AdminBookingsView.tsx`, `CustomerProfileDrawer.tsx`, `TransactionsView.tsx`, `src/app/admin/page.tsx`
+
+1. **Multi-Access Point Launching**:
+   - Accessible from 3 distinct locations across the administrative workspace:
+     1. **Bookings Page**: via the 3-dots (`MoreVertical`) dropdown menu beside `+ New Booking`.
+     2. **Patient Profile Drawer (`CustomerProfileDrawer.tsx`)**: via the dedicated `[🕒 Add Previous Booking]` top header action button and the Booking History tab header.
+     3. **Transactions Page (`TransactionsView.tsx`)**: via the top action button group directly beside `New Transaction` and `Audit Logs`.
+2. **Automatic Patient Data Prefill**:
+   - When launched from a patient profile, `AdminAddPreviousBookingView` receives the customer object (`initialCustomer`) and automatically pre-populates and binds the patient's **Phone** (`mobile` / `phone`) and **Name** (`name`), immediately triggering the matching badge (`✓ Existing patient found: [Name]`) without requiring manual re-entry.
+3. **Non-Disruption of Live Scheduling**:
+   - Historical bookings are saved with `status = 'completed'`, `is_manual = true`, and `is_historical = true`.
+   - Historical bookings never generate pending approval cards, upcoming appointment slot reservations, or doctor live calendar conflicts.
+4. **Original Historical Date Preservation**:
+   - The user-specified historical date (even years prior to system deployment) is preserved verbatim in `reservations.date` and `reservations.completed_at`.
+5. **Patient Matching & Automatic Profile Creation**:
+   - Matches existing patients by phone number (normalizing Egyptian formats `+201...`, `00201...`, `201...` to `01...`).
+   - If matched, links the historical reservation to `customer_id` and increments `number_of_bookings`.
+   - If no patient matches the phone number, a new patient record is automatically created in `customers` (`active = true`, `number_of_bookings = 1`) and linked.
+6. **Field Optionality**:
+   - `patientPhone`, `patientName`, and `date` are mandatory.
+   - `doctor`, `service`, and `paymentType` are optional and can remain empty without failing creation.
+7. **Patient & Booking History Visibility & Automated Verification**:
+   - The historical reservation is displayed in the patient's Profile Booking History, the Transactions list, and the All Appointments directory.
+   - Verified under System Test Suite `TC-038` and `TC-047`.
+
+---
+
+## Role-Based Access Control (RBAC) & Granular Action-Level Permissions Rules
+**Enforced in:** `src/app/admin/page.tsx`, `src/components/admin/settings/RoleManagementView.tsx`, `src/components/admin/translations.ts`, and individual view components (UI visibility) — **and, as of RISK-078/RISK-081 CORRUPT-A10 (2026-09-07), `src/lib/access.ts`'s `hasGranularPermission()` at the route level for `providers`, `services`, `inventory/products`, `inventory/devices`, and `customers/products`** (mutating verbs only). Before that fix, every rule below described UI behavior only — a role could have a button hidden and still perform the action via a direct API call. `employees` and `roles` remain `requireAdministratorAccess`-gated only (no granular distinction), which is intentional per RISK-069, not an oversight. See `ai_docs/SECURITY.md` §3a for the current per-route inventory.
+
+1. **Superadmin Immunity**:
+   - Users with `adminRole === 'superadmin'` possess blanket authorization across all navigation sections, APIs, action buttons, and 3-dots menus regardless of the `permissions` array.
+2. **Multi-Tier Hierarchical Fallback**:
+   - When checking an action-level permission (e.g., `bookings.action_print_schedule`, `providers.action_edit`, `inventory.action_update_pulses`), `hasPermission` automatically falls back to parent permissions (e.g. `bookings.view_calendar`, `providers.edit`, `inventory.manage_devices`) or the coarse category permission (e.g. `Bookings`, `Providers`, `Inventory`) if granular sub-keys are not explicitly defined.
+   - Preserves complete backward compatibility for existing roles configured prior to the granular matrix rollout.
+3. **Dynamic 3-Dots Menu Concealment**:
+   - When every individual action inside a 3-dots (`MoreVertical`) dropdown evaluates to `false` for the current user's role, the entire trigger button is suppressed from rendering. No empty or broken menus are ever shown to unauthorized staff.
+4. **Parent-Child Synchronization in Role Editor**:
+   - Selecting a category header or section parent in `RoleManagementView` automatically selects all underlying granular permissions.
+   - De-selecting all child actions automatically deselects the parent, ensuring the stored `permissions` array accurately reflects granular intent.
+5. **Coverage Across All 15 Subsystems**:
+   - RBAC rules strictly cover all 15 clinic categories: Dashboard & Reception, Bookings Management, Patient Management, Doctor Management, Services Catalog, Inventory & Devices, Employees & Staff, HR & Payroll, Financial Transactions, Marketing & Campaigns, Customer Support, Reports & Analytics, Finance & Accounting, Doctor Portal & Clinical Intake, and Settings & System Control.
+
+---
+
+## Multi-Service Public Booking (RISK-081 CORRUPT-U06)
+**Enforced in:** `src/components/BookingModal.tsx`, `src/app/api/availability/route.ts`, `src/app/api/reservations/route.ts`.
+
+1. **One Primary Service, Any Number Of Additional Services**:
+   - The public booking flow requires exactly one primary service (`serviceId`) and accepts zero or more `additionalServiceIds` on top of it, added via a pill picker shown once a primary service is chosen.
+   - Every downstream single-service assumption in `BookingModal.tsx` (doctor filtering, operating-hours calculation) keys off the *combined* set of selected services, not just the primary.
+2. **Combined Price & Duration**:
+   - Price and duration shown to the patient, the deposit calculated from them, and the amount charged server-side are all summed across every selected service — never the primary service alone.
+3. **One Doctor, One Room, Covers Every Selected Service**:
+   - A doctor is only offered as a choice (client-side) or matched (server-side, `/api/availability`) if their `services` list covers *every* selected service, not just one.
+   - A room is only assigned if it is mapped (`service_rooms`) to *every* selected service (intersection), both for automatic availability computation and for a manual/reception-created booking's room assignment.
+4. **`service_ids` Is The Source Of Truth**:
+   - The created `reservations` row stores the full, deduped list in `service_ids` (with `service_id` kept as the first entry for backward compatibility with any code still reading it as a scalar) — the same column `/admin` and the booking PATCH/checkout flow already read for admin-created multi-service bookings.
+
+---
+
+## Medical Records Are Per-Visit, Not Per-Customer (RISK-081 CORRUPT-D03)
+**Enforced in:** `src/app/api/medical-records/route.ts`, `supabase/migrations/20260907000000_add_reservation_id_to_medical_records.sql`.
+
+1. **A Visit's Intake Form Is Scoped To That Visit**:
+   - When a save includes a `reservation_id` (the doctor's active-session intake save), the row is keyed on `(customer_id, reservation_id)` — a second visit never overwrites the first visit's baseline data; it creates its own row.
+2. **A Patient-Profile Edit Has No `reservation_id`**:
+   - `MedicalFormModal.tsx` (opened from the customer profile page, not tied to any specific visit) saves with `reservation_id` omitted, and is upserted against the single `reservation_id IS NULL` row for that customer — this is deliberately a different concept from a visit's clinical intake.
+3. **Reads Default To "Most Recent"**:
+   - `GET /api/medical-records?customerId=` with no `reservationId` returns whichever row (profile or any visit) was most recently updated, so doctor-session prefill still shows the patient's latest known baseline.
+   - Pass `?reservationId=` to fetch one specific visit's intake data.
+
+---
+
+## Role-Based Dynamic URL Routing & Portal Login Isolation
+**Enforced in:** `src/lib/roleUtils.ts`, `src/app/[role]/page.tsx`, `src/app/admin/page.tsx`.
+
+1. **Direct Role Portal URLs (`/<role>`)**:
+   - The system routes staff directly to their clean role portal without `/admin/` prefix:
+     - Receptionist accounts: `/reception`
+     - Doctor accounts: `/doctor`
+     - Superadmin accounts: `/superadmin`
+     - Admin accounts: `/admin`
+     - Custom staff roles: `/<role-slug>` (e.g. `/hr`, `/nurse`, `/accountant`).
+2. **Role Portal Login Isolation**:
+   - Staff navigating to a specific role portal (e.g. `/admin`, `/reception`, `/doctor`, `/superadmin`, or `/<role-slug>`) can only log in if their assigned role matches that portal.
+   - The `/admin` portal strictly accepts **Admin** accounts (and **Superadmin**), rejecting non-admin staff (e.g., Receptionist or Doctor logging in at `/admin`) with: `"Access denied: This portal is exclusively for Admin accounts. Please sign in at your designated portal (/reception)."`.
+   - `superadmin` accounts retain universal access across all portals.
+3. **Seamless Session Synchronization**:
+   - On login, the browser URL cleanly reflects `/${roleSlug}` (or `/admin` for admins).
+   - On logout from a role portal, the URL preserves the portal path (e.g. `/reception`) for convenient re-login.
+4. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-045` (`Role-Based URL Routing & Account Navigation Engine`).
+
+---
+
+## Customer Portal Header Login Button Visibility & Page Settings Toggle
+**Enforced in:** `src/components/Navbar.tsx`, `src/components/admin/settings/HomePageSettingsView.tsx`, `src/app/admin/page.tsx`, `src/app/api/page-settings/route.ts`, `data/page_settings.json`.
+
+1. **Deactivated by Default in Customer View**:
+   - The customer login and profile button in the public website header (`Navbar.tsx` desktop and mobile menus) is deactivated (`showCustomerLogin: false`) by default.
+2. **Dynamic Admin Page Settings Toggle**:
+   - Administrators can activate or deactivate the customer login button via Admin Settings -> Pages Settings -> Home (`Customer Portal & Login Button` switch card).
+   - Saved under `header.showCustomerLogin` in `page_settings` (`/api/page-settings`).
+3. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-046` (`Customer Portal Header Login Settings Engine`).
+
+---
+
+## Core System-Locked Roles & Permissions Protection
+**Enforced in:** `src/components/admin/settings/RoleManagementView.tsx`, `src/app/api/roles/route.ts`.
+
+1. **Superadmin Root Role Is Permanently Locked**:
+   - The root owner role (`superadmin`) is permanently locked from deletion to guarantee system access integrity.
+   - Operational roles (`admin`, `reception`, `receptionist`, `doctor`, and all custom roles) are fully unlocked, customizable, and manageable by administrators in Role Management.
+   - Deletion buttons for `superadmin` are disabled and replaced with the `System Locked` indicator in Role Management.
+   - `DELETE /api/roles?name=superadmin` rejects deletion attempts targeting `superadmin` with a `400 Bad Request` error.
+
+---
+
+## Superadmin Dual Deletion Engine (Soft Delete vs Hard Delete)
+**Enforced in:** `src/contexts/AlertConfirmContext.tsx`, `src/app/api/customers/route.ts`, `src/app/api/employees/route.ts`, `src/app/api/providers/route.ts`, `src/app/api/services/route.ts`, `src/app/api/reservations/route.ts`, `src/app/admin/page.tsx`.
+
+1. **Dual Deletion Options for Super Administrators**:
+   - When a Super Admin triggers a delete action on core entities (Patients, Employees, Doctors, Services, Bookings), they are presented with two explicit choices:
+     - **Soft Delete (Deactivate / Archive)**: Deactivates and archives the record while preserving all associated financial transactions, historical bookings, medical reports, prescriptions, invoices, and audit logs.
+     - **Hard Delete (Permanent Removal)**: Permanently purges the record from Supabase tables and auth systems.
+2. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-048` (`Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine`).
+
+---
+
+## New Booking Multi-Slot Selection & Financial Calculation Rules
+**Enforced in:** `src/components/admin/bookings/AdminNewBookingView.tsx`, `src/app/api/reservations/route.ts`.
+
+1. **Multi-Slot Selection Engine**:
+   - Receptionists and admins can select one or multiple time slots for an appointment from interactive time chips.
+   - Selected slots automatically calculate and display the total session duration (e.g. 2 slots = 60 mins).
+   - The selected slots are joined and stored in `requested_time` and `time_slot`.
+2. **Form Field Ordering**:
+   - In Appointment Details (Card 2), **Available Time** is positioned directly before **Session Type** (In Person vs Online).
+3. **Financial Section & Breakdown**:
+   - Side-by-side **Booking Value (EGP)** and **Amount Paid Now (EGP)** inputs with browser spin arrows removed and clean visual placeholders.
+   - Auto-calculates `bookingValue = servicePrice * slotsCount` with support for manual receptionist override.
+   - Live **Remaining Value** (`bookingValue - amountPaidNow`) displayed in real-time with status badges (Fully Settled / Due on Visit / Credit Balance) and detailed in the Booking Confirmation Summary modal.
+
+---
+
+## Reception Dashboard Shift Lifecycle & Operational Rules
+**Enforced in:** `src/components/admin/reception/ReceptionDashboardView.tsx`, `src/app/api/reception/dashboard/route.ts`, `src/components/admin/translations.ts`.
+
+1. **Dynamic Shift State Architecture**:
+   - One unified dashboard dynamically adapting across 3 distinct shift states:
+     - **State 1 (Not Started / Start of Day)**: Displays greeting, scheduled shift hours, Overview KPIs, Quick Actions (`+ New Booking`, `+ New Patient`), Attention Needed alerts, today's bookings table with 3-dots action menu, and a prominent green `Start Shift` button.
+     - **State 2 (In Progress / During Day)**: Displays live elapsed shift timer, actual clock-in time, real-time KPI metrics, operational action grid, today's schedule table with 3-dots action menu, and an `End Shift` button.
+     - **State 3 (Completed / End of Day)**: Replaces live operational queues with a comprehensive End of Day Review including total worked duration, Today's Performance cards (Completed, Cancelled, No-Shows), and Payments Received breakdown (Cash, InstaPay, Visa, Wallet, Total).
 2. **End Shift Confirmation Dialog**:
    - Opening the End Shift modal calculates and renders live shift analytics:
      - **Shift Summary**: Actual start/end time and total worked duration.
@@ -462,3 +657,29 @@ The following are **not currently enforced in code**:
    - Complete dictionary parity across English and Arabic under `reception.dashboard` in `translations.ts` with RTL layout support.
 5. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-050` (`Reception Dashboard Shift State & Performance Metrics Engine`).
+
+---
+
+## Unified Staff Login & Public Customer Dropdown Real-Time Sync Rules
+**Enforced in:** `src/components/Navbar.tsx`, `src/app/login/page.tsx`, `src/components/admin/settings/HomePageSettingsView.tsx`, `src/app/api/auth/me/route.ts`, `src/lib/roleUtils.ts`.
+
+1. **Shaded Customer Login Preservation**:
+   - When the "Customer Portal & Login Button" toggle in Admin Settings -> Pages Settings -> Home is deactivated (`showCustomerLogin: false`), the customer login button in the public website header (`Navbar.tsx`) is **NOT removed**.
+   - Instead, the customer login option is visually **shaded / grayed out** (`opacity-50`, disabled cursor, "Deactivated" / "معطل" badge) to indicate disabled status while maintaining clean layout symmetry.
+2. **Instant Multi-Tab & Same-Tab Real-Time Sync**:
+   - Toggle updates in `HomePageSettingsView.tsx` broadcast immediately via 3 redundant channels:
+     - `window.dispatchEvent(new CustomEvent("revera-settings-change", { detail: { showCustomerLogin } }))` (same-tab immediate DOM update).
+     - `new BroadcastChannel("revera_channel").postMessage(...)` (cross-tab lightweight messaging).
+     - `localStorage.setItem("revera_settings_sync", ...)` (native cross-tab storage listener).
+   - Navbar updates live without requiring any page reload.
+3. **Public Navigation Login Dropdown**:
+   - The desktop and mobile navigation header features an interactive Login dropdown:
+     - **Option 1 (Patient & Customer Login)**: Opens patient authentication modal / profile when active; displays shaded disabled state when deactivated in settings.
+     - **Option 2 (Clinic Staff & Doctors Portal)**: Links to `/login`.
+4. **Unified Staff Login Portal (`/login`)**:
+   - Single unified login portal for all clinic staff (Doctors, Receptionists, Administrators, SuperAdmins, HR).
+   - Accepts Email Address or Employee ID (`REV-XXXX`), checks customer email exclusions, and authenticates via Supabase Auth.
+   - Automatically inspects the authenticated role via `/api/auth/me` and routes the user to their designated role portal (`/${getRoleSlug(role)}` e.g. `/admin`, `/doctor`, `/reception`, `/superadmin`).
+   - Already-authenticated staff visiting `/login` are automatically redirected to their active workspace without showing credentials prompt.
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-051` (`Unified Staff Login & Customer Dropdown Real-Time Sync Engine`).

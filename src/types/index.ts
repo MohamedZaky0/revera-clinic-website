@@ -35,6 +35,11 @@ export interface Translation {
     login: string;
     logout: string;
     user: string;
+    customerLogin?: string;
+    customerLoginDesc?: string;
+    staffLogin?: string;
+    staffLoginDesc?: string;
+    loginDisabledNotice?: string;
   };
   hero: {
     slides: Array<{

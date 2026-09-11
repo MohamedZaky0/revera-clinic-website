@@ -107,7 +107,15 @@ export default function HomePageSettingsView({
               setShowCustomerLogin?.(nextVal);
               await savePageSettings({ header: { showCustomerLogin: nextVal } });
               if (typeof window !== "undefined") {
-                window.dispatchEvent(new CustomEvent("revera-settings-change"));
+                window.dispatchEvent(new CustomEvent("revera-settings-change", { detail: { showCustomerLogin: nextVal } }));
+                try {
+                  localStorage.setItem("revera_settings_sync", JSON.stringify({ showCustomerLogin: nextVal, ts: Date.now() }));
+                  if (typeof BroadcastChannel !== "undefined") {
+                    const bc = new BroadcastChannel("revera_channel");
+                    bc.postMessage({ type: "settings_updated", showCustomerLogin: nextVal });
+                    bc.close();
+                  }
+                } catch {}
               }
             }}
             className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
