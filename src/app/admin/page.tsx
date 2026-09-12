@@ -5436,7 +5436,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
   return (
     <div id="admin-root" className="admin-view min-h-screen bg-[#F2EFE9] text-[#1F251A]">
-      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[220px_1fr]" dir={lang === "ar" ? "rtl" : "ltr"}>
+      <div className="min-h-screen flex flex-col md:flex-row" dir={lang === "ar" ? "rtl" : "ltr"}>
         {/* Backdrop for mobile sidebar */}
         {sidebarOpen && (
           <div
@@ -5444,7 +5444,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             onClick={() => setSidebarOpen(false)}
           />
         )}
-        <aside dir={lang === "ar" ? "rtl" : "ltr"} className={`fixed inset-y-0 start-0 top-0 bottom-0 z-50 flex w-[280px] max-w-[85vw] md:w-[220px] h-full min-h-screen min-h-[100dvh] max-h-screen md:max-h-screen flex-col bg-[#414E36] px-3.5 py-5 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:sticky md:top-0 md:h-screen md:translate-x-0 ${
+        <aside dir={lang === "ar" ? "rtl" : "ltr"} className={`fixed inset-y-0 start-0 top-0 bottom-0 z-50 md:z-30 flex w-[280px] max-w-[85vw] md:w-[220px] h-full min-h-screen min-h-[100dvh] max-h-screen md:h-screen md:max-h-screen flex-col bg-[#414E36] px-3.5 py-5 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : (lang === "ar" ? "translate-x-full" : "-translate-x-full")
         }`}>
           <div className="mb-6 flex items-center justify-between">
@@ -5719,7 +5719,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           </nav>
         </aside>
 
-        <main dir="ltr" className="flex flex-col px-3 sm:px-4 md:px-8 py-0 min-w-0 max-w-full overflow-x-hidden">
+        <main dir="ltr" className="flex-1 flex flex-col px-3 sm:px-4 md:px-8 py-0 min-w-0 max-w-full md:ps-[220px] overflow-x-hidden">
           {/* Top Navigation Bar */}
           <div className="sticky top-0 z-40 flex items-center justify-between border-b border-[#414E36]/10 bg-[#F2EFE9]/90 px-2 sm:px-4 py-2.5 sm:py-3 backdrop-blur-md gap-2 sm:gap-3">
             {/* Left: language toggle + branch selector */}

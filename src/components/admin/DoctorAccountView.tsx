@@ -1060,7 +1060,7 @@ export default function DoctorAccountView({
       />
 
       {/* 2. MAIN CONTENT WRAPPER */}
-      <div className="flex-1 flex flex-col min-w-0 h-full min-h-[100dvh] md:h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-full min-h-[100dvh] md:h-screen md:ps-[220px] overflow-hidden">
         {/* MOBILE TOP HEADER BAR (< md) */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[#414E36] text-white shrink-0 sticky top-0 z-30 shadow-md">
         <div className="flex items-center gap-2.5 min-w-0">
