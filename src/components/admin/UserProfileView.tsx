@@ -600,7 +600,7 @@ export default function UserProfileView({
     <div dir={dir} className="w-full max-w-5xl mx-auto space-y-6 pb-12 animate-fadeIn text-[#1F251A] print:p-0 print:m-0 print:max-w-none">
       
       {/* ── HEADER USER PROFILE CARD ── */}
-      <div className="rounded-[32px] border border-[#414E36]/12 bg-[#F9F9F7] p-6 md:p-8 shadow-xs space-y-6">
+      <div className="rounded-[32px] border border-[#414E36]/12 bg-[#F9F9F7] p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-center gap-5">
             {/* Avatar Container with Camera Icon Overlay */}
@@ -717,7 +717,7 @@ export default function UserProfileView({
       </div>
 
       {/* ── SECTION 1: PERSONAL INFORMATION ── */}
-      <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 md:p-8 shadow-xs space-y-6">
+      <div className="rounded-3xl border border-[#414E36]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div className="flex items-center gap-3">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#C4AE7C] text-white text-xs font-black">
@@ -781,7 +781,7 @@ export default function UserProfileView({
       </div>
 
       {/* ── SECTION 2: WORK INFORMATION (REAL DATABASE RESPONSE - VIEW ONLY, BREAK TIME REMOVED) ── */}
-      <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 md:p-8 shadow-xs space-y-6">
+      <div className="rounded-3xl border border-[#414E36]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div className="flex items-center gap-3">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#C4AE7C] text-white text-xs font-black">
@@ -845,7 +845,7 @@ export default function UserProfileView({
       </div>
 
       {/* ── SECTION 3: ATTENDANCE SUMMARY (REAL DATA FROM DATABASE) ── */}
-      <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 md:p-8 shadow-xs space-y-6">
+      <div className="rounded-3xl border border-[#414E36]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div className="flex items-center gap-3">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#C4AE7C] text-white text-xs font-black">
@@ -931,7 +931,7 @@ export default function UserProfileView({
       </div>
 
       {/* ── SECTION 4: PAYROLL SUMMARY (REAL DATA FROM DATABASE: DOCTOR PAYROLL VS STAFF PAYROLL) ── */}
-      <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 md:p-8 shadow-xs space-y-6">
+      <div className="rounded-3xl border border-[#414E36]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div className="flex items-center gap-3">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#C4AE7C] text-white text-xs font-black">

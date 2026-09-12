@@ -406,7 +406,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       )}
 
       {/* ── FORM CARD ── */}
-      <form onSubmit={handleSubmit} className="rounded-3xl border border-gray-200/80 bg-white p-6 sm:p-8 shadow-xs space-y-6">
+      <form onSubmit={handleSubmit} className="rounded-3xl border border-gray-200/80 bg-white p-4 sm:p-8 shadow-xs space-y-6">
         
         {/* ── ROW 1: 3 FIELDS (PATIENT PHONE *, PATIENT NAME *, DOCTOR OPTIONAL) ── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

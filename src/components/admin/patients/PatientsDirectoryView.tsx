@@ -242,7 +242,7 @@ export default function PatientsDirectoryView({
 
         {/* Unified Search and Icon-only Filter Bar */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 min-w-[180px] max-w-md">
             <Search size={16} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] z-10 pointer-events-none" />
             <input
               type="text"
@@ -271,7 +271,7 @@ export default function PatientsDirectoryView({
 
       {/* Toggleable Customer Filters Drawer */}
       {showCustomerFilterPanel && (
-        <div className="mb-6 grid grid-cols-1 gap-4 rounded-3xl border border-[#414E36]/10 bg-[#F9F9F7] p-5 md:grid-cols-4 items-end shadow-sm animate-fadeIn">
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 rounded-3xl border border-[#414E36]/10 bg-[#F9F9F7] p-4 sm:p-5 items-end shadow-sm animate-fadeIn">
           {/* Gender Filter */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">{t.genderFilterLabel}</label>

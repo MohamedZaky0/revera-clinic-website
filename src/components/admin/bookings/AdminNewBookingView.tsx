@@ -898,7 +898,7 @@ export default function AdminNewBookingView({
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="w-full max-w-6xl mx-auto space-y-6 pb-12 animate-fadeIn text-[#1F251A]">
       
       {/* ── TOP PAGE HEADER ── */}
-      <div className="bg-white rounded-3xl p-6 border border-[#414E36]/10 shadow-xs flex items-center justify-between">
+      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#414E36]/10 shadow-xs flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-black tracking-tight text-[#1F251A]">{tr.title}</h1>
           <p className="text-xs md:text-sm font-semibold text-[#5A6A51] mt-0.5">{tr.subtitle}</p>
@@ -920,7 +920,7 @@ export default function AdminNewBookingView({
         <div className={activePackage ? "lg:col-span-2 space-y-6" : "space-y-6"}>
 
           {/* CARD 1: PATIENT INFORMATION */}
-          <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#414E36]/10 shadow-xs space-y-6">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 md:p-8 border border-[#414E36]/10 shadow-xs space-y-6">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-700 text-white text-xs font-black">
@@ -1328,7 +1328,7 @@ export default function AdminNewBookingView({
           </div>
 
           {/* CARD 2: APPOINTMENT DETAILS */}
-          <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#414E36]/10 shadow-xs space-y-6">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 md:p-8 border border-[#414E36]/10 shadow-xs space-y-6">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-700 text-white text-xs font-black">
@@ -1690,7 +1690,7 @@ export default function AdminNewBookingView({
       </div>
 
       {/* ── BOTTOM ACTIONS BAR ── */}
-      <div className="bg-white rounded-3xl p-6 border border-[#414E36]/10 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#414E36]/10 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
         <button
           type="button"
           onClick={onClose}
