@@ -5444,7 +5444,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             onClick={() => setSidebarOpen(false)}
           />
         )}
-        <aside dir={lang === "ar" ? "rtl" : "ltr"} className={`fixed inset-y-0 start-0 z-50 flex w-[280px] max-w-[85vw] md:w-[220px] h-screen flex-col bg-[#414E36] px-3.5 py-5 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:sticky md:top-0 md:translate-x-0 ${
+        <aside dir={lang === "ar" ? "rtl" : "ltr"} className={`fixed inset-y-0 start-0 top-0 bottom-0 z-50 flex w-[280px] max-w-[85vw] md:w-[220px] h-full min-h-screen min-h-[100dvh] max-h-screen md:max-h-screen flex-col bg-[#414E36] px-3.5 py-5 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:sticky md:top-0 md:h-screen md:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : (lang === "ar" ? "translate-x-full" : "-translate-x-full")
         }`}>
           <div className="mb-6 flex items-center justify-between">
@@ -5500,7 +5500,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             </button>
           </div>
 
-          <nav className="flex-1 space-y-1 overflow-y-auto pe-0.5">
+          <nav className="flex-1 min-h-0 space-y-1 overflow-y-auto pe-0.5">
             {permittedSidebarItems.map((item) => {
               if (item.label === "Settings") {
                 const Icon = item.icon;
