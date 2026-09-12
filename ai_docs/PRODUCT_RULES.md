@@ -711,6 +711,8 @@ The following are **not currently enforced in code**:
 
 1. **Mobile Admin Shell & Navigation Drawer**:
    - Mobile navigation drawer width is responsive (`w-[280px] max-w-[85vw] md:w-[220px]`).
+   - Aside drawer containers must use `fixed inset-y-0 start-0 top-0 bottom-0 z-50 h-full min-h-screen min-h-[100dvh] max-h-screen md:max-h-screen md:sticky md:top-0 md:h-screen` ensuring 100% full viewport height coverage across dynamic mobile address bars and embedded viewports without bottom cutoffs.
+   - The scrollable `<nav>` flex container must include `flex-1 min-h-0 space-y-1 overflow-y-auto` to allow proper inner scrolling and prevent flex container height distortion.
    - Every sidebar item and submenu link must trigger `setSidebarOpen(false)` on click to auto-dismiss the drawer on mobile viewports.
    - Sticky top header elements adapt gracefully on `< 640px` screens: branch dropdown uses `max-w-[130px] sm:max-w-[200px] truncate`, Profile button hides text (`hidden sm:inline`), and gaps/paddings scale down to `gap-1.5 sm:gap-3` and `px-2 sm:px-4`.
 2. **Table Container Scoping & Minimum Widths**:
@@ -719,4 +721,6 @@ The following are **not currently enforced in code**:
 3. **Adaptive Card Paddings & Grid Scaling**:
    - Section containers and dashboard cards must use adaptive padding classes (`p-4 sm:p-6 md:p-8`) instead of rigid large paddings (`p-8`).
    - Card grids must scale progressively from mobile to desktop (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`).
+4. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-054` (`Responsive Staff Views & Mobile Layout Engine`).
 
