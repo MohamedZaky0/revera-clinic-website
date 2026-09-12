@@ -136,8 +136,9 @@ export async function resolveBranchCoordinates(branch: {
 
   // Fallback default coordinates for known clinic locations if maps link is missing or unresolvable
   const bName = String(branch.name_en || branch.name_ar || branch.id || "").toLowerCase();
-  if (bName.includes("zayed") || bName.includes("sheikh") || bName.includes("زايد") || bName.includes("شيخ")) {
-    return { latitude: 30.0131, longitude: 30.9876 };
+  if (bName.includes("zayed") || bName.includes("sheikh") || bName.includes("زايد") || bName.includes("شيخ") || bName.includes("beverly") || bName.includes("nada")) {
+    // Beverly Hills, El Nada Clinics Complex, Sheikh Zayed: 30.066883, 30.933526
+    return { latitude: 30.066883, longitude: 30.933526 };
   }
   if (
     bName.includes("cairo") ||
@@ -148,7 +149,8 @@ export async function resolveBranchCoordinates(branch: {
     bName.includes("تجمع") ||
     bName.includes("خامس")
   ) {
-    return { latitude: 30.0263, longitude: 31.4913 };
+    // New Cairo, Tagamoa Branch: 30.001242, 31.451330
+    return { latitude: 30.001242, longitude: 31.451330 };
   }
   if (bName.includes("maadi") || bName.includes("معادي")) {
     return { latitude: 29.9602, longitude: 31.2569 };

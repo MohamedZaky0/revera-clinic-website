@@ -273,10 +273,12 @@ export default function ReceptionDashboardView({
             } else {
               setLocationError(result.error || result.message || "generic");
             }
+            setShowStartShiftPopup(true);
           }
         } catch (err: any) {
           console.error("Start shift network/server error:", err);
           setLocationError("generic");
+          setShowStartShiftPopup(true);
         } finally {
           setShiftProcessing(false);
         }
@@ -292,6 +294,7 @@ export default function ReceptionDashboardView({
         } else {
           setLocationError("permission_denied");
         }
+        setShowStartShiftPopup(true);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -562,6 +565,24 @@ export default function ReceptionDashboardView({
             )}
           </div>
         </div>
+
+        {/* Location Error In-Card Alert Banner */}
+        {locationError && isNotStarted && (
+          <div className="rounded-2xl bg-amber-50 border border-amber-200/80 p-3.5 text-start flex items-start gap-2.5 text-xs text-amber-900 animate-in fade-in duration-150">
+            <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold">{tr.errors?.out_of_location || "Location verification failed"}</p>
+              <p className="text-[11px] text-amber-800/90 mt-0.5 font-medium">{resolveLocationError(locationError)}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLocationError(null)}
+              className="text-amber-600 hover:text-amber-900 p-1 cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* 4 Shift Metrics Columns */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
