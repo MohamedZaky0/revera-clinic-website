@@ -713,7 +713,8 @@ export default function AdminNewBookingView({
   const toggleTimeSlot = (slot: string) => {
     if (!availableTimeSlots.includes(slot) || bookedTimeSlots.includes(normalizeTimeSlot(slot))) return;
     setFormErrors((prev) => ({ ...prev, time: false }));
-    setSelectedTimes((prev) => (prev[0] === slot ? [] : [slot]));
+    setSelectedTimes([slot]);
+    setShowTimeDropdown(false);
   };
 
   const handleClearSlots = () => {
@@ -1401,12 +1402,12 @@ export default function AdminNewBookingView({
               {/* ── 1. AVAILABLE TIME (MULTI-SLOT SELECTION) ── */}
               <div>
                 <label className="block font-bold text-[#1F251A] mb-2">{tr.availableTimeLabel}</label>
-                <div ref={timeDropdownRef} className="relative">
+                <div ref={timeDropdownRef} className={`relative ${showTimeDropdown ? "z-50" : "z-10"}`}>
                   <button
                     type="button"
                     onClick={() => setShowTimeDropdown((open) => !open)}
                     aria-expanded={showTimeDropdown}
-                    className={`w-full max-w-md rounded-2xl border-2 bg-[var(--cr-white)] px-4 py-3.5 flex items-center gap-3 text-sm font-extrabold text-[var(--cr-dark)] transition ${
+                    className={`w-full max-w-md rounded-2xl border-2 bg-[var(--cr-white)] px-4 py-3.5 flex items-center gap-3 text-sm font-extrabold text-[var(--cr-dark)] transition cursor-pointer ${
                       formErrors.time ? "border-red-500 ring-2 ring-red-200" : "border-[var(--cr-primary)] hover:bg-white"
                     }`}
                   >
@@ -1418,24 +1419,35 @@ export default function AdminNewBookingView({
                   </button>
 
                   {showTimeDropdown && (
-                    <div className="absolute start-0 end-0 top-full z-40 mt-4 rounded-2xl border border-[var(--cr-primary)]/15 bg-white p-5 shadow-xl sm:max-w-4xl">
-                      <span className="absolute -top-3 start-8 h-6 w-6 rotate-45 border-l border-t border-[var(--cr-primary)]/15 bg-white" />
-                      <div className="relative space-y-4">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <h3 className="text-lg font-black text-[var(--cr-dark)]">{tr.availableTimeHeading}</h3>
-                          <div className="flex items-center justify-between gap-3 sm:justify-end">
-                            <span className="text-sm font-semibold text-[var(--cr-secondary)]">
-                              {totalDurationMinutes} {tr.minutesPerSlotLabel}
+                    <div className="absolute start-0 end-0 top-full z-[100] mt-2 max-w-2xl rounded-2xl border border-[var(--cr-primary)]/20 bg-white p-4 shadow-2xl animate-fadeIn">
+                      <span className="absolute -top-2 start-8 h-4 w-4 rotate-45 border-l border-t border-[var(--cr-primary)]/20 bg-white" />
+                      <div className="relative space-y-3">
+                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <Clock size={16} className="text-emerald-800" />
+                            <h3 className="text-sm font-black text-[var(--cr-dark)]">{tr.availableTimeHeading}</h3>
+                            <span className="text-xs font-semibold text-[var(--cr-secondary)]">
+                              ({totalDurationMinutes} {tr.minutesPerSlotLabel})
                             </span>
+                          </div>
+                          <div className="flex items-center gap-2">
                             {selectedTimes.length > 0 && (
                               <button
                                 type="button"
                                 onClick={handleClearSlots}
-                                className="rounded-xl bg-[var(--cr-secondary)] px-3.5 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-50"
+                                className="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 transition hover:bg-rose-100 cursor-pointer"
                               >
                                 {tr.clearSlotsBtn}
                               </button>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => setShowTimeDropdown(false)}
+                              className="h-7 w-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 transition cursor-pointer"
+                              title="Close"
+                            >
+                              <X size={14} />
+                            </button>
                           </div>
                         </div>
 
@@ -1444,44 +1456,46 @@ export default function AdminNewBookingView({
                             <Loader2 size={18} className="animate-spin text-emerald-700" /> {tr.fetchingSlotsLabel}
                           </div>
                         ) : allTimeSlots.length > 0 ? (
-                          <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 ${
-                            formErrors.time ? "rounded-2xl border border-red-500 p-2 ring-2 ring-red-200" : ""
-                          }`}>
-                            {allTimeSlots.map((tSlot) => {
-                              const isSelected = selectedTime === tSlot;
-                              const selectedStartIndex = getSlotIndex(selectedTime);
-                              const currentSlotIndex = getSlotIndex(tSlot);
-                              const isInsideSelectedService = selectedStartIndex >= 0
-                                && currentSlotIndex > selectedStartIndex
-                                && currentSlotIndex < selectedStartIndex + requiredSlotCount;
-                              const isBooked = bookedTimeSlots.includes(normalizeTimeSlot(tSlot));
-                              const isAvailableStart = availableTimeSlots.includes(tSlot) && !isBooked;
-                              const isDisabled = !isAvailableStart || isInsideSelectedService;
+                          <div className="max-h-64 sm:max-h-72 overflow-y-auto pr-1">
+                            <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 ${
+                              formErrors.time ? "rounded-2xl border border-red-500 p-2 ring-2 ring-red-200" : ""
+                            }`}>
+                              {allTimeSlots.map((tSlot) => {
+                                const isSelected = selectedTime === tSlot;
+                                const selectedStartIndex = getSlotIndex(selectedTime);
+                                const currentSlotIndex = getSlotIndex(tSlot);
+                                const isInsideSelectedService = selectedStartIndex >= 0
+                                  && currentSlotIndex > selectedStartIndex
+                                  && currentSlotIndex < selectedStartIndex + requiredSlotCount;
+                                const isBooked = bookedTimeSlots.includes(normalizeTimeSlot(tSlot));
+                                const isAvailableStart = availableTimeSlots.includes(tSlot) && !isBooked;
+                                const isDisabled = !isAvailableStart || isInsideSelectedService;
 
-                              return (
-                                <button
-                                  key={tSlot}
-                                  type="button"
-                                  disabled={isDisabled && !isSelected}
-                                  onClick={() => toggleTimeSlot(tSlot)}
-                                  title={isDisabled && !isSelected ? tr.slotUnavailableTitle : undefined}
-                                  className={`min-h-16 rounded-2xl border px-3.5 py-3 text-sm font-extrabold transition flex items-center justify-between gap-2 select-none ${
-                                    isSelected
-                                      ? "border-[var(--cr-primary)] bg-[var(--cr-primary)] text-white shadow-sm ring-2 ring-emerald-700/20"
-                                      : isDisabled
-                                      ? "cursor-not-allowed border-[var(--cr-divider)] bg-[var(--cr-white)] text-[var(--cr-secondary)] opacity-70"
-                                      : "cursor-pointer border-[var(--cr-divider)] bg-white text-[var(--cr-dark)] hover:border-[var(--cr-primary)] hover:bg-[var(--cr-secondary)]"
-                                  }`}
-                                >
-                                  <span>{tSlot}</span>
-                                  {isSelected ? (
-                                    <Check size={20} className="shrink-0 text-white" />
-                                  ) : (
-                                    <Clock size={20} className="shrink-0 text-[var(--cr-secondary)]" />
-                                  )}
-                                </button>
-                              );
-                            })}
+                                return (
+                                  <button
+                                    key={tSlot}
+                                    type="button"
+                                    disabled={isDisabled && !isSelected}
+                                    onClick={() => toggleTimeSlot(tSlot)}
+                                    title={isDisabled && !isSelected ? tr.slotUnavailableTitle : undefined}
+                                    className={`h-11 rounded-xl border px-3 text-xs font-bold transition flex items-center justify-between gap-1.5 select-none ${
+                                      isSelected
+                                        ? "border-[var(--cr-primary)] bg-[#1E3A2B] text-white shadow-sm ring-2 ring-emerald-700/20"
+                                        : isDisabled
+                                        ? "cursor-not-allowed border-[var(--cr-divider)] bg-[var(--cr-white)] text-[var(--cr-secondary)] opacity-50"
+                                        : "cursor-pointer border-[#414E36]/15 bg-white text-[#1F251A] hover:border-emerald-700 hover:bg-emerald-50/50"
+                                    }`}
+                                  >
+                                    <span>{tSlot}</span>
+                                    {isSelected ? (
+                                      <Check size={14} className="shrink-0 text-white" />
+                                    ) : (
+                                      <Clock size={14} className="shrink-0 text-[#8B9882]" />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                         ) : (
                           <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200/80 bg-amber-50 p-3.5 text-xs text-amber-900">
