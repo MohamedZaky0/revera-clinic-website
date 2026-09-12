@@ -200,6 +200,73 @@ export default function AdminEmployeesView({
     setNewEmployeeShiftEnd(parsed.end);
   };
 
+  const computeShiftSummary = (workingDays: Record<string, { isOpen: boolean; start: string; end: string; shifts?: Array<{ start: string; end: string }> }>): string => {
+    if (!workingDays || typeof workingDays !== 'object') return "Day";
+    const openDays = Object.values(workingDays).filter(d => d && d.isOpen);
+    if (openDays.length === 0) return "Off";
+    
+    const hasMultipleShifts = openDays.some(d => d.shifts && d.shifts.length > 1);
+    if (hasMultipleShifts) {
+      return "Multi-Shift Schedule";
+    }
+    
+    const first = openDays[0];
+    const firstStart = first.shifts?.[0]?.start || first.start || "09:00";
+    const firstEnd = first.shifts?.[0]?.end || first.end || "17:00";
+    const allSame = openDays.every(d => {
+      const s = d.shifts?.[0]?.start || d.start || "09:00";
+      const e = d.shifts?.[0]?.end || d.end || "17:00";
+      return s === firstStart && e === firstEnd;
+    });
+    
+    if (allSame) {
+      return `${formatTime12Hour(firstStart)} to ${formatTime12Hour(firstEnd)}`;
+    }
+    return "Multi-Shift Schedule";
+  };
+
+  const loadEmployeeWorkingSchedule = (emp: any, matchProv?: any, branchIdToUse?: string) => {
+    const targetBranch = branchIdToUse || emp?.branch_id || (matchProv?.workingDaysHours?.branch_ids?.[0]) || "";
+    const rawWdh = (targetBranch && matchProv?.workingDaysHours?.branch_schedules?.[targetBranch]?.in_person)
+      || matchProv?.workingDaysHours?.in_person 
+      || matchProv?.workingDaysHours 
+      || (targetBranch && emp?.working_days_hours?.branch_schedules?.[targetBranch]?.in_person)
+      || emp?.working_days_hours?.in_person
+      || emp?.working_days_hours
+      || (targetBranch && emp?.workingDaysHours?.branch_schedules?.[targetBranch]?.in_person)
+      || emp?.workingDaysHours?.in_person
+      || emp?.workingDaysHours;
+
+    if (rawWdh && typeof rawWdh === 'object' && ('Sunday' in rawWdh || 'Monday' in rawWdh)) {
+      const normalized: Record<string, { isOpen: boolean; start: string; end: string; shifts?: Array<{ start: string; end: string }> }> = {};
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      for (const d of days) {
+        const item = rawWdh[d] || { isOpen: d !== "Friday", start: "09:00", end: "17:00" };
+        const shifts = (item.shifts && Array.isArray(item.shifts) && item.shifts.length > 0)
+          ? item.shifts
+          : [{ start: item.start || "09:00", end: item.end || "17:00" }];
+        normalized[d] = {
+          isOpen: !!item.isOpen,
+          start: shifts[0].start,
+          end: shifts[0].end,
+          shifts: shifts
+        };
+      }
+      return normalized;
+    }
+
+    const parsed = parseShiftString(emp?.shift || "Day");
+    return {
+      Sunday: { isOpen: true, start: parsed.start, end: parsed.end, shifts: [{ start: parsed.start, end: parsed.end }] },
+      Monday: { isOpen: true, start: parsed.start, end: parsed.end, shifts: [{ start: parsed.start, end: parsed.end }] },
+      Tuesday: { isOpen: true, start: parsed.start, end: parsed.end, shifts: [{ start: parsed.start, end: parsed.end }] },
+      Wednesday: { isOpen: true, start: parsed.start, end: parsed.end, shifts: [{ start: parsed.start, end: parsed.end }] },
+      Thursday: { isOpen: true, start: parsed.start, end: parsed.end, shifts: [{ start: parsed.start, end: parsed.end }] },
+      Friday: { isOpen: false, start: parsed.start, end: parsed.end, shifts: [{ start: parsed.start, end: parsed.end }] },
+      Saturday: { isOpen: true, start: parsed.start, end: parsed.end, shifts: [{ start: parsed.start, end: parsed.end }] }
+    };
+  };
+
   const handleShiftStartChange = (val: string) => {
     setNewEmployeeShiftStart(val);
     const formattedStart = formatTime12Hour(val);
@@ -329,7 +396,7 @@ export default function AdminEmployeesView({
         const bSched = fullBranchSchedules[bId];
         if (!bSched) continue;
         const bObj = branchList.find((b) => b.id === bId);
-        const bName = bObj ? (bObj.name_en || bObj.name || bId) : "Branch";
+        const bName = bObj ? (bObj.name_en || bObj.name_ar || bId) : "Branch";
 
         // 1. In-Clinic shifts
         const inPersonDay = bSched.in_person?.[day];
@@ -895,17 +962,19 @@ export default function AdminEmployeesView({
             setEditingEmployee(null);
             setNewEmployeeName("");
             setNewEmployeeEmail("");
-            setNewEmployeeRole("");
+            const defaultRole = rolesList.find((r: any) => !r.name.toLowerCase().includes("doc"))?.name || "receptionist";
+            setNewEmployeeRole(defaultRole);
             setNewEmployeePassword("");
             setNewEmployeePhone("");
-            setNewEmployeeDepartment("Reception");
+            const defaultDept = departmentsList.find((d: string) => !d.toLowerCase().includes("doc")) || "Receptionist";
+            setNewEmployeeDepartment(defaultDept);
             updateShiftState("Day");
             setNewEmployeeSalary("0");
             setNewEmployeeNationalId("");
             setNewEmployeeNationalIdFront("");
             setNewEmployeeNationalIdBack("");
             applyAddressToState("");
-            setNewEmployeeBranchId("");
+            setNewEmployeeBranchId(branches.length > 0 ? branches[0].id : "");
             setNewEmployeeContract("");
             setNewEmployeeContractName("");
             setNewEmployeeAdditionalFiles([]);
@@ -1156,19 +1225,10 @@ export default function AdminEmployeesView({
                                     bIds = [branches[0].id];
                                   }
                                   setNewEmployeeBranchIds(bIds);
-                                  let sched = matchProv?.workingDaysHours?.branch_schedules?.[bIds[0]]?.in_person || matchProv?.workingDaysHours?.in_person || matchProv?.workingDaysHours;
-                                  if (!sched || typeof sched !== 'object') {
-                                    sched = {
-                                      Sunday: { isOpen: true, start: "09:00", end: "17:00" },
-                                      Monday: { isOpen: true, start: "09:00", end: "17:00" },
-                                      Tuesday: { isOpen: true, start: "09:00", end: "17:00" },
-                                      Wednesday: { isOpen: true, start: "09:00", end: "17:00" },
-                                      Thursday: { isOpen: true, start: "09:00", end: "17:00" },
-                                      Friday: { isOpen: false, start: "09:00", end: "17:00" },
-                                      Saturday: { isOpen: true, start: "09:00", end: "17:00" }
-                                    };
-                                  }
+                                  const sched = loadEmployeeWorkingSchedule(emp, matchProv, bIds[0]);
                                   setNewEmployeeWorkingDaysHours(sched);
+                                  const onlineSched = (bIds[0] && matchProv?.workingDaysHours?.branch_schedules?.[bIds[0]]?.online) || matchProv?.workingDaysHours?.online || sched;
+                                  setNewEmployeeOnlineWorkingDaysHours(onlineSched);
                                   setIsEditingEmployeeModalOpen(true);
                                 }}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
@@ -1244,9 +1304,10 @@ export default function AdminEmployeesView({
                 }
                 try {
                   const activeBranchId = newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0] || newEmployeeBranchId;
-    
-                  // 1. Validate Shift Overlaps across all branches and shift types
-                  if (newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc")) {
+                  const isDoctor = !!(newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc"));
+
+                  // 1. Validate Shift Overlaps
+                  if (isDoctor) {
                     const overlapCheck = checkShiftOverlaps(
                       newEmployeeBranchIds,
                       newEmployeeBranchSchedules,
@@ -1255,31 +1316,60 @@ export default function AdminEmployeesView({
                       newEmployeeOnlineWorkingDaysHours,
                       branches
                     );
-    
+
+                    if (overlapCheck.hasOverlap) {
+                      alert(overlapCheck.message);
+                      return;
+                    }
+                  } else {
+                    const singleBranchId = newEmployeeBranchId || activeBranchId || (branches.length > 0 ? branches[0].id : "branch-1");
+                    const overlapCheck = checkShiftOverlaps(
+                      [singleBranchId],
+                      {},
+                      singleBranchId,
+                      newEmployeeWorkingDaysHours,
+                      {},
+                      branches
+                    );
+
                     if (overlapCheck.hasOverlap) {
                       alert(overlapCheck.message);
                       return;
                     }
                   }
-    
-                  // 2. Compile schedules for all assigned branches
-                  const compiledBranchSchedules: Record<string, { in_person: any; online: any }> = {
+
+                  // 2. Compute human-readable shift string and compile schedule
+                  const computedShift = computeShiftSummary(newEmployeeWorkingDaysHours);
+
+                  const compiledBranchSchedules: Record<string, { in_person: any; online: any }> = isDoctor ? {
                     ...newEmployeeBranchSchedules,
                     [activeBranchId]: {
                       in_person: newEmployeeWorkingDaysHours,
                       online: newEmployeeOnlineWorkingDaysHours
                     }
+                  } : {
+                    [newEmployeeBranchId || activeBranchId]: {
+                      in_person: newEmployeeWorkingDaysHours,
+                      online: {}
+                    }
                   };
-    
-                  for (const bId of newEmployeeBranchIds) {
-                    if (!compiledBranchSchedules[bId]) {
-                      compiledBranchSchedules[bId] = {
-                        in_person: newEmployeeWorkingDaysHours,
-                        online: newEmployeeOnlineWorkingDaysHours
-                      };
+
+                  if (isDoctor) {
+                    for (const bId of newEmployeeBranchIds) {
+                      if (!compiledBranchSchedules[bId]) {
+                        compiledBranchSchedules[bId] = {
+                          in_person: newEmployeeWorkingDaysHours,
+                          online: newEmployeeOnlineWorkingDaysHours
+                        };
+                      }
                     }
                   }
-    
+
+                  const finalWorkingDaysHours = {
+                    branch_ids: isDoctor ? (newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId]) : [newEmployeeBranchId || activeBranchId],
+                    branch_schedules: compiledBranchSchedules
+                  };
+
                   if (editingEmployee) {
                     const res = await fetch("/api/employees", {
                       method: "PATCH",
@@ -1293,7 +1383,7 @@ export default function AdminEmployeesView({
                         roleName: newEmployeeRole,
                         phone: newEmployeePhone.trim(),
                         department: newEmployeeDepartment,
-                        shift: newEmployeeShift,
+                        shift: computedShift,
                         salary: Number(newEmployeeSalary),
                         nationalId: newEmployeeNationalId.trim() || null,
                         nationalIdFront: newEmployeeNationalIdFront || null,
@@ -1314,10 +1404,7 @@ export default function AdminEmployeesView({
                         commission_base: newEmployeeCommissionBase,
                         commission_fixed_component: Number(newEmployeeCommissionFixedComponent || 0),
                         service_commissions: newEmployeeServiceCommissions,
-                        workingDaysHours: {
-                          branch_ids: newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId],
-                          branch_schedules: compiledBranchSchedules
-                        }
+                        workingDaysHours: finalWorkingDaysHours
                       }),
                     });
                     if (res.ok) {
@@ -1353,13 +1440,13 @@ export default function AdminEmployeesView({
                         roleName: newEmployeeRole,
                         phone: newEmployeePhone.trim(),
                         department: newEmployeeDepartment,
-                        shift: newEmployeeShift,
+                        shift: computedShift,
                         salary: Number(newEmployeeSalary),
                         nationalId: newEmployeeNationalId.trim() || null,
                         nationalIdFront: newEmployeeNationalIdFront || null,
                         nationalIdBack: newEmployeeNationalIdBack || null,
                         address: buildAddress(newEmployeeAddressLine1.trim(), newEmployeeAddressLine2.trim(), newEmployeeCity.trim(), newEmployeeGovernorateProp.trim(), newEmployeePostalCode.trim(), newEmployeeCountry.trim()) || null,
-                        branchId: newEmployeeBranchIds[0] || newEmployeeBranchId || null,
+                        branchId: (isDoctor ? newEmployeeBranchIds[0] : newEmployeeBranchId) || newEmployeeBranchId || null,
                         contractFile: newEmployeeAdditionalFiles.length > 0 
                           ? JSON.stringify({ contract: newEmployeeContract || "", additional: newEmployeeAdditionalFiles }) 
                           : (newEmployeeContract || null),
@@ -1374,10 +1461,7 @@ export default function AdminEmployeesView({
                         commission_base: newEmployeeCommissionBase,
                         commission_fixed_component: Number(newEmployeeCommissionFixedComponent || 0),
                         service_commissions: newEmployeeServiceCommissions,
-                        workingDaysHours: {
-                          branch_ids: newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId],
-                          branch_schedules: compiledBranchSchedules
-                        }
+                        workingDaysHours: finalWorkingDaysHours
                       }),
                     });
                     if (res.ok) {
@@ -1458,7 +1542,17 @@ export default function AdminEmployeesView({
                       const val = e.target.value;
                       setNewEmployeeRole(val);
                       if (val.toLowerCase().includes("doc")) {
-                        setNewEmployeeDepartment("Doctors");
+                        const docDept = departmentsList.find((d: string) => d.toLowerCase().includes("doc"));
+                        setNewEmployeeDepartment(docDept || "Doctors");
+                      } else {
+                        if (newEmployeeDepartment.toLowerCase().includes("doc")) {
+                          const nonDocDept = departmentsList.find((d: string) => {
+                            const dLower = d.toLowerCase();
+                            const vLower = val.toLowerCase();
+                            return dLower === vLower || (vLower.includes("rec") && dLower.includes("rec"));
+                          }) || departmentsList.find((d: string) => !d.toLowerCase().includes("doc"));
+                          setNewEmployeeDepartment(nonDocDept || "Receptionist");
+                        }
                       }
                     }}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
@@ -1474,7 +1568,10 @@ export default function AdminEmployeesView({
                   <select
                     required
                     value={newEmployeeBranchId}
-                    onChange={(e) => setNewEmployeeBranchId(e.target.value)}
+                    onChange={(e) => {
+                      setNewEmployeeBranchId(e.target.value);
+                      setNewEmployeeBranchIds([e.target.value]);
+                    }}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   >
                     <option value="" disabled>{t.form.selectBranch}</option>
@@ -1493,9 +1590,22 @@ export default function AdminEmployeesView({
                     onChange={(e) => {
                       const val = e.target.value;
                       setNewEmployeeDepartment(val);
-                      if (val.toLowerCase().includes("doc") && !newEmployeeRole.toLowerCase().includes("doc")) {
-                        const docRole = rolesList.find((r: any) => r.name.toLowerCase().includes("doc"));
-                        if (docRole) setNewEmployeeRole(docRole.name);
+                      if (val.toLowerCase().includes("doc")) {
+                        if (!newEmployeeRole.toLowerCase().includes("doc")) {
+                          const docRole = rolesList.find((r: any) => r.name.toLowerCase().includes("doc"));
+                          if (docRole) setNewEmployeeRole(docRole.name);
+                          else setNewEmployeeRole("Doctor");
+                        }
+                      } else {
+                        if (newEmployeeRole.toLowerCase().includes("doc")) {
+                          const matchingRole = rolesList.find((r: any) => {
+                            const rLower = r.name.toLowerCase();
+                            const vLower = val.toLowerCase();
+                            return rLower === vLower || (vLower.includes("rec") && rLower.includes("rec"));
+                          }) || rolesList.find((r: any) => !r.name.toLowerCase().includes("doc"));
+                          if (matchingRole) setNewEmployeeRole(matchingRole.name);
+                          else setNewEmployeeRole("Receptionist");
+                        }
                       }
                     }}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
@@ -1833,56 +1943,184 @@ export default function AdminEmployeesView({
                 </div>
               )}
     
-              {/* Shift & Target for Non-Doctor Employees */}
+              {/* Shift & Target for Non-Doctor Employees (e.g. Receptionist) */}
               {!(newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc")) && (
-                <>
-                  <div className="mt-4">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.table.shift}</label>
-                    <div className="flex items-center gap-2 max-w-[320px]">
-                      <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-3.5 py-2.5 w-full focus-within:border-[#C4AE7C] transition-colors">
-                        <input
-                          type="time"
-                          value={newEmployeeShiftStart}
-                          onChange={(e) => handleShiftStartChange(e.target.value)}
-                          onClick={(e) => {
-                            try { e.currentTarget.showPicker(); } catch {}
-                          }}
-                          className="bg-transparent text-sm text-[#1F251A] outline-none w-full pr-6 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                        />
-                        <Clock size={14} className="text-[#5A6A51] absolute right-3.5 pointer-events-none" />
-                      </div>
-                      <span className="text-sm font-semibold text-[#5A6A51] select-none">to</span>
-                      <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-3.5 py-2.5 w-full focus-within:border-[#C4AE7C] transition-colors">
-                        <input
-                          type="time"
-                          value={newEmployeeShiftEnd}
-                          onChange={(e) => handleShiftEndChange(e.target.value)}
-                          onClick={(e) => {
-                            try { e.currentTarget.showPicker(); } catch {}
-                          }}
-                          className="bg-transparent text-sm text-[#1F251A] outline-none w-full pr-6 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                        />
-                        <Clock size={14} className="text-[#5A6A51] absolute right-3.5 pointer-events-none" />
-                      </div>
+                <div className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-5 space-y-5 shadow-sm animate-fadeIn">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/10 pb-3">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#414E36]">
+                      <Clock size={16} className="text-[#C4AE7C]" />
+                      {t.nonDoctorSection?.weeklyShifts || "Staff Weekly Shifts & Working Days Schedule"}
                     </div>
+                    {newEmployeeBranchId && (
+                      <span className="text-[11px] font-bold text-[#5A6A51] bg-white px-2.5 py-1 rounded-lg border border-[#414E36]/15 w-max">
+                        {lang === "ar"
+                          ? (branches.find(b => b.id === newEmployeeBranchId)?.name_ar || branches.find(b => b.id === newEmployeeBranchId)?.name_en || "الفرع المخصص")
+                          : (branches.find(b => b.id === newEmployeeBranchId)?.name_en || branches.find(b => b.id === newEmployeeBranchId)?.name_ar || "Assigned Branch")}
+                      </span>
+                    )}
                   </div>
-    
+
+                  {/* Weekly Shifts Grid */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                    {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => {
+                      const sched = newEmployeeWorkingDaysHours[day] || { isOpen: false, start: "09:00", end: "17:00" };
+                      return (
+                        <div key={day} className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
+                          <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
+                            <input
+                              type="checkbox"
+                              checked={sched.isOpen}
+                              onChange={(e) => {
+                                setNewEmployeeWorkingDaysHours({
+                                  ...newEmployeeWorkingDaysHours,
+                                  [day]: { ...sched, isOpen: e.target.checked }
+                                });
+                              }}
+                              className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                            />
+                            <span className={`text-xs font-bold w-24 ${sched.isOpen ? "text-[#1F251A]" : "text-gray-400"}`}>
+                              {t.dayNames?.[day as keyof typeof t.dayNames] || day}
+                            </span>
+                          </label>
+
+                          {sched.isOpen ? (
+                            <div className="flex flex-col gap-2 w-full sm:w-auto">
+                              {/* Shifts list with multi-shift support */}
+                              {((sched.shifts && sched.shifts.length > 0) ? sched.shifts : [{ start: sched.start || "09:00", end: sched.end || "17:00" }]).map((shft, shiftIdx) => (
+                                <div key={shiftIdx} className="flex items-center gap-2">
+                                  <input
+                                    type="time"
+                                    value={shft.start}
+                                    onChange={(e) => {
+                                      const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                      currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], start: e.target.value };
+                                      setNewEmployeeWorkingDaysHours({
+                                        ...newEmployeeWorkingDaysHours,
+                                        [day]: {
+                                          ...sched,
+                                          start: currentShifts[0].start,
+                                          end: currentShifts[0].end,
+                                          shifts: currentShifts
+                                        }
+                                      });
+                                    }}
+                                    className="rounded-lg border border-[#414E36]/15 px-2.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                                  />
+                                  <span className="text-xs text-[#5A6A51]">{t.doctorSection.shiftTo || "to"}</span>
+                                  <input
+                                    type="time"
+                                    value={shft.end}
+                                    onChange={(e) => {
+                                      const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                      currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], end: e.target.value };
+                                      setNewEmployeeWorkingDaysHours({
+                                        ...newEmployeeWorkingDaysHours,
+                                        [day]: {
+                                          ...sched,
+                                          start: currentShifts[0].start,
+                                          end: currentShifts[0].end,
+                                          shifts: currentShifts
+                                        }
+                                      });
+                                    }}
+                                    className="rounded-lg border border-[#414E36]/15 px-2.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                                  />
+                                  {shiftIdx > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                        const filteredShifts = currentShifts.filter((_, i) => i !== shiftIdx);
+                                        setNewEmployeeWorkingDaysHours({
+                                          ...newEmployeeWorkingDaysHours,
+                                          [day]: {
+                                            ...sched,
+                                            start: filteredShifts[0].start,
+                                            end: filteredShifts[0].end,
+                                            shifts: filteredShifts
+                                          }
+                                        });
+                                      }}
+                                      className="text-red-500 hover:text-red-700 transition cursor-pointer"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                  const newShifts = [...currentShifts, { start: "09:00", end: "17:00" }];
+                                  setNewEmployeeWorkingDaysHours({
+                                    ...newEmployeeWorkingDaysHours,
+                                    [day]: {
+                                      ...sched,
+                                      shifts: newShifts
+                                    }
+                                  });
+                                }}
+                                className="text-xs font-bold text-[#414E36] hover:text-[#2e3a26] transition flex items-center gap-1 mt-0.5 cursor-pointer"
+                              >
+                                <Plus size={12} /> {t.doctorSection.addShift || "Add Shift"}
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">{t.doctorSection.offClosed || "Off / Closed"}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Live Shift Overlap Warning Banner */}
+                  {(() => {
+                    const singleBranch = newEmployeeBranchId || (branches.length > 0 ? branches[0].id : "branch-1");
+                    const overlap = checkShiftOverlaps(
+                      [singleBranch],
+                      {},
+                      singleBranch,
+                      newEmployeeWorkingDaysHours,
+                      {},
+                      branches
+                    );
+                    if (overlap.hasOverlap) {
+                      return (
+                        <div className="mt-3 flex items-start gap-2 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium animate-fadeIn">
+                          <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold block text-amber-900 mb-0.5">{t.doctorSection.overlapWarningTitle || "⚠️ Shift Overlap Warning:"}</span>
+                            {overlap.message}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
                   {/* Target & Bonus Configuration */}
                   <div className="border-t border-[#414E36]/10 pt-4 space-y-4">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Target &amp; Performance Bonus</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">
+                      {t.nonDoctorSection?.targetTitle || "Target & Performance Bonus"}
+                    </h4>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Required Target Amount (EGP)</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                          {t.nonDoctorSection?.requiredTarget || "Required Target Amount (EGP)"}
+                        </label>
                         <input
                           type="number"
                           min="0"
                           value={newEmployeeRequiredTargetAmount}
                           onChange={(e) => setNewEmployeeRequiredTargetAmount(e.target.value)}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Bonus Percentage (%)</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                          {t.nonDoctorSection?.bonusPercentage || "Bonus Percentage (%)"}
+                        </label>
                         <input
                           type="number"
                           min="0"
@@ -1892,12 +2130,12 @@ export default function AdminEmployeesView({
                             const val = Math.min(100, Math.max(0, Number(e.target.value) || 0));
                             setNewEmployeeBonusPercentage(String(val));
                           }}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                         />
                       </div>
                     </div>
                   </div>
-                </>
+                </div>
               )}
     
               {/* --- NEW EMPLOYEE PROFILE FIELDS (National ID, Photo Uploads, Address) --- */}
@@ -2358,6 +2596,7 @@ export default function AdminEmployeesView({
                   setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
                   setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
                   applyAddressToState(viewingEmployee.address || "");
+                  setNewEmployeeBranchId(viewingEmployee.branch_id || "");
                   const rawContract = viewingEmployee.contract_file || "";
                   let contractUrl = "";
                   let additionalList: any[] = [];
@@ -2378,11 +2617,27 @@ export default function AdminEmployeesView({
                   setNewEmployeeRequiredTargetAmount(String(viewingEmployee.requiredTargetAmount || 0));
                   setNewEmployeeBonusPercentage(String(viewingEmployee.bonusPercentage || 0));
                   const matchProv2 = providers.find(p => (p.name && viewingEmployee.name && p.name.trim().toLowerCase() === viewingEmployee.name.trim().toLowerCase()) || (p.phone && viewingEmployee.phone && p.phone === viewingEmployee.phone));
+                  setNewEmployeeSpecialty(matchProv2?.specialty || "");
+                  setNewEmployeeSelectedServices(matchProv2?.services || []);
+                  setNewEmployeeRating(String(matchProv2?.rating || 5));
                   setNewEmployeeCommissionType(matchProv2?.commissionType || "none");
                   setNewEmployeeCommissionValue(String(matchProv2?.commissionValue || 0));
                   setNewEmployeeCommissionBase((matchProv2?.commissionBase as "gross" | "net_of_materials") || "gross");
                   setNewEmployeeCommissionFixedComponent(String(matchProv2?.commissionFixedComponent || 0));
                   setNewEmployeeServiceCommissions(Array.isArray(matchProv2?.serviceCommissions) ? matchProv2.serviceCommissions : []);
+                  let bIds: string[] = [];
+                  if (matchProv2?.workingDaysHours?.branch_ids && Array.isArray(matchProv2.workingDaysHours.branch_ids)) {
+                    bIds = matchProv2.workingDaysHours.branch_ids;
+                  } else if (viewingEmployee.branch_id) {
+                    bIds = [viewingEmployee.branch_id];
+                  } else if (branches.length > 0) {
+                    bIds = [branches[0].id];
+                  }
+                  setNewEmployeeBranchIds(bIds);
+                  const sched = loadEmployeeWorkingSchedule(viewingEmployee, matchProv2, bIds[0]);
+                  setNewEmployeeWorkingDaysHours(sched);
+                  const onlineSched = (bIds[0] && matchProv2?.workingDaysHours?.branch_schedules?.[bIds[0]]?.online) || matchProv2?.workingDaysHours?.online || sched;
+                  setNewEmployeeOnlineWorkingDaysHours(onlineSched);
                   setViewingEmployee(null);
                   setIsEditingEmployeeModalOpen(true);
                 }}

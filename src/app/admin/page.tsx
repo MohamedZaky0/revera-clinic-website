@@ -2355,7 +2355,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-048', name: 'Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine', category: 'System & Settings', endpoint: '/api/roles', description: 'Validates system locking for superadmin role and dual deletion modes (soft/hard) for administrative management.', status: 'idle' },
     { id: 'TC-049', name: 'New Booking Multi-Slot Selection & Financial Calculation Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Validates multi-slot time selection, duration aggregation, side-by-side Booking Value and Amount Paid Now inputs, and remaining value calculation.', status: 'idle' },
     { id: 'TC-050', name: 'Reception Dashboard Shift State & Performance Metrics Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies 3 shift states (Not Started, In Progress, Completed), live performance counters (completed, cancelled, no-shows), and payment breakdown aggregation.', status: 'idle' },
-    { id: 'TC-051', name: 'Unified Staff Login & Customer Dropdown Real-Time Sync Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies unified staff portal routing (/login -> /doctor, /reception, /admin), shaded customer login state persistence, and instant multi-tab sync.', status: 'idle' }
+    { id: 'TC-051', name: 'Unified Staff Login & Customer Dropdown Real-Time Sync Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies unified staff portal routing (/login -> /doctor, /reception, /admin), shaded customer login state persistence, and instant multi-tab sync.', status: 'idle' },
+    { id: 'TC-052', name: 'Optional Email Booking & Patient Creation Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies optional email support for staff booking creation and patient profile registration without validation blockers.', status: 'idle' },
+    { id: 'TC-053', name: 'Reception & Staff Weekly Shift Configuration Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee profile creation, weekly shift schedule configuration for non-doctor staff, and department/role synchronization.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -5203,8 +5205,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }
 
   async function handleCreateManualBooking() {
-    if (!newPatientName || !newPatientEmail || !newPatientPhone || !newPatientDate) {
-      alert("Please fill in all required fields (Name, Email, Phone, Date).");
+    if (!newPatientName || !newPatientPhone || !newPatientDate) {
+      alert("Please fill in all required fields (Name, Phone, Date).");
       return;
     }
 
@@ -5231,7 +5233,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       date: newPatientDate,
       requestedTime: newPatientTimeSlot,
       name: newPatientName,
-      email: newPatientEmail,
+      email: newPatientEmail.trim() || null,
       phone: newPatientPhone,
       // When staff explicitly picked an existing patient (search picker or a resolved phone
       // match), link the reservation to that exact customer id directly — bypasses the
@@ -8141,10 +8143,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   />
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Email *</label>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Email (Optional)</label>
                   <input
                     type="email"
-                    required
                     placeholder="Enter email"
                     value={newPatientEmail}
                     onChange={(e) => setNewPatientEmail(e.target.value)}

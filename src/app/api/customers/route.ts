@@ -179,8 +179,9 @@ export async function POST(req: Request) {
     }
   }
 
-  if (email) {
-    const cleanEmail = email.trim().toLowerCase();
+  const cleanEmail = (email && typeof email === 'string' && email.trim()) ? email.trim().toLowerCase() : null;
+
+  if (cleanEmail) {
     const { data: employeeCheck, error: empCheckError } = await supabaseServer
       .from('employee_accounts')
       .select('id')
@@ -200,7 +201,7 @@ export async function POST(req: Request) {
     name,
     mobile,
     gender: gender || null,
-    email: email || null,
+    email: cleanEmail,
     active: active ?? true,
     area: area || null,
     location_name: location_name || null,
