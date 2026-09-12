@@ -709,9 +709,10 @@ The following are **not currently enforced in code**:
 ## Responsive Layout & Mobile Staff Views Standards
 **Enforced in:** `src/app/admin/page.tsx`, `AdminBookingsView.tsx`, `ReceptionDashboardView.tsx`, `PatientsDirectoryView.tsx`, `CustomerProfileDrawer.tsx`, `AdminEmployeesView.tsx`, `TransactionsView.tsx`, `InventoryDevicesTab.tsx`, `InventoryProductsTab.tsx`, `AdminServicesView.tsx`, `AdminHrView.tsx`, `AdminNewBookingView.tsx`, `AdminAddPreviousBookingView.tsx`, `UserProfileView.tsx`.
 
-1. **Mobile Admin Shell & Navigation Drawer**:
+1. **Admin Shell & Navigation Drawer**:
    - Mobile navigation drawer width is responsive (`w-[280px] max-w-[85vw] md:w-[220px]`).
-   - Aside drawer containers must use `fixed inset-y-0 start-0 top-0 bottom-0 z-50 h-full min-h-screen min-h-[100dvh] max-h-screen md:max-h-screen md:sticky md:top-0 md:h-screen` ensuring 100% full viewport height coverage across dynamic mobile address bars and embedded viewports without bottom cutoffs.
+   - Aside drawer containers must use `fixed inset-y-0 start-0 top-0 bottom-0 z-50 md:z-30 h-full min-h-screen min-h-[100dvh] max-h-screen md:h-screen md:max-h-screen md:translate-x-0` ensuring 100% full viewport height coverage across dynamic mobile address bars and embedded viewports without bottom cutoffs.
+   - On desktop, the main content wrapper uses `flex-1 flex flex-col min-w-0 max-w-full md:ps-[220px]` (padding-inline-start), permanently locking the sidebar to the viewport so the sidebar never scrolls away or reveals background gaps when page content scrolls down.
    - The scrollable `<nav>` flex container must include `flex-1 min-h-0 space-y-1 overflow-y-auto` to allow proper inner scrolling and prevent flex container height distortion.
    - Every sidebar item and submenu link must trigger `setSidebarOpen(false)` on click to auto-dismiss the drawer on mobile viewports.
    - Sticky top header elements adapt gracefully on `< 640px` screens: branch dropdown uses `max-w-[130px] sm:max-w-[200px] truncate`, Profile button hides text (`hidden sm:inline`), and gaps/paddings scale down to `gap-1.5 sm:gap-3` and `px-2 sm:px-4`.

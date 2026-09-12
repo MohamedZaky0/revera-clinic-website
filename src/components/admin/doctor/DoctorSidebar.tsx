@@ -65,7 +65,7 @@ export default function DoctorSidebar({
       {/* Unified Responsive Sidebar / Drawer */}
       <aside
         dir={lang === "ar" ? "rtl" : "ltr"}
-        className={`fixed inset-y-0 start-0 top-0 bottom-0 z-50 flex w-[280px] max-w-[85vw] md:w-[220px] h-full min-h-screen min-h-[100dvh] max-h-screen md:max-h-screen flex-col justify-between bg-[#414E36] px-3.5 py-5 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:sticky md:top-0 md:h-screen md:translate-x-0 shrink-0 overflow-y-auto ${
+        className={`fixed inset-y-0 start-0 top-0 bottom-0 z-50 md:z-30 flex w-[280px] max-w-[85vw] md:w-[220px] h-full min-h-screen min-h-[100dvh] max-h-screen md:h-screen md:max-h-screen flex-col justify-between bg-[#414E36] px-3.5 py-5 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:translate-x-0 shrink-0 overflow-y-auto ${
           sidebarOpen ? "translate-x-0" : (lang === "ar" ? "translate-x-full" : "-translate-x-full")
         }`}
       >
