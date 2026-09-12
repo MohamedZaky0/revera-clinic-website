@@ -65,7 +65,7 @@ Operating hours are defined by the branch's specific `service_hours` table confi
 ### Required booking fields
 **Enforced in:** `POST /api/reservations`
 
-`serviceId`, `date`, `name`, `email`, `phone` are required. Missing any returns HTTP 400.
+`serviceId`, `date`, `name`, `phone` are required. Missing any returns HTTP 400. `email` is optional (nullable); when omitted, the booking and linked customer are saved with `email: null`.
 
 ---
 
@@ -684,3 +684,22 @@ The following are **not currently enforced in code**:
    - Already-authenticated staff visiting `/login` are automatically redirected to their active workspace without showing credentials prompt.
 5. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-051` (`Unified Staff Login & Customer Dropdown Real-Time Sync Engine`).
+
+---
+
+## Reception & Non-Doctor Staff Weekly Shifts & Department Synchronization Rules
+**Enforced in:** `src/components/admin/employees/AdminEmployeesView.tsx`, `src/app/api/employees/route.ts`, `src/components/admin/translations.ts`.
+
+1. **Weekly Working Days Shift Schedule Matrix**:
+   - Receptionists and non-doctor staff configure their schedules using the full weekly working days matrix (Sunday through Saturday).
+   - Each weekday supports an `isOpen` working status checkbox, start and end time pickers, multi-shift additions (`+ Add Shift`), and removal of extra shifts (`Trash2`).
+2. **Single-Branch & In-Clinic Scoping**:
+   - Unlike Doctors who can be assigned to multiple branches and provide online consultations, Receptionists and operational staff are strictly bound to a **single assigned branch** and operate **exclusively in-clinic** (multi-branch selector and online consultation tabs are hidden).
+3. **Bidirectional Department & Role Synchronization**:
+   - When switching the department dropdown to `"Doctors"`, the system role automatically synchronizes to `"Doctor"` (or the primary doctor role from `rolesList`), revealing the doctor & medical configuration section.
+   - When switching the department back to `"Receptionist"` (or other non-doctor departments), the system role automatically reverts to a non-doctor role (e.g. `"receptionist"`), cleanly hiding the doctor section and restoring the staff weekly shifts configuration.
+   - Conversely, changing the system role dropdown synchronizes the department dropdown in both directions.
+4. **Summary Shift String & Working Schedule Compilation**:
+   - On submission, the matrix schedule is compiled into `workingDaysHours` and summarized into a human-readable `shift` string (`"09:00 AM to 05:00 PM"`, `"Multi-Shift Schedule"`, or `"Off"`) for backward compatibility with `employee_accounts.shift` and attendance reporting.
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-053` (`Reception & Staff Weekly Shift Configuration Engine`).

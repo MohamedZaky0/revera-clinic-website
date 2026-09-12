@@ -1059,8 +1059,10 @@ export default function DoctorAccountView({
         setSidebarOpen={setSidebarOpen}
       />
 
-      {/* 2. MOBILE TOP HEADER BAR (< md) */}
-      <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[#414E36] text-white shrink-0 sticky top-0 z-30 shadow-md">
+      {/* 2. MAIN CONTENT WRAPPER */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+        {/* MOBILE TOP HEADER BAR (< md) */}
+        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[#414E36] text-white shrink-0 sticky top-0 z-30 shadow-md">
         <div className="flex items-center gap-2.5 min-w-0">
           <button
             type="button"
@@ -1254,8 +1256,9 @@ export default function DoctorAccountView({
           />
         )}
       </main>
+      </div>
 
-      {/* 4. MOBILE BOTTOM NAVIGATION BAR (< md) */}
+      {/* 3. MOBILE BOTTOM NAVIGATION BAR (< md) */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-[#414E36]/15 px-2 py-1.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] flex items-center justify-around">
         <button
           type="button"

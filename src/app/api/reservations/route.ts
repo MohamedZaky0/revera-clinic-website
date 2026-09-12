@@ -699,7 +699,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId, doctorName, createdByEmployeeId, customerId: explicitCustomerId } = body;
 
-    if (!serviceId || !date || !name || !email || !phone) {
+    if (!serviceId || !date || !name || !phone) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -783,8 +783,9 @@ export async function POST(req: Request) {
       }
     }
 
-    if (email) {
-      const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = (email && typeof email === 'string' && email.trim()) ? email.trim().toLowerCase() : null;
+
+    if (cleanEmail) {
       const { data: employeeCheck, error: empCheckError } = await supabaseServer
         .from('employee_accounts')
         .select('id')
@@ -844,7 +845,7 @@ export async function POST(req: Request) {
           .update({
             number_of_bookings: newBookings,
             name: name || customer.name,
-            email: email || customer.email,
+            email: cleanEmail || customer.email || null,
           })
           .eq('id', customerId);
       } else {
@@ -853,7 +854,7 @@ export async function POST(req: Request) {
           .insert({
             name,
             mobile: normalizedPhone,
-            email: email || null,
+            email: cleanEmail,
             registration_date: new Date().toISOString(),
             active: true,
             spent_amount: 0,
@@ -1039,7 +1040,7 @@ export async function POST(req: Request) {
       date,
       requested_time: requestedTime || null,
       name,
-      email,
+      email: cleanEmail,
       phone,
       notes: notes || '',
       status: isManualBooking ? 'approved' : initialStatus,

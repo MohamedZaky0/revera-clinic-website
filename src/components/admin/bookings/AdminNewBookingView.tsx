@@ -811,7 +811,7 @@ export default function AdminNewBookingView({
             first_name: firstName,
             last_name: lastName,
             mobile: phone,
-            email: email || null,
+            email: email.trim() || null,
             gender: gender || null,
             national_id: nationalId || null,
             age: age ? Number(age) : null,
@@ -846,7 +846,7 @@ export default function AdminNewBookingView({
       const payload = {
         name: fullPatientName,
         phone: phone,
-        email: email || null,
+        email: email.trim() || null,
         serviceId: selectedServiceObj?.id,
         doctorId: selectedDoctorObj?.id,
         branchId: selectedBranchObj?.id || null,

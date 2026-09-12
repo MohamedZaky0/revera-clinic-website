@@ -276,9 +276,9 @@ Returns reservations. Filterable by query params.
 Creates a new reservation. Status is `'pending'`, or `'pending_deposit'` when a deposit
 percentage is configured and the booking isn't manual (`isManual` not set).
 
-**Body:** `{ serviceId, additionalServiceIds?, date, requestedTime?, name, email, phone, notes?, sessionType?, branchId?, doctorName?, createdByEmployeeId?, isManual?, customerId? }`
+**Body:** `{ serviceId, additionalServiceIds?, date, requestedTime?, name, email?, phone, notes?, sessionType?, branchId?, doctorName?, createdByEmployeeId?, isManual?, customerId? }`
 
-Required: serviceId, date, name, email, phone.
+Required: serviceId, date, name, phone. `email` is optional.
 
 `additionalServiceIds` (optional, `number[]`) — CORRUPT-U06/RISK-081: lets a single session book
 more than one service. `serviceId` stays the required "primary" service; price and duration are
