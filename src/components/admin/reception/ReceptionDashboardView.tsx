@@ -81,9 +81,28 @@ export default function ReceptionDashboardView({
   const [showAllAlertsModal, setShowAllAlertsModal] = useState(false);
   const [alertsFilter, setAlertsFilter] = useState<string>("all");
   const [liveElapsedSeconds, setLiveElapsedSeconds] = useState(0);
-  const [hasAutoPrompted, setHasAutoPrompted] = useState(false);
+  const hasAutoPromptedRef = useRef(false);
   const [activeBookingMenuId, setActiveBookingMenuId] = useState<string | number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Helper for persistent session prompt key
+  const getSessionPromptKey = () => {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const userKey = employeeId || email || "staff_user";
+    return `revera_shift_prompted_${todayStr}_${userKey}`;
+  };
+
+  const handleDismissStartShiftPopup = () => {
+    setShowStartShiftPopup(false);
+    setLocationError(null);
+    hasAutoPromptedRef.current = true;
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.setItem(getSessionPromptKey(), "true");
+      } catch {}
+    }
+  };
 
   // Close 3-dots row menu on outside click
   useEffect(() => {
@@ -120,9 +139,22 @@ export default function ReceptionDashboardView({
         if (data.shift?.elapsedSeconds) {
           setLiveElapsedSeconds(data.shift.elapsedSeconds);
         }
-        if (!hasAutoPrompted && data.shift?.status === "not_started") {
+
+        let alreadyPrompted = hasAutoPromptedRef.current;
+        if (!alreadyPrompted && typeof window !== "undefined") {
+          try {
+            alreadyPrompted = sessionStorage.getItem(getSessionPromptKey()) === "true";
+          } catch {}
+        }
+
+        if (!alreadyPrompted && data.shift?.status === "not_started") {
           setShowStartShiftPopup(true);
-          setHasAutoPrompted(true);
+          hasAutoPromptedRef.current = true;
+          if (typeof window !== "undefined") {
+            try {
+              sessionStorage.setItem(getSessionPromptKey(), "true");
+            } catch {}
+          }
         }
       }
     } catch (err) {
@@ -1304,10 +1336,7 @@ export default function ReceptionDashboardView({
               <button
                 type="button"
                 disabled={shiftProcessing}
-                onClick={() => {
-                  setShowStartShiftPopup(false);
-                  setLocationError(null);
-                }}
+                onClick={handleDismissStartShiftPopup}
                 className="w-full py-3 px-6 rounded-2xl font-bold text-sm text-[#1F251A] border border-[#E6E9EB] hover:bg-[#F2EFE9] transition cursor-pointer"
               >
                 <span>{tr.cancel ?? "Cancel"}</span>
