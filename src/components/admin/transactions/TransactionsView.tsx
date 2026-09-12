@@ -327,9 +327,9 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       </div>
 
       {/* ── Quick Overview Cards ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
         {/* Card 1: Today's Payments */}
-        <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
+        <div className="rounded-3xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
           <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
             <Wallet size={24} />
           </div>
@@ -354,7 +354,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         </div>
 
         {/* Card 2: Outstanding */}
-        <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
+        <div className="rounded-3xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
           <div className="h-12 w-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold shrink-0">
             <FileText size={24} />
           </div>
@@ -373,7 +373,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
         {/* Card 3: Wallet Balance */}
         <div
-          className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow"
+          className="rounded-3xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow"
           title={lang === "ar" ? "إجمالي الأرصدة المتاحة في محافظ المرضى بالعيادة" : "Total active patient wallet credit across all patients"}
         >
           <div className="h-12 w-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold shrink-0">
@@ -575,7 +575,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       {/* ── Transactions Table ── */}
       <div className="overflow-hidden rounded-3xl border border-[#414E36]/10 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-start text-xs border-collapse">
+          <table className="w-full text-start text-xs border-collapse min-w-[850px]">
             <thead>
               <tr className="border-b border-gray-100 bg-[#F9F9F7] text-[11px] font-bold uppercase tracking-wider text-gray-500">
                 <th className="py-3.5 px-4 text-start">

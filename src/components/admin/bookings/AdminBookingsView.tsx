@@ -1012,7 +1012,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
       {/* ── CONDITIONAL VIEW: PENDING APPROVALS or CALENDAR+SCHEDULE ── */}
       {viewMode === "pending" ? (
-      <div id="pending-approvals-section" className="rounded-3xl border border-gray-100 bg-white p-6 shadow-xs space-y-4">
+      <div id="pending-approvals-section" className="rounded-3xl border border-gray-100 bg-white p-4 sm:p-6 shadow-xs space-y-4">
         {/* Section Header */}
         <div className="flex items-center justify-between pb-2 border-b border-gray-100">
           <div>
@@ -1021,8 +1021,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
         </div>
         {/* Table Container */}
-        <div className="w-full overflow-hidden">
-          <table className="w-full text-start text-xs border-collapse table-fixed">
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-start text-xs border-collapse min-w-[750px]">
             <thead>
               <tr className="border-b border-gray-100 text-[11px] font-bold text-[#6B7280]">
                 <th className="py-3 px-2 text-start w-[16%]">{tr.colPatient} ˅</th>
@@ -1179,7 +1179,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       </div>
       ) : viewMode === "all" ? (
         /* ── ALL APPOINTMENTS DIRECTORY VIEW ── */
-        <div id="all-appointments-section" className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
+        <div id="all-appointments-section" className="rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm space-y-5">
           {/* Top Header & Search Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
             <div>
@@ -1258,7 +1258,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   className="w-full rounded-xl border border-gray-200 bg-white p-2 text-xs font-semibold text-[#1F251A] outline-none"
                 >
                   <option value="All">{tr.filterDoctorAll || "All Doctors"}</option>
-                  {Array.from(new Set(mergedAppointments.map(r => r.doctor_name).filter(Boolean))).map((doc: any) => (
+                  {Array.from(new Set(mergedAppointments.map((r: any) => r.doctor_name).filter(Boolean))).map((doc: any) => (
                     <option key={doc} value={doc}>{doc}</option>
                   ))}
                 </select>
@@ -1281,8 +1281,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           )}
 
           {/* Table Container */}
-          <div className="w-full overflow-hidden rounded-2xl border border-gray-100">
-            <table className="w-full text-start text-xs border-collapse table-fixed">
+          <div className="w-full overflow-x-auto rounded-2xl border border-gray-100">
+            <table className="w-full text-start text-xs border-collapse min-w-[800px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-[#F9F9F7] text-[10px] uppercase font-bold tracking-tight text-[#9CA3AF]">
                   <th className="py-3 px-2.5 text-start font-bold w-[14%]">{tr.colDateTime || "DATE & TIME"}</th>
@@ -1680,8 +1680,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               )}
 
               {/* Table */}
-              <div className="w-full overflow-hidden">
-                <table className="w-full text-start border-collapse text-xs table-fixed">
+              <div className="w-full overflow-x-auto">
+                <table className="w-full text-start border-collapse text-xs min-w-[700px]">
                   <thead>
                     <tr className="border-b border-gray-100 text-[10px] uppercase font-bold tracking-tight text-[#9CA3AF]">
                       <th className="py-2.5 px-2 text-start font-bold w-[12%]">{tr.colTime}</th>

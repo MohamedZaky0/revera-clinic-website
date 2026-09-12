@@ -703,3 +703,20 @@ The following are **not currently enforced in code**:
    - On submission, the matrix schedule is compiled into `workingDaysHours` and summarized into a human-readable `shift` string (`"09:00 AM to 05:00 PM"`, `"Multi-Shift Schedule"`, or `"Off"`) for backward compatibility with `employee_accounts.shift` and attendance reporting.
 5. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-053` (`Reception & Staff Weekly Shift Configuration Engine`).
+
+---
+
+## Responsive Layout & Mobile Staff Views Standards
+**Enforced in:** `src/app/admin/page.tsx`, `AdminBookingsView.tsx`, `ReceptionDashboardView.tsx`, `PatientsDirectoryView.tsx`, `CustomerProfileDrawer.tsx`, `AdminEmployeesView.tsx`, `TransactionsView.tsx`, `InventoryDevicesTab.tsx`, `InventoryProductsTab.tsx`, `AdminServicesView.tsx`, `AdminHrView.tsx`, `AdminNewBookingView.tsx`, `AdminAddPreviousBookingView.tsx`, `UserProfileView.tsx`.
+
+1. **Mobile Admin Shell & Navigation Drawer**:
+   - Mobile navigation drawer width is responsive (`w-[280px] max-w-[85vw] md:w-[220px]`).
+   - Every sidebar item and submenu link must trigger `setSidebarOpen(false)` on click to auto-dismiss the drawer on mobile viewports.
+   - Sticky top header elements adapt gracefully on `< 640px` screens: branch dropdown uses `max-w-[130px] sm:max-w-[200px] truncate`, Profile button hides text (`hidden sm:inline`), and gaps/paddings scale down to `gap-1.5 sm:gap-3` and `px-2 sm:px-4`.
+2. **Table Container Scoping & Minimum Widths**:
+   - All administrative data tables must be wrapped in `<div className="overflow-x-auto ...">` with explicit minimum table widths (`min-w-[700px]` to `min-w-[950px]`).
+   - `overflow-hidden` must never be applied directly to a table container without an `overflow-x-auto` wrapper, preventing crushed columns and content clipping.
+3. **Adaptive Card Paddings & Grid Scaling**:
+   - Section containers and dashboard cards must use adaptive padding classes (`p-4 sm:p-6 md:p-8`) instead of rigid large paddings (`p-8`).
+   - Card grids must scale progressively from mobile to desktop (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`).
+

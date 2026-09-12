@@ -352,9 +352,9 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
         )}
 
         {/* Devices Table */}
-        <div className="rounded-[36px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB]">
+        <div className="rounded-[36px] bg-[#FBFBF9] p-4 sm:p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB]">
           <div className="overflow-x-auto rounded-[28px] border border-[#E6E9EB] bg-white">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[750px]">
               <thead>
                 <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.15em] text-[#5A6A51]">
                   <th className="px-6 py-4 text-start">{t.thDeviceDetails}</th>

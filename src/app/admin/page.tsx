@@ -2357,7 +2357,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-050', name: 'Reception Dashboard Shift State & Performance Metrics Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies 3 shift states (Not Started, In Progress, Completed), live performance counters (completed, cancelled, no-shows), and payment breakdown aggregation.', status: 'idle' },
     { id: 'TC-051', name: 'Unified Staff Login & Customer Dropdown Real-Time Sync Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies unified staff portal routing (/login -> /doctor, /reception, /admin), shaded customer login state persistence, and instant multi-tab sync.', status: 'idle' },
     { id: 'TC-052', name: 'Optional Email Booking & Patient Creation Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies optional email support for staff booking creation and patient profile registration without validation blockers.', status: 'idle' },
-    { id: 'TC-053', name: 'Reception & Staff Weekly Shift Configuration Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee profile creation, weekly shift schedule configuration for non-doctor staff, and department/role synchronization.', status: 'idle' }
+    { id: 'TC-053', name: 'Reception & Staff Weekly Shift Configuration Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee profile creation, weekly shift schedule configuration for non-doctor staff, and department/role synchronization.', status: 'idle' },
+    { id: 'TC-054', name: 'Responsive Staff Views & Mobile Layout Engine', category: 'System & Settings', endpoint: '/api/health/supabase', description: 'Verifies mobile responsiveness, horizontal scroll containers (min-w), adaptive padding, and auto-dismiss navigation for all staff views.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -5443,7 +5444,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             onClick={() => setSidebarOpen(false)}
           />
         )}
-        <aside dir={lang === "ar" ? "rtl" : "ltr"} className={`fixed inset-y-0 start-0 z-50 flex w-[220px] h-screen flex-col bg-[#414E36] px-3.5 py-5 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:sticky md:top-0 md:translate-x-0 ${
+        <aside dir={lang === "ar" ? "rtl" : "ltr"} className={`fixed inset-y-0 start-0 z-50 flex w-[280px] max-w-[85vw] md:w-[220px] h-screen flex-col bg-[#414E36] px-3.5 py-5 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:sticky md:top-0 md:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : (lang === "ar" ? "translate-x-full" : "-translate-x-full")
         }`}>
           <div className="mb-6 flex items-center justify-between">
@@ -5579,7 +5580,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                             <button
                               key={sub.label}
                               type="button"
-                              onClick={() => setActiveNav(sub.label)}
+                              onClick={() => {
+                                setActiveNav(sub.label);
+                                setSidebarOpen(false);
+                              }}
                               className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[11px] font-medium transition-all duration-200 ${
                                 subActive
                                   ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-s-[3px] border-[#C4AE7C] ps-2 rounded-s-none"
@@ -5607,6 +5611,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       onClick={() => {
                         setMarketingExpanded(!marketingExpanded);
                         setActiveNav("Promotions");
+                        setSidebarOpen(false);
                       }}
                       className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-start text-xs font-semibold transition-all duration-200 ${
                         active
@@ -5643,7 +5648,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                             <button
                               key={sub.label}
                               type="button"
-                              onClick={() => setActiveNav(sub.label)}
+                              onClick={() => {
+                                setActiveNav(sub.label);
+                                setSidebarOpen(false);
+                              }}
                               className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[11px] font-medium transition-all duration-200 ${
                                 subActive
                                   ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-s-[3px] border-[#C4AE7C] ps-2 rounded-s-none"
@@ -5677,6 +5685,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       handleLogout();
                     } else {
                       setActiveNav(item.label);
+                      setSidebarOpen(false);
                     }
                   }}
                   className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-start text-xs font-semibold transition-all duration-200 ${
@@ -5710,35 +5719,35 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           </nav>
         </aside>
 
-        <main dir="ltr" className="flex flex-col px-4 md:px-8 py-0 min-w-0">
+        <main dir="ltr" className="flex flex-col px-3 sm:px-4 md:px-8 py-0 min-w-0 max-w-full overflow-x-hidden">
           {/* Top Navigation Bar */}
-          <div className="sticky top-0 z-40 flex items-center justify-between border-b border-[#414E36]/10 bg-[#F2EFE9]/90 px-2 py-3 backdrop-blur-md gap-3">
+          <div className="sticky top-0 z-40 flex items-center justify-between border-b border-[#414E36]/10 bg-[#F2EFE9]/90 px-2 sm:px-4 py-2.5 sm:py-3 backdrop-blur-md gap-2 sm:gap-3">
             {/* Left: language toggle + branch selector */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="md:hidden flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-[#414E36]/15 text-[#414E36] hover:bg-[#F9F9F7] shadow-sm transition"
+                className="md:hidden flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-white border border-[#414E36]/15 text-[#414E36] hover:bg-[#F9F9F7] shadow-sm transition"
                 title="Open sidebar"
               >
-                <Menu size={18} />
+                <Menu size={16} className="sm:w-[18px] sm:h-[18px]" />
               </button>
               {adminRole === "superadmin" || adminRole === "admin" ? (
-                <div className="relative">
+                <div className="relative min-w-0 max-w-[130px] sm:max-w-[200px] md:max-w-none">
                   <select
                     value={branch}
                     onChange={(e) => setBranch(e.target.value)}
-                    className="appearance-none rounded-xl border border-[#414E36]/15 bg-white py-2 pl-3 pr-8 text-sm font-medium text-[#1F251A] shadow-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 cursor-pointer"
+                    className="w-full appearance-none rounded-xl border border-[#414E36]/15 bg-white py-1.5 sm:py-2 pl-2.5 sm:pl-3 pr-7 sm:pr-8 text-xs sm:text-sm font-medium text-[#1F251A] shadow-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 cursor-pointer truncate"
                   >
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>{b.name_en}</option>
                     ))}
                   </select>
-                  <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                  <ChevronDown size={13} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
                 </div>
               ) : (
-                <div className="rounded-xl border border-[#414E36]/15 bg-white py-2 px-4 text-sm font-semibold text-[#1F251A] shadow-sm select-none">
-                  {branches.find((b) => b.id === branch)?.name_en || "Loading assigned branch..."}
+                <div className="rounded-xl border border-[#414E36]/15 bg-white py-1.5 sm:py-2 px-2.5 sm:px-4 text-xs sm:text-sm font-semibold text-[#1F251A] shadow-sm select-none truncate max-w-[130px] sm:max-w-none">
+                  {branches.find((b) => b.id === branch)?.name_en || "Loading..."}
                 </div>
               )}
 
@@ -5746,7 +5755,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               <button
                 type="button"
                 onClick={() => setActiveNav("Profile")}
-                className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-sm border ${
+                className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-xl px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold transition shadow-sm border shrink-0 ${
                   activeNav === "Profile"
                     ? "bg-[#414E36] text-white border-[#414E36]"
                     : "bg-white text-[#414E36] border-[#414E36]/15 hover:bg-[#414E36]/10"
@@ -5754,12 +5763,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 title="View Personal Profile & Staff Details"
               >
                 <User size={14} />
-                <span>Profile</span>
+                <span className="hidden sm:inline">Profile</span>
               </button>
             </div>
 
             {/* Right: new entry, notifications, user profile */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
               {/* Quick Actions Dropdown */}
               <div className="relative">
                 <button

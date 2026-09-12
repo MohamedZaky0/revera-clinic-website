@@ -528,7 +528,7 @@ export default function ReceptionDashboardView({
       </div>
 
       {/* ── 1. TODAY'S SHIFT / SHIFT SUMMARY CARD ── */}
-      <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-6">
+      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#EBE8E0] shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#F3F0E8]">
           <div className="flex items-center gap-3.5">
             <div className="h-11 w-11 rounded-full bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
@@ -598,13 +598,12 @@ export default function ReceptionDashboardView({
           </div>
         </div>
 
-        {/* Location Error In-Card Alert Banner */}
-        {locationError && isNotStarted && (
-          <div className="rounded-2xl bg-amber-50 border border-amber-200/80 p-3.5 text-start flex items-start gap-2.5 text-xs text-amber-900 animate-in fade-in duration-150">
-            <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="font-bold">{tr.errors?.out_of_location || "Location verification failed"}</p>
-              <p className="text-[11px] text-amber-800/90 mt-0.5 font-medium">{resolveLocationError(locationError)}</p>
+        {/* Location Error Banner */}
+        {locationError && (
+          <div className="rounded-2xl bg-amber-50 border border-amber-200/80 p-3.5 flex items-start justify-between gap-3 text-xs text-amber-900 animate-in fade-in duration-150">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="font-semibold leading-snug">{resolveLocationError(locationError)}</p>
             </div>
             <button
               type="button"
@@ -617,7 +616,7 @@ export default function ReceptionDashboardView({
         )}
 
         {/* 4 Shift Metrics Columns */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           {/* 1. Today's Date */}
           <div className="flex items-center gap-3.5">
             <div className="h-10 w-10 rounded-xl bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
@@ -740,7 +739,7 @@ export default function ReceptionDashboardView({
           {/* ── 3. 2-COLUMN OPERATIONAL GRID: QUICK ACTIONS & ATTENTION NEEDED ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Quick Actions Card */}
-            <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-4">
+            <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#EBE8E0] shadow-sm space-y-4">
               <div className="flex items-center gap-2.5">
                 <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
                   <Plus size={18} />
@@ -770,7 +769,7 @@ export default function ReceptionDashboardView({
             </div>
 
             {/* Attention Needed Card */}
-            <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-3">
+            <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#EBE8E0] shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="h-9 w-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
@@ -834,7 +833,7 @@ export default function ReceptionDashboardView({
           </div>
 
           {/* ── 4. TODAY'S BOOKINGS TABLE ── */}
-          <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-4">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#EBE8E0] shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
@@ -853,7 +852,7 @@ export default function ReceptionDashboardView({
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-start text-xs border-collapse">
+              <table className="w-full text-start text-xs border-collapse min-w-[700px]">
                 <thead>
                   <tr className="border-b border-[#F0EEE6] text-[#8C9686] uppercase text-[10px] font-extrabold tracking-wider">
                     <th className="py-3 px-3.5 text-start">{tr.time ?? "Time"}</th>

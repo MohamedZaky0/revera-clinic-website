@@ -671,8 +671,8 @@ export default function CustomerProfileDrawer({
                 }
               </span>
             </div>
-            <div className="overflow-hidden rounded-xl border border-[#E6E9EB]">
-              <table className="w-full text-xs">
+            <div className="overflow-x-auto rounded-xl border border-[#E6E9EB]">
+              <table className="w-full text-xs min-w-[650px]">
                 <thead>
                   <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] font-bold text-[#5A6A51] uppercase tracking-wider text-[10px]">
                     <th className="px-4 py-3 text-start">{t.colDateSlot}</th>
@@ -1307,7 +1307,7 @@ export default function CustomerProfileDrawer({
                   <p className="text-xs text-[#8A9A81] italic text-center py-6">{t.noSalesHistory}</p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-start text-xs border-collapse">
+                    <table className="w-full text-start text-xs border-collapse min-w-[600px]">
                       <thead>
                         <tr className="border-b border-[#414E36]/10 text-[#5A6A51] font-bold uppercase bg-[#FBFBF9]">
                           <th className="py-2.5 px-3">{t.colDate}</th>

@@ -522,7 +522,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               </div>
 
               {/* Table View */}
-              <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+              <div className="overflow-x-auto rounded-[32px] border border-[#E6E9EB] bg-white">
                 <table className="w-full min-w-[900px] text-sm">
                   <thead>
                     <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">

@@ -1286,7 +1286,7 @@ export default function AdminEmployeesView({
               <ArrowLeft size={14} /> {t.modal.backToEmployees}
             </button>
           </div>
-          <div className="w-full bg-white rounded-3xl border border-[#414E36]/10 p-8 shadow-sm">
+          <div className="w-full bg-white rounded-3xl border border-[#414E36]/10 p-4 sm:p-8 shadow-sm">
             <h3 className="text-2xl font-bold text-[#1F251A] mb-1">
               {editingEmployee ? t.modal.editTitle : t.modal.addTitle}
             </h3>

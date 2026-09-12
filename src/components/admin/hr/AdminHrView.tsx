@@ -214,8 +214,8 @@ export default function AdminHrView({
       {hrActiveSubTab === "overview" && (
         <div className="space-y-6">
           {/* Summary Cards */}
-          <div className="grid gap-6 sm:grid-cols-3">
-            <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">{t.overview.activeEmployees}</p>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-3xl font-semibold text-[#1F251A]">{employeesList.length}</span>
@@ -225,7 +225,7 @@ export default function AdminHrView({
               </div>
             </div>
     
-            <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm">
+            <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">{t.overview.approvedLeavesThisMonth}</p>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-3xl font-semibold text-[#1F251A]">
@@ -237,7 +237,7 @@ export default function AdminHrView({
               </div>
             </div>
     
-            <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm">
+            <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm sm:col-span-2 lg:col-span-1">
               <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">{t.overview.totalPayrollRun(selectedPayrollMonth)}</p>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-3xl font-semibold text-[#1F251A]">
@@ -255,11 +255,11 @@ export default function AdminHrView({
     
           {/* Employees Directory Card */}
           <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
-            <div className="p-6 border-b border-[#414E36]/10 flex items-center justify-between">
+            <div className="p-4 sm:p-6 border-b border-[#414E36]/10 flex items-center justify-between">
               <h3 className="text-lg font-bold text-[#1F251A]">{t.overview.workforceDirectory}</h3>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-sm">
+              <table className="w-full border-collapse text-left text-sm min-w-[700px]">
                 <thead>
                    <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.overview.employeeInfo}</th>
@@ -507,7 +507,7 @@ export default function AdminHrView({
             {/* Main Table */}
             <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-sm">
+                <table className="w-full border-collapse text-left text-sm min-w-[950px]">
                   <thead>
                      <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
                        <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.payroll.employee}</th>
@@ -932,7 +932,7 @@ export default function AdminHrView({
             {/* Main Table */}
             <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-sm">
+                <table className="w-full border-collapse text-left text-sm min-w-[900px]">
                   <thead>
                     <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
                       <th className="px-6 py-4">{t.doctorPayroll.doctorId}</th>
@@ -1505,7 +1505,7 @@ export default function AdminHrView({
               <p className="mt-1 text-xs text-[#5A6A51]">{t.attendance.subtitle}</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-sm">
+              <table className="w-full border-collapse text-left text-sm min-w-[800px]">
                 <thead>
                   <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
                     <th className="px-6 py-4">{t.attendance.employee}</th>
@@ -1653,7 +1653,7 @@ export default function AdminHrView({
               <p className="mt-1 text-xs text-[#5A6A51]">{t.targets.subtitle}</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-sm">
+              <table className="w-full border-collapse text-left text-sm min-w-[850px]">
                 <thead>
                   <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
                     <th className="px-6 py-4">{t.targets.employeeInfo}</th>
