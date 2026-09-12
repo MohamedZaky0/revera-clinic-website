@@ -99,7 +99,7 @@ export default function DoctorSessionDrawer({
   const activeRx = customerRxList.length > 0 ? customerRxList[0] : null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-6 bg-black/40 isolate">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/40 isolate">
       {/* Click backdrop overlay to close */}
       <div 
         className="absolute inset-0 cursor-pointer" 
@@ -108,7 +108,7 @@ export default function DoctorSessionDrawer({
 
       {/* Centered Modal Panel */}
       <div 
-        className="relative w-full max-w-3xl max-h-[90vh] bg-white rounded-3xl z-10 flex flex-col border border-[#414E36]/20 shadow-xl overflow-hidden [transform:translateZ(0)] [backface-visibility:hidden]"
+        className="relative w-full max-w-3xl max-h-[94vh] sm:max-h-[90vh] bg-white rounded-2xl sm:rounded-3xl z-10 flex flex-col border border-[#414E36]/20 shadow-xl overflow-hidden [transform:translateZ(0)] [backface-visibility:hidden]"
         style={{
           WebkitFontSmoothing: "antialiased",
           MozOsxFontSmoothing: "grayscale",
@@ -117,30 +117,30 @@ export default function DoctorSessionDrawer({
       >
         
         {/* Drawer Header */}
-        <div className="flex items-center justify-between p-5 px-6 border-b border-[#414E36]/10 bg-[#FBFBF9]">
-          <div className="flex items-center gap-3.5">
-            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#414E36] text-white font-black text-base shadow-md border-2 border-white">
+        <div className="flex items-center justify-between p-4 sm:p-5 px-4 sm:px-6 border-b border-[#414E36]/10 bg-[#FBFBF9]">
+          <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
+            <div className="relative flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-[#414E36] text-white font-black text-sm sm:text-base shadow-md border-2 border-white">
               {(scheduleModalBooking.name || scheduleModalBooking.customer_name || "P").slice(0, 2).toUpperCase()}
-              <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white shadow-sm ${
+              <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full ring-2 ring-white shadow-sm ${
                 isCompleted ? "bg-emerald-500" : "bg-amber-500"
               }`} />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-extrabold text-[#1F251A]">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base sm:text-lg font-extrabold text-[#1F251A] truncate">
                   {scheduleModalBooking.name || scheduleModalBooking.customer_name}
                 </h3>
                 {isCompleted ? (
-                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800 flex items-center gap-1">
-                    <CheckCircle2 size={12} /> {t.completedStatus}
+                  <span className="rounded-full bg-emerald-100 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-extrabold text-emerald-800 flex items-center gap-1 shrink-0">
+                    <CheckCircle2 size={11} /> {t.completedStatus}
                   </span>
                 ) : (
-                  <span className="rounded-full bg-[#414E36]/10 px-2.5 py-0.5 text-[10px] font-extrabold text-[#414E36] capitalize">
+                  <span className="rounded-full bg-[#414E36]/10 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-extrabold text-[#414E36] capitalize shrink-0">
                     {scheduleModalBooking.status || "Scheduled"}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-[#5A6A51] mt-0.5 font-mono">
+              <p className="text-[11px] sm:text-xs text-[#5A6A51] mt-0.5 font-mono truncate">
                 {scheduleModalBooking.service || scheduleModalBooking.service_name} • {scheduleModalBooking.time || scheduleModalBooking.time_slot || "Today"}
               </p>
             </div>
@@ -149,7 +149,7 @@ export default function DoctorSessionDrawer({
           <button
             type="button"
             onClick={() => setScheduleModalBooking(null)}
-            className="rounded-2xl p-2.5 text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36] transition"
+            className="rounded-2xl p-2 text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36] transition cursor-pointer shrink-0"
             title={t.closeDrawerBtn}
           >
             <X size={20} />
@@ -157,10 +157,10 @@ export default function DoctorSessionDrawer({
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
           
           {/* Primary Reserved Service Selector Card */}
-          <div className="rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 shadow-sm space-y-2">
+          <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] p-3.5 sm:p-4 shadow-sm space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
                 <FileText size={14} className="text-[#414E36]" /> {t.primaryBookingService || "Primary Reserved Service"}
@@ -196,7 +196,7 @@ export default function DoctorSessionDrawer({
           </div>
 
           {/* 1. Patient Medical Record Intake Card */}
-          <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm space-y-4">
+          <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
                 <AlertCircle size={15} className="text-[#414E36]" /> {t.patientMedicalRecordTitle}
@@ -287,13 +287,13 @@ export default function DoctorSessionDrawer({
           </div>
 
           {/* 2. Issued Digital Prescription Display */}
-          <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm space-y-3">
+          <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-5 shadow-sm space-y-3">
             <h4 className="text-xs font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
               <Pill size={15} className="text-[#414E36]" /> {t.savedPrescriptionTitle}
             </h4>
 
             {activeRx ? (
-              <div className="bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 space-y-3 text-xs">
+              <div className="bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10 space-y-3 text-xs">
                 {activeRx.diagnosis && (
                   <div>
                     <span className="font-bold text-[#5A6A51] text-[11px]">{t.diagnosisLabel}:</span>
@@ -333,13 +333,13 @@ export default function DoctorSessionDrawer({
 
           {/* 3. Session Consumables & Financial Breakdown */}
           {(parsedNotes.productsLog || parsedNotes.invoiceLog) && (
-            <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm space-y-3">
+            <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-5 shadow-sm space-y-3">
               <h4 className="text-xs font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
                 <Receipt size={15} className="text-[#414E36]" /> {t.sessionSummaryTitle}
               </h4>
 
               {parsedNotes.productsLog && (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-xs">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3.5 sm:p-4 text-xs">
                   <div className="flex items-center gap-2 font-bold text-emerald-900">
                     <Package size={14} className="text-emerald-700" />
                     <span>{t.productsUsedTitle}</span>
@@ -351,7 +351,7 @@ export default function DoctorSessionDrawer({
               )}
 
               {parsedNotes.invoiceLog && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs flex items-center justify-between">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 sm:p-4 text-xs flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2 font-bold text-slate-800">
                     <DollarSign size={14} className="text-slate-600" />
                     <span>{t.updatedInvoiceTotal}</span>
@@ -373,16 +373,16 @@ export default function DoctorSessionDrawer({
             </div>
 
             {isCompleted ? (
-              <p className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] font-sans leading-relaxed">
+              <p className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3.5 sm:p-4 text-xs text-[#1F251A] font-sans leading-relaxed">
                 {parsedNotes.cleanDoctorNote || t.noBookingNotes}
               </p>
             ) : (
               <textarea
-                rows={5}
+                rows={4}
                 value={clinicalNote}
                 onChange={(e) => setClinicalNote(e.target.value)}
                 placeholder={t.doctorNotesPlaceholder}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans leading-relaxed"
+                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3.5 sm:p-4 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans leading-relaxed"
               />
             )}
           </div>
@@ -390,23 +390,23 @@ export default function DoctorSessionDrawer({
         </div>
 
         {/* Drawer Action Sticky Footer */}
-        <div className="p-4 px-6 bg-[#FBFBF9] border-t border-[#414E36]/10 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div className="p-3.5 sm:p-4 px-4 sm:px-6 bg-[#FBFBF9] border-t border-[#414E36]/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 shrink-0">
           {isCompleted ? (
-            <div className="flex items-center justify-between w-full">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-extrabold text-emerald-800">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between w-full gap-2">
+              <span className="inline-flex items-center justify-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-extrabold text-emerald-800">
                 <CheckCircle2 size={14} /> {t.completedSessionRecord}
               </span>
               <button
                 type="button"
                 onClick={() => setScheduleModalBooking(null)}
-                className="rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition"
+                className="rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition cursor-pointer text-center"
               >
                 {t.closeDrawerBtn}
               </button>
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -414,7 +414,7 @@ export default function DoctorSessionDrawer({
                     setActiveTab?.("ongoing");
                     setScheduleModalBooking(null);
                   }}
-                  className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 text-xs font-bold transition shadow-sm flex items-center gap-1.5"
+                  className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Play size={14} />
                   <span>{t.startOngoingSessionBtn}</span>
@@ -424,20 +424,17 @@ export default function DoctorSessionDrawer({
                   type="button"
                   onClick={() => handleSaveClinicalNote(scheduleModalBooking)}
                   disabled={savingNote}
-                  className="rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm disabled:opacity-50"
+                  className="rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm disabled:opacity-50 flex items-center justify-center cursor-pointer"
                 >
                   {savingNote ? "..." : t.saveClinicalNotesBtn}
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
-                {/* "Write Prescription" was removed from here — it opened a second, disconnected
-                    prescription form (customers/doctor:2026-08-16). The only prescription editor
-                    now is the one inside the Ongoing Session tab, which is what's actually used. */}
+              <div className="flex items-center">
                 <button
                   type="button"
                   onClick={() => handleCompleteTreatment(scheduleModalBooking)}
-                  className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
+                  className="w-full sm:w-auto rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition cursor-pointer text-center"
                 >
                   {t.completeTreatmentBtn}
                 </button>

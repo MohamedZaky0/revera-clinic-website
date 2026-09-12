@@ -65,9 +65,9 @@ export default function DoctorScheduleTab({
   return (
     <div className="space-y-6 w-full">
       {/* Header Title & View Toggle Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-[#1F251A]">
+          <h2 className="text-xl sm:text-2xl font-bold text-[#1F251A]">
             {selectedDateStr === todayStr
               ? t.todayAppointmentsTitle
               : selectedDateStr === yesterdayStr
@@ -76,18 +76,18 @@ export default function DoctorScheduleTab({
               ? t.tomorrowAppointmentsTitle
               : `${t.customDateAppointmentsTitle} ${selectedDateStr}`}
           </h2>
-          <p className="text-xs text-[#5A6A51] mt-1">
+          <p className="text-xs text-[#5A6A51] mt-0.5">
             {t.scheduleSubtitle}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
           {/* VIEW MODE TOGGLE SWITCHER */}
           <div className="flex items-center rounded-2xl bg-white p-1 border border-[#414E36]/15 shadow-sm">
             <button
               type="button"
               onClick={() => setScheduleViewMode("calendar")}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
                 scheduleViewMode === "calendar"
                   ? "bg-[#414E36] text-white shadow-sm"
                   : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F4F5F1]"
@@ -100,7 +100,7 @@ export default function DoctorScheduleTab({
             <button
               type="button"
               onClick={() => setScheduleViewMode("list")}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
                 scheduleViewMode === "list"
                   ? "bg-[#414E36] text-white shadow-sm"
                   : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F4F5F1]"
@@ -112,60 +112,60 @@ export default function DoctorScheduleTab({
           </div>
 
           {/* Patient Search Input */}
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-3 text-[#5A6A51]" />
+          <div className="relative w-full sm:w-56">
+            <Search size={14} className="absolute start-3 top-3 text-[#5A6A51]" />
             <input
               type="text"
               placeholder={t.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="rounded-2xl border border-[#414E36]/15 bg-white pl-9 pr-4 py-2 text-xs text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36] w-56"
+              className="rounded-2xl border border-[#414E36]/15 bg-white ps-9 pe-4 py-2 text-xs text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36] w-full shadow-xs"
             />
           </div>
         </div>
       </div>
 
       {/* Quick Dynamic Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
-        <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
-          <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full">
+        <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-5 shadow-sm">
+          <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#5A6A51]">
             {scheduleViewMode === "calendar" ? `${t.totalScheduledCard} (${calendarMonth.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" })})` : t.totalScheduledCard}
           </span>
-          <div className="mt-2 text-3xl font-extrabold text-[#1F251A]">{stats.total} {t.patientsUnit}</div>
+          <div className="mt-1.5 sm:mt-2 text-2xl sm:text-3xl font-extrabold text-[#1F251A]">{stats.total} {t.patientsUnit}</div>
         </div>
-        <div className="rounded-3xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
-          <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+        <div className="rounded-2xl sm:rounded-3xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5 shadow-sm">
+          <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-emerald-700">
             {scheduleViewMode === "calendar" ? `${t.completedCard} (${calendarMonth.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" })})` : t.completedCard}
           </span>
-          <div className="mt-2 text-3xl font-extrabold text-emerald-800">{stats.completed} {t.sessionsUnit}</div>
+          <div className="mt-1.5 sm:mt-2 text-2xl sm:text-3xl font-extrabold text-emerald-800">{stats.completed} {t.sessionsUnit}</div>
         </div>
-        <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 shadow-sm">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+        <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5 shadow-sm">
+          <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-600">
             {scheduleViewMode === "calendar" ? `${t.upcomingQueueCard} (${calendarMonth.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" })})` : t.upcomingQueueCard}
           </span>
-          <div className="mt-2 text-3xl font-extrabold text-slate-700">{stats.upcoming} {t.waitingUnit}</div>
+          <div className="mt-1.5 sm:mt-2 text-2xl sm:text-3xl font-extrabold text-slate-700">{stats.upcoming} {t.waitingUnit}</div>
         </div>
       </div>
 
       {/* DUAL VIEW CONTAINER */}
       {scheduleViewMode === "calendar" ? (
         /* VIEW 1: INTERACTIVE CALENDAR VIEW */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 w-full items-start">
           {/* Left Column: Interactive Month Grid Picker & Navigator */}
-          <div className="lg:col-span-5 rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-[0_20px_50px_rgba(47,61,41,0.05)] space-y-4">
+          <div className="lg:col-span-5 rounded-2xl sm:rounded-[32px] border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-[0_20px_50px_rgba(47,61,41,0.05)] space-y-3 sm:space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#414E36]/10">
               <div className="flex items-center gap-2">
                 <Calendar size={18} className="text-[#414E36]" />
-                <h3 className="text-base font-extrabold text-[#1F251A]">
+                <h3 className="text-sm sm:text-base font-extrabold text-[#1F251A]">
                   {calendarMonth.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "long", year: "numeric" })}
                 </h3>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1 sm:gap-1.5">
                 <button
                   type="button"
                   onClick={handlePrevCalendarMonth}
-                  className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
+                  className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-xs cursor-pointer"
                   title="Previous Month"
                 >
                   <ChevronLeft size={16} className="rtl:rotate-180 transition-transform" />
@@ -173,7 +173,7 @@ export default function DoctorScheduleTab({
                 <button
                   type="button"
                   onClick={handleTodayCalendarMonth}
-                  className="px-3 py-1 text-xs font-bold rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
+                  className="px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-bold rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-xs cursor-pointer"
                   title={t.todayBtn}
                 >
                   {t.todayBtn}
@@ -181,7 +181,7 @@ export default function DoctorScheduleTab({
                 <button
                   type="button"
                   onClick={handleNextCalendarMonth}
-                  className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
+                  className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-xs cursor-pointer"
                   title="Next Month"
                 >
                   <ChevronRight size={16} className="rtl:rotate-180 transition-transform" />
@@ -190,7 +190,7 @@ export default function DoctorScheduleTab({
             </div>
 
             {/* Weekday Header Labels */}
-            <div className="grid grid-cols-7 text-center text-[11px] font-extrabold uppercase tracking-wider text-[#5A6A51]/70">
+            <div className="grid grid-cols-7 text-center text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-[#5A6A51]/70">
               <div>{t.weekdaySun}</div>
               <div>{t.weekdayMon}</div>
               <div>{t.weekdayTue}</div>
@@ -201,7 +201,7 @@ export default function DoctorScheduleTab({
             </div>
 
             {/* Days Grid Cells */}
-            <div className="grid grid-cols-7 gap-1.5 pt-1">
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5 pt-1">
               {calendarDaysList.map((dayItem, idx) => {
                 const isSelected = dayItem.dateStr === selectedDateStr;
                 const isToday = dayItem.dateStr === todayStr;
@@ -217,7 +217,7 @@ export default function DoctorScheduleTab({
                     key={`${dayItem.dateStr}-${idx}`}
                     type="button"
                     onClick={() => setSelectedDateStr(dayItem.dateStr)}
-                    className={`relative flex flex-col items-center justify-between p-2 min-h-[56px] rounded-2xl transition-all duration-200 text-xs font-bold ${
+                    className={`relative flex flex-col items-center justify-between p-1 sm:p-2 min-h-[46px] sm:min-h-[56px] rounded-xl sm:rounded-2xl transition-all duration-200 text-[11px] sm:text-xs font-bold cursor-pointer ${
                       isSelected
                         ? "bg-[#414E36] text-white shadow-md shadow-[#414E36]/25 scale-105 z-10 ring-2 ring-[#414E36]"
                         : dayItem.isCurrentMonth
@@ -228,13 +228,13 @@ export default function DoctorScheduleTab({
                     }`}
                   >
                     <div className="flex w-full justify-between items-center">
-                      <span className={`text-xs ${isSelected ? "font-extrabold text-white" : isToday ? "font-black text-[#414E36]" : ""}`}>
+                      <span className={`text-[11px] sm:text-xs ${isSelected ? "font-extrabold text-white" : isToday ? "font-black text-[#414E36]" : ""}`}>
                         {dayItem.dayNum}
                       </span>
 
                       {hasBookings && (
                         <span
-                          className={`flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-black ${
+                          className={`flex h-3.5 sm:h-4 min-w-[14px] sm:min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] sm:text-[9px] font-black ${
                             isSelected
                               ? "bg-white text-[#414E36]"
                               : "bg-[#414E36] text-white"
@@ -247,7 +247,7 @@ export default function DoctorScheduleTab({
 
                     {/* Status Indicator Dots */}
                     {hasBookings && (
-                      <div className="flex items-center gap-1 mt-1">
+                      <div className="flex items-center gap-0.5 sm:gap-1 mt-0.5 sm:mt-1">
                         {hasCompleted && <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? "bg-emerald-300" : "bg-emerald-500"}`} />}
                         {hasInProgress && <span className={`h-1.5 w-1.5 rounded-full animate-ping ${isSelected ? "bg-amber-300" : "bg-amber-500"}`} />}
                         {hasArrived && <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? "bg-blue-300" : "bg-blue-500"}`} />}
@@ -262,35 +262,35 @@ export default function DoctorScheduleTab({
             </div>
 
             {/* Legend Footer */}
-            <div className="flex flex-wrap items-center justify-around pt-3 border-t border-[#414E36]/10 text-[10px] text-[#5A6A51] font-semibold">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            <div className="flex flex-wrap items-center justify-around gap-1 pt-3 border-t border-[#414E36]/10 text-[9px] sm:text-[10px] text-[#5A6A51] font-semibold">
+              <div className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-emerald-500" />
                 <span>{t.completedStatus}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
+              <div className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-amber-500" />
                 <span>{t.inSessionStatus}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-blue-500" />
+              <div className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-blue-500" />
                 <span>{t.arrivedStatus}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#414E36]/40" />
+              <div className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-[#414E36]/40" />
                 <span>{t.upcomingQueueCard}</span>
               </div>
             </div>
           </div>
 
           {/* Right Column: Selected Date Agenda */}
-          <div className="lg:col-span-7 space-y-4">
-            <div className="flex items-center justify-between rounded-3xl bg-white p-4 px-6 border border-[#414E36]/10 shadow-sm">
+          <div className="lg:col-span-7 space-y-3 sm:space-y-4 w-full">
+            <div className="flex items-center justify-between rounded-2xl sm:rounded-3xl bg-white p-3.5 sm:p-4 px-4 sm:px-6 border border-[#414E36]/10 shadow-sm">
               <div>
-                <h3 className="text-sm font-extrabold text-[#1F251A] flex items-center gap-2">
+                <h3 className="text-xs sm:text-sm font-extrabold text-[#1F251A] flex items-center gap-2">
                   <Clock size={16} className="text-[#414E36]" />
-                  {t.dayTimelineHeader} {selectedDateStr}
+                  <span>{t.dayTimelineHeader} {selectedDateStr}</span>
                 </h3>
-                <p className="text-[11px] text-[#5A6A51] mt-0.5">
+                <p className="text-[10px] sm:text-[11px] text-[#5A6A51] mt-0.5">
                   {filteredSchedule.length} {t.patientAppointmentsScheduled}
                 </p>
               </div>
@@ -298,7 +298,7 @@ export default function DoctorScheduleTab({
               <button
                 type="button"
                 onClick={() => setSelectedDateStr(todayStr)}
-                className="px-3.5 py-1.5 text-xs font-bold rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
+                className="px-3 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-bold rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-xs cursor-pointer"
               >
                 {t.jumpToTodayBtn}
               </button>
@@ -306,12 +306,12 @@ export default function DoctorScheduleTab({
 
             {/* Appointments List for Selected Date */}
             {filteredSchedule.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-[32px] border border-dashed border-[#414E36]/20 bg-white p-12 text-center shadow-sm">
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-[#FBFBF9] text-[#414E36]/40 mb-3 shadow-inner">
-                  <CalendarDays size={32} />
+              <div className="flex flex-col items-center justify-center rounded-2xl sm:rounded-[32px] border border-dashed border-[#414E36]/20 bg-white p-8 sm:p-12 text-center shadow-sm">
+                <div className="flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-2xl sm:rounded-3xl bg-[#FBFBF9] text-[#414E36]/40 mb-3 shadow-inner">
+                  <CalendarDays size={28} />
                 </div>
-                <h4 className="text-base font-bold text-[#1F251A]">{t.noAppointmentsFor} {selectedDateStr}</h4>
-                <p className="text-xs text-[#5A6A51] max-w-sm mt-1">
+                <h4 className="text-sm sm:text-base font-bold text-[#1F251A]">{t.noAppointmentsFor} {selectedDateStr}</h4>
+                <p className="text-[11px] sm:text-xs text-[#5A6A51] max-w-sm mt-1">
                   {t.noAppointmentsDesc}
                 </p>
               </div>
@@ -325,7 +325,7 @@ export default function DoctorScheduleTab({
                   return (
                     <div
                       key={item.id || idx}
-                      className={`group relative flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-3xl border p-5 transition-all duration-300 shadow-sm ${
+                      className={`group relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 rounded-2xl sm:rounded-3xl border p-4 sm:p-5 transition-all duration-300 shadow-sm ${
                         isInSession
                           ? "border-amber-300 bg-amber-50/40 ring-2 ring-amber-400/30"
                           : isCompleted
@@ -333,17 +333,17 @@ export default function DoctorScheduleTab({
                           : "border-[#414E36]/10 bg-white hover:border-[#414E36]/30 hover:shadow-md"
                       }`}
                     >
-                      <div className="flex items-start gap-4">
-                        <div className="flex flex-col items-center justify-center min-w-[75px] rounded-2xl bg-[#F4F5F1] p-2.5 text-center border border-[#414E36]/10 group-hover:border-[#414E36]/30 transition">
-                          <Clock size={14} className="text-[#414E36] mb-0.5" />
-                          <span className="text-xs font-black text-[#414E36]">
+                      <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+                        <div className="flex flex-col items-center justify-center min-w-[65px] sm:min-w-[75px] rounded-xl sm:rounded-2xl bg-[#F4F5F1] p-2 sm:p-2.5 text-center border border-[#414E36]/10 group-hover:border-[#414E36]/30 transition shrink-0">
+                          <Clock size={13} className="text-[#414E36] mb-0.5" />
+                          <span className="text-[11px] sm:text-xs font-black text-[#414E36]">
                             {item.time || item.time_slot || item.timeSlot || "09:00 AM"}
                           </span>
                         </div>
 
-                        <div className="space-y-1">
+                        <div className="space-y-1 min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="text-sm font-extrabold text-[#1F251A]">
+                            <h4 className="text-xs sm:text-sm font-extrabold text-[#1F251A] truncate">
                               {item.name || item.customer_name || "Patient"}
                             </h4>
 
@@ -369,23 +369,23 @@ export default function DoctorScheduleTab({
                             )}
                           </div>
 
-                          <p className="text-xs font-semibold text-[#5A6A51] flex items-center gap-2 flex-wrap">
+                          <p className="text-[11px] sm:text-xs font-semibold text-[#5A6A51] flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-[#414E36]">{item.service || item.service_name || "Clinical Session"}</span>
                             <span>•</span>
                             <span>{item.room || item.room_name || "Treatment Room"}</span>
                           </p>
 
                           {item.phone && (
-                            <p className="text-[11px] font-mono text-[#5A6A51]">
+                            <p className="text-[10px] sm:text-[11px] font-mono text-[#5A6A51]">
                               Phone: {item.phone}
                             </p>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                      <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
                         {(item.price || item.total_price || item.amount) && (
-                          <span className="text-xs font-extrabold text-[#414E36] bg-[#414E36]/10 px-3 py-1.5 rounded-xl">
+                          <span className="text-[11px] sm:text-xs font-extrabold text-[#414E36] bg-[#414E36]/10 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl">
                             {item.price || item.total_price || item.amount} EGP
                           </span>
                         )}
@@ -393,9 +393,10 @@ export default function DoctorScheduleTab({
                         <button
                           type="button"
                           onClick={() => handleOpenScheduleModal(item)}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/20 bg-white px-3.5 py-2 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/20 bg-white px-3 sm:px-3.5 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-xs cursor-pointer"
                         >
-                          <Info size={14} /> {t.detailsBtn}
+                          <Info size={14} />
+                          <span>{t.infoBtn || "Info"}</span>
                         </button>
                       </div>
                     </div>
@@ -408,12 +409,12 @@ export default function DoctorScheduleTab({
       ) : (
         /* VIEW 2: QUEUE LIST TABLE VIEW */
         <div className="space-y-4 w-full">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-3xl border border-[#414E36]/10 shadow-sm w-full">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-[#414E36]/10 shadow-sm w-full">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={() => setSelectedDateStr(yesterdayStr)}
-                className={`px-4 py-2 text-xs font-bold rounded-2xl transition ${
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-2xl transition cursor-pointer ${
                   selectedDateStr === yesterdayStr
                     ? "bg-[#414E36] text-white shadow-sm"
                     : "bg-[#F4F5F1] text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
@@ -425,7 +426,7 @@ export default function DoctorScheduleTab({
               <button
                 type="button"
                 onClick={() => setSelectedDateStr(todayStr)}
-                className={`px-4 py-2 text-xs font-bold rounded-2xl transition ${
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-2xl transition cursor-pointer ${
                   selectedDateStr === todayStr
                     ? "bg-[#414E36] text-white shadow-sm"
                     : "bg-[#F4F5F1] text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
@@ -437,7 +438,7 @@ export default function DoctorScheduleTab({
               <button
                 type="button"
                 onClick={() => setSelectedDateStr(tomorrowStr)}
-                className={`px-4 py-2 text-xs font-bold rounded-2xl transition ${
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-2xl transition cursor-pointer ${
                   selectedDateStr === tomorrowStr
                     ? "bg-[#414E36] text-white shadow-sm"
                     : "bg-[#F4F5F1] text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
@@ -448,27 +449,27 @@ export default function DoctorScheduleTab({
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-[#5A6A51]">{t.jumpToDateLabel}</span>
+              <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51]">{t.jumpToDateLabel}</span>
               <input
                 type="date"
                 value={selectedDateStr}
                 onChange={(e) => setSelectedDateStr(e.target.value)}
-                className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-1.5 text-xs font-bold text-[#414E36] outline-none focus:border-[#414E36]"
+                className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#414E36] outline-none focus:border-[#414E36] cursor-pointer"
               />
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-[32px] border border-[#414E36]/10 bg-white shadow-[0_20px_50px_rgba(47,61,41,0.05)] w-full">
+          <div className="overflow-hidden rounded-2xl sm:rounded-[32px] border border-[#414E36]/10 bg-white shadow-[0_20px_50px_rgba(47,61,41,0.05)] w-full">
             <div className="overflow-x-auto w-full">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-[#414E36]/10 bg-[#FBFBF9] text-xs uppercase tracking-wider text-[#5A6A51]">
                   <tr>
-                    <th className="px-6 py-4 font-bold">{t.timeSlotHeader}</th>
-                    <th className="px-6 py-4 font-bold">{t.patientNameHeader}</th>
-                    <th className="px-6 py-4 font-bold">{t.requestedServiceHeader}</th>
-                    <th className="px-6 py-4 font-bold">{t.roomLocationHeader}</th>
-                    <th className="px-6 py-4 font-bold text-center">{t.statusHeader}</th>
-                    <th className="px-6 py-4 font-bold text-right">{t.actionHeader}</th>
+                    <th className="px-4 sm:px-6 py-3.5 sm:py-4 font-bold">{t.timeSlotHeader}</th>
+                    <th className="px-4 sm:px-6 py-3.5 sm:py-4 font-bold">{t.patientNameHeader}</th>
+                    <th className="px-4 sm:px-6 py-3.5 sm:py-4 font-bold">{t.requestedServiceHeader}</th>
+                    <th className="px-4 sm:px-6 py-3.5 sm:py-4 font-bold">{t.roomLocationHeader}</th>
+                    <th className="px-4 sm:px-6 py-3.5 sm:py-4 font-bold text-center">{t.statusHeader}</th>
+                    <th className="px-4 sm:px-6 py-3.5 sm:py-4 font-bold text-right">{t.actionHeader}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#414E36]/05 text-[#1F251A]">
@@ -487,22 +488,22 @@ export default function DoctorScheduleTab({
                   ) : (
                     filteredSchedule.map((item, idx) => (
                       <tr key={item.id || idx} className="hover:bg-[#FBFBF9]/80 transition">
-                        <td className="px-6 py-4 font-bold text-[#414E36]">
+                        <td className="px-4 sm:px-6 py-3.5 sm:py-4 font-bold text-[#414E36]">
                           {item.time || item.time_slot || item.timeSlot || "09:00 AM"}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 sm:px-6 py-3.5 sm:py-4">
                           <div className="font-bold text-sm text-[#1F251A]">
                             {item.name || item.customer_name || "Patient"}
                           </div>
                           {item.phone && <div className="text-[10px] text-[#5A6A51] font-mono">{item.phone}</div>}
                         </td>
-                        <td className="px-6 py-4 font-medium text-[#5A6A51]">
+                        <td className="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-[#5A6A51]">
                           {item.service || item.service_name || "Consultation"}
                         </td>
-                        <td className="px-6 py-4 font-semibold text-[#414E36]">
+                        <td className="px-4 sm:px-6 py-3.5 sm:py-4 font-semibold text-[#414E36]">
                           {item.room || item.room_name || "Treatment Room"}
                         </td>
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-4 sm:px-6 py-3.5 sm:py-4 text-center">
                           {(item.status === "completed" || item.status === "done") && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-800">
                               <CheckCircle2 size={12} /> Completed
@@ -524,13 +525,13 @@ export default function DoctorScheduleTab({
                             </span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
                           <button
                             type="button"
                             onClick={() => handleOpenScheduleModal(item)}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/20 bg-white px-3.5 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/20 bg-white px-3.5 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-xs cursor-pointer"
                           >
-                            <Info size={14} /> Info
+                            <Info size={14} /> <span>Info</span>
                           </button>
                         </td>
                       </tr>

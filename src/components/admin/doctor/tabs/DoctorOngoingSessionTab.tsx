@@ -450,21 +450,21 @@ export default function DoctorOngoingSessionTab({
       {activeSessionBooking && activeSessionBooking.status !== "completed" && activeSessionBooking.status !== "done" ? (
         <>
           {/* Active Patient Header Card */}
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 border border-[#414E36]/10 shadow-sm w-full">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#414E36] text-white font-bold text-xl shadow-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 border border-[#414E36]/10 shadow-sm w-full">
+            <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+              <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl bg-[#414E36] text-white font-bold text-lg sm:text-xl shadow-md">
                 {(activeSessionBooking.name || "P").slice(0, 2).toUpperCase()}
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-bold text-[#1F251A]">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xl sm:text-2xl font-bold text-[#1F251A] truncate">
                     {activeSessionBooking.name || activeSessionBooking.customer_name || "Patient"}
                   </h2>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-800 animate-pulse">
-                    <Play size={12} /> {t.sessionStartedByReception}
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 sm:px-3 py-0.5 text-[11px] sm:text-xs font-bold text-amber-800 animate-pulse">
+                    <Play size={11} /> {t.sessionStartedByReception}
                   </span>
                 </div>
-                <p className="text-xs text-[#5A6A51] mt-1 flex items-center gap-2">
+                <p className="text-[11px] sm:text-xs text-[#5A6A51] mt-1 flex items-center gap-1.5 sm:gap-2 flex-wrap">
                   <strong className="text-[#414E36] font-bold">
                     {activeSessionBooking.service || activeSessionBooking.service_name}
                   </strong>
@@ -476,7 +476,7 @@ export default function DoctorOngoingSessionTab({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -487,7 +487,7 @@ export default function DoctorOngoingSessionTab({
                   }
                   handleCompleteTreatment(activeSessionBooking, totalSessionPulses);
                 }}
-                className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition cursor-pointer shadow-md ${
+                className={`w-full sm:w-auto justify-center flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition cursor-pointer shadow-md ${
                   isFirstVisit && !medicalRecord
                     ? "bg-amber-700 hover:bg-amber-800 text-white"
                     : "bg-[#414E36] hover:bg-[#343F2B] text-white"
@@ -500,14 +500,14 @@ export default function DoctorOngoingSessionTab({
           </div>
 
           {/* Main 2-Column Treatment Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 w-full">
             
             {/* LEFT COLUMN (1/3 Width): Patient Medical Record & Clinical Notes Intake */}
-            <div className="space-y-6">
-              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between gap-2">
+            <div className="space-y-4 sm:space-y-6">
+              <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="space-y-0.5">
-                    <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                    <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
                       <AlertCircle size={16} className="text-[#414E36]" /> {t.patientMedicalRecordTitle}
                     </h3>
                     {activeTemplate && (
@@ -538,7 +538,7 @@ export default function DoctorOngoingSessionTab({
                   </p>
                 ) : medicalRecord && !showMedicalForm ? (
                   /* Display Existing Medical Record */
-                  <div className="space-y-2.5 text-xs bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                  <div className="space-y-2.5 text-xs bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
                     {(activeTemplate?.fields || []).length > 0 ? (
                       (activeTemplate?.fields || []).map((f) => {
                         const rawVal = medicalRecord.responses?.[f.id] !== undefined
@@ -755,7 +755,7 @@ export default function DoctorOngoingSessionTab({
                 )}
 
                 {/* DOCTOR PROCEDURE OBSERVATIONS & MEDICAL NOTES (NOW INTEGRATED IN INTAKE CARD) */}
-                <div className="mt-6 border-t border-[#414E36]/10 pt-4 space-y-3">
+                <div className="mt-4 sm:mt-6 border-t border-[#414E36]/10 pt-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-bold text-[#1F251A] uppercase tracking-wider">
                       {t.doctorNotesTitle}
@@ -788,13 +788,13 @@ export default function DoctorOngoingSessionTab({
             </div>
 
             {/* RIGHT COLUMN (2/3 Width): Digital Prescription Writer ABOVE Services & Products */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-4 sm:space-y-6">
 
               {/* 1. DIGITAL PRESCRIPTION WRITER CARD (POSITIONED ABOVE PRODUCTS & SERVICES) */}
-              <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+              <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/12 bg-white p-4 sm:p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 flex-wrap gap-2">
                   <div>
-                    <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                    <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
                       <FileText size={16} className="text-[#414E36]" /> {t.digitalPrescriptionTitle}
                     </h3>
                     <p className="text-xs text-[#5A6A51] mt-0.5">
@@ -869,7 +869,7 @@ export default function DoctorOngoingSessionTab({
                     <button
                       type="button"
                       onClick={() => setRxMedications([...rxMedications, { name: "", dosage: "", frequency: "", duration: "" }])}
-                      className="text-xs font-bold text-[#414E36] flex items-center gap-1 mt-1 hover:underline"
+                      className="text-xs font-bold text-[#414E36] flex items-center gap-1 mt-1 hover:underline cursor-pointer"
                     >
                       <Plus size={14} /> {t.addAnotherMedicationBtn}
                     </button>
@@ -890,7 +890,7 @@ export default function DoctorOngoingSessionTab({
                     <button
                       type="submit"
                       disabled={savingRxInline}
-                      className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1.5"
+                      className="w-full sm:w-auto justify-center rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                     >
                       <Printer size={14} /> {savingRxInline ? "..." : t.saveAndPrintRxBtn}
                     </button>
@@ -899,17 +899,17 @@ export default function DoctorOngoingSessionTab({
               </div>
 
               {/* 2. SERVICES, DEVICES & PULSES MANAGER SECTION */}
-              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
+              <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
                   <div>
-                    <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                    <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
                       <Zap size={16} className="text-amber-600" /> {t.additionalServicesTitle}
                     </h3>
                   </div>
                   
                   {/* Live Total Pulse Counter Badge — only when device-linked services exist */}
                   {(selectedDeviceId || additionalServices.some((s) => s.deviceId)) && (
-                  <div className="flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-1.5 text-xs font-black text-amber-900 shadow-sm">
+                  <div className="flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-3.5 sm:px-4 py-1.5 text-xs font-black text-amber-900 shadow-sm">
                     <Zap size={14} className="text-amber-600 fill-amber-500 animate-pulse" />
                     <span>{t.totalPulsesCalculated}</span>
                     <span className="text-sm text-amber-900 font-extrabold">{totalSessionPulses} {t.pulsesLabel}</span>
@@ -918,7 +918,7 @@ export default function DoctorOngoingSessionTab({
                 </div>
 
                 {/* Primary Reserved Service Display */}
-                <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-2">
+                <div className="rounded-2xl bg-[#FBFBF9] p-3.5 sm:p-4 border border-[#414E36]/10 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
                       <Layers size={14} className="text-[#414E36]" /> {t.primaryBookingService}
@@ -960,17 +960,17 @@ export default function DoctorOngoingSessionTab({
                 </div>
 
                 {/* Additional Services Selection & Counter */}
-                <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                <div className="space-y-3 bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
                   <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
                     <Plus size={14} className="text-[#414E36]" /> {t.addAdditionalServiceBtn}
                   </h4>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {/* Service Selector Dropdown */}
                     <select
                       value={selectedServiceIdToAdd}
                       onChange={(e) => setSelectedServiceIdToAdd(e.target.value)}
-                      className="md:col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                      className="sm:col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
                     >
                       <option value="">{t.selectServicePlaceholder}</option>
                       {servicesList.map((s) => (
@@ -995,7 +995,7 @@ export default function DoctorOngoingSessionTab({
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.overridePulsesLabel}</label>
                       <input
@@ -1013,7 +1013,7 @@ export default function DoctorOngoingSessionTab({
                         type="button"
                         onClick={handleAddServiceToSession}
                         disabled={!selectedServiceIdToAdd}
-                        className="w-full rounded-xl bg-[#414E36] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1"
+                        className="w-full rounded-xl bg-[#414E36] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <Plus size={14} /> {t.addAdditionalServiceBtn}
                       </button>
@@ -1024,19 +1024,19 @@ export default function DoctorOngoingSessionTab({
                   {additionalServices.length > 0 && (
                     <div className="space-y-2 pt-2 border-t border-[#414E36]/10">
                       {additionalServices.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10">
-                          <div>
-                            <span className="font-bold text-[#1F251A] block">{item.name}</span>
-                            <span className="text-[10px] text-[#5A6A51]">
+                        <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
+                          <div className="min-w-0">
+                            <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
+                            <span className="text-[10px] text-[#5A6A51] block truncate">
                               {item.deviceName ? `${t.deviceUsedLabel} ${item.deviceName} • ` : ""}{item.pulses} {t.pulsesLabel}
                             </span>
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 shrink-0">
                             <span className="font-extrabold text-[#414E36]">+{item.price} EGP</span>
                             <button
                               type="button"
                               onClick={() => handleRemoveServiceFromSession(item.id)}
-                              className="text-rose-600 hover:text-rose-800 text-xs font-bold"
+                              className="text-rose-600 hover:text-rose-800 text-xs font-bold cursor-pointer p-1"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -1049,19 +1049,19 @@ export default function DoctorOngoingSessionTab({
               </div>
 
               {/* 3. PRODUCTS / CONSUMABLES USED SECTION */}
-              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
+              <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
-                  <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                  <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
                     <ShoppingBag size={16} className="text-[#414E36]" /> {t.productsUsedTitle}
                   </h3>
                 </div>
 
-                <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
-                  <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-3 bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <select
                       value={selectedProductId}
                       onChange={(e) => setSelectedProductId(e.target.value)}
-                      className="col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                      className="sm:col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
                     >
                       <option value="">{t.selectProductPlaceholder}</option>
                       {productsList.map((p) => {
@@ -1087,7 +1087,7 @@ export default function DoctorOngoingSessionTab({
                   <button
                     type="button"
                     onClick={handleAddProductToSession}
-                    className="w-full rounded-xl bg-[#414E36] py-1.5 text-xs font-bold text-white hover:bg-[#343F2B] transition"
+                    className="w-full rounded-xl bg-[#414E36] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition cursor-pointer"
                   >
                     {t.addProductToInvoiceBtn}
                   </button>
@@ -1095,17 +1095,17 @@ export default function DoctorOngoingSessionTab({
                   {usedProducts.length > 0 && (
                     <div className="space-y-1.5 pt-2 border-t border-[#414E36]/10">
                       {usedProducts.map((item, i) => (
-                        <div key={i} className="flex items-center justify-between text-xs bg-white p-2 rounded-xl border border-[#414E36]/10">
-                          <div>
-                            <span className="font-bold text-[#1F251A]">{item.name}</span>
-                            <span className="text-[10px] text-[#5A6A51] block">Qty: {item.qty} x {item.unitPrice} EGP</span>
+                        <div key={i} className="flex items-center justify-between text-xs bg-white p-2 rounded-xl border border-[#414E36]/10 gap-2">
+                          <div className="min-w-0">
+                            <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
+                            <span className="text-[10px] text-[#5A6A51] block truncate">Qty: {item.qty} x {item.unitPrice} EGP</span>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 shrink-0">
                             <span className="font-extrabold text-[#414E36]">{item.total} EGP</span>
                             <button
                               type="button"
                               onClick={() => handleRemoveProductFromSession(i)}
-                              className="text-rose-600 hover:text-rose-800 text-xs font-bold"
+                              className="text-rose-600 hover:text-rose-800 text-xs font-bold cursor-pointer p-1"
                             >
                               <X size={14} />
                             </button>
@@ -1117,8 +1117,8 @@ export default function DoctorOngoingSessionTab({
                 </div>
 
                 {/* Final Session Invoice Breakdown Summary */}
-                <div className="bg-[#414E36]/05 p-4 rounded-2xl space-y-2 text-xs">
-                  <div className="flex flex-wrap items-center justify-between gap-3 text-[#5A6A51]">
+                <div className="bg-[#414E36]/05 p-3.5 sm:p-4 rounded-2xl space-y-2 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 text-[#5A6A51]">
                     <span>{t.baseServiceLabel} <strong className="text-[#1F251A]">{baseBookingPrice} EGP</strong></span>
                     {additionalServicesSubtotal > 0 && (
                       <span>{t.additionalServicesSubtotal} <strong className="text-[#1F251A]">+{additionalServicesSubtotal} EGP</strong></span>
@@ -1127,7 +1127,7 @@ export default function DoctorOngoingSessionTab({
                       <span>{t.productsAddonsLabel} <strong className="text-[#1F251A]">+{productsSubtotal} EGP</strong></span>
                     )}
                   </div>
-                  <div className="pt-2 border-t border-[#414E36]/10 flex items-center justify-between text-[#414E36] font-extrabold text-base">
+                  <div className="pt-2 border-t border-[#414E36]/10 flex items-center justify-between text-[#414E36] font-extrabold text-sm sm:text-base">
                     <span>{t.finalInvoiceLabel}</span>
                     <span>{finalSessionTotal} EGP</span>
                   </div>
@@ -1138,18 +1138,18 @@ export default function DoctorOngoingSessionTab({
           </div>
         </>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Active Sessions Banner if any found */}
           {activeSessionsList.length > 0 && (
-            <div className="rounded-3xl border-2 border-amber-300 bg-amber-50 p-6 shadow-md space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="rounded-2xl sm:rounded-3xl border-2 border-amber-300 bg-amber-50 p-4 sm:p-6 shadow-md space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500 text-white font-bold text-lg shadow-sm animate-pulse">
-                    <Play size={24} />
+                  <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-amber-500 text-white font-bold text-base sm:text-lg shadow-sm animate-pulse shrink-0">
+                    <Play size={22} />
                   </div>
-                  <div>
-                    <h3 className="text-lg font-extrabold text-amber-950">{t.activeSessionDetectedTitle}</h3>
-                    <p className="text-xs text-amber-800 font-bold mt-0.5">
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-lg font-extrabold text-amber-950 truncate">{t.activeSessionDetectedTitle}</h3>
+                    <p className="text-xs text-amber-800 font-bold mt-0.5 truncate">
                       {activeSessionsList[0].name || activeSessionsList[0].customer_name} • {activeSessionsList[0].service || activeSessionsList[0].service_name} • <strong className="text-amber-950">{activeSessionsList[0].room || activeSessionsList[0].room_name || "Treatment Room"}</strong>
                     </p>
                   </div>
@@ -1157,7 +1157,7 @@ export default function DoctorOngoingSessionTab({
                 <button
                   type="button"
                   onClick={() => setActiveSessionBooking?.(activeSessionsList[0])}
-                  className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition flex items-center gap-2"
+                  className="w-full sm:w-auto justify-center rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition flex items-center gap-2 cursor-pointer"
                 >
                   <UserCheck size={16} /> {t.openActiveSessionBtn}
                 </button>
@@ -1166,11 +1166,11 @@ export default function DoctorOngoingSessionTab({
           )}
 
           {/* Standard Waiting Screen */}
-          <div className="rounded-3xl border border-[#414E36]/10 bg-white p-12 text-center text-[#5A6A51] space-y-4 shadow-sm">
-            <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
-              <Play size={28} />
+          <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-8 sm:p-12 text-center text-[#5A6A51] space-y-4 shadow-sm">
+            <div className="h-14 w-14 sm:h-16 sm:w-16 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+              <Play size={26} />
             </div>
-            <h3 className="text-xl font-bold text-[#1F251A]">{t.waitingForReceptionistTitle}</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-[#1F251A]">{t.waitingForReceptionistTitle}</h3>
             <p className="text-xs text-[#5A6A51] max-w-md mx-auto leading-relaxed">
               {t.waitingForReceptionistDesc}
             </p>
@@ -1178,7 +1178,7 @@ export default function DoctorOngoingSessionTab({
               <button
                 type="button"
                 onClick={() => setActiveTab("schedule")}
-                className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
+                className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition cursor-pointer"
               >
                 {t.viewTodayQueueBtn}
               </button>

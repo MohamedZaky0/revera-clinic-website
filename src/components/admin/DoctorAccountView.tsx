@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Image from "next/image";
+import { Menu, CalendarDays, Stethoscope, Users, BarChart3, User } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { DoctorAccountViewProps, DoctorTab, DoctorPatient, UsedProduct } from "./doctor/types";
 import { doctorTranslations } from "./doctor/translations";
@@ -37,6 +39,7 @@ export default function DoctorAccountView({
   const [lang, setLang] = useState<"en" | "ar">("en");
   const t = doctorTranslations[lang];
   const [activeTab, setActiveTab] = useState<DoctorTab>("schedule");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [scheduleViewMode, setScheduleViewMode] = useState<"calendar" | "list">("calendar");
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
   // Helper to exclude rejected and cancelled bookings from doctor view
@@ -1034,7 +1037,7 @@ export default function DoctorAccountView({
 
   return (
     <div className="h-screen w-full bg-[#FBFBF9] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
-      {/* SIDEBAR NAVIGATION */}
+      {/* 1. SIDEBAR NAVIGATION (Desktop Sidebar & Mobile Drawer) */}
       <DoctorSidebar
         activeTab={activeTab}
         setActiveTab={(tab) => {
@@ -1052,10 +1055,70 @@ export default function DoctorAccountView({
         setLang={setLang}
         onFetchReservations={fetchDoctorReservations}
         onLogout={onLogout}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
       />
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 w-full h-full overflow-y-auto px-6 md:px-8 py-6 animate-fadeIn flex flex-col min-w-0">
+      {/* 2. MOBILE TOP HEADER BAR (< md) */}
+      <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[#414E36] text-white shrink-0 sticky top-0 z-30 shadow-md">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="h-9 w-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition active:scale-95 cursor-pointer relative shrink-0"
+            aria-label="Toggle Doctor Menu"
+          >
+            <Menu size={20} />
+            {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
+              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+              </span>
+            )}
+          </button>
+          
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="relative h-7 w-7 rounded-lg bg-white p-1 overflow-hidden shrink-0">
+              <Image src="/images/main_logo.png" alt="Revera Clinics" fill style={{ objectFit: "contain" }} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xs font-bold leading-tight truncate">{t.portalTitle}</h1>
+              <p className="text-[9px] text-white/60 leading-none truncate">{doctorName}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Quick Language Toggle */}
+          <button
+            type="button"
+            onClick={() => setLang(lang === "en" ? "ar" : "en")}
+            className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white/10 hover:bg-white/20 text-white transition border border-white/15 cursor-pointer"
+          >
+            {lang === "en" ? "العربية" : "English"}
+          </button>
+
+          {/* Quick Profile Avatar */}
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedPatientHistory(null);
+              setActiveTab("profile");
+            }}
+            className={`h-8 w-8 rounded-lg font-bold text-[11px] flex items-center justify-center shadow-xs transition cursor-pointer ${
+              activeTab === "profile"
+                ? "bg-white text-[#414E36] ring-2 ring-emerald-400"
+                : "bg-white/15 text-white hover:bg-white/25"
+            }`}
+            title="Doctor Profile"
+          >
+            {(doctorName.replace(/^Dr\.?\s*/i, "") || "D").slice(0, 2).toUpperCase()}
+          </button>
+        </div>
+      </header>
+
+      {/* 3. MAIN CONTENT AREA */}
+      <main className="flex-1 w-full h-full overflow-y-auto px-4 sm:px-6 md:px-8 py-4 sm:py-6 pb-24 md:pb-6 animate-fadeIn flex flex-col min-w-0">
         {/* TAB 1: SCHEDULE VIEW */}
         {activeTab === "schedule" && (
           <DoctorScheduleTab
@@ -1187,16 +1250,109 @@ export default function DoctorAccountView({
             }}
             isDoctorView={true}
             lang={lang}
-            // UserProfileView's chrome (labels, dropdown text, attendance/payroll copy) is
-            // genuinely language content, not admin-specific — it already carries both the
-            // isDoctorView and non-isDoctorView label variants internally. Reusing
-            // adminTranslations.userProfile here instead of duplicating the same ~80 strings
-            // into doctorTranslations; typed against UserProfileView's own exported interface
-            // (not `as any`) so a shape drift between the two still fails typecheck.
             t={adminTranslations[lang].userProfile as UserProfileViewTranslations}
           />
         )}
       </main>
+
+      {/* 4. MOBILE BOTTOM NAVIGATION BAR (< md) */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-[#414E36]/15 px-2 py-1.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] flex items-center justify-around">
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedPatientHistory(null);
+            setActiveTab("schedule");
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            activeTab === "schedule"
+              ? "text-[#414E36] font-bold"
+              : "text-[#5A6A51]/70 hover:text-[#414E36]"
+          }`}
+        >
+          <div className={`p-1 rounded-lg ${activeTab === "schedule" ? "bg-[#414E36]/10 text-[#414E36]" : ""}`}>
+            <CalendarDays size={18} />
+          </div>
+          <span className="text-[10px] mt-0.5">{t.schedule}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedPatientHistory(null);
+            setActiveTab("ongoing");
+          }}
+          className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            activeTab === "ongoing"
+              ? "text-[#414E36] font-bold"
+              : "text-[#5A6A51]/70 hover:text-[#414E36]"
+          }`}
+        >
+          <div className={`p-1 rounded-lg relative ${activeTab === "ongoing" ? "bg-[#414E36]/10 text-[#414E36]" : ""}`}>
+            <Stethoscope size={18} />
+            {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
+              <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] mt-0.5">{t.ongoingSession}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedPatientHistory(null);
+            setActiveTab("patients");
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            activeTab === "patients"
+              ? "text-[#414E36] font-bold"
+              : "text-[#5A6A51]/70 hover:text-[#414E36]"
+          }`}
+        >
+          <div className={`p-1 rounded-lg ${activeTab === "patients" ? "bg-[#414E36]/10 text-[#414E36]" : ""}`}>
+            <Users size={18} />
+          </div>
+          <span className="text-[10px] mt-0.5">{t.patients}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedPatientHistory(null);
+            setActiveTab("analytics");
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            activeTab === "analytics"
+              ? "text-[#414E36] font-bold"
+              : "text-[#5A6A51]/70 hover:text-[#414E36]"
+          }`}
+        >
+          <div className={`p-1 rounded-lg ${activeTab === "analytics" ? "bg-[#414E36]/10 text-[#414E36]" : ""}`}>
+            <BarChart3 size={18} />
+          </div>
+          <span className="text-[10px] mt-0.5">{t.analytics}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedPatientHistory(null);
+            setActiveTab("profile");
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            activeTab === "profile"
+              ? "text-[#414E36] font-bold"
+              : "text-[#5A6A51]/70 hover:text-[#414E36]"
+          }`}
+        >
+          <div className={`p-1 rounded-lg ${activeTab === "profile" ? "bg-[#414E36]/10 text-[#414E36]" : ""}`}>
+            <User size={18} />
+          </div>
+          <span className="text-[10px] mt-0.5">Profile</span>
+        </button>
+      </nav>
 
       {/* MODAL 1: SCHEDULE DETAILS DRAWER */}
       {scheduleModalBooking && (
