@@ -795,8 +795,8 @@ export async function POST(req: Request) {
       let parsedLat: number | null = null;
       let parsedLng: number | null = null;
 
-      // When GPS shift check is enabled and not superadmin without branch:
-      if (gpsShiftEnabled && (!isSuperadmin || employeeRecord?.branch_id)) {
+      // When GPS shift check is enabled (default true):
+      if (gpsShiftEnabled) {
         if (latitude === undefined || longitude === undefined || latitude === null || longitude === null) {
           return NextResponse.json(
             { success: false, error: "location_permission_denied", message: "Location permission is required to start your shift." },
@@ -822,7 +822,7 @@ export async function POST(req: Request) {
         }
 
         // Fetch clinic branch(es) to check distance
-        let branchesQuery = supabaseServer.from("branches").select("id, name_en, name_ar, latitude, longitude, maps_embed, maps_link");
+        let branchesQuery = supabaseServer.from("branches").select("id, name_en, name_ar, latitude, longitude, maps_embed, maps_link, status");
         if (employeeRecord?.branch_id) {
           branchesQuery = branchesQuery.eq("id", employeeRecord.branch_id);
         }
@@ -833,7 +833,7 @@ export async function POST(req: Request) {
         // Also fetch all active branches for fallback proximity check
         const { data: allBranches } = await supabaseServer
           .from("branches")
-          .select("id, name_en, name_ar, latitude, longitude, maps_embed, maps_link");
+          .select("id, name_en, name_ar, latitude, longitude, maps_embed, maps_link, status");
         const candidateBranches = validBranches.length > 0 ? validBranches : (Array.isArray(allBranches) ? allBranches : []);
         const fallbackCheckBranches = Array.isArray(allBranches) && allBranches.length > 0 ? allBranches : candidateBranches;
 
@@ -868,18 +868,19 @@ export async function POST(req: Request) {
           }
         }
 
-        // If clinic branches exist and employee is outside allowed working location:
-        if (candidateBranches.length > 0 && !isInsideLocation) {
+        // If employee is outside allowed working location or no coordinates matched:
+        if (!isInsideLocation) {
           return NextResponse.json(
             {
               success: false,
               error: "out_of_location",
-              message: "You must be in a working location to start your shift."
+              message: "You must be in a working location to start your shift.",
+              distance: Number.isFinite(minimumDistance) ? Math.round(minimumDistance) : null
             },
             { status: 400 }
           );
         }
-      } else if (!gpsShiftEnabled) {
+      } else {
         // When GPS check is disabled in settings, parse coordinates if supplied, but do not block
         if (latitude !== undefined && longitude !== undefined && Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude))) {
           parsedLat = Number(latitude);

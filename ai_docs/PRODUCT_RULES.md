@@ -160,16 +160,17 @@ Deletes all rows from the reservations table. No soft-delete. No confirmation be
 
 ---
 
-### Provider attendance geofence
-**Enforced in:** `POST /api/hr/attendance` (client trigger: `src/app/admin/page.tsx` geolocation check-in effect)
+### Reception Dashboard & Staff Shift Geofence
+**Enforced in:** `POST /api/reception/dashboard` (`action: "start_shift"`) (client trigger: `ReceptionDashboardView.tsx`)
 
-- Requires branch coordinates (`lat`, `lng`) configured on the branch (resolved from `maps_link` when present).
-- Calculates distance between employee GPS location and branch coordinates.
-- If distance > 800m, check-in is rejected and logged with status `Out of Location`.
-- Two separate bypasses exist:
-  - **Client-side:** the browser skips calling the check-in API entirely when `adminRole === 'superadmin'` AND the logged-in employee has no `branch_id` assigned (global superadmins with no branch).
-  - **Server-side:** the route itself always allows check-in (no distance check) when the employee's email is exactly `superadmin@revera.com`, regardless of role or branch.
-- Note: `POST /api/provider-attendance` is a separate, unrelated route — it just upserts an admin-set manual status/check-in-out time for a provider, with no geolocation logic at all.
+- Controlled by `enableGpsShift` toggle under **Admin Settings -> Inactivity & Shift Settings** (`page_settings.home.inactivity.enableGpsShift`, default `true`).
+- When `enableGpsShift === true`:
+  - Browser geolocation (`latitude`, `longitude`, `accuracy`) is strictly required for all users (receptionists, employees, admins, superadmins).
+  - Validates coordinates against the assigned branch (if assigned) and all active clinic branches within a 1000m tolerance.
+  - If the user is outside the 1000m radius of all active clinic locations or no coordinates could be matched (`!isInsideLocation`), the request is strictly rejected with HTTP 400 (`out_of_location`) and no attendance row is created.
+  - Surfaces real-time location verification errors both in the Start Shift modal and as an in-card alert banner.
+- When `enableGpsShift === false`:
+  - Staff can start shifts from anywhere without GPS restriction.
 
 ---
 

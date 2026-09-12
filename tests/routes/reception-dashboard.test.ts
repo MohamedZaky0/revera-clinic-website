@@ -63,11 +63,17 @@ function seedReceptionAuth() {
     { id: EMP_RECEPTION_A, role_name: 'receptionist', department: 'Reception', auth_user_id: USER_RECEPTION_A },
     { id: EMP_RECEPTION_B, role_name: 'receptionist', department: 'Reception', auth_user_id: USER_RECEPTION_B },
   );
+  if (mockDb.branches.length === 0) {
+    seedBranch();
+  }
 }
 
 function seedHrAuth() {
   mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_HR } }, error: null });
   mockDb.employee_accounts.push({ id: EMP_HR, role_name: 'hr', auth_user_id: USER_HR });
+  if (mockDb.branches.length === 0) {
+    seedBranch();
+  }
 }
 
 function seedDoctorAuth() {
@@ -334,17 +340,27 @@ describe('geofenced start_shift', () => {
     expect(mockDb.hr_attendance).toHaveLength(0);
   });
 
-  it('a superadmin with no assigned branch bypasses the location check entirely', async () => {
-    // Deliberate product behaviour, not a hole: an owner/superadmin is not tied to one branch and
-    // is expected to be able to record presence from anywhere.
+  it('a superadmin with no assigned branch can start shift from any active clinic branch', async () => {
     mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_HR } }, error: null });
     mockDb.employee_accounts.push({ id: EMP_HR, role_name: 'superadmin', auth_user_id: USER_HR, branch_id: null });
     seedBranch();
 
-    const res = await POST(authedReq('superadmin-token', { body: { action: 'start_shift' } }));
+    const res = await POST(authedReq('superadmin-token', { body: { action: 'start_shift', latitude: INSIDE_LAT, longitude: INSIDE_LNG } }));
     expect(res.status).toBe(200);
 
     const row = mockDb.hr_attendance.find((r) => r.employee_id === EMP_HR && r.date === TODAY);
+    expect(row).toBeDefined();
+    expect(row!.status).toBe('Present');
+  });
+
+  it('when GPS shift check is disabled in page settings, staff can start shift from anywhere', async () => {
+    seedReceptionAuth();
+    fake.seed('page_settings', [{ key: 'home', value: { inactivity: { enableGpsShift: false } } }]);
+
+    const res = await POST(authedReq('reception-token', { body: { action: 'start_shift' } }));
+    expect(res.status).toBe(200);
+
+    const row = mockDb.hr_attendance.find((r) => r.employee_id === EMP_RECEPTION_A && r.date === TODAY);
     expect(row).toBeDefined();
   });
 
@@ -368,16 +384,17 @@ describe('geofenced start_shift', () => {
 
   // The older /api/hr/attendance route was deliberately changed to block check-in when a branch
   // has no usable coordinates (commit dd600cd, "fail check-in and block if branch location
-  // coordinates are not configured in db"). This route inverts that: `candidateBranches.length > 0`
-  // guards the refusal, so a clinic with no branch rows — or branches whose lat/lng were never
-  // filled in — silently accepts a check-in from anywhere on earth. Same intent, opposite outcome.
-  it.fails('refuses to clock in when no branch has usable coordinates, instead of accepting any position', async () => {
+  // coordinates are not configured in db"). This route now strictly refuses clock-in whenever
+  // no branch has usable coordinates or distance is not within range.
+  it('refuses to clock in when no branch has usable coordinates, instead of accepting any position', async () => {
     seedReceptionAuth();
-    // No seedBranch() — nothing configured to measure against.
+    mockDb.branches = []; // No branch configured to measure against.
 
     const res = await POST(authedReq('reception-token', {
       body: { action: 'start_shift', latitude: OUTSIDE_LAT, longitude: OUTSIDE_LNG },
     }));
     expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('out_of_location');
   });
 });

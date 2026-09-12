@@ -7,7 +7,8 @@ import {
   Stethoscope,
   Users,
   BarChart3,
-  LogOut
+  LogOut,
+  X
 } from "lucide-react";
 import { DoctorTab } from "./types";
 
@@ -25,6 +26,8 @@ interface DoctorSidebarProps {
   setLang: (lang: "en" | "ar") => void;
   onFetchReservations: () => void;
   onLogout: () => void;
+  sidebarOpen?: boolean;
+  setSidebarOpen?: (open: boolean) => void;
 }
 
 export default function DoctorSidebar({
@@ -40,30 +43,51 @@ export default function DoctorSidebar({
   lang,
   setLang,
   onFetchReservations,
-  onLogout
+  onLogout,
+  sidebarOpen = false,
+  setSidebarOpen
 }: DoctorSidebarProps) {
-  return (
-    <aside className="w-full md:w-[220px] bg-[#414E36] text-[#FBFBF9] flex flex-col justify-between shrink-0 h-auto md:h-screen sticky top-0 px-3.5 py-5 shadow-[0_0_70px_rgba(0,0,0,0.08)] overflow-y-auto">
+  const handleTabClick = (tab: DoctorTab) => {
+    setActiveTab(tab);
+    if (setSidebarOpen) setSidebarOpen(false);
+  };
+
+  const renderSidebarContent = (isMobile = false) => (
+    <>
       {/* Top: Logo & Branding */}
       <div className="space-y-4">
         {/* Logo Header */}
-        <div className="flex items-center gap-2.5 pb-2 border-b border-white/10">
-          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-md p-1.5">
-            <Image
-              src="/images/main_logo.png"
-              alt="Revera Clinics"
-              fill
-              style={{ objectFit: "contain", padding: "2px" }}
-            />
+        <div className="flex items-center justify-between pb-2 border-b border-white/10">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-md p-1.5">
+              <Image
+                src="/images/main_logo.png"
+                alt="Revera Clinics"
+                fill
+                style={{ objectFit: "contain", padding: "2px" }}
+              />
+            </div>
+            <div className="flex flex-col justify-center min-w-0">
+              <p className="text-[9px] uppercase tracking-[0.2em] text-[#FBFBF9]/60 leading-none mb-0.5">
+                Revera Clinics
+              </p>
+              <h1 className="text-base font-bold text-[#FBFBF9] leading-tight truncate">
+                {t.portalTitle}
+              </h1>
+            </div>
           </div>
-          <div className="flex flex-col justify-center min-w-0">
-            <p className="text-[9px] uppercase tracking-[0.2em] text-[#FBFBF9]/60 leading-none mb-0.5">
-              Revera Clinics
-            </p>
-            <h1 className="text-base font-bold text-[#FBFBF9] leading-tight truncate">
-              {t.portalTitle}
-            </h1>
-          </div>
+
+          {/* Close button for mobile drawer */}
+          {isMobile && (
+            <button
+              type="button"
+              onClick={() => setSidebarOpen && setSidebarOpen(false)}
+              className="h-8 w-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+              title="Close Menu"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
 
         {/* Global Language Toggle Switcher */}
@@ -71,7 +95,7 @@ export default function DoctorSidebar({
           <button
             type="button"
             onClick={() => setLang("en")}
-            className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition text-center ${
+            className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition text-center cursor-pointer ${
               lang === "en"
                 ? "bg-[#FBFBF9] text-[#414E36] shadow-sm"
                 : "text-[#FBFBF9]/70 hover:text-white hover:bg-white/10"
@@ -82,7 +106,7 @@ export default function DoctorSidebar({
           <button
             type="button"
             onClick={() => setLang("ar")}
-            className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition text-center ${
+            className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition text-center cursor-pointer ${
               lang === "ar"
                 ? "bg-[#FBFBF9] text-[#414E36] shadow-sm"
                 : "text-[#FBFBF9]/70 hover:text-white hover:bg-white/10"
@@ -101,9 +125,9 @@ export default function DoctorSidebar({
           {/* Tab 1: Schedule */}
           <button
             type="button"
-            onClick={() => setActiveTab("schedule")}
+            onClick={() => handleTabClick("schedule")}
             title={t.schedule}
-            className={`group flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 ${
+            className={`group flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 cursor-pointer ${
               activeTab === "schedule"
                 ? "bg-[#FBFBF9] text-[#414E36] shadow-lg font-bold"
                 : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
@@ -124,9 +148,9 @@ export default function DoctorSidebar({
           {/* Tab 2: Ongoing Session */}
           <button
             type="button"
-            onClick={() => setActiveTab("ongoing")}
+            onClick={() => handleTabClick("ongoing")}
             title={t.ongoingSession}
-            className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 ${
+            className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 cursor-pointer ${
               activeTab === "ongoing"
                 ? "bg-[#FBFBF9] text-[#414E36] shadow-lg font-bold"
                 : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
@@ -158,9 +182,9 @@ export default function DoctorSidebar({
           {/* Tab 3: Patients */}
           <button
             type="button"
-            onClick={() => setActiveTab("patients")}
+            onClick={() => handleTabClick("patients")}
             title={t.patients}
-            className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 ${
+            className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 cursor-pointer ${
               activeTab === "patients"
                 ? "bg-[#FBFBF9] text-[#414E36] shadow-lg font-bold"
                 : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
@@ -192,9 +216,9 @@ export default function DoctorSidebar({
           {/* Tab 4: Analytics */}
           <button
             type="button"
-            onClick={() => setActiveTab("analytics")}
+            onClick={() => handleTabClick("analytics")}
             title={t.analytics}
-            className={`group flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 ${
+            className={`group flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 cursor-pointer ${
               activeTab === "analytics"
                 ? "bg-[#FBFBF9] text-[#414E36] shadow-lg font-bold"
                 : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
@@ -219,7 +243,7 @@ export default function DoctorSidebar({
         {/* Doctor Account Card */}
         <button
           type="button"
-          onClick={() => setActiveTab("profile")}
+          onClick={() => handleTabClick("profile")}
           title="View Doctor Profile & Security Settings"
           className={`flex w-full items-center gap-2 rounded-xl p-2 transition-all text-left group cursor-pointer ${
             activeTab === "profile"
@@ -234,7 +258,7 @@ export default function DoctorSidebar({
                 : "bg-[#FBFBF9] text-[#414E36]"
             }`}
           >
-            {(doctorName.replace(/^Dr\.?\s*/i, '') || "D").slice(0, 2).toUpperCase()}
+            {(doctorName.replace(/^Dr\.?\s*/i, "") || "D").slice(0, 2).toUpperCase()}
             <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-[#414E36]" />
           </div>
           <div className="text-left min-w-0 flex-1">
@@ -260,7 +284,7 @@ export default function DoctorSidebar({
           <button
             type="button"
             onClick={onLogout}
-            className="w-full flex items-center justify-center gap-1.5 h-8 rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-white transition text-xs font-semibold"
+            className="w-full flex items-center justify-center gap-1.5 h-8 rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-white transition text-xs font-semibold cursor-pointer"
             title={t.signOut}
           >
             <LogOut size={14} />
@@ -268,6 +292,30 @@ export default function DoctorSidebar({
           </button>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* 1. DESKTOP PERMANENT SIDEBAR (>= md) */}
+      <aside className="hidden md:flex w-[220px] bg-[#414E36] text-[#FBFBF9] flex-col justify-between shrink-0 h-screen sticky top-0 px-3.5 py-5 shadow-[0_0_70px_rgba(0,0,0,0.08)] overflow-y-auto">
+        {renderSidebarContent(false)}
+      </aside>
+
+      {/* 2. MOBILE SLIDE-OVER DRAWER (< md) */}
+      {sidebarOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs md:hidden animate-fadeIn"
+            onClick={() => setSidebarOpen && setSidebarOpen(false)}
+          />
+          <aside
+            className="fixed inset-y-0 start-0 z-50 w-72 max-w-[85vw] bg-[#414E36] text-[#FBFBF9] flex flex-col justify-between p-4 shadow-2xl md:hidden overflow-y-auto animate-fadeIn"
+          >
+            {renderSidebarContent(true)}
+          </aside>
+        </>
+      )}
+    </>
   );
 }
