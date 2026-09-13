@@ -53,18 +53,9 @@ export default function BookingSettingsView({
 }: BookingSettingsViewProps) {
   return (
     <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-4xl font-semibold text-[#1F251A]">{t.title}</h2>
-          <p className="mt-2 text-sm text-[#5A6A51]">{t.subtitle}</p>
-        </div>
-        <button
-          onClick={handleSaveBookingSettings}
-          disabled={savingBookingSettings}
-          className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
-        >
-          {savingBookingSettings ? t.savingBtn : t.saveBtn}
-        </button>
+      <div className="mb-6">
+        <h2 className="text-4xl font-semibold text-[#1F251A]">{t.title}</h2>
+        <p className="mt-2 text-sm text-[#5A6A51]">{t.subtitle}</p>
       </div>
 
       <div className="max-w-4xl rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
@@ -258,6 +249,18 @@ export default function BookingSettingsView({
                 <span className="text-xs text-[#5A6A51]">{t.showDoctorNotesHint}</span>
               </div>
             </label>
+          </div>
+
+          {/* Bottom Save Action */}
+          <div className="border-t border-[#F2EFE9] pt-6 flex items-center justify-end">
+            <button
+              type="button"
+              onClick={handleSaveBookingSettings}
+              disabled={savingBookingSettings}
+              className="rounded-3xl bg-[#414E36] px-8 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md cursor-pointer"
+            >
+              {savingBookingSettings ? t.savingBtn : t.saveBtn}
+            </button>
           </div>
         </div>
     </div>
