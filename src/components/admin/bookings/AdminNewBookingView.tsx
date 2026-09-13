@@ -421,18 +421,14 @@ export default function AdminNewBookingView({
     }
   }, [sameAsPhone, phone]);
 
-  const [showTimeDropdown, setShowTimeDropdown] = useState(false);
+  const [showTimeModal, setShowTimeModal] = useState(false);
   const phoneDropdownRef = useRef<HTMLDivElement>(null);
-  const timeDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close customer dropdown & time dropdown on click outside
+  // Close customer dropdown on click outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (phoneDropdownRef.current && !phoneDropdownRef.current.contains(e.target as Node)) {
         setShowCustomerDropdown(false);
-      }
-      if (timeDropdownRef.current && !timeDropdownRef.current.contains(e.target as Node)) {
-        setShowTimeDropdown(false);
       }
     };
     document.addEventListener("click", handler);
@@ -714,7 +710,7 @@ export default function AdminNewBookingView({
     if (!availableTimeSlots.includes(slot) || bookedTimeSlots.includes(normalizeTimeSlot(slot))) return;
     setFormErrors((prev) => ({ ...prev, time: false }));
     setSelectedTimes([slot]);
-    setShowTimeDropdown(false);
+    setShowTimeModal(false);
   };
 
   const handleClearSlots = () => {
@@ -1402,11 +1398,10 @@ export default function AdminNewBookingView({
               {/* ── 1. AVAILABLE TIME (MULTI-SLOT SELECTION) ── */}
               <div>
                 <label className="block font-bold text-[#1F251A] mb-2">{tr.availableTimeLabel}</label>
-                <div ref={timeDropdownRef} className={`relative ${showTimeDropdown ? "z-50" : "z-10"}`}>
+                <div>
                   <button
                     type="button"
-                    onClick={() => setShowTimeDropdown((open) => !open)}
-                    aria-expanded={showTimeDropdown}
+                    onClick={() => setShowTimeModal(true)}
                     className={`w-full max-w-md rounded-2xl border-2 bg-[var(--cr-white)] px-4 py-3.5 flex items-center gap-3 text-sm font-extrabold text-[var(--cr-dark)] transition cursor-pointer ${
                       formErrors.time ? "border-red-500 ring-2 ring-red-200" : "border-[var(--cr-primary)] hover:bg-white"
                     }`}
@@ -1415,48 +1410,64 @@ export default function AdminNewBookingView({
                     <span className="flex-1 text-start">
                       {selectedTime || tr.showAvailableTimeLabel}
                     </span>
-                    <ChevronDown size={22} className={`text-[var(--cr-primary)] transition-transform ${showTimeDropdown ? "rotate-180" : ""}`} />
+                    <ChevronDown size={22} className="text-[var(--cr-primary)]" />
                   </button>
 
-                  {showTimeDropdown && (
-                    <div className="absolute start-0 end-0 top-full z-[100] mt-2 max-w-2xl rounded-2xl border border-[var(--cr-primary)]/20 bg-white p-4 shadow-2xl animate-fadeIn">
-                      <span className="absolute -top-2 start-8 h-4 w-4 rotate-45 border-l border-t border-[var(--cr-primary)]/20 bg-white" />
-                      <div className="relative space-y-3">
-                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-2.5">
-                          <div className="flex items-center gap-2">
-                            <Clock size={16} className="text-emerald-800" />
-                            <h3 className="text-sm font-black text-[var(--cr-dark)]">{tr.availableTimeHeading}</h3>
-                            <span className="text-xs font-semibold text-[var(--cr-secondary)]">
-                              ({totalDurationMinutes} {tr.minutesPerSlotLabel})
-                            </span>
+                  {showTimeModal && (
+                    <div
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn"
+                      onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowTimeModal(false);
+                      }}
+                    >
+                      <div
+                        className="relative w-full max-w-2xl rounded-3xl border border-[#414E36]/15 bg-white p-6 shadow-2xl space-y-4 text-start animate-fadeIn"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-9 w-9 rounded-full bg-[#EDF1EC] text-emerald-800 flex items-center justify-center shrink-0">
+                              <Clock size={18} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-sm md:text-base font-black text-[var(--cr-dark)]">{tr.availableTimeHeading}</h3>
+                                <span className="text-xs font-semibold text-[var(--cr-secondary)]">
+                                  ({totalDurationMinutes} {tr.minutesPerSlotLabel})
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#5A6A51] mt-0.5">
+                                {formattedDateStr} • {selectedDoctorName}
+                              </p>
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             {selectedTimes.length > 0 && (
                               <button
                                 type="button"
                                 onClick={handleClearSlots}
-                                className="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 transition hover:bg-rose-100 cursor-pointer"
+                                className="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-100 cursor-pointer"
                               >
                                 {tr.clearSlotsBtn}
                               </button>
                             )}
                             <button
                               type="button"
-                              onClick={() => setShowTimeDropdown(false)}
-                              className="h-7 w-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 transition cursor-pointer"
+                              onClick={() => setShowTimeModal(false)}
+                              className="h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-[#1F251A] transition cursor-pointer"
                               title="Close"
                             >
-                              <X size={14} />
+                              <X size={16} />
                             </button>
                           </div>
                         </div>
 
                         {loadingSlots ? (
-                          <div className="flex items-center justify-center gap-2 py-8 text-sm font-semibold text-[#5A6A51]">
-                            <Loader2 size={18} className="animate-spin text-emerald-700" /> {tr.fetchingSlotsLabel}
+                          <div className="flex items-center justify-center gap-2 py-10 text-sm font-semibold text-[#5A6A51]">
+                            <Loader2 size={20} className="animate-spin text-emerald-700" /> {tr.fetchingSlotsLabel}
                           </div>
                         ) : allTimeSlots.length > 0 ? (
-                          <div className="max-h-64 sm:max-h-72 overflow-y-auto pr-1">
+                          <div className="max-h-72 overflow-y-auto pr-1">
                             <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 ${
                               formErrors.time ? "rounded-2xl border border-red-500 p-2 ring-2 ring-red-200" : ""
                             }`}>
@@ -1498,7 +1509,7 @@ export default function AdminNewBookingView({
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200/80 bg-amber-50 p-3.5 text-xs text-amber-900">
+                          <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200/80 bg-amber-50 p-4 text-xs text-amber-900">
                             <AlertCircle size={16} className="mt-0.5 shrink-0 text-amber-600" />
                             <span className="font-bold">
                               {isBranchClosedToday
