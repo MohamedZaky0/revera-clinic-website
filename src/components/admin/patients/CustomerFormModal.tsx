@@ -642,18 +642,61 @@ export default function CustomerFormModal({
           </div>
 
           <div className="space-y-4">
-            <label className="flex items-start gap-3 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={custActive}
-                onChange={(e) => setCustActive(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#203D20] focus:ring-[#203D20] accent-[#203D20] cursor-pointer"
-              />
-              <div>
-                <span className="block text-sm font-bold text-[#1F251A]">{t.activeLabel}</span>
-                <span className="block text-xs text-[#5A6A51] mt-0.5">{t.activeProfileHelp || "Uncheck to deactivate this customer profile"}</span>
+            <div
+              onClick={() => setCustActive(!custActive)}
+              className={`flex items-center justify-between p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer select-none ${
+                custActive
+                  ? "border-[#414E36]/20 bg-[#F4F7F2]/80 hover:bg-[#EEF4EC]"
+                  : "border-gray-200 bg-[#FBFBF9] hover:bg-gray-50"
+              }`}
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-sm font-bold text-[#1F251A]">{t.activeLabel || "Active Profile"}</span>
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                      custActive
+                        ? "bg-[#E0EBDC] text-[#244322] border border-[#244322]/15"
+                        : "bg-red-50 text-red-700 border border-red-200"
+                    }`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${custActive ? "bg-[#244322]" : "bg-red-500"}`} />
+                    {custActive
+                      ? (t.activeStatusActive || (lang === "ar" ? "نشط" : "Active"))
+                      : (t.activeStatusInactive || (lang === "ar" ? "غير نشط" : "Inactive"))}
+                  </span>
+                </div>
+                <p className="text-xs text-[#5A6A51]">
+                  {custActive
+                    ? (t.activeProfileActiveDesc || (lang === "ar" ? "ملف المريض نشط حالياً. قم بالتبديل لإلغاء التفعيل." : "Patient profile is currently active. Toggle to deactivate."))
+                    : (t.activeProfileInactiveDesc || (lang === "ar" ? "ملف المريض غير نشط حالياً. قم بالتبديل للتفعيل." : "Patient profile is currently inactive. Toggle to activate."))}
+                </p>
               </div>
-            </label>
+
+              {/* Toggle switch */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={custActive}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCustActive(!custActive);
+                }}
+                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#414E36]/30 ${
+                  custActive ? "bg-[#203D20]" : "bg-gray-300"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    custActive
+                      ? lang === "ar"
+                        ? "-translate-x-5"
+                        : "translate-x-5"
+                      : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
 
             <div>
               <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.notesLabel}</label>

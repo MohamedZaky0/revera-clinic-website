@@ -637,6 +637,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // Inactivity Settings State
   const [inactivityThreshold, setInactivityThreshold] = useState<number>(30);
   const [inactivityCountdown, setInactivityCountdown] = useState<number>(10);
+  const [globalEndingSession, setGlobalEndingSession] = useState<boolean>(false);
   const [savingInactivitySettings, setSavingInactivitySettings] = useState(false);
   // RISK-043: how long a session may sit `started`/`in_progress` before AdminBookingsView flags it
   // as forgotten. Configurable so a clinic that runs longer sessions isn't stuck with false alarms.
@@ -2358,7 +2359,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-051', name: 'Unified Staff Login & Customer Dropdown Real-Time Sync Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies unified staff portal routing (/login -> /doctor, /reception, /admin), shaded customer login state persistence, and instant multi-tab sync.', status: 'idle' },
     { id: 'TC-052', name: 'Optional Email Booking & Patient Creation Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies optional email support for staff booking creation and patient profile registration without validation blockers.', status: 'idle' },
     { id: 'TC-053', name: 'Reception & Staff Weekly Shift Configuration Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee profile creation, weekly shift schedule configuration for non-doctor staff, and department/role synchronization.', status: 'idle' },
-    { id: 'TC-054', name: 'Responsive Staff Views & Mobile Layout Engine', category: 'System & Settings', endpoint: '/api/health/supabase', description: 'Verifies mobile responsiveness, horizontal scroll containers (min-w), adaptive padding, and auto-dismiss navigation for all staff views.', status: 'idle' }
+    { id: 'TC-054', name: 'Responsive Staff Views & Mobile Layout Engine', category: 'System & Settings', endpoint: '/api/health/supabase', description: 'Verifies mobile responsiveness, horizontal scroll containers (min-w), adaptive padding, and auto-dismiss navigation for all staff views.', status: 'idle' },
+    { id: 'TC-055', name: 'Global Ending Session & Receptionist Clinical Finalization Engine', category: 'Services & Bookings', endpoint: '/api/page-settings', description: 'Verifies global session ending toggle activation, receptionist clinical intake & prescription synchronization, and instant doctor exit.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -3902,11 +3904,17 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             if (data.inactivity.enableGpsShift !== undefined) {
               setEnableGpsShift(Boolean(data.inactivity.enableGpsShift));
             }
+            if (data.inactivity.globalEndingSession !== undefined) {
+              setGlobalEndingSession(Boolean(data.inactivity.globalEndingSession));
+            }
           }
 
           // Fallback resolution for enableGpsShift if not set in inactivity
           if (data.inactivity?.enableGpsShift === undefined) {
             setEnableGpsShift(data.booking?.enableGpsShift ?? data.shift?.gpsShiftEnabled ?? true);
+          }
+          if (data.inactivity?.globalEndingSession === undefined && data.booking?.globalEndingSession !== undefined) {
+            setGlobalEndingSession(Boolean(data.booking.globalEndingSession));
           }
 
           if (data.notifications) {
@@ -4089,12 +4097,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           inactivity: {
             threshold: Number(inactivityThreshold),
             countdown: Number(inactivityCountdown),
-            enableGpsShift: enableGpsShift
+            enableGpsShift: enableGpsShift,
+            globalEndingSession: globalEndingSession
           }
         }),
       });
       if (res.ok) {
         alert("Inactivity settings saved successfully!");
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("revera-settings-change", {
+              detail: { globalEndingSession }
+            })
+          );
+        }
         clearFetchCache();
         fetchPageSettings();
       } else {
@@ -6801,6 +6817,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               setInactivityCountdown={setInactivityCountdown}
               enableGpsShift={enableGpsShift}
               setEnableGpsShift={setEnableGpsShift}
+              globalEndingSession={globalEndingSession}
+              setGlobalEndingSession={setGlobalEndingSession}
               handleSaveInactivitySettings={handleSaveInactivitySettings}
               savingInactivitySettings={savingInactivitySettings}
               setActiveInfoFeature={setActiveInfoFeature}
@@ -7689,6 +7707,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           setPostponeNewDate={setPostponeNewDate}
           setPostponeNewTime={setPostponeNewTime}
           setPostponeFollowUpDate={setPostponeFollowUpDate}
+          globalEndingSession={globalEndingSession}
         />
       )}
 
