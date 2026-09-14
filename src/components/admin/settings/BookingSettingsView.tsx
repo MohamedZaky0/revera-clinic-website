@@ -1,6 +1,6 @@
 "use client";
 
-import { Info } from "lucide-react";
+import { Info, Zap, Sparkles, CheckCircle2, Lock } from "lucide-react";
 import { adminTranslations } from "@/components/admin/translations";
 
 interface ActiveInfoFeature {
@@ -23,6 +23,8 @@ interface BookingSettingsViewProps {
   setBookingShowDoctorNotes: (v: boolean) => void;
   bookingStaleSessionHours: number;
   setBookingStaleSessionHours: (v: number) => void;
+  globalEndingSession?: boolean;
+  setGlobalEndingSession?: (v: boolean) => void;
   handleSaveBookingSettings: () => Promise<void>;
   savingBookingSettings: boolean;
   setActiveInfoFeature: (f: ActiveInfoFeature) => void;
@@ -45,6 +47,8 @@ export default function BookingSettingsView({
   setBookingShowDoctorNotes,
   bookingStaleSessionHours,
   setBookingStaleSessionHours,
+  globalEndingSession = false,
+  setGlobalEndingSession,
   handleSaveBookingSettings,
   savingBookingSettings,
   setActiveInfoFeature,
@@ -249,6 +253,157 @@ export default function BookingSettingsView({
                 <span className="text-xs text-[#5A6A51]">{t.showDoctorNotesHint}</span>
               </div>
             </label>
+          </div>
+
+          {/* Futuristic Global Ending Session Control Card */}
+          <div className="relative overflow-hidden rounded-[32px] bg-[#FBFBF9] p-6 sm:p-7 border border-[#414E36]/15 shadow-sm space-y-6">
+            {/* Futuristic Ambient Glow Effect */}
+            <div className={`absolute top-0 end-0 -mt-10 -me-10 h-40 w-40 rounded-full blur-3xl pointer-events-none transition-all duration-700 ${globalEndingSession ? 'bg-emerald-400/25' : 'bg-gray-200/20'}`} />
+            
+            <div className="relative flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-5">
+              <div className="flex items-center gap-3.5">
+                <div className={`h-12 w-12 flex items-center justify-center rounded-2xl transition-all duration-500 shadow-sm shrink-0 ${
+                  globalEndingSession 
+                    ? 'bg-gradient-to-br from-[#1F251A] via-[#414E36] to-[#0F3826] text-emerald-300 ring-4 ring-emerald-500/20 shadow-emerald-900/10' 
+                    : 'bg-white text-gray-400 border border-gray-200'
+                }`}>
+                  <Zap size={22} className={globalEndingSession ? 'animate-pulse text-emerald-400 fill-emerald-400/30' : ''} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-lg sm:text-xl font-black text-[#1F251A] tracking-tight">
+                      {t.globalEndingSession}
+                    </h3>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
+                      globalEndingSession 
+                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-xs' 
+                        : 'bg-white text-gray-500 border border-gray-200'
+                    }`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${globalEndingSession ? 'bg-emerald-600 animate-ping' : 'bg-gray-400'}`} />
+                      <span>{globalEndingSession ? (lang === "ar" ? "نشط وفوري" : "LIVE & REACTIVE") : (lang === "ar" ? "معطل" : "DISABLED")}</span>
+                    </span>
+                    {setActiveInfoFeature && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setActiveInfoFeature({
+                            title: t.globalEndingSessionInfoTitle || t.globalEndingSession,
+                            description: t.globalEndingSessionInfoDesc
+                          });
+                        }}
+                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-1 rounded-full hover:bg-[#EDF1EC] flex cursor-pointer"
+                        title={t.clickForInfo || "Click for info"}
+                      >
+                        <Info size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#5A6A51] mt-1 font-medium max-w-xl">
+                    {t.globalEndingSessionHint}
+                  </p>
+                </div>
+              </div>
+
+              {/* Futuristic Cyber-Clinical Toggle Switch */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={globalEndingSession}
+                  onClick={() => {
+                    const nextVal = !globalEndingSession;
+                    setGlobalEndingSession?.(nextVal);
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(
+                        new CustomEvent("revera-settings-change", {
+                          detail: { globalEndingSession: nextVal }
+                        })
+                      );
+                    }
+                  }}
+                  className={`relative inline-flex h-8 w-16 shrink-0 cursor-pointer rounded-full p-1 transition-colors duration-300 ease-in-out focus:outline-none ring-2 ${
+                    globalEndingSession 
+                      ? 'bg-gradient-to-r from-[#0F3826] to-[#414E36] ring-emerald-500/40 shadow-inner' 
+                      : 'bg-gray-200 ring-transparent'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-flex h-6 w-6 transform items-center justify-center rounded-full bg-white shadow-md transition duration-300 ease-in-out ${
+                      globalEndingSession 
+                        ? 'translate-x-8 rtl:-translate-x-8 text-emerald-800' 
+                        : 'translate-x-0 rtl:translate-x-0 text-gray-400'
+                    }`}
+                  >
+                    {globalEndingSession ? <Sparkles size={13} className="text-emerald-700" /> : <Lock size={12} className="text-gray-400" />}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Feature Capability Status Breakdown */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden ${
+                globalEndingSession 
+                  ? 'bg-gradient-to-br from-emerald-50/90 via-white to-emerald-50/50 border-emerald-300/80 text-emerald-950 shadow-xs' 
+                  : 'bg-white border-gray-200 opacity-60 text-gray-500'
+              }`}>
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className={`h-7 w-7 rounded-xl flex items-center justify-center ${globalEndingSession ? 'bg-emerald-600 text-white shadow-xs' : 'bg-gray-200 text-gray-400'}`}>
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold">{t.globalEndingSessionActive}</h4>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800/80">Reception Full Control</span>
+                  </div>
+                </div>
+                <p className="text-xs leading-relaxed text-[#2C3825]">
+                  {t.globalEndingSessionActiveDesc}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  <span className="inline-block rounded-lg bg-[#EDF1EC] px-2 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
+                    ✓ Medical Intake
+                  </span>
+                  <span className="inline-block rounded-lg bg-[#EDF1EC] px-2 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
+                    ✓ Digital Rx
+                  </span>
+                  <span className="inline-block rounded-lg bg-[#EDF1EC] px-2 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
+                    ✓ Consumables &amp; Pulses
+                  </span>
+                  <span className="inline-block rounded-lg bg-[#EDF1EC] px-2 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
+                    ✓ Doctor Auto-Exit
+                  </span>
+                </div>
+              </div>
+
+              <div className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden ${
+                !globalEndingSession 
+                  ? 'bg-gradient-to-br from-amber-50/90 via-white to-amber-50/50 border-amber-300/80 text-amber-950 shadow-xs' 
+                  : 'bg-white border-gray-200 opacity-60 text-gray-500'
+              }`}>
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className={`h-7 w-7 rounded-xl flex items-center justify-center ${!globalEndingSession ? 'bg-amber-600 text-white shadow-xs' : 'bg-gray-200 text-gray-400'}`}>
+                    <Lock size={15} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold">{t.globalEndingSessionRestricted}</h4>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-800/80">Doctor Portal Only</span>
+                  </div>
+                </div>
+                <p className="text-xs leading-relaxed text-[#4A3B2C]">
+                  {t.globalEndingSessionRestrictedDesc}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  <span className="inline-block rounded-lg bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-900 border border-amber-200">
+                    • Booking Details View Only
+                  </span>
+                  <span className="inline-block rounded-lg bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-900 border border-amber-200">
+                    • Doctor-Only Intake
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Bottom Save Action */}
