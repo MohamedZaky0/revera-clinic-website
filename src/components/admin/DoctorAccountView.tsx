@@ -411,6 +411,19 @@ export default function DoctorAccountView({
             const isActive = st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
             if (isActive) {
               setActiveSessionBooking(updated);
+            } else if (st === "completed" || st === "done" || st === "cancelled" || st === "canceled") {
+              setActiveSessionBooking((curr: any) => {
+                if (curr && String(curr.id) === String(updated.id)) {
+                  return null;
+                }
+                return curr;
+              });
+              setScheduleModalBooking((curr: any) => {
+                if (curr && String(curr.id) === String(updated.id)) {
+                  return null;
+                }
+                return curr;
+              });
             }
           }
         }

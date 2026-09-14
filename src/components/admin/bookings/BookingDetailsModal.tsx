@@ -24,6 +24,19 @@ import {
   XCircle,
   UserX,
   Play,
+  ChevronLeft,
+  AlertCircle,
+  CheckCircle2,
+  AlertTriangle,
+  Edit,
+  Save,
+  Zap,
+  Layers,
+  Trash2,
+  Loader2,
+  Sparkles,
+  Pill,
+  Send,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
@@ -32,6 +45,16 @@ import { ServiceItem, getEffectiveServicePrice } from "@/lib/services";
 import { printInvoice, printPrescription } from "@/lib/printUtils";
 import { Branch } from "@/types";
 import type { Req } from "@/app/admin/page";
+
+export interface AdditionalServiceItem {
+  id: string | number;
+  serviceId?: number | string;
+  name: string;
+  price: number;
+  deviceId?: string;
+  deviceName?: string;
+  pulses: number;
+}
 
 interface BookingDetailsModalProps {
   booking: Req;
@@ -60,6 +83,7 @@ interface BookingDetailsModalProps {
   setPostponeNewDate: (d: string) => void;
   setPostponeNewTime: (t: string) => void;
   setPostponeFollowUpDate: (d: string) => void;
+  globalEndingSession?: boolean;
 }
 
 export default function BookingDetailsModal({
@@ -89,6 +113,7 @@ export default function BookingDetailsModal({
   setPostponeNewDate,
   setPostponeNewTime,
   setPostponeFollowUpDate,
+  globalEndingSession = false,
 }: BookingDetailsModalProps) {
   const { isRTL } = useLanguage();
   const { showConfirm } = useAlertConfirm();
@@ -105,6 +130,224 @@ export default function BookingDetailsModal({
   ]);
   const [drawerRxNotes, setDrawerRxNotes] = useState("");
   const [savingDrawerRx, setSavingDrawerRx] = useState(false);
+
+  // ── Global Ending Session & Clinical Finalization View State ──
+  const [viewMode, setViewMode] = useState<"details" | "end_session">("details");
+  const [isGlobalEndingSessionActive, setIsGlobalEndingSessionActive] = useState<boolean>(Boolean(globalEndingSession));
+
+  // Medical record intake states
+  const [medicalRecord, setMedicalRecord] = useState<any>(null);
+  const [medicalRecordLoading, setMedicalRecordLoading] = useState<boolean>(false);
+  const [showMedicalForm, setShowMedicalForm] = useState<boolean>(false);
+  const [activeTemplate, setActiveTemplate] = useState<any | null>(null);
+  const [loadingTemplate, setLoadingTemplate] = useState<boolean>(false);
+  const [dynamicResponses, setDynamicResponses] = useState<Record<string, any>>({});
+  const [formSkinType, setFormSkinType] = useState<string>("Normal");
+  const [formAllergies, setFormAllergies] = useState<string>("");
+  const [formMedicationDetails, setFormMedicationDetails] = useState<string>("");
+  const [formMedicalConditionsDetails, setFormMedicalConditionsDetails] = useState<string>("");
+  const [formPreviousTreatmentsDetails, setFormPreviousTreatmentsDetails] = useState<string>("");
+  const [savingMedicalRecord, setSavingMedicalRecord] = useState<boolean>(false);
+
+  // Clinical procedure notes state
+  const [clinicalNote, setClinicalNote] = useState<string>("");
+  const [savingClinicalNote, setSavingClinicalNote] = useState<boolean>(false);
+
+  // Inline prescription state
+  const [rxDiagnosis, setRxDiagnosis] = useState<string>("");
+  const [rxMedications, setRxMedications] = useState<{ name: string; dosage: string; frequency: string; duration: string }[]>([
+    { name: "", dosage: "", frequency: "", duration: "" }
+  ]);
+  const [rxGeneralNotes, setRxGeneralNotes] = useState<string>("");
+  const [savingRxInline, setSavingRxInline] = useState<boolean>(false);
+
+  // Services & Pulses state
+  const [primaryServiceId, setPrimaryServiceId] = useState<string>("");
+  const [additionalServices, setAdditionalServices] = useState<AdditionalServiceItem[]>([]);
+  const [selectedServiceIdToAdd, setSelectedServiceIdToAdd] = useState<string>("");
+  const [selectedDeviceForService, setSelectedDeviceForService] = useState<string>("");
+  const [pulsesCountForService, setPulsesCountForService] = useState<number>(0);
+  const [loadingDeviceLinks, setLoadingDeviceLinks] = useState<boolean>(false);
+  const [devicesList, setDevicesList] = useState<any[]>([]);
+
+  // Products / Consumables state
+  const [usedProducts, setUsedProducts] = useState<{ id: string; name: string; qty: number; unitPrice: number; total: number }[]>([]);
+  const [selectedSessionProductId, setSelectedSessionProductId] = useState<string>("");
+  const [selectedSessionProductQty, setSelectedSessionProductQty] = useState<number>(1);
+
+  // Device pulses state
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+  const [extraPulsesCount, setExtraPulsesCount] = useState<number>(0);
+  const [pricePerPulse, setPricePerPulse] = useState<number>(0);
+
+  // Finalizing state
+  const [finalizingSession, setFinalizingSession] = useState<boolean>(false);
+
+  // Sync globalEndingSession prop
+  useEffect(() => {
+    setIsGlobalEndingSessionActive(Boolean(globalEndingSession));
+  }, [globalEndingSession]);
+
+  // Real-time custom event listener for instant zero-reload reactivity
+  useEffect(() => {
+    const handleSettingsChange = (e: any) => {
+      if (e?.detail && typeof e.detail.globalEndingSession === "boolean") {
+        setIsGlobalEndingSessionActive(e.detail.globalEndingSession);
+      } else {
+        try {
+          const stored = localStorage.getItem("revera_global_ending_session") || localStorage.getItem("revera_inactivity_settings");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (typeof parsed === "boolean") setIsGlobalEndingSessionActive(parsed);
+            else if (typeof parsed?.globalEndingSession === "boolean") setIsGlobalEndingSessionActive(parsed.globalEndingSession);
+          }
+        } catch (err) {}
+      }
+    };
+    window.addEventListener("revera-settings-change", handleSettingsChange as EventListener);
+    return () => {
+      window.removeEventListener("revera-settings-change", handleSettingsChange as EventListener);
+    };
+  }, []);
+
+  // Initialize booking details and state
+  useEffect(() => {
+    if (!booking) {
+      setViewMode("details");
+      setMedicalRecord(null);
+      setClinicalNote("");
+      setAdditionalServices([]);
+      setUsedProducts([]);
+      return;
+    }
+    const note = booking.doctorNotes || (booking as any).doctor_notes || "";
+    setClinicalNote(note);
+    const initialSvcId = String(booking.serviceId || (booking.serviceIds && booking.serviceIds[0]) || "");
+    setPrimaryServiceId(initialSvcId);
+  }, [booking?.id]);
+
+  // Load Devices List
+  useEffect(() => {
+    fetch("/api/inventory/devices", { headers: authenticatedJsonHeaders })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.devices && Array.isArray(data.devices)) {
+          setDevicesList(data.devices);
+        } else if (Array.isArray(data)) {
+          setDevicesList(data);
+        }
+      })
+      .catch((err) => console.warn("Error loading devices in modal:", err));
+  }, []);
+
+  // Load Medical Record for patient
+  useEffect(() => {
+    if (!booking) return;
+    const custId = booking.customerId || (booking as any).customer_id;
+    const bookId = booking.id;
+    setMedicalRecordLoading(true);
+
+    const params = new URLSearchParams();
+    if (custId) params.set("customerId", String(custId));
+    if (bookId) params.set("reservationId", String(bookId));
+
+    fetch(`/api/medical-records?${params.toString()}`, { headers: authenticatedJsonHeaders })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.form) {
+          setMedicalRecord(data.form);
+        } else if (data && !data.error && !Array.isArray(data)) {
+          setMedicalRecord(data);
+        } else {
+          setMedicalRecord(null);
+        }
+      })
+      .catch((err) => {
+        console.warn("Error fetching medical record:", err);
+        setMedicalRecord(null);
+      })
+      .finally(() => setMedicalRecordLoading(false));
+  }, [booking?.id, booking?.customerId, (booking as any)?.customer_id]);
+
+  // Load specialized intake template matching current service
+  useEffect(() => {
+    if (!booking) return;
+    const currentSvcId = primaryServiceId || booking.serviceId || (booking.serviceIds && booking.serviceIds[0]);
+
+    const fetchMatchingTemplate = async () => {
+      setLoadingTemplate(true);
+      try {
+        const url = currentSvcId
+          ? `/api/medical-records/templates?serviceId=${encodeURIComponent(String(currentSvcId))}`
+          : `/api/medical-records/templates`;
+        const res = await fetch(url, { headers: authenticatedJsonHeaders });
+        if (res.ok) {
+          const data = await res.json();
+          const tmpl = data.template || (data.templates && data.templates[0]);
+          if (tmpl) {
+            setActiveTemplate(tmpl);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading service intake template:", err);
+      } finally {
+        setLoadingTemplate(false);
+      }
+    };
+
+    fetchMatchingTemplate();
+  }, [booking?.id, primaryServiceId]);
+
+  // Sync dynamic responses from medicalRecord / activeTemplate
+  useEffect(() => {
+    if (!activeTemplate) return;
+    const initial: Record<string, any> = {};
+    const existingResponses = medicalRecord?.responses || {};
+
+    (activeTemplate.fields || []).forEach((f: any) => {
+      if (existingResponses[f.id] !== undefined) {
+        initial[f.id] = existingResponses[f.id];
+      } else if (f.id === "skin_type") {
+        initial[f.id] = medicalRecord?.skin_type || formSkinType || "Normal";
+      } else if (f.id === "allergies") {
+        initial[f.id] = medicalRecord?.allergies || formAllergies || "";
+      } else if (f.id === "medications" || f.id === "current_medication") {
+        initial[f.id] = medicalRecord?.medication_details || formMedicationDetails || "";
+      } else if (f.id === "medical_conditions") {
+        initial[f.id] = medicalRecord?.medical_conditions_details || formMedicalConditionsDetails || "";
+      } else if (f.id === "previous_treatments") {
+        initial[f.id] = medicalRecord?.previous_treatments_details || formPreviousTreatmentsDetails || "";
+      } else if (f.type === "select" && f.options?.length) {
+        initial[f.id] = f.options[0];
+      } else if (f.type === "checkbox") {
+        initial[f.id] = false;
+      } else {
+        initial[f.id] = "";
+      }
+    });
+
+    setDynamicResponses(initial);
+  }, [medicalRecord, activeTemplate]);
+
+  // Service device lookup when selecting an additional service
+  useEffect(() => {
+    if (!selectedServiceIdToAdd) return;
+    setLoadingDeviceLinks(true);
+    fetch(`/api/service-devices?serviceId=${selectedServiceIdToAdd}`, { headers: authenticatedJsonHeaders })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const links = data?.deviceLinks || [];
+        if (links.length > 0) {
+          setSelectedDeviceForService(links[0].device_id || "");
+          setPulsesCountForService(Number(links[0].pulses_per_session) || 100);
+        } else {
+          setSelectedDeviceForService("");
+          setPulsesCountForService(0);
+        }
+      })
+      .catch((err) => console.warn("Error loading service devices:", err))
+      .finally(() => setLoadingDeviceLinks(false));
+  }, [selectedServiceIdToAdd]);
 
   useEffect(() => {
     if (booking) {
@@ -351,6 +594,439 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         }
       });
   }, [booking?.id]);
+
+  // ── Standalone Handlers for Global Ending Session View ──
+  const handleSaveMedicalRecordStandalone = async (customData?: any) => {
+    if (!booking) return;
+    setSavingMedicalRecord(true);
+    try {
+      const custId = booking.customerId || (booking as any).customer_id || booking.id;
+      const patientName = booking.name || (booking as any).customer_name || "Patient";
+
+      const payload = customData || {
+        customer_id: custId ? String(custId) : null,
+        reservation_id: booking.id,
+        patient_name: patientName,
+        template_id: activeTemplate?.id || null,
+        responses: dynamicResponses,
+        skin_type: dynamicResponses.skin_type || dynamicResponses.fitzpatrick_scale || formSkinType || "Normal",
+        allergies: dynamicResponses.allergies || formAllergies || "",
+        medication_details: dynamicResponses.medications || dynamicResponses.photosensitizing_drugs || formMedicationDetails || "",
+        medical_conditions_details: dynamicResponses.medical_conditions || dynamicResponses.bleeding_disorders || formMedicalConditionsDetails || "",
+        previous_treatments_details: dynamicResponses.previous_treatments || dynamicResponses.previous_injectables || formPreviousTreatmentsDetails || ""
+      };
+
+      const res = await fetch("/api/medical-records", {
+        method: "POST",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMedicalRecord(data.form || data.medicalRecord || data);
+        setShowMedicalForm(false);
+        alert(isRTL ? "تم حفظ السجل الطبي للمريض بنجاح!" : "Patient medical record saved successfully!");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Failed to save medical record.");
+      }
+    } catch (err: any) {
+      console.error("Error saving medical record:", err);
+      alert(err.message || "Error saving medical record.");
+    } finally {
+      setSavingMedicalRecord(false);
+    }
+  };
+
+  const handleSaveInlinePrescription = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!booking) return;
+    setSavingRxInline(true);
+    try {
+      const custId = booking.customerId || (booking as any).customer_id || null;
+      const patientName = booking.name || (booking as any).customer_name || "Patient";
+      const payload = {
+        booking_id: booking.id,
+        customer_id: custId ? String(custId) : null,
+        patient_name: patientName,
+        customer_name: patientName,
+        doctor_name: booking.doctorName || "Treating Doctor",
+        diagnosis: rxDiagnosis,
+        medications: rxMedications.filter((m) => m.name.trim() !== ""),
+        instructions: rxGeneralNotes,
+        general_notes: rxGeneralNotes,
+        date: booking.date || new Date().toISOString().slice(0, 10),
+      };
+
+      const res = await fetch("/api/prescriptions", {
+        method: "POST",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const newRx = await res.json().catch(() => payload);
+        alert(isRTL ? "تم حفظ الروشتة الإلكترونية بنجاح!" : "Prescription saved successfully!");
+        printPrescription(newRx, booking);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Failed to save prescription.");
+      }
+    } catch (err: any) {
+      console.error("Error saving prescription:", err);
+      alert(err.message || "Error saving prescription.");
+    } finally {
+      setSavingRxInline(false);
+    }
+  };
+
+  const handleAddServiceToSession = () => {
+    if (!selectedServiceIdToAdd) return;
+    const srv = localServices.find((s) => String(s.id) === String(selectedServiceIdToAdd));
+    if (!srv) return;
+
+    const srvName = (isRTL ? srv.ar : srv.en) || srv.en || srv.ar || "Clinical Service";
+    const srvPrice = getEffectiveServicePrice(srv, booking?.branchId, branches);
+    const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceForService));
+
+    const newItem: AdditionalServiceItem = {
+      id: Date.now() + Math.random(),
+      serviceId: srv.id,
+      name: srvName,
+      price: srvPrice,
+      deviceId: devObj?.id ? String(devObj.id) : undefined,
+      deviceName: devObj?.name,
+      pulses: Math.max(0, Number(pulsesCountForService) || 0)
+    };
+
+    setAdditionalServices((prev) => [...prev, newItem]);
+    setSelectedServiceIdToAdd("");
+    setSelectedDeviceForService("");
+    setPulsesCountForService(0);
+  };
+
+  const handleRemoveServiceFromSession = (id: string | number) => {
+    setAdditionalServices((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleAddProductToSession = () => {
+    if (!selectedSessionProductId) return;
+    const prod = (inventoryProducts || []).find((p: any) => String(p.id) === String(selectedSessionProductId));
+    if (!prod) return;
+
+    const unitPrice = Number(prod.price || prod.unit_price || prod.selling_price || 0);
+    const qty = Number(selectedSessionProductQty) || 1;
+    const total = unitPrice * qty;
+
+    setUsedProducts((prev) => [
+      ...prev,
+      {
+        id: String(prod.id),
+        name: prod.name,
+        qty,
+        unitPrice,
+        total
+      }
+    ]);
+    setSelectedSessionProductId("");
+    setSelectedSessionProductQty(1);
+  };
+
+  const handleRemoveProductFromSession = (index: number) => {
+    setUsedProducts((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveClinicalNoteStandalone = async () => {
+    if (!booking) return;
+    setSavingClinicalNote(true);
+    try {
+      const res = await fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}`, {
+        method: "PATCH",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify({
+          doctorNotes: clinicalNote
+        })
+      });
+      if (res.ok) {
+        setBooking((prev: any) => prev ? { ...prev, doctorNotes: clinicalNote } : null);
+        alert(isRTL ? "تم حفظ الملاحظات الطبية بنجاح!" : "Clinical notes saved successfully!");
+      }
+    } catch (err) {
+      console.error("Error saving clinical notes:", err);
+    } finally {
+      setSavingClinicalNote(false);
+    }
+  };
+
+  const handleConfirmEndSession = async (
+    calculatedInvoiceTotal: number,
+    paidAmount: number
+  ) => {
+    if (!booking) return;
+    setFinalizingSession(true);
+
+    try {
+      const custId = booking.customerId || (booking as any).customer_id || booking.id;
+      const patientName = booking.name || (booking as any).customer_name || "Patient";
+
+      // 1. Strict guard: Check if first visit patient has no medical record intake
+      const customerRecord = (dbCustomers || []).find((c: any) =>
+        (custId && String(c.id) === String(custId)) ||
+        (booking.phone && c.phone === booking.phone)
+      );
+      const pastVisits = Number(customerRecord?.visit_count ?? customerRecord?.visitCount ?? customerRecord?.total_bookings ?? 0);
+      const isFirstVisitPatient = !medicalRecord && pastVisits <= 1;
+
+      if (isFirstVisitPatient && !medicalRecord) {
+        const hasIntakeData = Boolean(
+          formSkinType || formAllergies || formMedicationDetails ||
+          formMedicalConditionsDetails || formPreviousTreatmentsDetails ||
+          (Object.keys(dynamicResponses).length > 0 && Object.values(dynamicResponses).some((v) => Boolean(v)))
+        );
+
+        if (!hasIntakeData) {
+          alert(isRTL ? "لا يمكن إنهاء الجلسة: تسجيل بيانات الفحص الطبي مطلوب إجبارياً لمرضى الزيارة الأولى. يرجى ملء نموذج الفحص الطبي أولاً." : "Cannot complete treatment: Medical record intake is strictly required for first-visit patients. Please complete the intake form before ending the session.");
+          setShowMedicalForm(true);
+          setFinalizingSession(false);
+          return;
+        }
+      }
+
+      // 2. Save Medical Record if filled or updated
+      const hasAnyIntakeInput = Boolean(
+        formSkinType || formAllergies || formMedicationDetails ||
+        formMedicalConditionsDetails || formPreviousTreatmentsDetails ||
+        (Object.keys(dynamicResponses).length > 0 && Object.values(dynamicResponses).some((v) => Boolean(v)))
+      );
+
+      if (hasAnyIntakeInput && (showMedicalForm || !medicalRecord)) {
+        try {
+          const medPayload = {
+            customer_id: custId ? String(custId) : null,
+            reservation_id: booking.id,
+            patient_name: patientName,
+            template_id: activeTemplate?.id || null,
+            responses: dynamicResponses,
+            skin_type: dynamicResponses.skin_type || dynamicResponses.fitzpatrick_scale || formSkinType || "Normal",
+            allergies: dynamicResponses.allergies || formAllergies || "",
+            medication_details: dynamicResponses.medications || dynamicResponses.photosensitizing_drugs || formMedicationDetails || "",
+            medical_conditions_details: dynamicResponses.medical_conditions || dynamicResponses.bleeding_disorders || formMedicalConditionsDetails || "",
+            previous_treatments_details: dynamicResponses.previous_treatments || dynamicResponses.previous_injectables || formPreviousTreatmentsDetails || ""
+          };
+          const medRes = await fetch("/api/medical-records", {
+            method: "POST",
+            headers: authenticatedJsonHeaders,
+            body: JSON.stringify(medPayload)
+          });
+          if (medRes.ok) {
+            const mData = await medRes.json();
+            setMedicalRecord(mData.form || mData.medicalRecord || mData);
+          }
+        } catch (mErr) {
+          console.error("Error saving medical record during global end session:", mErr);
+        }
+      }
+
+      // 3. Save Prescription if entered
+      const validMeds = rxMedications.filter((m) => m.name.trim() !== "");
+      if (rxDiagnosis.trim() || validMeds.length > 0 || rxGeneralNotes.trim()) {
+        try {
+          const rxPayload = {
+            booking_id: booking.id,
+            customer_id: custId ? String(custId) : null,
+            patient_name: patientName,
+            customer_name: patientName,
+            doctor_name: booking.doctorName || "Treating Doctor",
+            diagnosis: rxDiagnosis,
+            medications: validMeds,
+            instructions: rxGeneralNotes,
+            general_notes: rxGeneralNotes,
+            date: booking.date || new Date().toISOString().slice(0, 10),
+          };
+          await fetch("/api/prescriptions", {
+            method: "POST",
+            headers: authenticatedJsonHeaders,
+            body: JSON.stringify(rxPayload)
+          });
+        } catch (rxErr) {
+          console.error("Error saving prescription during global end session:", rxErr);
+        }
+      }
+
+      // 4. Deduct Used Products from Inventory Stock
+      if (usedProducts.length > 0) {
+        for (const item of usedProducts) {
+          try {
+            await fetch("/api/inventory/products/sales", {
+              method: "POST",
+              headers: authenticatedJsonHeaders,
+              body: JSON.stringify({
+                product_id: item.id,
+                product_name: item.name,
+                quantity: Number(item.qty) || 1,
+                unit_price: Number(item.unitPrice) || 0,
+                total_amount: Number(item.total) || 0,
+                customer_id: custId || "",
+                customer_name: patientName,
+                customer_mobile: booking.phone || "N/A",
+                notes: `Consumable deducted via Global Ending Session (Booking #${booking.id})`
+              })
+            });
+          } catch (pErr) {
+            console.error("Error deducting product stock:", pErr);
+          }
+        }
+      }
+
+      // 5. Deduct Device Pulses from DB
+      const totalPulses = (Number(extraPulsesCount) || 0) + additionalServices.reduce((sum, s) => sum + Number(s.pulses || 0), 0);
+      const targetDevId = selectedDeviceId || additionalServices.find((s) => s.deviceId)?.deviceId;
+      if (targetDevId && totalPulses > 0) {
+        try {
+          const devObj = devicesList.find((d) => String(d.id) === String(targetDevId));
+          if (devObj) {
+            const currentPulses = Number(devObj.current_pulse_count || devObj.total_pulses || 0);
+            const newPulseCount = currentPulses + totalPulses;
+            await fetch("/api/inventory/devices", {
+              method: "PUT",
+              headers: authenticatedJsonHeaders,
+              body: JSON.stringify({
+                id: devObj.id,
+                current_pulse_count: newPulseCount,
+                notes: `Global Ending Session pulse usage for ${patientName} (${totalPulses} pulses deducted)`
+              })
+            });
+          }
+        } catch (dErr) {
+          console.error("Error updating device pulses:", dErr);
+        }
+      }
+
+      // 6. Persist Line Items to reservation_products
+      const lineItemWrites: Promise<any>[] = [];
+      for (const p of usedProducts) {
+        lineItemWrites.push(
+          fetch("/api/reservation-products", {
+            method: "POST",
+            headers: authenticatedJsonHeaders,
+            body: JSON.stringify({
+              reservationId: booking.id,
+              lineType: "product",
+              productId: p.id,
+              description: p.name,
+              qty: p.qty,
+              unitPrice: p.unitPrice,
+              addedByRole: "receptionist_global_ending",
+            }),
+          })
+        );
+      }
+      for (const s of additionalServices) {
+        const realServiceId = s.serviceId || (typeof s.id === "number" && s.id < 1000000 ? s.id : null);
+        lineItemWrites.push(
+          fetch("/api/reservation-products", {
+            method: "POST",
+            headers: authenticatedJsonHeaders,
+            body: JSON.stringify({
+              reservationId: booking.id,
+              lineType: "additional_service",
+              serviceId: realServiceId ? Number(realServiceId) : null,
+              description: s.name,
+              qty: 1,
+              unitPrice: s.price,
+              addedByRole: "receptionist_global_ending",
+            }),
+          })
+        );
+      }
+      if (totalPulses > 0) {
+        const devName = devicesList.find((d) => String(d.id) === String(targetDevId))?.name || "Laser Device";
+        lineItemWrites.push(
+          fetch("/api/reservation-products", {
+            method: "POST",
+            headers: authenticatedJsonHeaders,
+            body: JSON.stringify({
+              reservationId: booking.id,
+              lineType: "device_pulses",
+              description: `${devName} — ${totalPulses} pulses`,
+              qty: totalPulses,
+              unitPrice: pricePerPulse,
+              addedByRole: "receptionist_global_ending",
+            }),
+          })
+        );
+      }
+      await Promise.allSettled(lineItemWrites);
+
+      // 7. Update Reservation Status to 'completed' with clinical notes and updated invoice
+      const finalInvoiceAmount = calculatedInvoiceTotal;
+      const finalAmountLeft = Math.max(0, finalInvoiceAmount - paidAmount);
+
+      // Build structured notes summary
+      let updatedNotes = String(booking.notes || "");
+      if (additionalServices.length > 0) {
+        const addSvcString = `\n[Additional Services Used]: ${additionalServices.map((s) => `${s.name} (Qty: 1 x ${s.price} EGP = ${s.price} EGP)`).join(", ")}`;
+        updatedNotes = updatedNotes.replace(/\[Additional Services(?: Used)?(?: During Session)?\]:[^\n\[]*/gi, "").trim() + addSvcString;
+      }
+      if (usedProducts.length > 0) {
+        const prodString = `\n[Products Used During Session]: ${usedProducts.map((p) => `${p.name} (Qty: ${p.qty} x ${p.unitPrice} EGP = ${p.total} EGP)`).join(", ")}`;
+        updatedNotes = updatedNotes.replace(/\[Products Used During Session\]:[^\n\[]*/gi, "").trim() + prodString;
+      }
+      if (totalPulses > 0) {
+        const pulseString = `\n[Extra Device Pulses]: ${totalPulses} pulses = ${(Number(extraPulsesCount) || 0) * (Number(pricePerPulse) || 0)} EGP`;
+        updatedNotes = updatedNotes.replace(/\[Extra Device Pulses\]:[^\n\[]*/gi, "").trim() + pulseString;
+      }
+
+      const patchRes = await fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}`, {
+        method: "PATCH",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify({
+          id: booking.id,
+          status: "completed",
+          doctorNotes: clinicalNote || (booking.doctorNotes ?? ""),
+          notes: updatedNotes,
+          amountLeft: finalAmountLeft,
+          total_price: finalInvoiceAmount,
+          price: finalInvoiceAmount
+        })
+      });
+
+      if (patchRes.ok) {
+        const updatedBookingData = await patchRes.json().catch(() => ({}));
+        setBooking((prev: any) =>
+          prev
+            ? {
+                ...prev,
+                ...updatedBookingData,
+                status: "completed",
+                doctorNotes: clinicalNote || (prev.doctorNotes ?? ""),
+                notes: updatedNotes,
+                amountLeft: finalAmountLeft,
+                total_price: finalInvoiceAmount,
+                price: finalInvoiceAmount
+              }
+            : null
+        );
+
+        fetchAllReservations();
+        fetchRequests();
+        fetchCustomers();
+        fetchInventoryProducts();
+
+        alert(isRTL ? "تم إنهاء الجلسة بنجاح! تم حفظ السجلات الطبية وخصم المخزون والنبضات وتحديث الفاتورة." : "Session completed successfully! Clinical records saved, inventory deducted, and invoice updated.");
+        setViewMode("details");
+      } else {
+        const err = await patchRes.json().catch(() => ({}));
+        alert(err.error || err.message || "Failed to complete treatment session.");
+      }
+    } catch (err: any) {
+      console.error("Error finalizing session:", err);
+      alert(err.message || "Error finalizing treatment session.");
+    } finally {
+      setFinalizingSession(false);
+    }
+  };
   return (
     <>
       {booking && (() => {
@@ -597,16 +1273,795 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
         const isInvoicePaid = (rawLeft !== null && rawLeft !== undefined && Number(rawLeft) <= 0 && sessionPaid > 0) || (sessionLeft <= 0 && sessionPaid > 0) || (sessionPaid >= totalPrice && totalPrice > 0);
 
+        // Primary effective service for end session
+        const primaryServiceObj = localServices.find(
+          (s) => String(s.id) === String(primaryServiceId || booking.serviceId || (booking.serviceIds && booking.serviceIds[0])) ||
+                 (s.en && s.en === ((booking as any).service || (booking as any).service_name)) ||
+                 (s.ar && s.ar === ((booking as any).service || (booking as any).service_name))
+        );
+        const baseBookingPrice = primaryServiceObj 
+          ? getEffectiveServicePrice(primaryServiceObj, booking.branchId, branches)
+          : (servicesCost || Number((booking as any).total_price || (booking as any).price || 0) || 500);
+
+        const additionalServicesSubtotal = additionalServices.reduce((sum, item) => sum + Number(item.price || 0), 0);
+        const productsSubtotal = usedProducts.reduce((sum, item) => sum + Number(item.total || 0), 0);
+        const extraPulsesSubtotal = (Number(extraPulsesCount) || 0) * (Number(pricePerPulse) || 0);
+        const additionalPulsesTotal = additionalServices.reduce((sum, item) => sum + Number(item.pulses || 0), 0);
+        const totalSessionPulses = (Number(extraPulsesCount) || 0) + additionalPulsesTotal;
+        const endSessionInvoiceTotal = baseBookingPrice + additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal;
+        const endSessionAmountLeft = Math.max(0, endSessionInvoiceTotal - sessionPaid);
+
+        // First visit check
+        const customerRecord = (dbCustomers || []).find((c: any) =>
+          (booking.customerId && String(c.id) === String(booking.customerId)) ||
+          ((booking as any).customer_id && String(c.id) === String((booking as any).customer_id)) ||
+          (booking.phone && c.phone === booking.phone)
+        );
+        const pastVisitsCount = Number(customerRecord?.visit_count ?? customerRecord?.visitCount ?? customerRecord?.total_bookings ?? 0);
+        const isFirstVisit = !medicalRecord && pastVisitsCount <= 1;
+        const isReturningPatient = !!medicalRecord || pastVisitsCount > 1;
+
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 sm:p-5 animate-fadeIn">
             <div className="w-full max-w-6xl rounded-[32px] bg-[#FBFBF9] p-6 sm:p-8 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[92vh] overflow-y-auto custom-scrollbar border border-[#414E36]/15 space-y-6">
               
-              {/* ── HEADER ── */}
-              <div className="flex items-start justify-between border-b border-[#414E36]/10 pb-5">
-                <div className="space-y-1.5">
-                  <h2 className="text-2xl sm:text-3xl font-black text-[#1F251A] tracking-tight">
-                    Booking Details
-                  </h2>
+              {viewMode === "end_session" ? (
+                /* ── COMPREHENSIVE CLINICAL INTAKE & SESSION FINALIZATION VIEW ── */
+                <div className="space-y-6 w-full animate-fadeIn">
+                  {/* TOP BAR WITH BACK BUTTON */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#414E36]/10 pb-5">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("details")}
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white hover:bg-[#F4F5F1] text-[#414E36] border border-[#414E36]/20 font-bold text-xs transition shadow-2xs cursor-pointer group"
+                      >
+                        <ChevronLeft size={16} className={`transition-transform group-hover:-translate-x-0.5 ${isRTL ? "rotate-180 group-hover:translate-x-0.5" : ""}`} />
+                        <span>{isRTL ? "العودة إلى تفاصيل الحجز" : "Back to Booking Details"}</span>
+                      </button>
+
+                      <div>
+                        <h2 className="text-xl sm:text-2xl font-black text-[#1F251A] tracking-tight flex items-center gap-2">
+                          <span>{isRTL ? "إنهاء الجلسة وتسجيل الفحوصات الطبية" : "Clinical Session Finalization"}</span>
+                          <span className="text-xs font-mono font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full">
+                            #{booking.id}
+                          </span>
+                        </h2>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">
+                          {isRTL ? "تسجيل الملاحظات والروشتة والأدوية وإنهاء الجلسة فورياً" : "Fill medical intake, write prescriptions, attach extra services/products, and end session."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        setIsEditingService(false);
+                      }}
+                      className="h-9 w-9 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-800 flex items-center justify-center transition cursor-pointer shrink-0 self-end sm:self-auto"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* PATIENT HEADER BANNER */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl bg-gradient-to-r from-emerald-900 via-[#2C3524] to-[#414E36] p-5 sm:p-6 text-white shadow-md">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="flex h-13 w-13 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-md text-white font-black text-xl border border-white/20 shadow-inner">
+                        {(booking.name || "P").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-lg sm:text-xl font-black text-white truncate">
+                            {booking.name || "Patient"}
+                          </h3>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/20 border border-emerald-400/40 px-3 py-0.5 text-[11px] font-bold text-emerald-200">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            {isRTL ? "جلسة نشطة • إنهاء الجلسة عبر الاستقبال" : "Live Session • Reception Finalization"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-white/80 mt-1 font-medium">
+                          <span>{booking.phone || "No phone"}</span>
+                          <span>•</span>
+                          <span className="text-emerald-200 font-bold">{(booking as any).service || (primaryServiceObj ? (isRTL ? primaryServiceObj.ar : primaryServiceObj.en) : "Clinical Service")}</span>
+                          <span>•</span>
+                          <span>{booking.date || "Today"} ({(booking as any).time || booking.timeSlot || ""})</span>
+                          <span>•</span>
+                          <span>{(booking as any).room || "Room 1"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2-COLUMN CLINICAL GRID */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    {/* LEFT COLUMN (1/3 Width): Medical Record & Clinical Notes */}
+                    <div className="space-y-5">
+                      {/* Medical Record Card */}
+                      <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+                        <div className="flex items-center justify-between gap-2 flex-wrap border-b border-[#414E36]/10 pb-3">
+                          <div className="space-y-0.5">
+                            <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                              <AlertCircle size={16} className="text-[#414E36]" />
+                              <span>{isRTL ? "السجل الطبي للمريض" : "Patient Medical Record"}</span>
+                            </h3>
+                            {activeTemplate && (
+                              <span className="text-[10px] font-extrabold text-[#414E36] bg-[#EDF1EC] px-2 py-0.5 rounded-md inline-block">
+                                {activeTemplate.title}
+                              </span>
+                            )}
+                          </div>
+
+                          {medicalRecord ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 shrink-0">
+                              <CheckCircle2 size={10} /> {isRTL ? "مسجل بالملف" : "On File"}
+                            </span>
+                          ) : isFirstVisit ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800 shrink-0 animate-pulse">
+                              <AlertTriangle size={10} /> {isRTL ? "مطلوب (زيارة أولى)" : "Intake Required (1st Visit)"}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 shrink-0">
+                              <CheckCircle2 size={10} /> {isRTL ? "مريض سابق" : "Returning Patient"}
+                            </span>
+                          )}
+                        </div>
+
+                        {medicalRecordLoading || loadingTemplate ? (
+                          <p className="text-xs text-[#5A6A51] flex items-center gap-1.5 py-4 justify-center">
+                            <Loader2 size={14} className="animate-spin text-[#414E36]" />
+                            <span>{isRTL ? "جاري تحميل السجل الطبي..." : "Loading medical record..."}</span>
+                          </p>
+                        ) : medicalRecord && !showMedicalForm ? (
+                          /* Display Existing Record */
+                          <div className="space-y-2.5 text-xs bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
+                            {(activeTemplate?.fields || []).length > 0 ? (
+                              (activeTemplate?.fields || []).map((f: any) => {
+                                const rawVal = medicalRecord.responses?.[f.id] !== undefined
+                                  ? medicalRecord.responses[f.id]
+                                  : (f.id === "skin_type" ? medicalRecord.skin_type
+                                    : f.id === "allergies" ? medicalRecord.allergies
+                                    : f.id === "medications" ? medicalRecord.medication_details
+                                    : f.id === "medical_conditions" ? medicalRecord.medical_conditions_details
+                                    : f.id === "previous_treatments" ? medicalRecord.previous_treatments_details
+                                    : undefined);
+
+                                const displayVal = typeof rawVal === "boolean"
+                                  ? (rawVal ? "Yes" : "No")
+                                  : (rawVal || "None reported");
+
+                                return (
+                                  <div key={f.id} className="flex justify-between items-start gap-2 border-b border-[#414E36]/10 pb-2 last:border-b-0 last:pb-0">
+                                    <span className="font-bold text-[#5A6A51]">{f.label}:</span>
+                                    <span className={`font-semibold text-right ${f.id === "allergies" || f.id === "laser_contraindications" || f.id === "bleeding_disorders" ? "text-rose-700 font-bold" : "text-[#1F251A]"}`}>
+                                      {displayVal}
+                                    </span>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <>
+                                <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                                  <span className="font-bold text-[#5A6A51]">{isRTL ? "نوع البشرة" : "Skin Type"}:</span>
+                                  <span className="font-bold text-[#1F251A]">{medicalRecord.skin_type || "Normal"}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                                  <span className="font-bold text-[#5A6A51]">{isRTL ? "الحساسية" : "Allergies"}:</span>
+                                  <span className="font-bold text-rose-700">{medicalRecord.allergies || "None reported"}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                                  <span className="font-bold text-[#5A6A51]">{isRTL ? "الأدوية الحالية" : "Current Medications"}:</span>
+                                  <span className="font-semibold text-[#1F251A]">{medicalRecord.medication_details || "None"}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                                  <span className="font-bold text-[#5A6A51]">{isRTL ? "الحالات المزمنة" : "Medical Conditions"}:</span>
+                                  <span className="font-semibold text-[#1F251A]">{medicalRecord.medical_conditions_details || "None"}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="font-bold text-[#5A6A51]">{isRTL ? "علاجات سابقة" : "Previous Treatments"}:</span>
+                                  <span className="font-semibold text-[#1F251A]">{medicalRecord.previous_treatments_details || "None"}</span>
+                                </div>
+                              </>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => setShowMedicalForm(true)}
+                              className="mt-2 flex items-center gap-1.5 text-xs font-bold text-[#414E36] hover:underline cursor-pointer"
+                            >
+                              <Edit size={14} /> {isRTL ? "تعديل بيانات السجل الطبي" : "Update Medical Record"}
+                            </button>
+                          </div>
+                        ) : (
+                          /* Medical Intake Form */
+                          <div className="space-y-3 border-t border-[#414E36]/10 pt-3">
+                            {isFirstVisit ? (
+                              <div className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200">
+                                <strong className="block font-bold">{isRTL ? "تم اكتشاف زيارة أولى" : "First Visit Detected"}</strong>
+                                {isRTL ? "تسجيل الفحص الطبي مطلوب إجبارياً لتسجيل المريض لأول مرة." : "Medical intake form is required for first-time patient registration."}
+                              </div>
+                            ) : !medicalRecord && isReturningPatient ? (
+                              <div className="rounded-2xl bg-[#EDF1EC] p-3 text-xs text-[#414E36] border border-[#414E36]/15">
+                                <strong className="block font-bold">{isRTL ? "مريض سابق" : "Returning Patient"}</strong>
+                                {isRTL ? "سجل المريض الطبي متاح سابقاً. يمكنك تدوين ملاحظات جديدة أو المتابعة مباشرة." : "Previous patient clinical history is on file. You can record specialized intake notes or proceed directly."}
+                              </div>
+                            ) : null}
+
+                            {(activeTemplate?.fields || []).length > 0 ? (
+                              (activeTemplate?.fields || []).map((f: any) => (
+                                <div key={f.id}>
+                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                    {f.label} {f.required && <span className="text-red-500">*</span>}
+                                  </label>
+                                  {f.type === "select" ? (
+                                    <select
+                                      value={dynamicResponses[f.id] || (f.options?.[0] || "")}
+                                      onChange={(e) => setDynamicResponses({ ...dynamicResponses, [f.id]: e.target.value })}
+                                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                                    >
+                                      {(f.options || []).map((opt: string) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  ) : f.type === "textarea" ? (
+                                    <textarea
+                                      rows={2}
+                                      value={dynamicResponses[f.id] || ""}
+                                      onChange={(e) => setDynamicResponses({ ...dynamicResponses, [f.id]: e.target.value })}
+                                      placeholder={f.placeholder || "Enter details..."}
+                                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 text-xs text-[#1F251A] outline-none"
+                                    />
+                                  ) : f.type === "checkbox" ? (
+                                    <label className="flex items-center gap-2 p-2.5 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-xs font-semibold text-[#1F251A] cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(dynamicResponses[f.id])}
+                                        onChange={(e) => setDynamicResponses({ ...dynamicResponses, [f.id]: e.target.checked })}
+                                        className="h-4 w-4 rounded accent-[#414E36]"
+                                      />
+                                      <span>{isRTL ? "نعم / مؤكد" : "Yes / Confirmed"}</span>
+                                    </label>
+                                  ) : (
+                                    <input
+                                      type={f.type === "number" ? "number" : "text"}
+                                      value={dynamicResponses[f.id] || ""}
+                                      onChange={(e) => setDynamicResponses({ ...dynamicResponses, [f.id]: e.target.value })}
+                                      placeholder={f.placeholder || "Enter details..."}
+                                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                                    />
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <>
+                                <div>
+                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{isRTL ? "نوع البشرة" : "Skin Type"}</label>
+                                  <select
+                                    value={formSkinType}
+                                    onChange={(e) => setFormSkinType(e.target.value)}
+                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                                  >
+                                    <option value="Normal">Normal</option>
+                                    <option value="Dry">Dry</option>
+                                    <option value="Oily">Oily</option>
+                                    <option value="Sensitive">Sensitive</option>
+                                    <option value="Combination">Combination</option>
+                                    <option value="Acne-Prone">Acne-Prone</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{isRTL ? "الحساسية" : "Known Allergies"}</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Latex, Aspirin, None"
+                                    value={formAllergies}
+                                    onChange={(e) => setFormAllergies(e.target.value)}
+                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{isRTL ? "الأدوية الحالية" : "Current Daily Medications"}</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Roaccutane, Blood thinners, None"
+                                    value={formMedicationDetails}
+                                    onChange={(e) => setFormMedicationDetails(e.target.value)}
+                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{isRTL ? "الحالات المزمنة" : "Medical Conditions"}</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Diabetes, Eczema, None"
+                                    value={formMedicalConditionsDetails}
+                                    onChange={(e) => setFormMedicalConditionsDetails(e.target.value)}
+                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{isRTL ? "علاجات سابقة" : "Previous Treatments"}</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Chemical Peel 3 mos ago, None"
+                                    value={formPreviousTreatmentsDetails}
+                                    onChange={(e) => setFormPreviousTreatmentsDetails(e.target.value)}
+                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                                  />
+                                </div>
+                              </>
+                            )}
+
+                            <div className="flex justify-end gap-2 pt-2">
+                              {medicalRecord && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowMedicalForm(false)}
+                                  className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#5A6A51] cursor-pointer"
+                                >
+                                  {isRTL ? "إلغاء" : "Cancel"}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                disabled={savingMedicalRecord}
+                                onClick={() => handleSaveMedicalRecordStandalone()}
+                                className="rounded-xl bg-[#414E36] px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                              >
+                                <Save size={14} /> {savingMedicalRecord ? "..." : (isRTL ? "حفظ السجل الطبي" : "Save Medical Record")}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* CLINICAL PROCEDURE NOTES */}
+                        <div className="mt-4 border-t border-[#414E36]/10 pt-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <label className="block text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
+                              <FileText size={14} className="text-[#414E36]" />
+                              <span>{isRTL ? "ملاحظات الطبيب والإجراءات" : "Doctor / Procedure Notes"}</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={handleSaveClinicalNoteStandalone}
+                              disabled={savingClinicalNote}
+                              className="rounded-xl bg-[#414E36] px-3 py-1 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                            >
+                              <Save size={12} /> {savingClinicalNote ? "..." : (isRTL ? "حفظ الملاحظات" : "Save Notes")}
+                            </button>
+                          </div>
+                          <textarea
+                            rows={3}
+                            value={clinicalNote}
+                            onChange={(e) => setClinicalNote(e.target.value)}
+                            placeholder={isRTL ? "أدخل تفاصيل وملاحظات الجلسة والإرشادات..." : "Enter clinical findings, device settings, observations..."}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                          />
+                        </div>
+
+                        {/* RECEPTION BOOKING NOTES PREVIEW */}
+                        <div className="mt-3 border-t border-[#414E36]/10 pt-3 space-y-1.5">
+                          <span className="text-[11px] font-bold text-[#5A6A51]">{isRTL ? "ملاحظات الاستقبال الأصلية" : "Original Booking Notes"}</span>
+                          <p className="text-xs text-[#1F251A] bg-[#F4F5F1] p-3 rounded-2xl font-mono leading-relaxed">
+                            {(booking.receptionNotes ?? (booking as any).reception_notes) || booking.notes || (isRTL ? "لا توجد ملاحظات سابقة" : "No booking notes")}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* RIGHT COLUMN (2/3 Width): Prescription + Services/Pulses + Products + Invoice */}
+                    <div className="lg:col-span-2 space-y-5">
+                      
+                      {/* 1. DIGITAL PRESCRIPTION WRITER */}
+                      <div className="rounded-3xl border border-[#414E36]/12 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 flex-wrap gap-2">
+                          <div>
+                            <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                              <Pill size={16} className="text-[#414E36]" />
+                              <span>{isRTL ? "كتابة الروشتة الطبية الإلكترونية" : "Digital Prescription Writer"}</span>
+                            </h3>
+                            <p className="text-xs text-[#5A6A51] mt-0.5">
+                              {isRTL ? "المريض" : "Patient"}: <strong className="text-[#414E36]">{booking.name || "Patient"}</strong>
+                            </p>
+                          </div>
+                        </div>
+
+                        <form onSubmit={handleSaveInlinePrescription} className="space-y-4">
+                          <div>
+                            <label className="block text-xs font-bold text-[#5A6A51] mb-1">{isRTL ? "التشخيص الطبي" : "Clinical Diagnosis"}</label>
+                            <input
+                              type="text"
+                              placeholder={isRTL ? "مثال: التهاب ما بعد الليزر، حب شباب درجة ثانية" : "e.g. Post-laser erythema, Acne Vulgaris Grade II"}
+                              value={rxDiagnosis}
+                              onChange={(e) => setRxDiagnosis(e.target.value)}
+                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                            />
+                          </div>
+
+                          {/* Medications List */}
+                          <div className="space-y-2">
+                            <label className="block text-xs font-bold text-[#5A6A51]">{isRTL ? "الأدوية الموصوفة" : "Prescribed Medications"}</label>
+                            {rxMedications.map((med, idx) => (
+                              <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                                <input
+                                  type="text"
+                                  placeholder={isRTL ? "اسم الدواء" : "Medication Name"}
+                                  value={med.name}
+                                  onChange={(e) => {
+                                    const updated = [...rxMedications];
+                                    updated[idx].name = e.target.value;
+                                    setRxMedications(updated);
+                                  }}
+                                  className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder={isRTL ? "الجرعة" : "Dosage (e.g. 500mg)"}
+                                  value={med.dosage}
+                                  onChange={(e) => {
+                                    const updated = [...rxMedications];
+                                    updated[idx].dosage = e.target.value;
+                                    setRxMedications(updated);
+                                  }}
+                                  className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder={isRTL ? "التكرار" : "Frequency (e.g. 2x daily)"}
+                                  value={med.frequency}
+                                  onChange={(e) => {
+                                    const updated = [...rxMedications];
+                                    updated[idx].frequency = e.target.value;
+                                    setRxMedications(updated);
+                                  }}
+                                  className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder={isRTL ? "المدة" : "Duration (e.g. 5 days)"}
+                                  value={med.duration}
+                                  onChange={(e) => {
+                                    const updated = [...rxMedications];
+                                    updated[idx].duration = e.target.value;
+                                    setRxMedications(updated);
+                                  }}
+                                  className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                                />
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => setRxMedications([...rxMedications, { name: "", dosage: "", frequency: "", duration: "" }])}
+                              className="text-xs font-bold text-[#414E36] flex items-center gap-1 mt-1 hover:underline cursor-pointer"
+                            >
+                              <Plus size={14} /> {isRTL ? "+ إضافة دواء آخر" : "+ Add Another Medication"}
+                            </button>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-[#5A6A51] mb-1">{isRTL ? "إرشادات وتعليمات المريض" : "General Patient Instructions"}</label>
+                            <textarea
+                              rows={2}
+                              placeholder={isRTL ? "مثال: استخدام واقي شمس SPF 50 يومياً، تجنب الشمس المباشرة 48 ساعة..." : "e.g. Apply sunscreen SPF 50 daily, avoid direct sun exposure for 48 hours..."}
+                              value={rxGeneralNotes}
+                              onChange={(e) => setRxGeneralNotes(e.target.value)}
+                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const rxPayload = {
+                                  patient_name: booking.name,
+                                  doctor_name: booking.doctorName,
+                                  diagnosis: rxDiagnosis,
+                                  medications: rxMedications.filter((m) => m.name.trim()),
+                                  general_notes: rxGeneralNotes,
+                                  date: new Date().toISOString().slice(0, 10)
+                                };
+                                handleSendPrescriptionWhatsApp(rxPayload, booking);
+                              }}
+                              className="rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Send size={13} /> {isRTL ? "إرسال عبر واتساب" : "Send WhatsApp Rx"}
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={savingRxInline}
+                              className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Printer size={14} /> {savingRxInline ? "..." : (isRTL ? "حفظ وطباعة الروشتة" : "Save & Print Rx")}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+
+                      {/* 2. SERVICES, DEVICES & PULSES MANAGER */}
+                      <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
+                          <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                            <Zap size={16} className="text-amber-600" />
+                            <span>{isRTL ? "الخدمات الإضافية ونبضات الأجهزة" : "Services, Devices & Pulses"}</span>
+                          </h3>
+
+                          {(selectedDeviceId || additionalServices.some((s) => s.deviceId)) && (
+                            <div className="flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-3.5 py-1.5 text-xs font-black text-amber-900 shadow-xs">
+                              <Zap size={14} className="text-amber-600 fill-amber-500 animate-pulse" />
+                              <span>{isRTL ? "إجمالي النبضات:" : "Total Pulses:"}</span>
+                              <span className="text-sm text-amber-900 font-extrabold">{totalSessionPulses}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Primary Service Display */}
+                        <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
+                              <Layers size={14} className="text-[#414E36]" />
+                              <span>{isRTL ? "الخدمة الأساسية المحجوزة" : "Primary Reserved Service"}</span>
+                            </span>
+                            <span className="font-extrabold text-[#414E36]">{baseBookingPrice} EGP</span>
+                          </div>
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
+                            <div className="flex-1 w-full">
+                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">
+                                {isRTL ? "تعديل الخدمة الأساسية للجلسة" : "Selected Patient Service (Changeable)"}
+                              </label>
+                              <select
+                                value={primaryServiceId}
+                                onChange={(e) => setPrimaryServiceId(e.target.value)}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                              >
+                                {localServices.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {isRTL ? (s.ar || s.en) : (s.en || s.ar)} ({getEffectiveServicePrice(s, booking?.branchId, branches)} EGP)
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Additional Services Manager */}
+                        <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                          <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
+                            <Plus size={14} className="text-[#414E36]" />
+                            <span>{isRTL ? "إضافة خدمة إضافية للجلسة" : "Add Additional Service"}</span>
+                          </h4>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <select
+                              value={selectedServiceIdToAdd}
+                              onChange={(e) => setSelectedServiceIdToAdd(e.target.value)}
+                              className="sm:col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                            >
+                              <option value="">{isRTL ? "-- اختر الخدمة --" : "-- Select Additional Service --"}</option>
+                              {localServices.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {isRTL ? (s.ar || s.en) : (s.en || s.ar)} ({getEffectiveServicePrice(s, booking?.branchId, branches)} EGP)
+                                </option>
+                              ))}
+                            </select>
+
+                            <select
+                              value={selectedDeviceForService}
+                              onChange={(e) => setSelectedDeviceForService(e.target.value)}
+                              className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                            >
+                              <option value="">{isRTL ? "-- ربط الجهاز (اختياري) --" : "-- Linked Device --"}</option>
+                              {devicesList.map((d) => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">
+                                {isRTL ? "عدد نبضات الجهاز" : "Device Pulses"}
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                value={pulsesCountForService}
+                                onChange={(e) => setPulsesCountForService(Math.max(0, parseInt(e.target.value) || 0))}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                placeholder="Pulses (e.g. 150)"
+                              />
+                            </div>
+
+                            <div className="flex items-end">
+                              <button
+                                type="button"
+                                onClick={handleAddServiceToSession}
+                                disabled={!selectedServiceIdToAdd}
+                                className="w-full rounded-xl bg-[#414E36] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Plus size={14} /> {isRTL ? "إضافة الخدمة" : "Add Service"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Added Additional Services List */}
+                          {additionalServices.length > 0 && (
+                            <div className="space-y-2 pt-2 border-t border-[#414E36]/10">
+                              {additionalServices.map((item) => (
+                                <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
+                                  <div className="min-w-0">
+                                    <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
+                                    <span className="text-[10px] text-[#5A6A51] block truncate">
+                                      {item.deviceName ? `${item.deviceName} • ` : ""}{item.pulses} Pulses
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3 shrink-0">
+                                    <span className="font-extrabold text-[#414E36]">+{item.price} EGP</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveServiceFromSession(item.id)}
+                                      className="text-rose-600 hover:text-rose-800 text-xs font-bold cursor-pointer p-1"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3. PRODUCTS & CONSUMABLES USED */}
+                      <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
+                          <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                            <ShoppingBag size={16} className="text-[#414E36]" />
+                            <span>{isRTL ? "المنتجات والمستهلكات المستخدمة" : "Products & Consumables Used"}</span>
+                          </h3>
+                        </div>
+
+                        <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <select
+                              value={selectedSessionProductId}
+                              onChange={(e) => setSelectedSessionProductId(e.target.value)}
+                              className="sm:col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                            >
+                              <option value="">{isRTL ? "-- اختر المنتج --" : "-- Select Product / Consumable --"}</option>
+                              {(inventoryProducts || []).map((p: any) => {
+                                const isOutOfStock = Number(p.stock_quantity ?? p.stockQuantity ?? p.stock ?? p.quantity ?? 0) <= 0 || p.status === "Out of Stock";
+                                return (
+                                  <option key={p.id} value={p.id} disabled={isOutOfStock}>
+                                    {p.name} ({p.price || p.unit_price || p.selling_price || 0} EGP){isOutOfStock ? " — Out of Stock" : ""}
+                                  </option>
+                                );
+                              })}
+                            </select>
+
+                            <input
+                              type="number"
+                              min={1}
+                              value={selectedSessionProductQty}
+                              onChange={(e) => setSelectedSessionProductQty(Math.max(1, parseInt(e.target.value) || 1))}
+                              className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                              placeholder="Qty"
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleAddProductToSession}
+                            disabled={!selectedSessionProductId}
+                            className="w-full rounded-xl bg-[#414E36] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
+                          >
+                            <Plus size={14} /> {isRTL ? "إضافة المنتج للفاتورة وخصمه من المخزون" : "Add Product to Invoice & Deduct Stock"}
+                          </button>
+
+                          {usedProducts.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-[#414E36]/10">
+                              {usedProducts.map((item, i) => (
+                                <div key={i} className="flex items-center justify-between text-xs bg-white p-2.5 rounded-xl border border-[#414E36]/10 gap-2">
+                                  <div className="min-w-0">
+                                    <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
+                                    <span className="text-[10px] text-[#5A6A51] block truncate">Qty: {item.qty} x {item.unitPrice} EGP</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="font-extrabold text-[#414E36]">+{item.total} EGP</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveProductFromSession(i)}
+                                      className="text-rose-600 hover:text-rose-800 text-xs font-bold cursor-pointer p-1"
+                                    >
+                                      <X size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* FINAL SESSION INVOICE SUMMARY */}
+                        <div className="bg-[#414E36]/05 p-4 rounded-2xl space-y-2 text-xs border border-[#414E36]/10">
+                          <div className="flex flex-wrap items-center justify-between gap-3 text-[#5A6A51]">
+                            <span>{isRTL ? "الخدمة الأساسية:" : "Base Service:"} <strong className="text-[#1F251A]">{baseBookingPrice} EGP</strong></span>
+                            {additionalServicesSubtotal > 0 && (
+                              <span>{isRTL ? "خدمات إضافية:" : "Extra Services:"} <strong className="text-[#1F251A]">+{additionalServicesSubtotal} EGP</strong></span>
+                            )}
+                            {productsSubtotal > 0 && (
+                              <span>{isRTL ? "منتجات ومستهلكات:" : "Products:"} <strong className="text-[#1F251A]">+{productsSubtotal} EGP</strong></span>
+                            )}
+                          </div>
+                          <div className="pt-2 border-t border-[#414E36]/10 flex items-center justify-between text-[#414E36] font-extrabold text-sm sm:text-base">
+                            <span>{isRTL ? "إجمالي فاتورة الجلسة النهائية:" : "Final Session Invoice:"}</span>
+                            <span>{endSessionInvoiceTotal} EGP</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-[#5A6A51] pt-1">
+                            <span>{isRTL ? "المدفوع مسبقاً:" : "Paid:"} <strong className="text-emerald-700">{sessionPaid} EGP</strong></span>
+                            <span>{isRTL ? "المتبقي للتحصيل:" : "Outstanding:"} <strong className={endSessionAmountLeft > 0 ? "text-rose-700 font-bold" : "text-emerald-700 font-bold"}>{endSessionAmountLeft} EGP</strong></span>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* BOTTOM CONFIRMATION BAR */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-3xl bg-white p-5 border border-[#414E36]/15 shadow-sm">
+                    <div className="space-y-0.5 text-xs text-[#5A6A51]">
+                      <p className="font-bold text-[#1F251A]">
+                        {isRTL ? "تأكيد الإنهاء النهائي للجلسة" : "Confirm Session Termination"}
+                      </p>
+                      <p>
+                        {isRTL ? "سيتم حفظ كافة البيانات وخصم المخزون والنبضات وإنهاء الجلسة فورياً لدى شاشة الطبيب دون إعادة تحميل" : "Persists intake, Rx, stock sales, pulses, and terminates doctor session in real-time."}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("details")}
+                        className="w-full sm:w-auto px-5 py-3 rounded-2xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+                      >
+                        {isRTL ? "إلغاء والعودة" : "Back (Do Not End)"}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={finalizingSession}
+                        onClick={() => handleConfirmEndSession(endSessionInvoiceTotal, sessionPaid)}
+                        className="w-full sm:w-auto justify-center flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 via-[#414E36] to-emerald-700 px-7 py-3 text-xs font-black text-white shadow-lg shadow-emerald-900/20 hover:brightness-110 active:scale-[0.99] transition disabled:opacity-50 cursor-pointer"
+                      >
+                        {finalizingSession ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            <span>{isRTL ? "جاري الإنهاء والحفظ..." : "Finalizing Session..."}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check size={16} className="text-emerald-200" />
+                            <span>{isRTL ? "تأكيد وإنهاء الجلسة فورياً" : "Confirm & End Session"}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ── STANDARD DETAILS VIEW ── */
+                <div className="space-y-6">
+                  {/* ── HEADER ── */}
+                  <div className="flex items-start justify-between border-b border-[#414E36]/10 pb-5">
+                    <div className="space-y-1.5">
+                      <h2 className="text-2xl sm:text-3xl font-black text-[#1F251A] tracking-tight">
+                        Booking Details
+                      </h2>
                   <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs">
                     <span className="font-semibold text-[#5A6A51] flex items-center gap-1.5">
                       <span>Reference ID:</span>
@@ -1270,10 +2725,27 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       )}
 
                       {booking.status === 'started' && (
-                        <div className="w-full rounded-2xl bg-amber-50 border border-amber-200 p-3 text-center text-xs font-extrabold text-amber-900 flex items-center justify-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                          <span>Treatment In Session</span>
-                        </div>
+                        isGlobalEndingSessionActive ? (
+                          <div className="space-y-2">
+                            <button
+                              type="button"
+                              onClick={() => setViewMode("end_session")}
+                              className="w-full rounded-2xl bg-gradient-to-r from-emerald-700 via-[#414E36] to-emerald-800 text-white py-3 px-3 text-xs font-black hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-md shadow-[#414E36]/25 cursor-pointer animate-pulse"
+                            >
+                              <Check size={16} className="text-emerald-300" />
+                              <span>{isRTL ? "إنهاء الجلسة (الاستقبال)" : "End Session"}</span>
+                            </button>
+                            <div className="w-full rounded-xl bg-amber-50/80 border border-amber-200/80 py-1.5 text-center text-[10px] font-bold text-amber-900 flex items-center justify-center gap-1.5">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />
+                              <span>{isRTL ? "الجلسة جارية حالياً لدى الطبيب" : "Treatment In Session"}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-full rounded-2xl bg-amber-50 border border-amber-200 p-3 text-center text-xs font-extrabold text-amber-900 flex items-center justify-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                            <span>{isRTL ? "جلسة العلاج جارية" : "Treatment In Session"}</span>
+                          </div>
+                        )
                       )}
 
                       {booking.status === 'completed' && (
@@ -1529,6 +3001,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 </div>
 
               </div>
+
+            </div>
+          )}
 
             </div>
           </div>

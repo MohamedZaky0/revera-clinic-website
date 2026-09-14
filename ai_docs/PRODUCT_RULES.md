@@ -174,6 +174,24 @@ Deletes all rows from the reservations table. No soft-delete. No confirmation be
 
 ---
 
+### Global Ending Session & Receptionist Clinical Finalization Engine
+**Enforced in:** `src/components/admin/settings/InactivitySettingsView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/components/admin/DoctorAccountView.tsx`, `src/app/admin/page.tsx` (`TC-055`)
+
+- **Configuration:** Admin Settings -> Inactivity & Shift Settings (`page_settings.home.inactivity.globalEndingSession`, default `false`).
+- **Zero-Reload Reactivity:** Settings updates immediately trigger `window.dispatchEvent(new CustomEvent('revera-settings-change'))`, propagating live state to all open modals, drawers, and tabs instantly without requiring a page refresh.
+- **Receptionist Booking Modal Integration:** When `globalEndingSession === true` and a booking is active (`status === 'started'`), the static "● Treatment In Session" badge in the Session Flow card of `BookingDetailsModal.tsx` is transformed into an interactive **"End Session"** action button.
+- **Clinical Intake & Finalization Screen (`viewMode === "end_session"`):**
+  - **Back Navigation:** Top-left `< Back to Booking Details` button returns to `"details"` view without ending the treatment session or discarding entered data.
+  - **Medical Intake & History:** Integrates dynamic service-specific intake templates (`/api/medical-records/templates`), on-file status badges, and fallback intake fields (Skin type, Allergies, Daily medications, Chronic conditions, Previous treatments). Strictly blocks session finalization for first-visit patients if intake is missing.
+  - **Clinical Procedure Notes:** Dedicated textarea for procedure observations and clinical recommendations, persisted directly to `reservations.doctorNotes`.
+  - **Digital Prescription Writer:** Clinical diagnosis, dynamic medications array (Name, Dosage, Frequency, Duration), instructions, WhatsApp transmission, and branded print PDF generation.
+  - **Primary & Additional Services Manager:** Live primary service switcher, additional services selector with linked equipment devices, and automated pulse summation.
+  - **Products & Consumables Manager:** Live stock verification, attached products deduction, and automatic sales logging via `POST /api/inventory/products/sales`.
+  - **Real-Time Doctor Sync:** Session termination persists all records, deducts device pulses (`PUT /api/inventory/devices`), records line items (`POST /api/reservation-products`), and patches the reservation to `status: 'completed'`. Doctor view Postgres realtime channel immediately clears the ongoing treatment session on the doctor's screen with zero page reload.
+  - **System Test Suite:** Validated automatically via Diagnostic Test Case `TC-055` in the Admin Settings System Test Suite.
+
+---
+
 ### Coming-soon sidebar sections are superadmin-only
 **Enforced in:** `src/app/admin/page.tsx` (`SIDEBAR_ITEMS`, `permittedSidebarItems`)
 
