@@ -175,9 +175,9 @@ Deletes all rows from the reservations table. No soft-delete. No confirmation be
 ---
 
 ### Global Ending Session & Receptionist Clinical Finalization Engine
-**Enforced in:** `src/components/admin/settings/InactivitySettingsView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/components/admin/DoctorAccountView.tsx`, `src/app/admin/page.tsx` (`TC-055`)
+**Enforced in:** `src/components/admin/settings/BookingSettingsView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/components/admin/DoctorAccountView.tsx`, `src/app/admin/page.tsx` (`TC-055`)
 
-- **Configuration:** Admin Settings -> Inactivity & Shift Settings (`page_settings.home.inactivity.globalEndingSession`, default `false`).
+- **Configuration:** Admin Settings -> Booking Settings (`page_settings.home.booking.globalEndingSession`, default `false`).
 - **Zero-Reload Reactivity:** Settings updates immediately trigger `window.dispatchEvent(new CustomEvent('revera-settings-change'))`, propagating live state to all open modals, drawers, and tabs instantly without requiring a page refresh.
 - **Receptionist Booking Modal Integration:** When `globalEndingSession === true` and a booking is active (`status === 'started'`), the static "● Treatment In Session" badge in the Session Flow card of `BookingDetailsModal.tsx` is transformed into an interactive **"End Session"** action button.
 - **Clinical Intake & Finalization Screen (`viewMode === "end_session"`):**
