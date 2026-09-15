@@ -3958,6 +3958,96 @@ provider row, and a non-doctor hire must not touch `providers`).
 
 ---
 
+## RISK-086: `medical-records/templates` Writes To A Local File That Is Read-Only On Vercel
+
+**Severity:** High (P1) · **Type:** Data integrity / platform mismatch
+**Found:** 2026-09-15, reviewing new routes added in the previous 4 weeks while auditing test
+coverage. **Not yet confirmed against a live Vercel deployment — this is a reasoned architectural
+finding, flagged so it gets verified deliberately rather than discovered by a clinic user.**
+
+**What it is:** `src/app/api/medical-records/templates/route.ts` treats a local JSON file
+(`data/medical_record_templates.json`, read/written via `fs.readFileSync`/`fs.writeFileSync`) as
+its primary store for POST/PUT/DELETE, and only best-effort mirrors each write to a
+`medical_record_templates` Supabase table afterward. `GET` does the opposite: it reads Supabase
+first and only falls back to the local file when Supabase has no rows.
+
+This is the same shape of anti-pattern `CLAUDE.md` rule 7 already warns about for
+`serviceStore.ts`/localStorage (RISK-004) — a server-side file standing in as the source of truth —
+except this one runs inside a Vercel serverless function, where the deployed filesystem is
+**read-only**. `fs.writeFileSync` there throws; the route's own `writeLocalTemplates()` catches and
+swallows that error (logs a warning, keeps going), so the write appears to succeed to the caller.
+
+**The concrete failure this produces:**
+1. Staff create a new custom intake template. `writeLocalTemplates()` fails silently in production;
+   the parallel `supabaseServer.upsert(...)` call succeeds, so the template is genuinely saved —
+   but only in Supabase.
+2. `GET` (Supabase-first) correctly shows the new template in the list.
+3. Staff try to **edit or delete** that same template. `PUT`/`DELETE` both call
+   `readLocalTemplates()` to find "the current list" to mutate — which, in production, can only
+   ever return what's baked into the deployed bundle (the 3 default templates), since local writes
+   never actually landed. The new template's id is not in that list → **404 "Template not found"**,
+   for a template the UI just showed as existing seconds earlier.
+
+**Business impact:** a clinic can create a custom intake form, see it in the list, and then be
+unable to edit or delete it — the exact kind of silent breakage that erodes trust in the system
+once discovered live, rather than in a demo.
+
+**Fix required:** make Supabase the single source of truth for this table (matching every other
+route in the codebase); either drop the local-file path entirely, or gate it strictly behind a
+local-dev-only check (e.g. `process.env.VERCEL` unset) so it can never run against a read-only
+filesystem in production.
+
+**Verification still needed:** confirm this reproduces against an actual Vercel preview/production
+deployment (not just local `next dev`, which has a writable filesystem and would not show the bug).
+No automated test can prove this either way — `tests/routes/medical-records-templates.test.ts`
+mocks `fs` entirely and is deliberately silent on this question (see that file's own header
+comment). Manual checklist: `ai_docs/manual_tests/NEW_ROUTES_SEPT_2026_MANUAL_TESTS.md`, check 6.
+
+---
+
+## RISK-087: Two Independent Implementations Decide How An Underpayment/Overpayment Settles
+
+**Severity:** Medium · **Type:** Maintainability / consistency risk
+**Found:** 2026-09-15, same review as RISK-086.
+
+**What it is:** deciding *how much of an underpayment draws from an existing wallet credit before
+adding debt to `outstanding`, and how much of an overpayment pays down existing debt before
+crediting the wallet* is business logic that exists **twice**, in two different places, written
+independently:
+
+1. `src/app/api/reservations/previous/route.ts:264-301` — an inline `diff`-based calculation run
+   entirely server-side when staff record a historical (pre-system) booking. It **automatically**
+   decides wallet-vs-debt allocation from `parsedValue`/`parsedPaid` and the customer's current
+   balances.
+2. The regular checkout flow (`PATCH /api/reservations`, `admin/page.tsx`'s checkout modal) instead
+   splits this responsibility: the **frontend** computes how much wallet to draw
+   (`useWalletBalance ? Math.min(walletBalance, balanceDue) : 0`) and sends that as an explicit
+   `walletWithdrawal`/`walletDeposit` amount; `src/lib/billing.ts`'s `computeSettledBalances()`
+   (tested, `tests/lib/billing.test.ts`) then just applies whatever deltas it's given — it does not
+   itself decide *whether* to use the wallet.
+
+Neither implementation is confirmed wrong — each does what its own inline comments say, and
+`tests/routes/reservations-previous.test.ts` pins implementation 1's rules exactly as documented.
+The risk is that these are two independently-maintained answers to conceptually the same question
+("how does a payment mismatch settle against a patient's wallet and debt"). A future change to the
+allocation rule (e.g. "cap wallet usage at 50% of a debt" or a rounding fix) applied to one will not
+apply to the other unless someone remembers both exist. If the two rules are ever accidentally
+allowed to diverge further, staff could see different settlement behavior for what looks to them
+like the same kind of transaction, depending only on which screen recorded it.
+
+**Fix required (not urgent, but worth scheduling):** extract the wallet-vs-debt allocation decision
+in `reservations/previous` into a small, named, tested pure function (parallel to how
+`computeSettledBalances` was extracted from the checkout route) — either reusing/extending
+`billing.ts`, or as a clearly-named sibling — so there is one function both call sites can point at,
+not two hand-written copies of the same rule.
+
+**Tests:** `tests/routes/reservations-previous.test.ts`'s "settlement math" describe block (9 cases)
+documents implementation 1's exact current behavior; `tests/lib/billing.test.ts` documents
+implementation 2's. Neither test file currently asserts the two are equivalent — that assertion
+doesn't exist yet because the two functions don't share a common interface to compare.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:
