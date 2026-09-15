@@ -28,7 +28,8 @@ import {
   Coins,
   DollarSign,
   History,
-  CalendarPlus
+  CalendarPlus,
+  MessageSquare
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getSessionStaleness } from "@/lib/services";
@@ -167,16 +168,18 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   // Direct Supabase database fallback state
   const [dbReservations, setDbReservations] = useState<any[]>([]);
   const [dbProviders, setDbProviders] = useState<any[]>(providers);
+  const [dbPrescriptions, setDbPrescriptions] = useState<any[]>([]);
   const [loadingDb, setLoadingDb] = useState(false);
 
-  // Fetch real reservations & providers directly from database on mount
+  // Fetch real reservations, providers & prescriptions directly from database on mount
   useEffect(() => {
     async function fetchRealData() {
       setLoadingDb(true);
       try {
-        const [resResponse, provResponse] = await Promise.all([
+        const [resResponse, provResponse, rxResponse] = await Promise.all([
           supabase.from("reservations").select("*").order("date", { ascending: false }),
-          supabase.from("providers").select("*").order("name", { ascending: true })
+          supabase.from("providers").select("*").order("name", { ascending: true }),
+          supabase.from("prescriptions").select("*").not("follow_up_date", "is", null).order("follow_up_date", { ascending: false })
         ]);
 
         if (!resResponse.error && resResponse.data) {
@@ -185,8 +188,11 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         if (!provResponse.error && provResponse.data && provResponse.data.length > 0) {
           setDbProviders(provResponse.data);
         }
+        if (!rxResponse.error && rxResponse.data) {
+          setDbPrescriptions(rxResponse.data);
+        }
       } catch (err) {
-        console.error("Error fetching database reservations/providers:", err);
+        console.error("Error fetching database reservations/providers/prescriptions:", err);
       } finally {
         setLoadingDb(false);
       }
@@ -303,10 +309,71 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         display_status: st,
         paymentStatus: paySt,
         isStaleSession: staleness.isStale,
-        staleElapsedLabel: staleness.elapsedLabel
+        staleElapsedLabel: staleness.elapsedLabel,
+        followUpDate: r.followUpDate || r.follow_up_date || null,
+        follow_up_notes: r.follow_up_notes || null
       };
     });
   }, [allReservations, dbReservations, dbProviders, localServices, providers, selectedDateStr, staleThresholdMs]);
+
+  // Aggregate all Follow-Up Reminders from bookings and prescriptions
+  const allFollowUpReminders = useMemo(() => {
+    const list: any[] = [];
+    const seenKeys = new Set<string>();
+
+    // 1. From merged appointments
+    mergedAppointments.forEach((apt) => {
+      const fDate = apt.followUpDate || apt.follow_up_date;
+      if (fDate) {
+        const cleanFDate = String(fDate).slice(0, 10);
+        const key = `${apt.id || apt.customer_name}-${cleanFDate}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          list.push({
+            id: `fu-apt-${apt.id}`,
+            bookingId: apt.id,
+            customerId: apt.customer_id || apt.customerId,
+            patientName: apt.customer_name,
+            phone: apt.customer_phone,
+            doctorName: apt.doctor_name,
+            serviceName: apt.service_name,
+            followUpDate: cleanFDate,
+            notes: apt.follow_up_notes || apt.notes || "",
+            raw: apt
+          });
+        }
+      }
+    });
+
+    // 2. From dbPrescriptions
+    dbPrescriptions.forEach((rx) => {
+      if (rx.follow_up_date) {
+        const cleanFDate = String(rx.follow_up_date).slice(0, 10);
+        const key = `${rx.booking_id || rx.customer_id || rx.patient_name || rx.customer_name}-${cleanFDate}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          list.push({
+            id: `fu-rx-${rx.id}`,
+            bookingId: rx.booking_id,
+            customerId: rx.customer_id,
+            patientName: rx.patient_name || rx.customer_name || "Patient",
+            phone: rx.customer_phone || rx.phone || "",
+            doctorName: rx.doctor_name || "Doctor",
+            serviceName: rx.service_name || "Follow-Up Consultation",
+            followUpDate: cleanFDate,
+            notes: rx.follow_up_notes || rx.instructions || rx.general_notes || "",
+            raw: rx
+          });
+        }
+      }
+    });
+
+    return list;
+  }, [mergedAppointments, dbPrescriptions]);
+
+  const selectedDayFollowUps = useMemo(() => {
+    return allFollowUpReminders.filter((fu) => fu.followUpDate === selectedDateStr);
+  }, [allFollowUpReminders, selectedDateStr]);
 
   // Chronological Booking Flow Order
   const FLOW_ORDER: Record<string, number> = {
@@ -597,8 +664,17 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       }
     });
 
+    allFollowUpReminders.forEach(fu => {
+      if (!fu.followUpDate) return;
+      if (!map[fu.followUpDate]) map[fu.followUpDate] = [];
+      const fuColor = "#6366F1"; // Indigo/purple for follow-up reminders
+      if (!map[fu.followUpDate].includes(fuColor) && map[fu.followUpDate].length < 3) {
+        map[fu.followUpDate].push(fuColor);
+      }
+    });
+
     return map;
-  }, [mergedAppointments]);
+  }, [mergedAppointments, allFollowUpReminders]);
 
   // Format header date string (e.g. "Wednesday, 6 August 2026")
   const formattedHeaderDate = useMemo(() => {
@@ -1535,13 +1611,146 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       <span>{label}</span>
                     </div>
                   ))}
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-[#6366F1]"></span>
+                    <span>{tr.followUpBadge || "Follow-Up Reminder"}</span>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Follow-Up Due Quick Alert in Left Column */}
+            {selectedDayFollowUps.length > 0 && (
+              <div className="rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 text-xs text-indigo-950 space-y-1.5 shadow-2xs animate-fadeIn">
+                <div className="flex items-center justify-between font-bold">
+                  <span className="flex items-center gap-1.5 text-indigo-900">
+                    <CalendarPlus size={15} className="text-indigo-600" />
+                    {tr.cardFollowUps || "Follow-Ups Due"}
+                  </span>
+                  <span className="bg-indigo-600 text-white rounded-full px-2 py-0.5 text-[10px] font-extrabold">
+                    {selectedDayFollowUps.length}
+                  </span>
+                </div>
+                <p className="text-[11px] text-indigo-800 leading-relaxed">
+                  {tr.followUpRemindersSubtitle || "Patients recommended for follow-up by their doctor. Contact them to confirm & book."}
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* ── RIGHT: TODAY'S SCHEDULE TABLE ── */}
+          {/* ── RIGHT: TODAY'S SCHEDULE & FOLLOW-UPS TABLE ── */}
           <div className="space-y-4 lg:col-span-8">
+
+            {/* ── FOLLOW-UP REMINDERS (NOT CONFIRMED RESERVATIONS) ── */}
+            {selectedDayFollowUps.length > 0 && (
+              <div className="rounded-2xl sm:rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50/70 to-purple-50/40 p-4 sm:p-5 shadow-xs space-y-3.5 animate-fadeIn">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-xs">
+                      <CalendarPlus size={18} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm sm:text-base font-extrabold text-indigo-950">
+                          {tr.followUpRemindersHeading || "Follow-Up Reminders (Not Reservations)"}
+                        </h3>
+                        <span className="rounded-full bg-indigo-100 border border-indigo-300 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-800">
+                          {selectedDayFollowUps.length} {selectedDayFollowUps.length === 1 ? "Patient" : "Patients"}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-indigo-700 font-medium mt-0.5">
+                        {tr.notAReservationNotice || "Not a confirmed booking yet — contact patient to schedule."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {selectedDayFollowUps.map((fu) => {
+                    const rawPhone = fu.phone || "";
+                    const cleanPhone = rawPhone.replace(/\D/g, "");
+                    const intlPhone = cleanPhone.startsWith("0") ? `20${cleanPhone.slice(1)}` : cleanPhone;
+                    const waMessage = lang === "ar"
+                      ? `مرحباً ${fu.patientName}، عيادات ريفيرا تتواصل معك. أوصى د. ${fu.doctorName} بموعد متابعة / استشارة يوم ${fu.followUpDate} بخصوص ${fu.serviceName}. هل تود تأكيد وحجز الموعد؟`
+                      : `Hello ${fu.patientName}, this is Revera Clinics. Dr. ${fu.doctorName} recommended a follow-up visit on ${fu.followUpDate} for your ${fu.serviceName} treatment. Would you like us to confirm and book your appointment?`;
+                    const waUrl = `https://wa.me/${intlPhone}?text=${encodeURIComponent(waMessage)}`;
+
+                    return (
+                      <div
+                        key={fu.id}
+                        className="bg-white rounded-2xl border border-indigo-100 p-3.5 shadow-xs flex flex-col justify-between space-y-3 hover:border-indigo-300 transition"
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="font-extrabold text-xs text-[#111827] flex items-center gap-1.5">
+                                <User size={13} className="text-indigo-600" />
+                                <span>{fu.patientName}</span>
+                              </h4>
+                              <p className="text-[11px] text-gray-500 font-mono mt-0.5">{rawPhone || "—"}</p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[9px] font-bold text-indigo-700">
+                              {tr.followUpBadge || "Follow-Up Reminder"}
+                            </span>
+                          </div>
+
+                          <div className="text-[11px] text-[#4B5563] bg-[#F9FAFB] p-2.5 rounded-xl border border-gray-100 space-y-0.5">
+                            <p>
+                              <strong className="text-indigo-900">{tr.doctorRecommendedPrefix || "Dr."} {fu.doctorName}</strong> · {fu.serviceName}
+                            </p>
+                            {fu.notes && (
+                              <p className="text-[10px] text-gray-600 italic">
+                                <span className="font-semibold text-gray-700">{tr.followUpNotesPrefix || "Note:"}</span> {fu.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action Buttons for Receptionist */}
+                        <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100 flex-wrap">
+                          {rawPhone && rawPhone !== "—" && (
+                            <>
+                              <a
+                                href={waUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-300 px-2.5 py-1.5 text-[11px] font-bold text-emerald-800 hover:bg-emerald-600 hover:text-white transition shadow-2xs cursor-pointer"
+                                title={tr.whatsAppReminderBtn || "Send WhatsApp Reminder"}
+                              >
+                                <MessageSquare size={12} />
+                                <span>{tr.whatsAppReminderBtn || "WhatsApp"}</span>
+                              </a>
+                              <a
+                                href={`tel:${rawPhone}`}
+                                className="inline-flex items-center gap-1 rounded-xl bg-gray-50 border border-gray-200 px-2 py-1.5 text-[11px] font-bold text-[#374151] hover:bg-gray-200 transition shadow-2xs"
+                                title={tr.callPatientBtn || "Call Patient"}
+                              >
+                                <Phone size={12} />
+                                <span>{tr.callPatientBtn || "Call"}</span>
+                              </a>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onNewBooking) {
+                                onNewBooking();
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 transition shadow-xs cursor-pointer ml-auto rtl:mr-auto rtl:ml-0"
+                            title={tr.convertToBookingBtn || "Convert to Full Booking"}
+                          >
+                            <Plus size={13} />
+                            <span>{tr.convertToBookingBtn || "Book Appointment"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               {/* Header */}
               <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

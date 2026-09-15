@@ -323,6 +323,15 @@ export default function DoctorSessionDrawer({
                     <p className="text-[#1F251A] mt-0.5 font-sans leading-relaxed">{activeRx.general_notes}</p>
                   </div>
                 )}
+
+                {(activeRx.follow_up_date || scheduleModalBooking.follow_up_date || scheduleModalBooking.followUpDate) && (
+                  <div className="pt-2 border-t border-[#414E36]/10 flex items-center justify-between flex-wrap gap-2">
+                    <span className="font-bold text-[#5A6A51] text-[11px]">{t.followUpDateBadge || "Follow-Up Due:"}</span>
+                    <span className="font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full text-xs">
+                      {activeRx.follow_up_date || scheduleModalBooking.follow_up_date || scheduleModalBooking.followUpDate}
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-xs text-[#5A6A51] bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 italic">

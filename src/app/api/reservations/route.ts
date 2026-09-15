@@ -107,7 +107,7 @@ async function resolveProviderId(doctorName?: string | null): Promise<string | n
       return exactMatch[0].id;
     }
 
-    const cleanName = name.replace(/^Dr\.?\s*/i, '').trim();
+    const cleanName = name.replace(/^(dr\.?|د\.?|دكتور\s+)\s*/i, '').trim();
     if (cleanName && cleanName !== name) {
       const { data: cleanMatch } = await supabaseServer
         .from('providers')
@@ -608,11 +608,53 @@ export async function GET(req: Request) {
     if (phone) q = q.eq('phone', phone);
     if (customerId) q = q.eq('customer_id', customerId);
     if (createdByEmployeeId) q = q.eq('created_by_employee_id', createdByEmployeeId);
-    if (doctorId) {
-      q = q.eq('provider_id', doctorId);
-    } else if (doctorName) {
-      const cleanDoc = doctorName.replace(/^Dr\.?\s*/i, '').trim();
-      q = q.ilike('doctor_name', `%${cleanDoc}%`);
+    if (doctorId || doctorName) {
+      let resolvedProvId: string | null = null;
+      let resolvedDocName = doctorName ? doctorName.replace(/^(dr\.?|د\.?|دكتور\s+)\s*/i, '').trim() : '';
+
+      if (doctorId) {
+        // Check if doctorId is a provider id
+        const { data: provMatch } = await supabaseServer
+          .from('providers')
+          .select('id, name')
+          .eq('id', doctorId)
+          .maybeSingle();
+
+        if (provMatch) {
+          resolvedProvId = provMatch.id;
+          if (!resolvedDocName && provMatch.name) {
+            resolvedDocName = provMatch.name.replace(/^(dr\.?|د\.?|دكتور\s+)\s*/i, '').trim();
+          }
+        } else {
+          // Check if doctorId is an employee_accounts id
+          const { data: empMatch } = await supabaseServer
+            .from('employee_accounts')
+            .select('id, name')
+            .eq('id', doctorId)
+            .maybeSingle();
+
+          if (empMatch?.name) {
+            if (!resolvedDocName) {
+              resolvedDocName = empMatch.name.replace(/^(dr\.?|د\.?|دكتور\s+)\s*/i, '').trim();
+            }
+            resolvedProvId = await resolveProviderId(empMatch.name);
+          }
+        }
+      }
+
+      if (!resolvedProvId && resolvedDocName) {
+        resolvedProvId = await resolveProviderId(resolvedDocName);
+      }
+
+      if (resolvedProvId && resolvedDocName) {
+        q = q.or(`provider_id.eq.${resolvedProvId},doctor_name.ilike.%${resolvedDocName}%`);
+      } else if (resolvedProvId) {
+        q = q.or(`provider_id.eq.${resolvedProvId},provider_id.eq.${doctorId}`);
+      } else if (resolvedDocName) {
+        q = q.ilike('doctor_name', `%${resolvedDocName}%`);
+      } else if (doctorId) {
+        q = q.eq('provider_id', doctorId);
+      }
     }
     // Include bookings that match this branch OR have no branch set (website bookings without branch)
     if (branchId) q = q.or(`branch_id.eq.${branchId},branch_id.is.null`);

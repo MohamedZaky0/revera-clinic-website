@@ -192,6 +192,19 @@ Deletes all rows from the reservations table. No soft-delete. No confirmation be
 
 ---
 
+### Doctor Prescription Follow-Up Visits & Reception Reminders Engine
+**Enforced in:** `DoctorOngoingSessionTab.tsx`, `AdminBookingsView.tsx`, `POST /api/prescriptions`, `PATCH /api/reservations`
+- **Clinical Follow-Up Specification:** Doctors can toggle *"Requires Follow-Up / Consultation?"* during active treatment sessions in `DoctorOngoingSessionTab.tsx`. Doctors choose from quick interval presets (`+3 Days`, `+1 Week`, `+2 Weeks`, `+1 Month`) or pick a custom date (`follow_up_date`) and add clinical instructions.
+- **Persistence:** Submitting the prescription saves `follow_up_date` to `prescriptions` table via `POST /api/prescriptions` and syncs `followUpDate` to the booking via `PATCH /api/reservations`.
+- **Reception Calendar Indicator (Not a Confirmed Reservation):** Follow-ups are surfaced in the Reception Calendar (`AdminBookingsView.tsx`) with clear non-reservation badging (**"Follow-Up Reminder (Not a Reservation)" / "تذكير متابعة (ليست حجزاً)"**) and calendar date dots so receptionists clearly know the patient is recommended for follow-up and does not occupy a confirmed appointment slot yet.
+- **Receptionist Outreach & 1-Click Conversion:** Provides receptionists with direct tools to contact the patient 1–2 days prior to the follow-up date:
+  1. **WhatsApp Reminder:** Generates a pre-filled WhatsApp message with doctor name, recommended follow-up date, and service details.
+  2. **Call Patient:** Direct phone dialing (`tel:`).
+  3. **Convert to Full Booking ("تحويل لحجز مؤكد"):** Launches the booking flow so receptionists can lock in the appointment with a single click.
+- **System Test Suite:** Validated automatically via Diagnostic Test Case `TC-060` in the Admin Settings System Test Suite.
+
+---
+
 ### Coming-soon sidebar sections are superadmin-only
 **Enforced in:** `src/app/admin/page.tsx` (`SIDEBAR_ITEMS`, `permittedSidebarItems`)
 
@@ -832,6 +845,33 @@ The following are **not currently enforced in code**:
 
 5. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-058` (`User Profile Working Details & Schedule Visualization Engine`).
+
+---
+
+## Doctor Started Session Propagation & Real-Time Synchronization Engine Rules
+**Enforced in:** `src/app/api/reservations/route.ts`, `src/components/admin/DoctorAccountView.tsx`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/doctor/tabs/DoctorScheduleTab.tsx`.
+
+1. **Composite Doctor Resolution in API (`/api/reservations`)**:
+   - When querying reservations by doctor (`doctorId` or `doctorName`), the backend must resolve both the `provider_id` (from `providers` or linked `employee_accounts`) and the doctor's display name.
+   - The query matches reservations using a composite OR filter: `provider_id.eq.${resolvedProvId}` OR `doctor_name.ilike.%${cleanName}%`.
+   - Arabic (`د.`, `دكتور`) and English (`Dr.`) titles are stripped during matching to guarantee zero false negative misses.
+
+2. **Real-time Postgres Subscription Normalization**:
+   - When a receptionist or admin starts a session (`status = 'started'`), Supabase `postgres_changes` emits a payload with raw table rows.
+   - `DoctorAccountView` filters the event using `isDoctorMatch(payload.new)` and normalizes missing joined fields (`service_name` resolved from `servicesList`, `room_name`, `time_slot`).
+   - If the booking status is `started`, `in_progress`, `active`, or `in treatment`, it immediately populates `activeSessionBooking`.
+
+3. **Global Live Session Pulse Banner**:
+   - When an active session is detected and the doctor is on any tab other than Ongoing Session (`schedule`, `patients`, `analytics`), a glowing Live Active Session Pulse Banner is rendered at the top of the main view with:
+     - Live pulse animation icon (`Play` with glowing pulse)
+     - Patient name, service title, scheduled time, and treatment room
+     - 1-click **Open Ongoing Session** action button jumping directly to the Ongoing Session tab.
+
+4. **Queue & Schedule Tab Started Highlighting**:
+   - On the Doctor Schedule Tab (Calendar Agenda & Queue List), appointments in `started` or `in_progress` status are highlighted with an active glowing pill and direct **Open Session** action buttons.
+
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-059` (`Doctor View Real-time Started Session Detection & Synchronization Engine`).
 
 
 

@@ -203,7 +203,19 @@ export const doctorTranslations = {
     generalInstructionsLabel: "General Patient Instructions",
     cancelBtn: "Cancel",
     saveAndPrintRxBtn: "Save & Print Prescription",
-    patientHistoryDrawerTitle: "Complete Treatment History & Visit Timeline"
+    patientHistoryDrawerTitle: "Complete Treatment History & Visit Timeline",
+
+    // Follow-up Section
+    requiresFollowUpLabel: "Requires Follow-Up / Consultation?",
+    followUpDateLabel: "Recommended Follow-Up Date",
+    followUpNotesLabel: "Follow-Up Instructions / Reason",
+    followUpNotesPlaceholder: "e.g. Check skin reaction, review lab results, evaluate treatment progress...",
+    preset3Days: "+3 Days",
+    preset1Week: "+1 Week",
+    preset2Weeks: "+2 Weeks",
+    preset1Month: "+1 Month",
+    followUpRequiredBadge: "Follow-Up Recommended",
+    followUpDateBadge: "Follow-Up Due:"
   },
   ar: {
     portalTitle: "بوابة الطبيب",
@@ -409,6 +421,18 @@ export const doctorTranslations = {
     generalInstructionsLabel: "تعليمات عامة للمريض",
     cancelBtn: "إلغاء",
     saveAndPrintRxBtn: "حفظ وطباعة الروشتة",
-    patientHistoryDrawerTitle: "السجل الطبي الكامل والتسلسل الزمني للزيارات"
+    patientHistoryDrawerTitle: "السجل الطبي الكامل والتسلسل الزمني للزيارات",
+
+    // Follow-up Section
+    requiresFollowUpLabel: "تحديد موعد متابعة / استشارة قادمة؟",
+    followUpDateLabel: "تاريخ المتابعة الموصى به",
+    followUpNotesLabel: "تعليمات أو سبب المتابعة",
+    followUpNotesPlaceholder: "مثال: فحص تقشير البشرة، مراجعة التحاليل، تقييم نتائج الجلسة...",
+    preset3Days: "+3 أيام",
+    preset1Week: "+أسبوع",
+    preset2Weeks: "+أسبوعين",
+    preset1Month: "+شهر",
+    followUpRequiredBadge: "مطلوب متابعة / استشارة",
+    followUpDateBadge: "موعد المتابعة:"
   }
 };

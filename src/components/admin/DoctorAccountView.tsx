@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
-import { Menu, CalendarDays, Stethoscope, Users, BarChart3, User } from "lucide-react";
+import { Menu, CalendarDays, Stethoscope, Users, BarChart3, User, Play } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { DoctorAccountViewProps, DoctorTab, DoctorPatient, UsedProduct } from "./doctor/types";
 import { doctorTranslations } from "./doctor/translations";
@@ -78,14 +78,24 @@ export default function DoctorAccountView({
   useEffect(() => {
     async function loadProviderDetails() {
       try {
-        const cleanName = doctorName ? doctorName.replace(/^Dr\.?\s*/i, "").trim() : "";
-        let query = supabase.from("providers").select("*");
+        const cleanName = doctorName ? doctorName.replace(/^(dr\.?|د\.?|دكتور\s+)\s*/i, "").trim() : "";
+        let data: any = null;
+
         if (doctorDbId) {
-          query = query.eq("id", doctorDbId);
-        } else if (cleanName) {
-          query = query.ilike("name", `%${cleanName}%`);
+          const res = await supabase.from("providers").select("*").eq("id", doctorDbId).maybeSingle();
+          if (res.data) data = res.data;
         }
-        const { data } = await query.maybeSingle();
+
+        if (!data && doctorEmail) {
+          const res = await supabase.from("providers").select("*").eq("email", doctorEmail).maybeSingle();
+          if (res.data) data = res.data;
+        }
+
+        if (!data && cleanName) {
+          const res = await supabase.from("providers").select("*").ilike("name", `%${cleanName}%`).limit(1).maybeSingle();
+          if (res.data) data = res.data;
+        }
+
         if (data) {
           setProviderRecord(data);
 
@@ -124,7 +134,7 @@ export default function DoctorAccountView({
       }
     }
     loadProviderDetails();
-  }, [doctorDbId, doctorName]);
+  }, [doctorDbId, doctorName, doctorEmail]);
 
   const resolvedBranchName = useMemo(() => {
     if (!doctorBranch) return "Main Branch";
@@ -344,15 +354,45 @@ export default function DoctorAccountView({
     fetchInventory();
   }, []);
 
+  // Robust doctor match helper supporting name, providerId, and title variations
+  const isDoctorMatch = (r: any) => {
+    if (!r) return false;
+    const rDocName = String(r.doctorName || r.doctor_name || "").trim();
+    const rProvId = String(r.providerId || r.provider_id || r.doctorId || r.doctor_id || "").trim();
+
+    const cleanAccountDoc = doctorName && doctorName !== "Doctor"
+      ? doctorName.toLowerCase().replace(/^(dr\.?|د\.?|دكتور\s+)\s*/i, "").trim()
+      : "";
+
+    const provId = providerRecord?.id || doctorDbId;
+    if (provId && rProvId && (rProvId === String(provId) || (doctorDbId && rProvId === String(doctorDbId)))) {
+      return true;
+    }
+
+    if (!cleanAccountDoc) return true;
+    if (!rDocName) return false;
+
+    const cleanRDoc = rDocName.toLowerCase().replace(/^(dr\.?|د\.?|دكتور\s+)\s*/i, "").trim();
+    if (!cleanRDoc) return false;
+
+    return cleanAccountDoc.includes(cleanRDoc) || cleanRDoc.includes(cleanAccountDoc);
+  };
+
   // Fetch Doctor Reservations from DB
   const fetchDoctorReservations = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       let queryUrl = "/api/reservations?limit=150";
-      if (doctorDbId) {
-        queryUrl += `&doctorId=${encodeURIComponent(doctorDbId)}`;
-      } else if (doctorName && doctorName !== "Doctor") {
-        queryUrl += `&doctorName=${encodeURIComponent(doctorName)}`;
+      const cleanDoc = doctorName && doctorName !== "Doctor"
+        ? doctorName.replace(/^(dr\.?|د\.?|دكتور\s+)\s*/i, "").trim()
+        : "";
+      const pId = providerRecord?.id || doctorDbId;
+
+      if (pId) {
+        queryUrl += `&doctorId=${encodeURIComponent(pId)}`;
+      }
+      if (cleanDoc) {
+        queryUrl += `&doctorName=${encodeURIComponent(cleanDoc)}`;
       }
 
       const headers = await getAuthHeaders();
@@ -361,12 +401,11 @@ export default function DoctorAccountView({
         const data = await res.json();
         let resList = Array.isArray(data) ? data : data.reservations || [];
         resList = filterValidDoctorBookings(resList);
-        if (doctorName && doctorName !== "Doctor" && resList.length > 0) {
-          const docLower = doctorName.toLowerCase().replace(/^dr\.?\s*/i, "").trim();
+        if (cleanDoc && resList.length > 0) {
           resList = resList.filter((r: any) => {
-            if (!r.doctorName) return true;
-            const rDocLower = String(r.doctorName).toLowerCase().replace(/^dr\.?\s*/i, "").trim();
-            return rDocLower.includes(docLower) || docLower.includes(rDocLower);
+            const hasDoctorSpecified = !!(r.doctorName || r.doctor_name || r.providerId || r.provider_id);
+            if (!hasDoctorSpecified) return true;
+            return isDoctorMatch(r);
           });
         }
         setReservations(resList);
@@ -385,7 +424,7 @@ export default function DoctorAccountView({
       fetchDoctorReservations(true);
     }, 3000);
     return () => clearInterval(interval);
-  }, [doctorDbId, doctorName]);
+  }, [doctorDbId, doctorName, providerRecord]);
 
   // Persistent Real-time Subscriptions for Started Sessions & Bookings
   useEffect(() => {
@@ -397,33 +436,51 @@ export default function DoctorAccountView({
         (payload: any) => {
           if (payload.new) {
             const updated: any = payload.new;
+            const belongsToDoctor = isDoctorMatch(updated);
+            if (!belongsToDoctor) {
+              setReservations((prev) => prev.filter((item) => String(item.id) !== String(updated.id)));
+              if (activeSessionBooking && String(activeSessionBooking.id) === String(updated.id)) {
+                setActiveSessionBooking(null);
+              }
+              return;
+            }
+
+            // Normalize fields from raw database row
+            const serviceObj = servicesList.find((s) => String(s.id) === String(updated.service_id || updated.serviceId));
+            const serviceName = serviceObj?.en || serviceObj?.name || serviceObj?.title || updated.service || updated.service_name || "Clinical Session";
+
+            const normalizedBooking = {
+              ...updated,
+              id: updated.id,
+              name: updated.name || updated.customer_name || "Patient",
+              service: serviceName,
+              service_name: serviceName,
+              doctorName: updated.doctor_name || updated.doctorName || doctorName,
+              doctor_name: updated.doctor_name || updated.doctorName || doctorName,
+              time: updated.time_slot || updated.requested_time || updated.time || "Today",
+              time_slot: updated.time_slot || updated.requested_time || updated.time,
+              room: updated.room_name || updated.room || "Treatment Room",
+              date: updated.date,
+              status: updated.status,
+            };
+
             setReservations((prev) => {
-              const idx = prev.findIndex((item) => item.id === updated.id);
+              const idx = prev.findIndex((item) => String(item.id) === String(updated.id));
               if (idx >= 0) {
                 const next = [...prev];
-                next[idx] = { ...next[idx], ...updated };
+                next[idx] = { ...next[idx], ...normalizedBooking };
                 return next;
               }
-              return [updated, ...prev];
+              return [normalizedBooking, ...prev];
             });
 
             const st = String(updated.status || "").toLowerCase().trim();
             const isActive = st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
             if (isActive) {
-              setActiveSessionBooking(updated);
-            } else if (st === "completed" || st === "done" || st === "cancelled" || st === "canceled") {
-              setActiveSessionBooking((curr: any) => {
-                if (curr && String(curr.id) === String(updated.id)) {
-                  return null;
-                }
-                return curr;
-              });
-              setScheduleModalBooking((curr: any) => {
-                if (curr && String(curr.id) === String(updated.id)) {
-                  return null;
-                }
-                return curr;
-              });
+              setActiveSessionBooking(normalizedBooking);
+            } else if (st === "completed" || st === "done" || st === "cancelled" || st === "canceled" || st === "rejected") {
+              setActiveSessionBooking((curr: any) => (curr && String(curr.id) === String(updated.id) ? null : curr));
+              setScheduleModalBooking((curr: any) => (curr && String(curr.id) === String(updated.id) ? null : curr));
             }
           }
         }
@@ -433,28 +490,29 @@ export default function DoctorAccountView({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [servicesList, doctorName, doctorDbId, providerRecord]);
 
   // Auto-detect receptionist started session
   const receptionistStartedSession = useMemo(() => {
     return reservations.find((r) => {
       const st = String(r.status || "").toLowerCase().trim();
-      return st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
+      const isActive = st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
+      return isActive && isDoctorMatch(r);
     });
-  }, [reservations]);
+  }, [reservations, doctorName, doctorDbId, providerRecord]);
 
   useEffect(() => {
     if (receptionistStartedSession) {
-      if (!activeSessionBooking || activeSessionBooking.id !== receptionistStartedSession.id) {
+      if (!activeSessionBooking || String(activeSessionBooking.id) !== String(receptionistStartedSession.id) || activeSessionBooking.status !== receptionistStartedSession.status) {
         setActiveSessionBooking(receptionistStartedSession);
       }
     } else if (activeSessionBooking) {
       const st = String(activeSessionBooking.status || "").toLowerCase().trim();
-      if (st === "completed" || st === "done" || st === "cancelled" || st === "canceled") {
+      if (st === "completed" || st === "done" || st === "cancelled" || st === "canceled" || st === "rejected") {
         setActiveSessionBooking(null);
       }
     }
-  }, [receptionistStartedSession, reservations, activeSessionBooking]);
+  }, [receptionistStartedSession, activeSessionBooking]);
 
   // Sync active session clinical notes — Brief 33: prefer doctor_notes (clean column),
   // fall back to regex-cleaned legacy notes for pre-migration bookings
@@ -1134,6 +1192,42 @@ export default function DoctorAccountView({
 
       {/* 3. MAIN CONTENT AREA */}
       <main className="flex-1 w-full h-full overflow-y-auto px-4 sm:px-6 md:px-8 py-4 sm:py-6 pb-24 md:pb-6 animate-fadeIn flex flex-col min-w-0">
+        {/* GLOBAL LIVE STARTED SESSION PULSE BANNER (Visible across all tabs except ongoing) */}
+        {receptionistStartedSession && receptionistStartedSession.status !== "completed" && receptionistStartedSession.status !== "done" && activeTab !== "ongoing" && (
+          <div className="mb-4 sm:mb-6 rounded-2xl sm:rounded-3xl border-2 border-amber-400 bg-gradient-to-r from-amber-500 via-amber-600 to-emerald-700 p-4 sm:p-5 text-white shadow-lg animate-fadeIn flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md text-white font-bold shadow-inner">
+                <Play size={22} className="animate-pulse text-amber-200 fill-amber-200" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/20 backdrop-blur-sm px-2.5 py-0.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-white">
+                    <span className="h-2 w-2 rounded-full bg-white animate-ping" />
+                    {t.sessionStartedByReception}
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-white mt-1 truncate">
+                  {receptionistStartedSession.name || receptionistStartedSession.customer_name || "Patient"}
+                </h3>
+                <p className="text-xs text-white/90 font-medium truncate mt-0.5">
+                  {receptionistStartedSession.service || receptionistStartedSession.service_name || "Clinical Session"} • {receptionistStartedSession.time || receptionistStartedSession.time_slot || "Today"} • <strong>{receptionistStartedSession.room || receptionistStartedSession.room_name || "Treatment Room"}</strong>
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSessionBooking(receptionistStartedSession);
+                setActiveTab("ongoing");
+              }}
+              className="shrink-0 rounded-2xl bg-white text-[#414E36] px-5 py-2.5 text-xs font-black shadow-md hover:bg-[#FBFBF9] active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Stethoscope size={16} />
+              <span>{t.openActiveSessionBtn}</span>
+            </button>
+          </div>
+        )}
+
         {/* TAB 1: SCHEDULE VIEW */}
         {activeTab === "schedule" && (
           <DoctorScheduleTab
@@ -1157,6 +1251,10 @@ export default function DoctorAccountView({
             stats={stats}
             filteredSchedule={filteredSchedule}
             handleOpenScheduleModal={handleOpenScheduleModal}
+            onOpenOngoingSession={(booking) => {
+              setActiveSessionBooking(booking);
+              setActiveTab("ongoing");
+            }}
             t={t}
           />
         )}
