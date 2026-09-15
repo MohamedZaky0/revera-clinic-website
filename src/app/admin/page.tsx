@@ -189,6 +189,7 @@ export type Req = {
   rooms?: string[];
   createdByEmployeeId?: string | null;
   followUpDate?: string | null;
+  followUpNotes?: string | null;
 };
 
 function getStatusBadgeClass(status: string): string {

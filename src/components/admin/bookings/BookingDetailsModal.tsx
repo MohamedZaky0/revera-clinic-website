@@ -143,6 +143,9 @@ export default function BookingDetailsModal({
     { name: "", dosage: "", frequency: "", duration: "" }
   ]);
   const [drawerRxNotes, setDrawerRxNotes] = useState("");
+  const [drawerRxHasFollowUp, setDrawerRxHasFollowUp] = useState(false);
+  const [drawerRxFollowUpDate, setDrawerRxFollowUpDate] = useState("");
+  const [drawerRxFollowUpNotes, setDrawerRxFollowUpNotes] = useState("");
   const [savingDrawerRx, setSavingDrawerRx] = useState(false);
 
   // ── Global Ending Session & Clinical Finalization View State ──
@@ -173,6 +176,9 @@ export default function BookingDetailsModal({
     { name: "", dosage: "", frequency: "", duration: "" }
   ]);
   const [rxGeneralNotes, setRxGeneralNotes] = useState<string>("");
+  const [rxHasFollowUp, setRxHasFollowUp] = useState<boolean>(false);
+  const [rxFollowUpDate, setRxFollowUpDate] = useState<string>("");
+  const [rxFollowUpNotes, setRxFollowUpNotes] = useState<string>("");
   const [savingRxInline, setSavingRxInline] = useState<boolean>(false);
 
   // Services & Pulses state
@@ -224,6 +230,19 @@ export default function BookingDetailsModal({
     };
   }, []);
 
+  // Interval presets helpers
+  const setFollowUpPresetDays = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    setRxFollowUpDate(d.toISOString().slice(0, 10));
+  };
+
+  const setDrawerFollowUpPresetDays = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    setDrawerRxFollowUpDate(d.toISOString().slice(0, 10));
+  };
+
   // Initialize booking details and state
   useEffect(() => {
     if (!booking) {
@@ -232,12 +251,21 @@ export default function BookingDetailsModal({
       setClinicalNote("");
       setAdditionalServices([]);
       setUsedProducts([]);
+      setRxDiagnosis("");
+      setRxMedications([{ name: "", dosage: "", frequency: "", duration: "" }]);
+      setRxGeneralNotes("");
+      setRxHasFollowUp(false);
+      setRxFollowUpDate("");
+      setRxFollowUpNotes("");
       return;
     }
     const note = booking.doctorNotes || (booking as any).doctor_notes || "";
     setClinicalNote(note);
     const initialSvcId = String(booking.serviceId || (booking.serviceIds && booking.serviceIds[0]) || "");
     setPrimaryServiceId(initialSvcId);
+    setRxHasFollowUp(Boolean((booking as any).follow_up_date || booking.followUpDate));
+    setRxFollowUpDate((booking as any).follow_up_date || booking.followUpDate || "");
+    setRxFollowUpNotes((booking as any).follow_up_notes || booking.followUpNotes || "");
   }, [booking?.id]);
 
   // Load Devices List
@@ -436,6 +464,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     setSavingDrawerRx(true);
     try {
       const custId = booking.customerId || (booking as any).customer_id || null;
+      const followUpDateVal = drawerRxHasFollowUp && drawerRxFollowUpDate ? drawerRxFollowUpDate : null;
+      const followUpNotesVal = drawerRxHasFollowUp && drawerRxFollowUpNotes ? drawerRxFollowUpNotes : null;
+
       const res = await fetch("/api/prescriptions", {
         method: "POST",
         headers: authenticatedJsonHeaders,
@@ -450,16 +481,32 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           medications: drawerRxMeds.filter((m) => m.name.trim() !== ""),
           instructions: drawerRxNotes,
           general_notes: drawerRxNotes,
-          doctor_notes: booking.notes || ""
+          doctor_notes: booking.notes || "",
+          follow_up_date: followUpDateVal,
+          follow_up_notes: followUpNotesVal,
         })
       });
 
       if (res.ok) {
+        // Sync follow_up_date to the reservation record
+        if (followUpDateVal) {
+          fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}`, {
+            method: "PATCH",
+            headers: authenticatedJsonHeaders,
+            body: JSON.stringify({
+              followUpDate: followUpDateVal
+            })
+          }).catch(err => console.error("Error syncing follow_up_date to booking:", err));
+        }
+
         alert("Digital Prescription saved successfully!");
         setShowDrawerPrescriptionModal(false);
         setDrawerRxDiagnosis("");
         setDrawerRxMeds([{ name: "", dosage: "", frequency: "", duration: "" }]);
         setDrawerRxNotes("");
+        setDrawerRxHasFollowUp(false);
+        setDrawerRxFollowUpDate("");
+        setDrawerRxFollowUpNotes("");
 
         const params = new URLSearchParams();
         if (booking.id) params.set("bookingId", String(booking.id));
@@ -469,6 +516,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const rxData = await rxRes.json();
           setDrawerPrescriptions(Array.isArray(rxData) ? rxData : []);
         }
+        fetchAllReservations();
       } else {
         const err = await res.json().catch(() => ({}));
         alert(err.error || "Failed to save prescription.");
@@ -746,6 +794,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     try {
       const custId = booking.customerId || (booking as any).customer_id || null;
       const patientName = booking.name || (booking as any).customer_name || "Patient";
+      const followUpDateVal = rxHasFollowUp && rxFollowUpDate ? rxFollowUpDate : null;
+      const followUpNotesVal = rxHasFollowUp && rxFollowUpNotes ? rxFollowUpNotes : null;
+
       const payload = {
         booking_id: booking.id,
         customer_id: custId ? String(custId) : null,
@@ -756,6 +807,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         medications: rxMedications.filter((m) => m.name.trim() !== ""),
         instructions: rxGeneralNotes,
         general_notes: rxGeneralNotes,
+        follow_up_date: followUpDateVal,
+        follow_up_notes: followUpNotesVal,
         date: booking.date || new Date().toISOString().slice(0, 10),
       };
 
@@ -766,9 +819,20 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       });
 
       if (res.ok) {
+        if (followUpDateVal) {
+          fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}`, {
+            method: "PATCH",
+            headers: authenticatedJsonHeaders,
+            body: JSON.stringify({
+              followUpDate: followUpDateVal
+            })
+          }).catch(err => console.error("Error syncing follow_up_date to booking:", err));
+        }
+
         const newRx = await res.json().catch(() => payload);
         alert(isRTL ? "تم حفظ الروشتة الإلكترونية بنجاح!" : "Prescription saved successfully!");
         printPrescription(newRx, booking);
+        fetchAllReservations();
       } else {
         const err = await res.json().catch(() => ({}));
         alert(err.error || "Failed to save prescription.");
@@ -930,8 +994,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
       // 3. Save Prescription if entered
       const validMeds = rxMedications.filter((m) => m.name.trim() !== "");
-      if (rxDiagnosis.trim() || validMeds.length > 0 || rxGeneralNotes.trim()) {
+      if (rxDiagnosis.trim() || validMeds.length > 0 || rxGeneralNotes.trim() || (rxHasFollowUp && rxFollowUpDate)) {
         try {
+          const followUpDateVal = rxHasFollowUp && rxFollowUpDate ? rxFollowUpDate : null;
+          const followUpNotesVal = rxHasFollowUp && rxFollowUpNotes ? rxFollowUpNotes : null;
           const rxPayload = {
             booking_id: booking.id,
             customer_id: custId ? String(custId) : null,
@@ -942,6 +1008,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             medications: validMeds,
             instructions: rxGeneralNotes,
             general_notes: rxGeneralNotes,
+            follow_up_date: followUpDateVal,
+            follow_up_notes: followUpNotesVal,
             date: booking.date || new Date().toISOString().slice(0, 10),
           };
           await fetch("/api/prescriptions", {
@@ -1088,7 +1156,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           notes: updatedNotes,
           amountLeft: finalAmountLeft,
           total_price: finalInvoiceAmount,
-          price: finalInvoiceAmount
+          price: finalInvoiceAmount,
+          ...(rxHasFollowUp && rxFollowUpDate ? { followUpDate: rxFollowUpDate } : {})
         })
       });
 
@@ -1839,7 +1908,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               onClick={() => setRxMedications([...rxMedications, { name: "", dosage: "", frequency: "", duration: "" }])}
                               className="text-xs font-bold text-[#414E36] flex items-center gap-1 mt-1 hover:underline cursor-pointer"
                             >
-                              <Plus size={14} /> {isRTL ? "+ إضافة دواء آخر" : "+ Add Another Medication"}
+                              <Plus size={14} /> {isRTL ? "إضافة دواء آخر" : "Add Another Medication"}
                             </button>
                           </div>
 
@@ -1854,6 +1923,103 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             />
                           </div>
 
+                          {/* Follow-Up Visit Specification */}
+                          <div className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3.5 sm:p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-bold text-[#1F251A] flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={rxHasFollowUp}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setRxHasFollowUp(checked);
+                                    if (checked && !rxFollowUpDate) {
+                                      setFollowUpPresetDays(7);
+                                    }
+                                  }}
+                                  className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36] accent-[#414E36]"
+                                />
+                                <Calendar size={14} className="text-[#414E36]" />
+                                <span>{isRTL ? "تحديد موعد متابعة / استشارة قادمة؟" : "Requires Follow-Up / Consultation?"}</span>
+                              </label>
+
+                              {rxHasFollowUp && (
+                                <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                                  {isRTL ? "مطلوب متابعة / استشارة" : "Follow-Up Recommended"}
+                                </span>
+                              )}
+                            </div>
+
+                            {rxHasFollowUp && (
+                              <div className="space-y-3 pt-2 border-t border-[#414E36]/10 animate-fadeIn">
+                                {/* Interval Presets */}
+                                <div>
+                                  <span className="block text-[11px] font-bold text-[#5A6A51] mb-1.5">
+                                    {isRTL ? "فترات زمنية سريعة:" : "Quick Interval Presets:"}
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setFollowUpPresetDays(3)}
+                                      className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                                    >
+                                      {isRTL ? "+3 أيام" : "+3 Days"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setFollowUpPresetDays(7)}
+                                      className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                                    >
+                                      {isRTL ? "+أسبوع" : "+1 Week"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setFollowUpPresetDays(14)}
+                                      className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                                    >
+                                      {isRTL ? "+أسبوعين" : "+2 Weeks"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setFollowUpPresetDays(30)}
+                                      className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                                    >
+                                      {isRTL ? "+شهر" : "+1 Month"}
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Date Picker & Reason */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                      {isRTL ? "تاريخ المتابعة الموصى به" : "Recommended Follow-Up Date"}
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={rxFollowUpDate}
+                                      min={new Date().toISOString().slice(0, 10)}
+                                      onChange={(e) => setRxFollowUpDate(e.target.value)}
+                                      className="w-full rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] font-bold outline-none focus:border-[#414E36]"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                      {isRTL ? "تعليمات أو سبب المتابعة" : "Follow-Up Instructions / Reason"}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      placeholder={isRTL ? "مثال: فحص تقشير البشرة، مراجعة التحاليل..." : "e.g. Check skin reaction, review lab results..."}
+                                      value={rxFollowUpNotes}
+                                      onChange={(e) => setRxFollowUpNotes(e.target.value)}
+                                      className="w-full rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
                           <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
                             <button
                               type="button"
@@ -1864,6 +2030,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                   diagnosis: rxDiagnosis,
                                   medications: rxMedications.filter((m) => m.name.trim()),
                                   general_notes: rxGeneralNotes,
+                                  follow_up_date: rxHasFollowUp && rxFollowUpDate ? rxFollowUpDate : null,
+                                  follow_up_notes: rxHasFollowUp && rxFollowUpNotes ? rxFollowUpNotes : null,
                                   date: new Date().toISOString().slice(0, 10)
                                 };
                                 handleSendPrescriptionWhatsApp(rxPayload, booking);
@@ -2662,6 +2830,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           ? rx.medications
                           : (Array.isArray(rx.items) ? rx.items : []);
                         const rxNotes = rx.general_notes || rx.instructions || rx.doctor_notes || rx.notes;
+                        const followUpDate = rx.follow_up_date || rx.followUpDate;
+                        const followUpNotes = rx.follow_up_notes || rx.followUpNotes;
 
                         return (
                           <div className="space-y-2.5">
@@ -2733,6 +2903,22 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 <p className="text-[11px] text-[#1F251A] mt-0.5 whitespace-pre-line leading-relaxed">
                                   {rxNotes}
                                 </p>
+                              </div>
+                            )}
+
+                            {/* Follow-Up Due Display */}
+                            {followUpDate && (
+                              <div className="rounded-xl bg-indigo-50/80 p-2.5 border border-indigo-200/60 text-xs">
+                                <div className="flex items-center gap-1.5 text-indigo-800 font-bold text-[11px]">
+                                  <Calendar size={13} className="text-indigo-600" />
+                                  <span>{isRTL ? "موعد المتابعة المقترح:" : "Recommended Follow-Up:"}</span>
+                                  <span className="font-extrabold">{new Date(followUpDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+                                </div>
+                                {followUpNotes && (
+                                  <p className="text-[11px] text-indigo-700/90 mt-1 ps-4 italic">
+                                    ↳ {followUpNotes}
+                                  </p>
+                                )}
                               </div>
                             )}
 
@@ -3406,6 +3592,101 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 />
               </div>
 
+              {/* Follow-Up Visit Specification */}
+              <div className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-[#1F251A] flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={drawerRxHasFollowUp}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setDrawerRxHasFollowUp(checked);
+                        if (checked && !drawerRxFollowUpDate) {
+                          setDrawerFollowUpPresetDays(7);
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36] accent-[#414E36]"
+                    />
+                    <Calendar size={14} className="text-[#414E36]" />
+                    <span>Requires Follow-Up / Consultation? / تحديد موعد متابعة؟</span>
+                  </label>
+
+                  {drawerRxHasFollowUp && (
+                    <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                      Follow-Up Recommended
+                    </span>
+                  )}
+                </div>
+
+                {drawerRxHasFollowUp && (
+                  <div className="space-y-3 pt-2 border-t border-[#414E36]/10 animate-fadeIn">
+                    <div>
+                      <span className="block text-[11px] font-bold text-[#5A6A51] mb-1.5">
+                        Quick Interval Presets:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setDrawerFollowUpPresetDays(3)}
+                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                        >
+                          +3 Days
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDrawerFollowUpPresetDays(7)}
+                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                        >
+                          +1 Week
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDrawerFollowUpPresetDays(14)}
+                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                        >
+                          +2 Weeks
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDrawerFollowUpPresetDays(30)}
+                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                        >
+                          +1 Month
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                          Recommended Follow-Up Date
+                        </label>
+                        <input
+                          type="date"
+                          value={drawerRxFollowUpDate}
+                          min={new Date().toISOString().slice(0, 10)}
+                          onChange={(e) => setDrawerRxFollowUpDate(e.target.value)}
+                          className="w-full rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] font-bold outline-none focus:border-[#414E36]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                          Follow-Up Instructions / Reason
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Skin check, evaluation..."
+                          value={drawerRxFollowUpNotes}
+                          onChange={(e) => setDrawerRxFollowUpNotes(e.target.value)}
+                          className="w-full rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2 pt-2 border-t border-gray-100">
                 <button
                   type="button"
@@ -3414,6 +3695,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     setDrawerRxDiagnosis("");
                     setDrawerRxMeds([{ name: "", dosage: "", frequency: "", duration: "" }]);
                     setDrawerRxNotes("");
+                    setDrawerRxHasFollowUp(false);
+                    setDrawerRxFollowUpDate("");
+                    setDrawerRxFollowUpNotes("");
                   }}
                   className="w-1/2 rounded-xl border border-gray-300 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
                 >

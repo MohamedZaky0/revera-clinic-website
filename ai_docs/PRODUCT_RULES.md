@@ -873,6 +873,27 @@ The following are **not currently enforced in code**:
 5. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-059` (`Doctor View Real-time Started Session Detection & Synchronization Engine`).
 
+---
 
+## Follow-Up Visit Management & Clinical Prescription Engine Rules
+**Enforced in:** `src/app/api/prescriptions/route.ts`, `src/app/api/reservations/route.ts`, `src/components/admin/AdminBookingsView.tsx`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`.
 
+1. **Universal Follow-Up Availability in Prescription Writers**:
+   - The interactive Follow-Up Visit toggle card is ubiquitously embedded in:
+     - Doctor View Active Session (`DoctorOngoingSessionTab.tsx`)
+     - Reception Clinical Finalization & Global Ending Session (`BookingDetailsModal.tsx` inline prescription form)
+     - Booking Details Drawer Standalone Prescription Modal (`BookingDetailsModal.tsx` modal)
+   - Features quick interval presets: `+3 Days`, `+1 Week`, `+2 Weeks`, `+1 Month`, alongside an explicit date picker (with `min` set to today) and clinical instructions/reason input.
 
+2. **Persistence and Automatic Calendar Synchronization**:
+   - When a prescription is saved with follow-up enabled (`follow_up_date`), it is recorded in the `prescriptions` table and automatically propagated to the parent `reservations` record (`follow_up_date` / `followUpDate`).
+   - In Reception Calendar (`AdminBookingsView.tsx`), dates with pending follow-up visits display an indigo calendar dot (`#6366F1`) and are distinguished from full reservations.
+
+3. **Receptionist Follow-Up Action Hub**:
+   - Follow-up entries are rendered in a dedicated **Follow-Up Reminders** section featuring:
+     - 1-click WhatsApp reminder template generator with localized patient greeting and follow-up reason.
+     - Direct Phone Call action button (`tel:` link).
+     - 1-click **Convert to Full Booking / تحويل لحجز مؤكد** modal that transitions the follow-up reminder into a formal confirmed reservation on the calendar.
+
+4. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-060` (`Clinical Prescription Follow-Up Visit & Reception Calendar Integration Engine`).
