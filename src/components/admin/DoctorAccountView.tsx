@@ -1049,7 +1049,7 @@ export default function DoctorAccountView({
   };
 
   return (
-    <div className="h-screen min-h-[100dvh] w-full bg-[#FBFBF9] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
+    <div className="h-screen min-h-[100dvh] w-full bg-[#FBFBF9] text-[#1F251A] font-sans grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)] overflow-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
       {/* 1. SIDEBAR NAVIGATION (Desktop Sidebar & Mobile Drawer) */}
       <DoctorSidebar
         activeTab={activeTab}
@@ -1073,7 +1073,7 @@ export default function DoctorAccountView({
       />
 
       {/* 2. MAIN CONTENT WRAPPER */}
-      <div className="flex-1 flex flex-col min-w-0 h-full min-h-[100dvh] md:h-screen md:ps-[220px] overflow-hidden">
+      <div className="flex flex-col min-w-0 w-full h-full min-h-[100dvh] md:h-screen overflow-hidden">
         {/* MOBILE TOP HEADER BAR (< md) */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[#414E36] text-white shrink-0 sticky top-0 z-30 shadow-md">
         <div className="flex items-center gap-2.5 min-w-0">
