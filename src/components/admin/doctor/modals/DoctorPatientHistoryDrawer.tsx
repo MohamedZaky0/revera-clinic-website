@@ -402,6 +402,14 @@ export default function DoctorPatientHistoryDrawer({
                       {matchingRx.general_notes && (
                         <p className="text-xs text-[#5A6A51] italic">{matchingRx.general_notes}</p>
                       )}
+                      {(matchingRx.follow_up_date || booking.follow_up_date || booking.followUpDate) && (
+                        <div className="pt-2 border-t border-[#414E36]/10 flex items-center justify-between flex-wrap gap-2">
+                          <span className="font-bold text-[#5A6A51] text-[11px]">{t.followUpDateBadge || "Follow-Up Due:"}</span>
+                          <span className="font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full text-[11px]">
+                            {matchingRx.follow_up_date || booking.follow_up_date || booking.followUpDate}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
 

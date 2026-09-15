@@ -21,7 +21,8 @@ import {
   Layers,
   Trash2,
   Printer,
-  Loader2
+  Loader2,
+  Calendar
 } from "lucide-react";
 import { DoctorTab, MedicationItem } from "../types";
 import { getAuthHeaders } from "../utils";
@@ -158,7 +159,30 @@ export default function DoctorOngoingSessionTab({
     { name: "", dosage: "", frequency: "", duration: "" }
   ]);
   const [rxGeneralNotes, setRxGeneralNotes] = useState("");
+  const [rxHasFollowUp, setRxHasFollowUp] = useState(false);
+  const [rxFollowUpDate, setRxFollowUpDate] = useState("");
+  const [rxFollowUpNotes, setRxFollowUpNotes] = useState("");
   const [savingRxInline, setSavingRxInline] = useState(false);
+
+  const setFollowUpPresetDays = (days: number) => {
+    const target = new Date();
+    target.setDate(target.getDate() + days);
+    const y = target.getFullYear();
+    const m = String(target.getMonth() + 1).padStart(2, "0");
+    const d = String(target.getDate()).padStart(2, "0");
+    setRxFollowUpDate(`${y}-${m}-${d}`);
+    setRxHasFollowUp(true);
+  };
+
+  // Sync follow-up from existing booking
+  useEffect(() => {
+    if (!activeSessionBooking) return;
+    const existingFollowUp = activeSessionBooking.followUpDate || activeSessionBooking.follow_up_date;
+    if (existingFollowUp) {
+      setRxFollowUpDate(String(existingFollowUp).slice(0, 10));
+      setRxHasFollowUp(true);
+    }
+  }, [activeSessionBooking?.id]);
 
   // Fetch specialized intake template matching current service
   useEffect(() => {
@@ -363,6 +387,9 @@ export default function DoctorOngoingSessionTab({
     setSavingRxInline(true);
     try {
       const headers = await getAuthHeaders();
+      const followUpDateVal = rxHasFollowUp && rxFollowUpDate ? rxFollowUpDate : null;
+      const followUpNotesVal = rxHasFollowUp && rxFollowUpNotes ? rxFollowUpNotes : null;
+
       const payload = {
         booking_id: activeSessionBooking.id,
         customer_id: activeSessionBooking.customerId || (activeSessionBooking as any).customer_id || null,
@@ -373,6 +400,8 @@ export default function DoctorOngoingSessionTab({
         medications: rxMedications.filter((m) => m.name.trim()),
         instructions: rxGeneralNotes,
         general_notes: rxGeneralNotes,
+        follow_up_date: followUpDateVal,
+        follow_up_notes: followUpNotesVal,
         date: activeSessionBooking.date || new Date().toISOString().slice(0, 10),
       };
 
@@ -383,6 +412,17 @@ export default function DoctorOngoingSessionTab({
       });
 
       if (res.ok) {
+        // Also sync follow_up_date to the reservation record
+        if (activeSessionBooking.id) {
+          fetch(`/api/reservations?id=${encodeURIComponent(activeSessionBooking.id)}`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({
+              followUpDate: followUpDateVal
+            })
+          }).catch(err => console.error("Error syncing follow_up_date to booking:", err));
+        }
+
         alert("Prescription saved successfully!");
       } else {
         const errData = await res.json().catch(() => null);
@@ -407,6 +447,19 @@ export default function DoctorOngoingSessionTab({
 
   // Final Session Invoice Total
   const finalSessionTotal = totalServicesPrice + productsSubtotal + extraPulsesSubtotal;
+
+  // Resolved active service name with catalog fallback
+  const resolvedActiveServiceName = useMemo(() => {
+    if (!activeSessionBooking) return "Clinical Session";
+    if (activeSessionBooking.service) return activeSessionBooking.service;
+    if (activeSessionBooking.service_name) return activeSessionBooking.service_name;
+    const svcId = activeSessionBooking.service_id || activeSessionBooking.serviceId;
+    if (svcId && Array.isArray(servicesList)) {
+      const match = servicesList.find((s) => String(s.id) === String(svcId));
+      if (match) return match.en || match.name || match.title || "Clinical Session";
+    }
+    return "Clinical Session";
+  }, [activeSessionBooking, servicesList]);
 
   // Find all active / started sessions from reservations list
   const activeSessionsList = reservations.filter((r) => {
@@ -453,7 +506,7 @@ export default function DoctorOngoingSessionTab({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 border border-[#414E36]/10 shadow-sm w-full">
             <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
               <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl bg-[#414E36] text-white font-bold text-lg sm:text-xl shadow-md">
-                {(activeSessionBooking.name || "P").slice(0, 2).toUpperCase()}
+                {(activeSessionBooking.name || activeSessionBooking.customer_name || "P").slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -466,12 +519,12 @@ export default function DoctorOngoingSessionTab({
                 </div>
                 <p className="text-[11px] sm:text-xs text-[#5A6A51] mt-1 flex items-center gap-1.5 sm:gap-2 flex-wrap">
                   <strong className="text-[#414E36] font-bold">
-                    {activeSessionBooking.service || activeSessionBooking.service_name}
+                    {resolvedActiveServiceName}
                   </strong>
                   <span>•</span>
-                  <span>{activeSessionBooking.time || activeSessionBooking.time_slot || "Today"}</span>
+                  <span>{activeSessionBooking.time || activeSessionBooking.time_slot || activeSessionBooking.requested_time || activeSessionBooking.requestedTime || "Today"}</span>
                   <span>•</span>
-                  <span className="text-[#414E36] font-bold">{activeSessionBooking.room || "Treatment Room"}</span>
+                  <span className="text-[#414E36] font-bold">{activeSessionBooking.room || activeSessionBooking.room_name || "Treatment Room"}</span>
                 </p>
               </div>
             </div>
@@ -884,6 +937,102 @@ export default function DoctorOngoingSessionTab({
                       onChange={(e) => setRxGeneralNotes(e.target.value)}
                       className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
                     />
+                  </div>
+
+                  {/* Follow-Up Visit Specification */}
+                  <div className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3.5 sm:p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-[#1F251A] flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={rxHasFollowUp}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setRxHasFollowUp(checked);
+                            if (checked && !rxFollowUpDate) {
+                              setFollowUpPresetDays(7);
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36] accent-[#414E36]"
+                        />
+                        <Calendar size={14} className="text-[#414E36]" />
+                        <span>{t.requiresFollowUpLabel || "Requires Follow-Up / Consultation?"}</span>
+                      </label>
+                      {rxHasFollowUp && (
+                        <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                          {t.followUpRequiredBadge || "Follow-Up Recommended"}
+                        </span>
+                      )}
+                    </div>
+
+                    {rxHasFollowUp && (
+                      <div className="space-y-3 pt-2 border-t border-[#414E36]/10 animate-fadeIn">
+                        {/* Interval Presets */}
+                        <div>
+                          <span className="block text-[11px] font-bold text-[#5A6A51] mb-1.5">
+                            Quick Interval Presets:
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setFollowUpPresetDays(3)}
+                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                            >
+                              {t.preset3Days || "+3 Days"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFollowUpPresetDays(7)}
+                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                            >
+                              {t.preset1Week || "+1 Week"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFollowUpPresetDays(14)}
+                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                            >
+                              {t.preset2Weeks || "+2 Weeks"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFollowUpPresetDays(30)}
+                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                            >
+                              {t.preset1Month || "+1 Month"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Date Picker & Reason */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                              {t.followUpDateLabel || "Recommended Follow-Up Date"}
+                            </label>
+                            <input
+                              type="date"
+                              value={rxFollowUpDate}
+                              min={new Date().toISOString().slice(0, 10)}
+                              onChange={(e) => setRxFollowUpDate(e.target.value)}
+                              className="w-full rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] font-bold outline-none focus:border-[#414E36]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                              {t.followUpNotesLabel || "Follow-Up Instructions / Reason"}
+                            </label>
+                            <input
+                              type="text"
+                              value={rxFollowUpNotes}
+                              onChange={(e) => setRxFollowUpNotes(e.target.value)}
+                              placeholder={t.followUpNotesPlaceholder || "e.g. Check skin peeling, review lab results..."}
+                              className="w-full rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end gap-3 pt-2">
