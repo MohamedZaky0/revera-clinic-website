@@ -599,6 +599,12 @@ claim in `PROJECT.md`/`AGENTS.md`/`RISKS.md`, corrected 2026-07-21).
 | `id` | UUID | Primary key |
 | `customer_id` | UUID | FK → customers.id, cascade delete |
 | `booking_id` | UUID | FK → reservations.id ON DELETE SET NULL, nullable. Added 2026-08-17 by `20260817010000_add_booking_id_to_prescriptions.sql`. Links digital prescription to a specific booking session. |
+| `parent_prescription_id` | UUID | FK → prescriptions.id ON DELETE SET NULL, nullable. Added 2026-09-15. Points to previous version in edit history. |
+| `root_prescription_id` | UUID | FK → prescriptions.id ON DELETE SET NULL, nullable. Added 2026-09-15. Points to the v1 root prescription of the history chain. |
+| `version` | integer | NOT NULL DEFAULT 1. Added 2026-09-15. Incremental version number (1, 2, 3...). |
+| `is_latest` | boolean | NOT NULL DEFAULT true. Added 2026-09-15. True for active prescription, false for historical revisions. |
+| `doctor_name` | text | nullable. Added 2026-09-15. Prescribing / editing clinician name. |
+| `doctor_id` | UUID | nullable. Added 2026-09-15. Responsible doctor user ID. |
 | `patient_name` | text | NOT NULL — denormalized snapshot |
 | `date` | date | Default `CURRENT_DATE` |
 | `diagnosis` | text | nullable |
@@ -611,6 +617,7 @@ claim in `PROJECT.md`/`AGENTS.md`/`RISKS.md`, corrected 2026-07-21).
 
 Confirmed wired to real reads/writes via `/api/prescriptions` (falls back to a local
 `data/prescriptions.json` file only if the Supabase call itself errors, not as a primary store).
+Prescription edits preserve immutable history by inserting new records (`version = prev.version + 1`, `is_latest = true`) while setting previous version `is_latest = false`.
 Note: consultation notes, treatment plans, and before/after photos are **still mock UI** — only
 prescriptions (diagnosis/medications/follow-up) got a real table.
 

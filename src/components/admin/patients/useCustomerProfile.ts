@@ -85,6 +85,12 @@ export function useCustomerProfile({
   const [prescriptionEditMode, setPrescriptionEditMode] = useState(false);
   const [editingPrescription, setEditingPrescription] = useState<any | null>(null);
 
+  // ── Prescription History Timeline state ──
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [historyPrescriptions, setHistoryPrescriptions] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedHistoryRx, setSelectedHistoryRx] = useState<any | null>(null);
+
   // ── Patient Product Balances state ──
   const [customerProductsSubTab, setCustomerProductsSubTab] = useState<"current" | "history">("current");
   const [customerProductBalances, setCustomerProductBalances] = useState<any[]>([]);
@@ -420,10 +426,15 @@ export function useCustomerProfile({
     if (!viewingCustomerProfile?.id) return;
     setSavingPrescription(true);
 
+    const doctorName = session?.user?.user_metadata?.name || session?.user?.name || session?.user?.email || "Doctor / Staff";
+    const doctorId = session?.user?.id || null;
+
     const payload: Record<string, any> = {
       id: editingPrescription?.id || undefined,
       customer_id: viewingCustomerProfile.id,
       patient_name: viewingCustomerProfile.name,
+      doctor_name: doctorName,
+      doctor_id: doctorId,
       date: new Date().toISOString().slice(0, 10),
       diagnosis: rxDiagnosis.trim() || null,
       medications: rxMedications,
@@ -468,6 +479,37 @@ export function useCustomerProfile({
       setSavingPrescription(false);
     }
   }
+
+  const handleOpenPrescriptionHistory = async (rx: any) => {
+    setSelectedHistoryRx(rx);
+    setHistoryModalOpen(true);
+    setLoadingHistory(true);
+    try {
+      const rootId = rx.root_prescription_id || rx.id;
+      const res = await fetch(`/api/prescriptions?rootId=${encodeURIComponent(rootId)}&all_versions=true`, {
+        headers: authenticatedJsonHeaders,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.prescriptions || []);
+        list.sort((a: any, b: any) => (b.version || 1) - (a.version || 1));
+        setHistoryPrescriptions(list);
+      } else {
+        setHistoryPrescriptions([rx]);
+      }
+    } catch (err) {
+      console.error("Error fetching prescription history:", err);
+      setHistoryPrescriptions([rx]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleClosePrescriptionHistory = () => {
+    setHistoryModalOpen(false);
+    setSelectedHistoryRx(null);
+    setHistoryPrescriptions([]);
+  };
 
   async function handleDeletePrescription(id: string) {
     if (!(await showConfirm("Are you sure you want to delete this prescription?"))) return;
@@ -786,6 +828,11 @@ export function useCustomerProfile({
     rxFollowUpDate,
     setRxFollowUpDate,
     savingPrescription,
+    historyModalOpen,
+    setHistoryModalOpen,
+    historyPrescriptions,
+    loadingHistory,
+    selectedHistoryRx,
 
     // Functions
     fetchCustomerProductBalances,
@@ -797,6 +844,8 @@ export function useCustomerProfile({
     handleAddProductToPatient,
     handleStartCreatePrescription,
     handleStartEditPrescription,
+    handleOpenPrescriptionHistory,
+    handleClosePrescriptionHistory,
     handleAddMedication,
     handleRemoveMedication,
     handleSavePrescription,

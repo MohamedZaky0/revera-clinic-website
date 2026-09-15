@@ -1824,3 +1824,57 @@ fabricate sample log entries (RISK-076).
 
 **Response:** `{ "logs": TransactionAuditLog[] }`
 
+---
+
+## GET /api/prescriptions
+
+Fetches patient prescriptions with version filtering and history retrieval.
+
+**Query params:**
+- `customerId` / `customer_id`: Filter prescriptions for a specific patient. Defaults to returning active/latest records (`is_latest = true`) unless `all_versions=true` is set.
+- `bookingId` / `booking_id`: Filter prescription for a specific booking.
+- `id`: Fetch a single prescription by ID.
+- `rootId`: Fetch entire version history chain for a prescription (`all_versions` automatically enabled).
+- `all_versions`: Set to `"true"` to include previous archived revisions.
+
+**Response:** Array of prescription objects with `{ id, customer_id, booking_id, root_prescription_id, parent_prescription_id, version, is_latest, doctor_name, doctor_id, patient_name, date, diagnosis, medications, general_notes, doctor_notes, follow_up_date, created_at, updated_at }`.
+
+---
+
+## POST /api/prescriptions
+
+Creates a new prescription or saves changes to an existing prescription as a new version without deleting previous history.
+
+**Body:**
+- `id`: Optional. If provided, creates a new version record (`version = previous.version + 1`, `parent_prescription_id = previous.id`, `root_prescription_id = previous.root_prescription_id || previous.id`) and marks the older record `is_latest = false`.
+- `customer_id` / `customerId`: UUID of the patient.
+- `booking_id`: Optional UUID of the linked appointment.
+- `patient_name` / `customer_name`: Patient full name.
+- `doctor_name`: Prescribing doctor or staff name.
+- `doctor_id`: Optional UUID of the prescribing doctor.
+- `date`: YYYY-MM-DD.
+- `diagnosis`: Medical diagnosis string.
+- `medications`: Array of `{ name, dosage, instructions }`.
+- `general_notes`: Patient-visible notes.
+- `doctor_notes`: Confidential doctor-only clinical notes.
+- `follow_up_date`: YYYY-MM-DD.
+
+**Response:**
+```json
+{
+  "success": true,
+  "prescription": { ... }
+}
+```
+
+---
+
+## DELETE /api/prescriptions
+
+Deletes a prescription by ID.
+
+**Query params:** `id` (required UUID)
+
+**Response:** `{ "success": true }`
+
+
