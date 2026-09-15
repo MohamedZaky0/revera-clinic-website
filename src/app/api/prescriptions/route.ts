@@ -43,24 +43,38 @@ export async function GET(req: Request) {
     const customerId = searchParams.get('customerId') || searchParams.get('customer_id');
     const bookingId = searchParams.get('bookingId') || searchParams.get('booking_id');
     const patientName = searchParams.get('patientName') || searchParams.get('patient_name');
+    const rootId = searchParams.get('rootId') || searchParams.get('root_id') || searchParams.get('history_for');
+    const allVersions = searchParams.get('all_versions') === 'true';
 
     try {
       let query = supabaseServer
         .from('prescriptions')
-        .select('*')
-        .order('date', { ascending: false });
+        .select('*');
 
-      if (bookingId && bookingId !== 'all') {
-        query = query.eq('booking_id', bookingId);
-      } else if (customerId && customerId !== 'all') {
-        query = query.eq('customer_id', customerId);
-      } else if (patientName) {
-        query = query.ilike('patient_name', `%${patientName}%`);
+      if (rootId) {
+        // Fetch full version history chain for this prescription root
+        query = query.or(`id.eq.${rootId},root_prescription_id.eq.${rootId}`).order('version', { ascending: true });
+      } else {
+        // By default, filter to latest versions only
+        if (!allVersions) {
+          query = query.or('is_latest.eq.true,is_latest.is.null');
+        }
+
+        if (bookingId && bookingId !== 'all') {
+          query = query.eq('booking_id', bookingId);
+        } else if (customerId && customerId !== 'all') {
+          query = query.eq('customer_id', customerId);
+        } else if (patientName) {
+          query = query.ilike('patient_name', `%${patientName}%`);
+        }
+
+        query = query.order('created_at', { ascending: false }).order('date', { ascending: false });
       }
 
       let { data, error } = await query;
 
-      if (error && (error.message?.includes('booking_id') || error.code === 'PGRST204')) {
+      if (error && (error.message?.includes('root_prescription_id') || error.message?.includes('is_latest') || error.code === 'PGRST204')) {
+        // Fallback query if columns not yet migrated
         let fallbackQuery = supabaseServer
           .from('prescriptions')
           .select('*')
@@ -80,12 +94,21 @@ export async function GET(req: Request) {
         if (error.code === 'PGRST205') {
           console.warn('prescriptions table not found in Supabase. Falling back to local data/prescriptions.json');
           let local = readLocalPrescriptions();
-          if (bookingId && bookingId !== 'all') {
-            local = local.filter((p: any) => String(p.booking_id) === String(bookingId));
-          } else if (customerId && customerId !== 'all') {
-            local = local.filter((p: any) => String(p.customer_id) === String(customerId));
-          } else if (patientName) {
-            local = local.filter((p: any) => String(p.patient_name || '').toLowerCase().includes(patientName.toLowerCase()));
+          if (rootId) {
+            local = local.filter((p: any) => String(p.root_prescription_id || p.id) === String(rootId));
+            local.sort((a: any, b: any) => (a.version || 1) - (b.version || 1));
+          } else {
+            if (!allVersions) {
+              local = local.filter((p: any) => p.is_latest !== false);
+            }
+            if (bookingId && bookingId !== 'all') {
+              local = local.filter((p: any) => String(p.booking_id) === String(bookingId));
+            } else if (customerId && customerId !== 'all') {
+              local = local.filter((p: any) => String(p.customer_id) === String(customerId));
+            } else if (patientName) {
+              local = local.filter((p: any) => String(p.patient_name || '').toLowerCase().includes(patientName.toLowerCase()));
+            }
+            local.sort((a: any, b: any) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
           }
           return NextResponse.json(local);
         }
@@ -96,12 +119,21 @@ export async function GET(req: Request) {
       if (dbErr.code === 'PGRST205' || dbErr.message?.includes('relation "public.prescriptions" does not exist')) {
         console.warn('prescriptions table not found in Supabase. Falling back to local data/prescriptions.json');
         let local = readLocalPrescriptions();
-        if (bookingId && bookingId !== 'all') {
-          local = local.filter((p: any) => String(p.booking_id) === String(bookingId));
-        } else if (customerId && customerId !== 'all') {
-          local = local.filter((p: any) => String(p.customer_id) === String(customerId));
-        } else if (patientName) {
-          local = local.filter((p: any) => String(p.patient_name || '').toLowerCase().includes(patientName.toLowerCase()));
+        if (rootId) {
+          local = local.filter((p: any) => String(p.root_prescription_id || p.id) === String(rootId));
+          local.sort((a: any, b: any) => (a.version || 1) - (b.version || 1));
+        } else {
+          if (!allVersions) {
+            local = local.filter((p: any) => p.is_latest !== false);
+          }
+          if (bookingId && bookingId !== 'all') {
+            local = local.filter((p: any) => String(p.booking_id) === String(bookingId));
+          } else if (customerId && customerId !== 'all') {
+            local = local.filter((p: any) => String(p.customer_id) === String(customerId));
+          } else if (patientName) {
+            local = local.filter((p: any) => String(p.patient_name || '').toLowerCase().includes(patientName.toLowerCase()));
+          }
+          local.sort((a: any, b: any) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
         }
         return NextResponse.json(local);
       }
@@ -134,12 +166,14 @@ export async function POST(req: Request) {
   const diagnosis = body.diagnosis;
   const medications = body.medications;
   const generalNotes = body.general_notes || body.instructions || body.notes;
+  const doctorName = body.doctor_name || body.doctorName || null;
+  const doctorId = body.doctor_id || body.doctorId || null;
 
-  if (!patientName) {
-    return NextResponse.json({ error: 'patient_name or customer_name is required' }, { status: 400 });
+  if (!patientName && !customerId) {
+    return NextResponse.json({ error: 'patient_name or customer_id is required' }, { status: 400 });
   }
 
-  const prescriptionData: Record<string, any> = {
+  const basePrescriptionData: Record<string, any> = {
     customer_id: customerId || null,
     patient_name: patientName,
     date: body.date || new Date().toISOString().slice(0, 10),
@@ -147,6 +181,8 @@ export async function POST(req: Request) {
     medications: Array.isArray(medications) ? medications : [],
     general_notes: generalNotes || null,
     doctor_notes: body.doctor_notes || null,
+    doctor_name: doctorName,
+    doctor_id: doctorId,
     follow_up_date: body.follow_up_date || null,
     updated_at: new Date().toISOString()
   };
@@ -160,38 +196,66 @@ export async function POST(req: Request) {
         .maybeSingle();
 
       if (resMatch?.id) {
-        prescriptionData.booking_id = cleanBookingId;
+        basePrescriptionData.booking_id = cleanBookingId;
       }
     } catch (_) {
       // Ignore lookup error and proceed without setting booking_id
     }
   }
 
-  let targetPrescriptionId = id;
-  if (!targetPrescriptionId && cleanBookingId) {
-    try {
-      const { data: existingRx } = await supabaseServer
-        .from('prescriptions')
-        .select('id')
-        .eq('booking_id', cleanBookingId)
-        .maybeSingle();
-      if (existingRx?.id) {
-        targetPrescriptionId = existingRx.id;
-      }
-    } catch (_) {
-      // Ignore lookup error
-    }
-  }
-
   try {
     try {
       let result;
-      if (targetPrescriptionId) {
-        // Update
+      if (id) {
+        // ── EDIT PRESCRIPTION WORKFLOW (IMMUTABLE VERSIONING) ──
+        // 1. Fetch current prescription to retrieve root and version
+        let previousRx: any = null;
+        try {
+          const { data: existing } = await supabaseServer
+            .from('prescriptions')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+          previousRx = existing;
+        } catch (_) {}
+
+        const rootId = previousRx?.root_prescription_id || previousRx?.id || id;
+        const currentVersion = Number(previousRx?.version || 1);
+        const newVersion = currentVersion + 1;
+
+        // 2. Mark previous version as NOT latest
+        try {
+          await supabaseServer
+            .from('prescriptions')
+            .update({ is_latest: false, updated_at: new Date().toISOString() })
+            .eq('id', id);
+        } catch (_) {}
+
+        // Also mark any other older versions in this root chain as not latest
+        try {
+          await supabaseServer
+            .from('prescriptions')
+            .update({ is_latest: false })
+            .eq('root_prescription_id', rootId);
+        } catch (_) {}
+
+        // 3. Insert NEW prescription version
+        const newVersionData: Record<string, any> = {
+          ...basePrescriptionData,
+          customer_id: customerId || previousRx?.customer_id || null,
+          patient_name: patientName || previousRx?.patient_name || 'Patient',
+          booking_id: basePrescriptionData.booking_id || previousRx?.booking_id || null,
+          version: newVersion,
+          is_latest: true,
+          root_prescription_id: rootId,
+          parent_prescription_id: id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
         let { data, error } = await supabaseServer
           .from('prescriptions')
-          .update(prescriptionData)
-          .eq('id', targetPrescriptionId)
+          .insert(newVersionData)
           .select()
           .single();
 
@@ -202,11 +266,10 @@ export async function POST(req: Request) {
           error.message?.includes('foreign key constraint') ||
           error.message?.includes('prescriptions_booking_id_fkey')
         )) {
-          delete prescriptionData.booking_id;
+          delete newVersionData.booking_id;
           const retry = await supabaseServer
             .from('prescriptions')
-            .update(prescriptionData)
-            .eq('id', targetPrescriptionId)
+            .insert(newVersionData)
             .select()
             .single();
           data = retry.data;
@@ -219,13 +282,18 @@ export async function POST(req: Request) {
         }
         result = data;
       } else {
-        // Insert
+        // ── CREATE BRAND-NEW PRESCRIPTION (VERSION 1) ──
+        const newPrescriptionPayload: Record<string, any> = {
+          ...basePrescriptionData,
+          version: 1,
+          is_latest: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
         let { data, error } = await supabaseServer
           .from('prescriptions')
-          .insert({
-            ...prescriptionData,
-            created_at: new Date().toISOString()
-          })
+          .insert(newPrescriptionPayload)
           .select()
           .single();
 
@@ -236,13 +304,10 @@ export async function POST(req: Request) {
           error.message?.includes('foreign key constraint') ||
           error.message?.includes('prescriptions_booking_id_fkey')
         )) {
-          delete prescriptionData.booking_id;
+          delete newPrescriptionPayload.booking_id;
           const retry = await supabaseServer
             .from('prescriptions')
-            .insert({
-              ...prescriptionData,
-              created_at: new Date().toISOString()
-            })
+            .insert(newPrescriptionPayload)
             .select()
             .single();
           data = retry.data;
@@ -253,6 +318,18 @@ export async function POST(req: Request) {
           if (error.code === 'PGRST205') throw error; // trigger local fallback
           throw error;
         }
+
+        // Set root_prescription_id to its own id if null
+        if (data?.id && !data.root_prescription_id) {
+          try {
+            await supabaseServer
+              .from('prescriptions')
+              .update({ root_prescription_id: data.id })
+              .eq('id', data.id);
+            data.root_prescription_id = data.id;
+          } catch (_) {}
+        }
+
         result = data;
       }
 
@@ -263,25 +340,46 @@ export async function POST(req: Request) {
         const local = readLocalPrescriptions();
         let result: any;
         if (id) {
-          // Update local
-          const index = local.findIndex((p: any) => p.id === id);
-          if (index !== -1) {
-            local[index] = {
-              ...local[index],
-              ...prescriptionData,
-              updated_at: new Date().toISOString()
-            };
-            result = local[index];
-          } else {
-            return NextResponse.json({ error: 'Prescription not found locally' }, { status: 404 });
-          }
+          // Find old in local
+          const oldIndex = local.findIndex((p: any) => p.id === id);
+          const previousLocal = oldIndex !== -1 ? local[oldIndex] : null;
+          const rootId = previousLocal?.root_prescription_id || previousLocal?.id || id;
+          const currentVersion = Number(previousLocal?.version || 1);
+          const newVersion = currentVersion + 1;
+
+          // Mark older versions as not latest
+          local.forEach((p: any) => {
+            if (p.id === id || String(p.root_prescription_id) === String(rootId)) {
+              p.is_latest = false;
+            }
+          });
+
+          // Insert new version
+          const newId = `rx-${Math.random().toString(36).substr(2, 9)}`;
+          result = {
+            id: newId,
+            ...basePrescriptionData,
+            customer_id: customerId || previousLocal?.customer_id || null,
+            patient_name: patientName || previousLocal?.patient_name || 'Patient',
+            version: newVersion,
+            is_latest: true,
+            root_prescription_id: rootId,
+            parent_prescription_id: id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          local.push(result);
         } else {
           // Create local
           const newId = `rx-${Math.random().toString(36).substr(2, 9)}`;
           result = {
             id: newId,
-            ...prescriptionData,
-            created_at: new Date().toISOString()
+            ...basePrescriptionData,
+            version: 1,
+            is_latest: true,
+            root_prescription_id: newId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           };
           local.push(result);
         }
@@ -311,10 +409,20 @@ export async function DELETE(req: Request) {
     }
 
     try {
+      // Find prescription to determine if we should delete version chain
+      const { data: rxItem } = await supabaseServer
+        .from('prescriptions')
+        .select('id, root_prescription_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      const rootId = rxItem?.root_prescription_id || id;
+
+      // Delete all version nodes in this prescription chain
       const { error } = await supabaseServer
         .from('prescriptions')
         .delete()
-        .eq('id', id);
+        .or(`id.eq.${id},root_prescription_id.eq.${rootId},id.eq.${rootId}`);
 
       if (error) {
         if (error.code === 'PGRST205') throw error; // trigger local fallback
@@ -325,7 +433,9 @@ export async function DELETE(req: Request) {
       if (dbErr.code === 'PGRST205' || dbErr.message?.includes('relation "public.prescriptions" does not exist')) {
         console.warn('prescriptions table not found in Supabase. Falling back to local data/prescriptions.json');
         const local = readLocalPrescriptions();
-        const filtered = local.filter((p: any) => p.id !== id);
+        const rxItem = local.find((p: any) => p.id === id);
+        const rootId = rxItem?.root_prescription_id || id;
+        const filtered = local.filter((p: any) => p.id !== id && p.root_prescription_id !== rootId && p.id !== rootId);
         writeLocalPrescriptions(filtered);
         return NextResponse.json({ message: 'Prescription deleted successfully' });
       }

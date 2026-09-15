@@ -376,9 +376,14 @@ export default function DoctorPatientHistoryDrawer({
                   {/* Issued Digital Prescription for this visit */}
                   {matchingRx && (
                     <div className="bg-[#FBFBF9] p-3.5 sm:p-4.5 rounded-2xl border border-[#414E36]/10 space-y-2 text-xs">
-                      <span className="font-extrabold text-[#414E36] flex items-center gap-2 text-xs">
-                        <Pill size={15} /> {t.savedPrescriptionTitle}
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-[#414E36] flex items-center gap-2 text-xs">
+                          <Pill size={15} /> {t.savedPrescriptionTitle}
+                        </span>
+                        <span className="text-[10px] font-bold bg-[#414E36]/10 text-[#414E36] px-2 py-0.5 rounded-full">
+                          v{matchingRx.version || 1}
+                        </span>
+                      </div>
                       {matchingRx.diagnosis && (
                         <p className="text-xs font-bold text-[#1F251A]">
                           <span className="text-[#5A6A51] font-medium">{t.diagnosisLabel}:</span> {matchingRx.diagnosis}

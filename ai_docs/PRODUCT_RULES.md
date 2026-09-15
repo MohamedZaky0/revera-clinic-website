@@ -743,3 +743,26 @@ The following are **not currently enforced in code**:
 4. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-054` (`Responsive Staff Views & Mobile Layout Engine`).
 
+---
+
+## Prescription Versioning & Immutable History Audit Rules
+**Enforced in:** `src/app/api/prescriptions/route.ts`, `src/components/admin/patients/useCustomerProfile.ts`, `src/components/admin/patients/CustomerProfileDrawer.tsx`, `src/components/admin/doctor/modals/DoctorPatientHistoryDrawer.tsx`, `src/components/admin/translations.ts`, `supabase/migrations/20260915180000_add_prescription_versioning.sql`.
+
+1. **Immutable History on Prescription Edit**:
+   - Editing an existing prescription must **never delete or mutate** previous version records in place.
+   - Every edit inserts a new prescription row with incremented version (`version = previous.version + 1`), sets `is_latest = true`, and links `parent_prescription_id` to the immediate ancestor and `root_prescription_id` to the v1 original root.
+   - The previous version is updated to `is_latest = false` to preserve the historical audit record.
+2. **Clinician & Staff Attribution**:
+   - Every prescription version captures the prescribing/modifying doctor's identity (`doctor_name` and `doctor_id`).
+3. **Prescription History Drawer & Read-Only Audit**:
+   - The Patient Profile Prescriptions tab provides a **Prescription History** action on every prescription record.
+   - Clicking **Prescription History** opens a dedicated chronological version timeline modal displaying each historical version with its version pill, date/time, doctor attribution, diagnosis, medications list, and general notes.
+   - Previous versions are strictly read-only and marked with `Read-Only History` badges and audit notice banners.
+   - Each historical version can be individually printed using standard clinic prescription templates.
+4. **Tooltips & Internationalization**:
+   - *Edit Prescription*: "Update this prescription. Previous versions will remain available in history." / "تعديل هذه الروشتة. ستبقى النسخ السابقة محفوظة في السجل."
+   - *Prescription History*: "View previous versions of this prescription." / "عرض النسخ السابقة من هذه الروشتة."
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-056` (`Prescription Versioning & Immutable History Audit Engine`).
+
+

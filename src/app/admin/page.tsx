@@ -2360,7 +2360,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-052', name: 'Optional Email Booking & Patient Creation Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies optional email support for staff booking creation and patient profile registration without validation blockers.', status: 'idle' },
     { id: 'TC-053', name: 'Reception & Staff Weekly Shift Configuration Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee profile creation, weekly shift schedule configuration for non-doctor staff, and department/role synchronization.', status: 'idle' },
     { id: 'TC-054', name: 'Responsive Staff Views & Mobile Layout Engine', category: 'System & Settings', endpoint: '/api/health/supabase', description: 'Verifies mobile responsiveness, horizontal scroll containers (min-w), adaptive padding, and auto-dismiss navigation for all staff views.', status: 'idle' },
-    { id: 'TC-055', name: 'Global Ending Session & Receptionist Clinical Finalization Engine', category: 'Services & Bookings', endpoint: '/api/page-settings', description: 'Verifies global session ending toggle activation, receptionist clinical intake & prescription synchronization, and instant doctor exit.', status: 'idle' }
+    { id: 'TC-055', name: 'Global Ending Session & Receptionist Clinical Finalization Engine', category: 'Services & Bookings', endpoint: '/api/page-settings', description: 'Verifies global session ending toggle activation, receptionist clinical intake & prescription synchronization, and instant doctor exit.', status: 'idle' },
+    { id: 'TC-056', name: 'Prescription Versioning & Immutable History Audit Engine', category: 'Medical & Patients', endpoint: '/api/prescriptions', description: 'Verifies prescription editing creating new immutable version chains (v1 -> v2), is_latest flags, doctor attribution, and read-only history retrieval.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -2669,6 +2670,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     rxFollowUpDate,
     setRxFollowUpDate,
     savingPrescription,
+    historyModalOpen,
+    setHistoryModalOpen,
+    historyPrescriptions,
+    loadingHistory,
+    selectedHistoryRx,
     fetchCustomerProductBalances,
     fetchAvailablePackageOffers,
     handleSellPackageToCustomer,
@@ -2676,6 +2682,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     handleAddProductToPatient,
     handleStartCreatePrescription,
     handleStartEditPrescription,
+    handleOpenPrescriptionHistory,
+    handleClosePrescriptionHistory,
     handleAddMedication,
     handleRemoveMedication,
     handleSavePrescription,
@@ -6394,12 +6402,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   rxFollowUpDate={rxFollowUpDate}
                   setRxFollowUpDate={setRxFollowUpDate}
                   savingPrescription={savingPrescription}
+                  historyModalOpen={historyModalOpen}
+                  setHistoryModalOpen={setHistoryModalOpen}
+                  historyPrescriptions={historyPrescriptions}
+                  loadingHistory={loadingHistory}
+                  selectedHistoryRx={selectedHistoryRx}
                   fetchAvailablePackageOffers={fetchAvailablePackageOffers}
                   handleSellPackageToCustomer={handleSellPackageToCustomer}
                   handleSaveUsageLog={handleSaveUsageLog}
                   handleAddProductToPatient={handleAddProductToPatient}
                   handleStartCreatePrescription={handleStartCreatePrescription}
                   handleStartEditPrescription={handleStartEditPrescription}
+                  handleOpenPrescriptionHistory={handleOpenPrescriptionHistory}
+                  handleClosePrescriptionHistory={handleClosePrescriptionHistory}
                   handleAddMedication={handleAddMedication}
                   handleRemoveMedication={handleRemoveMedication}
                   handleSavePrescription={handleSavePrescription}
