@@ -1534,21 +1534,70 @@ export async function PATCH(req: Request) {
 
       let derivedTotalCost = 0;
       if (effectiveServiceIds.length > 0) {
+        // Resolve branch pricing if target branch is known
+        let targetBranchName: string | null = null;
+        if (target.branch_id) {
+          try {
+            const { data: bObj } = await supabaseServer
+              .from('branches')
+              .select('name_en, name_ar')
+              .eq('id', target.branch_id)
+              .maybeSingle();
+            if (bObj) targetBranchName = bObj.name_en || bObj.name_ar || null;
+          } catch (e) {
+            console.warn('Branch lookup for pricing failed:', e);
+          }
+        }
+
         const { data: svcs } = await supabaseServer
           .from('services')
-          .select('id, price')
+          .select('id, price, branch_pricing')
           .in('id', effectiveServiceIds);
         if (svcs && svcs.length > 0) {
-          derivedTotalCost = svcs.reduce((sum: number, s: any) => sum + Number(s.price || 0), 0);
+          derivedTotalCost = svcs.reduce((sum: number, s: any) => {
+            const mappedService = { price: s.price !== null ? Number(s.price) : 0, branchPricing: s.branch_pricing };
+            return sum + getEffectiveServicePrice(mappedService, targetBranchName);
+          }, 0);
         }
       }
 
-      const effectivePaid = amountPaid !== undefined ? Number(amountPaid) : Number(target.amount_paid || 0);
+      // Query attached products / consumables from reservation_products
+      let attachedProductsCost = 0;
+      try {
+        const { data: resProducts } = await supabaseServer
+          .from('reservation_products')
+          .select('total, unit_price, price, qty')
+          .eq('reservation_id', id);
+        if (resProducts && resProducts.length > 0) {
+          attachedProductsCost = resProducts.reduce(
+            (sum: number, p: any) => sum + (Number(p.total) || (Number(p.qty || 1) * Number(p.unit_price || p.price || 0))),
+            0
+          );
+        }
+      } catch (e) {
+        console.warn('Could not query reservation_products for amount_left recalculation:', e);
+      }
 
-      // When completing a reservation, if amount_left wasn't explicitly provided, calculate it as total cost minus amount paid
-      if (amountLeft === undefined && (status === 'completed' || target.amount_left === null || target.amount_left === undefined)) {
-        const calculatedLeft = Math.max(0, derivedTotalCost - effectivePaid);
-        if (status === 'completed' || target.amount_left === null || target.amount_left === undefined) {
+      const effectivePaid = amountPaid !== undefined ? Number(amountPaid) : Number(target.amount_paid || 0);
+      const isServiceChanged = (serviceId !== undefined && Number(serviceId) !== Number(target.service_id)) || (serviceIds !== undefined);
+
+      // Record service change audit note if service changed or explicit audit passed
+      if (isServiceChanged && (body.oldServiceName || body.newServiceName || body.serviceChangeAudit)) {
+        const changedBy = body.changedBy || body.changed_by || 'Receptionist';
+        const oldName = body.oldServiceName || `Service #${target.service_id}`;
+        const oldPrice = body.oldServicePrice !== undefined ? `${body.oldServicePrice} EGP` : '';
+        const newName = body.newServiceName || `Service #${updates.service_id || target.service_id}`;
+        const newPrice = `${derivedTotalCost} EGP`;
+        const auditTime = new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
+        const auditEntry = `\n[Service Changed by ${changedBy} on ${auditTime}]: ${oldName}${oldPrice ? ` (${oldPrice})` : ''} ➔ ${newName} (${newPrice})`;
+        updates.notes = (updates.notes !== undefined ? updates.notes : (target.notes || '')) + auditEntry;
+      }
+
+      // When service changes or when completing a reservation, if amount_left wasn't explicitly provided,
+      // calculate it as (total service cost + attached products) minus effective amount paid
+      if (amountLeft === undefined) {
+        if (isServiceChanged || status === 'completed' || target.amount_left === null || target.amount_left === undefined) {
+          const calculatedLeft = Math.max(0, derivedTotalCost + attachedProductsCost - effectivePaid);
           updates.amount_left = calculatedLeft;
         }
       }
