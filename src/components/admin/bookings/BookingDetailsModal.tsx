@@ -37,6 +37,9 @@ import {
   Sparkles,
   Pill,
   Send,
+  Search,
+  ChevronDown,
+  ArrowRight,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
@@ -44,6 +47,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { ServiceItem, getEffectiveServicePrice } from "@/lib/services";
 import { printInvoice, printPrescription } from "@/lib/printUtils";
 import { Branch } from "@/types";
+import { adminTranslations } from "../translations";
 import type { Req } from "@/app/admin/page";
 
 export interface AdditionalServiceItem {
@@ -117,6 +121,16 @@ export default function BookingDetailsModal({
 }: BookingDetailsModalProps) {
   const { isRTL } = useLanguage();
   const { showConfirm } = useAlertConfirm();
+  const tr = (adminTranslations[isRTL ? "ar" : "en"] || adminTranslations.en).bookingControl;
+
+  // ── Receptionist Service Editing & Booking Control States ──
+  const [showChangeServiceModal, setShowChangeServiceModal] = useState<boolean>(false);
+  const [selectedNewServiceId, setSelectedNewServiceId] = useState<number | string>("");
+  const [serviceSearchTerm, setServiceSearchTerm] = useState<string>("");
+  const [serviceSelectedCategory, setServiceSelectedCategory] = useState<string>("All");
+  const [showPriceConfirmModal, setShowPriceConfirmModal] = useState<boolean>(false);
+  const [isSavingServiceChange, setIsSavingServiceChange] = useState<boolean>(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
 
   const [copiedBookingRef, setCopiedBookingRef] = useState<boolean>(false);
   const [drawerPrescriptions, setDrawerPrescriptions] = useState<any[]>([]);
@@ -594,6 +608,92 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         }
       });
   }, [booking?.id]);
+
+  // ── Receptionist Full Booking Status Control ──
+  const handleUpdateBookingStatus = async (newStatus: string) => {
+    if (!booking || isUpdatingStatus) return;
+    if (!hasPermission("bookings.edit")) {
+      alert(isRTL ? "ليس لديك صلاحية لتعديل الحجز" : "You do not have permission to edit bookings.");
+      return;
+    }
+
+    if (newStatus === "cancelled") {
+      if (!(await showConfirm(isRTL ? "هل أنت متأكد من إلغاء هذا الحجز؟ سيتم استرداد أي عربون مدفوع إلى محفظة المريض." : "Cancel this booking? Any deposit paid will be refunded to the patient's wallet."))) return;
+    } else if (newStatus === "no_show") {
+      if (!(await showConfirm(isRTL ? "هل أنت متأكد من تحديد هذا الحجز كعدم حضور؟ سيتم مصادرة أي عربون كرسوم إلغاء." : "Mark this booking as a no-show? Any deposit paid will be forfeited as a cancellation fee, not refunded."))) return;
+    }
+
+    setIsUpdatingStatus(true);
+    try {
+      const payload: any = { status: newStatus };
+      if (newStatus === "cancelled") payload.action = "cancel";
+      if (newStatus === "no_show") payload.action = "no_show";
+
+      const res = await fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}`, {
+        method: "PATCH",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const updated = await res.json().catch(() => ({}));
+        setBooking((prev) => (prev ? { ...prev, ...updated, status: newStatus } : null));
+        fetchAllReservations();
+        fetchRequests();
+        fetchCustomers();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || err.message || (isRTL ? "فشل تحديث حالة الحجز" : "Failed to update booking status."));
+      }
+    } catch (err: any) {
+      console.error("Error updating booking status:", err);
+      alert(err.message || (isRTL ? "حدث خطأ أثناء تحديث حالة الحجز" : "Error updating booking status."));
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // ── Receptionist Booked Service Editing & Price Recalculation ──
+  const handleConfirmServiceChange = async () => {
+    if (!booking || !selectedNewServiceId || isSavingServiceChange) return;
+    const newSvc = localServices.find((s) => String(s.id) === String(selectedNewServiceId));
+    if (!newSvc) return;
+
+    setIsSavingServiceChange(true);
+    try {
+      const newServiceName = (isRTL ? newSvc.ar : newSvc.en) || newSvc.en || newSvc.ar;
+      const res = await fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}`, {
+        method: "PATCH",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify({
+          serviceId: Number(selectedNewServiceId),
+          service_name: newServiceName,
+          changedBy: "Receptionist",
+        }),
+      });
+
+      if (res.ok) {
+        const updated = await res.json().catch(() => ({}));
+        setBooking((prev) => (prev ? { ...prev, ...updated } : null));
+        setPrimaryServiceId(String(selectedNewServiceId));
+        setShowPriceConfirmModal(false);
+        setShowChangeServiceModal(false);
+        setSelectedNewServiceId("");
+        setServiceSearchTerm("");
+        fetchAllReservations();
+        fetchRequests();
+        alert(tr.serviceUpdatedSuccess);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || err.message || (isRTL ? "فشل تغيير الخدمة" : "Failed to update service."));
+      }
+    } catch (err: any) {
+      console.error("Error updating service:", err);
+      alert(err.message || (isRTL ? "حدث خطأ أثناء تغيير الخدمة" : "Error updating service."));
+    } finally {
+      setIsSavingServiceChange(false);
+    }
+  };
 
   // ── Standalone Handlers for Global Ending Session View ──
   const handleSaveMedicalRecordStandalone = async (customData?: any) => {
@@ -2108,20 +2208,59 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       </button>
                     </span>
 
-                    {/* Status Badge */}
-                    <span className={`rounded-full px-3 py-0.5 text-[11px] font-extrabold uppercase tracking-wider ${
-                      booking.status === 'approved' || booking.status === 'confirmed'
-                        ? 'bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB]' 
-                        : booking.status === 'rejected' 
-                          ? 'bg-red-100 text-red-800' 
-                          : booking.status === 'completed'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : booking.status === 'started'
-                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                              : 'bg-amber-50 text-amber-800 border border-amber-200'
-                    }`}>
-                      {booking.status === 'approved' ? 'CONFIRMED' : booking.status.toUpperCase()}
-                    </span>
+                    {/* Interactive Status Selector / Badge */}
+                    {hasPermission("bookings.edit") ? (
+                      <div className="relative inline-flex items-center">
+                        <select
+                          value={booking.status === "approved" ? "confirmed" : booking.status}
+                          disabled={isUpdatingStatus}
+                          onChange={(e) => handleUpdateBookingStatus(e.target.value)}
+                          className={`rounded-full py-0.5 ps-3 pe-6 text-[11px] font-extrabold uppercase tracking-wider outline-none cursor-pointer appearance-none border transition shadow-2xs ${
+                            booking.status === 'approved' || booking.status === 'confirmed'
+                              ? 'bg-[#EBF7EE] text-[#1E7E34] border-[#C3E6CB] hover:bg-[#d9f2de]' 
+                              : booking.status === 'rejected' || booking.status === 'cancelled'
+                                ? 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200' 
+                                : booking.status === 'completed'
+                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200'
+                                  : booking.status === 'started'
+                                    ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
+                                    : booking.status === 'checked_in'
+                                      ? 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200'
+                                      : booking.status === 'no_show'
+                                        ? 'bg-rose-100 text-rose-800 border-rose-200 hover:bg-rose-200'
+                                        : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                          }`}
+                          title={tr.statusSelectorLabel}
+                        >
+                          <option value="pending">{tr.statusOptions.pending}</option>
+                          <option value="confirmed">{tr.statusOptions.confirmed}</option>
+                          <option value="checked_in">{tr.statusOptions.checked_in}</option>
+                          <option value="started">{tr.statusOptions.started}</option>
+                          <option value="completed">{tr.statusOptions.completed}</option>
+                          <option value="cancelled">{tr.statusOptions.cancelled}</option>
+                          <option value="no_show">{tr.statusOptions.no_show}</option>
+                        </select>
+                        <ChevronDown size={11} className={`pointer-events-none absolute ${isRTL ? "left-2" : "right-2"} text-current opacity-70`} />
+                      </div>
+                    ) : (
+                      <span className={`rounded-full px-3 py-0.5 text-[11px] font-extrabold uppercase tracking-wider ${
+                        booking.status === 'approved' || booking.status === 'confirmed'
+                          ? 'bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB]' 
+                          : booking.status === 'rejected' || booking.status === 'cancelled'
+                            ? 'bg-red-100 text-red-800' 
+                            : booking.status === 'completed'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : booking.status === 'started'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                : booking.status === 'checked_in'
+                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  : booking.status === 'no_show'
+                                    ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                    : 'bg-amber-50 text-amber-800 border border-amber-200'
+                      }`}>
+                        {booking.status === 'approved' ? 'CONFIRMED' : (tr.statusOptions[booking.status as keyof typeof tr.statusOptions] || booking.status).toUpperCase()}
+                      </span>
+                    )}
 
                     {/* Source Badge */}
                     <span className={`rounded-full px-3 py-0.5 text-[11px] font-extrabold uppercase tracking-wider ${
@@ -2219,9 +2358,25 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* Card A: SERVICE */}
                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
-                      <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
-                        <ShoppingBag size={13} className="text-[#0F3826]" />
-                        <span>SERVICE</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
+                          <ShoppingBag size={13} className="text-[#0F3826]" />
+                          <span>SERVICE</span>
+                        </div>
+                        {hasPermission("bookings.edit") && booking.status !== 'completed' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedNewServiceId(String(booking.serviceId || (booking.serviceIds && booking.serviceIds[0]) || ""));
+                              setShowChangeServiceModal(true);
+                            }}
+                            className="rounded-lg border border-[#414E36]/20 bg-[#414E36]/05 px-2 py-0.5 text-[10px] font-bold text-[#414E36] hover:bg-[#414E36]/15 transition flex items-center gap-1 cursor-pointer"
+                            title={tr.changeServiceBtn}
+                          >
+                            <Edit size={10} />
+                            <span>{tr.changeServiceBtn}</span>
+                          </button>
+                        )}
                       </div>
                       <p className="font-black text-sm text-[#1F251A] leading-snug line-clamp-1 pt-0.5" title={serviceNames}>
                         {bookingServices[0]?.name || serviceNames || "Clinic Service"}
@@ -2323,16 +2478,31 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <Box size={14} className="text-[#0F3826]" />
                         <span>SERVICE DETAILS</span>
                       </div>
-                      {!isEditingService && hasPermission("bookings.edit") && booking.status !== 'completed' && (
-                        <button
-                          type="button"
-                          onClick={() => setIsEditingService(true)}
-                          className="rounded-xl border border-gray-200 bg-white px-3 py-1 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                        >
-                          <Plus size={12} />
-                          <span>Add Service</span>
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {hasPermission("bookings.edit") && booking.status !== 'completed' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedNewServiceId(String(booking.serviceId || (booking.serviceIds && booking.serviceIds[0]) || ""));
+                              setShowChangeServiceModal(true);
+                            }}
+                            className="rounded-xl border border-[#414E36]/20 bg-[#414E36]/05 px-2.5 py-1 text-xs font-bold text-[#414E36] hover:bg-[#414E36]/15 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                          >
+                            <Edit size={12} />
+                            <span>{tr.changeServiceBtn}</span>
+                          </button>
+                        )}
+                        {!isEditingService && hasPermission("bookings.edit") && booking.status !== 'completed' && (
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingService(true)}
+                            className="rounded-xl border border-gray-200 bg-white px-3 py-1 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                          >
+                            <Plus size={12} />
+                            <span>Add Service</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Services List */}
@@ -3261,6 +3431,318 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           </div>
         </div>
       )}
+
+      {/* Service Selection Picker Modal */}
+      {showChangeServiceModal && booking && (() => {
+        const serviceCategories = ["All", ...Array.from(new Set((localServices || []).map(s => s.cat || (s as any).category_ar || (s as any).category_en || (isRTL ? "خدمات عامة" : "General")).filter(Boolean)))];
+
+        const filteredServicesList = (localServices || []).filter(svc => {
+          const nameEn = (svc.en || "").toLowerCase();
+          const nameAr = (svc.ar || "").toLowerCase();
+          const cat = (svc.cat || (svc as any).category_en || (svc as any).category_ar || "").toLowerCase();
+          const search = serviceSearchTerm.toLowerCase().trim();
+
+          const matchesSearch = !search || nameEn.includes(search) || nameAr.includes(search) || cat.includes(search);
+          const svcCat = svc.cat || (svc as any).category_en || (svc as any).category_ar || (isRTL ? "خدمات عامة" : "General");
+          const matchesCategory = serviceSelectedCategory === "All" || svcCat === serviceSelectedCategory;
+
+          return matchesSearch && matchesCategory;
+        });
+
+        return (
+          <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-5 animate-fadeIn">
+            <div className="w-full max-w-2xl rounded-3xl bg-[#FBFBF9] p-5 sm:p-6 shadow-2xl border border-[#414E36]/15 space-y-4 max-h-[90vh] flex flex-col">
+              {/* Header */}
+              <div className="flex items-start justify-between border-b border-[#414E36]/10 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full">
+                      {isRTL ? "الاستقبال • تعديل الحجز" : "Reception • Booking Update"}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-[#5A6A51]">
+                      #{booking.id}
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black text-[#1F251A] mt-1">
+                    {tr.editServiceTitle}
+                  </h3>
+                  <p className="text-xs text-[#5A6A51] mt-0.5">
+                    {isRTL ? "اختر الخدمة الجديدة ليتم تحديث الحجز وحساب السعر تلقائياً" : "Select a new clinical service to replace the currently booked procedure."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangeServiceModal(false);
+                    setServiceSearchTerm("");
+                    setSelectedNewServiceId("");
+                  }}
+                  className="h-9 w-9 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-800 flex items-center justify-center transition cursor-pointer shrink-0"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Search & Category Filter */}
+              <div className="space-y-2.5">
+                <div className="relative">
+                  <Search size={15} className={`absolute ${isRTL ? "right-3" : "left-3"} top-1/2 -translate-y-1/2 text-[#5A6A51]`} />
+                  <input
+                    type="text"
+                    value={serviceSearchTerm}
+                    onChange={(e) => setServiceSearchTerm(e.target.value)}
+                    placeholder={tr.searchServicePlaceholder}
+                    className={`w-full rounded-2xl border border-[#414E36]/20 bg-white py-2.5 text-xs text-[#1F251A] font-semibold outline-none focus:border-[#414E36] shadow-2xs ${isRTL ? "pr-9 pl-3" : "pl-9 pr-3"}`}
+                  />
+                </div>
+
+                {/* Category Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar text-xs">
+                  {serviceCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setServiceSelectedCategory(cat)}
+                      className={`px-3 py-1 rounded-full text-[11px] font-bold shrink-0 transition cursor-pointer ${
+                        serviceSelectedCategory === cat
+                          ? "bg-[#414E36] text-white shadow-2xs"
+                          : "bg-white text-[#5A6A51] border border-[#414E36]/15 hover:bg-gray-50"
+                      }`}
+                    >
+                      {cat === "All" ? (isRTL ? "جميع الخدمات" : "All Services") : cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Services Grid */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pe-1 max-h-[42vh]">
+                {filteredServicesList.length === 0 ? (
+                  <div className="text-center py-10 text-xs text-[#5A6A51]">
+                    <p className="font-bold">{tr.noServicesFound}</p>
+                  </div>
+                ) : (
+                  filteredServicesList.map((svc) => {
+                    const isSelected = String(selectedNewServiceId) === String(svc.id);
+                    const isCurrent = String(primaryServiceId || booking.serviceId) === String(svc.id);
+                    const svcPrice = getEffectiveServicePrice(svc, booking.branchId, branches);
+                    const svcName = (isRTL ? svc.ar : svc.en) || svc.en || svc.ar;
+                    const catLabel = svc.cat || (svc as any).category_ar || (svc as any).category_en || "";
+
+                    return (
+                      <div
+                        key={svc.id}
+                        onClick={() => setSelectedNewServiceId(svc.id)}
+                        className={`flex items-center justify-between p-3.5 rounded-2xl border transition cursor-pointer ${
+                          isSelected
+                            ? "bg-[#EBF7EE] border-[#1E7E34] shadow-xs"
+                            : isCurrent
+                              ? "bg-amber-50/70 border-amber-200 hover:bg-amber-50"
+                              : "bg-white border-[#414E36]/10 hover:border-[#414E36]/30 hover:bg-[#F4F5F1]"
+                        }`}
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-extrabold text-xs text-[#1F251A]">
+                              {svcName}
+                            </span>
+                            {catLabel && (
+                              <span className="text-[10px] font-bold text-[#5A6A51] bg-[#EDF1EC] px-2 py-0.5 rounded-md">
+                                {catLabel}
+                              </span>
+                            )}
+                            {isCurrent && (
+                              <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
+                                {isRTL ? "الخدمة الحالية" : "Current Service"}
+                              </span>
+                            )}
+                          </div>
+                          {svc.duration && (
+                            <span className="text-[11px] text-[#5A6A51] block mt-0.5">
+                              ⏱ {svc.duration} {isRTL ? "دقيقة" : "min"}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="font-black text-sm text-[#414E36]">
+                            {svcPrice} EGP
+                          </span>
+                          <div className={`h-5 w-5 rounded-full flex items-center justify-center border ${
+                            isSelected ? "bg-[#1E7E34] border-[#1E7E34] text-white" : "border-gray-300 bg-white"
+                          }`}>
+                            {isSelected && <Check size={12} />}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex items-center justify-between gap-3 pt-3 border-t border-[#414E36]/10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangeServiceModal(false);
+                    setServiceSearchTerm("");
+                    setSelectedNewServiceId("");
+                  }}
+                  className="px-4 py-2.5 rounded-2xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+                >
+                  {tr.cancelBtn}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!selectedNewServiceId || String(selectedNewServiceId) === String(primaryServiceId || booking.serviceId)}
+                  onClick={() => setShowPriceConfirmModal(true)}
+                  className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-6 py-2.5 text-xs font-black text-white hover:bg-[#343F2B] transition disabled:opacity-40 cursor-pointer shadow-sm"
+                >
+                  <span>{isRTL ? "مراجعة وتأكيد السعر" : "Review & Confirm Price"}</span>
+                  <ArrowRight size={14} className={isRTL ? "rotate-180" : ""} />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Price Change Confirmation Modal */}
+      {showPriceConfirmModal && booking && (() => {
+        const currentPrimaryService = (localServices || []).find(
+          (s) => String(s.id) === String(primaryServiceId || booking.serviceId || (booking.serviceIds && booking.serviceIds[0])) ||
+                 (s.en && s.en === ((booking as any).service || (booking as any).service_name)) ||
+                 (s.ar && s.ar === ((booking as any).service || (booking as any).service_name))
+        );
+        const currentServicePrice = currentPrimaryService
+          ? getEffectiveServicePrice(currentPrimaryService, booking.branchId, branches)
+          : (Number((booking as any).total_price || (booking as any).price || 0) || 500);
+        const currentServiceName = currentPrimaryService
+          ? (isRTL ? currentPrimaryService.ar : currentPrimaryService.en)
+          : ((booking as any).service || (booking as any).service_name || "Current Service");
+
+        const selectedNewSvcObj = (localServices || []).find((s) => String(s.id) === String(selectedNewServiceId));
+        const selectedNewSvcPrice = selectedNewSvcObj
+          ? getEffectiveServicePrice(selectedNewSvcObj, booking.branchId, branches)
+          : 0;
+        const selectedNewSvcName = selectedNewSvcObj
+          ? (isRTL ? selectedNewSvcObj.ar : selectedNewSvcObj.en)
+          : "";
+
+        const effectivePaidAmount = Number(booking.amountPaid || (booking as any).amount_paid || (booking as any).deposit_amount || 0);
+        const attachedProductsSubtotal = ((booking as any).attachedProducts || []).reduce((sum: number, p: any) => sum + Number(p.total || 0), 0);
+        const projectedNewInvoiceTotal = selectedNewSvcPrice + attachedProductsSubtotal;
+        const projectedNewAmountLeft = Math.max(0, projectedNewInvoiceTotal - effectivePaidAmount);
+
+        return (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-5 animate-fadeIn">
+            <div className="w-full max-w-lg rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-[#414E36]/20 space-y-5">
+              {/* Top Banner */}
+              <div className="flex items-start gap-3">
+                <div className="h-11 w-11 rounded-2xl bg-[#EBF7EE] text-[#1E7E34] flex items-center justify-center shrink-0">
+                  <Sparkles size={22} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-black text-[#1F251A] tracking-tight">
+                    {tr.confirmServiceChangeTitle}
+                  </h3>
+                  <p className="text-xs text-[#5A6A51] mt-1 leading-relaxed">
+                    {tr.confirmServiceChangeDesc}
+                  </p>
+                </div>
+              </div>
+
+              {/* Comparison Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Old Service Card */}
+                <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-3.5 space-y-1">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500 block">
+                    {tr.originalServiceLabel}
+                  </span>
+                  <p className="font-bold text-xs text-gray-800 line-clamp-2">
+                    {currentServiceName}
+                  </p>
+                  <p className="font-extrabold text-sm text-gray-700 pt-1">
+                    {currentServicePrice} EGP
+                  </p>
+                </div>
+
+                {/* New Service Card */}
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3.5 space-y-1">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 block">
+                    {tr.newServiceLabel}
+                  </span>
+                  <p className="font-bold text-xs text-emerald-950 line-clamp-2">
+                    {selectedNewSvcName}
+                  </p>
+                  <p className="font-extrabold text-sm text-emerald-800 pt-1">
+                    {selectedNewSvcPrice} EGP
+                  </p>
+                </div>
+              </div>
+
+              {/* Financial Recalculation Summary */}
+              <div className="rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 p-4 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between text-[#5A6A51]">
+                  <span>{tr.paidAmountLabel}:</span>
+                  <span className="font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                    {effectivePaidAmount} EGP (100% {isRTL ? "محفوظ" : "Preserved"})
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[#5A6A51]">
+                  <span>{isRTL ? "إجمالي الفاتورة الجديد:" : "New Total Invoice:"}</span>
+                  <span className="font-bold text-[#1F251A]">
+                    {projectedNewInvoiceTotal} EGP
+                  </span>
+                </div>
+
+                <div className="pt-2 border-t border-[#414E36]/10 flex items-center justify-between text-[#1F251A]">
+                  <span className="font-extrabold text-xs sm:text-sm">
+                    {tr.remainingDueLabel}:
+                  </span>
+                  <span className={`font-black text-sm sm:text-base ${projectedNewAmountLeft > 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                    {projectedNewAmountLeft} EGP
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isSavingServiceChange}
+                  onClick={() => setShowPriceConfirmModal(false)}
+                  className="px-4 py-2.5 rounded-2xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+                >
+                  {isRTL ? "رجوع" : "Back"}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSavingServiceChange}
+                  onClick={handleConfirmServiceChange}
+                  className="flex items-center gap-2 rounded-2xl bg-[#0F3826] px-6 py-2.5 text-xs font-black text-white hover:bg-[#0A271A] transition disabled:opacity-50 cursor-pointer shadow-md"
+                >
+                  {isSavingServiceChange ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>{tr.updatingService}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={14} />
+                      <span>{tr.saveServiceChangeBtn}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }

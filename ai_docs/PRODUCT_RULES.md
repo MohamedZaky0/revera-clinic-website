@@ -765,4 +765,41 @@ The following are **not currently enforced in code**:
 5. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-056` (`Prescription Versioning & Immutable History Audit Engine`).
 
+---
+
+## Receptionist Booking Control & Booked Service Editing Rules
+**Enforced in:** `src/app/api/reservations/route.ts`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/components/admin/translations.ts`.
+
+1. **Full Receptionist Booking Status Lifecycle Control**:
+   - Receptionists and authorized staff have direct, single-click control over booking status transitions across the entire lifecycle: `pending`, `confirmed` / `approved`, `checked_in` / arrived, `started` / in-progress, `completed`, `cancelled`, and `no_show`.
+   - The interactive status selector is available directly in the modal header and session flow card.
+   - Cancel and No-Show transitions require explicit confirmation to avoid accidental cancellations.
+
+2. **Booked Service Replacement On Patient Arrival**:
+   - Receptionists can edit or replace the assigned clinical service directly when the patient arrives at the clinic or from the Booking Details drawer.
+   - A dedicated **Change Service** action opens a structured Service Picker with real-time search, category filtering, and effective branch pricing.
+
+3. **Financial Integrity & Automatic Recalculation**:
+   - Previously paid amounts (`amount_paid` or deposit amounts) are **100% preserved** and never reset or overwritten during a service replacement.
+   - The new service's price is resolved dynamically according to the booking's assigned branch (`getEffectiveServicePrice` / branch price overrides).
+   - The invoice total is recalculated: `total_price = new_service_price + attached_products_cost`.
+   - Remaining balance due is automatically updated: `amount_left = Math.max(0, total_price - amount_paid)`.
+   - If the new service price is lower than or equal to the amount already paid, `amount_left` becomes 0 (and the invoice is treated as fully settled).
+
+4. **Price Confirmation Dialog**:
+   - Prior to committing the change, the system displays a clear, bilingual comparative dialog showing:
+     - Old Service & Old Price
+     - New Service & New Price
+     - Paid Amount (Preserved & Protected)
+     - Recalculated Remaining Due
+     - Financial reassurance notice explaining the automatic adjustment.
+
+5. **Audit Logging & Historical Traceability**:
+   - Changing a service automatically appends an immutable audit entry to `notes`:
+     `[Service Changed by {user} on {timestamp}]: {oldServiceName} ({oldPrice} EGP) ➔ {newServiceName} ({newPrice} EGP)`.
+
+6. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-057` (`Receptionist Booking Control & Service Editing Engine`).
+
+
 
