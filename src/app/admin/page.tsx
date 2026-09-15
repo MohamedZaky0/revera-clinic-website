@@ -19,7 +19,7 @@ import { translations } from "@/lib/translations";
 import { CLIENT } from "@/config/client";
 import { getRoleSlug, getRoleDisplayName, isPortalRoleMatch } from "@/lib/roleUtils";
 import { adminTranslations } from "@/components/admin/translations";
-import UserProfileView from "@/components/admin/UserProfileView";
+import UserProfileView, { UserProfileViewTranslations } from "@/components/admin/UserProfileView";
 import ClinicProfileSettingsView from "@/components/admin/settings/ClinicProfileSettingsView";
 import MedicalRecordsSettingsView from "@/components/admin/settings/MedicalRecordsSettingsView";
 import RoleManagementView from "@/components/admin/settings/RoleManagementView";
@@ -2361,8 +2361,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-053', name: 'Reception & Staff Weekly Shift Configuration Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee profile creation, weekly shift schedule configuration for non-doctor staff, and department/role synchronization.', status: 'idle' },
     { id: 'TC-054', name: 'Responsive Staff Views & Mobile Layout Engine', category: 'System & Settings', endpoint: '/api/health/supabase', description: 'Verifies mobile responsiveness, horizontal scroll containers (min-w), adaptive padding, and auto-dismiss navigation for all staff views.', status: 'idle' },
     { id: 'TC-055', name: 'Global Ending Session & Receptionist Clinical Finalization Engine', category: 'Services & Bookings', endpoint: '/api/page-settings', description: 'Verifies global session ending toggle activation, receptionist clinical intake & prescription synchronization, and instant doctor exit.', status: 'idle' },
-    { id: 'TC-056', name: 'Prescription Versioning & Immutable History Audit Engine', category: 'Medical & Patients', endpoint: '/api/prescriptions', description: 'Verifies prescription editing creating new immutable version chains (v1 -> v2), is_latest flags, doctor attribution, and read-only history retrieval.', status: 'idle' },
-    { id: 'TC-057', name: 'Receptionist Booking Control & Service Editing Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies receptionist booking status lifecycle transitions, booked service replacement on arrival, branch price resolution, and paid amount preservation.', status: 'idle' }
+    { id: 'TC-057', name: 'Receptionist Booking Control & Service Editing Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies receptionist booking status lifecycle transitions, booked service replacement on arrival, branch price resolution, and paid amount preservation.', status: 'idle' },
+    { id: 'TC-058', name: 'User Profile Working Details & Schedule Visualization Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee profile schedule extraction, multi-branch weekly matrix normalization, 12h time formatting, and dynamic fallback resolution.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -6654,18 +6654,27 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   address: profileAddress || profileEmployee?.address || "",
                   role: isSuperadminBypass ? "Superadmin" : (profileEmployee?.role_name || "Employee"),
                   branch: currentBranchName,
+                  branchesList: Array.isArray(profileEmployee?.branches) && profileEmployee.branches.length > 0
+                    ? profileEmployee.branches
+                    : [currentBranchName],
                   department: profileEmployee?.department || "Reception",
                   employeeId: isSuperadminBypass ? "EMP-SUPER" : (profileEmployee?.employee_id || "EMP-001"),
                   employmentType: "Full Time",
                   joiningDate: profileEmployee?.created_at
                     ? new Date(profileEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
                     : "July 21, 2026",
+                  shiftType: profileEmployee?.shift_type || profileEmployee?.shift || "Day",
+                  workingDays: profileEmployee?.working_days || null,
+                  workingHours: profileEmployee?.working_hours || null,
+                  workingDaysHours: profileEmployee?.working_days_hours || null,
                   basicSalary: Number(profileEmployee?.salary || 0),
                   bonuses: Number(profileEmployee?.bonus || 0),
                   deductions: Number(profileEmployee?.deductions || 0),
                   monthlyTarget: Number(profileEmployee?.required_target_amount || 0),
                   avatarUrl: customerAvatars[profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile"] || null
                 }}
+                lang="en"
+                t={adminTranslations.en.userProfile as UserProfileViewTranslations}
                 onUpdateUser={async (updated) => {
                   if (updated.email) setAdminEmail(updated.email);
                   if (updated.phone) setProfilePhone(updated.phone);
@@ -6704,8 +6713,6 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   const key = profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile";
                   if (key) handleAvatarRemove(key);
                 }}
-                lang={lang}
-                t={adminTranslations[lang].userProfile}
               />
             );
           })()}

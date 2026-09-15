@@ -801,5 +801,38 @@ The following are **not currently enforced in code**:
 6. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-057` (`Receptionist Booking Control & Service Editing Engine`).
 
+---
+
+## User Profile Working Details & Schedule Visualization Engine Rules
+**Enforced in:** `src/components/admin/UserProfileView.tsx`, `src/components/admin/translations.ts`, `src/app/admin/page.tsx`, `src/components/admin/DoctorAccountView.tsx`.
+
+1. **Zero-Dash Guarantee for Schedule Information**:
+   - Working Days and Working Hours must **never** display empty dashes (`—`) in employee or doctor profiles.
+   - When no custom working schedule is found in the database, the system automatically resolves to the clinic's standard operating schedule (**Saturday – Thursday**, **10:00 AM – 08:00 PM**, **Friday Off**).
+
+2. **Multi-Source Schedule Normalization**:
+   - The schedule engine recursively normalizes all data representations:
+     - Nested `branch_schedules` per branch ID
+     - Direct `in_person` and `online` nodes
+     - Multi-shift arrays (`shifts: [{ start: "...", end: "..." }]`)
+     - Pre-formatted text shifts (e.g., `"09:00 AM to 05:00 PM"`, `"10:00 AM to 08:00 PM"`)
+     - 24-hour time strings (`"09:00"`, `"17:00"`) converted into clean 12-hour AM/PM format (`"09:00 AM – 05:00 PM"` in English, `"09:00 ص – 05:00 م"` in Arabic).
+
+3. **Background Database Auto-Enrichment**:
+   - If schedule props are not fully pre-populated by parent views, `UserProfileView` performs client-side lookups against `employee_accounts` and `providers` to retrieve complete working days, hours, and branch assignments.
+
+4. **Modern 7-Day Interactive Weekly Schedule Matrix**:
+   - Section 2 (**Work Information & Weekly Schedule**) displays an interactive 7-day visual grid (Saturday through Friday) with:
+     - **Active Days**: Emerald active pill with checkmark, 12-hour formatted time slot badges, and daily hours duration.
+     - **Off Days**: Clean muted card with coffee/moon icon and `Off Day` / `Rest Day` badge.
+     - **Today Indicator**: Dynamic highlighting of the current day of the week with a prominent `Today` badge.
+     - **Header Badges**: Shift badge with Sun/Moon/Clock icons, Total Weekly Working Hours counter (`X hrs/week`), and Active Days count (`X Days Active`).
+     - **Attribute Cards**: 6 modern structured cards for Department, Employment Type, Assigned Branches, Active Working Days, Daily Working Hours, and Weekly Off Day.
+     - **Branch Schedule Switcher**: Seamless branch tab switcher when staff is assigned to multiple branches with distinct operating hours.
+
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-058` (`User Profile Working Details & Schedule Visualization Engine`).
+
+
 
 
