@@ -37,6 +37,7 @@ interface DoctorScheduleTabProps {
   filteredSchedule: any[];
   handleOpenScheduleModal: (booking: any) => void;
   onOpenOngoingSession?: (booking: any) => void;
+  onStartOngoingSession?: (booking: any) => void;
   t: any;
 }
 
@@ -62,6 +63,7 @@ export default function DoctorScheduleTab({
   filteredSchedule,
   handleOpenScheduleModal,
   onOpenOngoingSession,
+  onStartOngoingSession,
   t
 }: DoctorScheduleTabProps) {
   return (
@@ -396,10 +398,21 @@ export default function DoctorScheduleTab({
                           <button
                             type="button"
                             onClick={() => onOpenOngoingSession(item)}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] text-white px-3 sm:px-3.5 py-1.5 text-xs font-black shadow-md hover:bg-[#343F2B] active:scale-95 transition cursor-pointer animate-pulse"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 text-white px-3 sm:px-3.5 py-1.5 text-xs font-black shadow-md hover:bg-amber-700 active:scale-95 transition cursor-pointer animate-pulse"
                           >
                             <Play size={13} />
                             <span>{t.openSessionBtn || "Open Session"}</span>
+                          </button>
+                        )}
+
+                        {!isCompleted && !isInSession && !["cancelled", "canceled", "rejected"].includes(item.status) && onStartOngoingSession && (
+                          <button
+                            type="button"
+                            onClick={() => onStartOngoingSession(item)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] text-white px-3 sm:px-3.5 py-1.5 text-xs font-bold shadow-md hover:bg-[#343F2B] active:scale-95 transition cursor-pointer"
+                          >
+                            <Play size={13} />
+                            <span>{t.startTreatmentBtn || "Start Treatment"}</span>
                           </button>
                         )}
 
@@ -544,9 +557,18 @@ export default function DoctorScheduleTab({
                               <button
                                 type="button"
                                 onClick={() => onOpenOngoingSession(item)}
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] text-white px-3 py-1.5 text-xs font-black shadow-md hover:bg-[#343F2B] active:scale-95 transition cursor-pointer animate-pulse"
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 text-white px-3 py-1.5 text-xs font-black shadow-md hover:bg-amber-700 active:scale-95 transition cursor-pointer animate-pulse"
                               >
                                 <Play size={12} /> <span>{t.openSessionBtn || "Open"}</span>
+                              </button>
+                            )}
+                            {!["completed", "done", "cancelled", "canceled", "rejected", "started", "in-progress"].includes(item.status) && onStartOngoingSession && (
+                              <button
+                                type="button"
+                                onClick={() => onStartOngoingSession(item)}
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] text-white px-3 py-1.5 text-xs font-bold shadow-md hover:bg-[#343F2B] active:scale-95 transition cursor-pointer"
+                              >
+                                <Play size={12} /> <span>{t.startTreatmentBtn || "Start"}</span>
                               </button>
                             )}
                             <button

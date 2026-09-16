@@ -44,6 +44,7 @@ interface DoctorSessionDrawerProps {
   savingNote: boolean;
   handleCompleteTreatment: (booking: any, totalPulses?: number) => void;
   setActiveSessionBooking?: (booking: any) => void;
+  onStartOngoingSession?: (booking: any) => void;
   setActiveTab?: (tab: any) => void;
   prescriptionsMap?: Record<string, any[]>;
   servicesList?: any[];
@@ -77,6 +78,7 @@ export default function DoctorSessionDrawer({
   savingNote,
   handleCompleteTreatment,
   setActiveSessionBooking,
+  onStartOngoingSession,
   setActiveTab,
   prescriptionsMap = {},
   servicesList = [],
@@ -419,8 +421,12 @@ export default function DoctorSessionDrawer({
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveSessionBooking?.(scheduleModalBooking);
-                    setActiveTab?.("ongoing");
+                    if (onStartOngoingSession) {
+                      onStartOngoingSession(scheduleModalBooking);
+                    } else {
+                      setActiveSessionBooking?.(scheduleModalBooking);
+                      setActiveTab?.("ongoing");
+                    }
                     setScheduleModalBooking(null);
                   }}
                   className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
