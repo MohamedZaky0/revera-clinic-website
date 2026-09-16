@@ -12,15 +12,16 @@
 | Date | Check | Environment | Evidence | Result |
 |---|---|---|---|---|
 | 2026-09-17 | Add Service to a category with existing services | Local dev (`localhost:57422`), `finance-test@revera.com` | Pre-fix: `POST /api/services` → 500, server log `null value in column "id" ... violates not-null constraint`. Post-fix: 201, new row ("Test Diagnostic Service", id 57) appeared in the Dermatology & Aesthetic list at EGP 150. Deleted afterward to leave the shared dev DB clean. | PASS |
+| 2026-09-17 | Editing an existing service still works | Local dev (`localhost:49353`), `finance-test@revera.com` | Edited "Skin Care Treatments" (id 2) price 120 → 121: `POST /api/services` → 201, response showed `id: 2` unchanged with `price: 121`, still 7/21 total rows (no duplicate). Hard-reloaded the page — EGP 121 persisted. Reverted 121 → 120 the same way (another 201, `id: 2` unchanged) to leave the row exactly as found. | PASS |
 
 ## Per-check list
 
 ### Adding a brand-new service works
 
-- [ ] Open Admin → Services. Pick a category that already has at least one service in it (this is the exact shape that triggered the bug — a mixed array of existing + new rows).
-- [ ] Click **Add Service** on that category, fill in Category, Duration, Session Type, Name (EN), Name (AR), Price, and click **Save**.
-- [ ] Confirm the modal closes and the new service appears in the list immediately, with a real (non-zero) `ID` column value and the price/name you entered.
-- [ ] Reload the page (hard refresh). Confirm the new service is still there — i.e. it actually persisted to the DB, not just optimistic local state.
+- [x] Open Admin → Services. Pick a category that already has at least one service in it (this is the exact shape that triggered the bug — a mixed array of existing + new rows).
+- [x] Click **Add Service** on that category, fill in Category, Duration, Session Type, Name (EN), Name (AR), Price, and click **Save**.
+- [x] Confirm the modal closes and the new service appears in the list immediately, with a real (non-zero) `ID` column value and the price/name you entered.
+- [x] Reload the page (hard refresh). Confirm the new service is still there — i.e. it actually persisted to the DB, not just optimistic local state. — Verified 2026-09-17, see Evidence log.
 
 ### Adding to a category with zero existing services still works
 
@@ -28,7 +29,7 @@
 
 ### Editing an existing service still works (this path was never broken)
 
-- [ ] Open an existing service, change its price or name, save. Confirm the change persists after a reload, and no duplicate row was created.
+- [x] Open an existing service, change its price or name, save. Confirm the change persists after a reload, and no duplicate row was created. — Verified 2026-09-17, see Evidence log.
 
 ### Adding while other services in the same category are simultaneously being edited/reordered
 
