@@ -282,6 +282,9 @@ A comprehensive architectural and functional audit of the Revera Clinic codebase
 | **CORRUPT-D05** | Doctor View | `src/components/admin/DoctorAccountView.tsx:640` | Base service price drops to 0 unless manually changed in UI | **High** | **Fixed** |
 | **CORRUPT-D06** | Doctor View | `src/app/api/hr/doctor-payroll/route.ts:80` | Doctor commission skipped when reservation lacks `provider_id` | **High** | **Fixed** |
 | **CORRUPT-D07** | Doctor View | `tests/components/doctor/DoctorProfileDetailsView.test.tsx` | Test suite selector mismatch against redesigned doctor profile view | **Medium** | **Fixed** |
+| **CORRUPT-D08** | Doctor View | `src/components/admin/DoctorAccountView.tsx` | Doctor portal leaking all clinic appointments via loose token matching and empty array fallback | **Critical** | **Fixed** |
+| **CORRUPT-D09** | Doctor View | `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx` | Ongoing session desynchronization, missing DB status transition on start, and inactive queue triggers | **Critical** | **Fixed** |
+| **CORRUPT-D10** | Doctor View | `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx` | Prescription blanking on session reload and duplicate insertions on multi-save | **High** | **Fixed** |
 | **CORRUPT-S01** | Security | `src/app/api/medical-records/route.ts` | PHI medical records accessible without role authorization | **Critical** | **Fixed** |
 | **CORRUPT-S02** | Security | `src/app/api/branches/route.ts` | Clinic configuration CRUD endpoints lack admin auth | **High** | **Fixed** |
 | **CORRUPT-S03** | Architecture | `supabase/migrations/` | Migration tracking drift between dev and production DB | **High** | **Fixed** |

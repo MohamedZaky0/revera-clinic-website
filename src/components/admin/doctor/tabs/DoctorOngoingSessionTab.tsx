@@ -85,6 +85,7 @@ interface DoctorOngoingSessionTabProps {
   setActiveTab: (tab: DoctorTab) => void;
   reservations?: any[];
   setActiveSessionBooking?: (booking: any) => void;
+  onStartOngoingSession?: (booking: any) => void;
   onAdditionalServicesChange?: (services: AdditionalServiceItem[]) => void;
   t: any;
 }
@@ -136,6 +137,7 @@ export default function DoctorOngoingSessionTab({
   setActiveTab,
   reservations = [],
   setActiveSessionBooking,
+  onStartOngoingSession,
   onAdditionalServicesChange,
   t
 }: DoctorOngoingSessionTabProps) {
@@ -154,6 +156,8 @@ export default function DoctorOngoingSessionTab({
   const [dynamicResponses, setDynamicResponses] = useState<Record<string, any>>({});
 
   // Inline Prescription State (positioned above services & products)
+  const [existingRxId, setExistingRxId] = useState<string | null>(null);
+  const [loadingRx, setLoadingRx] = useState(false);
   const [rxDiagnosis, setRxDiagnosis] = useState("");
   const [rxMedications, setRxMedications] = useState<MedicationItem[]>([
     { name: "", dosage: "", frequency: "", duration: "" }
@@ -173,6 +177,57 @@ export default function DoctorOngoingSessionTab({
     setRxFollowUpDate(`${y}-${m}-${d}`);
     setRxHasFollowUp(true);
   };
+
+  // Preload existing prescription for the active session booking
+  useEffect(() => {
+    if (!activeSessionBooking?.id) {
+      setExistingRxId(null);
+      setRxDiagnosis("");
+      setRxMedications([{ name: "", dosage: "", frequency: "", duration: "" }]);
+      setRxGeneralNotes("");
+      setRxHasFollowUp(false);
+      setRxFollowUpDate("");
+      setRxFollowUpNotes("");
+      return;
+    }
+
+    const fetchExistingPrescription = async () => {
+      setLoadingRx(true);
+      try {
+        const headers = await getAuthHeaders();
+        const bookingId = activeSessionBooking.id;
+        const res = await fetch(`/api/prescriptions?booking_id=${encodeURIComponent(bookingId)}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const rxList = Array.isArray(data) ? data : data.prescriptions || [];
+          const existing = rxList.find((rx: any) => String(rx.booking_id) === String(bookingId)) || (rxList.length > 0 ? rxList[0] : null);
+          if (existing) {
+            setExistingRxId(existing.id);
+            setRxDiagnosis(existing.diagnosis || "");
+            if (Array.isArray(existing.medications) && existing.medications.length > 0) {
+              setRxMedications(existing.medications);
+            }
+            setRxGeneralNotes(existing.instructions || existing.general_notes || "");
+            if (existing.follow_up_date) {
+              setRxFollowUpDate(String(existing.follow_up_date).slice(0, 10));
+              setRxHasFollowUp(true);
+            }
+            if (existing.follow_up_notes) {
+              setRxFollowUpNotes(existing.follow_up_notes);
+            }
+          } else {
+            setExistingRxId(null);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching existing prescription:", err);
+      } finally {
+        setLoadingRx(false);
+      }
+    };
+
+    fetchExistingPrescription();
+  }, [activeSessionBooking?.id]);
 
   // Sync follow-up from existing booking
   useEffect(() => {
@@ -387,10 +442,7 @@ export default function DoctorOngoingSessionTab({
     setSavingRxInline(true);
     try {
       const headers = await getAuthHeaders();
-      const followUpDateVal = rxHasFollowUp && rxFollowUpDate ? rxFollowUpDate : null;
-      const followUpNotesVal = rxHasFollowUp && rxFollowUpNotes ? rxFollowUpNotes : null;
-
-      const payload = {
+      const payload: Record<string, any> = {
         booking_id: activeSessionBooking.id,
         customer_id: activeSessionBooking.customerId || (activeSessionBooking as any).customer_id || null,
         patient_name: activeSessionBooking.name || (activeSessionBooking as any).customer_name || "Patient",
@@ -400,10 +452,18 @@ export default function DoctorOngoingSessionTab({
         medications: rxMedications.filter((m) => m.name.trim()),
         instructions: rxGeneralNotes,
         general_notes: rxGeneralNotes,
-        follow_up_date: followUpDateVal,
-        follow_up_notes: followUpNotesVal,
         date: activeSessionBooking.date || new Date().toISOString().slice(0, 10),
       };
+
+      if (existingRxId) {
+        payload.id = existingRxId;
+      }
+      if (rxHasFollowUp && rxFollowUpDate) {
+        payload.follow_up_date = rxFollowUpDate;
+      }
+      if (rxHasFollowUp && rxFollowUpNotes) {
+        payload.follow_up_notes = rxFollowUpNotes;
+      }
 
       const res = await fetch("/api/prescriptions", {
         method: "POST",
@@ -412,13 +472,20 @@ export default function DoctorOngoingSessionTab({
       });
 
       if (res.ok) {
+        const resData = await res.json().catch(() => null);
+        if (resData?.id) {
+          setExistingRxId(resData.id);
+        } else if (resData?.prescription?.id) {
+          setExistingRxId(resData.prescription.id);
+        }
+
         // Also sync follow_up_date to the reservation record
         if (activeSessionBooking.id) {
           fetch(`/api/reservations?id=${encodeURIComponent(activeSessionBooking.id)}`, {
             method: "PATCH",
             headers,
             body: JSON.stringify({
-              followUpDate: followUpDateVal
+              followUpDate: rxHasFollowUp && rxFollowUpDate ? rxFollowUpDate : null
             })
           }).catch(err => console.error("Error syncing follow_up_date to booking:", err));
         }
@@ -1322,24 +1389,97 @@ export default function DoctorOngoingSessionTab({
           )}
 
           {/* Standard Waiting Screen */}
-          <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-8 sm:p-12 text-center text-[#5A6A51] space-y-4 shadow-sm">
-            <div className="h-14 w-14 sm:h-16 sm:w-16 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
-              <Play size={26} />
+          <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-6 sm:p-8 text-center text-[#5A6A51] space-y-3 shadow-sm">
+            <div className="h-12 w-12 sm:h-14 sm:w-14 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+              <Play size={22} />
             </div>
-            <h3 className="text-lg sm:text-xl font-bold text-[#1F251A]">{t.waitingForReceptionistTitle}</h3>
+            <h3 className="text-base sm:text-lg font-bold text-[#1F251A]">{t.waitingForReceptionistTitle}</h3>
             <p className="text-xs text-[#5A6A51] max-w-md mx-auto leading-relaxed">
               {t.waitingForReceptionistDesc}
             </p>
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab("schedule")}
-                className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition cursor-pointer"
-              >
-                {t.viewTodayQueueBtn}
-              </button>
-            </div>
           </div>
+
+          {/* Today's Doctor Queue with 1-Click Treatment Start */}
+          {queueBookings.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                  <Calendar size={15} className="text-[#414E36]" /> {t.todayAvailableBookings || "Today's Patient Queue"} ({queueBookings.length})
+                </h3>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white shadow-sm">
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-[#414E36]/10 bg-[#FBFBF9] text-[11px] uppercase tracking-wider text-[#5A6A51]">
+                      <tr>
+                        <th className="px-4 py-3 font-bold">{t.timeSlotHeader || "Time"}</th>
+                        <th className="px-4 py-3 font-bold">{t.patientNameHeader || "Patient"}</th>
+                        <th className="px-4 py-3 font-bold">{t.requestedServiceHeader || "Service"}</th>
+                        <th className="px-4 py-3 font-bold">{t.roomLocationHeader || "Room"}</th>
+                        <th className="px-4 py-3 font-bold text-center">{t.statusHeader || "Status"}</th>
+                        <th className="px-4 py-3 font-bold text-right">{t.actionHeader || "Action"}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#414E36]/05 text-[#1F251A]">
+                      {queueBookings.map((item) => {
+                        const st = String(item.status || "").toLowerCase().trim();
+                        const isStarted = st === "started" || st === "in-progress" || st === "in_progress" || st === "active";
+                        return (
+                          <tr key={item.id} className="hover:bg-[#FBFBF9]/80 transition">
+                            <td className="px-4 py-3 font-bold text-[#414E36]">
+                              {item.time || item.time_slot || item.requested_time || "Today"}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-xs text-[#1F251A]">{item.name || item.customer_name || "Patient"}</div>
+                              {item.phone && <div className="text-[10px] text-[#5A6A51] font-mono">{item.phone}</div>}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-[#5A6A51]">
+                              {item.service || item.service_name || "Clinical Session"}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-[#414E36]">
+                              {item.room || item.room_name || "Treatment Room"}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {isStarted ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 animate-pulse">
+                                  <Play size={10} /> In Session
+                                </span>
+                              ) : st === "arrived" ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold text-blue-800">
+                                  <UserCheck size={10} /> Arrived
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700 capitalize">
+                                  {item.status || "Scheduled"}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (onStartOngoingSession) {
+                                    onStartOngoingSession(item);
+                                  } else {
+                                    setActiveSessionBooking?.(item);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 rounded-xl bg-[#414E36] text-white px-3 py-1.5 text-xs font-bold shadow-sm hover:bg-[#343F2B] active:scale-95 transition cursor-pointer"
+                              >
+                                <Play size={12} />
+                                <span>{isStarted ? (t.openSessionBtn || "Open") : (t.startOngoingSessionBtn || "Start Session")}</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
