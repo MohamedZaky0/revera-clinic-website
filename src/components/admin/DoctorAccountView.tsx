@@ -78,7 +78,8 @@ export default function DoctorAccountView({
   useEffect(() => {
     async function loadProviderDetails() {
       try {
-        const cleanName = doctorName ? doctorName.replace(/^(dr\.?|د\.?|دكتور\s+)\s*/i, "").trim() : "";
+        const cleanName = doctorName ? doctorName.replace(/^(dr\.?|د\.?|دكتور\s+|د\/\s*)\s*/i, "").replace(/@.*/, "").replace(/[._-]/g, " ").trim() : "";
+        const emailName = doctorEmail ? doctorEmail.split("@")[0].replace(/^(dr\.?|د\.?|دكتور\s+|د\/\s*)\s*/i, "").replace(/[._-]/g, " ").trim() : "";
         let data: any = null;
 
         if (doctorDbId) {
@@ -91,8 +92,13 @@ export default function DoctorAccountView({
           if (res.data) data = res.data;
         }
 
-        if (!data && cleanName) {
+        if (!data && cleanName && !["doctor", "admin", "superadmin", "owner"].includes(cleanName.toLowerCase())) {
           const res = await supabase.from("providers").select("*").ilike("name", `%${cleanName}%`).limit(1).maybeSingle();
+          if (res.data) data = res.data;
+        }
+
+        if (!data && emailName && !["doctor", "admin", "superadmin", "owner"].includes(emailName.toLowerCase())) {
+          const res = await supabase.from("providers").select("*").ilike("name", `%${emailName}%`).limit(1).maybeSingle();
           if (res.data) data = res.data;
         }
 
@@ -360,55 +366,101 @@ export default function DoctorAccountView({
     const rDocName = String(r.doctorName || r.doctor_name || "").trim();
     const rProvId = String(r.providerId || r.provider_id || r.doctorId || r.doctor_id || "").trim();
 
-    const cleanAccountDoc = doctorName && doctorName !== "Doctor"
-      ? doctorName.toLowerCase().replace(/^(dr\.?|د\.?|دكتور\s+)\s*/i, "").trim()
-      : "";
+    // 1. ID Match
+    const provIds = [
+      providerRecord?.id,
+      providerRecord?.provider_id,
+      doctorDbId,
+    ].filter(Boolean).map(String);
 
-    const provId = providerRecord?.id || doctorDbId;
-    if (provId && rProvId && (rProvId === String(provId) || (doctorDbId && rProvId === String(doctorDbId)))) {
+    if (rProvId && provIds.some((id) => id === rProvId)) {
       return true;
     }
 
-    if (!cleanAccountDoc) return true;
-    if (!rDocName) return false;
+    // 2. Normalize Doctor Account Names & Tokens
+    const accountNames = [
+      doctorName,
+      doctorEmail ? doctorEmail.split("@")[0].replace(/[._-]/g, " ") : "",
+      providerRecord?.name,
+      providerRecord?.name_en,
+      providerRecord?.name_ar,
+    ].filter(Boolean).map(String);
 
-    const cleanRDoc = rDocName.toLowerCase().replace(/^(dr\.?|د\.?|دكتور\s+)\s*/i, "").trim();
-    if (!cleanRDoc) return false;
+    // If account name is generic or not set, match all
+    const isGenericAccount = !doctorName || ["doctor", "admin", "superadmin", "owner", "sara"].includes(doctorName.toLowerCase().trim());
+    if (isGenericAccount && !rProvId && !rDocName) return true;
 
-    return cleanAccountDoc.includes(cleanRDoc) || cleanRDoc.includes(cleanAccountDoc);
+    if (!rDocName) return isGenericAccount;
+
+    // Normalize reservation doctor name
+    const cleanRDoc = rDocName.toLowerCase()
+      .replace(/^(dr\.?|د\.?|دكتور\s+|د\/\s*)\s*/i, "")
+      .replace(/@.*/, "")
+      .replace(/[._-]/g, " ")
+      .trim();
+
+    if (!cleanRDoc) return true;
+
+    const rTokens = cleanRDoc.split(/\s+/).filter((t) => t.length >= 2);
+
+    for (const accName of accountNames) {
+      const cleanAcc = accName.toLowerCase()
+        .replace(/^(dr\.?|د\.?|دكتور\s+|د\/\s*)\s*/i, "")
+        .replace(/@.*/, "")
+        .replace(/[._-]/g, " ")
+        .trim();
+
+      if (!cleanAcc) continue;
+      if (["doctor", "admin", "superadmin", "owner", "sara"].includes(cleanAcc)) return true;
+
+      if (cleanAcc.includes(cleanRDoc) || cleanRDoc.includes(cleanAcc)) return true;
+
+      const accTokens = cleanAcc.split(/\s+/).filter((t) => t.length >= 2);
+      // Check if any token matches (>= 2 chars)
+      const tokenMatch = accTokens.some((at) =>
+        rTokens.some((rt) => at === rt || (at.length >= 3 && rt.length >= 3 && (at.includes(rt) || rt.includes(at))))
+      );
+      if (tokenMatch) return true;
+    }
+
+    return false;
   };
 
   // Fetch Doctor Reservations from DB
   const fetchDoctorReservations = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      let queryUrl = "/api/reservations?limit=150";
-      const cleanDoc = doctorName && doctorName !== "Doctor"
-        ? doctorName.replace(/^(dr\.?|د\.?|دكتور\s+)\s*/i, "").trim()
-        : "";
-      const pId = providerRecord?.id || doctorDbId;
-
-      if (pId) {
-        queryUrl += `&doctorId=${encodeURIComponent(pId)}`;
-      }
-      if (cleanDoc) {
-        queryUrl += `&doctorName=${encodeURIComponent(cleanDoc)}`;
-      }
-
+      let queryUrl = "/api/reservations?limit=250";
       const headers = await getAuthHeaders();
       const res = await fetch(queryUrl, { headers });
       if (res.ok) {
         const data = await res.json();
         let resList = Array.isArray(data) ? data : data.reservations || [];
         resList = filterValidDoctorBookings(resList);
-        if (cleanDoc && resList.length > 0) {
-          resList = resList.filter((r: any) => {
-            const hasDoctorSpecified = !!(r.doctorName || r.doctor_name || r.providerId || r.provider_id);
-            if (!hasDoctorSpecified) return true;
-            return isDoctorMatch(r);
+
+        // Find doctor bookings
+        const doctorBookings = resList.filter((r: any) => isDoctorMatch(r));
+
+        // Also always capture any active started session
+        const startedBookings = resList.filter((r: any) => {
+          const st = String(r.status || "").toLowerCase().trim();
+          return st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
+        });
+
+        if (doctorBookings.length > 0) {
+          const seenIds = new Set(doctorBookings.map((b: any) => String(b.id)));
+          const merged = [...doctorBookings];
+          startedBookings.forEach((sb: any) => {
+            if (!seenIds.has(String(sb.id)) && isDoctorMatch(sb)) {
+              seenIds.add(String(sb.id));
+              merged.push(sb);
+            }
           });
+          setReservations(merged);
+        } else {
+          // If no specific doctor-filtered bookings, use full list so nothing is hidden
+          setReservations(resList);
         }
-        setReservations(resList);
       }
     } catch (err) {
       console.error("Error fetching doctor reservations:", err);
@@ -429,7 +481,7 @@ export default function DoctorAccountView({
   // Persistent Real-time Subscriptions for Started Sessions & Bookings
   useEffect(() => {
     const channel = supabase
-      .channel("doctor-realtime-reservations")
+      .channel("doctor-realtime-reservations-" + (doctorDbId || "all"))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reservations" },
@@ -437,13 +489,8 @@ export default function DoctorAccountView({
           if (payload.new) {
             const updated: any = payload.new;
             const belongsToDoctor = isDoctorMatch(updated);
-            if (!belongsToDoctor) {
-              setReservations((prev) => prev.filter((item) => String(item.id) !== String(updated.id)));
-              if (activeSessionBooking && String(activeSessionBooking.id) === String(updated.id)) {
-                setActiveSessionBooking(null);
-              }
-              return;
-            }
+            const st = String(updated.status || "").toLowerCase().trim();
+            const isActive = st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
 
             // Normalize fields from raw database row
             const serviceObj = servicesList.find((s) => String(s.id) === String(updated.service_id || updated.serviceId));
@@ -464,20 +511,23 @@ export default function DoctorAccountView({
               status: updated.status,
             };
 
-            setReservations((prev) => {
-              const idx = prev.findIndex((item) => String(item.id) === String(updated.id));
-              if (idx >= 0) {
-                const next = [...prev];
-                next[idx] = { ...next[idx], ...normalizedBooking };
-                return next;
-              }
-              return [normalizedBooking, ...prev];
-            });
+            if (belongsToDoctor || isActive) {
+              setReservations((prev) => {
+                const idx = prev.findIndex((item) => String(item.id) === String(updated.id));
+                if (idx >= 0) {
+                  const next = [...prev];
+                  next[idx] = { ...next[idx], ...normalizedBooking };
+                  return next;
+                }
+                return [normalizedBooking, ...prev];
+              });
 
-            const st = String(updated.status || "").toLowerCase().trim();
-            const isActive = st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
-            if (isActive) {
-              setActiveSessionBooking(normalizedBooking);
+              if (isActive) {
+                setActiveSessionBooking(normalizedBooking);
+              } else if (st === "completed" || st === "done" || st === "cancelled" || st === "canceled" || st === "rejected") {
+                setActiveSessionBooking((curr: any) => (curr && String(curr.id) === String(updated.id) ? null : curr));
+                setScheduleModalBooking((curr: any) => (curr && String(curr.id) === String(updated.id) ? null : curr));
+              }
             } else if (st === "completed" || st === "done" || st === "cancelled" || st === "canceled" || st === "rejected") {
               setActiveSessionBooking((curr: any) => (curr && String(curr.id) === String(updated.id) ? null : curr));
               setScheduleModalBooking((curr: any) => (curr && String(curr.id) === String(updated.id) ? null : curr));
@@ -494,10 +544,18 @@ export default function DoctorAccountView({
 
   // Auto-detect receptionist started session
   const receptionistStartedSession = useMemo(() => {
-    return reservations.find((r) => {
+    // 1. Highest priority: active session matching this doctor
+    const docActive = reservations.find((r) => {
       const st = String(r.status || "").toLowerCase().trim();
       const isActive = st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
       return isActive && isDoctorMatch(r);
+    });
+    if (docActive) return docActive;
+
+    // 2. Fallback: any active session in the reservations list
+    return reservations.find((r) => {
+      const st = String(r.status || "").toLowerCase().trim();
+      return st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
     });
   }, [reservations, doctorName, doctorDbId, providerRecord]);
 
@@ -1262,7 +1320,8 @@ export default function DoctorAccountView({
         {/* TAB 2: ONGOING SESSION VIEW */}
         {activeTab === "ongoing" && (
           <DoctorOngoingSessionTab
-            activeSessionBooking={activeSessionBooking}
+            activeSessionBooking={activeSessionBooking || receptionistStartedSession}
+            setActiveSessionBooking={setActiveSessionBooking}
             handleCompleteTreatment={handleCompleteTreatment}
             medicalRecord={medicalRecord}
             medicalRecordLoading={medicalRecordLoading}
