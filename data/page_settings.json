@@ -170,5 +170,16 @@
     "phoneAr": "(+20) 01035595691",
     "image1": "",
     "image2": "/uploads/img_1782222425667_853.png"
+  },
+  "booking": {
+    "minAdvance": 2,
+    "maxAdvance": 30,
+    "cancelWindow": 4,
+    "maxPerSlot": 3,
+    "instantApproval": false,
+    "showDoctorNotes": true,
+    "depositPercentage": 20,
+    "staleSessionHours": 2,
+    "followUpLeadDays": 2
   }
 }

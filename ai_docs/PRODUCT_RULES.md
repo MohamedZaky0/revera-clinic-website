@@ -295,6 +295,13 @@ The following are **not currently enforced in code**:
      - **Session Outstanding**: Remaining balance owed for this specific session (`amountLeft EGP` / `cost - amountPaid EGP`).
     - Upon completing payment settlement checkout, Session Paid is updated to total price, Session Outstanding drops to 0 EGP, Customer Total Spent increases by settled payment, and Customer Outstanding is reduced by settled amount.
 
+6. **Reception Follow-Up Reminders & Pre-Filled Booking Engine (`TC-060` & `TC-061`)**:
+   - **Doctor Follow-Up Intent**: When completing a session or issuing a digital prescription, doctors record an optional follow-up target date (`follow_up_date`) and clinical instructions (`follow_up_instructions`).
+   - **Lead Time Window**: Follow-up reminders appear on the receptionist's bookings view before the target date according to `booking.followUpLeadDays` configured in Booking Settings (`/admin` -> Settings -> Booking Settings, default 2 days). Reminder appearance date = `targetDate - followUpLeadDays`.
+   - **Full-Width Sleek Notification Banner**: Active follow-up reminders are rendered at the top of the receptionist bookings view spanning 100% width, styled as a sleek Indigo alert banner directly below any active treatment session alerts.
+   - **1-Click Pre-Filled Booking Conversion**: Clicking **"+ Convert to Full Booking"** automatically opens the New Booking view (`AdminNewBookingView.tsx`) with pre-populated patient details (matching database profile and loading active packages/balances), recommending doctor (`selectedDoctorId`), service (`selectedServiceId`), appointment date, and clinical notes.
+   - **Mini-Calendar Dots**: Dates with active follow-up reminder alerts display distinct Indigo dots on the calendar date grid.
+
 ---
 
 ## Financial Transactions & Manual Ledger Rules

@@ -77,7 +77,8 @@ const DEFAULT_SETTINGS = {
       maxPerSlot: 1,
       instantApproval: false,
       showDoctorNotes: false,
-      depositPercentage: 20
+      depositPercentage: 20,
+      followUpLeadDays: 2
     },
     header: {
       showCustomerLogin: false

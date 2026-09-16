@@ -59,7 +59,7 @@ interface AdminBookingsViewProps {
   providers?: any[];
   localServices?: any[];
   userName?: string;
-  onNewBooking?: () => void;
+  onNewBooking?: (initialData?: any) => void;
   onAddPreviousBooking?: () => void;
   onPendingApprovalsClick?: () => void;
   onFilterClick?: () => void;
@@ -70,6 +70,8 @@ interface AdminBookingsViewProps {
   onRejectBooking?: (booking: any) => void;
   /** SuperAdmin-configured "Stale Session Alert" from Booking Settings. Defaults to 2 hours. */
   staleSessionThresholdHours?: number;
+  /** SuperAdmin-configured "Follow-Up Reminder Lead Time" from Booking Settings. Defaults to 2 days. */
+  followUpLeadDays?: number;
   hasPermission?: (perm: string) => boolean;
   lang?: "en" | "ar";
   t?: any;
@@ -97,6 +99,17 @@ const formatDisplayTime = (timeStr?: string): string => {
   return trimmed;
 };
 
+function computeReminderDate(targetDateStr: string, leadDays: number): string {
+  if (!targetDateStr || !/^\d{4}-\d{2}-\d{2}$/.test(targetDateStr)) return targetDateStr;
+  const [y, m, d] = targetDateStr.split("-").map(Number);
+  const targetDate = new Date(y, m - 1, d);
+  targetDate.setDate(targetDate.getDate() - (leadDays || 0));
+  const remY = targetDate.getFullYear();
+  const remM = String(targetDate.getMonth() + 1).padStart(2, "0");
+  const remD = String(targetDate.getDate()).padStart(2, "0");
+  return `${remY}-${remM}-${remD}`;
+}
+
 export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   allReservations = [],
   requests = [],
@@ -113,6 +126,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   onApproveBooking,
   onRejectBooking,
   staleSessionThresholdHours,
+  followUpLeadDays = 2,
   hasPermission,
   lang = "en",
   t,
@@ -316,7 +330,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     });
   }, [allReservations, dbReservations, dbProviders, localServices, providers, selectedDateStr, staleThresholdMs]);
 
-  // Aggregate all Follow-Up Reminders from bookings and prescriptions
+  // Aggregate all Follow-Up Reminders from bookings and prescriptions with lead time calculation
   const allFollowUpReminders = useMemo(() => {
     const list: any[] = [];
     const seenKeys = new Set<string>();
@@ -326,6 +340,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       const fDate = apt.followUpDate || apt.follow_up_date;
       if (fDate) {
         const cleanFDate = String(fDate).slice(0, 10);
+        const remDate = computeReminderDate(cleanFDate, followUpLeadDays || 2);
         const key = `${apt.id || apt.customer_name}-${cleanFDate}`;
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
@@ -336,8 +351,11 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             patientName: apt.customer_name,
             phone: apt.customer_phone,
             doctorName: apt.doctor_name,
+            doctorId: apt.provider_id || apt.providerId || apt.doctorId || apt.doctor_id,
             serviceName: apt.service_name,
+            serviceId: apt.service_id || apt.serviceId,
             followUpDate: cleanFDate,
+            reminderDate: remDate,
             notes: apt.follow_up_notes || apt.notes || "",
             raw: apt
           });
@@ -349,6 +367,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     dbPrescriptions.forEach((rx) => {
       if (rx.follow_up_date) {
         const cleanFDate = String(rx.follow_up_date).slice(0, 10);
+        const remDate = computeReminderDate(cleanFDate, followUpLeadDays || 2);
         const key = `${rx.booking_id || rx.customer_id || rx.patient_name || rx.customer_name}-${cleanFDate}`;
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
@@ -359,8 +378,11 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             patientName: rx.patient_name || rx.customer_name || "Patient",
             phone: rx.customer_phone || rx.phone || "",
             doctorName: rx.doctor_name || "Doctor",
+            doctorId: rx.provider_id || rx.doctor_id,
             serviceName: rx.service_name || "Follow-Up Consultation",
+            serviceId: rx.service_id,
             followUpDate: cleanFDate,
+            reminderDate: remDate,
             notes: rx.follow_up_notes || rx.instructions || rx.general_notes || "",
             raw: rx
           });
@@ -369,10 +391,15 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     });
 
     return list;
-  }, [mergedAppointments, dbPrescriptions]);
+  }, [mergedAppointments, dbPrescriptions, followUpLeadDays]);
 
   const selectedDayFollowUps = useMemo(() => {
-    return allFollowUpReminders.filter((fu) => fu.followUpDate === selectedDateStr);
+    return allFollowUpReminders.filter((fu) => {
+      // Active if reminderDate matches selected date or within active window up to target follow-up date
+      if (fu.reminderDate === selectedDateStr) return true;
+      if (fu.reminderDate <= selectedDateStr && selectedDateStr <= fu.followUpDate) return true;
+      return false;
+    });
   }, [allFollowUpReminders, selectedDateStr]);
 
   // Chronological Booking Flow Order
@@ -665,12 +692,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     });
 
     allFollowUpReminders.forEach(fu => {
-      if (!fu.followUpDate) return;
-      if (!map[fu.followUpDate]) map[fu.followUpDate] = [];
-      const fuColor = "#6366F1"; // Indigo/purple for follow-up reminders
-      if (!map[fu.followUpDate].includes(fuColor) && map[fu.followUpDate].length < 3) {
-        map[fu.followUpDate].push(fuColor);
-      }
+      const datesToDot = [fu.reminderDate, fu.followUpDate].filter(Boolean);
+      datesToDot.forEach(dStr => {
+        if (!map[dStr]) map[dStr] = [];
+        const fuColor = "#6366F1"; // Indigo/purple for follow-up reminders
+        if (!map[dStr].includes(fuColor) && map[dStr].length < 3) {
+          map[dStr].push(fuColor);
+        }
+      });
     });
 
     return map;
@@ -1082,6 +1111,132 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 </span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── FOLLOW-UP REMINDERS BANNER (FULL WIDTH & COMPACT) ── */}
+      {selectedDayFollowUps.length > 0 && (
+        <div className="rounded-3xl border border-indigo-200 bg-indigo-50/70 p-4 sm:p-5 shadow-xs space-y-3 animate-fadeIn">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
+                <CalendarPlus size={18} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-sm font-bold text-indigo-950">
+                    {tr.followUpRemindersHeading || "Follow-Up Reminders (Not Reservations)"}
+                  </h2>
+                  <span className="rounded-full bg-indigo-100 border border-indigo-300 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-800">
+                    {selectedDayFollowUps.length} {selectedDayFollowUps.length === 1 ? (lang === "ar" ? "مريض" : "Patient") : (lang === "ar" ? "مرضى" : "Patients")}
+                  </span>
+                </div>
+                <p className="text-xs text-indigo-700/90 mt-0.5">
+                  {lang === "ar" 
+                    ? `تذكيرات متابعة مستحقة (قبل ${followUpLeadDays || 2} ${followUpLeadDays === 1 ? "يوم" : "أيام"} من الموعد) — تواصل مع المرضى لتأكيد الحجز.` 
+                    : `Patients due for follow-up (${followUpLeadDays || 2} ${followUpLeadDays === 1 ? "day" : "days"} lead time) — contact to schedule.`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {selectedDayFollowUps.map((fu) => {
+              const rawPhone = fu.phone || "";
+              const cleanPhone = rawPhone.replace(/\D/g, "");
+              const intlPhone = cleanPhone.startsWith("0") ? `20${cleanPhone.slice(1)}` : cleanPhone;
+              const waMessage = lang === "ar"
+                ? `مرحباً ${fu.patientName}، عيادات ريفيرا تتواصل معك. أوصى د. ${fu.doctorName} بموعد متابعة / استشارة يوم ${fu.followUpDate} بخصوص ${fu.serviceName}. هل تود تأكيد وحجز الموعد؟`
+                : `Hello ${fu.patientName}, this is Revera Clinics. Dr. ${fu.doctorName} recommended a follow-up visit on ${fu.followUpDate} for your ${fu.serviceName} treatment. Would you like us to confirm and book your appointment?`;
+              const waUrl = `https://wa.me/${intlPhone}?text=${encodeURIComponent(waMessage)}`;
+
+              return (
+                <div
+                  key={fu.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-white px-4 py-2.5 shadow-2xs hover:border-indigo-300 transition"
+                >
+                  {/* Patient and Doctor info */}
+                  <div className="flex min-w-0 items-start sm:items-center gap-3">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 mt-0.5 sm:mt-0">
+                      <User size={14} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-xs text-[#111827]">{fu.patientName}</span>
+                        <span className="text-[11px] font-mono text-gray-500">{rawPhone || "—"}</span>
+                        <span className="rounded-md bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 text-[9px] font-bold text-indigo-700">
+                          {lang === "ar" ? `موعد المتابعة: ${fu.followUpDate}` : `Target: ${fu.followUpDate}`}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-[#4B5563] flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <span className="font-semibold text-indigo-900">{tr.doctorRecommendedPrefix || "Dr."} {fu.doctorName}</span>
+                        <span>·</span>
+                        <span className="text-gray-600">{fu.serviceName}</span>
+                        {fu.notes && (
+                          <>
+                            <span>·</span>
+                            <span className="text-[10px] text-gray-500 italic max-w-xs truncate" title={fu.notes}>
+                              "{fu.notes}"
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                    {rawPhone && rawPhone !== "—" && (
+                      <>
+                        <a
+                          href={waUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-300 px-2.5 py-1.5 text-[11px] font-bold text-emerald-800 hover:bg-emerald-600 hover:text-white transition shadow-2xs cursor-pointer"
+                          title={tr.whatsAppReminderBtn || "Send WhatsApp Reminder"}
+                        >
+                          <MessageSquare size={12} />
+                          <span className="hidden md:inline">{tr.whatsAppReminderBtn || "WhatsApp"}</span>
+                        </a>
+                        <a
+                          href={`tel:${rawPhone}`}
+                          className="inline-flex items-center gap-1 rounded-xl bg-gray-50 border border-gray-200 px-2.5 py-1.5 text-[11px] font-bold text-[#374151] hover:bg-gray-200 transition shadow-2xs"
+                          title={tr.callPatientBtn || "Call Patient"}
+                        >
+                          <Phone size={12} />
+                          <span className="hidden md:inline">{tr.callPatientBtn || "Call"}</span>
+                        </a>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onNewBooking) {
+                          onNewBooking({
+                            customerId: fu.customerId,
+                            patientName: fu.patientName,
+                            phone: fu.phone,
+                            doctorName: fu.doctorName,
+                            doctorId: fu.doctorId,
+                            serviceName: fu.serviceName,
+                            serviceId: fu.serviceId,
+                            date: fu.followUpDate,
+                            notes: fu.notes ? `Follow-up from Dr. ${fu.doctorName}: ${fu.notes}` : `Follow-up visit recommended by Dr. ${fu.doctorName}`,
+                            raw: fu.raw
+                          });
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 transition shadow-xs cursor-pointer"
+                      title={tr.convertToBookingBtn || "Convert to Full Booking"}
+                    >
+                      <Plus size={13} />
+                      <span>{tr.convertToBookingBtn || "Convert to Full Booking"}</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1618,139 +1773,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 </div>
               </div>
             </div>
-
-            {/* Follow-Up Due Quick Alert in Left Column */}
-            {selectedDayFollowUps.length > 0 && (
-              <div className="rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 text-xs text-indigo-950 space-y-1.5 shadow-2xs animate-fadeIn">
-                <div className="flex items-center justify-between font-bold">
-                  <span className="flex items-center gap-1.5 text-indigo-900">
-                    <CalendarPlus size={15} className="text-indigo-600" />
-                    {tr.cardFollowUps || "Follow-Ups Due"}
-                  </span>
-                  <span className="bg-indigo-600 text-white rounded-full px-2 py-0.5 text-[10px] font-extrabold">
-                    {selectedDayFollowUps.length}
-                  </span>
-                </div>
-                <p className="text-[11px] text-indigo-800 leading-relaxed">
-                  {tr.followUpRemindersSubtitle || "Patients recommended for follow-up by their doctor. Contact them to confirm & book."}
-                </p>
-              </div>
-            )}
           </div>
 
-          {/* ── RIGHT: TODAY'S SCHEDULE & FOLLOW-UPS TABLE ── */}
+          {/* ── RIGHT: TODAY'S SCHEDULE TABLE ── */}
           <div className="space-y-4 lg:col-span-8">
-
-            {/* ── FOLLOW-UP REMINDERS (NOT CONFIRMED RESERVATIONS) ── */}
-            {selectedDayFollowUps.length > 0 && (
-              <div className="rounded-2xl sm:rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50/70 to-purple-50/40 p-4 sm:p-5 shadow-xs space-y-3.5 animate-fadeIn">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-xs">
-                      <CalendarPlus size={18} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm sm:text-base font-extrabold text-indigo-950">
-                          {tr.followUpRemindersHeading || "Follow-Up Reminders (Not Reservations)"}
-                        </h3>
-                        <span className="rounded-full bg-indigo-100 border border-indigo-300 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-800">
-                          {selectedDayFollowUps.length} {selectedDayFollowUps.length === 1 ? "Patient" : "Patients"}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-indigo-700 font-medium mt-0.5">
-                        {tr.notAReservationNotice || "Not a confirmed booking yet — contact patient to schedule."}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {selectedDayFollowUps.map((fu) => {
-                    const rawPhone = fu.phone || "";
-                    const cleanPhone = rawPhone.replace(/\D/g, "");
-                    const intlPhone = cleanPhone.startsWith("0") ? `20${cleanPhone.slice(1)}` : cleanPhone;
-                    const waMessage = lang === "ar"
-                      ? `مرحباً ${fu.patientName}، عيادات ريفيرا تتواصل معك. أوصى د. ${fu.doctorName} بموعد متابعة / استشارة يوم ${fu.followUpDate} بخصوص ${fu.serviceName}. هل تود تأكيد وحجز الموعد؟`
-                      : `Hello ${fu.patientName}, this is Revera Clinics. Dr. ${fu.doctorName} recommended a follow-up visit on ${fu.followUpDate} for your ${fu.serviceName} treatment. Would you like us to confirm and book your appointment?`;
-                    const waUrl = `https://wa.me/${intlPhone}?text=${encodeURIComponent(waMessage)}`;
-
-                    return (
-                      <div
-                        key={fu.id}
-                        className="bg-white rounded-2xl border border-indigo-100 p-3.5 shadow-xs flex flex-col justify-between space-y-3 hover:border-indigo-300 transition"
-                      >
-                        <div className="space-y-1.5">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h4 className="font-extrabold text-xs text-[#111827] flex items-center gap-1.5">
-                                <User size={13} className="text-indigo-600" />
-                                <span>{fu.patientName}</span>
-                              </h4>
-                              <p className="text-[11px] text-gray-500 font-mono mt-0.5">{rawPhone || "—"}</p>
-                            </div>
-                            <span className="shrink-0 rounded-full bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[9px] font-bold text-indigo-700">
-                              {tr.followUpBadge || "Follow-Up Reminder"}
-                            </span>
-                          </div>
-
-                          <div className="text-[11px] text-[#4B5563] bg-[#F9FAFB] p-2.5 rounded-xl border border-gray-100 space-y-0.5">
-                            <p>
-                              <strong className="text-indigo-900">{tr.doctorRecommendedPrefix || "Dr."} {fu.doctorName}</strong> · {fu.serviceName}
-                            </p>
-                            {fu.notes && (
-                              <p className="text-[10px] text-gray-600 italic">
-                                <span className="font-semibold text-gray-700">{tr.followUpNotesPrefix || "Note:"}</span> {fu.notes}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Action Buttons for Receptionist */}
-                        <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100 flex-wrap">
-                          {rawPhone && rawPhone !== "—" && (
-                            <>
-                              <a
-                                href={waUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-300 px-2.5 py-1.5 text-[11px] font-bold text-emerald-800 hover:bg-emerald-600 hover:text-white transition shadow-2xs cursor-pointer"
-                                title={tr.whatsAppReminderBtn || "Send WhatsApp Reminder"}
-                              >
-                                <MessageSquare size={12} />
-                                <span>{tr.whatsAppReminderBtn || "WhatsApp"}</span>
-                              </a>
-                              <a
-                                href={`tel:${rawPhone}`}
-                                className="inline-flex items-center gap-1 rounded-xl bg-gray-50 border border-gray-200 px-2 py-1.5 text-[11px] font-bold text-[#374151] hover:bg-gray-200 transition shadow-2xs"
-                                title={tr.callPatientBtn || "Call Patient"}
-                              >
-                                <Phone size={12} />
-                                <span>{tr.callPatientBtn || "Call"}</span>
-                              </a>
-                            </>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (onNewBooking) {
-                                onNewBooking();
-                              }
-                            }}
-                            className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 transition shadow-xs cursor-pointer ml-auto rtl:mr-auto rtl:ml-0"
-                            title={tr.convertToBookingBtn || "Convert to Full Booking"}
-                          >
-                            <Plus size={13} />
-                            <span>{tr.convertToBookingBtn || "Book Appointment"}</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               {/* Header */}
               <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
