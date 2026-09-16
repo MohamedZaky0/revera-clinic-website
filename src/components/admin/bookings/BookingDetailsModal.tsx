@@ -2995,6 +2995,22 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         </span>
                       </div>
                     </div>
+
+                    {/* Booking Notes / Clinical Follow-Up Instructions */}
+                    {(() => {
+                      const bookingNotes = booking.notes || (booking as any).follow_up_notes || (booking as any).followUpNotes;
+                      if (!bookingNotes) return null;
+                      return (
+                        <div className="pt-3 border-t border-gray-100">
+                          <span className="text-[#5A6A51] font-bold text-[10px] uppercase tracking-wider block mb-1.5">
+                            {isRTL ? "ملاحظات الحجز / تعليمات الطبيب" : "BOOKING NOTES / CLINICAL INSTRUCTIONS"}
+                          </span>
+                          <div className="p-3 bg-amber-50/80 border border-amber-200/70 rounded-xl text-xs text-[#1F251A] whitespace-pre-line leading-relaxed font-medium">
+                            {bookingNotes}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                 </div>

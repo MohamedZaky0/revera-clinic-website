@@ -110,6 +110,17 @@ function computeReminderDate(targetDateStr: string, leadDays: number): string {
   return `${remY}-${remM}-${remD}`;
 }
 
+function cleanDoctorName(doc: string | undefined | null): string {
+  if (!doc || doc === "—" || doc === "-") return "Doctor";
+  let d = String(doc).trim();
+  if (d.includes("@")) {
+    d = d.split("@")[0].replace(/[._-]/g, " ");
+  }
+  d = d.replace(/^Dr\.?\s*/i, "").trim();
+  d = d.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+  return d ? `Dr. ${d}` : "Doctor";
+}
+
 export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   allReservations = [],
   requests = [],
@@ -184,6 +195,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   const [dbProviders, setDbProviders] = useState<any[]>(providers);
   const [dbPrescriptions, setDbPrescriptions] = useState<any[]>([]);
   const [loadingDb, setLoadingDb] = useState(false);
+  const [convertedFollowUpIds, setConvertedFollowUpIds] = useState<Set<string>>(() => new Set());
 
   // Fetch real reservations, providers & prescriptions directly from database on mount
   useEffect(() => {
@@ -371,16 +383,25 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         const key = `${rx.booking_id || rx.customer_id || rx.patient_name || rx.customer_name}-${cleanFDate}`;
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
+          // Look up matching appointment to get phone or doctor name if missing
+          const matchingApt = mergedAppointments.find((a) =>
+            (rx.booking_id && String(a.id) === String(rx.booking_id)) ||
+            (rx.customer_id && a.customer_id && String(a.customer_id) === String(rx.customer_id)) ||
+            (rx.patient_name && a.customer_name && a.customer_name.trim().toLowerCase() === String(rx.patient_name).trim().toLowerCase())
+          );
+          const rawPhone = rx.customer_phone || rx.phone || matchingApt?.customer_phone || matchingApt?.phone || "";
+          const docName = rx.doctor_name || matchingApt?.doctor_name || "Doctor";
+
           list.push({
             id: `fu-rx-${rx.id}`,
             bookingId: rx.booking_id,
-            customerId: rx.customer_id,
-            patientName: rx.patient_name || rx.customer_name || "Patient",
-            phone: rx.customer_phone || rx.phone || "",
-            doctorName: rx.doctor_name || "Doctor",
-            doctorId: rx.provider_id || rx.doctor_id,
-            serviceName: rx.service_name || "Follow-Up Consultation",
-            serviceId: rx.service_id,
+            customerId: rx.customer_id || matchingApt?.customer_id,
+            patientName: rx.patient_name || rx.customer_name || matchingApt?.customer_name || "Patient",
+            phone: rawPhone,
+            doctorName: docName,
+            doctorId: rx.provider_id || rx.doctor_id || matchingApt?.provider_id,
+            serviceName: rx.service_name || matchingApt?.service_name || "Follow-Up Consultation",
+            serviceId: rx.service_id || matchingApt?.service_id,
             followUpDate: cleanFDate,
             reminderDate: remDate,
             notes: rx.follow_up_notes || rx.instructions || rx.general_notes || "",
@@ -390,8 +411,38 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       }
     });
 
-    return list;
-  }, [mergedAppointments, dbPrescriptions, followUpLeadDays]);
+    // 3. Filter out follow-ups that have already been converted or have an active upcoming/target booking
+    return list.filter((fu) => {
+      // Check converted in session
+      if (convertedFollowUpIds.has(String(fu.id))) return false;
+      if (fu.bookingId && convertedFollowUpIds.has(String(fu.bookingId))) return false;
+      if (fu.customerId && convertedFollowUpIds.has(String(fu.customerId))) return false;
+      if (fu.patientName && convertedFollowUpIds.has(`name-${fu.patientName.toLowerCase().trim()}`)) return false;
+
+      // Check if patient already has an active (non-cancelled / non-rejected) reservation scheduled on or after reminder date
+      const hasActiveBooking = mergedAppointments.some((r) => {
+        if (r.id === fu.bookingId && String(r.date) < fu.reminderDate) {
+          // This is the past appointment that originated the follow-up, ignore it
+          return false;
+        }
+        const isCancelled = r.status === "canceled" || r.status === "cancelled" || r.status === "rejected";
+        if (isCancelled) return false;
+
+        const isSameCustomer =
+          (fu.customerId && r.customer_id && String(fu.customerId) === String(r.customer_id)) ||
+          (fu.phone && r.customer_phone && String(fu.phone).replace(/\D/g, "") === String(r.customer_phone).replace(/\D/g, "") && String(fu.phone).replace(/\D/g, "").length >= 7) ||
+          (fu.patientName && r.customer_name && fu.patientName.trim().toLowerCase() === r.customer_name.trim().toLowerCase());
+
+        if (!isSameCustomer) return false;
+
+        // If the booking is on or after the reminder date, or matches the follow-up target date
+        const rDate = String(r.date || "").slice(0, 10);
+        return rDate >= fu.reminderDate || rDate === fu.followUpDate;
+      });
+
+      return !hasActiveBooking;
+    });
+  }, [mergedAppointments, dbPrescriptions, followUpLeadDays, convertedFollowUpIds]);
 
   const selectedDayFollowUps = useMemo(() => {
     return allFollowUpReminders.filter((fu) => {
@@ -1146,9 +1197,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               const rawPhone = fu.phone || "";
               const cleanPhone = rawPhone.replace(/\D/g, "");
               const intlPhone = cleanPhone.startsWith("0") ? `20${cleanPhone.slice(1)}` : cleanPhone;
+              const formattedDocName = cleanDoctorName(fu.doctorName);
               const waMessage = lang === "ar"
-                ? `مرحباً ${fu.patientName}، عيادات ريفيرا تتواصل معك. أوصى د. ${fu.doctorName} بموعد متابعة / استشارة يوم ${fu.followUpDate} بخصوص ${fu.serviceName}. هل تود تأكيد وحجز الموعد؟`
-                : `Hello ${fu.patientName}, this is Revera Clinics. Dr. ${fu.doctorName} recommended a follow-up visit on ${fu.followUpDate} for your ${fu.serviceName} treatment. Would you like us to confirm and book your appointment?`;
+                ? `مرحباً ${fu.patientName}، عيادات ريفيرا تتواصل معك. أوصى ${formattedDocName} بموعد متابعة يوم ${fu.followUpDate}. هل تود تأكيد وحجز الموعد؟`
+                : `Hello ${fu.patientName}, this is Revera Clinics. ${formattedDocName} recommended a follow-up visit on ${fu.followUpDate}. Would you like us to confirm and book your appointment?`;
               const waUrl = `https://wa.me/${intlPhone}?text=${encodeURIComponent(waMessage)}`;
 
               return (
@@ -1158,24 +1210,27 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 >
                   {/* Patient and Doctor info */}
                   <div className="flex min-w-0 items-start sm:items-center gap-3">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 mt-0.5 sm:mt-0">
-                      <User size={14} />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 mt-0.5 sm:mt-0">
+                      <User size={15} />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 space-y-0.5">
+                      {/* Top Line: Patient Name + Follow-Up Target Date Badge */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-extrabold text-xs text-[#111827]">{fu.patientName}</span>
-                        <span className="text-[11px] font-mono text-gray-500">{rawPhone || "—"}</span>
-                        <span className="rounded-md bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 text-[9px] font-bold text-indigo-700">
+                        <span className="font-extrabold text-xs sm:text-sm text-[#111827]">{fu.patientName}</span>
+                        <span className="rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
                           {lang === "ar" ? `موعد المتابعة: ${fu.followUpDate}` : `Target: ${fu.followUpDate}`}
                         </span>
                       </div>
-                      <div className="text-[11px] text-[#4B5563] flex items-center gap-1.5 flex-wrap mt-0.5">
-                        <span className="font-semibold text-indigo-900">{tr.doctorRecommendedPrefix || "Dr."} {fu.doctorName}</span>
-                        <span>·</span>
-                        <span className="text-gray-600">{fu.serviceName}</span>
+                      {/* Underneath Line: Doctor Name · Follow-Up · Patient Phone Number · Clinical Notes */}
+                      <div className="text-[11px] text-[#4B5563] flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-indigo-950">{formattedDocName}</span>
+                        <span className="text-gray-400">·</span>
+                        <span className="text-indigo-700 font-semibold">{lang === "ar" ? "متابعة" : "Follow-Up"}</span>
+                        <span className="text-gray-400">·</span>
+                        <span className="font-mono text-gray-700 font-medium dir-ltr">{rawPhone || "—"}</span>
                         {fu.notes && (
                           <>
-                            <span>·</span>
+                            <span className="text-gray-400">·</span>
                             <span className="text-[10px] text-gray-500 italic max-w-xs truncate" title={fu.notes}>
                               "{fu.notes}"
                             </span>
@@ -1212,17 +1267,25 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => {
+                        setConvertedFollowUpIds(prev => {
+                          const next = new Set(prev);
+                          if (fu.id) next.add(String(fu.id));
+                          if (fu.bookingId) next.add(String(fu.bookingId));
+                          if (fu.customerId) next.add(String(fu.customerId));
+                          if (fu.patientName) next.add(`name-${fu.patientName.toLowerCase().trim()}`);
+                          return next;
+                        });
                         if (onNewBooking) {
                           onNewBooking({
                             customerId: fu.customerId,
                             patientName: fu.patientName,
                             phone: fu.phone,
-                            doctorName: fu.doctorName,
+                            doctorName: formattedDocName,
                             doctorId: fu.doctorId,
                             serviceName: fu.serviceName,
                             serviceId: fu.serviceId,
                             date: fu.followUpDate,
-                            notes: fu.notes ? `Follow-up from Dr. ${fu.doctorName}: ${fu.notes}` : `Follow-up visit recommended by Dr. ${fu.doctorName}`,
+                            notes: fu.notes ? `Follow-up from ${formattedDocName}: ${fu.notes}` : `Follow-up visit recommended by ${formattedDocName}`,
                             raw: fu.raw
                           });
                         }
