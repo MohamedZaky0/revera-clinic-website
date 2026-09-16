@@ -467,6 +467,13 @@ export default function DoctorOngoingSessionTab({
     return st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
   });
 
+  // Auto-sync active booking if currently null but active session exists
+  useEffect(() => {
+    if ((!activeSessionBooking || activeSessionBooking.status === "completed" || activeSessionBooking.status === "done") && activeSessionsList.length > 0 && setActiveSessionBooking) {
+      setActiveSessionBooking(activeSessionsList[0]);
+    }
+  }, [activeSessionBooking, activeSessionsList, setActiveSessionBooking]);
+
   // Find all non-completed queue bookings
   const queueBookings = reservations.filter(
     (r) => r.status !== "completed" && r.status !== "cancelled"
