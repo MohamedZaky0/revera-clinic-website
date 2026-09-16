@@ -23,6 +23,8 @@ interface BookingSettingsViewProps {
   setBookingShowDoctorNotes: (v: boolean) => void;
   bookingStaleSessionHours: number;
   setBookingStaleSessionHours: (v: number) => void;
+  bookingFollowUpLeadDays?: number;
+  setBookingFollowUpLeadDays?: (v: number) => void;
   globalEndingSession?: boolean;
   setGlobalEndingSession?: (v: boolean) => void;
   handleSaveBookingSettings: () => Promise<void>;
@@ -47,6 +49,8 @@ export default function BookingSettingsView({
   setBookingShowDoctorNotes,
   bookingStaleSessionHours,
   setBookingStaleSessionHours,
+  bookingFollowUpLeadDays = 2,
+  setBookingFollowUpLeadDays,
   globalEndingSession = false,
   setGlobalEndingSession,
   handleSaveBookingSettings,
@@ -189,6 +193,35 @@ export default function BookingSettingsView({
                 {[1, 2, 3, 4, 6, 8, 12].map(h => <option key={h} value={h}>{h} {h === 1 ? t.hour : t.hours}</option>)}
               </select>
               <span className="text-[11px] text-[#8A9A81] mt-1 block">{t.staleSessionHint}</span>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">{t.followUpLeadDays}</label>
+                <button
+                  type="button"
+                  onClick={() => setActiveInfoFeature({
+                    title: t.followUpLeadDaysInfoTitle || t.followUpLeadDays,
+                    description: t.followUpLeadDaysInfoDesc || "Controls how many days before the scheduled follow-up date the reminder notification appears on the receptionist bookings dashboard, giving receptionists time to contact and schedule the patient."
+                  })}
+                  className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                  title={t.clickForInfo}
+                >
+                  <Info size={13} />
+                </button>
+              </div>
+              <select
+                value={bookingFollowUpLeadDays}
+                onChange={(e) => setBookingFollowUpLeadDays && setBookingFollowUpLeadDays(Number(e.target.value))}
+                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+              >
+                {[1, 2, 3, 4, 5, 7, 14].map(d => (
+                  <option key={d} value={d}>
+                    {d} {d === 1 ? (t.day || "Day") : t.days} {d === 2 ? (lang === "ar" ? "(افتراضي)" : "(Default)") : ""}
+                  </option>
+                ))}
+              </select>
+              <span className="text-[11px] text-[#8A9A81] mt-1 block">{t.followUpLeadDaysHint}</span>
             </div>
 
           </div>
