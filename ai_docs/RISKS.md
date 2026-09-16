@@ -4091,6 +4091,8 @@ regardless of column-uniformity across the batch), so this suite locks in the po
 rather than independently catching the original regression — the defect itself was confirmed by the
 live reproduction described above.
 
+**Manual test checklist:** `ai_docs/manual_tests/RISK_088_MANUAL_TESTS.md`
+
 ---
 
 ## PROPOSALS.md Reference
