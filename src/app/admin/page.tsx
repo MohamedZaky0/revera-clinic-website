@@ -19,7 +19,7 @@ import { translations } from "@/lib/translations";
 import { CLIENT } from "@/config/client";
 import { getRoleSlug, getRoleDisplayName, isPortalRoleMatch } from "@/lib/roleUtils";
 import { adminTranslations } from "@/components/admin/translations";
-import UserProfileView from "@/components/admin/UserProfileView";
+import UserProfileView, { UserProfileViewTranslations } from "@/components/admin/UserProfileView";
 import ClinicProfileSettingsView from "@/components/admin/settings/ClinicProfileSettingsView";
 import MedicalRecordsSettingsView from "@/components/admin/settings/MedicalRecordsSettingsView";
 import RoleManagementView from "@/components/admin/settings/RoleManagementView";
@@ -189,6 +189,7 @@ export type Req = {
   rooms?: string[];
   createdByEmployeeId?: string | null;
   followUpDate?: string | null;
+  followUpNotes?: string | null;
 };
 
 function getStatusBadgeClass(status: string): string {
@@ -642,6 +643,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // RISK-043: how long a session may sit `started`/`in_progress` before AdminBookingsView flags it
   // as forgotten. Configurable so a clinic that runs longer sessions isn't stuck with false alarms.
   const [bookingStaleSessionHours, setBookingStaleSessionHours] = useState<number>(2);
+  const [bookingFollowUpLeadDays, setBookingFollowUpLeadDays] = useState<number>(2);
   // Rooms state
   const [rooms, setRooms] = useState<any[]>([]);
 
@@ -1346,6 +1348,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [showActionsMenuModal, setShowActionsMenuModal] = useState(false);
   const [showAddBookingModal, setShowAddBookingModal] = useState(false);
   const [showFullViewNewBooking, setShowFullViewNewBooking] = useState(false);
+  const [newBookingInitialData, setNewBookingInitialData] = useState<any | null>(null);
   const [showAddPreviousBooking, setShowAddPreviousBooking] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -2361,7 +2364,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-053', name: 'Reception & Staff Weekly Shift Configuration Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee profile creation, weekly shift schedule configuration for non-doctor staff, and department/role synchronization.', status: 'idle' },
     { id: 'TC-054', name: 'Responsive Staff Views & Mobile Layout Engine', category: 'System & Settings', endpoint: '/api/health/supabase', description: 'Verifies mobile responsiveness, horizontal scroll containers (min-w), adaptive padding, and auto-dismiss navigation for all staff views.', status: 'idle' },
     { id: 'TC-055', name: 'Global Ending Session & Receptionist Clinical Finalization Engine', category: 'Services & Bookings', endpoint: '/api/page-settings', description: 'Verifies global session ending toggle activation, receptionist clinical intake & prescription synchronization, and instant doctor exit.', status: 'idle' },
-    { id: 'TC-056', name: 'Prescription Versioning & Immutable History Audit Engine', category: 'Medical & Patients', endpoint: '/api/prescriptions', description: 'Verifies prescription editing creating new immutable version chains (v1 -> v2), is_latest flags, doctor attribution, and read-only history retrieval.', status: 'idle' }
+    { id: 'TC-057', name: 'Receptionist Booking Control & Service Editing Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies receptionist booking status lifecycle transitions, booked service replacement on arrival, branch price resolution, and paid amount preservation.', status: 'idle' },
+    { id: 'TC-058', name: 'User Profile Working Details & Schedule Visualization Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee profile schedule extraction, multi-branch weekly matrix normalization, 12h time formatting, and dynamic fallback resolution.', status: 'idle' },
+    { id: 'TC-059', name: 'Doctor View Real-time Started Session Detection & Synchronization Engine', category: 'Doctor & Clinical', endpoint: '/api/reservations', description: 'Verifies reservation doctor query filtering with provider_id and doctor_name, starting session status transitions, and real-time active session propagation.', status: 'idle' },
+    { id: 'TC-060', name: 'Doctor Prescription Follow-Up & Reception Reminders Engine', category: 'Doctor & Clinical', endpoint: '/api/prescriptions', description: 'Verifies prescription follow-up date and clinical instructions recording, reception calendar follow-up reminders aggregation, WhatsApp reminder deep link generation, and 1-click booking conversion.', status: 'idle' },
+    { id: 'TC-061', name: 'Reception Follow-Up Lead Time & Auto Pre-Filled Booking Engine', category: 'Services & Bookings', endpoint: '/api/page-settings', description: 'Verifies configurable follow-up reminder lead days in booking settings, early receptionist alert banner rendering, full-width session banner styling, and 1-click new booking pre-fill with patient, doctor, service, and date.', status: 'idle' },
+    { id: 'TC-062', name: 'Doctor Portal Clinical Session & Data Isolation Verification Engine', category: 'Doctor & Clinical', endpoint: '/api/reservations', description: 'Verifies strict doctor reservation matching, provider UUID resolution, real-time ongoing session status management, queue-based treatment activation, and prescription deduplication.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -3876,6 +3884,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             setBookingShowDoctorNotes(data.booking.showDoctorNotes ?? true);
             setBookingDepositPercentage(data.booking.depositPercentage ?? 20);
             setBookingStaleSessionHours(data.booking.staleSessionHours ?? 2);
+            setBookingFollowUpLeadDays(data.booking.followUpLeadDays ?? 2);
           }
           if (data.deposit) {
             setInstapayName(data.deposit.instapayName || "Revera Clinic");
@@ -4148,6 +4157,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             showDoctorNotes: bookingShowDoctorNotes,
             depositPercentage: bookingDepositPercentage,
             staleSessionHours: bookingStaleSessionHours,
+            followUpLeadDays: bookingFollowUpLeadDays,
             termsText: termsText,
             globalEndingSession: globalEndingSession
           },
@@ -6653,18 +6663,27 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   address: profileAddress || profileEmployee?.address || "",
                   role: isSuperadminBypass ? "Superadmin" : (profileEmployee?.role_name || "Employee"),
                   branch: currentBranchName,
+                  branchesList: Array.isArray(profileEmployee?.branches) && profileEmployee.branches.length > 0
+                    ? profileEmployee.branches
+                    : [currentBranchName],
                   department: profileEmployee?.department || "Reception",
                   employeeId: isSuperadminBypass ? "EMP-SUPER" : (profileEmployee?.employee_id || "EMP-001"),
                   employmentType: "Full Time",
                   joiningDate: profileEmployee?.created_at
                     ? new Date(profileEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
                     : "July 21, 2026",
+                  shiftType: profileEmployee?.shift_type || profileEmployee?.shift || "Day",
+                  workingDays: profileEmployee?.working_days || null,
+                  workingHours: profileEmployee?.working_hours || null,
+                  workingDaysHours: profileEmployee?.working_days_hours || null,
                   basicSalary: Number(profileEmployee?.salary || 0),
                   bonuses: Number(profileEmployee?.bonus || 0),
                   deductions: Number(profileEmployee?.deductions || 0),
                   monthlyTarget: Number(profileEmployee?.required_target_amount || 0),
                   avatarUrl: customerAvatars[profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile"] || null
                 }}
+                lang="en"
+                t={adminTranslations.en.userProfile as UserProfileViewTranslations}
                 onUpdateUser={async (updated) => {
                   if (updated.email) setAdminEmail(updated.email);
                   if (updated.phone) setProfilePhone(updated.phone);
@@ -6703,8 +6722,6 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   const key = profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile";
                   if (key) handleAvatarRemove(key);
                 }}
-                lang={lang}
-                t={adminTranslations[lang].userProfile}
               />
             );
           })()}
@@ -6800,6 +6817,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               setBookingShowDoctorNotes={setBookingShowDoctorNotes}
               bookingStaleSessionHours={bookingStaleSessionHours}
               setBookingStaleSessionHours={setBookingStaleSessionHours}
+              bookingFollowUpLeadDays={bookingFollowUpLeadDays}
+              setBookingFollowUpLeadDays={setBookingFollowUpLeadDays}
               globalEndingSession={globalEndingSession}
               setGlobalEndingSession={setGlobalEndingSession}
               handleSaveBookingSettings={handleSaveBookingSettings}
@@ -7380,6 +7399,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               activeBranchNameAr={branches.find((b) => b.id === branch)?.name_ar || "الفرع الرئيسي"}
               onNavigateTab={(tabName) => setActiveNav(tabName)}
               onNewBooking={() => {
+                setNewBookingInitialData(null);
                 setActiveNav("Bookings");
                 setShowFullViewNewBooking(true);
               }}
@@ -7412,11 +7432,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           {activeNav === "Bookings" && (
             showFullViewNewBooking ? (
               <AdminNewBookingView
-                onClose={() => setShowFullViewNewBooking(false)}
+                initialData={newBookingInitialData}
+                onClose={() => {
+                  setShowFullViewNewBooking(false);
+                  setNewBookingInitialData(null);
+                }}
                 onBookingCreated={() => {
                   clearFetchCache();
                   fetchAllReservations();
                   setShowFullViewNewBooking(false);
+                  setNewBookingInitialData(null);
                 }}
                 services={localServices}
                 providers={providers}
@@ -7456,10 +7481,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 localServices={localServices}
                 userName={loggedEmpAccount?.name?.split(" ")[0] || "Sara"}
                 staleSessionThresholdHours={bookingStaleSessionHours}
+                followUpLeadDays={bookingFollowUpLeadDays}
                 hasPermission={hasPermission}
                 lang={lang}
                 t={adminTranslations[lang].bookings.adminBookingsView}
-                onNewBooking={() => setShowFullViewNewBooking(true)}
+                onNewBooking={(data?: any) => {
+                  setNewBookingInitialData(data || null);
+                  setShowFullViewNewBooking(true);
+                }}
                 onAddPreviousBooking={() => {
                   setPreviousBookingCustomer(null);
                   setShowAddPreviousBooking(true);
@@ -7508,11 +7537,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           )}
           {activeNav === "New Booking" && (
             <AdminNewBookingView
-              onClose={() => setActiveNav("Bookings")}
+              initialData={newBookingInitialData}
+              onClose={() => {
+                setActiveNav("Bookings");
+                setNewBookingInitialData(null);
+              }}
               onBookingCreated={() => {
                 clearFetchCache();
                 fetchAllReservations();
                 setActiveNav("Bookings");
+                setNewBookingInitialData(null);
               }}
               services={localServices}
               providers={providers}

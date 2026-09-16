@@ -21,9 +21,18 @@ import {
   Lock,
   X,
   DollarSign,
-  Loader2
+  Loader2,
+  Sun,
+  Moon,
+  Coffee,
+  Check,
+  Building2,
+  Sparkles,
+  Layers,
+  ChevronDown
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { adminTranslations } from "./translations";
 
 export interface UserProfileData {
   id?: string;
@@ -77,6 +86,21 @@ export interface UserProfileViewTranslations {
   assignedBranches: string;
   workingDays: string;
   workingHours: string;
+  weeklySchedule?: string;
+  weeklyOffDay?: string;
+  totalWeeklyHours?: string;
+  activeDay?: string;
+  offDay?: string;
+  restDay?: string;
+  today?: string;
+  shiftLabel?: string;
+  hoursPerWeek?: string;
+  daysCount?: string;
+  allBranches?: string;
+  selectBranchSchedule?: string;
+  dayNames?: Record<string, string>;
+  dayNamesShort?: Record<string, string>;
+  shiftTypes?: Record<string, string>;
   attendanceSummary: string;
   presentDays: string;
   absentDays: string;
@@ -153,7 +177,46 @@ export default function UserProfileView({
   lang = "en",
   t
 }: UserProfileViewProps) {
-  const tr = t;
+  const tr = t || adminTranslations[lang]?.userProfile || adminTranslations.en.userProfile;
+
+  // Background Database Fetched Records for complete schedule resolution
+  const [fetchedEmployee, setFetchedEmployee] = useState<any>(null);
+  const [fetchedProvider, setFetchedProvider] = useState<any>(null);
+  const [selectedScheduleBranch, setSelectedScheduleBranch] = useState<string>("all");
+
+  useEffect(() => {
+    async function loadExtraDetails() {
+      try {
+        const email = user.email?.trim().toLowerCase();
+        const userId = user.id;
+        const phone = user.phone;
+
+        if (email || userId || phone) {
+          const empQuery = supabase.from("employee_accounts").select("*");
+          if (userId && userId !== "my-profile" && !userId.includes("@")) {
+            empQuery.or(`id.eq.${userId},employee_id.eq.${userId},email.eq.${email || 'none'}`);
+          } else if (email) {
+            empQuery.eq("email", email);
+          }
+          const { data: empData } = await empQuery.maybeSingle();
+          if (empData) setFetchedEmployee(empData);
+
+          const provQuery = supabase.from("providers").select("*");
+          if (userId && userId !== "my-profile" && !userId.includes("@")) {
+            provQuery.or(`id.eq.${userId},phone.eq.${phone || 'none'},email.eq.${email || 'none'}`);
+          } else if (email || phone) {
+            provQuery.or(`phone.eq.${phone || 'none'},email.eq.${email || 'none'}`);
+          }
+          const { data: provData } = await provQuery.maybeSingle();
+          if (provData) setFetchedProvider(provData);
+        }
+      } catch (err) {
+        console.warn("UserProfileView: background schedule load notice:", err);
+      }
+    }
+    loadExtraDetails();
+  }, [user.id, user.email, user.phone]);
+
   // Local edit states
   const [showEditPersonalModal, setShowEditPersonalModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -241,7 +304,7 @@ export default function UserProfileView({
       if (filtered.length > 0) return filtered.join(", ");
     }
 
-    const rawSched = user.workingDaysHours;
+    const rawSched = user.workingDaysHours || fetchedEmployee?.working_days_hours || fetchedProvider?.working_days_hours;
     if (rawSched && typeof rawSched === "object" && Array.isArray(rawSched.branch_ids) && rawSched.branch_ids.length > 0) {
       const filtered = rawSched.branch_ids.map((bId: any) => {
         const clean = String(bId).trim().toLowerCase();
@@ -257,54 +320,330 @@ export default function UserProfileView({
     }
 
     return allSystemBranches.length > 0 ? allSystemBranches.join(", ") : "Main Branch";
-  }, [user.branch, user.branchesList, user.workingDaysHours, allSystemBranches]);
+  }, [user.branch, user.branchesList, user.workingDaysHours, fetchedEmployee, fetchedProvider, allSystemBranches]);
 
-  // Formatted Working Schedule strictly parsed from Database Response
-  const displayWorkingSchedule = useMemo(() => {
-    const rawSched = user.workingDaysHours;
-    if (rawSched) {
-      let parsed: any = rawSched;
-      if (typeof parsed === "string") {
-        try { parsed = JSON.parse(parsed); } catch (e) {}
-      }
+  // Current day index for "Today" highlighting (0 is Sun, 6 is Sat)
+  const currentDayIndex = typeof window !== "undefined" ? new Date().getDay() : 0;
 
-      if (parsed && typeof parsed === "object") {
-        const dayKeys = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-        const activeDays: string[] = [];
-        const timeSlots: string[] = [];
+  // Available Branch Tabs for Schedule View
+  const availableScheduleBranches = useMemo(() => {
+    const rawSched = user.workingDaysHours || fetchedEmployee?.working_days_hours || fetchedProvider?.working_days_hours;
+    let parsed: any = rawSched;
+    if (typeof parsed === "string") {
+      try { parsed = JSON.parse(parsed); } catch (e) {}
+    }
 
-        dayKeys.forEach(d => {
-          const dayData = parsed[d] || parsed[d.toLowerCase()];
-          if (dayData && dayData.active !== false && (dayData.start || dayData.hours)) {
-            // Strip any artificial parenthesized annotations like (Morning) / (Evening)
-            let hoursLabel = dayData.hours || `${dayData.start || "09:00"} – ${dayData.end || "17:00"}`;
-            hoursLabel = hoursLabel.replace(/\s*\([^)]*\)/g, "").trim();
-            activeDays.push(d);
-            if (hoursLabel && !timeSlots.includes(hoursLabel)) {
-              timeSlots.push(hoursLabel);
-            }
-          }
-        });
+    const branchIds = new Set<string>();
+    if (parsed && typeof parsed === "object" && parsed.branch_schedules && typeof parsed.branch_schedules === "object") {
+      Object.keys(parsed.branch_schedules).forEach(id => branchIds.add(id));
+    }
+    if (Array.isArray(user.branchesList)) {
+      user.branchesList.forEach(b => branchIds.add(b));
+    }
+    if (user.branch && user.branch.toLowerCase() !== "home") {
+      branchIds.add(user.branch);
+    }
 
-        if (activeDays.length > 0) {
-          return {
-            days: activeDays.join(", "),
-            hours: timeSlots.join(" | "),
-            shiftType: timeSlots.length > 1 ? "Multi-Shift Schedule" : (user.shiftType || "Day")
-          };
-        }
+    const list: Array<{ id: string; name: string }> = [{ id: "all", name: tr?.allBranches || (lang === "ar" ? "جميع الفروع" : "All Branches") }];
+    branchIds.forEach(bId => {
+      const found = allSystemBranches.find(bName => bName.toLowerCase() === bId.toLowerCase());
+      list.push({ id: bId, name: found || bId });
+    });
+    return list;
+  }, [user.workingDaysHours, fetchedEmployee, fetchedProvider, user.branchesList, user.branch, allSystemBranches, tr, lang]);
+
+  // Helper time parsing & formatting functions
+  const parseTimeToMinutes = (tStr: string): number => {
+    if (!tStr) return 0;
+    const clean = String(tStr).trim().toUpperCase();
+    const isPM = clean.includes("PM") || clean.includes("م");
+    const isAM = clean.includes("AM") || clean.includes("ص");
+    const numPart = clean.replace(/AM|PM|ص|م/gi, "").trim();
+    const parts = numPart.split(":").map(Number);
+    let hours = parts[0] || 0;
+    const mins = parts[1] || 0;
+
+    if (isPM && hours < 12) hours += 12;
+    if (isAM && hours === 12) hours = 0;
+
+    return hours * 60 + mins;
+  };
+
+  const formatTime12Hour = (timeStr?: string, targetLang: "en" | "ar" = "en"): string => {
+    if (!timeStr) return "";
+    const clean = String(timeStr).trim();
+    if (clean.toLowerCase() === "off" || clean === "—") return "";
+    
+    if (clean.includes("AM") || clean.includes("PM") || clean.includes("ص") || clean.includes("م")) {
+      if (targetLang === "ar") {
+        return clean.replace(/AM/gi, "ص").replace(/PM/gi, "م");
+      } else {
+        return clean.replace(/ص/g, "AM").replace(/م/g, "PM");
       }
     }
 
-    // Clean hours string without artificial parentheses annotations
-    let rawHours = (user.workingHours || "—").replace(/\s*\([^)]*\)/g, "").trim();
+    const parts = clean.split(":");
+    if (parts.length >= 2) {
+      let hour = parseInt(parts[0], 10);
+      const min = parts[1].slice(0, 2);
+      if (!isNaN(hour)) {
+        const isPm = hour >= 12;
+        const period = isPm ? (targetLang === "ar" ? "م" : "PM") : (targetLang === "ar" ? "ص" : "AM");
+        let h12 = hour % 12;
+        if (h12 === 0) h12 = 12;
+        return `${String(h12).padStart(2, "0")}:${min} ${period}`;
+      }
+    }
+    return clean;
+  };
+
+  const calcShiftHours = (start?: string, end?: string): number => {
+    if (!start || !end) return 0;
+    const startMins = parseTimeToMinutes(start);
+    const endMins = parseTimeToMinutes(end);
+    let diff = endMins - startMins;
+    if (diff < 0) diff += 24 * 60;
+    return Math.round((diff / 60) * 10) / 10;
+  };
+
+  // Comprehensive 7-Day Weekly Schedule Matrix (Saturday to Friday)
+  const weeklyScheduleData = useMemo(() => {
+    const WEEK_DAYS = [
+      { key: "Saturday", short: "Sat", id: 6, arName: "السبت", arShort: "سبت" },
+      { key: "Sunday", short: "Sun", id: 0, arName: "الأحد", arShort: "أحد" },
+      { key: "Monday", short: "Mon", id: 1, arName: "الإثنين", arShort: "إثنين" },
+      { key: "Tuesday", short: "Tue", id: 2, arName: "الثلاثاء", arShort: "ثلاثاء" },
+      { key: "Wednesday", short: "Wed", id: 3, arName: "الأربعاء", arShort: "أربعاء" },
+      { key: "Thursday", short: "Thu", id: 4, arName: "الخميس", arShort: "خميس" },
+      { key: "Friday", short: "Fri", id: 5, arName: "الجمعة", arShort: "جمعة" },
+    ];
+
+    const rawSched = user.workingDaysHours || fetchedEmployee?.working_days_hours || fetchedProvider?.working_days_hours;
+    let parsed: any = rawSched;
+    if (typeof parsed === "string") {
+      try { parsed = JSON.parse(parsed); } catch (e) {}
+    }
+
+    const shiftStr = user.shiftType || fetchedEmployee?.shift || fetchedProvider?.shift || "";
+
+    let customShiftTimes: { start: string; end: string } | null = null;
+    if (shiftStr && (shiftStr.toLowerCase().includes("to") || shiftStr.includes("-"))) {
+      const sep = shiftStr.toLowerCase().includes("to") ? /to/i : /-/;
+      const parts = shiftStr.split(sep);
+      if (parts.length === 2 && parts[0].trim() && parts[1].trim()) {
+        customShiftTimes = {
+          start: parts[0].trim(),
+          end: parts[1].trim()
+        };
+      }
+    }
+
+    const extractShiftsFromDayNode = (dayData: any): Array<{ start: string; end: string; formatted: string; duration: number }> => {
+      if (!dayData) return [];
+      if (typeof dayData === "string") {
+        if (dayData.toLowerCase() === "off" || dayData === "—") return [];
+        const parts = dayData.split("-").map(s => s.trim());
+        if (parts.length === 2) {
+          const startF = formatTime12Hour(parts[0], lang);
+          const endF = formatTime12Hour(parts[1], lang);
+          return [{
+            start: parts[0],
+            end: parts[1],
+            formatted: `${startF} – ${endF}`,
+            duration: calcShiftHours(parts[0], parts[1])
+          }];
+        }
+        return [{
+          start: dayData,
+          end: dayData,
+          formatted: formatTime12Hour(dayData, lang),
+          duration: 8
+        }];
+      }
+
+      const isOpen = dayData.isOpen ?? dayData.active ?? dayData.open ?? true;
+      if (!isOpen || dayData.hours === "Off" || dayData.off === true) {
+        return [];
+      }
+
+      const res: Array<{ start: string; end: string; formatted: string; duration: number }> = [];
+      if (Array.isArray(dayData.shifts) && dayData.shifts.length > 0) {
+        dayData.shifts.forEach((s: any) => {
+          if (s.start && s.end) {
+            const startF = formatTime12Hour(s.start, lang);
+            const endF = formatTime12Hour(s.end, lang);
+            res.push({
+              start: s.start,
+              end: s.end,
+              formatted: `${startF} – ${endF}`,
+              duration: calcShiftHours(s.start, s.end)
+            });
+          }
+        });
+      } else if (dayData.start && dayData.end) {
+        const startF = formatTime12Hour(dayData.start, lang);
+        const endF = formatTime12Hour(dayData.end, lang);
+        res.push({
+          start: dayData.start,
+          end: dayData.end,
+          formatted: `${startF} – ${endF}`,
+          duration: calcShiftHours(dayData.start, dayData.end)
+        });
+      } else if (dayData.hours && dayData.hours !== "Off") {
+        const parts = dayData.hours.split("–").length === 2 ? dayData.hours.split("–") : dayData.hours.split("-");
+        if (parts.length === 2) {
+          const startF = formatTime12Hour(parts[0].trim(), lang);
+          const endF = formatTime12Hour(parts[1].trim(), lang);
+          res.push({
+            start: parts[0].trim(),
+            end: parts[1].trim(),
+            formatted: `${startF} – ${endF}`,
+            duration: calcShiftHours(parts[0].trim(), parts[1].trim())
+          });
+        }
+      }
+      return res;
+    };
+
+    let hasExplicitDbSchedule = false;
+    const scheduleByDay: Record<string, {
+      dayKey: string;
+      dayShort: string;
+      dayIndex: number;
+      dayLabel: string;
+      dayShortLabel: string;
+      isOpen: boolean;
+      shifts: Array<{ start: string; end: string; formatted: string; duration: number }>;
+      totalDayHours: number;
+    }> = {};
+
+    WEEK_DAYS.forEach(day => {
+      let dayShifts: Array<{ start: string; end: string; formatted: string; duration: number }> = [];
+
+      if (parsed && typeof parsed === "object") {
+        if (parsed.branch_schedules && typeof parsed.branch_schedules === "object") {
+          hasExplicitDbSchedule = true;
+          Object.entries(parsed.branch_schedules).forEach(([bId, bSched]: [string, any]) => {
+            if (selectedScheduleBranch !== "all" && bId !== selectedScheduleBranch) return;
+            const modeNode = bSched?.in_person || bSched;
+            if (modeNode && typeof modeNode === "object") {
+              const dNode = modeNode[day.key] || modeNode[day.key.toLowerCase()];
+              if (dNode) {
+                const extracted = extractShiftsFromDayNode(dNode);
+                extracted.forEach(s => {
+                  if (!dayShifts.some(existing => existing.formatted === s.formatted)) {
+                    dayShifts.push(s);
+                  }
+                });
+              }
+            }
+          });
+        } else {
+          const topNode = parsed.in_person || parsed;
+          if (topNode && typeof topNode === "object") {
+            const dNode = topNode[day.key] || topNode[day.key.toLowerCase()];
+            if (dNode !== undefined) {
+              hasExplicitDbSchedule = true;
+              dayShifts = extractShiftsFromDayNode(dNode);
+            }
+          }
+        }
+      }
+
+      // If no explicit day shifts yet but customShiftTimes is available
+      if (dayShifts.length === 0 && !hasExplicitDbSchedule && customShiftTimes && day.key !== "Friday") {
+        const startF = formatTime12Hour(customShiftTimes.start, lang);
+        const endF = formatTime12Hour(customShiftTimes.end, lang);
+        dayShifts.push({
+          start: customShiftTimes.start,
+          end: customShiftTimes.end,
+          formatted: `${startF} – ${endF}`,
+          duration: calcShiftHours(customShiftTimes.start, customShiftTimes.end)
+        });
+      }
+
+      // Clinic Standard Egyptian Default: Saturday to Thursday 10:00 AM – 08:00 PM (Friday Off)
+      if (dayShifts.length === 0 && !hasExplicitDbSchedule && day.key !== "Friday") {
+        const startF = formatTime12Hour("10:00", lang);
+        const endF = formatTime12Hour("20:00", lang);
+        dayShifts.push({
+          start: "10:00",
+          end: "20:00",
+          formatted: `${startF} – ${endF}`,
+          duration: 10
+        });
+      }
+
+      const isOpen = dayShifts.length > 0;
+      const totalDayHours = dayShifts.reduce((sum, s) => sum + s.duration, 0);
+
+      const dayLabel = lang === "ar"
+        ? (tr?.dayNames?.[day.key.toLowerCase()] || day.arName)
+        : (tr?.dayNames?.[day.key.toLowerCase()] || day.key);
+
+      const dayShortLabel = lang === "ar"
+        ? (tr?.dayNamesShort?.[day.short.toLowerCase()] || day.arShort)
+        : (tr?.dayNamesShort?.[day.short.toLowerCase()] || day.short);
+
+      scheduleByDay[day.key] = {
+        dayKey: day.key,
+        dayShort: day.short,
+        dayIndex: day.id,
+        dayLabel,
+        dayShortLabel,
+        isOpen,
+        shifts: dayShifts,
+        totalDayHours
+      };
+    });
+
+    const activeDaysList = WEEK_DAYS.filter(d => scheduleByDay[d.key]?.isOpen);
+    const offDaysList = WEEK_DAYS.filter(d => !scheduleByDay[d.key]?.isOpen);
+    const totalWeeklyHours = Object.values(scheduleByDay).reduce((sum, d) => sum + d.totalDayHours, 0);
+
+    let daysSummary = "";
+    if (activeDaysList.length === 7) {
+      daysSummary = lang === "ar" ? "طوال أيام الأسبوع (7 أيام)" : "All Week (7 Days)";
+    } else if (activeDaysList.length === 6 && !scheduleByDay["Friday"]?.isOpen) {
+      daysSummary = lang === "ar" ? "السبت – الخميس (6 أيام)" : "Saturday – Thursday (6 Days)";
+    } else if (activeDaysList.length > 0) {
+      daysSummary = activeDaysList.map(d => scheduleByDay[d.key].dayShortLabel).join(", ");
+    } else {
+      daysSummary = lang === "ar" ? "السبت – الخميس (6 أيام)" : "Saturday – Thursday (6 Days)";
+    }
+
+    let offDaysSummary = "";
+    if (offDaysList.length > 0) {
+      offDaysSummary = offDaysList.map(d => scheduleByDay[d.key].dayLabel).join(", ");
+    } else {
+      offDaysSummary = lang === "ar" ? "لا يوجد (دوام كامل)" : "None (Full Availability)";
+    }
+
+    const allDistinctHours = new Set<string>();
+    Object.values(scheduleByDay).forEach(d => {
+      d.shifts.forEach(s => allDistinctHours.add(s.formatted));
+    });
+    const hoursSummary = allDistinctHours.size > 0 
+      ? Array.from(allDistinctHours).join(" | ")
+      : `${formatTime12Hour("10:00", lang)} – ${formatTime12Hour("20:00", lang)}`;
+
+    let shiftType = user.shiftType || fetchedEmployee?.shift || "Day";
+    if (allDistinctHours.size > 1) {
+      shiftType = tr?.shiftTypes?.multiShift || (lang === "ar" ? "جدول متعدد الورديات" : "Multi-Shift Schedule");
+    } else if (shiftType === "Day" || !shiftType) {
+      shiftType = tr?.shiftTypes?.day || (lang === "ar" ? "وردية نهارية" : "Day Shift");
+    }
 
     return {
-      days: user.workingDays || "—",
-      hours: rawHours || "—",
-      shiftType: user.shiftType || "Day"
+      days: WEEK_DAYS.map(d => scheduleByDay[d.key]),
+      activeDaysCount: activeDaysList.length,
+      totalWeeklyHours,
+      daysSummary,
+      offDaysSummary,
+      hoursSummary,
+      shiftType
     };
-  }, [user.workingDaysHours, user.workingDays, user.workingHours, user.shiftType]);
+  }, [user.workingDaysHours, user.shiftType, fetchedEmployee, fetchedProvider, selectedScheduleBranch, lang, tr]);
 
   // Helper to get date ranges based on selected period
   const getDateRange = (periodStr: string) => {
@@ -780,66 +1119,219 @@ export default function UserProfileView({
         </div>
       </div>
 
-      {/* ── SECTION 2: WORK INFORMATION (REAL DATABASE RESPONSE - VIEW ONLY, BREAK TIME REMOVED) ── */}
+      {/* ── SECTION 2: WORK INFORMATION & WEEKLY SCHEDULE ── */}
       <div className="rounded-3xl border border-[#414E36]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
-        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+        {/* Section Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#414E36]/10 pb-4 gap-3">
           <div className="flex items-center gap-3">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#C4AE7C] text-white text-xs font-black">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#C4AE7C] text-white text-xs font-black shadow-xs">
               2
             </span>
             <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[#C4AE7C]">
-              {tr?.workInformation ?? "Work Information"}
+              {tr?.workInformation ?? "Work Information & Weekly Schedule"}
             </h2>
+          </div>
+
+          {/* Quick Badges in Header */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Shift Badge */}
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#F9F9F7] border border-[#414E36]/15 px-3 py-1 text-xs font-extrabold text-[#414E36] shadow-2xs">
+              {weeklyScheduleData.shiftType.toLowerCase().includes("night") || weeklyScheduleData.shiftType.toLowerCase().includes("evening") || weeklyScheduleData.shiftType.includes("مسائية") ? (
+                <Moon size={13} className="text-indigo-500" />
+              ) : weeklyScheduleData.shiftType.toLowerCase().includes("multi") || weeklyScheduleData.shiftType.includes("متعدد") ? (
+                <Clock size={13} className="text-[#414E36]" />
+              ) : (
+                <Sun size={13} className="text-amber-500" />
+              )}
+              <span>{weeklyScheduleData.shiftType}</span>
+            </span>
+
+            {/* Total Weekly Hours Badge */}
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#EDE4C8] border border-[#C4AE7C]/40 px-3 py-1 text-xs font-black text-[#414E36] shadow-2xs">
+              <Timer size={13} className="text-[#414E36]" />
+              <span>{weeklyScheduleData.totalWeeklyHours} {tr?.hoursPerWeek ?? "hrs/week"}</span>
+            </span>
+
+            {/* Active Days Badge */}
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-extrabold text-emerald-800 shadow-2xs">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{weeklyScheduleData.activeDaysCount} {tr?.daysCount ?? "Days Active"}</span>
+            </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-xs md:text-sm">
-          <div className="flex items-start gap-3">
-            <Briefcase size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
-            <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.department ?? "Department"}</span>
-              <span className="font-extrabold text-[#1F251A]">{displayDepartment}</span>
+        {/* 6 Key Attribute Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 text-xs">
+          {/* 1. Department */}
+          <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3 transition hover:border-[#414E36]/25">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36]/10 text-[#414E36] shrink-0">
+              <Briefcase size={16} />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">{tr?.department ?? "Department"}</span>
+              <span className="font-extrabold text-[#1F251A] truncate block">{displayDepartment}</span>
             </div>
           </div>
 
-          <div className="flex items-start gap-3">
-            <Clock size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
-            <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.shiftType ?? "Shift Type"}</span>
-              <span className="font-extrabold text-[#1F251A]">{displayWorkingSchedule.shiftType}</span>
+          {/* 2. Employment Type */}
+          <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3 transition hover:border-[#414E36]/25">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36]/10 text-[#414E36] shrink-0">
+              <Briefcase size={16} />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">{tr?.employmentType ?? "Employment Type"}</span>
+              <span className="font-extrabold text-[#1F251A] truncate block">{user.employmentType || (tr?.fullTime ?? "Full Time")}</span>
             </div>
           </div>
 
-          <div className="flex items-start gap-3">
-            <MapPin size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
-            <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.assignedBranches ?? "Assigned Branches"}</span>
-              <span className="font-extrabold text-[#1F251A]">{displayBranches}</span>
+          {/* 3. Assigned Branches */}
+          <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3 transition hover:border-[#414E36]/25">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36]/10 text-[#414E36] shrink-0">
+              <MapPin size={16} />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">{tr?.assignedBranches ?? "Assigned Branches"}</span>
+              <span className="font-extrabold text-[#1F251A] truncate block">{displayBranches}</span>
             </div>
           </div>
 
-          <div className="flex items-start gap-3">
-            <Calendar size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
-            <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.workingDays ?? "Working Days"}</span>
-              <span className="font-extrabold text-[#1F251A]">{displayWorkingSchedule.days}</span>
+          {/* 4. Active Working Days */}
+          <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3 transition hover:border-[#414E36]/25">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 shrink-0">
+              <CalendarCheck size={16} />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">{tr?.workingDays ?? "Working Days"}</span>
+              <span className="font-extrabold text-[#1F251A] truncate block">{weeklyScheduleData.daysSummary}</span>
             </div>
           </div>
 
-          <div className="flex items-start gap-3">
-            <Briefcase size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
-            <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.employmentType ?? "Employment Type"}</span>
-              <span className="font-extrabold text-[#1F251A]">{user.employmentType || (tr?.fullTime ?? "Full Time")}</span>
+          {/* 5. Daily Working Hours */}
+          <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3 transition hover:border-[#414E36]/25">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36]/10 text-[#414E36] shrink-0">
+              <Clock3 size={16} />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">{tr?.workingHours ?? "Working Hours"}</span>
+              <span className="font-extrabold text-[#1F251A] font-mono text-[11px] truncate block">{weeklyScheduleData.hoursSummary}</span>
             </div>
           </div>
 
-          <div className="flex items-start gap-3">
-            <Clock size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
-            <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">{tr?.workingHours ?? "Working Hours"}</span>
-              <span className="font-extrabold text-[#1F251A]">{displayWorkingSchedule.hours}</span>
+          {/* 6. Weekly Off Day */}
+          <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3 transition hover:border-[#414E36]/25">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600 shrink-0">
+              <CalendarX size={16} />
             </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">{tr?.weeklyOffDay ?? "Weekly Off Day"}</span>
+              <span className="font-extrabold text-[#1F251A] truncate block">{weeklyScheduleData.offDaysSummary}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 7-Day Weekly Schedule Matrix Board ── */}
+        <div className="pt-2 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[#C4AE7C]" />
+              <h3 className="text-xs font-black uppercase tracking-wider text-[#1F251A]">
+                {tr?.weeklySchedule ?? "Weekly Schedule Matrix"}
+              </h3>
+            </div>
+
+            {/* Branch Selector Switcher if multi-branch */}
+            {availableScheduleBranches.length > 2 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+                {availableScheduleBranches.map(b => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => setSelectedScheduleBranch(b.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition whitespace-nowrap ${
+                      selectedScheduleBranch === b.id
+                        ? "bg-[#414E36] text-white shadow-xs"
+                        : "bg-[#F5F5F3] text-[#5A6A51] hover:bg-[#EBEFE9] hover:text-[#1F251A]"
+                    }`}
+                  >
+                    {b.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 7 Day Cards Grid (Saturday to Friday) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+            {weeklyScheduleData.days.map((day) => {
+              const isCurrentDay = day.dayIndex === currentDayIndex;
+              return (
+                <div
+                  key={day.dayKey}
+                  className={`rounded-2xl p-3 border transition flex flex-col justify-between relative ${
+                    isCurrentDay
+                      ? "ring-2 ring-[#414E36] ring-offset-1 shadow-xs"
+                      : ""
+                  } ${
+                    day.isOpen
+                      ? "border-emerald-200/90 bg-emerald-50/25 hover:bg-emerald-50/50"
+                      : "border-[#414E36]/10 bg-[#F9F9F7]/70 text-[#5A6A51]"
+                  }`}
+                >
+                  {/* Top Day Header & Status */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs font-black text-[#1F251A]">{day.dayLabel}</span>
+                      {isCurrentDay && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-[#414E36] text-white text-[8px] font-black uppercase tracking-wider">
+                          {tr?.today ?? "Today"}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      {day.isOpen ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 text-[10px] font-black">
+                          <Check size={10} strokeWidth={3} />
+                          <span>{tr?.activeDay ?? "Active"}</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold">
+                          <Coffee size={10} />
+                          <span>{tr?.offDay ?? "Off"}</span>
+                        </span>
+                      )}
+
+                      {day.isOpen && day.totalDayHours > 0 && (
+                        <span className="text-[10px] font-bold text-[#5A6A51]">
+                          {day.totalDayHours}h
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Middle: Shift Times / Rest Day */}
+                  <div className="pt-3">
+                    {day.isOpen ? (
+                      <div className="space-y-1.5">
+                        {day.shifts.map((shift, idx) => (
+                          <div
+                            key={idx}
+                            className="px-2 py-1.5 rounded-xl bg-white border border-emerald-200/70 text-[10px] font-black text-[#1F251A] text-center font-mono shadow-2xs leading-tight"
+                          >
+                            {shift.formatted}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-2.5 text-center flex flex-col items-center justify-center gap-1 text-[#5A6A51]">
+                        <Coffee size={14} className="opacity-40" />
+                        <span className="text-[11px] font-semibold">{tr?.restDay ?? "Rest Day"}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

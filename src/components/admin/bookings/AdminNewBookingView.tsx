@@ -95,6 +95,7 @@ interface AdminNewBookingViewProps {
   lang?: "en" | "ar";
   t?: any;
   activeBranchId?: string;
+  initialData?: any;
 }
 
 // Helper to extract service name cleanly. DB rows carry both `en` and `ar` columns —
@@ -221,7 +222,8 @@ export default function AdminNewBookingView({
   rooms = [],
   lang = "en",
   t,
-  activeBranchId
+  activeBranchId,
+  initialData,
 }: AdminNewBookingViewProps) {
   const tr = t || adminTranslations[lang].bookings.adminNewBookingView;
   // Patient Search & Selection State
@@ -434,6 +436,97 @@ export default function AdminNewBookingView({
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
   }, []);
+
+  // ── PRE-FILL FROM INITIAL DATA (e.g., Follow-Up Reminder Convert to Booking) ──
+  const initialDataAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!initialData || initialDataAppliedRef.current) return;
+    initialDataAppliedRef.current = true;
+
+    if (initialData.phone) {
+      setPhone(initialData.phone);
+    }
+    if (initialData.patientName) {
+      const parts = String(initialData.patientName).trim().split(" ");
+      setFirstName(parts[0] || "");
+      setLastName(parts.slice(1).join(" ") || "");
+      setPatientSearchQuery(initialData.patientName);
+    }
+    if (initialData.date) {
+      setBookingDate(initialData.date);
+    }
+    if (initialData.notes) {
+      setNotes(initialData.notes);
+    }
+    if (initialData.branchId) {
+      setSelectedBranchId(String(initialData.branchId));
+    }
+  }, [initialData]);
+
+  // Match and select customer account from initialData
+  useEffect(() => {
+    if (!initialData) return;
+    const searchPhone = (initialData.phone || "").replace(/\D/g, "");
+    const searchId = initialData.customerId ? String(initialData.customerId) : "";
+    const searchName = (initialData.patientName || "").trim().toLowerCase();
+
+    if (allCustomers && allCustomers.length > 0) {
+      const matched = allCustomers.find(c => {
+        if (searchId && String(c.id) === searchId) return true;
+        const cPhone = (c.mobile || c.phone || "").replace(/\D/g, "");
+        if (searchPhone && cPhone && (cPhone === searchPhone || cPhone.endsWith(searchPhone) || searchPhone.endsWith(cPhone))) return true;
+        const cName = (c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`).trim().toLowerCase();
+        if (searchName && cName && (cName === searchName || cName.includes(searchName) || searchName.includes(cName))) return true;
+        return false;
+      });
+      if (matched) {
+        handleSelectCustomer(matched);
+      }
+    }
+  }, [initialData, allCustomers]);
+
+  // Match and select doctor from initialData
+  useEffect(() => {
+    if (!initialData || (!initialData.doctorName && !initialData.doctorId)) return;
+    if (dbDoctors && dbDoctors.length > 0) {
+      const targetDocId = initialData.doctorId ? String(initialData.doctorId) : "";
+      const targetDocName = (initialData.doctorName || "").replace(/^Dr\.?\s*/i, "").trim().toLowerCase();
+
+      const matched = dbDoctors.find(d => {
+        const dAny = d as any;
+        if (targetDocId && (String(d.id) === targetDocId || String(dAny.provider_id) === targetDocId)) return true;
+        const dName = (d.name || dAny.full_name || dAny.name_en || "").replace(/^Dr\.?\s*/i, "").trim().toLowerCase();
+        if (targetDocName && dName && (dName === targetDocName || dName.includes(targetDocName) || targetDocName.includes(dName))) return true;
+        return false;
+      });
+
+      if (matched) {
+        setSelectedDoctorId(String(matched.id));
+      }
+    }
+  }, [initialData, dbDoctors]);
+
+  // Match and select service from initialData
+  useEffect(() => {
+    if (!initialData || (!initialData.serviceName && !initialData.serviceId)) return;
+    if (dbServices && dbServices.length > 0) {
+      const targetSvcId = initialData.serviceId ? String(initialData.serviceId) : "";
+      const targetSvcName = (initialData.serviceName || "").trim().toLowerCase();
+
+      const matched = dbServices.find(s => {
+        const sAny = s as any;
+        if (targetSvcId && String(s.id) === targetSvcId) return true;
+        const sEn = (sAny.en || s.name || sAny.title || sAny.name_en || "").trim().toLowerCase();
+        const sAr = (sAny.ar || sAny.name_ar || sAny.title_ar || "").trim().toLowerCase();
+        if (targetSvcName && (sEn === targetSvcName || sAr === targetSvcName || sEn.includes(targetSvcName) || targetSvcName.includes(sEn))) return true;
+        return false;
+      });
+
+      if (matched) {
+        setSelectedServiceId(String(matched.id));
+      }
+    }
+  }, [initialData, dbServices]);
 
   // 2. Real-time Customer Search & Filter based on Phone Number field
   useEffect(() => {
@@ -916,7 +1009,7 @@ export default function AdminNewBookingView({
         <div className={activePackage ? "lg:col-span-2 space-y-6" : "space-y-6"}>
 
           {/* CARD 1: PATIENT INFORMATION */}
-          <div className="bg-white rounded-3xl p-4 sm:p-6 md:p-8 border border-[#414E36]/10 shadow-xs space-y-6">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 md:p-8 border border-[#414E36]/10 shadow-xs space-y-6 relative z-30">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-700 text-white text-xs font-black">
@@ -952,7 +1045,7 @@ export default function AdminNewBookingView({
 
             <div className="space-y-4 text-xs md:text-sm">
               {/* Phone Input with Country Code & Integrated Patients Dropdown */}
-              <div className="relative" ref={phoneDropdownRef}>
+              <div className="relative z-50" ref={phoneDropdownRef}>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block font-bold text-[#1F251A]">{tr.phoneLabel}</label>
                   <button
@@ -1025,10 +1118,10 @@ export default function AdminNewBookingView({
 
                 {/* Scrollable Floating Customer List Dropdown */}
                 {showCustomerDropdown && customerList.length > 0 && (
-                  <div className="absolute start-0 end-0 top-full mt-1 z-[100] max-h-64 overflow-y-auto bg-white rounded-2xl border border-[#414E36]/20 shadow-2xl p-2 space-y-1">
-                    <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#5A6A51] bg-[#FBFBF9] rounded-xl flex justify-between items-center mb-1">
+                  <div className="absolute start-0 end-0 top-full mt-1.5 z-[100] max-h-72 overflow-y-auto overscroll-contain bg-white rounded-2xl border border-[#414E36]/20 shadow-[0_12px_40px_rgba(0,0,0,0.18)] p-2 space-y-1">
+                    <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#5A6A51] bg-[#FBFBF9] rounded-xl flex justify-between items-center mb-1 sticky top-0 z-10 border border-[#414E36]/5">
                       <span>{tr.databasePatientsPrefix} ({customerList.length})</span>
-                      <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[#1F251A] font-bold text-xs">{tr.closeBtn}</button>
+                      <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[#1F251A] hover:text-red-700 font-bold text-xs cursor-pointer">{tr.closeBtn}</button>
                     </div>
                     
                     {customerList.length === 0 ? (
@@ -1045,17 +1138,17 @@ export default function AdminNewBookingView({
                           <div
                             key={c.id}
                             onClick={() => handleSelectCustomer(c)}
-                            className={`p-3 rounded-xl cursor-pointer transition flex items-center justify-between border-b border-gray-100 last:border-0 ${
+                            className={`p-2.5 sm:p-3 rounded-xl cursor-pointer transition flex items-center justify-between gap-3 border-b border-gray-100 last:border-0 ${
                               isSelected ? "bg-emerald-100/70 border-emerald-300" : "hover:bg-emerald-50/70"
                             }`}
                           >
-                            <div>
-                              <span className="font-extrabold text-[#1F251A] text-xs block">{cName}</span>
-                              <span className="text-[11px] font-mono text-[#5A6A51]">
+                            <div className="min-w-0 flex-1">
+                              <span className="font-extrabold text-[#1F251A] text-xs block truncate">{cName}</span>
+                              <span className="text-[11px] font-mono text-[#5A6A51] block truncate">
                                 {cPhone} {c.email ? `• ${c.email}` : ""}
                               </span>
                             </div>
-                            <span className={`text-[11px] font-bold px-3 py-1 rounded-xl flex items-center gap-1 ${
+                            <span className={`text-[11px] font-bold px-3 py-1 rounded-xl flex items-center gap-1 shrink-0 ${
                               isSelected ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800"
                             }`}>
                               {isSelected ? <Check size={12} /> : null}
@@ -1324,7 +1417,7 @@ export default function AdminNewBookingView({
           </div>
 
           {/* CARD 2: APPOINTMENT DETAILS */}
-          <div className="bg-white rounded-3xl p-4 sm:p-6 md:p-8 border border-[#414E36]/10 shadow-xs space-y-6">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 md:p-8 border border-[#414E36]/10 shadow-xs space-y-6 relative z-10">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-700 text-white text-xs font-black">
@@ -1415,7 +1508,7 @@ export default function AdminNewBookingView({
 
                   {showTimeModal && (
                     <div
-                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn"
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto animate-fadeIn"
                       onClick={(e) => {
                         if (e.target === e.currentTarget) setShowTimeModal(false);
                       }}
@@ -1662,7 +1755,7 @@ export default function AdminNewBookingView({
 
         {/* RIGHT COLUMN: ACTIVE PACKAGE (1/3 width, if active package exists) */}
         {activePackage && (
-          <div className="space-y-6">
+          <div className="space-y-6 relative z-10">
             <div className="bg-white rounded-3xl p-6 border border-emerald-700/20 shadow-xs space-y-4">
               <div className="flex items-center gap-2 text-emerald-800">
                 <Package size={18} />

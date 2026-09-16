@@ -192,6 +192,19 @@ Deletes all rows from the reservations table. No soft-delete. No confirmation be
 
 ---
 
+### Doctor Prescription Follow-Up Visits & Reception Reminders Engine
+**Enforced in:** `DoctorOngoingSessionTab.tsx`, `AdminBookingsView.tsx`, `POST /api/prescriptions`, `PATCH /api/reservations`
+- **Clinical Follow-Up Specification:** Doctors can toggle *"Requires Follow-Up / Consultation?"* during active treatment sessions in `DoctorOngoingSessionTab.tsx`. Doctors choose from quick interval presets (`+3 Days`, `+1 Week`, `+2 Weeks`, `+1 Month`) or pick a custom date (`follow_up_date`) and add clinical instructions.
+- **Persistence:** Submitting the prescription saves `follow_up_date` to `prescriptions` table via `POST /api/prescriptions` and syncs `followUpDate` to the booking via `PATCH /api/reservations`.
+- **Reception Calendar Indicator (Not a Confirmed Reservation):** Follow-ups are surfaced in the Reception Calendar (`AdminBookingsView.tsx`) with clear non-reservation badging (**"Follow-Up Reminder (Not a Reservation)" / "تذكير متابعة (ليست حجزاً)"**) and calendar date dots so receptionists clearly know the patient is recommended for follow-up and does not occupy a confirmed appointment slot yet.
+- **Receptionist Outreach & 1-Click Conversion:** Provides receptionists with direct tools to contact the patient 1–2 days prior to the follow-up date:
+  1. **WhatsApp Reminder:** Generates a pre-filled WhatsApp message with doctor name, recommended follow-up date, and service details.
+  2. **Call Patient:** Direct phone dialing (`tel:`).
+  3. **Convert to Full Booking ("تحويل لحجز مؤكد"):** Launches the booking flow so receptionists can lock in the appointment with a single click.
+- **System Test Suite:** Validated automatically via Diagnostic Test Case `TC-060` in the Admin Settings System Test Suite.
+
+---
+
 ### Coming-soon sidebar sections are superadmin-only
 **Enforced in:** `src/app/admin/page.tsx` (`SIDEBAR_ITEMS`, `permittedSidebarItems`)
 
@@ -281,6 +294,13 @@ The following are **not currently enforced in code**:
      - **Session Paid**: Actual amount paid so far for this specific session (`amountPaid EGP`).
      - **Session Outstanding**: Remaining balance owed for this specific session (`amountLeft EGP` / `cost - amountPaid EGP`).
     - Upon completing payment settlement checkout, Session Paid is updated to total price, Session Outstanding drops to 0 EGP, Customer Total Spent increases by settled payment, and Customer Outstanding is reduced by settled amount.
+
+6. **Reception Follow-Up Reminders & Pre-Filled Booking Engine (`TC-060` & `TC-061`)**:
+   - **Doctor Follow-Up Intent**: When completing a session or issuing a digital prescription, doctors record an optional follow-up target date (`follow_up_date`) and clinical instructions (`follow_up_instructions`).
+   - **Lead Time Window**: Follow-up reminders appear on the receptionist's bookings view before the target date according to `booking.followUpLeadDays` configured in Booking Settings (`/admin` -> Settings -> Booking Settings, default 2 days). Reminder appearance date = `targetDate - followUpLeadDays`.
+   - **Full-Width Sleek Notification Banner**: Active follow-up reminders are rendered at the top of the receptionist bookings view spanning 100% width, styled as a sleek Indigo alert banner directly below any active treatment session alerts.
+   - **1-Click Pre-Filled Booking Conversion**: Clicking **"+ Convert to Full Booking"** automatically opens the New Booking view (`AdminNewBookingView.tsx`) with pre-populated patient details (matching database profile and loading active packages/balances), recommending doctor (`selectedDoctorId`), service (`selectedServiceId`), appointment date, and clinical notes.
+   - **Mini-Calendar Dots**: Dates with active follow-up reminder alerts display distinct Indigo dots on the calendar date grid.
 
 ---
 
@@ -765,4 +785,125 @@ The following are **not currently enforced in code**:
 5. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-056` (`Prescription Versioning & Immutable History Audit Engine`).
 
+---
 
+## Receptionist Booking Control & Booked Service Editing Rules
+**Enforced in:** `src/app/api/reservations/route.ts`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/components/admin/translations.ts`.
+
+1. **Full Receptionist Booking Status Lifecycle Control**:
+   - Receptionists and authorized staff have direct, single-click control over booking status transitions across the entire lifecycle: `pending`, `confirmed` / `approved`, `checked_in` / arrived, `started` / in-progress, `completed`, `cancelled`, and `no_show`.
+   - The interactive status selector is available directly in the modal header and session flow card.
+   - Cancel and No-Show transitions require explicit confirmation to avoid accidental cancellations.
+
+2. **Booked Service Replacement On Patient Arrival**:
+   - Receptionists can edit or replace the assigned clinical service directly when the patient arrives at the clinic or from the Booking Details drawer.
+   - A dedicated **Change Service** action opens a structured Service Picker with real-time search, category filtering, and effective branch pricing.
+
+3. **Financial Integrity & Automatic Recalculation**:
+   - Previously paid amounts (`amount_paid` or deposit amounts) are **100% preserved** and never reset or overwritten during a service replacement.
+   - The new service's price is resolved dynamically according to the booking's assigned branch (`getEffectiveServicePrice` / branch price overrides).
+   - The invoice total is recalculated: `total_price = new_service_price + attached_products_cost`.
+   - Remaining balance due is automatically updated: `amount_left = Math.max(0, total_price - amount_paid)`.
+   - If the new service price is lower than or equal to the amount already paid, `amount_left` becomes 0 (and the invoice is treated as fully settled).
+
+4. **Price Confirmation Dialog**:
+   - Prior to committing the change, the system displays a clear, bilingual comparative dialog showing:
+     - Old Service & Old Price
+     - New Service & New Price
+     - Paid Amount (Preserved & Protected)
+     - Recalculated Remaining Due
+     - Financial reassurance notice explaining the automatic adjustment.
+
+5. **Audit Logging & Historical Traceability**:
+   - Changing a service automatically appends an immutable audit entry to `notes`:
+     `[Service Changed by {user} on {timestamp}]: {oldServiceName} ({oldPrice} EGP) ➔ {newServiceName} ({newPrice} EGP)`.
+
+6. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-057` (`Receptionist Booking Control & Service Editing Engine`).
+
+---
+
+## User Profile Working Details & Schedule Visualization Engine Rules
+**Enforced in:** `src/components/admin/UserProfileView.tsx`, `src/components/admin/translations.ts`, `src/app/admin/page.tsx`, `src/components/admin/DoctorAccountView.tsx`.
+
+1. **Zero-Dash Guarantee for Schedule Information**:
+   - Working Days and Working Hours must **never** display empty dashes (`—`) in employee or doctor profiles.
+   - When no custom working schedule is found in the database, the system automatically resolves to the clinic's standard operating schedule (**Saturday – Thursday**, **10:00 AM – 08:00 PM**, **Friday Off**).
+
+2. **Multi-Source Schedule Normalization**:
+   - The schedule engine recursively normalizes all data representations:
+     - Nested `branch_schedules` per branch ID
+     - Direct `in_person` and `online` nodes
+     - Multi-shift arrays (`shifts: [{ start: "...", end: "..." }]`)
+     - Pre-formatted text shifts (e.g., `"09:00 AM to 05:00 PM"`, `"10:00 AM to 08:00 PM"`)
+     - 24-hour time strings (`"09:00"`, `"17:00"`) converted into clean 12-hour AM/PM format (`"09:00 AM – 05:00 PM"` in English, `"09:00 ص – 05:00 م"` in Arabic).
+
+3. **Background Database Auto-Enrichment**:
+   - If schedule props are not fully pre-populated by parent views, `UserProfileView` performs client-side lookups against `employee_accounts` and `providers` to retrieve complete working days, hours, and branch assignments.
+
+4. **Modern 7-Day Interactive Weekly Schedule Matrix**:
+   - Section 2 (**Work Information & Weekly Schedule**) displays an interactive 7-day visual grid (Saturday through Friday) with:
+     - **Active Days**: Emerald active pill with checkmark, 12-hour formatted time slot badges, and daily hours duration.
+     - **Off Days**: Clean muted card with coffee/moon icon and `Off Day` / `Rest Day` badge.
+     - **Today Indicator**: Dynamic highlighting of the current day of the week with a prominent `Today` badge.
+     - **Header Badges**: Shift badge with Sun/Moon/Clock icons, Total Weekly Working Hours counter (`X hrs/week`), and Active Days count (`X Days Active`).
+     - **Attribute Cards**: 6 modern structured cards for Department, Employment Type, Assigned Branches, Active Working Days, Daily Working Hours, and Weekly Off Day.
+     - **Branch Schedule Switcher**: Seamless branch tab switcher when staff is assigned to multiple branches with distinct operating hours.
+
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-058` (`User Profile Working Details & Schedule Visualization Engine`).
+
+---
+
+## Doctor Started Session Propagation & Real-Time Synchronization Engine Rules
+**Enforced in:** `src/app/api/reservations/route.ts`, `src/components/admin/DoctorAccountView.tsx`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/doctor/tabs/DoctorScheduleTab.tsx`.
+
+1. **Composite Doctor Resolution in API (`/api/reservations`)**:
+   - When querying reservations by doctor (`doctorId` or `doctorName`), the backend must resolve both the `provider_id` (from `providers` or linked `employee_accounts`) and the doctor's display name.
+   - The query matches reservations using a composite OR filter: `provider_id.eq.${resolvedProvId}` OR `doctor_name.ilike.%${cleanName}%`.
+   - Arabic (`د.`, `دكتور`) and English (`Dr.`) titles are stripped during matching to guarantee zero false negative misses.
+
+2. **Real-time Postgres Subscription Normalization**:
+   - When a receptionist or admin starts a session (`status = 'started'`), Supabase `postgres_changes` emits a payload with raw table rows.
+   - `DoctorAccountView` filters the event using `isDoctorMatch(payload.new)` and normalizes missing joined fields (`service_name` resolved from `servicesList`, `room_name`, `time_slot`).
+   - If the booking status is `started`, `in_progress`, `active`, or `in treatment`, it immediately populates `activeSessionBooking`.
+
+3. **Global Live Session Pulse Banner**:
+   - When an active session is detected and the doctor is on any tab other than Ongoing Session (`schedule`, `patients`, `analytics`), a glowing Live Active Session Pulse Banner is rendered at the top of the main view with:
+     - Live pulse animation icon (`Play` with glowing pulse)
+     - Patient name, service title, scheduled time, and treatment room
+     - 1-click **Open Ongoing Session** action button jumping directly to the Ongoing Session tab.
+
+4. **Queue & Schedule Tab Started Highlighting**:
+   - On the Doctor Schedule Tab (Calendar Agenda & Queue List), appointments in `started` or `in_progress` status are highlighted with an active glowing pill and direct **Open Session** action buttons.
+
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-059` (`Doctor View Real-time Started Session Detection & Synchronization Engine`).
+
+---
+
+## Follow-Up Visit Management & Clinical Prescription Engine Rules
+**Enforced in:** `src/app/api/prescriptions/route.ts`, `src/app/api/reservations/route.ts`, `src/components/admin/AdminBookingsView.tsx`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`.
+
+1. **Universal Follow-Up Availability in Prescription Writers**:
+   - The interactive Follow-Up Visit toggle card is ubiquitously embedded in:
+     - Doctor View Active Session (`DoctorOngoingSessionTab.tsx`)
+     - Reception Clinical Finalization & Global Ending Session (`BookingDetailsModal.tsx` inline prescription form)
+     - Booking Details Drawer Standalone Prescription Modal (`BookingDetailsModal.tsx` modal)
+   - Features quick interval presets: `+3 Days`, `+1 Week`, `+2 Weeks`, `+1 Month`, alongside an explicit date picker (with `min` set to today) and clinical instructions/reason input.
+
+2. **Persistence and Automatic Calendar Synchronization**:
+   - When a prescription is saved with follow-up enabled (`follow_up_date`), it is recorded in the `prescriptions` table and automatically propagated to the parent `reservations` record (`follow_up_date` / `followUpDate`).
+   - In Reception Calendar (`AdminBookingsView.tsx`), dates with pending follow-up visits display an indigo calendar dot (`#6366F1`) and are distinguished from full reservations.
+
+3. **Receptionist Follow-Up Action Hub & Notification Layout**:
+   - Follow-up entries are rendered in a dedicated **Follow-Up Reminders** notification banner featuring:
+     - Clear 2-line layout: Top line displays **Patient Name** with the **Target Date badge**, and underneath line displays **Doctor Name**, **Follow-Up indicator**, **Patient Phone Number**, and **Doctor Clinical Instructions/Notes**.
+     - 1-click WhatsApp reminder template generator with localized patient greeting and follow-up reason.
+     - Direct Phone Call action button (`tel:` link).
+     - 1-click **Convert to Full Booking / تحويل لحجز مؤكد** action that carries full patient profile, recommending doctor, service, target date, and clinical instructions directly into the New Booking form (`AdminNewBookingView.tsx`) and confirmation summary.
+     - **Automatic Dismissal**: A follow-up reminder is immediately and automatically dismissed when the receptionist clicks "+ Convert to Full Booking" or when an active (non-cancelled / non-rejected) reservation is scheduled for that patient on/after the reminder date.
+     - **Booking Details Drawer**: Converted follow-up clinical notes and instructions are prominently displayed inside the Booking Information card in `BookingDetailsModal.tsx`.
+
+4. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test cases `TC-060` & `TC-061` (`Clinical Prescription Follow-Up Visit & Reception Calendar Integration Engine`).

@@ -260,14 +260,16 @@ Upserts the `page_settings` row (`key='home'`, `value=body`). Falls back to JSON
 Returns reservations. Filterable by query params.
 
 **Query params:**
-- `status` — 'pending', 'approved', 'rejected', 'confirmed', 'started', 'completed', 'cancelled'
+- `status` — 'pending', 'approved', 'rejected', 'confirmed', 'checked_in', 'started', 'completed', 'cancelled', 'no_show'
 - `serviceId` — numeric service ID
 - `date` — YYYY-MM-DD
 - `branchId` — UUID
 - `phone` — Patient phone filter (returns only matched bookings)
 - `customerId` — UUID customer identifier filter
+- `doctorId` — UUID provider ID or employee account ID (resolves linked provider ID and matches composite `provider_id` or `doctor_name`)
+- `doctorName` — Doctor display name filter (supports prefix stripping e.g. "Dr.", "د.", "دكتور" and composite `provider_id` + `doctor_name` matching)
 
-**Response:** `ReservationRow[]` — `{ id, serviceId, serviceIds, date, requestedTime, name, email, phone, notes, status, timeSlot, sessionType, createdAt, isManual, branchId, customerId, amountPaid, amountLeft, roomId, rooms, createdByEmployeeId, services, doctorName, providerId, followUpDate }`
+**Response:** `ReservationRow[]` — `{ id, serviceId, serviceIds, date, requestedTime, name, email, phone, notes, doctorNotes, receptionNotes, status, timeSlot, sessionType, createdAt, isManual, branchId, customerId, amountPaid, amountLeft, roomId, rooms, createdByEmployeeId, services, doctorName, providerId, followUpDate, startedAt, actualDurationMinutes, attachedProducts }`
 
 ---
 
@@ -353,7 +355,8 @@ Updates a reservation. Supports three modes:
 - Else if `followUpDate` is given: sets status to `'postponed'` and stores `follow_up_date` as a reminder — the existing `date`/`time_slot` are left untouched but should be treated as stale until the booking is actually rescheduled via the path above.
 - One of `date` or `followUpDate` is required.
 
-**Generic update (includes checkout/wallet adjustments):** `{ status?, notes?, doctorName?, sessionType?, amountPaid?, amountLeft?, walletDeposit?, walletWithdrawal?, consumptionOverrides?, redeemedServiceIds?, date? }`
+**Generic update (includes checkout/wallet adjustments & service replacement):** `{ status?, notes?, doctorName?, sessionType?, serviceId?, serviceIds?, service_name?, changedBy?, amountPaid?, amountLeft?, walletDeposit?, walletWithdrawal?, consumptionOverrides?, redeemedServiceIds?, date? }`
+- `serviceId` / `serviceIds` / `service_name`: Replaces the booked clinical service. Resolves effective branch pricing for the target branch, recalculates total invoice price, preserves 100% of previously paid amounts (`amount_paid`), automatically recomputes `amount_left = Math.max(0, derivedTotalCost + attachedProductsCost - effectivePaid)`, and appends an audit record to `notes`: `[Service Changed by {changedBy} on {timestamp}]: {oldService} ({oldPrice} EGP) ➔ {newService} ({newPrice} EGP)`.
 - `date` (paired with `timeSlot`) reschedules the booking directly, independent of the `postpone` action above — this is the general-purpose "edit booking date/time" path.
 - Requires a staff bearer token and updates any combination of those fields
 - Transitioning to status `'completed'` triggers patient balance ledger calculations and an additive invoice, invoice-line, and payment write. If `amountLeft` is omitted, `amount_left` is automatically derived as `Math.max(0, totalCost - amountPaid)` and saved to the reservation, properly incrementing `customer.outstanding` by the unpaid remainder until payment is settled.
@@ -563,6 +566,32 @@ Requires a staff bearer token. Updates a package definition. `id` required in th
 all items if an `items` array is present, otherwise leaves items unchanged.
 
 **Response:** Updated package object.
+
+---
+
+## GET /api/prescriptions
+
+Requires staff bearer token or customer lookup parameter. Retrieves clinical prescriptions filtered by `customer_id`, `booking_id`, or all active clinic prescriptions.
+
+**Query Parameters:**
+- `customer_id` (optional): Filter prescriptions by patient ID.
+- `booking_id` (optional): Filter prescriptions by booking reservation ID.
+
+**Response:** `PrescriptionItem[]` — `{ id, booking_id, customer_id, customer_name, patient_name, doctor_name, diagnosis, medications: [{ name, dosage, frequency, duration }], instructions, general_notes, doctor_notes, follow_up_date, follow_up_notes, version, created_at, updated_at }`
+
+---
+
+## POST /api/prescriptions
+
+Requires staff/doctor bearer token. Creates or updates a digital prescription for a patient visit with deduplication and automated versioning.
+
+**Body:** `{ booking_id?, customer_id?, patient_name, customer_name?, doctor_name?, diagnosis, medications: MedicationItem[], instructions?, general_notes?, doctor_notes?, follow_up_date?, follow_up_notes?, date? }`
+
+- `follow_up_date`: Optional string (`YYYY-MM-DD`). Records the doctor's recommended clinical follow-up visit date.
+- `follow_up_notes`: Optional string. Records specific clinical instructions or rationale for the follow-up consultation.
+- When saved, `follow_up_date` is persisted to `prescriptions` and can be synced to `reservations.follow_up_date` to trigger reception calendar follow-up reminders.
+
+**Response:** `{ success: true, message: string, prescription: object, isNewVersion: boolean }`
 
 ---
 

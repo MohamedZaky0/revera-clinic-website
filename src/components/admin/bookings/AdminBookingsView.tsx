@@ -28,7 +28,8 @@ import {
   Coins,
   DollarSign,
   History,
-  CalendarPlus
+  CalendarPlus,
+  MessageSquare
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getSessionStaleness } from "@/lib/services";
@@ -58,7 +59,7 @@ interface AdminBookingsViewProps {
   providers?: any[];
   localServices?: any[];
   userName?: string;
-  onNewBooking?: () => void;
+  onNewBooking?: (initialData?: any) => void;
   onAddPreviousBooking?: () => void;
   onPendingApprovalsClick?: () => void;
   onFilterClick?: () => void;
@@ -69,6 +70,8 @@ interface AdminBookingsViewProps {
   onRejectBooking?: (booking: any) => void;
   /** SuperAdmin-configured "Stale Session Alert" from Booking Settings. Defaults to 2 hours. */
   staleSessionThresholdHours?: number;
+  /** SuperAdmin-configured "Follow-Up Reminder Lead Time" from Booking Settings. Defaults to 2 days. */
+  followUpLeadDays?: number;
   hasPermission?: (perm: string) => boolean;
   lang?: "en" | "ar";
   t?: any;
@@ -96,6 +99,28 @@ const formatDisplayTime = (timeStr?: string): string => {
   return trimmed;
 };
 
+function computeReminderDate(targetDateStr: string, leadDays: number): string {
+  if (!targetDateStr || !/^\d{4}-\d{2}-\d{2}$/.test(targetDateStr)) return targetDateStr;
+  const [y, m, d] = targetDateStr.split("-").map(Number);
+  const targetDate = new Date(y, m - 1, d);
+  targetDate.setDate(targetDate.getDate() - (leadDays || 0));
+  const remY = targetDate.getFullYear();
+  const remM = String(targetDate.getMonth() + 1).padStart(2, "0");
+  const remD = String(targetDate.getDate()).padStart(2, "0");
+  return `${remY}-${remM}-${remD}`;
+}
+
+function cleanDoctorName(doc: string | undefined | null): string {
+  if (!doc || doc === "—" || doc === "-") return "Doctor";
+  let d = String(doc).trim();
+  if (d.includes("@")) {
+    d = d.split("@")[0].replace(/[._-]/g, " ");
+  }
+  d = d.replace(/^Dr\.?\s*/i, "").trim();
+  d = d.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+  return d ? `Dr. ${d}` : "Doctor";
+}
+
 export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   allReservations = [],
   requests = [],
@@ -112,6 +137,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   onApproveBooking,
   onRejectBooking,
   staleSessionThresholdHours,
+  followUpLeadDays = 2,
   hasPermission,
   lang = "en",
   t,
@@ -167,16 +193,19 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   // Direct Supabase database fallback state
   const [dbReservations, setDbReservations] = useState<any[]>([]);
   const [dbProviders, setDbProviders] = useState<any[]>(providers);
+  const [dbPrescriptions, setDbPrescriptions] = useState<any[]>([]);
   const [loadingDb, setLoadingDb] = useState(false);
+  const [convertedFollowUpIds, setConvertedFollowUpIds] = useState<Set<string>>(() => new Set());
 
-  // Fetch real reservations & providers directly from database on mount
+  // Fetch real reservations, providers & prescriptions directly from database on mount
   useEffect(() => {
     async function fetchRealData() {
       setLoadingDb(true);
       try {
-        const [resResponse, provResponse] = await Promise.all([
+        const [resResponse, provResponse, rxResponse] = await Promise.all([
           supabase.from("reservations").select("*").order("date", { ascending: false }),
-          supabase.from("providers").select("*").order("name", { ascending: true })
+          supabase.from("providers").select("*").order("name", { ascending: true }),
+          supabase.from("prescriptions").select("*").not("follow_up_date", "is", null).order("follow_up_date", { ascending: false })
         ]);
 
         if (!resResponse.error && resResponse.data) {
@@ -185,8 +214,11 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         if (!provResponse.error && provResponse.data && provResponse.data.length > 0) {
           setDbProviders(provResponse.data);
         }
+        if (!rxResponse.error && rxResponse.data) {
+          setDbPrescriptions(rxResponse.data);
+        }
       } catch (err) {
-        console.error("Error fetching database reservations/providers:", err);
+        console.error("Error fetching database reservations/providers/prescriptions:", err);
       } finally {
         setLoadingDb(false);
       }
@@ -303,10 +335,123 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         display_status: st,
         paymentStatus: paySt,
         isStaleSession: staleness.isStale,
-        staleElapsedLabel: staleness.elapsedLabel
+        staleElapsedLabel: staleness.elapsedLabel,
+        followUpDate: r.followUpDate || r.follow_up_date || null,
+        follow_up_notes: r.follow_up_notes || null
       };
     });
   }, [allReservations, dbReservations, dbProviders, localServices, providers, selectedDateStr, staleThresholdMs]);
+
+  // Aggregate all Follow-Up Reminders from bookings and prescriptions with lead time calculation
+  const allFollowUpReminders = useMemo(() => {
+    const list: any[] = [];
+    const seenKeys = new Set<string>();
+
+    // 1. From merged appointments
+    mergedAppointments.forEach((apt) => {
+      const fDate = apt.followUpDate || apt.follow_up_date;
+      if (fDate) {
+        const cleanFDate = String(fDate).slice(0, 10);
+        const remDate = computeReminderDate(cleanFDate, followUpLeadDays || 2);
+        const key = `${apt.id || apt.customer_name}-${cleanFDate}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          list.push({
+            id: `fu-apt-${apt.id}`,
+            bookingId: apt.id,
+            customerId: apt.customer_id || apt.customerId,
+            patientName: apt.customer_name,
+            phone: apt.customer_phone,
+            doctorName: apt.doctor_name,
+            doctorId: apt.provider_id || apt.providerId || apt.doctorId || apt.doctor_id,
+            serviceName: apt.service_name,
+            serviceId: apt.service_id || apt.serviceId,
+            followUpDate: cleanFDate,
+            reminderDate: remDate,
+            notes: apt.follow_up_notes || apt.notes || "",
+            raw: apt
+          });
+        }
+      }
+    });
+
+    // 2. From dbPrescriptions
+    dbPrescriptions.forEach((rx) => {
+      if (rx.follow_up_date) {
+        const cleanFDate = String(rx.follow_up_date).slice(0, 10);
+        const remDate = computeReminderDate(cleanFDate, followUpLeadDays || 2);
+        const key = `${rx.booking_id || rx.customer_id || rx.patient_name || rx.customer_name}-${cleanFDate}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          // Look up matching appointment to get phone or doctor name if missing
+          const matchingApt = mergedAppointments.find((a) =>
+            (rx.booking_id && String(a.id) === String(rx.booking_id)) ||
+            (rx.customer_id && a.customer_id && String(a.customer_id) === String(rx.customer_id)) ||
+            (rx.patient_name && a.customer_name && a.customer_name.trim().toLowerCase() === String(rx.patient_name).trim().toLowerCase())
+          );
+          const rawPhone = rx.customer_phone || rx.phone || matchingApt?.customer_phone || matchingApt?.phone || "";
+          const docName = rx.doctor_name || matchingApt?.doctor_name || "Doctor";
+
+          list.push({
+            id: `fu-rx-${rx.id}`,
+            bookingId: rx.booking_id,
+            customerId: rx.customer_id || matchingApt?.customer_id,
+            patientName: rx.patient_name || rx.customer_name || matchingApt?.customer_name || "Patient",
+            phone: rawPhone,
+            doctorName: docName,
+            doctorId: rx.provider_id || rx.doctor_id || matchingApt?.provider_id,
+            serviceName: rx.service_name || matchingApt?.service_name || "Follow-Up Consultation",
+            serviceId: rx.service_id || matchingApt?.service_id,
+            followUpDate: cleanFDate,
+            reminderDate: remDate,
+            notes: rx.follow_up_notes || rx.instructions || rx.general_notes || "",
+            raw: rx
+          });
+        }
+      }
+    });
+
+    // 3. Filter out follow-ups that have already been converted or have an active upcoming/target booking
+    return list.filter((fu) => {
+      // Check converted in session
+      if (convertedFollowUpIds.has(String(fu.id))) return false;
+      if (fu.bookingId && convertedFollowUpIds.has(String(fu.bookingId))) return false;
+      if (fu.customerId && convertedFollowUpIds.has(String(fu.customerId))) return false;
+      if (fu.patientName && convertedFollowUpIds.has(`name-${fu.patientName.toLowerCase().trim()}`)) return false;
+
+      // Check if patient already has an active (non-cancelled / non-rejected) reservation scheduled on or after reminder date
+      const hasActiveBooking = mergedAppointments.some((r) => {
+        if (r.id === fu.bookingId && String(r.date) < fu.reminderDate) {
+          // This is the past appointment that originated the follow-up, ignore it
+          return false;
+        }
+        const isCancelled = r.status === "canceled" || r.status === "cancelled" || r.status === "rejected";
+        if (isCancelled) return false;
+
+        const isSameCustomer =
+          (fu.customerId && r.customer_id && String(fu.customerId) === String(r.customer_id)) ||
+          (fu.phone && r.customer_phone && String(fu.phone).replace(/\D/g, "") === String(r.customer_phone).replace(/\D/g, "") && String(fu.phone).replace(/\D/g, "").length >= 7) ||
+          (fu.patientName && r.customer_name && fu.patientName.trim().toLowerCase() === r.customer_name.trim().toLowerCase());
+
+        if (!isSameCustomer) return false;
+
+        // If the booking is on or after the reminder date, or matches the follow-up target date
+        const rDate = String(r.date || "").slice(0, 10);
+        return rDate >= fu.reminderDate || rDate === fu.followUpDate;
+      });
+
+      return !hasActiveBooking;
+    });
+  }, [mergedAppointments, dbPrescriptions, followUpLeadDays, convertedFollowUpIds]);
+
+  const selectedDayFollowUps = useMemo(() => {
+    return allFollowUpReminders.filter((fu) => {
+      // Active if reminderDate matches selected date or within active window up to target follow-up date
+      if (fu.reminderDate === selectedDateStr) return true;
+      if (fu.reminderDate <= selectedDateStr && selectedDateStr <= fu.followUpDate) return true;
+      return false;
+    });
+  }, [allFollowUpReminders, selectedDateStr]);
 
   // Chronological Booking Flow Order
   const FLOW_ORDER: Record<string, number> = {
@@ -597,8 +742,19 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       }
     });
 
+    allFollowUpReminders.forEach(fu => {
+      const datesToDot = [fu.reminderDate, fu.followUpDate].filter(Boolean);
+      datesToDot.forEach(dStr => {
+        if (!map[dStr]) map[dStr] = [];
+        const fuColor = "#6366F1"; // Indigo/purple for follow-up reminders
+        if (!map[dStr].includes(fuColor) && map[dStr].length < 3) {
+          map[dStr].push(fuColor);
+        }
+      });
+    });
+
     return map;
-  }, [mergedAppointments]);
+  }, [mergedAppointments, allFollowUpReminders]);
 
   // Format header date string (e.g. "Wednesday, 6 August 2026")
   const formattedHeaderDate = useMemo(() => {
@@ -1006,6 +1162,144 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 </span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── FOLLOW-UP REMINDERS BANNER (FULL WIDTH & COMPACT) ── */}
+      {selectedDayFollowUps.length > 0 && (
+        <div className="rounded-3xl border border-indigo-200 bg-indigo-50/70 p-4 sm:p-5 shadow-xs space-y-3 animate-fadeIn">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
+                <CalendarPlus size={18} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-sm font-bold text-indigo-950">
+                    {tr.followUpRemindersHeading || "Follow-Up Reminders (Not Reservations)"}
+                  </h2>
+                  <span className="rounded-full bg-indigo-100 border border-indigo-300 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-800">
+                    {selectedDayFollowUps.length} {selectedDayFollowUps.length === 1 ? (lang === "ar" ? "مريض" : "Patient") : (lang === "ar" ? "مرضى" : "Patients")}
+                  </span>
+                </div>
+                <p className="text-xs text-indigo-700/90 mt-0.5">
+                  {lang === "ar" 
+                    ? `تذكيرات متابعة مستحقة (قبل ${followUpLeadDays || 2} ${followUpLeadDays === 1 ? "يوم" : "أيام"} من الموعد) — تواصل مع المرضى لتأكيد الحجز.` 
+                    : `Patients due for follow-up (${followUpLeadDays || 2} ${followUpLeadDays === 1 ? "day" : "days"} lead time) — contact to schedule.`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {selectedDayFollowUps.map((fu) => {
+              const rawPhone = fu.phone || "";
+              const cleanPhone = rawPhone.replace(/\D/g, "");
+              const intlPhone = cleanPhone.startsWith("0") ? `20${cleanPhone.slice(1)}` : cleanPhone;
+              const formattedDocName = cleanDoctorName(fu.doctorName);
+              const waMessage = lang === "ar"
+                ? `مرحباً ${fu.patientName}، عيادات ريفيرا تتواصل معك. أوصى ${formattedDocName} بموعد متابعة يوم ${fu.followUpDate}. هل تود تأكيد وحجز الموعد؟`
+                : `Hello ${fu.patientName}, this is Revera Clinics. ${formattedDocName} recommended a follow-up visit on ${fu.followUpDate}. Would you like us to confirm and book your appointment?`;
+              const waUrl = `https://wa.me/${intlPhone}?text=${encodeURIComponent(waMessage)}`;
+
+              return (
+                <div
+                  key={fu.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-white px-4 py-2.5 shadow-2xs hover:border-indigo-300 transition"
+                >
+                  {/* Patient and Doctor info */}
+                  <div className="flex min-w-0 items-start sm:items-center gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 mt-0.5 sm:mt-0">
+                      <User size={15} />
+                    </div>
+                    <div className="min-w-0 space-y-0.5">
+                      {/* Top Line: Patient Name + Follow-Up Target Date Badge */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-xs sm:text-sm text-[#111827]">{fu.patientName}</span>
+                        <span className="rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                          {lang === "ar" ? `موعد المتابعة: ${fu.followUpDate}` : `Target: ${fu.followUpDate}`}
+                        </span>
+                      </div>
+                      {/* Underneath Line: Doctor Name · Follow-Up · Patient Phone Number · Clinical Notes */}
+                      <div className="text-[11px] text-[#4B5563] flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-indigo-950">{formattedDocName}</span>
+                        <span className="text-gray-400">·</span>
+                        <span className="text-indigo-700 font-semibold">{lang === "ar" ? "متابعة" : "Follow-Up"}</span>
+                        <span className="text-gray-400">·</span>
+                        <span className="font-mono text-gray-700 font-medium dir-ltr">{rawPhone || "—"}</span>
+                        {fu.notes && (
+                          <>
+                            <span className="text-gray-400">·</span>
+                            <span className="text-[10px] text-gray-500 italic max-w-xs truncate" title={fu.notes}>
+                              "{fu.notes}"
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                    {rawPhone && rawPhone !== "—" && (
+                      <>
+                        <a
+                          href={waUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-300 px-2.5 py-1.5 text-[11px] font-bold text-emerald-800 hover:bg-emerald-600 hover:text-white transition shadow-2xs cursor-pointer"
+                          title={tr.whatsAppReminderBtn || "Send WhatsApp Reminder"}
+                        >
+                          <MessageSquare size={12} />
+                          <span className="hidden md:inline">{tr.whatsAppReminderBtn || "WhatsApp"}</span>
+                        </a>
+                        <a
+                          href={`tel:${rawPhone}`}
+                          className="inline-flex items-center gap-1 rounded-xl bg-gray-50 border border-gray-200 px-2.5 py-1.5 text-[11px] font-bold text-[#374151] hover:bg-gray-200 transition shadow-2xs"
+                          title={tr.callPatientBtn || "Call Patient"}
+                        >
+                          <Phone size={12} />
+                          <span className="hidden md:inline">{tr.callPatientBtn || "Call"}</span>
+                        </a>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConvertedFollowUpIds(prev => {
+                          const next = new Set(prev);
+                          if (fu.id) next.add(String(fu.id));
+                          if (fu.bookingId) next.add(String(fu.bookingId));
+                          if (fu.customerId) next.add(String(fu.customerId));
+                          if (fu.patientName) next.add(`name-${fu.patientName.toLowerCase().trim()}`);
+                          return next;
+                        });
+                        if (onNewBooking) {
+                          onNewBooking({
+                            customerId: fu.customerId,
+                            patientName: fu.patientName,
+                            phone: fu.phone,
+                            doctorName: formattedDocName,
+                            doctorId: fu.doctorId,
+                            serviceName: fu.serviceName,
+                            serviceId: fu.serviceId,
+                            date: fu.followUpDate,
+                            notes: fu.notes ? `Follow-up from ${formattedDocName}: ${fu.notes}` : `Follow-up visit recommended by ${formattedDocName}`,
+                            raw: fu.raw
+                          });
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 transition shadow-xs cursor-pointer"
+                      title={tr.convertToBookingBtn || "Convert to Full Booking"}
+                    >
+                      <Plus size={13} />
+                      <span>{tr.convertToBookingBtn || "Convert to Full Booking"}</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1535,6 +1829,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       <span>{label}</span>
                     </div>
                   ))}
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-[#6366F1]"></span>
+                    <span>{tr.followUpBadge || "Follow-Up Reminder"}</span>
+                  </div>
                 </div>
               </div>
             </div>
