@@ -896,11 +896,14 @@ The following are **not currently enforced in code**:
    - When a prescription is saved with follow-up enabled (`follow_up_date`), it is recorded in the `prescriptions` table and automatically propagated to the parent `reservations` record (`follow_up_date` / `followUpDate`).
    - In Reception Calendar (`AdminBookingsView.tsx`), dates with pending follow-up visits display an indigo calendar dot (`#6366F1`) and are distinguished from full reservations.
 
-3. **Receptionist Follow-Up Action Hub**:
-   - Follow-up entries are rendered in a dedicated **Follow-Up Reminders** section featuring:
+3. **Receptionist Follow-Up Action Hub & Notification Layout**:
+   - Follow-up entries are rendered in a dedicated **Follow-Up Reminders** notification banner featuring:
+     - Clear 2-line layout: Top line displays **Patient Name** with the **Target Date badge**, and underneath line displays **Doctor Name**, **Follow-Up indicator**, **Patient Phone Number**, and **Doctor Clinical Instructions/Notes**.
      - 1-click WhatsApp reminder template generator with localized patient greeting and follow-up reason.
      - Direct Phone Call action button (`tel:` link).
-     - 1-click **Convert to Full Booking / تحويل لحجز مؤكد** modal that transitions the follow-up reminder into a formal confirmed reservation on the calendar.
+     - 1-click **Convert to Full Booking / تحويل لحجز مؤكد** action that carries full patient profile, recommending doctor, service, target date, and clinical instructions directly into the New Booking form (`AdminNewBookingView.tsx`) and confirmation summary.
+     - **Automatic Dismissal**: A follow-up reminder is immediately and automatically dismissed when the receptionist clicks "+ Convert to Full Booking" or when an active (non-cancelled / non-rejected) reservation is scheduled for that patient on/after the reminder date.
+     - **Booking Details Drawer**: Converted follow-up clinical notes and instructions are prominently displayed inside the Booking Information card in `BookingDetailsModal.tsx`.
 
 4. **Automated Diagnostic Verification**:
-   - Verified under System Test Suite test case `TC-060` (`Clinical Prescription Follow-Up Visit & Reception Calendar Integration Engine`).
+   - Verified under System Test Suite test cases `TC-060` & `TC-061` (`Clinical Prescription Follow-Up Visit & Reception Calendar Integration Engine`).
