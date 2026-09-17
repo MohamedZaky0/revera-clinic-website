@@ -2046,14 +2046,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               }}
                               className="rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                             >
-                              <Send size={13} /> {isRTL ? "إرسال عبر واتساب" : "Send WhatsApp Rx"}
+                              <Send size={13} /> {isRTL ? "إرسال عبر واتساب" : "Send WhatsApp"}
                             </button>
                             <button
                               type="submit"
                               disabled={savingRxInline}
                               className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                             >
-                              <Printer size={14} /> {savingRxInline ? "..." : (isRTL ? "حفظ وطباعة الروشتة" : "Save & Print Rx")}
+                              <Printer size={14} /> {savingRxInline ? "..." : (isRTL ? "حفظ وطباعة الروشتة" : "Save & Print")}
                             </button>
                           </div>
                         </form>
@@ -2295,7 +2295,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         {isRTL ? "تأكيد الإنهاء النهائي للجلسة" : "Confirm Session Termination"}
                       </p>
                       <p>
-                        {isRTL ? "سيتم حفظ كافة البيانات وخصم المخزون والنبضات وإنهاء الجلسة فورياً لدى شاشة الطبيب دون إعادة تحميل" : "Persists intake, Rx, stock sales, pulses, and terminates doctor session in real-time."}
+                        {isRTL ? "سيتم حفظ كافة البيانات وخصم المخزون والنبضات وإنهاء الجلسة فورياً لدى شاشة الطبيب دون إعادة تحميل" : "Persists intake, prescriptions, stock sales, pulses, and terminates doctor session in real-time."}
                       </p>
                     </div>
 
@@ -2946,7 +2946,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 className="flex-1 rounded-xl bg-[#0F3826] text-white py-1.5 px-2.5 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-[#0A271A] transition shadow-2xs cursor-pointer"
                               >
                                 <Printer size={12} />
-                                <span>Print Rx</span>
+                                <span>Print</span>
                               </button>
                             </div>
                           </div>
@@ -3499,7 +3499,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 my-8 border border-[#414E36]/10">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Digital Rx</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Digital Prescription</span>
                 <h3 className="text-base font-bold text-[#1F251A] mt-0.5">Add Prescription for {booking.name}</h3>
               </div>
               <button

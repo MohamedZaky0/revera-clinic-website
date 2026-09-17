@@ -712,7 +712,7 @@ export function useCustomerProfile({
           <div class="content-block" style="white-space: pre-wrap;">${rx.diagnosis}</div>
         ` : ''}
 
-        <div class="section-title" style="margin-top: 40px;">Rx (Prescribed Medications)</div>
+        <div class="section-title" style="margin-top: 40px;">Prescribed Medications</div>
         <div class="content-block">${medsHtml}</div>
 
         ${rx.general_notes ? `

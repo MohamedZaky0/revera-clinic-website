@@ -399,7 +399,7 @@ export default function BookingSettingsView({
                     ✓ Medical Intake
                   </span>
                   <span className="inline-block rounded-lg bg-[#EDF1EC] px-2 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
-                    ✓ Digital Rx
+                    ✓ Digital Prescription
                   </span>
                   <span className="inline-block rounded-lg bg-[#EDF1EC] px-2 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
                     ✓ Consumables &amp; Pulses
