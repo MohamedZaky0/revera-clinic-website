@@ -1098,6 +1098,7 @@ export async function POST(req: Request) {
       is_manual: isManualBooking,
       rooms: compRoomIds,
       created_by_employee_id: createdByEmployeeId || null,
+      follow_up_date: body.followUpDate || body.follow_up_date || null,
     };
 
     // No fallback retries here — deliberately. This used to retry a failed insert after
@@ -1520,7 +1521,7 @@ export async function PATCH(req: Request) {
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
-    } else if (status || notes !== undefined || doctorNotes !== undefined || receptionNotes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined || newDate !== undefined) {
+    } else if (status || notes !== undefined || doctorNotes !== undefined || receptionNotes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined || newDate !== undefined || followUpDate !== undefined || body.follow_up_date !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (status === 'completed' && target.status !== 'completed') {
@@ -1563,6 +1564,10 @@ export async function PATCH(req: Request) {
       if (createdByEmployeeId !== undefined) updates.created_by_employee_id = createdByEmployeeId || null;
       if (newDate !== undefined) updates.date = newDate;
       if (newDate !== undefined && timeSlot) updates.time_slot = timeSlot;
+      if (followUpDate !== undefined) updates.follow_up_date = followUpDate || null;
+      else if (body.follow_up_date !== undefined) updates.follow_up_date = body.follow_up_date || null;
+      if (body.follow_up_notes !== undefined) updates.follow_up_notes = body.follow_up_notes || null;
+      else if (body.followUpNotes !== undefined) updates.follow_up_notes = body.followUpNotes || null;
 
       // Determine total service cost to accurately resolve amount_left if null or missing
       const effectiveServiceIds: number[] =

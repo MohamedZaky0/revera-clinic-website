@@ -411,7 +411,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   // Aggregate all Follow-Up Reminders from bookings and prescriptions with lead time calculation
   const allFollowUpReminders = useMemo(() => {
     const list: any[] = [];
-    const seenKeys = new Set<string>();
+    const keyIndexMap = new Map<string, number>();
+
+    const makeKeys = (bookingId?: string | number, custId?: string, pName?: string, dateStr?: string): string[] => {
+      const keys: string[] = [];
+      const d = String(dateStr || "").slice(0, 10);
+      if (bookingId) keys.push(`bid-${bookingId}-${d}`);
+      if (custId) keys.push(`cid-${custId}-${d}`);
+      if (pName) keys.push(`name-${String(pName).trim().toLowerCase()}-${d}`);
+      return keys;
+    };
 
     // 1. From merged appointments
     mergedAppointments.forEach((apt) => {
@@ -419,24 +428,31 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       if (fDate) {
         const cleanFDate = String(fDate).slice(0, 10);
         const remDate = computeReminderDate(cleanFDate, followUpLeadDays ?? 2);
-        const key = `${apt.id || apt.customer_id || apt.customer_name}-${cleanFDate}`;
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key);
-          list.push({
-            id: `fu-apt-${apt.id}`,
-            bookingId: apt.id,
-            customerId: apt.customer_id || apt.customerId,
-            patientName: apt.customer_name,
-            phone: apt.customer_phone,
-            doctorName: apt.doctor_name,
-            doctorId: apt.provider_id || apt.providerId || apt.doctorId || apt.doctor_id,
-            serviceName: apt.service_name,
-            serviceId: apt.service_id || apt.serviceId,
-            followUpDate: cleanFDate,
-            reminderDate: remDate,
-            notes: apt.follow_up_notes || apt.notes || "",
-            raw: apt
-          });
+        const keys = makeKeys(apt.id, apt.customer_id || apt.customerId, apt.customer_name, cleanFDate);
+        const existingIdx = keys.map(k => keyIndexMap.get(k)).find(idx => idx !== undefined);
+
+        const item = {
+          id: `fu-apt-${apt.id}`,
+          bookingId: apt.id,
+          customerId: apt.customer_id || apt.customerId,
+          patientName: apt.customer_name,
+          phone: apt.customer_phone || apt.phone,
+          doctorName: apt.doctor_name,
+          doctorId: apt.provider_id || apt.providerId || apt.doctorId || apt.doctor_id,
+          serviceName: apt.service_name,
+          serviceId: apt.service_id || apt.serviceId,
+          followUpDate: cleanFDate,
+          reminderDate: remDate,
+          notes: apt.follow_up_notes || apt.notes || "",
+          raw: apt
+        };
+
+        if (existingIdx !== undefined) {
+          list[existingIdx] = { ...list[existingIdx], ...item };
+        } else {
+          const newIdx = list.length;
+          list.push(item);
+          keys.forEach(k => keyIndexMap.set(k, newIdx));
         }
       }
     });
@@ -446,33 +462,46 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       if (rx.follow_up_date) {
         const cleanFDate = String(rx.follow_up_date).slice(0, 10);
         const remDate = computeReminderDate(cleanFDate, followUpLeadDays ?? 2);
-        const key = `${rx.booking_id || rx.customer_id || rx.patient_name || rx.customer_name}-${cleanFDate}`;
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key);
-          // Look up matching appointment to get phone or doctor name if missing
-          const matchingApt = mergedAppointments.find((a) =>
-            (rx.booking_id && String(a.id) === String(rx.booking_id)) ||
-            (rx.customer_id && a.customer_id && String(a.customer_id) === String(rx.customer_id)) ||
-            (rx.patient_name && a.customer_name && a.customer_name.trim().toLowerCase() === String(rx.patient_name).trim().toLowerCase())
-          );
-          const rawPhone = rx.customer_phone || rx.phone || matchingApt?.customer_phone || matchingApt?.phone || "";
-          const docName = rx.doctor_name || matchingApt?.doctor_name || "Doctor";
+        const matchingApt = mergedAppointments.find((a) =>
+          (rx.booking_id && String(a.id) === String(rx.booking_id)) ||
+          (rx.customer_id && a.customer_id && String(a.customer_id) === String(rx.customer_id)) ||
+          (rx.patient_name && a.customer_name && a.customer_name.trim().toLowerCase() === String(rx.patient_name).trim().toLowerCase())
+        );
+        const rawPhone = rx.customer_phone || rx.phone || matchingApt?.customer_phone || matchingApt?.phone || "";
+        const docName = rx.doctor_name || matchingApt?.doctor_name || "Doctor";
+        const patName = rx.patient_name || rx.customer_name || matchingApt?.customer_name || "Patient";
 
-          list.push({
-            id: `fu-rx-${rx.id}`,
-            bookingId: rx.booking_id,
-            customerId: rx.customer_id || matchingApt?.customer_id,
-            patientName: rx.patient_name || rx.customer_name || matchingApt?.customer_name || "Patient",
-            phone: rawPhone,
-            doctorName: docName,
-            doctorId: rx.provider_id || rx.doctor_id || matchingApt?.provider_id,
-            serviceName: rx.service_name || matchingApt?.service_name || "Follow-Up Consultation",
-            serviceId: rx.service_id || matchingApt?.service_id,
-            followUpDate: cleanFDate,
-            reminderDate: remDate,
-            notes: rx.follow_up_notes || rx.instructions || rx.general_notes || "",
-            raw: rx
-          });
+        const keys = makeKeys(rx.booking_id, rx.customer_id || matchingApt?.customer_id, patName, cleanFDate);
+        const existingIdx = keys.map(k => keyIndexMap.get(k)).find(idx => idx !== undefined);
+        const rxNotes = rx.follow_up_notes || rx.instructions || rx.general_notes || rx.doctor_notes || "";
+
+        const item = {
+          id: `fu-rx-${rx.id}`,
+          bookingId: rx.booking_id || matchingApt?.id,
+          customerId: rx.customer_id || matchingApt?.customer_id,
+          patientName: patName,
+          phone: rawPhone,
+          doctorName: docName,
+          doctorId: rx.provider_id || rx.doctor_id || matchingApt?.provider_id,
+          serviceName: rx.service_name || matchingApt?.service_name || "Follow-Up Consultation",
+          serviceId: rx.service_id || matchingApt?.service_id,
+          followUpDate: cleanFDate,
+          reminderDate: remDate,
+          notes: rxNotes || matchingApt?.follow_up_notes || matchingApt?.notes || "",
+          raw: rx
+        };
+
+        if (existingIdx !== undefined) {
+          list[existingIdx] = {
+            ...list[existingIdx],
+            ...item,
+            phone: rawPhone || list[existingIdx].phone,
+            notes: rxNotes || list[existingIdx].notes
+          };
+        } else {
+          const newIdx = list.length;
+          list.push(item);
+          keys.forEach(k => keyIndexMap.set(k, newIdx));
         }
       }
     });
