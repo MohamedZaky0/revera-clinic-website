@@ -883,7 +883,7 @@ The following are **not currently enforced in code**:
 ---
 
 ## Follow-Up Visit Management & Clinical Prescription Engine Rules
-**Enforced in:** `src/app/api/prescriptions/route.ts`, `src/app/api/reservations/route.ts`, `src/components/admin/AdminBookingsView.tsx`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`.
+**Enforced in:** `src/app/api/prescriptions/route.ts`, `src/app/api/reservations/route.ts`, `src/components/admin/bookings/AdminBookingsView.tsx`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`.
 
 1. **Universal Follow-Up Availability in Prescription Writers**:
    - The interactive Follow-Up Visit toggle card is ubiquitously embedded in:
@@ -897,12 +897,15 @@ The following are **not currently enforced in code**:
    - In Reception Calendar (`AdminBookingsView.tsx`), dates with pending follow-up visits display an indigo calendar dot (`#6366F1`) and are distinguished from full reservations.
 
 3. **Receptionist Follow-Up Action Hub & Notification Layout**:
-   - Follow-up entries are rendered in a dedicated **Follow-Up Reminders** notification banner featuring:
+   - Follow-up entries are rendered in a dedicated **Follow-Up Reminders** notification banner positioned right under stale session alerts matching treatment-in-session styling featuring:
      - Clear 2-line layout: Top line displays **Patient Name** with the **Target Date badge**, and underneath line displays **Doctor Name**, **Follow-Up indicator**, **Patient Phone Number**, and **Doctor Clinical Instructions/Notes**.
      - 1-click WhatsApp reminder template generator with localized patient greeting and follow-up reason.
      - Direct Phone Call action button (`tel:` link).
      - 1-click **Convert to Full Booking / تحويل لحجز مؤكد** action that carries full patient profile, recommending doctor, service, target date, and clinical instructions directly into the New Booking form (`AdminNewBookingView.tsx`) and confirmation summary.
-     - **Automatic Dismissal**: A follow-up reminder is immediately and automatically dismissed when the receptionist clicks "+ Convert to Full Booking" or when an active (non-cancelled / non-rejected) reservation is scheduled for that patient on/after the reminder date.
+     - **Configurable Lead Time & Overdue Visibility**: Configured in Booking Settings (`followUpLeadDays`, default 2 days). On Today's view, all pending reminders whose reminder date has arrived (`fu.reminderDate <= today`) are displayed (including overdue follow-ups up to 90 days). When browsing specific future or past calendar dates, the banner displays follow-ups active for that selected window.
+     - **Origin Booking Exclusion Guarantee**: The appointment/session where the doctor created the follow-up is unconditionally excluded from satisfying its own reminder (`fu.bookingId && String(r.id) === String(fu.bookingId) -> return false`), preventing false premature dismissals.
+     - **Automatic Dismissal**: A follow-up reminder is immediately dismissed when the receptionist clicks "+ Convert to Full Booking" or when a separate active reservation is scheduled for that patient during the follow-up target window.
+     - **Real-Time Synchronization**: `AdminBookingsView.tsx` subscribes to Supabase realtime `postgres_changes` on `prescriptions` and `reservations` and window custom events (`revera-prescription-change`, `revera-booking-change`), seamlessly merging client Supabase queries with authenticated `/api/prescriptions` endpoints.
      - **Booking Details Drawer**: Converted follow-up clinical notes and instructions are prominently displayed inside the Booking Information card in `BookingDetailsModal.tsx`.
 
 4. **Automated Diagnostic Verification**:

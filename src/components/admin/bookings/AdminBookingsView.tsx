@@ -32,6 +32,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { getAuthHeaders } from "@/lib/authHeaders";
 import { getSessionStaleness } from "@/lib/services";
 import { adminTranslations } from "@/components/admin/translations";
 
@@ -197,16 +198,21 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   const [loadingDb, setLoadingDb] = useState(false);
   const [convertedFollowUpIds, setConvertedFollowUpIds] = useState<Set<string>>(() => new Set());
 
-  // Fetch real reservations, providers & prescriptions directly from database on mount
+  // Fetch real reservations, providers & prescriptions directly from database on mount & subscribe to realtime
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchRealData() {
       setLoadingDb(true);
       try {
-        const [resResponse, provResponse, rxResponse] = await Promise.all([
+        const [resResponse, provResponse, rxResponse, authHeaders] = await Promise.all([
           supabase.from("reservations").select("*").order("date", { ascending: false }),
           supabase.from("providers").select("*").order("name", { ascending: true }),
-          supabase.from("prescriptions").select("*").not("follow_up_date", "is", null).order("follow_up_date", { ascending: false })
+          supabase.from("prescriptions").select("*").not("follow_up_date", "is", null).order("follow_up_date", { ascending: false }),
+          getAuthHeaders().catch(() => ({ "Content-Type": "application/json" }))
         ]);
+
+        if (!isMounted) return;
 
         if (!resResponse.error && resResponse.data) {
           setDbReservations(resResponse.data);
@@ -214,16 +220,76 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         if (!provResponse.error && provResponse.data && provResponse.data.length > 0) {
           setDbProviders(provResponse.data);
         }
+
+        let combinedRx: any[] = [];
         if (!rxResponse.error && rxResponse.data) {
-          setDbPrescriptions(rxResponse.data);
+          combinedRx = [...rxResponse.data];
+        }
+
+        // Also fetch from /api/prescriptions with auth headers as resilient fallback / merge
+        try {
+          const apiRes = await fetch("/api/prescriptions", { headers: authHeaders });
+          if (apiRes.ok) {
+            const apiData = await apiRes.json();
+            if (Array.isArray(apiData)) {
+              const rxMap = new Map<string, any>();
+              combinedRx.forEach((item) => {
+                if (item?.id) rxMap.set(String(item.id), item);
+              });
+              apiData.forEach((item) => {
+                if (item?.follow_up_date) {
+                  const key = String(item.id || `${item.booking_id || item.customer_id}-${item.follow_up_date}`);
+                  rxMap.set(key, { ...(rxMap.get(key) || {}), ...item });
+                }
+              });
+              combinedRx = Array.from(rxMap.values());
+            }
+          }
+        } catch (apiErr) {
+          // fallback gracefully
+        }
+
+        if (isMounted) {
+          setDbPrescriptions(combinedRx);
         }
       } catch (err) {
         console.error("Error fetching database reservations/providers/prescriptions:", err);
       } finally {
-        setLoadingDb(false);
+        if (isMounted) setLoadingDb(false);
       }
     }
+
     fetchRealData();
+
+    // Real-time synchronization
+    const channel = supabase
+      .channel("admin-bookings-realtime-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "prescriptions" },
+        () => {
+          fetchRealData();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reservations" },
+        () => {
+          fetchRealData();
+        }
+      )
+      .subscribe();
+
+    const onSyncChange = () => fetchRealData();
+    window.addEventListener("revera-prescription-change", onSyncChange);
+    window.addEventListener("revera-booking-change", onSyncChange);
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+      window.removeEventListener("revera-prescription-change", onSyncChange);
+      window.removeEventListener("revera-booking-change", onSyncChange);
+    };
   }, []);
 
   // Helper to format date string YYYY-MM-DD
@@ -352,8 +418,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       const fDate = apt.followUpDate || apt.follow_up_date;
       if (fDate) {
         const cleanFDate = String(fDate).slice(0, 10);
-        const remDate = computeReminderDate(cleanFDate, followUpLeadDays || 2);
-        const key = `${apt.id || apt.customer_name}-${cleanFDate}`;
+        const remDate = computeReminderDate(cleanFDate, followUpLeadDays ?? 2);
+        const key = `${apt.id || apt.customer_id || apt.customer_name}-${cleanFDate}`;
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
           list.push({
@@ -379,7 +445,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     dbPrescriptions.forEach((rx) => {
       if (rx.follow_up_date) {
         const cleanFDate = String(rx.follow_up_date).slice(0, 10);
-        const remDate = computeReminderDate(cleanFDate, followUpLeadDays || 2);
+        const remDate = computeReminderDate(cleanFDate, followUpLeadDays ?? 2);
         const key = `${rx.booking_id || rx.customer_id || rx.patient_name || rx.customer_name}-${cleanFDate}`;
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
@@ -419,12 +485,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       if (fu.customerId && convertedFollowUpIds.has(String(fu.customerId))) return false;
       if (fu.patientName && convertedFollowUpIds.has(`name-${fu.patientName.toLowerCase().trim()}`)) return false;
 
-      // Check if patient already has an active (non-cancelled / non-rejected) reservation scheduled on or after reminder date
+      // Check if patient already has a separate active (non-cancelled / non-rejected) reservation scheduled for this follow-up
       const hasActiveBooking = mergedAppointments.some((r) => {
-        if (r.id === fu.bookingId && String(r.date) < fu.reminderDate) {
-          // This is the past appointment that originated the follow-up, ignore it
+        // ALWAYS skip the origin appointment where this follow-up was prescribed/created!
+        if (fu.bookingId && String(r.id) === String(fu.bookingId)) {
           return false;
         }
+
         const isCancelled = r.status === "canceled" || r.status === "cancelled" || r.status === "rejected";
         if (isCancelled) return false;
 
@@ -435,9 +502,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
         if (!isSameCustomer) return false;
 
-        // If the booking is on or after the reminder date, or matches the follow-up target date
         const rDate = String(r.date || "").slice(0, 10);
-        return rDate >= fu.reminderDate || rDate === fu.followUpDate;
+
+        // If the appointment date is before the reminderDate, it cannot be the follow-up appointment
+        if (rDate < fu.reminderDate) return false;
+
+        // An appointment fulfills the follow-up if it is a separate booking on the target date or within the follow-up window (within 7 days)
+        const diffDays = Math.abs((new Date(rDate).getTime() - new Date(fu.followUpDate).getTime()) / (1000 * 3600 * 24));
+        return rDate === fu.followUpDate || diffDays <= 7;
       });
 
       return !hasActiveBooking;
@@ -445,10 +517,26 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   }, [mergedAppointments, dbPrescriptions, followUpLeadDays, convertedFollowUpIds]);
 
   const selectedDayFollowUps = useMemo(() => {
+    const todayISO = formatDateISO(new Date());
+    const isToday = selectedDateStr === todayISO;
+
     return allFollowUpReminders.filter((fu) => {
-      // Active if reminderDate matches selected date or within active window up to target follow-up date
-      if (fu.reminderDate === selectedDateStr) return true;
+      // If viewing Today (default view mode for receptionists):
+      // Show all active reminders that are due today or overdue (reminderDate <= todayISO)
+      if (isToday) {
+        if (fu.reminderDate <= todayISO) {
+          const targetTime = new Date(fu.followUpDate).getTime();
+          const todayTime = new Date(todayISO).getTime();
+          const daysOverdue = (todayTime - targetTime) / (1000 * 60 * 60 * 24);
+          return daysOverdue <= 90; // Exclude ancient follow-ups older than 90 days
+        }
+        return false;
+      }
+
+      // If browsing a specific date on calendar (past or future):
+      // Show follow-ups active on that date (between reminderDate and followUpDate) or exactly on followUpDate
       if (fu.reminderDate <= selectedDateStr && selectedDateStr <= fu.followUpDate) return true;
+      if (fu.followUpDate === selectedDateStr) return true;
       return false;
     });
   }, [allFollowUpReminders, selectedDateStr]);

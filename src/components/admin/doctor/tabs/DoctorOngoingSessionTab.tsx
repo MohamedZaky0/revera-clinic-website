@@ -490,6 +490,11 @@ export default function DoctorOngoingSessionTab({
           }).catch(err => console.error("Error syncing follow_up_date to booking:", err));
         }
 
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+          window.dispatchEvent(new CustomEvent("revera-booking-change"));
+        }
+
         alert("Prescription saved successfully!");
       } else {
         const errData = await res.json().catch(() => null);
