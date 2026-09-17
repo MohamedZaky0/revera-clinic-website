@@ -2043,3 +2043,6 @@ The clinic reception dashboard required dynamic responsiveness to shift state (N
 3. **API Route Follow-Up Mutation Fix:**
    - Updated `PATCH /api/reservations` to gracefully process direct `followUpDate`, `follow_up_date`, and `follow_up_notes` updates without failing validation.
    - Added automatic synchronization of `follow_up_date` to `reservations` table on every prescription creation in `POST /api/prescriptions`.
+4. **Calendar Follow-Up Dot Isolation & Pulsing Beacon Warning:**
+   - Rendered calendar warning dots strictly on the actual `followUpDate` rather than lead reminder dates.
+   - Enhanced follow-up calendar dots and legend markers with a pulsating warning beacon animation (`animate-ping`, `animate-pulse`, glowing shadow) to ensure receptionists immediately notice pending patient follow-ups.

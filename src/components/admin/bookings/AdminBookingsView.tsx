@@ -846,7 +846,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   // Real Database Appointment dots mapping per date
   const appointmentsByDate = useMemo(() => {
-    const map: Record<string, string[]> = {};
+    const map: Record<string, { color: string; isFollowUp?: boolean }[]> = {};
 
     mergedAppointments.forEach(app => {
       if (!app.date) return;
@@ -862,20 +862,20 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       else if (st === "canceled" || st === "cancelled" || st === "rejected") color = "#EF4444"; // red
       else if (st === "no_show") color = "#6B7280"; // gray
 
-      if (!map[app.date].includes(color) && map[app.date].length < 3) {
-        map[app.date].push(color);
+      if (!map[app.date].some(d => d.color === color) && map[app.date].length < 3) {
+        map[app.date].push({ color });
       }
     });
 
     allFollowUpReminders.forEach(fu => {
-      const datesToDot = [fu.reminderDate, fu.followUpDate].filter(Boolean);
-      datesToDot.forEach(dStr => {
+      if (fu.followUpDate) {
+        const dStr = fu.followUpDate;
         if (!map[dStr]) map[dStr] = [];
         const fuColor = "#6366F1"; // Indigo/purple for follow-up reminders
-        if (!map[dStr].includes(fuColor) && map[dStr].length < 3) {
-          map[dStr].push(fuColor);
+        if (!map[dStr].some(d => d.isFollowUp) && map[dStr].length < 3) {
+          map[dStr].push({ color: fuColor, isFollowUp: true });
         }
-      });
+      }
     });
 
     return map;
@@ -1922,13 +1922,24 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       >
                         {cell.day}
                       </div>
-                      <div className="mt-1 flex h-1.5 min-h-[6px] items-center justify-center gap-0.5">
-                        {dots.map((dotColor, dIdx) => (
-                          <span
-                            key={dIdx}
-                            className="h-1.5 w-1.5 rounded-full"
-                            style={{ backgroundColor: dotColor }}
-                          />
+                      <div className="mt-1 flex h-2 min-h-[8px] items-center justify-center gap-0.5">
+                        {dots.map((dot, dIdx) => (
+                          dot.isFollowUp ? (
+                            <span
+                              key={dIdx}
+                              className="relative flex h-2 w-2 items-center justify-center"
+                              title={tr.followUpBadge || "Follow-Up Reminder"}
+                            >
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75 duration-1000" />
+                              <span className="relative inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-600 shadow-[0_0_8px_rgba(99,102,241,0.9)]" />
+                            </span>
+                          ) : (
+                            <span
+                              key={dIdx}
+                              className="h-1.5 w-1.5 rounded-full"
+                              style={{ backgroundColor: dot.color }}
+                            />
+                          )
                         ))}
                       </div>
                     </button>
@@ -1955,7 +1966,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     </div>
                   ))}
                   <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-[#6366F1]"></span>
+                    <span className="relative flex h-2.5 w-2.5 items-center justify-center shrink-0">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 animate-pulse rounded-full bg-[#6366F1] shadow-[0_0_6px_rgba(99,102,241,0.9)]" />
+                    </span>
                     <span>{tr.followUpBadge || "Follow-Up Reminder"}</span>
                   </div>
                 </div>
