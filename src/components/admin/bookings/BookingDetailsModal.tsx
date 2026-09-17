@@ -1191,6 +1191,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         fetchCustomers();
         fetchInventoryProducts();
 
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+          window.dispatchEvent(new CustomEvent("revera-booking-change"));
+        }
+
         alert(isRTL ? "تم إنهاء الجلسة بنجاح! تم حفظ السجلات الطبية وخصم المخزون والنبضات وتحديث الفاتورة." : "Session completed successfully! Clinical records saved, inventory deducted, and invoice updated.");
         setViewMode("details");
       } else {

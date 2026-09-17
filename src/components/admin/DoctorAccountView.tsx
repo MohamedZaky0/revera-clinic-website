@@ -526,13 +526,22 @@ export default function DoctorAccountView({
     }
   };
 
-  // Silent 3-second background polling
+  // Silent 3-second background polling & event listeners
   useEffect(() => {
     fetchDoctorReservations();
     const interval = setInterval(() => {
       fetchDoctorReservations(true);
     }, 3000);
-    return () => clearInterval(interval);
+
+    const onSync = () => fetchDoctorReservations(true);
+    window.addEventListener("revera-prescription-change", onSync);
+    window.addEventListener("revera-booking-change", onSync);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("revera-prescription-change", onSync);
+      window.removeEventListener("revera-booking-change", onSync);
+    };
   }, [doctorDbId, doctorName, providerRecord]);
 
   // Persistent Real-time Subscriptions for Started Sessions & Bookings
@@ -952,6 +961,9 @@ export default function DoctorAccountView({
       if (res.ok) {
         alert("Doctor clinical notes saved successfully!");
         fetchDoctorReservations();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("revera-booking-change"));
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         alert(err.error || err.message || "Failed to save clinical note.");
@@ -1207,6 +1219,11 @@ export default function DoctorAccountView({
         setClinicalNote("");
         setActiveTab("schedule");
         await fetchDoctorReservations(true);
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+          window.dispatchEvent(new CustomEvent("revera-booking-change"));
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         alert(err.error || err.message || "Failed to complete treatment session.");

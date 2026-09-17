@@ -202,8 +202,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   useEffect(() => {
     let isMounted = true;
 
-    async function fetchRealData() {
-      setLoadingDb(true);
+    async function fetchRealData(silent = false) {
+      if (!silent) setLoadingDb(true);
       try {
         const [resResponse, provResponse, rxResponse, authHeaders] = await Promise.all([
           supabase.from("reservations").select("*").order("date", { ascending: false }),
@@ -255,11 +255,18 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       } catch (err) {
         console.error("Error fetching database reservations/providers/prescriptions:", err);
       } finally {
-        if (isMounted) setLoadingDb(false);
+        if (isMounted && !silent) setLoadingDb(false);
       }
     }
 
-    fetchRealData();
+    fetchRealData(false);
+
+    // 3-second background polling ensures follow-up updates reflect instantly without reload
+    const pollInterval = setInterval(() => {
+      if (isMounted) {
+        fetchRealData(true);
+      }
+    }, 3000);
 
     // Real-time synchronization
     const channel = supabase
@@ -268,24 +275,25 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         "postgres_changes",
         { event: "*", schema: "public", table: "prescriptions" },
         () => {
-          fetchRealData();
+          fetchRealData(true);
         }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reservations" },
         () => {
-          fetchRealData();
+          fetchRealData(true);
         }
       )
       .subscribe();
 
-    const onSyncChange = () => fetchRealData();
+    const onSyncChange = () => fetchRealData(true);
     window.addEventListener("revera-prescription-change", onSyncChange);
     window.addEventListener("revera-booking-change", onSyncChange);
 
     return () => {
       isMounted = false;
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
       window.removeEventListener("revera-prescription-change", onSyncChange);
       window.removeEventListener("revera-booking-change", onSyncChange);

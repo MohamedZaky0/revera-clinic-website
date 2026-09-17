@@ -472,6 +472,11 @@ export function useCustomerProfile({
       setPrescriptionEditMode(false);
       setEditingPrescription(null);
       setPrescriptionBookingContext(null);
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+        window.dispatchEvent(new CustomEvent("revera-booking-change"));
+      }
     } catch (err: any) {
       console.error("handleSavePrescription error:", err);
       alert(err.message || "An error occurred while saving the prescription.");
@@ -530,6 +535,11 @@ export function useCustomerProfile({
           const rxData = await rxRes.json();
           setCustomerPrescriptions(rxData);
         }
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+        window.dispatchEvent(new CustomEvent("revera-booking-change"));
       }
     } catch (err: any) {
       console.error("handleDeletePrescription error:", err);

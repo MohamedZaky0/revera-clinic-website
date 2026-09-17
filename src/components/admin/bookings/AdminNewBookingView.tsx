@@ -973,6 +973,11 @@ export default function AdminNewBookingView({
         window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
       }
 
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("revera-booking-change"));
+        window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+      }
+
       if (onBookingCreated) onBookingCreated();
       onClose();
     } catch (err) {

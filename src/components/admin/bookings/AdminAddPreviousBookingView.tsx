@@ -350,6 +350,10 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       }
 
       setSuccessMsg(tr.successMessage);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("revera-booking-change"));
+        window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+      }
       setTimeout(() => {
         onBookingCreated?.();
       }, 750);

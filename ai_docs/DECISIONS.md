@@ -2015,4 +2015,31 @@ The clinic reception dashboard required dynamic responsiveness to shift state (N
 3. **Customer Auth Modal Isolation:**
    - `AuthModal.tsx` blocks any staff email attempting customer authentication and notifies them to log in via `/login`.
 
+---
 
+## DEC-057: Zero-Reload Real-Time Follow-Up Reminders Engine & Event Bus Synchronization
+
+**Date:** 2026-09-17
+**Status:** Decided & Implemented
+
+**Context:**
+1. When doctors or receptionists save prescriptions or set follow-up dates (e.g. from the Customer Profile Drawer, Doctor Session View, or Booking Details Modal), the follow-up reminder banners and calendar dots in Reception Bookings previously required a full browser reload to appear.
+2. `PATCH /api/reservations` was rejecting standalone `followUpDate` sync requests with `400 Bad Request: Unknown action` when action was omitted.
+3. Supabase Realtime WebSocket connections can intermittently disconnect or delay updates.
+
+**Decisions & Implementation:**
+1. **Multi-Channel Real-Time Event Bus:**
+   - Dispatched `revera-prescription-change` and `revera-booking-change` custom DOM events across all modification surfaces:
+     - `src/components/admin/patients/useCustomerProfile.ts` (`handleSavePrescription`, `handleDeletePrescription`)
+     - `src/components/admin/DoctorAccountView.tsx` (`handleCompleteTreatment`, `handleSaveClinicalNote`)
+     - `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx` (`handleSavePrescriptionInline`)
+     - `src/components/admin/bookings/AdminNewBookingView.tsx` (`handleCreateBooking`)
+     - `src/components/admin/bookings/AdminAddPreviousBookingView.tsx` (`handleSubmit`)
+     - `src/components/admin/bookings/BookingDetailsModal.tsx` (`handleFinalizeTreatmentSession`, etc.)
+     - `src/app/admin/page.tsx` (postpone and reschedule handlers)
+2. **Resilient 3-Second Background Polling & Subscription:**
+   - Added silent background fetching in `AdminBookingsView.tsx` and `DoctorAccountView.tsx` to automatically re-sync reservations and prescriptions in real time without flickering UI spinners or reload prompts.
+   - Combined `postgres_changes` subscriptions on `reservations` and `prescriptions` with local event listeners for instant in-tab updates.
+3. **API Route Follow-Up Mutation Fix:**
+   - Updated `PATCH /api/reservations` to gracefully process direct `followUpDate`, `follow_up_date`, and `follow_up_notes` updates without failing validation.
+   - Added automatic synchronization of `follow_up_date` to `reservations` table on every prescription creation in `POST /api/prescriptions`.

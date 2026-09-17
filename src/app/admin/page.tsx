@@ -9138,6 +9138,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       setPostponeBooking(null);
                       setViewingBooking(null);
                       fetchAllReservations();
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("revera-booking-change"));
+                        window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+                      }
                     } else {
                       const err = await res.json();
                       alert(err.error || "Failed to postpone booking.");
