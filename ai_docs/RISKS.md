@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **58 resolved** · 78 tracked total.
+**7 open** · **13 partially resolved** · **59 resolved** · 79 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -3955,6 +3955,143 @@ still be able to create ordinary staff, a doctor with no national ID or phone mu
 provider row, and a non-doctor hire must not touch `providers`).
 
 **Manual test checklist:** `ai_docs/manual_tests/EMPLOYEE_CREATION_ROLE_GUARD_MANUAL_TESTS.md`
+
+---
+
+## RISK-086: `medical-records/templates` Writes To A Local File That Is Read-Only On Vercel
+
+**Severity:** High (P1) · **Type:** Data integrity / platform mismatch
+**Found:** 2026-09-15, reviewing new routes added in the previous 4 weeks while auditing test
+coverage. **Not yet confirmed against a live Vercel deployment — this is a reasoned architectural
+finding, flagged so it gets verified deliberately rather than discovered by a clinic user.**
+
+**What it is:** `src/app/api/medical-records/templates/route.ts` treats a local JSON file
+(`data/medical_record_templates.json`, read/written via `fs.readFileSync`/`fs.writeFileSync`) as
+its primary store for POST/PUT/DELETE, and only best-effort mirrors each write to a
+`medical_record_templates` Supabase table afterward. `GET` does the opposite: it reads Supabase
+first and only falls back to the local file when Supabase has no rows.
+
+This is the same shape of anti-pattern `CLAUDE.md` rule 7 already warns about for
+`serviceStore.ts`/localStorage (RISK-004) — a server-side file standing in as the source of truth —
+except this one runs inside a Vercel serverless function, where the deployed filesystem is
+**read-only**. `fs.writeFileSync` there throws; the route's own `writeLocalTemplates()` catches and
+swallows that error (logs a warning, keeps going), so the write appears to succeed to the caller.
+
+**The concrete failure this produces:**
+1. Staff create a new custom intake template. `writeLocalTemplates()` fails silently in production;
+   the parallel `supabaseServer.upsert(...)` call succeeds, so the template is genuinely saved —
+   but only in Supabase.
+2. `GET` (Supabase-first) correctly shows the new template in the list.
+3. Staff try to **edit or delete** that same template. `PUT`/`DELETE` both call
+   `readLocalTemplates()` to find "the current list" to mutate — which, in production, can only
+   ever return what's baked into the deployed bundle (the 3 default templates), since local writes
+   never actually landed. The new template's id is not in that list → **404 "Template not found"**,
+   for a template the UI just showed as existing seconds earlier.
+
+**Business impact:** a clinic can create a custom intake form, see it in the list, and then be
+unable to edit or delete it — the exact kind of silent breakage that erodes trust in the system
+once discovered live, rather than in a demo.
+
+**Fix required:** make Supabase the single source of truth for this table (matching every other
+route in the codebase); either drop the local-file path entirely, or gate it strictly behind a
+local-dev-only check (e.g. `process.env.VERCEL` unset) so it can never run against a read-only
+filesystem in production.
+
+**Verification still needed:** confirm this reproduces against an actual Vercel preview/production
+deployment (not just local `next dev`, which has a writable filesystem and would not show the bug).
+No automated test can prove this either way — `tests/routes/medical-records-templates.test.ts`
+mocks `fs` entirely and is deliberately silent on this question (see that file's own header
+comment). Manual checklist: `ai_docs/manual_tests/NEW_ROUTES_SEPT_2026_MANUAL_TESTS.md`, check 6.
+
+---
+
+## RISK-087: Two Independent Implementations Decide How An Underpayment/Overpayment Settles
+
+**Severity:** Medium · **Type:** Maintainability / consistency risk
+**Found:** 2026-09-15, same review as RISK-086.
+
+**What it is:** deciding *how much of an underpayment draws from an existing wallet credit before
+adding debt to `outstanding`, and how much of an overpayment pays down existing debt before
+crediting the wallet* is business logic that exists **twice**, in two different places, written
+independently:
+
+1. `src/app/api/reservations/previous/route.ts:264-301` — an inline `diff`-based calculation run
+   entirely server-side when staff record a historical (pre-system) booking. It **automatically**
+   decides wallet-vs-debt allocation from `parsedValue`/`parsedPaid` and the customer's current
+   balances.
+2. The regular checkout flow (`PATCH /api/reservations`, `admin/page.tsx`'s checkout modal) instead
+   splits this responsibility: the **frontend** computes how much wallet to draw
+   (`useWalletBalance ? Math.min(walletBalance, balanceDue) : 0`) and sends that as an explicit
+   `walletWithdrawal`/`walletDeposit` amount; `src/lib/billing.ts`'s `computeSettledBalances()`
+   (tested, `tests/lib/billing.test.ts`) then just applies whatever deltas it's given — it does not
+   itself decide *whether* to use the wallet.
+
+Neither implementation is confirmed wrong — each does what its own inline comments say, and
+`tests/routes/reservations-previous.test.ts` pins implementation 1's rules exactly as documented.
+The risk is that these are two independently-maintained answers to conceptually the same question
+("how does a payment mismatch settle against a patient's wallet and debt"). A future change to the
+allocation rule (e.g. "cap wallet usage at 50% of a debt" or a rounding fix) applied to one will not
+apply to the other unless someone remembers both exist. If the two rules are ever accidentally
+allowed to diverge further, staff could see different settlement behavior for what looks to them
+like the same kind of transaction, depending only on which screen recorded it.
+
+**Fix required (not urgent, but worth scheduling):** extract the wallet-vs-debt allocation decision
+in `reservations/previous` into a small, named, tested pure function (parallel to how
+`computeSettledBalances` was extracted from the checkout route) — either reusing/extending
+`billing.ts`, or as a clearly-named sibling — so there is one function both call sites can point at,
+not two hand-written copies of the same rule.
+
+**Tests:** `tests/routes/reservations-previous.test.ts`'s "settlement math" describe block (9 cases)
+documents implementation 1's exact current behavior; `tests/lib/billing.test.ts` documents
+implementation 2's. Neither test file currently asserts the two are equivalent — that assertion
+doesn't exist yet because the two functions don't share a common interface to compare.
+
+---
+
+## RISK-088: `POST /api/services` Silently Failed To Create Any New Service (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Correctness / data integrity
+**Found:** 2026-09-17, live-reported by Mohamed ("Add Service" did nothing). **Fixed same day.**
+
+**What it was:** `AdminServicesView.tsx`'s "Add Service" flow builds the *entire* `localServices`
+array (every existing service, each with a real `id`, plus the one new row being created, which has
+no `id` yet — the DB is meant to assign it) and POSTs it as one array to `/api/services`, which ran
+it through a single `.upsert(servicesToUpsert)` call. Supabase-js/PostgREST builds one SQL statement
+from the whole array; when the objects in that array don't all share the same keys, the columns
+missing from any one object are sent as explicit SQL `NULL` for that row, not omitted. So the new
+service's row got `id: NULL` sent explicitly — which fails `services.id`'s `NOT NULL` constraint
+(Postgres error `23502`) even though the column is `GENERATED BY DEFAULT AS IDENTITY` (fixed for a
+different reason in `20260729000000_fix_services_id_identity_generation.sql`) and would have
+auto-assigned an id had the column been omitted entirely rather than sent as `null`.
+
+**The concrete failure:** clicking "Save" in the Add Service modal always returned a 500 from the
+API. The route's own `catch` block only did `console.error(...)` before returning a generic
+`{ error: 'Database error' }` — the modal stayed open with no visible message, so from the UI it
+looked exactly like the button silently did nothing. Editing an *existing* service worked fine
+(every row in that array already has a real `id`, so the array is uniform), which is why this went
+unnoticed until someone tried to add a brand-new service.
+
+**Fix:** `src/app/api/services/route.ts`'s `POST` handler now splits the mapped rows into two
+groups — rows that already carry an `id` (existing services, upserted as before) and rows that
+don't (new services) — and issues a separate `.insert()` call for the latter, letting the identity
+column generate the id normally. Both result sets are merged before mapping the response, so the
+bulk-sync API contract (`POST` with either a single object or an array; 201 + the row(s) reflecting
+DB-assigned values) is unchanged for every existing caller (Promotions, Packages' service picker).
+
+**Reproduced and verified live** (not just via tsc/tests): via the built-in browser against the dev
+server, logged in as `finance-test@revera.com`, added a real service ("Test Diagnostic Service") to
+Dermatology & Aesthetic — reproduced the 500 pre-fix (server log: `null value in column "id" ...
+violates not-null constraint`), then confirmed 201 + the new row appearing in the list post-fix, then
+deleted the test row via the UI to leave the shared dev database clean.
+
+**Tests:** added `tests/routes/services.test.ts`, covering single-object create, mixed
+array create+update, and the permission-rejection path. Note: `supabaseFake`'s `.upsert()` does not
+reproduce the Postgres-specific NOT NULL failure (it always assigns an id when one is missing,
+regardless of column-uniformity across the batch), so this suite locks in the post-fix contract
+rather than independently catching the original regression — the defect itself was confirmed by the
+live reproduction described above.
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_088_MANUAL_TESTS.md`
 
 ---
 

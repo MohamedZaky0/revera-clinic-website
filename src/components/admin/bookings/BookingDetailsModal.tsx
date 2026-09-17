@@ -516,6 +516,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const rxData = await rxRes.json();
           setDrawerPrescriptions(Array.isArray(rxData) ? rxData : []);
         }
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+          window.dispatchEvent(new CustomEvent("revera-booking-change"));
+        }
         fetchAllReservations();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -832,6 +836,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const newRx = await res.json().catch(() => payload);
         alert(isRTL ? "تم حفظ الروشتة الإلكترونية بنجاح!" : "Prescription saved successfully!");
         printPrescription(newRx, booking);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+          window.dispatchEvent(new CustomEvent("revera-booking-change"));
+        }
         fetchAllReservations();
       } else {
         const err = await res.json().catch(() => ({}));

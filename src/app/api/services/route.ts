@@ -102,13 +102,27 @@ export async function POST(req: Request) {
 
     const servicesToUpsert = rawServices.map(mapServiceToDb);
 
-    const { data, error } = await getSupabaseServer()
-      .from('services')
-      .upsert(servicesToUpsert)
-      .select();
+    // Rows keeping their existing id and brand-new rows (no id — the DB assigns one) cannot go
+    // through the same .upsert() call: PostgREST builds one INSERT from the whole array, and any
+    // row missing a key present on another row gets that column sent as explicit SQL NULL rather
+    // than omitted, which fails services.id's NOT NULL constraint instead of letting the identity
+    // column generate a value. Split by presence of `id` and issue separate upsert/insert calls.
+    const rowsWithId = servicesToUpsert.filter((r) => r.id !== undefined);
+    const rowsWithoutId = servicesToUpsert.filter((r) => r.id === undefined);
 
-    if (error) throw error;
-    return NextResponse.json(isArray ? data.map(mapServiceRow) : mapServiceRow(data[0]), { status: 201 });
+    const results: any[] = [];
+    if (rowsWithId.length > 0) {
+      const { data, error } = await getSupabaseServer().from('services').upsert(rowsWithId).select();
+      if (error) throw error;
+      results.push(...(data || []));
+    }
+    if (rowsWithoutId.length > 0) {
+      const { data, error } = await getSupabaseServer().from('services').insert(rowsWithoutId).select();
+      if (error) throw error;
+      results.push(...(data || []));
+    }
+
+    return NextResponse.json(isArray ? results.map(mapServiceRow) : mapServiceRow(results[0]), { status: 201 });
   } catch (err) {
     console.error('POST /api/services error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
