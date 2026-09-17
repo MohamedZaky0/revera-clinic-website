@@ -29,7 +29,9 @@ import {
   DollarSign,
   History,
   CalendarPlus,
-  MessageSquare
+  MessageSquare,
+  Trash2,
+  CalendarClock
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getAuthHeaders } from "@/lib/authHeaders";
@@ -197,6 +199,129 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   const [dbPrescriptions, setDbPrescriptions] = useState<any[]>([]);
   const [loadingDb, setLoadingDb] = useState(false);
   const [convertedFollowUpIds, setConvertedFollowUpIds] = useState<Set<string>>(() => new Set());
+
+  // Follow-Up Management Modal State
+  const [managingFollowUp, setManagingFollowUp] = useState<any | null>(null);
+  const [newFollowUpDateInput, setNewFollowUpDateInput] = useState<string>("");
+  const [updatingFollowUp, setUpdatingFollowUp] = useState<boolean>(false);
+  const [cancellingFollowUp, setCancellingFollowUp] = useState<boolean>(false);
+
+  const handleOpenManageFollowUp = (fu: any) => {
+    setManagingFollowUp(fu);
+    setNewFollowUpDateInput(fu.followUpDate || "");
+  };
+
+  const handleBookOnTargetDate = (fu: any, targetDate?: string) => {
+    const finalDate = targetDate || fu.followUpDate;
+    setConvertedFollowUpIds(prev => {
+      const next = new Set(prev);
+      if (fu.id) next.add(String(fu.id));
+      if (fu.bookingId) next.add(String(fu.bookingId));
+      if (fu.customerId) next.add(String(fu.customerId));
+      if (fu.patientName) next.add(`name-${fu.patientName.toLowerCase().trim()}`);
+      return next;
+    });
+    if (onNewBooking) {
+      onNewBooking({
+        customerId: fu.customerId,
+        patientName: fu.patientName,
+        phone: fu.phone,
+        doctorName: fu.doctorName,
+        doctorId: fu.doctorId,
+        serviceName: fu.serviceName,
+        serviceId: fu.serviceId,
+        date: finalDate,
+        notes: fu.notes ? `Follow-up from ${fu.doctorName}: ${fu.notes}` : `Follow-up visit recommended by ${fu.doctorName}`,
+        raw: fu.raw
+      });
+    }
+    setManagingFollowUp(null);
+  };
+
+  const handleCancelFollowUp = async (fu: any) => {
+    if (!fu) return;
+    if (!confirm(tr.cancelFollowUpConfirm || "Are you sure you want to cancel and remove this follow-up reminder?")) return;
+    setCancellingFollowUp(true);
+    try {
+      const headers = await getAuthHeaders();
+      // 1. If has bookingId, clear followUpDate on reservations
+      if (fu.bookingId) {
+        await fetch(`/api/reservations?id=${encodeURIComponent(fu.bookingId)}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ followUpDate: null, follow_up_date: null })
+        }).catch(() => {});
+      }
+      // 2. If prescription record, clear follow_up_date on prescriptions
+      const rxId = fu.raw?.id || (String(fu.id).startsWith("fu-rx-") ? String(fu.id).replace("fu-rx-", "") : null);
+      if (rxId) {
+        await fetch(`/api/prescriptions?id=${encodeURIComponent(rxId)}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ follow_up_date: null })
+        }).catch(() => {});
+      }
+      // 3. Mark in local converted state
+      setConvertedFollowUpIds(prev => {
+        const next = new Set(prev);
+        if (fu.id) next.add(String(fu.id));
+        if (fu.bookingId) next.add(String(fu.bookingId));
+        if (fu.customerId) next.add(String(fu.customerId));
+        if (fu.patientName) next.add(`name-${fu.patientName.toLowerCase().trim()}`);
+        return next;
+      });
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+        window.dispatchEvent(new CustomEvent("revera-booking-change"));
+      }
+      setManagingFollowUp(null);
+    } catch (err) {
+      console.error("Error cancelling follow up:", err);
+      alert("Error cancelling follow up. Please try again.");
+    } finally {
+      setCancellingFollowUp(false);
+    }
+  };
+
+  const handleSaveNewFollowUpDate = async (fu: any, newDate: string, thenBook: boolean = false) => {
+    if (!fu || !newDate) return;
+    setUpdatingFollowUp(true);
+    try {
+      const headers = await getAuthHeaders();
+      if (fu.bookingId) {
+        await fetch(`/api/reservations?id=${encodeURIComponent(fu.bookingId)}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ followUpDate: newDate, follow_up_date: newDate })
+        }).catch(() => {});
+      }
+      const rxId = fu.raw?.id || (String(fu.id).startsWith("fu-rx-") ? String(fu.id).replace("fu-rx-", "") : null);
+      if (rxId) {
+        await fetch(`/api/prescriptions?id=${encodeURIComponent(rxId)}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ follow_up_date: newDate })
+        }).catch(() => {});
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+        window.dispatchEvent(new CustomEvent("revera-booking-change"));
+      }
+
+      if (thenBook) {
+        handleBookOnTargetDate(fu, newDate);
+      } else {
+        setManagingFollowUp(null);
+      }
+    } catch (err) {
+      console.error("Error updating follow up date:", err);
+      alert("Error updating follow up date.");
+    } finally {
+      setUpdatingFollowUp(false);
+    }
+  };
 
   // Fetch real reservations, providers & prescriptions directly from database on mount & subscribe to realtime
   useEffect(() => {
@@ -1392,30 +1517,12 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setConvertedFollowUpIds(prev => {
-                          const next = new Set(prev);
-                          if (fu.id) next.add(String(fu.id));
-                          if (fu.bookingId) next.add(String(fu.bookingId));
-                          if (fu.customerId) next.add(String(fu.customerId));
-                          if (fu.patientName) next.add(`name-${fu.patientName.toLowerCase().trim()}`);
-                          return next;
+                        handleOpenManageFollowUp({
+                          ...fu,
+                          doctorName: formattedDocName || fu.doctorName
                         });
-                        if (onNewBooking) {
-                          onNewBooking({
-                            customerId: fu.customerId,
-                            patientName: fu.patientName,
-                            phone: fu.phone,
-                            doctorName: formattedDocName,
-                            doctorId: fu.doctorId,
-                            serviceName: fu.serviceName,
-                            serviceId: fu.serviceId,
-                            date: fu.followUpDate,
-                            notes: fu.notes ? `Follow-up from ${formattedDocName}: ${fu.notes}` : `Follow-up visit recommended by ${formattedDocName}`,
-                            raw: fu.raw
-                          });
-                        }
                       }}
-                      className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 transition shadow-xs cursor-pointer"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 active:scale-95 transition shadow-xs cursor-pointer"
                       title={tr.convertToBookingBtn || "Convert to Full Booking"}
                     >
                       <Plus size={13} />
@@ -2263,6 +2370,163 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* ── FOLLOW-UP ACTION MODAL (Book on target date / Change date / Cancel) ── */}
+      {managingFollowUp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn">
+          <div
+            dir={lang === "ar" ? "rtl" : "ltr"}
+            className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl border border-gray-100 space-y-5 animate-scaleUp overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 shadow-2xs">
+                  <CalendarClock size={22} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[#111827]">
+                    {tr.manageFollowUpModalTitle || "Manage Follow-Up Appointment"}
+                  </h3>
+                  <p className="text-xs text-[#6B7280]">
+                    {tr.manageFollowUpModalSubtitle || "Choose an action for this recommended follow-up visit."}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManagingFollowUp(null)}
+                className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Patient & Doctor Context Card */}
+            <div className="rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 p-4 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <div className="font-bold text-sm text-[#111827]">
+                  {managingFollowUp.patientName}
+                </div>
+                <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-bold text-indigo-800">
+                  {tr.targetDateLabel || "Recommended:"} {managingFollowUp.followUpDate}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-600 flex-wrap">
+                <span className="font-semibold text-indigo-950">{managingFollowUp.doctorName}</span>
+                <span>·</span>
+                <span>{managingFollowUp.serviceName}</span>
+                {managingFollowUp.phone && (
+                  <>
+                    <span>·</span>
+                    <span className="font-mono dir-ltr">{managingFollowUp.phone}</span>
+                  </>
+                )}
+              </div>
+              {managingFollowUp.notes && (
+                <div className="mt-1 text-[11px] italic text-gray-500 bg-white/80 rounded-xl p-2 border border-gray-200/50">
+                  "{managingFollowUp.notes}"
+                </div>
+              )}
+            </div>
+
+            {/* Action Options Grid */}
+            <div className="space-y-3">
+              {/* OPTION 1: Book on Recommended Date */}
+              <button
+                type="button"
+                onClick={() => handleBookOnTargetDate(managingFollowUp)}
+                className="w-full text-left rtl:text-right group flex items-center justify-between p-3.5 rounded-2xl border-2 border-indigo-600/20 bg-indigo-50/50 hover:bg-indigo-600 hover:text-white transition shadow-2xs cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white group-hover:bg-white group-hover:text-indigo-600 transition shadow-2xs">
+                    <Plus size={18} />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-[#111827] group-hover:text-white transition">
+                      {tr.bookOnTargetDateBtn || "Book on Target Date"} ({managingFollowUp.followUpDate})
+                    </div>
+                    <div className="text-[11px] text-gray-500 group-hover:text-indigo-100 transition">
+                      {tr.bookOnTargetDateDesc || "Create appointment on the doctor's recommended date"}
+                    </div>
+                  </div>
+                </div>
+                <ArrowRight size={16} className={`text-indigo-600 group-hover:text-white transition ${lang === "ar" ? "rotate-180" : ""}`} />
+              </button>
+
+              {/* OPTION 2: Change to Another Day */}
+              <div className="rounded-2xl border border-gray-200 bg-white p-3.5 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+                      <CalendarIcon size={16} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#111827]">
+                        {tr.changeFollowUpDateTitle || "Change Follow-Up Date"}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {tr.changeFollowUpDateDesc || "Select a new follow-up date for this patient"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                  <input
+                    type="date"
+                    value={newFollowUpDateInput}
+                    onChange={(e) => setNewFollowUpDateInput(e.target.value)}
+                    className="rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-xs font-semibold text-[#111827] focus:border-indigo-500 focus:bg-white focus:outline-hidden transition"
+                  />
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <button
+                      type="button"
+                      disabled={updatingFollowUp || !newFollowUpDateInput || newFollowUpDateInput === managingFollowUp.followUpDate}
+                      onClick={() => handleSaveNewFollowUpDate(managingFollowUp, newFollowUpDateInput, true)}
+                      className="flex-1 rounded-xl bg-indigo-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-indigo-700 transition disabled:opacity-40 cursor-pointer text-center"
+                    >
+                      {updatingFollowUp ? <Loader2 size={13} className="animate-spin inline" /> : (tr.bookOnNewDateBtn || "Book on New Date")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={updatingFollowUp || !newFollowUpDateInput || newFollowUpDateInput === managingFollowUp.followUpDate}
+                      onClick={() => handleSaveNewFollowUpDate(managingFollowUp, newFollowUpDateInput, false)}
+                      className="rounded-xl border border-gray-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 transition disabled:opacity-40 cursor-pointer"
+                      title={tr.saveNewDateOnlyBtn || "Save New Date"}
+                    >
+                      {tr.saveNewDateOnlyBtn || "Save Date"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* OPTION 3: Cancel Follow-Up */}
+              <button
+                type="button"
+                disabled={cancellingFollowUp}
+                onClick={() => handleCancelFollowUp(managingFollowUp)}
+                className="w-full text-left rtl:text-right group flex items-center justify-between p-3.5 rounded-2xl border border-rose-200 bg-rose-50/40 hover:bg-rose-600 hover:text-white transition shadow-2xs cursor-pointer disabled:opacity-50"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-100 text-rose-700 group-hover:bg-white group-hover:text-rose-600 transition shadow-2xs">
+                    {cancellingFollowUp ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-rose-900 group-hover:text-white transition">
+                      {tr.cancelFollowUpBtn || "Cancel This Follow-Up"}
+                    </div>
+                    <div className="text-[11px] text-rose-600/80 group-hover:text-rose-100 transition">
+                      {tr.cancelFollowUpDesc || "Patient declined or cancelled follow-up visit"}
+                    </div>
+                  </div>
+                </div>
+                <X size={16} className="text-rose-500 group-hover:text-white transition" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

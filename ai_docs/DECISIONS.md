@@ -2046,3 +2046,8 @@ The clinic reception dashboard required dynamic responsiveness to shift state (N
 4. **Calendar Follow-Up Dot Isolation & Pulsing Beacon Warning:**
    - Rendered calendar warning dots strictly on the actual `followUpDate` rather than lead reminder dates.
    - Enhanced follow-up calendar dots and legend markers with a pulsating warning beacon animation (`animate-ping`, `animate-pulse`, glowing shadow) to ensure receptionists immediately notice pending patient follow-ups.
+5. **Interactive Follow-Up Management Action Suite:**
+   - Upgraded `+ Convert to Full Booking` on follow-up reminder cards to open an interactive modal (`FollowUpActionModal`) providing 3 explicit choices:
+     - (a) **Book on Target Date**: Converts and opens New Booking pre-populated on the doctor's recommended date.
+     - (b) **Change Date / Reschedule**: Provides a date picker with options to either book immediately on the new chosen date or save the new follow-up date to the database so the calendar reminder adjusts.
+     - (c) **Cancel Follow-Up**: Cancels the follow-up reminder, clears `follow_up_date` in the database across reservations and prescriptions via atomic `PATCH /api/prescriptions` & `PATCH /api/reservations`, and dismisses the reminder with instant real-time event broadcasting.
