@@ -305,6 +305,18 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         }).catch(() => {});
       }
 
+      // If moving as a reminder to the new date, clear any converted status so it is active
+      if (!thenBook) {
+        setConvertedFollowUpIds(prev => {
+          const next = new Set(prev);
+          if (fu.id) next.delete(String(fu.id));
+          if (fu.bookingId) next.delete(String(fu.bookingId));
+          if (fu.customerId) next.delete(String(fu.customerId));
+          if (fu.patientName) next.delete(`name-${fu.patientName.toLowerCase().trim()}`);
+          return next;
+        });
+      }
+
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("revera-prescription-change"));
         window.dispatchEvent(new CustomEvent("revera-booking-change"));
@@ -2465,10 +2477,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     </div>
                     <div>
                       <div className="text-xs font-bold text-[#111827]">
-                        {tr.changeFollowUpDateTitle || "Change Follow-Up Date"}
+                        {tr.changeFollowUpDateTitle || "Reschedule Follow-Up Reminder to Another Date"}
                       </div>
                       <div className="text-[10px] text-gray-500">
-                        {tr.changeFollowUpDateDesc || "Select a new follow-up date for this patient"}
+                        {tr.changeFollowUpDateDesc || "Moves the reminder to the new date (notification only, not a full booking yet)."}
                       </div>
                     </div>
                   </div>
@@ -2485,19 +2497,20 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     <button
                       type="button"
                       disabled={updatingFollowUp || !newFollowUpDateInput || newFollowUpDateInput === managingFollowUp.followUpDate}
-                      onClick={() => handleSaveNewFollowUpDate(managingFollowUp, newFollowUpDateInput, true)}
-                      className="flex-1 rounded-xl bg-indigo-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-indigo-700 transition disabled:opacity-40 cursor-pointer text-center"
+                      onClick={() => handleSaveNewFollowUpDate(managingFollowUp, newFollowUpDateInput, false)}
+                      className="flex-1 rounded-xl bg-amber-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-amber-700 transition disabled:opacity-40 cursor-pointer text-center shadow-xs"
+                      title={tr.saveNewDateOnlyBtn || "Reschedule Reminder (Keep as Notification)"}
                     >
-                      {updatingFollowUp ? <Loader2 size={13} className="animate-spin inline" /> : (tr.bookOnNewDateBtn || "Book on New Date")}
+                      {updatingFollowUp ? <Loader2 size={13} className="animate-spin inline" /> : (tr.saveNewDateOnlyBtn || "Reschedule Reminder")}
                     </button>
                     <button
                       type="button"
                       disabled={updatingFollowUp || !newFollowUpDateInput || newFollowUpDateInput === managingFollowUp.followUpDate}
-                      onClick={() => handleSaveNewFollowUpDate(managingFollowUp, newFollowUpDateInput, false)}
-                      className="rounded-xl border border-gray-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 transition disabled:opacity-40 cursor-pointer"
-                      title={tr.saveNewDateOnlyBtn || "Save New Date"}
+                      onClick={() => handleSaveNewFollowUpDate(managingFollowUp, newFollowUpDateInput, true)}
+                      className="rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-2 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-40 cursor-pointer"
+                      title={tr.bookOnNewDateBtn || "Book Directly on New Date"}
                     >
-                      {tr.saveNewDateOnlyBtn || "Save Date"}
+                      {tr.bookOnNewDateBtn || "Book Immediately"}
                     </button>
                   </div>
                 </div>
