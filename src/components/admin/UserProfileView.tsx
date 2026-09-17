@@ -189,9 +189,10 @@ export default function UserProfileView({
       try {
         const email = user.email?.trim().toLowerCase();
         const userId = user.id;
-        const phone = user.phone;
+        const phone = user.phone?.trim();
+        const name = user.name?.trim();
 
-        if (email || userId || phone) {
+        if (email || userId || phone || name) {
           const empQuery = supabase.from("employee_accounts").select("*");
           if (userId && userId !== "my-profile" && !userId.includes("@")) {
             empQuery.or(`id.eq.${userId},employee_id.eq.${userId},email.eq.${email || 'none'}`);
@@ -203,9 +204,9 @@ export default function UserProfileView({
 
           const provQuery = supabase.from("providers").select("*");
           if (userId && userId !== "my-profile" && !userId.includes("@")) {
-            provQuery.or(`id.eq.${userId},phone.eq.${phone || 'none'},email.eq.${email || 'none'}`);
-          } else if (email || phone) {
-            provQuery.or(`phone.eq.${phone || 'none'},email.eq.${email || 'none'}`);
+            provQuery.or(`id.eq.${userId},phone.eq.${phone || 'none'},name.ilike.%${name || 'none'}%`);
+          } else if (phone || name) {
+            provQuery.or(`phone.eq.${phone || 'none'},name.ilike.%${name || 'none'}%`);
           }
           const { data: provData } = await provQuery.maybeSingle();
           if (provData) setFetchedProvider(provData);
@@ -215,7 +216,7 @@ export default function UserProfileView({
       }
     }
     loadExtraDetails();
-  }, [user.id, user.email, user.phone]);
+  }, [user.id, user.email, user.phone, user.name]);
 
   // Local edit states
   const [showEditPersonalModal, setShowEditPersonalModal] = useState(false);
@@ -418,7 +419,7 @@ export default function UserProfileView({
       { key: "Friday", short: "Fri", id: 5, arName: "الجمعة", arShort: "جمعة" },
     ];
 
-    const rawSched = user.workingDaysHours || fetchedEmployee?.working_days_hours || fetchedProvider?.working_days_hours;
+    const rawSched = user.workingDaysHours || fetchedProvider?.working_days_hours || fetchedEmployee?.working_days_hours;
     let parsed: any = rawSched;
     if (typeof parsed === "string") {
       try { parsed = JSON.parse(parsed); } catch (e) {}
@@ -426,33 +427,50 @@ export default function UserProfileView({
 
     const shiftStr = user.shiftType || fetchedEmployee?.shift || fetchedProvider?.shift || "";
 
-    let customShiftTimes: { start: string; end: string } | null = null;
-    if (shiftStr && (shiftStr.toLowerCase().includes("to") || shiftStr.includes("-"))) {
-      const sep = shiftStr.toLowerCase().includes("to") ? /to/i : /-/;
-      const parts = shiftStr.split(sep);
-      if (parts.length === 2 && parts[0].trim() && parts[1].trim()) {
-        customShiftTimes = {
-          start: parts[0].trim(),
-          end: parts[1].trim()
-        };
+    const parseShiftStringToTimes = (str: string): { start: string; end: string; formatted: string; duration: number } | null => {
+      if (!str) return null;
+      const clean = str.trim();
+      const lower = clean.toLowerCase();
+
+      if (lower === "day" || lower === "نهار" || lower === "صباحي" || lower === "day shift") {
+        const startF = formatTime12Hour("09:00", lang);
+        const endF = formatTime12Hour("17:00", lang);
+        return { start: "09:00", end: "17:00", formatted: `${startF} – ${endF}`, duration: 8 };
       }
-    }
+
+      if (lower === "night" || lower === "ليل" || lower === "مسائي" || lower === "night shift") {
+        const startF = formatTime12Hour("20:00", lang);
+        const endF = formatTime12Hour("04:00", lang);
+        return { start: "20:00", end: "04:00", formatted: `${startF} – ${endF}`, duration: 8 };
+      }
+
+      if (lower.includes("to") || clean.includes("–") || clean.includes("-")) {
+        const sep = lower.includes("to") ? /to/i : /[–-]/;
+        const parts = clean.split(sep).map(s => s.trim());
+        if (parts.length === 2 && parts[0] && parts[1]) {
+          const startF = formatTime12Hour(parts[0], lang);
+          const endF = formatTime12Hour(parts[1], lang);
+          const duration = calcShiftHours(parts[0], parts[1]);
+          return { start: parts[0], end: parts[1], formatted: `${startF} – ${endF}`, duration: duration || 8 };
+        }
+      }
+
+      return null;
+    };
+
+    const resolvedShift = parseShiftStringToTimes(shiftStr) || {
+      start: "09:00",
+      end: "17:00",
+      formatted: `${formatTime12Hour("09:00", lang)} – ${formatTime12Hour("17:00", lang)}`,
+      duration: 8
+    };
 
     const extractShiftsFromDayNode = (dayData: any): Array<{ start: string; end: string; formatted: string; duration: number }> => {
       if (!dayData) return [];
       if (typeof dayData === "string") {
-        if (dayData.toLowerCase() === "off" || dayData === "—") return [];
-        const parts = dayData.split("-").map(s => s.trim());
-        if (parts.length === 2) {
-          const startF = formatTime12Hour(parts[0], lang);
-          const endF = formatTime12Hour(parts[1], lang);
-          return [{
-            start: parts[0],
-            end: parts[1],
-            formatted: `${startF} – ${endF}`,
-            duration: calcShiftHours(parts[0], parts[1])
-          }];
-        }
+        if (dayData.toLowerCase() === "off" || dayData === "—" || dayData === "") return [];
+        const parsedShift = parseShiftStringToTimes(dayData);
+        if (parsedShift) return [parsedShift];
         return [{
           start: dayData,
           end: dayData,
@@ -461,7 +479,7 @@ export default function UserProfileView({
         }];
       }
 
-      const isOpen = dayData.isOpen ?? dayData.active ?? dayData.open ?? true;
+      const isOpen = dayData.isOpen ?? dayData.active ?? dayData.open ?? (dayData.hours !== "Off" && !dayData.off);
       if (!isOpen || dayData.hours === "Off" || dayData.off === true) {
         return [];
       }
@@ -490,22 +508,25 @@ export default function UserProfileView({
           duration: calcShiftHours(dayData.start, dayData.end)
         });
       } else if (dayData.hours && dayData.hours !== "Off") {
-        const parts = dayData.hours.split("–").length === 2 ? dayData.hours.split("–") : dayData.hours.split("-");
-        if (parts.length === 2) {
-          const startF = formatTime12Hour(parts[0].trim(), lang);
-          const endF = formatTime12Hour(parts[1].trim(), lang);
-          res.push({
-            start: parts[0].trim(),
-            end: parts[1].trim(),
-            formatted: `${startF} – ${endF}`,
-            duration: calcShiftHours(parts[0].trim(), parts[1].trim())
-          });
+        const parsedH = parseShiftStringToTimes(dayData.hours);
+        if (parsedH) {
+          res.push(parsedH);
         }
       }
       return res;
     };
 
     let hasExplicitDbSchedule = false;
+    if (parsed && typeof parsed === "object") {
+      if (parsed.branch_schedules && typeof parsed.branch_schedules === "object" && Object.keys(parsed.branch_schedules).length > 0) {
+        hasExplicitDbSchedule = true;
+      } else if (parsed.in_person && typeof parsed.in_person === "object") {
+        hasExplicitDbSchedule = true;
+      } else if (WEEK_DAYS.some(d => parsed[d.key] !== undefined || parsed[d.key.toLowerCase()] !== undefined)) {
+        hasExplicitDbSchedule = true;
+      }
+    }
+
     const scheduleByDay: Record<string, {
       dayKey: string;
       dayShort: string;
@@ -522,7 +543,6 @@ export default function UserProfileView({
 
       if (parsed && typeof parsed === "object") {
         if (parsed.branch_schedules && typeof parsed.branch_schedules === "object") {
-          hasExplicitDbSchedule = true;
           Object.entries(parsed.branch_schedules).forEach(([bId, bSched]: [string, any]) => {
             if (selectedScheduleBranch !== "all" && bId !== selectedScheduleBranch) return;
             const modeNode = bSched?.in_person || bSched;
@@ -543,35 +563,15 @@ export default function UserProfileView({
           if (topNode && typeof topNode === "object") {
             const dNode = topNode[day.key] || topNode[day.key.toLowerCase()];
             if (dNode !== undefined) {
-              hasExplicitDbSchedule = true;
               dayShifts = extractShiftsFromDayNode(dNode);
             }
           }
         }
       }
 
-      // If no explicit day shifts yet but customShiftTimes is available
-      if (dayShifts.length === 0 && !hasExplicitDbSchedule && customShiftTimes && day.key !== "Friday") {
-        const startF = formatTime12Hour(customShiftTimes.start, lang);
-        const endF = formatTime12Hour(customShiftTimes.end, lang);
-        dayShifts.push({
-          start: customShiftTimes.start,
-          end: customShiftTimes.end,
-          formatted: `${startF} – ${endF}`,
-          duration: calcShiftHours(customShiftTimes.start, customShiftTimes.end)
-        });
-      }
-
-      // Clinic Standard Egyptian Default: Saturday to Thursday 10:00 AM – 08:00 PM (Friday Off)
-      if (dayShifts.length === 0 && !hasExplicitDbSchedule && day.key !== "Friday") {
-        const startF = formatTime12Hour("10:00", lang);
-        const endF = formatTime12Hour("20:00", lang);
-        dayShifts.push({
-          start: "10:00",
-          end: "20:00",
-          formatted: `${startF} – ${endF}`,
-          duration: 10
-        });
+      // If no explicit structured schedule from database, apply employee's resolved real shift (Sat-Thu, Friday Off)
+      if (!hasExplicitDbSchedule && day.key !== "Friday") {
+        dayShifts.push(resolvedShift);
       }
 
       const isOpen = dayShifts.length > 0;
@@ -625,13 +625,15 @@ export default function UserProfileView({
     });
     const hoursSummary = allDistinctHours.size > 0 
       ? Array.from(allDistinctHours).join(" | ")
-      : `${formatTime12Hour("10:00", lang)} – ${formatTime12Hour("20:00", lang)}`;
+      : resolvedShift.formatted;
 
     let shiftType = user.shiftType || fetchedEmployee?.shift || "Day";
     if (allDistinctHours.size > 1) {
       shiftType = tr?.shiftTypes?.multiShift || (lang === "ar" ? "جدول متعدد الورديات" : "Multi-Shift Schedule");
     } else if (shiftType === "Day" || !shiftType) {
       shiftType = tr?.shiftTypes?.day || (lang === "ar" ? "وردية نهارية" : "Day Shift");
+    } else if (shiftType === "Night") {
+      shiftType = tr?.shiftTypes?.night || (lang === "ar" ? "وردية مسائية" : "Night Shift");
     }
 
     return {

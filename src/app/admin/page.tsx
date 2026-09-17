@@ -6651,36 +6651,44 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           {activeNav === "Profile" && (() => {
             const isSuperadminBypass = adminRole === "superadmin";
             const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+            const matchProv = providers.find(p => 
+              (profileEmployee?.name && p.name && p.name.trim().toLowerCase() === profileEmployee.name.trim().toLowerCase()) ||
+              (profileEmployee?.phone && p.phone && p.phone === profileEmployee.phone) ||
+              (profileEmployee?.id && p.id === profileEmployee.id) ||
+              (profileName && p.name && p.name.trim().toLowerCase() === profileName.trim().toLowerCase())
+            );
             const currentBranchName = branches.find(b => b.id === branch)?.name_en || "New Cairo Branch";
+            const effectiveWorkingDaysHours = matchProv?.working_days_hours || profileEmployee?.working_days_hours || null;
+            const effectiveShift = profileEmployee?.shift || matchProv?.shift || (matchProv?.working_days_hours ? "Multi-Shift Schedule" : "Day");
 
             return (
               <UserProfileView
                 user={{
-                  id: profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile",
-                  name: profileName || profileEmployee?.name || (isSuperadminBypass ? "zaki" : "Employee Account"),
+                  id: profileEmployee?.id || profileEmployee?.employee_id || matchProv?.id || adminEmail || "my-profile",
+                  name: profileName || profileEmployee?.name || matchProv?.name || (isSuperadminBypass ? "zaki" : "Employee Account"),
                   email: adminEmail || profileEmployee?.email || "",
-                  phone: profilePhone || profileEmployee?.phone || "",
+                  phone: profilePhone || profileEmployee?.phone || matchProv?.phone || "",
                   address: profileAddress || profileEmployee?.address || "",
-                  role: isSuperadminBypass ? "Superadmin" : (profileEmployee?.role_name || "Employee"),
+                  role: isSuperadminBypass ? "Superadmin" : (profileEmployee?.role_name || (matchProv ? "Doctor" : "Employee")),
                   branch: currentBranchName,
                   branchesList: Array.isArray(profileEmployee?.branches) && profileEmployee.branches.length > 0
                     ? profileEmployee.branches
                     : [currentBranchName],
-                  department: profileEmployee?.department || "Reception",
-                  employeeId: isSuperadminBypass ? "EMP-SUPER" : (profileEmployee?.employee_id || "EMP-001"),
+                  department: profileEmployee?.department || (matchProv ? "Doctor" : "Reception"),
+                  employeeId: isSuperadminBypass ? "EMP-SUPER" : (profileEmployee?.employee_id || (matchProv?.id ? `DOC-${matchProv.id.slice(0, 5).toUpperCase()}` : "EMP-001")),
                   employmentType: "Full Time",
-                  joiningDate: profileEmployee?.created_at
-                    ? new Date(profileEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                  joiningDate: profileEmployee?.created_at || matchProv?.created_at
+                    ? new Date(profileEmployee?.created_at || matchProv?.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
                     : "July 21, 2026",
-                  shiftType: profileEmployee?.shift_type || profileEmployee?.shift || "Day",
+                  shiftType: effectiveShift,
                   workingDays: profileEmployee?.working_days || null,
                   workingHours: profileEmployee?.working_hours || null,
-                  workingDaysHours: profileEmployee?.working_days_hours || null,
-                  basicSalary: Number(profileEmployee?.salary || 0),
+                  workingDaysHours: effectiveWorkingDaysHours,
+                  basicSalary: Number(profileEmployee?.salary || matchProv?.fixed_salary || matchProv?.salary || 0),
                   bonuses: Number(profileEmployee?.bonus || 0),
                   deductions: Number(profileEmployee?.deductions || 0),
                   monthlyTarget: Number(profileEmployee?.required_target_amount || 0),
-                  avatarUrl: customerAvatars[profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile"] || null
+                  avatarUrl: customerAvatars[profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile"] || matchProv?.image || null
                 }}
                 lang="en"
                 t={adminTranslations.en.userProfile as UserProfileViewTranslations}
