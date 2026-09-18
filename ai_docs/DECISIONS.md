@@ -2043,11 +2043,12 @@ The clinic reception dashboard required dynamic responsiveness to shift state (N
 3. **API Route Follow-Up Mutation Fix:**
    - Updated `PATCH /api/reservations` to gracefully process direct `followUpDate`, `follow_up_date`, and `follow_up_notes` updates without failing validation.
    - Added automatic synchronization of `follow_up_date` to `reservations` table on every prescription creation in `POST /api/prescriptions`.
-4. **Calendar Follow-Up Dot Isolation & Pulsing Beacon Warning:**
+4. **Calendar Follow-Up Dot Isolation & Warning Light On/Off Blink:**
    - Rendered calendar warning dots strictly on the actual `followUpDate` rather than lead reminder dates.
-   - Enhanced follow-up calendar dots and legend markers with a pulsating warning beacon animation (`animate-ping`, `animate-pulse`, glowing shadow) to ensure receptionists immediately notice pending patient follow-ups.
+   - Refined follow-up calendar dots to match the exact size of standard status indicator dots (`h-1.5 w-1.5 rounded-full`, 6px) without blurry shadows or halo rings, animated with a crisp warning light on/off blinking cycle (`.animate-warning-light` keyframe animation) so it clearly signals an alert by appearing and disappearing like a warning light switched on and off.
 5. **Interactive Follow-Up Management Action Suite:**
    - Upgraded `+ Convert to Full Booking` on follow-up reminder cards to open an interactive modal (`FollowUpActionModal`) providing 3 explicit choices:
      - (a) **Book on Target Date**: Converts and opens New Booking pre-populated on the doctor's recommended date.
-     - (b) **Change Date / Reschedule**: Provides a date picker with options to either book immediately on the new chosen date or save the new follow-up date to the database so the calendar reminder adjusts.
+     - (b) **Change Date / Reschedule**: Provides a date picker and action buttons in a clean single-line layout (`[ Date ] [ Reschedule Reminder ] [ Book on New Date ]`) with `whitespace-nowrap` to either book immediately on the new chosen date or save the new follow-up date to the database so the calendar reminder adjusts without text wrapping.
      - (c) **Cancel Follow-Up**: Cancels the follow-up reminder, clears `follow_up_date` in the database across reservations and prescriptions via atomic `PATCH /api/prescriptions` & `PATCH /api/reservations`, and dismisses the reminder with instant real-time event broadcasting.
+

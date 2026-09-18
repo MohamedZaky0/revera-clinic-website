@@ -2046,16 +2046,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                           dot.isFollowUp ? (
                             <span
                               key={dIdx}
-                              className="relative flex h-2 w-2 items-center justify-center"
+                              className="h-1.5 w-1.5 rounded-full bg-[#6366F1] animate-warning-light shrink-0"
                               title={tr.followUpBadge || "Follow-Up Reminder"}
-                            >
-                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75 duration-1000" />
-                              <span className="relative inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-600 shadow-[0_0_8px_rgba(99,102,241,0.9)]" />
-                            </span>
+                            />
                           ) : (
                             <span
                               key={dIdx}
-                              className="h-1.5 w-1.5 rounded-full"
+                              className="h-1.5 w-1.5 rounded-full shrink-0"
                               style={{ backgroundColor: dot.color }}
                             />
                           )
@@ -2085,10 +2082,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     </div>
                   ))}
                   <div className="flex items-center gap-2">
-                    <span className="relative flex h-2.5 w-2.5 items-center justify-center shrink-0">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
-                      <span className="relative inline-flex h-2 w-2 animate-pulse rounded-full bg-[#6366F1] shadow-[0_0_6px_rgba(99,102,241,0.9)]" />
-                    </span>
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-[#6366F1] animate-warning-light" />
                     <span>{tr.followUpBadge || "Follow-Up Reminder"}</span>
                   </div>
                 </div>
@@ -2390,7 +2384,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn">
           <div
             dir={lang === "ar" ? "rtl" : "ltr"}
-            className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl border border-gray-100 space-y-5 animate-scaleUp overflow-hidden"
+            className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl border border-gray-100 space-y-5 animate-scaleUp overflow-hidden"
           >
             {/* Header */}
             <div className="flex items-start justify-between border-b border-gray-100 pb-4">
@@ -2486,33 +2480,32 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                <div className="flex items-center gap-2 pt-1">
                   <input
                     type="date"
                     value={newFollowUpDateInput}
                     onChange={(e) => setNewFollowUpDateInput(e.target.value)}
-                    className="rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-xs font-semibold text-[#111827] focus:border-indigo-500 focus:bg-white focus:outline-hidden transition"
+                    className="shrink-0 rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-xs font-semibold text-[#111827] focus:border-indigo-500 focus:bg-white focus:outline-hidden transition"
                   />
-                  <div className="flex items-center gap-1.5 flex-1">
-                    <button
-                      type="button"
-                      disabled={updatingFollowUp || !newFollowUpDateInput || newFollowUpDateInput === managingFollowUp.followUpDate}
-                      onClick={() => handleSaveNewFollowUpDate(managingFollowUp, newFollowUpDateInput, false)}
-                      className="flex-1 rounded-xl bg-amber-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-amber-700 transition disabled:opacity-40 cursor-pointer text-center shadow-xs"
-                      title={tr.saveNewDateOnlyBtn || "Reschedule Reminder (Keep as Notification)"}
-                    >
-                      {updatingFollowUp ? <Loader2 size={13} className="animate-spin inline" /> : (tr.saveNewDateOnlyBtn || "Reschedule Reminder")}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={updatingFollowUp || !newFollowUpDateInput || newFollowUpDateInput === managingFollowUp.followUpDate}
-                      onClick={() => handleSaveNewFollowUpDate(managingFollowUp, newFollowUpDateInput, true)}
-                      className="rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-2 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-40 cursor-pointer"
-                      title={tr.bookOnNewDateBtn || "Book Directly on New Date"}
-                    >
-                      {tr.bookOnNewDateBtn || "Book Immediately"}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    disabled={updatingFollowUp || !newFollowUpDateInput || newFollowUpDateInput === managingFollowUp.followUpDate}
+                    onClick={() => handleSaveNewFollowUpDate(managingFollowUp, newFollowUpDateInput, false)}
+                    className="flex-1 whitespace-nowrap rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700 transition disabled:opacity-40 cursor-pointer text-center shadow-xs flex items-center justify-center gap-1.5"
+                    title={tr.saveNewDateOnlyBtn || "Reschedule Reminder"}
+                  >
+                    {updatingFollowUp ? <Loader2 size={13} className="animate-spin inline" /> : null}
+                    <span>{tr.saveNewDateOnlyBtn || "Reschedule Reminder"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={updatingFollowUp || !newFollowUpDateInput || newFollowUpDateInput === managingFollowUp.followUpDate}
+                    onClick={() => handleSaveNewFollowUpDate(managingFollowUp, newFollowUpDateInput, true)}
+                    className="shrink-0 whitespace-nowrap rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-40 cursor-pointer text-center"
+                    title={tr.bookOnNewDateBtn || "Book on New Date"}
+                  >
+                    <span>{tr.bookOnNewDateBtn || "Book on New Date"}</span>
+                  </button>
                 </div>
               </div>
 

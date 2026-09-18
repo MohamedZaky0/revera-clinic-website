@@ -972,3 +972,25 @@ body::-webkit-scrollbar-corner {
   transition: none !important;
   visibility: visible !important;
 }
+
+/* ── Warning Light Blink Animation (Switches ON and OFF like a warning lamp) ── */
+@keyframes warningLightBlink {
+  0%, 45% {
+    opacity: 1;
+  }
+  50%, 95% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-warning-light,
+#admin-root .animate-warning-light,
+#admin-root span.animate-warning-light {
+  animation: warningLightBlink 0.9s ease-in-out infinite !important;
+  animation-duration: 0.9s !important;
+  animation-iteration-count: infinite !important;
+}
+
