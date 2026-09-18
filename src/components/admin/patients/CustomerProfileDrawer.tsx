@@ -16,6 +16,11 @@ import {
   User,
   ReceiptText,
   History,
+  Phone,
+  Mail,
+  Wallet,
+  CreditCard,
+  Info,
 } from "lucide-react";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
@@ -442,57 +447,146 @@ export default function CustomerProfileDrawer({
       </div>
 
       {/* Profile Header Banner */}
-      <div className="bg-white rounded-3xl border border-[#414E36]/10 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="relative group shrink-0">
-            <div className="h-16 w-16 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl font-bold font-serif overflow-hidden shadow-xs">
-              {(viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url ? (
-                <img
-                  src={(viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url || ""}
-                  alt={viewingCustomerProfile.name || "Customer"}
-                  className="h-full w-full object-cover"
+      <div className="bg-white rounded-3xl border border-[#414E36]/10 p-6 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          {/* Left Column: Avatar & Patient Details */}
+          <div className="flex items-start sm:items-center gap-4.5 min-w-0">
+            <div className="relative group shrink-0">
+              <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl sm:text-3xl font-bold font-serif overflow-hidden shadow-xs">
+                {(viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url ? (
+                  <img
+                    src={(viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url || ""}
+                    alt={viewingCustomerProfile.name || "Customer"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span>{viewingCustomerProfile.name ? viewingCustomerProfile.name.charAt(0).toUpperCase() : "P"}</span>
+                )}
+              </div>
+              <label
+                className="absolute -bottom-1 -end-1 p-1.5 rounded-full bg-[#414E36] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
+                title={t.uploadPhotoTitle}
+              >
+                <Camera size={12} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && viewingCustomerProfile.id) {
+                      handleAvatarUpload(viewingCustomerProfile.id, file);
+                    }
+                  }}
                 />
-              ) : (
-                <span>{viewingCustomerProfile.name ? viewingCustomerProfile.name.charAt(0).toUpperCase() : "P"}</span>
+              </label>
+              {((viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url) && (
+                <button
+                  type="button"
+                  onClick={() => viewingCustomerProfile.id && handleAvatarRemove(viewingCustomerProfile.id)}
+                  className="absolute -top-1 -end-1 p-1 rounded-full bg-red-600 text-white shadow-xs hover:bg-red-700 transition"
+                  title={t.removePhotoTitle}
+                >
+                  <X size={10} />
+                </button>
               )}
             </div>
-            <label
-              className="absolute -bottom-1 -end-1 p-1.5 rounded-full bg-[#414E36] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
-              title={t.uploadPhotoTitle}
-            >
-              <Camera size={12} />
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file && viewingCustomerProfile.id) {
-                    handleAvatarUpload(viewingCustomerProfile.id, file);
-                  }
-                }}
-              />
-            </label>
-            {((viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url) && (
-              <button
-                type="button"
-                onClick={() => viewingCustomerProfile.id && handleAvatarRemove(viewingCustomerProfile.id)}
-                className="absolute -top-1 -end-1 p-1 rounded-full bg-red-600 text-white shadow-xs hover:bg-red-700 transition"
-                title={t.removePhotoTitle}
-              >
-                <X size={10} />
-              </button>
-            )}
+
+            <div className="min-w-0 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h3 className="text-xl sm:text-2xl font-bold text-[#1F251A] leading-tight truncate">
+                  {viewingCustomerProfile.name}
+                </h3>
+                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold shrink-0 ${
+                  viewingCustomerProfile.active !== false ? "bg-[#EDF1EC] text-[#414E36]" : "bg-red-50 text-red-600"
+                }`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-[#414E36]" : "bg-red-500"}`} />
+                  {viewingCustomerProfile.active !== false ? t.activePatientBadge : t.inactiveBadge}
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs font-medium text-[#5A6A51]">
+                <span className="inline-flex items-center gap-1.5">
+                  <Phone size={13} className="text-[#5A6A51] shrink-0" />
+                  <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
+                </span>
+                {viewingCustomerProfile.email && (
+                  <span className="inline-flex items-center gap-1.5 truncate">
+                    <Mail size={13} className="text-[#5A6A51] shrink-0" />
+                    <span className="text-[#5A6A51] truncate">{viewingCustomerProfile.email}</span>
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-          <div>
-            <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingCustomerProfile.name}</h3>
-            <div className="mt-2">
-              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                viewingCustomerProfile.active !== false ? "bg-[#EDF1EC] text-[#414E36]" : "bg-red-50 text-red-600"
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-[#414E36]" : "bg-red-500"}`} />
-                {viewingCustomerProfile.active !== false ? t.activePatientBadge : t.inactiveBadge}
-              </span>
+
+          {/* Center Divider */}
+          <div className="hidden lg:block h-20 w-px bg-[#414E36]/10 self-center" />
+
+          {/* Right Column: Financial Summary */}
+          <div className="lg:max-w-xl w-full">
+            <p className="text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2.5">
+              {t.financialSummary || "Financial Summary"}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Total Spend */}
+              <div className="rounded-2xl border border-emerald-100 bg-[#F0FDF4]/70 p-3.5 flex flex-col justify-between transition hover:shadow-xs">
+                <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
+                  <span className="flex items-center gap-1.5">
+                    <Wallet size={14} className="text-emerald-600 shrink-0" />
+                    <span>{t.totalSpend || "Total Spend"}</span>
+                  </span>
+                  <span title={t.totalSpend || "Total Spend"}>
+                    <Info size={12} className="text-emerald-500 opacity-60" />
+                  </span>
+                </div>
+                <div className="mt-2 text-lg sm:text-xl font-black text-[#1F251A] tracking-tight">
+                  {Number(viewingCustomerProfile.spent_amount !== undefined ? viewingCustomerProfile.spent_amount : viewingCustomerProfile.spent || 0).toLocaleString()} <span className="text-xs font-bold text-[#5A6A51]">{t.egp || "EGP"}</span>
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5 font-medium">
+                  {t.allTime || "All time"}
+                </div>
+              </div>
+
+              {/* Wallet */}
+              <div className="rounded-2xl border border-sky-100 bg-[#F0F9FF]/70 p-3.5 flex flex-col justify-between transition hover:shadow-xs">
+                <div className="flex items-center justify-between text-xs font-semibold text-sky-800">
+                  <span className="flex items-center gap-1.5">
+                    <Wallet size={14} className="text-sky-600 shrink-0" />
+                    <span>{t.wallet || "Wallet"}</span>
+                  </span>
+                  <span title={t.wallet || "Wallet"}>
+                    <Info size={12} className="text-sky-500 opacity-60" />
+                  </span>
+                </div>
+                <div className="mt-2 text-lg sm:text-xl font-black text-sky-700 tracking-tight">
+                  {Number(viewingCustomerProfile.wallet_balance !== undefined ? viewingCustomerProfile.wallet_balance : viewingCustomerProfile.wallet || 0).toLocaleString()} <span className="text-xs font-bold text-sky-600">{t.egp || "EGP"}</span>
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5 font-medium">
+                  {t.availableBalance || "Available balance"}
+                </div>
+              </div>
+
+              {/* Outstanding */}
+              <div className="rounded-2xl border border-amber-100 bg-[#FFF7ED]/70 p-3.5 flex flex-col justify-between transition hover:shadow-xs">
+                <div className="flex items-center justify-between text-xs font-semibold text-amber-800">
+                  <span className="flex items-center gap-1.5">
+                    <CreditCard size={14} className="text-amber-600 shrink-0" />
+                    <span>{t.outstanding || "Outstanding"}</span>
+                  </span>
+                  <span title={t.outstanding || "Outstanding"}>
+                    <Info size={12} className="text-amber-500 opacity-60" />
+                  </span>
+                </div>
+                <div className={`mt-2 text-lg sm:text-xl font-black tracking-tight ${
+                  Number(viewingCustomerProfile.outstanding || 0) > 0 ? "text-rose-600" : "text-[#1F251A]"
+                }`}>
+                  {Number(viewingCustomerProfile.outstanding || 0).toLocaleString()} <span className="text-xs font-bold text-rose-500">{t.egp || "EGP"}</span>
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5 font-medium">
+                  {t.unpaidAmount || "Unpaid amount"}
+                </div>
+              </div>
             </div>
           </div>
         </div>

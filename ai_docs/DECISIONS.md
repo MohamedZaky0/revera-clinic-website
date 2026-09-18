@@ -2053,3 +2053,31 @@ The clinic reception dashboard required dynamic responsiveness to shift state (N
      - (b) **Change Date / Reschedule**: Provides a date picker and action buttons in a clean single-line layout (`[ Date ] [ Reschedule Reminder ] [ Book on New Date ]`) with `whitespace-nowrap` to either book immediately on the new chosen date or save the new follow-up date to the database so the calendar reminder adjusts without text wrapping.
      - (c) **Cancel Follow-Up**: Cancels the follow-up reminder, clears `follow_up_date` in the database across reservations and prescriptions via atomic `PATCH /api/prescriptions` & `PATCH /api/reservations`, and dismisses the reminder with instant real-time event broadcasting.
 
+---
+
+## DEC-058: Modernized Patient Profile Financial Summary Header & Dynamic Staff Shift Schedule Engine
+
+**Date:** 2026-09-18
+**Status:** Decided & Implemented
+
+**Context:**
+1. In the Patient Profile Drawer (`CustomerProfileDrawer.tsx`), the top header only displayed a basic avatar and name, lacking quick financial visibility when inspecting a patient's file.
+2. In Employee Profiles (`UserProfileView.tsx` & `AdminEmployeesView.tsx`), the weekly schedule view previously rendered the fallback 09:00 AM - 05:00 PM schedule for every account because `loadExtraDetails()` encountered Postgres UUID parsing errors on non-UUID identifiers, and shift parser/display templates hardcoded 9-5 hours for non-night shifts.
+
+**Decisions & Implementation:**
+1. **Modernized 2-Column Patient Profile Header Card:**
+   - Redesigned `CustomerProfileDrawer.tsx` top hero banner into a responsive 2-column layout:
+     - **Left Column**: Large rounded avatar with initials/image, bottom-right camera upload overlay button, remove photo button, Patient Full Name, live Active/Inactive account status badge, clickable Phone with icon, and Email with icon.
+     - **Center Divider**: Vertical subtle divider (`border-[#414E36]/10`) on desktop viewports.
+     - **Right Column (Financial Summary)**: "Financial Summary" heading with 3 distinct soft color-coded metric cards:
+       - **Total Spend** (`bg-[#F0FDF4] border-emerald-100`): Wallet icon, label with Info icon, bold amount `{spent} EGP`, subtitle "All time".
+       - **Wallet** (`bg-[#F0F9FF] border-sky-100`): Wallet icon, label with Info icon, bold amount `{wallet} EGP` in primary blue, subtitle "Available balance".
+       - **Outstanding** (`bg-[#FFF7ED] border-amber-100`): Credit card icon, label with Info icon, bold amount `{outstanding} EGP` in rose/amber, subtitle "Unpaid amount".
+   - Added complete English & Arabic translations in `translations.ts`.
+2. **Dynamic Staff Shift Schedule & Safe DB Resolution:**
+   - Sanitized `loadExtraDetails()` in `UserProfileView.tsx` to guard against invalid UUID syntax errors (`22P02`) when checking `id` vs `employee_id`, `email`, `phone`, and `name`.
+   - Enhanced `parseShiftStringToTimes` and `weeklyScheduleData` in `UserProfileView.tsx` to parse custom time ranges (e.g. `02:00 PM to 10:00 PM`, `14:00 - 22:00`, `10:00 AM – 06:00 PM`), morning, evening, night, day shifts, and structured DB weekday schedule trees without falling back to hardcoded 9-5.
+   - Replaced hardcoded `t.doctorSection.dayHours` checks in `AdminEmployeesView.tsx` (work tab & print profile) with dynamic formatting helpers (`formatEmployeeDisplayHours`, `formatEmployeeShiftTypeDetails`, `formatEmployeeBreakTime`).
+   - Improved `Profile` view employee matching in `src/app/admin/page.tsx` across email, ID, and employee_id.
+3. **Automated Diagnostic Test Verification:**
+   - Added test case `TC-063` ("Patient Profile Financial Summary & Staff Shifts Resolution Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).

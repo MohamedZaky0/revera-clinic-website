@@ -200,6 +200,30 @@ export default function AdminEmployeesView({
     setNewEmployeeShiftEnd(parsed.end);
   };
 
+  const formatEmployeeDisplayHours = (shiftStr?: string): string => {
+    if (!shiftStr || shiftStr === "Day") return t.doctorSection.dayHours;
+    if (shiftStr === "Night") return t.doctorSection.nightHours;
+    if (shiftStr.includes("to") || shiftStr.includes("–") || shiftStr.includes("-")) {
+      const parts = shiftStr.split(/\s*(?:to|–|-)\s*/i);
+      if (parts.length === 2 && parts[0] && parts[1]) {
+        return `${formatTime12Hour(parseTime12Hour(parts[0]))} - ${formatTime12Hour(parseTime12Hour(parts[1]))}`;
+      }
+    }
+    return shiftStr;
+  };
+
+  const formatEmployeeShiftTypeDetails = (shiftStr?: string): string => {
+    if (!shiftStr || shiftStr === "Day") return t.doctorSection.shiftTypeDetails(false);
+    if (shiftStr === "Night") return t.doctorSection.shiftTypeDetails(true);
+    return shiftStr;
+  };
+
+  const formatEmployeeBreakTime = (shiftStr?: string): string => {
+    if (!shiftStr || shiftStr === "Day") return t.doctorSection.dayBreak;
+    if (shiftStr === "Night") return t.doctorSection.nightBreak;
+    return "01:00 PM - 02:00 PM";
+  };
+
   const computeShiftSummary = (workingDays: Record<string, { isOpen: boolean; start: string; end: string; shifts?: Array<{ start: string; end: string }> }>): string => {
     if (!workingDays || typeof workingDays !== 'object') return "Day";
     const openDays = Object.values(workingDays).filter(d => d && d.isOpen);
@@ -794,20 +818,20 @@ export default function AdminEmployeesView({
               <div class="value">${t.profile.shiftLabel(emp.shift)}</div>
             </div>
             <div>
-              <div class="label">{t.profile.shiftDetails}</div>
-              <div class="value">${t.doctorSection.shiftTypeDetails(emp.shift === "Night")}</div>
+              <div class="label">${t.profile.shiftDetails}</div>
+              <div class="value">${formatEmployeeShiftTypeDetails(emp.shift)}</div>
             </div>
             <div>
-              <div class="label">{t.profile.workingDays}</div>
+              <div class="label">${t.profile.workingDays}</div>
               <div class="value">${t.profile.workingDaysDefault}</div>
             </div>
             <div>
-              <div class="label">{t.profile.workingHours}</div>
-              <div class="value">${emp.shift === "Night" ? t.doctorSection.nightHours : t.doctorSection.dayHours}</div>
+              <div class="label">${t.profile.workingHours}</div>
+              <div class="value">${formatEmployeeDisplayHours(emp.shift)}</div>
             </div>
             <div>
-              <div class="label">{t.profile.breakTime}</div>
-              <div class="value">${emp.shift === "Night" ? t.doctorSection.nightBreak : t.doctorSection.dayBreak}</div>
+              <div class="label">${t.profile.breakTime}</div>
+              <div class="value">${formatEmployeeBreakTime(emp.shift)}</div>
             </div>
             <div>
               <div class="label">{t.profile.monthlySalary}</div>
@@ -2809,19 +2833,19 @@ export default function AdminEmployeesView({
                   <div>
                     <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.shiftDetails}</span>
                     <span className="font-semibold text-[#1F251A]">
-                      {t.doctorSection.shiftTypeDetails(viewingEmployee.shift === "Night")}
+                      {formatEmployeeShiftTypeDetails(viewingEmployee.shift)}
                     </span>
                   </div>
                   <div>
                     <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.workingHours}</span>
                     <span className="font-semibold text-[#1F251A]">
-                      {viewingEmployee.shift === "Night" ? t.doctorSection.nightHours : t.doctorSection.dayHours}
+                      {formatEmployeeDisplayHours(viewingEmployee.shift)}
                     </span>
                   </div>
                   <div>
                     <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.breakTime}</span>
                     <span className="font-semibold text-[#1F251A]">
-                      {viewingEmployee.shift === "Night" ? t.doctorSection.nightBreak : t.doctorSection.dayBreak}
+                      {formatEmployeeBreakTime(viewingEmployee.shift)}
                     </span>
                   </div>
                   <div>

@@ -2369,7 +2369,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-059', name: 'Doctor View Real-time Started Session Detection & Synchronization Engine', category: 'Doctor & Clinical', endpoint: '/api/reservations', description: 'Verifies reservation doctor query filtering with provider_id and doctor_name, starting session status transitions, and real-time active session propagation.', status: 'idle' },
     { id: 'TC-060', name: 'Doctor Prescription Follow-Up & Reception Reminders Engine', category: 'Doctor & Clinical', endpoint: '/api/prescriptions', description: 'Verifies prescription follow-up date and clinical instructions recording, reception calendar follow-up reminders aggregation, WhatsApp reminder deep link generation, and 1-click booking conversion.', status: 'idle' },
     { id: 'TC-061', name: 'Reception Follow-Up Lead Time, Rescheduling & Action Suite Engine', category: 'Services & Bookings', endpoint: '/api/page-settings', description: 'Verifies configurable follow-up reminder lead days in booking settings, early alert banner rendering, 1-click pre-filled booking conversion, and follow-up management modal with reminder date rescheduling and atomic cancellation.', status: 'idle' },
-    { id: 'TC-062', name: 'Doctor Portal Clinical Session & Data Isolation Verification Engine', category: 'Doctor & Clinical', endpoint: '/api/reservations', description: 'Verifies strict doctor reservation matching, provider UUID resolution, real-time ongoing session status management, queue-based treatment activation, and prescription deduplication.', status: 'idle' }
+    { id: 'TC-062', name: 'Doctor Portal Clinical Session & Data Isolation Verification Engine', category: 'Doctor & Clinical', endpoint: '/api/reservations', description: 'Verifies strict doctor reservation matching, provider UUID resolution, real-time ongoing session status management, queue-based treatment activation, and prescription deduplication.', status: 'idle' },
+    { id: 'TC-063', name: 'Patient Profile Financial Summary & Staff Shifts Resolution Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies the redesigned patient profile header card with 3-metric financial summary (total spend, wallet, outstanding) and dynamic employee shift resolution without 9-5 hardcoding.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -6650,16 +6651,23 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           {/* ── SETTINGS VIEWS ── */}
           {activeNav === "Profile" && (() => {
             const isSuperadminBypass = adminRole === "superadmin";
-            const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+            const profileEmployee = employeesList.find(emp => 
+              (emp.email && adminEmail && emp.email.toLowerCase() === adminEmail.toLowerCase()) ||
+              (emp.id && adminDbId && emp.id === adminDbId) ||
+              (emp.employee_id && adminEmployeeId && emp.employee_id === adminEmployeeId) ||
+              (emp.name && profileName && emp.name.trim().toLowerCase() === profileName.trim().toLowerCase())
+            );
             const matchProv = providers.find(p => 
               (profileEmployee?.name && p.name && p.name.trim().toLowerCase() === profileEmployee.name.trim().toLowerCase()) ||
               (profileEmployee?.phone && p.phone && p.phone === profileEmployee.phone) ||
               (profileEmployee?.id && p.id === profileEmployee.id) ||
-              (profileName && p.name && p.name.trim().toLowerCase() === profileName.trim().toLowerCase())
+              (profileName && p.name && p.name.trim().toLowerCase() === profileName.trim().toLowerCase()) ||
+              (adminEmail && p.email && p.email.toLowerCase() === adminEmail.toLowerCase())
             );
             const currentBranchName = branches.find(b => b.id === branch)?.name_en || "New Cairo Branch";
             const effectiveWorkingDaysHours = matchProv?.working_days_hours || profileEmployee?.working_days_hours || null;
             const effectiveShift = profileEmployee?.shift || matchProv?.shift || (matchProv?.working_days_hours ? "Multi-Shift Schedule" : "Day");
+            const effectiveWorkingHours = profileEmployee?.working_hours || (profileEmployee?.shift && profileEmployee.shift !== "Day" && profileEmployee.shift !== "Night" ? profileEmployee.shift : null);
 
             return (
               <UserProfileView
@@ -6682,7 +6690,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     : "July 21, 2026",
                   shiftType: effectiveShift,
                   workingDays: profileEmployee?.working_days || null,
-                  workingHours: profileEmployee?.working_hours || null,
+                  workingHours: effectiveWorkingHours,
                   workingDaysHours: effectiveWorkingDaysHours,
                   basicSalary: Number(profileEmployee?.salary || matchProv?.fixed_salary || matchProv?.salary || 0),
                   bonuses: Number(profileEmployee?.bonus || 0),

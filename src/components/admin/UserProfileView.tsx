@@ -188,27 +188,46 @@ export default function UserProfileView({
     async function loadExtraDetails() {
       try {
         const email = user.email?.trim().toLowerCase();
-        const userId = user.id;
+        const userId = user.id?.trim();
         const phone = user.phone?.trim();
         const name = user.name?.trim();
+        const isUUID = !!(userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId));
 
         if (email || userId || phone || name) {
-          const empQuery = supabase.from("employee_accounts").select("*");
-          if (userId && userId !== "my-profile" && !userId.includes("@")) {
-            empQuery.or(`id.eq.${userId},employee_id.eq.${userId},email.eq.${email || 'none'}`);
-          } else if (email) {
-            empQuery.eq("email", email);
+          // 1. Employee query (try email, UUID id, employee_id, and phone safely)
+          let empData = null;
+          if (email) {
+            const { data } = await supabase.from("employee_accounts").select("*").eq("email", email).maybeSingle();
+            if (data) empData = data;
           }
-          const { data: empData } = await empQuery.maybeSingle();
+          if (!empData && isUUID) {
+            const { data } = await supabase.from("employee_accounts").select("*").eq("id", userId).maybeSingle();
+            if (data) empData = data;
+          }
+          if (!empData && userId && userId !== "my-profile" && !userId.includes("@")) {
+            const { data } = await supabase.from("employee_accounts").select("*").eq("employee_id", userId).maybeSingle();
+            if (data) empData = data;
+          }
+          if (!empData && phone) {
+            const { data } = await supabase.from("employee_accounts").select("*").eq("phone", phone).maybeSingle();
+            if (data) empData = data;
+          }
           if (empData) setFetchedEmployee(empData);
 
-          const provQuery = supabase.from("providers").select("*");
-          if (userId && userId !== "my-profile" && !userId.includes("@")) {
-            provQuery.or(`id.eq.${userId},phone.eq.${phone || 'none'},name.ilike.%${name || 'none'}%`);
-          } else if (phone || name) {
-            provQuery.or(`phone.eq.${phone || 'none'},name.ilike.%${name || 'none'}%`);
+          // 2. Provider query (try UUID id, phone, name safely)
+          let provData = null;
+          if (isUUID) {
+            const { data } = await supabase.from("providers").select("*").eq("id", userId).maybeSingle();
+            if (data) provData = data;
           }
-          const { data: provData } = await provQuery.maybeSingle();
+          if (!provData && phone) {
+            const { data } = await supabase.from("providers").select("*").eq("phone", phone).maybeSingle();
+            if (data) provData = data;
+          }
+          if (!provData && name && name !== "Employee Account" && name !== "zaki") {
+            const { data } = await supabase.from("providers").select("*").ilike("name", `%${name}%`).maybeSingle();
+            if (data) provData = data;
+          }
           if (provData) setFetchedProvider(provData);
         }
       } catch (err) {
@@ -425,34 +444,47 @@ export default function UserProfileView({
       try { parsed = JSON.parse(parsed); } catch (e) {}
     }
 
-    const shiftStr = user.shiftType || fetchedEmployee?.shift || fetchedProvider?.shift || "";
+    const shiftStr = user.shiftType || user.workingHours || fetchedEmployee?.shift || fetchedProvider?.shift || "";
 
     const parseShiftStringToTimes = (str: string): { start: string; end: string; formatted: string; duration: number } | null => {
       if (!str) return null;
       const clean = str.trim();
       const lower = clean.toLowerCase();
 
-      if (lower === "day" || lower === "نهار" || lower === "صباحي" || lower === "day shift") {
-        const startF = formatTime12Hour("09:00", lang);
-        const endF = formatTime12Hour("17:00", lang);
-        return { start: "09:00", end: "17:00", formatted: `${startF} – ${endF}`, duration: 8 };
+      // Check if time range exists inside the string first (e.g. "10:00 AM to 06:00 PM", "14:00 - 22:00", "Night Shift (08:00 PM – 04:00 AM, 8h)")
+      const timeRangeRegex = /(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm|ص|م)?)\s*(?:to|–|-|إلى)\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm|ص|م)?)/i;
+      const match = clean.match(timeRangeRegex);
+      if (match && match[1] && match[2] && (clean.includes(":") || match[1].includes("AM") || match[1].includes("PM") || match[1].includes("ص") || match[1].includes("م"))) {
+        const rawStart = match[1].trim();
+        const rawEnd = match[2].trim();
+        const startF = formatTime12Hour(rawStart, lang);
+        const endF = formatTime12Hour(rawEnd, lang);
+        const duration = calcShiftHours(rawStart, rawEnd);
+        return { start: rawStart, end: rawEnd, formatted: `${startF} – ${endF}`, duration: duration || 8 };
       }
 
-      if (lower === "night" || lower === "ليل" || lower === "مسائي" || lower === "night shift") {
+      if (lower === "night" || lower === "ليل" || lower === "مسائي" || lower === "night shift" || lower.startsWith("night shift")) {
         const startF = formatTime12Hour("20:00", lang);
         const endF = formatTime12Hour("04:00", lang);
         return { start: "20:00", end: "04:00", formatted: `${startF} – ${endF}`, duration: 8 };
       }
 
-      if (lower.includes("to") || clean.includes("–") || clean.includes("-")) {
-        const sep = lower.includes("to") ? /to/i : /[–-]/;
-        const parts = clean.split(sep).map(s => s.trim());
-        if (parts.length === 2 && parts[0] && parts[1]) {
-          const startF = formatTime12Hour(parts[0], lang);
-          const endF = formatTime12Hour(parts[1], lang);
-          const duration = calcShiftHours(parts[0], parts[1]);
-          return { start: parts[0], end: parts[1], formatted: `${startF} – ${endF}`, duration: duration || 8 };
-        }
+      if (lower === "morning" || lower === "morning shift" || lower === "صباح") {
+        const startF = formatTime12Hour("08:00", lang);
+        const endF = formatTime12Hour("16:00", lang);
+        return { start: "08:00", end: "16:00", formatted: `${startF} – ${endF}`, duration: 8 };
+      }
+
+      if (lower === "evening" || lower === "evening shift" || lower === "مساء") {
+        const startF = formatTime12Hour("16:00", lang);
+        const endF = formatTime12Hour("00:00", lang);
+        return { start: "16:00", end: "00:00", formatted: `${startF} – ${endF}`, duration: 8 };
+      }
+
+      if (lower === "day" || lower === "نهار" || lower === "صباحي" || lower === "day shift" || lower.startsWith("day shift")) {
+        const startF = formatTime12Hour("09:00", lang);
+        const endF = formatTime12Hour("17:00", lang);
+        return { start: "09:00", end: "17:00", formatted: `${startF} – ${endF}`, duration: 8 };
       }
 
       return null;
@@ -627,13 +659,24 @@ export default function UserProfileView({
       ? Array.from(allDistinctHours).join(" | ")
       : resolvedShift.formatted;
 
-    let shiftType = user.shiftType || fetchedEmployee?.shift || "Day";
+    const rawShiftName = user.shiftType || fetchedEmployee?.shift || fetchedProvider?.shift || "Day";
+    let shiftType = rawShiftName;
     if (allDistinctHours.size > 1) {
       shiftType = tr?.shiftTypes?.multiShift || (lang === "ar" ? "جدول متعدد الورديات" : "Multi-Shift Schedule");
-    } else if (shiftType === "Day" || !shiftType) {
-      shiftType = tr?.shiftTypes?.day || (lang === "ar" ? "وردية نهارية" : "Day Shift");
-    } else if (shiftType === "Night") {
-      shiftType = tr?.shiftTypes?.night || (lang === "ar" ? "وردية مسائية" : "Night Shift");
+    } else if (rawShiftName.toLowerCase().includes("night") || rawShiftName.toLowerCase().includes("ليل") || rawShiftName.toLowerCase().includes("مسائي")) {
+      const hoursLabel = resolvedShift ? ` (${resolvedShift.formatted}, ${resolvedShift.duration}h)` : "";
+      shiftType = (tr?.shiftTypes?.night || (lang === "ar" ? "وردية مسائية" : "Night Shift")) + hoursLabel;
+    } else if (rawShiftName.toLowerCase().includes("morning") || rawShiftName.toLowerCase().includes("صباح")) {
+      const hoursLabel = resolvedShift ? ` (${resolvedShift.formatted}, ${resolvedShift.duration}h)` : "";
+      shiftType = (tr?.shiftTypes?.morning || (lang === "ar" ? "وردية صباحية" : "Morning Shift")) + hoursLabel;
+    } else if (rawShiftName.toLowerCase().includes("evening") || rawShiftName.toLowerCase().includes("مساء")) {
+      const hoursLabel = resolvedShift ? ` (${resolvedShift.formatted}, ${resolvedShift.duration}h)` : "";
+      shiftType = (tr?.shiftTypes?.evening || (lang === "ar" ? "وردية مسائية" : "Evening Shift")) + hoursLabel;
+    } else if (rawShiftName.toLowerCase() === "day" || rawShiftName.toLowerCase() === "day shift" || rawShiftName === "نهار") {
+      const hoursLabel = resolvedShift ? ` (${resolvedShift.formatted}, ${resolvedShift.duration}h)` : "";
+      shiftType = (tr?.shiftTypes?.day || (lang === "ar" ? "وردية نهارية" : "Day Shift")) + hoursLabel;
+    } else if (resolvedShift) {
+      shiftType = `${resolvedShift.formatted} (${resolvedShift.duration}h)`;
     }
 
     return {
