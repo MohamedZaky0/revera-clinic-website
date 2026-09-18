@@ -2043,9 +2043,10 @@ The clinic reception dashboard required dynamic responsiveness to shift state (N
 3. **API Route Follow-Up Mutation Fix:**
    - Updated `PATCH /api/reservations` to gracefully process direct `followUpDate`, `follow_up_date`, and `follow_up_notes` updates without failing validation.
    - Added automatic synchronization of `follow_up_date` to `reservations` table on every prescription creation in `POST /api/prescriptions`.
-4. **Calendar Follow-Up Dot Isolation & Warning Light On/Off Blink:**
+4. **Calendar Follow-Up Dot Isolation, Warning Light Blink & Status Color Differentiation:**
    - Rendered calendar warning dots strictly on the actual `followUpDate` rather than lead reminder dates.
-   - Refined follow-up calendar dots to match the exact size of standard status indicator dots (`h-1.5 w-1.5 rounded-full`, 6px) without blurry shadows or halo rings, animated with a crisp warning light on/off blinking cycle (`.animate-warning-light` keyframe animation) so it clearly signals an alert by appearing and disappearing like a warning light switched on and off.
+   - Refined follow-up calendar dots to match the exact size of standard status indicator dots (`h-1.5 w-1.5 rounded-full`, 6px) without blurry shadows or halo rings, animated on the calendar day cells with a crisp warning light on/off blinking cycle (`.animate-warning-light` keyframe animation), while the legend circle remains solid and steady without turning on and off.
+   - Updated the `Postponed` appointment status color across calendar dots, tables, badges, and legend to distinct yellow (`#EAB308`, `bg-yellow-50 text-yellow-800`), completely eliminating color collisions with the indigo Follow-Up Reminder markers.
 5. **Interactive Follow-Up Management Action Suite:**
    - Upgraded `+ Convert to Full Booking` on follow-up reminder cards to open an interactive modal (`FollowUpActionModal`) providing 3 explicit choices:
      - (a) **Book on Target Date**: Converts and opens New Booking pre-populated on the doctor's recommended date.

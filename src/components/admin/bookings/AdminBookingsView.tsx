@@ -995,7 +995,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       else if (st === "checked_in") color = "#3B82F6"; // blue
       else if (st === "in_progress" || st === "started") color = "#A855F7"; // purple
       else if (st === "completed") color = "#0D9488"; // teal
-      else if (st === "postponed" || st === "rescheduled") color = "#6366F1"; // indigo
+      else if (st === "postponed" || st === "rescheduled") color = "#EAB308"; // yellow
       else if (st === "canceled" || st === "cancelled" || st === "rejected") color = "#EF4444"; // red
       else if (st === "no_show") color = "#6B7280"; // gray
 
@@ -1044,7 +1044,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         return { label: tr.statusLabels.completed, bg: "bg-teal-50", text: "text-teal-700", dot: "bg-teal-500", border: "border-l-teal-500" };
       case "postponed":
       case "rescheduled":
-        return { label: tr.statusLabels.postponed, bg: "bg-indigo-50", text: "text-indigo-700", dot: "bg-indigo-500", border: "border-l-indigo-500" };
+        return { label: tr.statusLabels.postponed, bg: "bg-yellow-50", text: "text-yellow-800", dot: "bg-yellow-500", border: "border-l-yellow-500" };
       case "canceled":
       case "cancelled":
       case "rejected":
@@ -2072,7 +2072,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     { color: "#3B82F6", label: tr.statusLabels.checkedIn },
                     { color: "#A855F7", label: tr.statusLabels.inProgress },
                     { color: "#0D9488", label: tr.statusLabels.completed },
-                    { color: "#6366F1", label: tr.statusLabels.postponed },
+                    { color: "#EAB308", label: tr.statusLabels.postponed },
                     { color: "#EF4444", label: tr.statusLabels.canceled },
                     { color: "#6B7280", label: tr.statusLabels.noShow },
                   ].map(({ color, label }) => (
@@ -2082,7 +2082,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     </div>
                   ))}
                   <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-[#6366F1] animate-warning-light" />
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-[#6366F1]" />
                     <span>{tr.followUpBadge || "Follow-Up Reminder"}</span>
                   </div>
                 </div>
