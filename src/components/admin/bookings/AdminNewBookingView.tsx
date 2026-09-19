@@ -22,7 +22,8 @@ import {
   AlertCircle,
   MapPin,
   Wallet,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { adminTranslations } from "@/components/admin/translations";
@@ -242,9 +243,14 @@ export default function AdminNewBookingView({
   const [sameAsPhone, setSameAsPhone] = useState(true);
   const [formErrors, setFormErrors] = useState<{ phone?: boolean; firstName?: boolean; service?: boolean; doctor?: boolean; time?: boolean }>({});
 
-  // Customer Lookup state
+  // Customer Lookup & Packages state
   const [patientFound, setPatientFound] = useState<boolean | null>(null);
   const [foundCustomer, setFoundCustomer] = useState<CustomerItem | null>(null);
+  const [customerPackages, setCustomerPackages] = useState<any[]>([]);
+  const [loadingPackages, setLoadingPackages] = useState(false);
+  const [selectedPackageId, setSelectedPackageId] = useState<string>("");
+  const [selectedPackageItemId, setSelectedPackageItemId] = useState<string>("");
+  const [usePackagePayment, setUsePackagePayment] = useState(false);
   const [activePackage, setActivePackage] = useState<any>(null);
   const [usePackageMode, setUsePackageMode] = useState(false);
 
@@ -606,33 +612,108 @@ export default function AdminNewBookingView({
     }
 
     // Fetch active packages for this customer
+    if (cust.id) {
+      await loadCustomerPackages(cust.id);
+    } else {
+      setCustomerPackages([]);
+      setActivePackage(null);
+    }
+  }
+
+  // Fetch active packages for a customer with joined items and services
+  async function loadCustomerPackages(custId: string) {
+    if (!custId) {
+      setCustomerPackages([]);
+      setActivePackage(null);
+      return;
+    }
+    setLoadingPackages(true);
     try {
-      const { data: pkgData } = await supabase
+      const { data: pkgData, error: pkgErr } = await supabase
         .from("customer_packages")
-        .select("*, customer_package_items(*)")
-        .eq("customer_id", cust.id)
-        .eq("status", "active");
+        .select(`
+          id, package_id, status, purchased_at, expires_at, price_paid,
+          packages ( name, name_ar ),
+          customer_package_items ( id, service_id, qty_total, qty_used, qty_remaining, services ( en, ar ) )
+        `)
+        .eq("customer_id", custId)
+        .eq("status", "active")
+        .order("purchased_at", { ascending: false });
 
       if (pkgData && pkgData.length > 0) {
-        const firstPkg = pkgData[0];
-        const items = firstPkg.customer_package_items || [];
-        const totalRemaining = items.reduce((sum: number, it: any) => sum + (it.qty_remaining || 0), 0);
+        const normalizedPkgs = pkgData.map((row: any) => ({
+          id: row.id,
+          packageId: row.package_id,
+          packageName: row.packages?.name || row.package_name || "Session Package",
+          packageNameAr: row.packages?.name_ar || null,
+          status: row.status,
+          purchasedAt: row.purchased_at,
+          expiresAt: row.expires_at,
+          pricePaid: Number(row.price_paid || 0),
+          items: (row.customer_package_items || []).map((it: any) => ({
+            id: it.id,
+            serviceId: Number(it.service_id),
+            serviceName: it.services?.en || "Service",
+            serviceNameAr: it.services?.ar || null,
+            qtyTotal: Number(it.qty_total || 0),
+            qtyUsed: Number(it.qty_used || 0),
+            qtyRemaining: Number(it.qty_remaining || 0),
+          }))
+        }));
+        setCustomerPackages(normalizedPkgs);
+
+        // Populate legacy activePackage for backward compatibility
+        const firstPkg = normalizedPkgs[0];
+        const totalRemaining = (firstPkg.items || []).reduce((sum: number, it: any) => sum + (it.qtyRemaining || 0), 0);
         if (totalRemaining > 0) {
           setActivePackage({
-            name: firstPkg.package_name || "Session Package",
+            name: (lang === "ar" && firstPkg.packageNameAr) ? firstPkg.packageNameAr : firstPkg.packageName,
             remaining: totalRemaining,
-            expiresOn: firstPkg.expires_at ? new Date(firstPkg.expires_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"
+            expiresOn: firstPkg.expiresAt ? new Date(firstPkg.expiresAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"
           });
         } else {
           setActivePackage(null);
         }
       } else {
+        setCustomerPackages([]);
         setActivePackage(null);
       }
     } catch (e) {
       console.error("Error loading customer package:", e);
+      setCustomerPackages([]);
+      setActivePackage(null);
+    } finally {
+      setLoadingPackages(false);
     }
   }
+
+  // Matching active package item for currently selected service
+  const { matchingPackage, matchingPackageItem } = useMemo(() => {
+    if (!selectedServiceId || customerPackages.length === 0) {
+      return { matchingPackage: null, matchingPackageItem: null };
+    }
+    for (const pkg of customerPackages) {
+      const it = (pkg.items || []).find((item: any) => String(item.serviceId) === String(selectedServiceId) && item.qtyRemaining > 0);
+      if (it) return { matchingPackage: pkg, matchingPackageItem: it };
+    }
+    for (const pkg of customerPackages) {
+      const it = (pkg.items || []).find((item: any) => String(item.serviceId) === String(selectedServiceId));
+      if (it) return { matchingPackage: pkg, matchingPackageItem: it };
+    }
+    return { matchingPackage: null, matchingPackageItem: null };
+  }, [selectedServiceId, customerPackages]);
+
+  // Auto-reset package payment if selected service is no longer covered
+  useEffect(() => {
+    if (usePackagePayment) {
+      if (!matchingPackageItem || matchingPackageItem.qtyRemaining <= 0) {
+        setUsePackagePayment(false);
+        setSelectedPackageItemId("");
+        setSelectedPackageId("");
+        setCustomBookingValue(null);
+      }
+    }
+  }, [selectedServiceId, matchingPackageItem, usePackagePayment]);
 
   const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
   const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
@@ -817,11 +898,12 @@ export default function AdminNewBookingView({
 
   const fullPatientName = `${firstName} ${lastName}`.trim() || "Patient Name";
 
+  const isPackageCovered = Boolean(usePackagePayment || usePackageMode);
   const baseServicePrice = Number(selectedServiceObj?.price || 0);
-  const autoBookingValue = baseServicePrice * Math.max(1, selectedTimes.length);
-  const bookingValue = customBookingValue !== null && customBookingValue !== undefined ? Number(customBookingValue) : autoBookingValue;
-  const numAmountPaid = typeof amountPaidNow === "number" ? amountPaidNow : 0;
-  const remainingValue = bookingValue - numAmountPaid;
+  const autoBookingValue = isPackageCovered ? 0 : baseServicePrice * Math.max(1, selectedTimes.length);
+  const bookingValue = isPackageCovered ? 0 : (customBookingValue !== null && customBookingValue !== undefined ? Number(customBookingValue) : autoBookingValue);
+  const numAmountPaid = isPackageCovered ? 0 : (typeof amountPaidNow === "number" ? amountPaidNow : 0);
+  const remainingValue = isPackageCovered ? 0 : bookingValue - numAmountPaid;
   const selectedTime = selectedTimes[0] || "";
   const totalDurationMinutes = getServiceDurationMinutes(selectedServiceObj);
   const requiredSlotCount = Math.max(1, Math.ceil(totalDurationMinutes / 15));
@@ -932,6 +1014,10 @@ export default function AdminNewBookingView({
         }
       }
 
+      const packageNote = (usePackagePayment && matchingPackage && matchingPackageItem)
+        ? `\n[Package Redemption]: ${(lang === "ar" && matchingPackage.packageNameAr) ? matchingPackage.packageNameAr : matchingPackage.packageName} - ${selectedServiceName} (Item ID: ${matchingPackageItem.id})`
+        : "";
+
       const payload = {
         name: fullPatientName,
         phone: phone,
@@ -943,7 +1029,7 @@ export default function AdminNewBookingView({
         date: bookingDate,
         requestedTime: selectedTime,
         sessionType: sessionType === "in_person" ? "in_person" : "online",
-        notes: notes || null,
+        notes: (notes ? notes + packageNote : packageNote.trim()) || null,
         isManual: true,
         status: "approved",
         explicitCustomerId: resolvedCustomerId,
@@ -1008,10 +1094,10 @@ export default function AdminNewBookingView({
       </div>
 
       {/* ── MAIN FORM & LAYOUT ── */}
-      <div className={activePackage ? "grid grid-cols-1 lg:grid-cols-3 gap-6" : "space-y-6"}>
+      <div className="space-y-6">
 
         {/* MAIN FORM */}
-        <div className={activePackage ? "lg:col-span-2 space-y-6" : "space-y-6"}>
+        <div className="space-y-6">
 
           {/* CARD 1: PATIENT INFORMATION */}
           <div className="bg-white rounded-3xl p-4 sm:p-6 md:p-8 border border-[#414E36]/10 shadow-xs space-y-6 relative z-30">
@@ -1493,6 +1579,218 @@ export default function AdminNewBookingView({
                 </div>
               </div>
 
+              {/* ── CUSTOMER PACKAGES & SUBSCRIPTIONS SECTION ── */}
+              <div className="pt-1 pb-1">
+                {!foundCustomer && !phone ? (
+                  <div className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 text-xs text-[#5A6A51]">
+                    <Package size={16} className="shrink-0 text-[#8B9882]" />
+                    <span className="font-medium">
+                      {tr.selectPatientForPackagesHint || "Select or enter a patient above to check available packages and session balances."}
+                    </span>
+                  </div>
+                ) : loadingPackages ? (
+                  <div className="flex items-center gap-2 p-4 rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 text-xs text-[#5A6A51]">
+                    <Loader2 size={16} className="animate-spin text-emerald-700" />
+                    <span>{tr.loading || "Checking patient packages..."}</span>
+                  </div>
+                ) : customerPackages.length === 0 ? (
+                  <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200/70 text-xs text-amber-900">
+                    <Package size={18} className="shrink-0 text-amber-600" />
+                    <div>
+                      <span className="font-black block">{tr.noPackagesFound || "No active packages found for this patient"}</span>
+                      <span className="text-[11px] text-amber-800/80 font-medium">
+                        {tr.noPackagesSub || "This patient does not currently have any active packages or prepaid session plans."}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3 rounded-2xl border border-emerald-800/20 bg-emerald-50/30 p-4">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-emerald-800/10 pb-2.5">
+                      <div className="flex items-center gap-2 text-emerald-900">
+                        <Package size={18} className="text-emerald-700" />
+                        <h4 className="font-black text-xs uppercase tracking-wider">
+                          {tr.packagesHeading || "Patient Packages & Subscriptions"}
+                        </h4>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        {customerPackages.length} {tr.activePackagesCount || "Active Package(s)"}
+                      </span>
+                    </div>
+
+                    {/* Packages List */}
+                    <div className="space-y-3">
+                      {customerPackages.map((pkg) => {
+                        const totalPkgRemaining = (pkg.items || []).reduce((sum: number, it: any) => sum + (it.qtyRemaining || 0), 0);
+                        const isServiceCoveredInThisPkg = (pkg.items || []).some(
+                          (it: any) => String(it.serviceId) === String(selectedServiceId) && it.qtyRemaining > 0
+                        );
+
+                        return (
+                          <div key={pkg.id} className="rounded-xl border border-[#414E36]/15 bg-white p-3.5 space-y-3 shadow-xs">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div>
+                                <h5 className="font-black text-xs text-[#1F251A]">
+                                  {(lang === "ar" && pkg.packageNameAr) ? pkg.packageNameAr : pkg.packageName}
+                                </h5>
+                                <p className="text-[10px] text-[#5A6A51] font-semibold mt-0.5">
+                                  {pkg.expiresAt ? `${tr.packageExpires || "Expires:"} ${new Date(pkg.expiresAt).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", { day: "2-digit", month: "short", year: "numeric" })}` : ""}
+                                </p>
+                              </div>
+                              <span className="text-xs font-black text-emerald-800 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200/60">
+                                {totalPkgRemaining} {totalPkgRemaining === 1 ? (tr.sessionRemainingBadge || "session left") : (tr.sessionsRemainingBadge || "sessions left")}
+                              </span>
+                            </div>
+
+                            {/* Included Services List */}
+                            <div className="space-y-1.5 pt-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">
+                                {tr.packageServicesCovered || "Included Services & Sessions:"}
+                              </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {(pkg.items || []).map((it: any) => {
+                                  const isSelected = String(it.serviceId) === String(selectedServiceId);
+                                  const svcName = (lang === "ar" && it.serviceNameAr) ? it.serviceNameAr : it.serviceName;
+
+                                  return (
+                                    <div
+                                      key={it.id}
+                                      onClick={() => {
+                                        if (!isSelected) {
+                                          setSelectedServiceId(String(it.serviceId));
+                                        }
+                                      }}
+                                      className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition ${
+                                        isSelected
+                                          ? "border-emerald-600 bg-emerald-50/80 ring-1 ring-emerald-600 text-emerald-900 font-bold"
+                                          : "border-gray-200 bg-gray-50/50 hover:bg-white text-[#1F251A]"
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-1.5 truncate">
+                                        {isSelected ? (
+                                          <Check size={13} className="text-emerald-700 shrink-0" />
+                                        ) : (
+                                          <Sparkles size={13} className="text-[#8B9882] shrink-0" />
+                                        )}
+                                        <span className="truncate">{svcName}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                          it.qtyRemaining > 0 ? "bg-emerald-100 text-emerald-800" : "bg-gray-200 text-gray-600"
+                                        }`}>
+                                          {it.qtyRemaining} / {it.qtyTotal}
+                                        </span>
+                                        {isSelected && (
+                                          <span className="text-[9px] font-black uppercase text-emerald-800 bg-white px-1.5 py-0.5 rounded border border-emerald-300">
+                                            {tr.currentlySelectedService || "Selected"}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Pay with Package Checkbox / Option */}
+                            {matchingPackageItem && matchingPackageItem.qtyRemaining > 0 && matchingPackage?.id === pkg.id ? (
+                              <div className="pt-2 border-t border-[#414E36]/10">
+                                <label
+                                  onClick={() => {
+                                    const next = !usePackagePayment;
+                                    setUsePackagePayment(next);
+                                    if (next) {
+                                      setSelectedPackageId(pkg.id);
+                                      setSelectedPackageItemId(matchingPackageItem.id);
+                                      setCustomBookingValue(0);
+                                      setAmountPaidNow(0);
+                                    } else {
+                                      setSelectedPackageId("");
+                                      setSelectedPackageItemId("");
+                                      setCustomBookingValue(null);
+                                      setAmountPaidNow("");
+                                    }
+                                  }}
+                                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                                    usePackagePayment
+                                      ? "border-emerald-600 bg-emerald-100/60 ring-1 ring-emerald-600"
+                                      : "border-gray-200 bg-[#FBFBF9] hover:bg-emerald-50/40"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={usePackagePayment}
+                                    onChange={(e) => {
+                                      const next = e.target.checked;
+                                      setUsePackagePayment(next);
+                                      if (next) {
+                                        setSelectedPackageId(pkg.id);
+                                        setSelectedPackageItemId(matchingPackageItem.id);
+                                        setCustomBookingValue(0);
+                                        setAmountPaidNow(0);
+                                      } else {
+                                        setSelectedPackageId("");
+                                        setSelectedPackageItemId("");
+                                        setCustomBookingValue(null);
+                                        setAmountPaidNow("");
+                                      }
+                                    }}
+                                    className="mt-0.5 h-4 w-4 rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
+                                  />
+                                  <div className="space-y-0.5 flex-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-black text-xs text-emerald-950">
+                                        {tr.payWithPackageOption || "Pay with Package Session"}
+                                      </span>
+                                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-700 text-white">
+                                        0 EGP
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-emerald-900/80 font-medium">
+                                      {tr.payWithPackageDesc || "Redeem 1 session from patient's package for this appointment (0 EGP to pay)"}
+                                    </p>
+                                    {usePackagePayment && (
+                                      <p className="text-[10px] text-emerald-800 font-bold pt-1 flex items-center gap-1">
+                                        <CheckCircle2 size={12} className="text-emerald-700 shrink-0" />
+                                        <span>{tr.packageDeductionNote || "1 session will be deducted from package upon appointment completion"}</span>
+                                      </p>
+                                    )}
+                                  </div>
+                                </label>
+                              </div>
+                            ) : !isServiceCoveredInThisPkg ? (
+                              <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 text-[11px] text-amber-900 flex items-start gap-2">
+                                <AlertCircle size={14} className="text-amber-600 mt-0.5 shrink-0" />
+                                <div>
+                                  <span className="font-bold">
+                                    {tr.serviceNotCoveredInPackage || "Selected service is not covered in this package"}
+                                  </span>
+                                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                                    <span className="text-[10px] text-[#5A6A51] font-semibold">
+                                      {tr.switchToCoveredService || "Switch to a covered service:"}
+                                    </span>
+                                    {(pkg.items || []).filter((it: any) => it.qtyRemaining > 0).map((it: any) => (
+                                      <button
+                                        key={it.id}
+                                        type="button"
+                                        onClick={() => setSelectedServiceId(String(it.serviceId))}
+                                        className="text-[10px] font-bold text-emerald-800 bg-white hover:bg-emerald-100/60 px-2 py-0.5 rounded-md border border-emerald-300 transition cursor-pointer"
+                                      >
+                                        + {(lang === "ar" && it.serviceNameAr) ? it.serviceNameAr : it.serviceName} ({it.qtyRemaining})
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* ── 1. AVAILABLE TIME (MULTI-SLOT SELECTION) ── */}
               <div>
                 <label className="block font-bold text-[#1F251A] mb-2">{tr.availableTimeLabel}</label>
@@ -1758,44 +2056,6 @@ export default function AdminNewBookingView({
 
         </div>
 
-        {/* RIGHT COLUMN: ACTIVE PACKAGE (1/3 width, if active package exists) */}
-        {activePackage && (
-          <div className="space-y-6 relative z-10">
-            <div className="bg-white rounded-3xl p-6 border border-emerald-700/20 shadow-xs space-y-4">
-              <div className="flex items-center gap-2 text-emerald-800">
-                <Package size={18} />
-                <h3 className="font-extrabold text-sm">{tr.activePackageHeading}</h3>
-              </div>
-
-              <div className="bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 space-y-3">
-                <h4 className="font-extrabold text-xs text-[#1F251A]">{activePackage.name}</h4>
-                <div className="flex justify-between items-center text-[11px]">
-                  <div>
-                    <span className="text-[#5A6A51] block font-bold">{tr.remainingLabel}</span>
-                    <span className="font-black text-emerald-700 text-xs">{activePackage.remaining} {tr.sessionsSuffix}</span>
-                  </div>
-                  <div className="text-end">
-                    <span className="text-[#5A6A51] block font-bold">{tr.expiresOnLabel}</span>
-                    <span className="font-bold text-[#1F251A]">{activePackage.expiresOn}</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setUsePackageMode(!usePackageMode)}
-                  className={`w-full py-2.5 rounded-xl text-xs font-bold transition border ${
-                    usePackageMode
-                      ? "bg-emerald-700 text-white border-emerald-700"
-                      : "bg-white text-emerald-800 border-emerald-700/30 hover:bg-emerald-50"
-                  }`}
-                >
-                  {usePackageMode ? tr.packageAppliedLabel : tr.usePackageBtn}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
 
       {/* ── BOTTOM ACTIONS BAR ── */}
@@ -1893,10 +2153,27 @@ export default function AdminNewBookingView({
                 </span>
               </div>
 
-              {usePackageMode ? (
-                <div className="flex justify-between items-center pt-0.5 text-emerald-800 font-extrabold">
-                  <span>{tr.pricePaymentLabel}</span>
-                  <span>{tr.activePackagePriceLabel}</span>
+              {usePackagePayment || usePackageMode ? (
+                <div className="space-y-2 pt-1">
+                  <div className="flex justify-between items-center font-extrabold text-[#1F251A]">
+                    <span className="text-[#5A6A51] font-semibold">{tr.pricePaymentLabel}</span>
+                    <span className="text-emerald-800 font-extrabold flex items-center gap-1.5">
+                      <CheckCircle2 size={14} className="text-emerald-700" />
+                      <span>0 {tr.egpLabel} ({tr.paymentMethodPackage || "Package Redemption"})</span>
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-[#5A6A51] font-semibold">{tr.activePackageHeading || "Package"}</span>
+                    <span className="font-bold text-emerald-900">
+                      {matchingPackage ? ((lang === "ar" && matchingPackage.packageNameAr) ? matchingPackage.packageNameAr : matchingPackage.packageName) : (activePackage?.name || "Prepaid Package")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-[#414E36]/10 font-extrabold">
+                    <span className="text-[#5A6A51] font-semibold">{tr.remainingValueLabel || "Remaining Value"}</span>
+                    <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full">
+                      0 {tr.egpLabel} ({tr.fullySettledBadge || "Fully Settled"})
+                    </span>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2 pt-1">

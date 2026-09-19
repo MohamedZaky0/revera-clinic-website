@@ -2102,3 +2102,32 @@ Receptionists frequently need to assist doctors and patients at clinic front des
    - Added `+ Add Prescription` button in Card B of `BookingDetailsModal.tsx` when no prescription is recorded yet, opening `setShowDrawerPrescriptionModal(true)` directly.
 4. **Automated Diagnostic Test Verification:**
    - Added test case `TC-064` ("Receptionist Clinical Records & Prescription Access Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
+---
+
+## DEC-060: Customer Package Inspection & Session Redemption in New Booking View
+
+**Date:** 2026-09-19
+**Status:** Decided & Implemented
+
+**Context:**
+When staff create a new appointment in `AdminNewBookingView.tsx`, they need immediate visibility into whether the selected patient owns active prepaid session packages, which services and remaining sessions are covered, and the ability to pay for the booking using a package session (0 EGP to pay).
+
+**Decisions & Implementation:**
+1. **Interactive Package Inspection Card in Appointment Details (Section 2):**
+   - Embedded directly in Section 2 (`2 APPOINTMENT DETAILS`) of `AdminNewBookingView.tsx`:
+     - Displays patient package state in real time (`loadingPackages`, `noPackagesFound`, or active package cards).
+     - Renders package title, expiry date, and total sessions remaining badge.
+     - Lists all included services with `{qtyRemaining} / {qtyTotal}` session counts.
+     - Highlights the currently selected service and offers 1-click service switching for other covered services in the package.
+2. **Session Package Redemption Engine:**
+   - When the selected service matches an item with `qtyRemaining > 0` in the patient's active package:
+     - Displays a prominent "Pay with Package Session" toggle/checkbox.
+     - When activated: zeroes out financial totals (`bookingValue = 0`, `amountPaidNow = 0`, `remainingValue = 0`, marked as "Fully Settled").
+     - Records `[Package Redemption]: <Package Name> - <Service Name> (Item ID: <Item ID>)` into the reservation `notes`.
+     - In Booking Summary Confirmation Modal, clearly displays "0 EGP (Package Redemption)" with the package name.
+3. **Bilingual Parity:**
+   - Added all necessary keys in `adminTranslations` in `src/components/admin/translations.ts` for English and Arabic.
+4. **Automated Diagnostic Test Verification:**
+   - Added test case `TC-065` ("New Booking Customer Packages & Session Redemption Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
