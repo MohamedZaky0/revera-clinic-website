@@ -1043,7 +1043,7 @@ export default function AdminNewBookingView({
                   className="text-xs font-bold text-[#0F3826] hover:underline bg-[#EBF2EB] px-3 py-1.5 rounded-xl flex items-center gap-1 transition cursor-pointer"
                 >
                   <User size={13} />
-                  <span>{showAdditionalPatientFields ? "Hide Account Details" : "+ Patient Account Details"}</span>
+                  <span>{showAdditionalPatientFields ? (tr.hideAccountDetailsBtn || "Hide Account Details") : (tr.patientAccountDetailsBtn || "+ Patient Account Details")}</span>
                 </button>
               </div>
             </div>
@@ -1243,28 +1243,28 @@ export default function AdminNewBookingView({
                   {/* Row 1: Gender & National ID */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">Gender</label>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">{tr.genderLabel || "Gender"}</label>
                       <div className="relative">
                         <select
                           value={gender}
                           onChange={(e) => setGender(e.target.value)}
                           className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 appearance-none text-xs"
                         >
-                          <option value="">Select Gender</option>
-                          <option value="Female">Female</option>
-                          <option value="Male">Male</option>
+                          <option value="">{tr.selectGenderPlaceholder || "Select Gender"}</option>
+                          <option value="Female">{tr.genderFemale || "Female"}</option>
+                          <option value="Male">{tr.genderMale || "Male"}</option>
                         </select>
                         <ChevronDown size={14} className="absolute end-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">National ID</label>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">{tr.nationalIdLabel || "National ID"}</label>
                       <input
                         type="text"
                         value={nationalId}
                         onChange={(e) => setNationalId(e.target.value)}
-                        placeholder="Enter 14-digit National ID"
+                        placeholder={tr.nationalIdPlaceholder || "Enter 14-digit National ID"}
                         maxLength={14}
                         className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
                       />
@@ -1274,34 +1274,34 @@ export default function AdminNewBookingView({
                   {/* Row 2: Referral Source & Occupation */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">Referral Source</label>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">{tr.referralLabel || "Referral Source"}</label>
                       <div className="relative">
                         <select
                           value={referralSource}
                           onChange={(e) => setReferralSource(e.target.value)}
                           className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 appearance-none text-xs"
                         >
-                          <option value="">Select Referral Source...</option>
-                          <option value="Instagram">Instagram</option>
-                          <option value="Facebook">Facebook</option>
-                          <option value="Friend/Family">Friend / Family</option>
-                          <option value="TikTok">TikTok</option>
-                          <option value="Google Search">Google Search</option>
-                          <option value="Walk-in">Walk-in</option>
-                          <option value="Doctor Referral">Doctor Referral</option>
-                          <option value="Other">Other</option>
+                          <option value="">{tr.selectReferralPlaceholder || "Select Referral Source..."}</option>
+                          <option value="Instagram">{tr.referralInstagram || "Instagram"}</option>
+                          <option value="Facebook">{tr.referralFacebook || "Facebook"}</option>
+                          <option value="Friend/Family">{tr.referralFriend || "Friend / Family"}</option>
+                          <option value="TikTok">{tr.referralTikTok || "TikTok"}</option>
+                          <option value="Google Search">{tr.referralGoogle || "Google Search"}</option>
+                          <option value="Walk-in">{tr.referralWalkIn || "Walk-in"}</option>
+                          <option value="Doctor Referral">{tr.referralDoctor || "Doctor Referral"}</option>
+                          <option value="Other">{tr.referralOther || "Other"}</option>
                         </select>
                         <ChevronDown size={14} className="absolute end-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">Occupation</label>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">{tr.occupationLabel || "Occupation"}</label>
                       <input
                         type="text"
                         value={occupation}
                         onChange={(e) => setOccupation(e.target.value)}
-                        placeholder="e.g. Engineer, Doctor"
+                        placeholder={tr.occupationPlaceholder || "e.g. Engineer, Doctor"}
                         className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
                       />
                     </div>
@@ -1310,12 +1310,12 @@ export default function AdminNewBookingView({
                   {/* Row 3: Age (Photo 3) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">Age</label>
+                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">{tr.ageLabel || "Age"}</label>
                       <input
                         type="number"
                         value={age}
                         onChange={(e) => setAge(e.target.value)}
-                        placeholder="e.g. 28"
+                        placeholder={tr.agePlaceholder || "e.g. 28"}
                         className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
                       />
                     </div>
@@ -1327,47 +1327,47 @@ export default function AdminNewBookingView({
                       <div className="h-6 w-6 rounded-full bg-[#EBF2EB] flex items-center justify-center text-[#0F3826]">
                         <MapPin size={13} />
                       </div>
-                      <span>ADDRESS INFORMATION</span>
+                      <span>{tr.addressInformationHeading || "ADDRESS INFORMATION"}</span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">City / Area</label>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.cityAreaLabel || "City / Area"}</label>
                         <input
                           type="text"
                           value={city}
                           onChange={(e) => setCity(e.target.value)}
-                          placeholder="e.g. New Cairo"
+                          placeholder={tr.cityAreaPlaceholder || "e.g. New Cairo"}
                           className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Street</label>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.streetLabel || "Street"}</label>
                         <input
                           type="text"
                           value={street}
                           onChange={(e) => setStreet(e.target.value)}
-                          placeholder="e.g. 90th Street"
+                          placeholder={tr.streetPlaceholder || "e.g. 90th Street"}
                           className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Building</label>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.buildingLabel || "Building"}</label>
                         <input
                           type="text"
                           value={building}
                           onChange={(e) => setBuilding(e.target.value)}
-                          placeholder="e.g. Building 14"
+                          placeholder={tr.buildingPlaceholder || "e.g. Building 14"}
                           className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Floor / Apt</label>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.floorAptLabel || "Floor / Apt"}</label>
                         <input
                           type="text"
                           value={floorApt}
                           onChange={(e) => setFloorApt(e.target.value)}
-                          placeholder="e.g. Floor 3, Apt 6"
+                          placeholder={tr.floorAptPlaceholder || "e.g. Floor 3, Apt 6"}
                           className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
                         />
                       </div>
@@ -1380,12 +1380,12 @@ export default function AdminNewBookingView({
                       <div className="h-6 w-6 rounded-full bg-[#EBF2EB] flex items-center justify-center text-[#0F3826]">
                         <Wallet size={13} />
                       </div>
-                      <span>Financial Information (Optional)</span>
+                      <span>{tr.financialInformationHeading || "Financial Information (Optional)"}</span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Wallet Balance (EGP)</label>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.walletBalanceLabel || "Wallet Balance (EGP)"}</label>
                         <input
                           type="number"
                           value={walletBalance}
@@ -1395,7 +1395,7 @@ export default function AdminNewBookingView({
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Total Spent (EGP)</label>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.totalSpentLabel || "Total Spent (EGP)"}</label>
                         <input
                           type="number"
                           value={totalSpent}
@@ -1405,7 +1405,7 @@ export default function AdminNewBookingView({
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">Outstanding Balance (EGP)</label>
+                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.outstandingBalanceLabel || "Outstanding Balance (EGP)"}</label>
                         <input
                           type="number"
                           value={outstandingBalance}
@@ -1970,25 +1970,16 @@ export default function AdminNewBookingView({
 
             {/* Title & Question */}
             <div className="space-y-2">
-              <h3 className="text-2xl font-black text-[#1F251A]">Patient Account</h3>
+              <h3 className="text-2xl font-black text-[#1F251A]">{tr.patientAccountModalTitle || "Patient Account"}</h3>
               <p className="text-sm font-medium text-[#5A6A51]">
-                Does the patient already have an account?
+                {tr.patientAccountModalQuestion || "Does the patient already have an account?"}
               </p>
             </div>
 
             <div className="w-full border-b border-gray-100" />
 
-            {/* Actions: No / Yes */}
+            {/* Actions: No (New patient -> Show Additional Fields, Primary Color) / Yes (Existing patient -> Hide Additional Fields, White/Outline) */}
             <div className="flex items-center gap-3 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPatientAccountModal(false);
-                }}
-                className="flex-1 py-3 px-5 rounded-2xl border border-[#414E36]/30 text-[#1F251A] font-bold text-sm hover:bg-gray-50 transition cursor-pointer"
-              >
-                No
-              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -1997,7 +1988,17 @@ export default function AdminNewBookingView({
                 }}
                 className="flex-1 py-3 px-5 rounded-2xl bg-[#0F3826] text-white font-bold text-sm hover:bg-[#0A271A] transition shadow-md cursor-pointer"
               >
-                Yes
+                {tr.patientAccountModalNo || "No"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdditionalPatientFields(false);
+                  setShowPatientAccountModal(false);
+                }}
+                className="flex-1 py-3 px-5 rounded-2xl border border-[#414E36]/30 text-[#1F251A] font-bold text-sm hover:bg-gray-50 transition cursor-pointer"
+              >
+                {tr.patientAccountModalYes || "Yes"}
               </button>
             </div>
           </div>
