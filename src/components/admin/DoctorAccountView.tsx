@@ -1053,7 +1053,7 @@ export default function DoctorAccountView({
   };
 
   // Complete Treatment Session
-  const handleCompleteTreatment = async (targetBooking: any, overrideSessionPulses?: number) => {
+  const handleCompleteTreatment = async (targetBooking: any, overrideSessionPulses?: number, laserData?: any) => {
     if (!targetBooking) return;
 
     const custId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
@@ -1117,6 +1117,12 @@ export default function DoctorAccountView({
       }
     }
 
+    const bookingTargetId = targetBooking?.id || targetBooking?.booking_id || targetBooking?.bookingId || targetBooking?._id || targetBooking?.reservation_id;
+    if (!bookingTargetId) {
+      alert("Booking ID is missing. Cannot complete treatment session.");
+      return;
+    }
+
     // 2. Deduct Used Products from Inventory Stock DB via /api/inventory/products/sales
     if (usedProducts && usedProducts.length > 0) {
       try {
@@ -1136,7 +1142,7 @@ export default function DoctorAccountView({
                 customer_id: targetBooking.customer_id || targetBooking.customerId || "",
                 customer_name: targetBooking.name || targetBooking.customer_name || "Patient",
                 customer_mobile: targetBooking.phone || targetBooking.customer_phone || "N/A",
-                notes: `Consumable deducted during clinical session (Booking #${targetBooking.id})`
+                notes: `Consumable deducted during clinical session (Booking #${bookingTargetId})`
               })
             });
           }
@@ -1148,10 +1154,11 @@ export default function DoctorAccountView({
 
     // 3. Deduct Device Pulses from DB via PUT /api/inventory/devices (Uses Total Session Pulses)
     const pulsesToDeduct = Number(overrideSessionPulses || extraPulsesCount || 0);
-    if (selectedDeviceId && pulsesToDeduct > 0) {
+    const activeDevId = laserData?.deviceId || selectedDeviceId;
+    if (activeDevId && pulsesToDeduct > 0) {
       try {
         const headers = await getAuthHeaders();
-        const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceId));
+        const devObj = devicesList.find((d) => String(d.id) === String(activeDevId));
         if (devObj) {
           const currentPulses = Number(devObj.current_pulse_count || devObj.total_pulses || 0);
           const newPulseCount = currentPulses + pulsesToDeduct;
@@ -1170,18 +1177,114 @@ export default function DoctorAccountView({
       }
     }
 
-    const bookingTargetId = targetBooking?.id || targetBooking?.booking_id || targetBooking?.bookingId || targetBooking?._id || targetBooking?.reservation_id;
-    if (!bookingTargetId) {
-      alert("Booking ID is missing. Cannot complete treatment session.");
-      return;
+    // 4. Laser Pulse Counter Engine: Type 2 FIFO / Type 3 Package Deductions & Unified Log
+    if (laserData) {
+      try {
+        const headers = await getAuthHeaders();
+
+        // a) Type 2: FIFO Retail Pulse Deduction
+        if (laserData.pulseType === "PULSE_PURCHASE" && Number(laserData.pulsesUsed) > 0) {
+          try {
+            await fetch("/api/customers/products", {
+              method: "PATCH",
+              headers,
+              body: JSON.stringify({
+                action: "fifo_consume",
+                customerId: custId,
+                pulses: Number(laserData.pulsesUsed),
+                reservationId: bookingTargetId,
+                doctorId: doctorDbId || null,
+                treatmentArea: laserData.treatmentArea
+              })
+            });
+          } catch (e) {
+            console.error("Error executing FIFO pulse consumption:", e);
+          }
+        }
+
+        // b) Type 3: Package Pulse Deduction
+        if (laserData.pulseType === "PACKAGE" && laserData.sourceId && Number(laserData.pulsesUsed) > 0) {
+          try {
+            await fetch("/api/customers/packages", {
+              method: "PATCH",
+              headers,
+              body: JSON.stringify({
+                action: "consume_package_pulses",
+                customerPackageId: laserData.sourceId,
+                pulses: Number(laserData.pulsesUsed),
+                reservationId: bookingTargetId,
+                doctorId: doctorDbId || null,
+                treatmentArea: laserData.treatmentArea
+              })
+            });
+          } catch (e) {
+            console.error("Error executing package pulse consumption:", e);
+          }
+        }
+
+        // c) Record Unified Laser History Log
+        await fetch("/api/laser-pulses", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            reservation_id: bookingTargetId,
+            customer_id: custId,
+            patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
+            customer_phone: phone,
+            doctor_id: doctorDbId || null,
+            doctor_name: doctorName || "Doctor",
+            device_id: activeDevId || null,
+            device_name: laserData.deviceName || devicesList.find((d) => String(d.id) === String(activeDevId))?.name || null,
+            pulse_type: laserData.pulseType,
+            treatment_area: laserData.treatmentArea,
+            pulses_used: Number(laserData.pulsesUsed) || 0,
+            additional_pulses: Number(laserData.additionalPulses) || 0,
+            pulse_value: Number(laserData.pulseValue) || 0,
+            additional_charge: Number(laserData.additionalCharge) || 0,
+            additional_reason: laserData.additionalReason || "",
+            source_id: laserData.sourceId || null,
+            source_name: laserData.sourceName || null,
+            notes: clinicalNote || ""
+          })
+        });
+
+        // d) If Type 1 Additional Pulses carry a charge, stage into reservation_products
+        if (laserData.pulseType === "SERVICE" && Number(laserData.additionalCharge) > 0) {
+          try {
+            await fetch("/api/reservation-products", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                reservationId: bookingTargetId,
+                lineType: "device_pulses",
+                productName: `Additional Laser Pulses (${laserData.treatmentArea})`,
+                quantity: Number(laserData.additionalPulses) || 1,
+                unitPrice: Number(laserData.pulseValue) || 0,
+                totalPrice: Number(laserData.additionalCharge) || 0,
+                addedByRole: "doctor_session"
+              })
+            });
+          } catch (e) {
+            console.error("Error persisting additional pulses line item:", e);
+          }
+        }
+      } catch (e) {
+        console.error("Error during laser pulse processing:", e);
+      }
     }
 
     try {
-      const deviceNameForPulses = devicesList.find((d) => String(d.id) === String(selectedDeviceId))?.name || "Device";
+      const deviceNameForPulses = devicesList.find((d) => String(d.id) === String(activeDevId))?.name || "Device";
       await persistSessionLineItems({ ...targetBooking, id: bookingTargetId }, pulsesToDeduct, deviceNameForPulses);
     } catch (e) {
       console.error("persistSessionLineItems threw (non-fatal, continuing to complete treatment):", e);
     }
+
+    // Compute final session total according to laser mode
+    const effectiveBasePrice = laserData?.pulseType && laserData.pulseType !== "SERVICE" ? 0 : baseBookingPrice;
+    const additionalServicesSub = (additionalServices || []).reduce((sum, s) => sum + s.price, 0);
+    const laserExtraCharge = Number(laserData?.additionalCharge || 0);
+    const sessionComputedTotal = effectiveBasePrice + additionalServicesSub + productsSubtotal + laserExtraCharge;
 
     try {
       const headers = await getAuthHeaders();
@@ -1192,12 +1295,12 @@ export default function DoctorAccountView({
           id: bookingTargetId,
           status: "completed",
           doctorNotes: clinicalNote || "",
-          amountLeft: updatedInvoiceTotal - Number(targetBooking.amountPaid ?? 0)
+          amountLeft: Math.max(0, sessionComputedTotal - Number(targetBooking.amountPaid ?? 0))
         })
       });
 
       if (res.ok) {
-        alert("Session completed successfully! Product stock & device pulses deducted.");
+        alert("Session completed successfully! Laser pulses, products & charges recorded.");
         setReservations((prev) =>
           prev.map((r) =>
             String(r.id) === String(bookingTargetId)
@@ -1205,7 +1308,7 @@ export default function DoctorAccountView({
                   ...r,
                   status: "completed",
                   doctorNotes: clinicalNote || "",
-                  amountLeft: updatedInvoiceTotal - Number(targetBooking.amountPaid ?? 0)
+                  amountLeft: Math.max(0, sessionComputedTotal - Number(targetBooking.amountPaid ?? 0))
                 }
               : r
           )
@@ -1223,6 +1326,7 @@ export default function DoctorAccountView({
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("revera-prescription-change"));
           window.dispatchEvent(new CustomEvent("revera-booking-change"));
+          window.dispatchEvent(new CustomEvent("revera-laser-change"));
         }
       } else {
         const err = await res.json().catch(() => ({}));

@@ -1372,6 +1372,37 @@ Immutable audit logs tracking financial transaction creations, refunds, adjustme
 | `details` | jsonb | DEFAULT `'{}'::jsonb` |
 | `created_at` | timestamptz | NOT NULL DEFAULT now() |
 
+---
+
+### `laser_pulse_logs`
+
+**Added 2026-09-20** by `20260920000000_create_laser_pulse_engine.sql`.
+Unified clinical and accounting audit logs for all laser pulse treatments across Type 1 (Fixed Service), Type 2 (Retail FIFO Pulses), and Type 3 (Included Package Pulses).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key DEFAULT gen_random_uuid() |
+| `customer_id` | UUID | FK → customers.id ON DELETE CASCADE |
+| `reservation_id` | UUID | FK → reservations.id ON DELETE SET NULL, nullable |
+| `pulse_type` | text | NOT NULL (`'SERVICE'`, `'PULSE_PURCHASE'`, `'PACKAGE'`) |
+| `treatment_area` | text | NOT NULL DEFAULT `'Standard Area'` (e.g. `'Full Body'`, `'Face'`, `'Beard'`, `'Underarms'`) |
+| `pulses_used` | integer | NOT NULL DEFAULT 0 (standard session pulses delivered) |
+| `remaining_balance_after` | integer | nullable (remaining balance snapshot after session) |
+| `additional_pulses` | integer | NOT NULL DEFAULT 0 (extra pulses delivered beyond standard) |
+| `pulse_value` | numeric(10,2) | NOT NULL DEFAULT 0.00 (unit price per additional pulse) |
+| `additional_charge` | numeric(10,2) | NOT NULL DEFAULT 0.00 (`additional_pulses * pulse_value`) |
+| `total_patient_charge` | numeric(10,2) | NOT NULL DEFAULT 0.00 (total billed for this session) |
+| `additional_reason` | text | nullable (mandatory when `additional_pulses > 0`) |
+| `source_id` | text | nullable (linked package ID or product balance ID) |
+| `doctor_id` | text | nullable (doctor UUID or identifier) |
+| `doctor_name` | text | nullable (doctor display name) |
+| `device_id` | text | nullable (laser equipment device ID) |
+| `device_name` | text | nullable (laser equipment device name) |
+| `added_by` | text | NOT NULL DEFAULT `'Staff'` |
+| `notes` | text | nullable |
+| `session_date` | timestamptz | NOT NULL DEFAULT now() |
+| `created_at` | timestamptz | NOT NULL DEFAULT now() |
+
 ## Notes on Schema Gaps
 
 - Persistent patient records are stored in the `customers` table, and connected to `reservations` via `customer_id`.

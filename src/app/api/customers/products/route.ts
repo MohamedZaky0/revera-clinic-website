@@ -10,6 +10,9 @@ export interface UsageLog {
   used_at: string;
   used_by?: string;
   notes?: string;
+  booking_id?: string;
+  treatment_area?: string;
+  remaining_after?: number;
 }
 
 export interface CustomerProductBalance {
@@ -26,12 +29,13 @@ export interface CustomerProductBalance {
   unit_price?: number;
   total_amount?: number;
   status: 'Active' | 'Depleted';
+  is_pulse_product?: boolean;
   created_at: string;
   updated_at: string;
   usage_history: UsageLog[];
 }
 
-async function getStoredBalances(): Promise<{ balances: CustomerProductBalance[] }> {
+export async function getStoredBalances(): Promise<{ balances: CustomerProductBalance[] }> {
   try {
     // 1. Try querying native Supabase customer_product_balances table first
     const { data: dbData, error: dbErr } = await supabaseServer
@@ -75,7 +79,7 @@ async function getStoredBalances(): Promise<{ balances: CustomerProductBalance[]
   }
 }
 
-async function saveBalancesData(payload: { balances: CustomerProductBalance[] }) {
+export async function saveBalancesData(payload: { balances: CustomerProductBalance[] }) {
   // Always save to page_settings fallback (dual-storage pattern, matches inventory_products)
   await supabaseServer
     .from('page_settings')
@@ -104,7 +108,7 @@ export async function GET(req: Request) {
 
   try {
     const { searchParams } = new URL(req.url);
-    const customerId = searchParams.get('customer_id');
+    const customerId = searchParams.get('customer_id') || searchParams.get('customerId');
 
     const data = await getStoredBalances();
     let balances = data.balances || [];
@@ -113,7 +117,20 @@ export async function GET(req: Request) {
       balances = balances.filter(b => b.customer_id === customerId);
     }
 
-    return NextResponse.json({ success: true, balances });
+    // Calculate general active pulse balance summary
+    const activePulsePurchases = balances.filter(
+      (b) => (b.is_pulse_product || b.product_name.toLowerCase().includes('pulse')) && (b.remaining_quantity > 0 || b.status === 'Active')
+    );
+    const totalActivePulses = activePulsePurchases.reduce((sum, b) => sum + (Number(b.remaining_quantity) || 0), 0);
+
+    return NextResponse.json({
+      success: true,
+      balances,
+      summary: {
+        totalActivePulses,
+        activePulsePurchasesCount: activePulsePurchases.length
+      }
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
@@ -140,7 +157,9 @@ export async function POST(req: Request) {
       product_sku,
       quantity,
       unit_price,
-      total_amount
+      total_amount,
+      is_pulse_product,
+      force_new_record
     } = body;
 
     if (!customer_id || !product_name || !quantity || quantity <= 0) {
@@ -154,6 +173,8 @@ export async function POST(req: Request) {
       customer_id, customer_name, customer_mobile,
       product_id, product_name, product_sku,
       quantity, unit_price, total_amount,
+      is_pulse_product,
+      force_new_record
     });
     const { balances } = await getStoredBalances();
     return NextResponse.json({ success: true, balances });
@@ -163,13 +184,9 @@ export async function POST(req: Request) {
 }
 
 /**
- * Adds (or tops up) a patient's owned-quantity balance for a product.
- *
- * Extracted so `POST /api/inventory/products/sales` can do it in the same request as the sale
- * itself. The admin UI used to fire the two endpoints as separate unchecked round trips, which
- * meant a failed sale left the patient holding a balance with no money recorded anywhere
- * (RISK-076). Stock is deliberately NOT deducted here — the sales route owns that; doing both
- * removed twice the quantity (RISK-013).
+ * Adds a patient's owned-quantity balance for a product.
+ * Laser Pulse Purchases (Type 2) are kept as individual records (Scenario 8 & 9)
+ * so FIFO consumption can accurately deplete the oldest purchases first.
  */
 export async function upsertCustomerProductBalance(input: {
   customer_id: string;
@@ -181,24 +198,32 @@ export async function upsertCustomerProductBalance(input: {
   quantity: number;
   unit_price?: number;
   total_amount?: number;
+  is_pulse_product?: boolean;
+  force_new_record?: boolean;
 }): Promise<void> {
   const {
     customer_id, customer_name, customer_mobile,
     product_id, product_name, product_sku,
     quantity, unit_price, total_amount,
+    is_pulse_product,
+    force_new_record
   } = input;
 
-  {
-    const currentData = await getStoredBalances();
-    const balances = [...(currentData.balances || [])];
+  const currentData = await getStoredBalances();
+  const balances = [...(currentData.balances || [])];
 
-    // Check if an existing balance for customer + product_id/product_name exists
+  const isPulse = is_pulse_product ?? product_name.toLowerCase().includes('pulse');
+  const now = new Date().toISOString();
+  const qtyNum = Number(quantity);
+
+  // For regular retail products (non-pulse), merge if existing active balance exists unless force_new_record is requested.
+  // For pulse products (Type 2), keep each purchase as a separate record for FIFO traceability (Scenario 8/9/10).
+  const shouldCreateNewRecord = force_new_record || isPulse;
+
+  if (!shouldCreateNewRecord) {
     const existingIndex = balances.findIndex(
       b => b.customer_id === customer_id && (b.product_id === product_id || b.product_name === product_name)
     );
-
-    const now = new Date().toISOString();
-    const qtyNum = Number(quantity);
 
     if (existingIndex >= 0) {
       const existing = balances[existingIndex];
@@ -215,30 +240,150 @@ export async function upsertCustomerProductBalance(input: {
         unit_price: unit_price !== undefined ? Number(unit_price) : existing.unit_price,
         total_amount: total_amount !== undefined ? Number(total_amount) : existing.total_amount
       };
-    } else {
-      const newBalance: CustomerProductBalance = {
-        id: `cpb-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        customer_id,
-        customer_name: customer_name || 'Customer',
-        customer_mobile: customer_mobile || '',
-        product_id: product_id || `prod-${Date.now()}`,
-        product_name,
-        product_sku: product_sku || '',
-        purchased_quantity: qtyNum,
-        used_quantity: 0,
-        remaining_quantity: qtyNum,
-        unit_price: Number(unit_price || 0),
-        total_amount: Number(total_amount || 0),
-        status: 'Active',
-        created_at: now,
-        updated_at: now,
-        usage_history: []
-      };
-      balances.unshift(newBalance);
+      await saveBalancesData({ balances });
+      return;
     }
-
-    await saveBalancesData({ balances });
   }
+
+  // Create new balance record
+  const newBalance: CustomerProductBalance = {
+    id: `cpb-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    customer_id,
+    customer_name: customer_name || 'Customer',
+    customer_mobile: customer_mobile || '',
+    product_id: product_id || `prod-${Date.now()}`,
+    product_name,
+    product_sku: product_sku || '',
+    purchased_quantity: qtyNum,
+    used_quantity: 0,
+    remaining_quantity: qtyNum,
+    unit_price: Number(unit_price || 0),
+    total_amount: total_amount !== undefined ? Number(total_amount) : (qtyNum * Number(unit_price || 0)),
+    status: 'Active',
+    is_pulse_product: isPulse,
+    created_at: now,
+    updated_at: now,
+    usage_history: []
+  };
+  balances.unshift(newBalance);
+
+  await saveBalancesData({ balances });
+}
+
+/**
+ * FIFO Consumption Engine for Type 2 (Sell by Pulse)
+ * Scenarios 10, 11, 12:
+ * - Consumes from the oldest active pulse purchase first (Purchase Date ASC).
+ * - Spills over into subsequent purchases if usage > oldest purchase remaining.
+ * - Rejects with explicit 400 error if requested usage > total active balance (Scenario 12).
+ * - Updates remaining quantities and transitions depleted purchases to 'Depleted' (Fully Consumed).
+ */
+export async function consumePatientPulsesFIFO(input: {
+  customer_id: string;
+  quantity: number;
+  used_by?: string;
+  notes?: string;
+  booking_id?: string;
+  treatment_area?: string;
+}): Promise<{
+  success: boolean;
+  consumed: number;
+  remainingGeneralBalance: number;
+  affectedPurchases: Array<{ purchase_id: string; deducted: number; remaining_after: number; purchase_name: string }>;
+  error?: string;
+}> {
+  const { customer_id, quantity, used_by, notes, booking_id, treatment_area } = input;
+  const qtyToConsume = Math.max(0, parseInt(String(quantity), 10) || 0);
+
+  if (!customer_id) {
+    return { success: false, consumed: 0, remainingGeneralBalance: 0, affectedPurchases: [], error: 'Customer ID is required.' };
+  }
+  if (qtyToConsume <= 0) {
+    return { success: false, consumed: 0, remainingGeneralBalance: 0, affectedPurchases: [], error: 'Quantity to consume must be greater than 0.' };
+  }
+
+  const currentData = await getStoredBalances();
+  const allBalances = [...(currentData.balances || [])];
+
+  // Filter active pulse purchases for this customer
+  const customerPulsePurchases = allBalances
+    .map((b, originalIndex) => ({ ...b, originalIndex }))
+    .filter(
+      (b) =>
+        b.customer_id === customer_id &&
+        (b.is_pulse_product || b.product_name.toLowerCase().includes('pulse')) &&
+        Number(b.remaining_quantity || 0) > 0
+    );
+
+  const totalAvailable = customerPulsePurchases.reduce((sum, b) => sum + Number(b.remaining_quantity || 0), 0);
+
+  // Scenario 12: Insufficient pulse balance validation
+  if (qtyToConsume > totalAvailable) {
+    return {
+      success: false,
+      consumed: 0,
+      remainingGeneralBalance: totalAvailable,
+      affectedPurchases: [],
+      error: `Insufficient pulse balance. Available: ${totalAvailable} pulses, Requested: ${qtyToConsume} pulses.`
+    };
+  }
+
+  // Sort active purchases by created_at ASC (FIFO - oldest first, Scenario 10)
+  customerPulsePurchases.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+  let remainingNeeded = qtyToConsume;
+  const affected: Array<{ purchase_id: string; deducted: number; remaining_after: number; purchase_name: string }> = [];
+  const now = new Date().toISOString();
+
+  for (const purchase of customerPulsePurchases) {
+    if (remainingNeeded <= 0) break;
+
+    const availableInThisPurchase = Number(purchase.remaining_quantity || 0);
+    const toDeductFromThisPurchase = Math.min(remainingNeeded, availableInThisPurchase);
+
+    const newUsed = Number(purchase.used_quantity || 0) + toDeductFromThisPurchase;
+    const newRemaining = Math.max(0, Number(purchase.purchased_quantity || 0) - newUsed);
+    const newStatus = newRemaining > 0 ? 'Active' : 'Depleted';
+
+    const usageLog: UsageLog = {
+      id: `use-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      quantity_used: toDeductFromThisPurchase,
+      used_at: now,
+      used_by: used_by || 'Staff',
+      notes: notes || '',
+      booking_id: booking_id || undefined,
+      treatment_area: treatment_area || undefined,
+      remaining_after: newRemaining
+    };
+
+    allBalances[purchase.originalIndex] = {
+      ...allBalances[purchase.originalIndex],
+      used_quantity: newUsed,
+      remaining_quantity: newRemaining,
+      status: newStatus,
+      updated_at: now,
+      usage_history: [usageLog, ...(allBalances[purchase.originalIndex].usage_history || [])]
+    };
+
+    affected.push({
+      purchase_id: purchase.id,
+      deducted: toDeductFromThisPurchase,
+      remaining_after: newRemaining,
+      purchase_name: purchase.product_name
+    });
+
+    remainingNeeded -= toDeductFromThisPurchase;
+  }
+
+  await saveBalancesData({ balances: allBalances });
+
+  const remainingGeneral = totalAvailable - qtyToConsume;
+  return {
+    success: true,
+    consumed: qtyToConsume,
+    remainingGeneralBalance: remainingGeneral,
+    affectedPurchases: affected
+  };
 }
 
 // PATCH: Deduct / Consume quantity from patient product balance
@@ -253,8 +398,28 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { balance_id, quantity_used, used_by, notes } = body;
+    const { action, customer_id, quantity, quantity_used, balance_id, used_by, notes, booking_id, treatment_area } = body;
 
+    // FIFO Pulse Consumption action (Type 2 Engine)
+    if (action === 'fifo_consume' || action === 'consume_pulses') {
+      const fifoResult = await consumePatientPulsesFIFO({
+        customer_id: customer_id || body.customerId,
+        quantity: quantity || quantity_used,
+        used_by: used_by || (access.access.user as any)?.name || access.access.user?.email || 'Staff',
+        notes,
+        booking_id,
+        treatment_area
+      });
+
+      if (!fifoResult.success) {
+        return NextResponse.json({ success: false, error: fifoResult.error }, { status: 400 });
+      }
+
+      const { balances } = await getStoredBalances();
+      return NextResponse.json({ ...fifoResult, balances });
+    }
+
+    // Direct single balance deduction (legacy / manual)
     if (!balance_id || !quantity_used || quantity_used <= 0) {
       return NextResponse.json(
         { success: false, error: 'Balance ID and positive quantity_used are required.' },
@@ -275,6 +440,17 @@ export async function PATCH(req: Request) {
 
     const target = balances[targetIndex];
     const qtyToDeduct = Number(quantity_used);
+
+    if (qtyToDeduct > Number(target.remaining_quantity || 0)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Insufficient balance. Available: ${target.remaining_quantity}, Requested: ${qtyToDeduct}.`
+        },
+        { status: 400 }
+      );
+    }
+
     const newUsed = Number(target.used_quantity || 0) + qtyToDeduct;
     const newRemaining = Math.max(0, Number(target.purchased_quantity || 0) - newUsed);
 
@@ -284,7 +460,10 @@ export async function PATCH(req: Request) {
       quantity_used: qtyToDeduct,
       used_at: now,
       used_by: used_by || 'Staff',
-      notes: notes || ''
+      notes: notes || '',
+      booking_id: booking_id || undefined,
+      treatment_area: treatment_area || undefined,
+      remaining_after: newRemaining
     };
 
     const updatedHistory = [usageEntry, ...(target.usage_history || [])];

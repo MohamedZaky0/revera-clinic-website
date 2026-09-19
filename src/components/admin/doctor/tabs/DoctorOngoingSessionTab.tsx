@@ -40,7 +40,7 @@ export interface AdditionalServiceItem {
 
 interface DoctorOngoingSessionTabProps {
   activeSessionBooking: any;
-  handleCompleteTreatment: (booking: any, totalPulses?: number) => void;
+  handleCompleteTreatment: (booking: any, totalPulses?: number, laserData?: any) => void;
   medicalRecord: any;
   medicalRecordLoading: boolean;
   showMedicalForm: boolean;
@@ -141,6 +141,21 @@ export default function DoctorOngoingSessionTab({
   onAdditionalServicesChange,
   t
 }: DoctorOngoingSessionTabProps) {
+  // Laser Pulse Counter Engine State
+  const [laserMode, setLaserMode] = useState<"SERVICE" | "PULSE_PURCHASE" | "PACKAGE">("SERVICE");
+  const [treatmentArea, setTreatmentArea] = useState<string>("Face");
+  const [customTreatmentArea, setCustomTreatmentArea] = useState<string>("");
+  const [standardPulsesDelivered, setStandardPulsesDelivered] = useState<number>(100);
+  const [hasAdditionalPulses, setHasAdditionalPulses] = useState<boolean>(false);
+  const [additionalPulsesQty, setAdditionalPulsesQty] = useState<number>(0);
+  const [additionalPulseUnitPrice, setAdditionalPulseUnitPrice] = useState<number>(5);
+  const [additionalPulsesReason, setAdditionalPulsesReason] = useState<string>("");
+  const [patientActivePurchases, setPatientActivePurchases] = useState<any[]>([]);
+  const [patientTotalActivePulses, setPatientTotalActivePulses] = useState<number>(0);
+  const [patientActivePackages, setPatientActivePackages] = useState<any[]>([]);
+  const [selectedLaserPackageId, setSelectedLaserPackageId] = useState<string>("");
+  const [loadingLaserData, setLoadingLaserData] = useState<boolean>(false);
+
   // Additional Services added during ongoing treatment session
   const [additionalServices, setAdditionalServices] = useState<AdditionalServiceItem[]>([]);
   const [selectedServiceIdToAdd, setSelectedServiceIdToAdd] = useState<string>("");
@@ -167,6 +182,55 @@ export default function DoctorOngoingSessionTab({
   const [rxFollowUpDate, setRxFollowUpDate] = useState("");
   const [rxFollowUpNotes, setRxFollowUpNotes] = useState("");
   const [savingRxInline, setSavingRxInline] = useState(false);
+
+  // Fetch patient active pulse products & packages for laser engine
+  useEffect(() => {
+    if (!activeSessionBooking) return;
+    const custId = activeSessionBooking.customerId || activeSessionBooking.customer_id;
+    if (!custId) return;
+
+    setLoadingLaserData(true);
+    getAuthHeaders().then(async (headers) => {
+      try {
+        // Fetch retail pulse products
+        const prodRes = await fetch(`/api/customers/products?customerId=${encodeURIComponent(custId)}`, { headers });
+        if (prodRes.ok) {
+          const prodData = await prodRes.json();
+          const balances = prodData.customerProducts || [];
+          const pulseItems = balances.filter((p: any) => {
+            const name = (p.name || p.product_name || "").toLowerCase();
+            const cat = (p.category || "").toLowerCase();
+            return (cat === "laser_pulses" || p.is_pulse_product || name.includes("pulse")) && (p.remaining_quantity > 0 || (p.quantity - (p.quantity_used || 0)) > 0);
+          });
+          setPatientActivePurchases(pulseItems);
+          const totalPulses = prodData.totalActivePulses !== undefined
+            ? Number(prodData.totalActivePulses)
+            : pulseItems.reduce((s: number, p: any) => s + Number(p.remaining_quantity !== undefined ? p.remaining_quantity : (p.quantity - (p.quantity_used || 0))), 0);
+          setPatientTotalActivePulses(totalPulses);
+        }
+
+        // Fetch active packages
+        const pkgRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(custId)}`, { headers });
+        if (pkgRes.ok) {
+          const pkgData = await pkgRes.json();
+          const pkgs = pkgData.customerPackages || [];
+          const activePulsePkgs = pkgs.filter((p: any) => {
+            const rem = Number(p.remaining_pulses !== undefined ? p.remaining_pulses : (p.included_pulses - (p.used_pulses || 0)));
+            const isNotExpired = !p.expires_at || new Date(p.expires_at) >= new Date();
+            return p.status === "active" && rem > 0 && isNotExpired;
+          });
+          setPatientActivePackages(activePulsePkgs);
+          if (activePulsePkgs.length > 0 && !selectedLaserPackageId) {
+            setSelectedLaserPackageId(String(activePulsePkgs[0].id));
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching patient laser pulse data:", err);
+      } finally {
+        setLoadingLaserData(false);
+      }
+    });
+  }, [activeSessionBooking?.customerId, activeSessionBooking?.customer_id]);
 
   const setFollowUpPresetDays = (days: number) => {
     const target = new Date();
@@ -509,16 +573,36 @@ export default function DoctorOngoingSessionTab({
     }
   };
 
+  const TREATMENT_AREAS = [
+    "Face",
+    "Full Body",
+    "Underarms",
+    "Bikini",
+    "Full Arms",
+    "Half Arms",
+    "Full Legs",
+    "Half Legs",
+    "Back",
+    "Chest & Abdomen",
+    "Full Beard",
+    "Custom"
+  ];
+
   // Calculate Subtotals
   const additionalServicesSubtotal = additionalServices.reduce((sum, item) => sum + item.price, 0);
-  const totalServicesPrice = baseBookingPrice + additionalServicesSubtotal;
+  // In Type 2 & Type 3, base service price is 0 EGP because pulses were prepaid or included in package
+  const effectiveBaseServicePrice = laserMode === "SERVICE" ? baseBookingPrice : 0;
+  const totalServicesPrice = effectiveBaseServicePrice + additionalServicesSubtotal;
   
-  // Total Pulses Calculated = (Primary Service Default Pulses) + (Additional Services Pulses)
+  // Laser Additional Pulses Charge (Type 1 Special Case)
+  const laserAdditionalCharge = laserMode === "SERVICE" && hasAdditionalPulses ? (additionalPulsesQty * additionalPulseUnitPrice) : 0;
+
+  // Total Pulses Calculated = (Delivered Laser Pulses) + (Additional Services Pulses) + (Additional Pulses)
   const additionalPulsesTotal = additionalServices.reduce((sum, item) => sum + item.pulses, 0);
-  const totalSessionPulses = (extraPulsesCount || 0) + additionalPulsesTotal;
+  const totalSessionPulses = standardPulsesDelivered + (hasAdditionalPulses ? additionalPulsesQty : 0) + additionalPulsesTotal;
 
   // Final Session Invoice Total
-  const finalSessionTotal = totalServicesPrice + productsSubtotal + extraPulsesSubtotal;
+  const finalSessionTotal = totalServicesPrice + productsSubtotal + laserAdditionalCharge;
 
   // Resolved active service name with catalog fallback
   const resolvedActiveServiceName = useMemo(() => {
@@ -617,7 +701,55 @@ export default function DoctorOngoingSessionTab({
                     setShowMedicalForm(true);
                     return;
                   }
-                  handleCompleteTreatment(activeSessionBooking, totalSessionPulses);
+
+                  // Type 1 extra charge validation: mandatory reason
+                  if (laserMode === "SERVICE" && hasAdditionalPulses && additionalPulsesQty > 0 && additionalPulseUnitPrice > 0 && !additionalPulsesReason.trim()) {
+                    alert("Mandatory field missing: Please provide a reason for the additional pulse charge before completing the session.");
+                    return;
+                  }
+
+                  // Type 2 balance validation
+                  if (laserMode === "PULSE_PURCHASE") {
+                    if (standardPulsesDelivered <= 0) {
+                      alert("Please enter the number of laser pulses delivered in this session.");
+                      return;
+                    }
+                    if (standardPulsesDelivered > patientTotalActivePulses) {
+                      alert(`Insufficient pulse balance! Patient has ${patientTotalActivePulses} active pulses remaining, but ${standardPulsesDelivered} pulses were requested.`);
+                      return;
+                    }
+                  }
+
+                  // Type 3 package balance validation
+                  if (laserMode === "PACKAGE") {
+                    if (!selectedLaserPackageId) {
+                      alert("Please select a package containing included pulses to consume from.");
+                      return;
+                    }
+                    const selectedPkg = patientActivePackages.find((p) => String(p.id) === String(selectedLaserPackageId));
+                    const availablePkgPulses = selectedPkg ? Number(selectedPkg.remaining_pulses !== undefined ? selectedPkg.remaining_pulses : (selectedPkg.included_pulses - (selectedPkg.used_pulses || 0))) : 0;
+                    if (standardPulsesDelivered > availablePkgPulses) {
+                      alert(`Insufficient package pulses! Package has ${availablePkgPulses} pulses remaining, but ${standardPulsesDelivered} pulses were requested.`);
+                      return;
+                    }
+                  }
+
+                  const laserPulseData = {
+                    pulseType: laserMode,
+                    treatmentArea: treatmentArea === "Custom" ? customTreatmentArea || "Custom Area" : treatmentArea,
+                    pulsesUsed: standardPulsesDelivered,
+                    additionalPulses: hasAdditionalPulses ? additionalPulsesQty : 0,
+                    pulseValue: additionalPulseUnitPrice,
+                    additionalCharge: hasAdditionalPulses ? (additionalPulsesQty * additionalPulseUnitPrice) : 0,
+                    additionalReason: additionalPulsesReason,
+                    sourceId: laserMode === "PACKAGE" ? selectedLaserPackageId : (laserMode === "PULSE_PURCHASE" ? "FIFO" : null),
+                    sourceName: laserMode === "PACKAGE" ? patientActivePackages.find(p => String(p.id) === String(selectedLaserPackageId))?.package_name : null,
+                    selectedPackage: patientActivePackages.find(p => String(p.id) === String(selectedLaserPackageId)),
+                    deviceId: selectedDeviceId || selectedDeviceForService,
+                    deviceName: devicesList.find(d => String(d.id) === String(selectedDeviceId || selectedDeviceForService))?.name
+                  };
+
+                  handleCompleteTreatment(activeSessionBooking, totalSessionPulses, laserPulseData);
                 }}
                 className={`w-full sm:w-auto justify-center flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition cursor-pointer shadow-md ${
                   isFirstVisit && !medicalRecord
@@ -1126,75 +1258,378 @@ export default function DoctorOngoingSessionTab({
                 </form>
               </div>
 
-              {/* 2. SERVICES, DEVICES & PULSES MANAGER SECTION */}
+              {/* 2. LASER PULSE COUNTER & ACCOUNTING ENGINE */}
               <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
                   <div>
                     <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                      <Zap size={16} className="text-amber-600" /> {t.additionalServicesTitle}
+                      <Zap size={16} className="text-amber-600" /> Laser Pulse Counter & Accounting
                     </h3>
+                    <p className="text-[11px] text-[#5A6A51] mt-0.5">
+                      Multi-scenario accounting: Fixed Service, FIFO Retail Pulses, or Package Balances
+                    </p>
                   </div>
-                  
-                  {/* Live Total Pulse Counter Badge — only when device-linked services exist */}
-                  {(selectedDeviceId || additionalServices.some((s) => s.deviceId)) && (
-                  <div className="flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-3.5 sm:px-4 py-1.5 text-xs font-black text-amber-900 shadow-sm">
-                    <Zap size={14} className="text-amber-600 fill-amber-500 animate-pulse" />
-                    <span>{t.totalPulsesCalculated}</span>
-                    <span className="text-sm text-amber-900 font-extrabold">{totalSessionPulses} {t.pulsesLabel}</span>
+
+                  {/* Mode Selector Tabs */}
+                  <div className="flex bg-[#F2EFE9] p-1 rounded-xl gap-1 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setLaserMode("SERVICE")}
+                      className={`px-3 py-1.5 rounded-lg transition ${
+                        laserMode === "SERVICE" ? "bg-[#414E36] text-white shadow-xs" : "text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      Type 1: Service
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLaserMode("PULSE_PURCHASE")}
+                      className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                        laserMode === "PULSE_PURCHASE" ? "bg-[#414E36] text-white shadow-xs" : "text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      <span>Type 2: FIFO Pulses</span>
+                      {patientTotalActivePulses > 0 && (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${laserMode === "PULSE_PURCHASE" ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"}`}>
+                          {patientTotalActivePulses}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLaserMode("PACKAGE")}
+                      className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                        laserMode === "PACKAGE" ? "bg-[#414E36] text-white shadow-xs" : "text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      <span>Type 3: Package</span>
+                      {patientActivePackages.length > 0 && (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${laserMode === "PACKAGE" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-800"}`}>
+                          {patientActivePackages.length}
+                        </span>
+                      )}
+                    </button>
                   </div>
-                  )}
                 </div>
 
-                {/* Primary Reserved Service Display */}
-                <div className="rounded-2xl bg-[#FBFBF9] p-3.5 sm:p-4 border border-[#414E36]/10 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
-                      <Layers size={14} className="text-[#414E36]" /> {t.primaryBookingService}
-                    </span>
-                    <span className="font-extrabold text-[#414E36]">{baseBookingPrice || activeSessionBooking.price || activeSessionBooking.total_price || 0} EGP</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
-                    <div className="flex-1 w-full">
-                      <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Selected Patient Service (Changeable)</label>
-                      <select
-                        value={
-                          activeSessionBooking.serviceId ||
-                          activeSessionBooking.service_id ||
-                          servicesList.find((s) => {
-                            const sName = (s.en || s.name || s.title || s.name_en || s.ar || "").toLowerCase().trim();
-                            const bName = (activeSessionBooking.service || activeSessionBooking.service_name || activeSessionBooking.service_title || "").toLowerCase().trim();
-                            return sName && bName && (sName === bName || sName.includes(bName) || bName.includes(sName));
-                          })?.id || ""
-                        }
-                        onChange={(e) => handleChangePrimaryService && handleChangePrimaryService(activeSessionBooking, e.target.value)}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
-                      >
-                        {!(activeSessionBooking.service || activeSessionBooking.service_name) && (
-                          <option value="">Select Service</option>
-                        )}
-                        {servicesList.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.en || s.name || s.title || s.name_en || s.ar} ({s.price || 0} EGP)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {selectedDeviceId && (
-                    <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-lg shrink-0">
-                      {extraPulsesCount} {t.pulsesLabel}
-                    </span>
+                {/* Common Laser Settings: Treatment Area & Device */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Treatment Area</label>
+                    <select
+                      value={treatmentArea}
+                      onChange={(e) => setTreatmentArea(e.target.value)}
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                    >
+                      {TREATMENT_AREAS.map((area) => (
+                        <option key={area} value={area}>{area}</option>
+                      ))}
+                    </select>
+                    {treatmentArea === "Custom" && (
+                      <input
+                        type="text"
+                        placeholder="Specify custom area..."
+                        value={customTreatmentArea}
+                        onChange={(e) => setCustomTreatmentArea(e.target.value)}
+                        className="mt-2 w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                      />
                     )}
                   </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Laser Device (Hardware Counter)</label>
+                    <select
+                      value={selectedDeviceId}
+                      onChange={(e) => setSelectedDeviceId(e.target.value)}
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                    >
+                      <option value="">Select Laser Device...</option>
+                      {devicesList.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} {d.current_pulse_count ? `(${d.current_pulse_count} total pulses)` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                {/* Additional Services Selection & Counter */}
+                {/* MODE 1: SELL BY SERVICE */}
+                {laserMode === "SERVICE" && (
+                  <div className="space-y-4 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/10 pb-3">
+                      <div>
+                        <span className="font-bold text-xs text-[#1F251A] flex items-center gap-1.5">
+                          <Layers size={14} className="text-[#414E36]" /> Fixed Service Price: <strong>{baseBookingPrice} EGP</strong>
+                        </span>
+                        <p className="text-[11px] text-[#5A6A51] mt-0.5">
+                          Standard pulses recorded for clinical tracking only (0 EGP price change).
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-bold text-[#5A6A51]">Delivered Pulses:</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={standardPulsesDelivered}
+                          onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-28 rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                          placeholder="Pulses"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Additional Pulses Toggle */}
+                    <div className="space-y-3 pt-1">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[#1F251A]">
+                        <input
+                          type="checkbox"
+                          checked={hasAdditionalPulses}
+                          onChange={(e) => setHasAdditionalPulses(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-[#414E36] accent-[#414E36]"
+                        />
+                        <Plus size={14} className="text-amber-700" />
+                        <span>Add Additional Charged Pulses (Special Case)</span>
+                      </label>
+
+                      {hasAdditionalPulses && (
+                        <div className="space-y-3 bg-white p-3.5 rounded-xl border border-amber-200">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Additional Pulses Qty</label>
+                              <input
+                                type="number"
+                                min={1}
+                                value={additionalPulsesQty}
+                                onChange={(e) => setAdditionalPulsesQty(Math.max(0, parseInt(e.target.value) || 0))}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                placeholder="e.g. 100"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Price Per Pulse (EGP)</label>
+                              <input
+                                type="number"
+                                min={0}
+                                step={0.5}
+                                value={additionalPulseUnitPrice}
+                                onChange={(e) => setAdditionalPulseUnitPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                placeholder="5"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Additional Charge</label>
+                              <div className="w-full rounded-xl bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-black text-amber-900">
+                                +{additionalPulsesQty * additionalPulseUnitPrice} EGP
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">
+                              Reason for Additional Pulses <span className="text-rose-600 font-bold">* (Mandatory)</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={additionalPulsesReason}
+                              onChange={(e) => setAdditionalPulsesReason(e.target.value)}
+                              placeholder="e.g. Extended session for high hair density..."
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* MODE 2: SELL BY PULSE (FIFO ENGINE) */}
+                {laserMode === "PULSE_PURCHASE" && (
+                  <div className="space-y-4 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                    {/* Active Balance Banner */}
+                    <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider block">
+                          General Active Pulse Balance (FIFO Combined)
+                        </span>
+                        <span className="text-xl sm:text-2xl font-black text-emerald-950">
+                          {patientTotalActivePulses} <span className="text-xs font-bold text-emerald-700">Pulses Available</span>
+                        </span>
+                        <p className="text-[11px] text-emerald-700 mt-0.5">
+                          Base session charge: <strong>0 EGP</strong> (Consumes from pre-purchased balance).
+                        </p>
+                      </div>
+
+                      <div className="text-xs text-emerald-800 bg-white/80 px-3 py-1.5 rounded-lg border border-emerald-200 font-bold self-start sm:self-auto">
+                        {patientActivePurchases.length} Active Purchase {patientActivePurchases.length === 1 ? "Batch" : "Batches"}
+                      </div>
+                    </div>
+
+                    {/* FIFO Consumption Input & Projection */}
+                    <div className="space-y-3 bg-white p-3.5 rounded-xl border border-[#414E36]/10">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                            Pulses Used in This Session
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={standardPulsesDelivered}
+                            onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
+                            placeholder="e.g. 250"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                            Remaining Balance After Session
+                          </label>
+                          <div className={`w-full rounded-xl px-3 py-2 text-xs font-black border ${
+                            patientTotalActivePulses - standardPulsesDelivered < 0
+                              ? "bg-rose-50 text-rose-800 border-rose-200"
+                              : "bg-emerald-50 text-emerald-900 border-emerald-200"
+                          }`}>
+                            {Math.max(0, patientTotalActivePulses - standardPulsesDelivered)} Pulses Remaining
+                            {patientTotalActivePulses - standardPulsesDelivered < 0 && " (Insufficient!)"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {patientTotalActivePulses - standardPulsesDelivered < 0 && (
+                        <div className="p-2.5 rounded-xl bg-rose-100 text-rose-900 text-xs font-bold flex items-center gap-2 border border-rose-300">
+                          <AlertTriangle size={14} className="shrink-0" />
+                          <span>Insufficient pulse balance! Patient needs {standardPulsesDelivered - patientTotalActivePulses} more pulses.</span>
+                        </div>
+                      )}
+
+                      {/* Breakdown of Active Purchases (FIFO) */}
+                      {patientActivePurchases.length > 0 && (
+                        <div className="pt-2 border-t border-[#414E36]/10 space-y-1.5">
+                          <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider block">
+                            FIFO Consumption Order (Oldest Purchase First)
+                          </span>
+                          <div className="space-y-1 text-xs">
+                            {patientActivePurchases.map((p, idx) => {
+                              const rem = Number(p.remaining_quantity !== undefined ? p.remaining_quantity : (p.quantity - (p.quantity_used || 0)));
+                              const pDate = p.created_at || p.date || "Past Order";
+                              return (
+                                <div key={p.id || idx} className="flex items-center justify-between bg-[#FBFBF9] p-2 rounded-lg border border-[#414E36]/10 text-[11px]">
+                                  <span className="font-semibold text-[#1F251A]">
+                                    #{idx + 1} {p.name || p.product_name || "Pulses Batch"} ({new Date(pDate).toLocaleDateString()})
+                                  </span>
+                                  <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                    {rem} pulses left
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* MODE 3: PACKAGE INCLUDES PULSES */}
+                {laserMode === "PACKAGE" && (
+                  <div className="space-y-4 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                    {patientActivePackages.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-[#5A6A51] bg-white rounded-xl border border-[#414E36]/10 space-y-2">
+                        <p className="font-bold text-[#1F251A]">No active package with pulse balance found for this patient.</p>
+                        <p>Please switch to Type 1 Service or Type 2 FIFO Pulse Sales.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Select Active Package</label>
+                          <select
+                            value={selectedLaserPackageId}
+                            onChange={(e) => setSelectedLaserPackageId(e.target.value)}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
+                          >
+                            {patientActivePackages.map((pkg) => {
+                              const rem = Number(pkg.remaining_pulses !== undefined ? pkg.remaining_pulses : (pkg.included_pulses - (pkg.used_pulses || 0)));
+                              return (
+                                <option key={pkg.id} value={pkg.id}>
+                                  {pkg.package_name} ({rem} pulses remaining · Expires: {pkg.expires_at ? new Date(pkg.expires_at).toLocaleDateString() : "No Expiry"})
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+
+                        {/* Selected Package Details */}
+                        {(() => {
+                          const currentPkg = patientActivePackages.find((p) => String(p.id) === String(selectedLaserPackageId)) || patientActivePackages[0];
+                          if (!currentPkg) return null;
+                          const inc = Number(currentPkg.included_pulses || 0);
+                          const used = Number(currentPkg.used_pulses || 0);
+                          const rem = Number(currentPkg.remaining_pulses !== undefined ? currentPkg.remaining_pulses : (inc - used));
+
+                          return (
+                            <div className="space-y-3 bg-white p-3.5 rounded-xl border border-[#414E36]/10">
+                              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                <div className="bg-[#FBFBF9] p-2 rounded-lg border border-[#414E36]/10">
+                                  <span className="text-[10px] text-[#5A6A51] block">Included</span>
+                                  <span className="font-black text-[#1F251A]">{inc}</span>
+                                </div>
+                                <div className="bg-[#FBFBF9] p-2 rounded-lg border border-[#414E36]/10">
+                                  <span className="text-[10px] text-[#5A6A51] block">Used</span>
+                                  <span className="font-black text-[#5A6A51]">{used}</span>
+                                </div>
+                                <div className="bg-purple-50 p-2 rounded-lg border border-purple-200">
+                                  <span className="text-[10px] text-purple-800 block">Remaining</span>
+                                  <span className="font-black text-purple-950">{rem}</span>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                                <div>
+                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                    Pulses to Deduct from Package
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={standardPulsesDelivered}
+                                    onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
+                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                                    placeholder="Pulses"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                    Package Balance After Session
+                                  </label>
+                                  <div className={`w-full rounded-xl px-3 py-2 text-xs font-black border ${
+                                    rem - standardPulsesDelivered < 0
+                                      ? "bg-rose-50 text-rose-800 border-rose-200"
+                                      : "bg-purple-50 text-purple-900 border-purple-200"
+                                  }`}>
+                                    {Math.max(0, rem - standardPulsesDelivered)} Pulses Remaining
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Additional Clinical Services Section */}
                 <div className="space-y-3 bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
                   <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
                     <Plus size={14} className="text-[#414E36]" /> {t.addAdditionalServiceBtn}
                   </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {/* Service Selector Dropdown */}
                     <select
                       value={selectedServiceIdToAdd}
                       onChange={(e) => setSelectedServiceIdToAdd(e.target.value)}
@@ -1208,7 +1643,6 @@ export default function DoctorOngoingSessionTab({
                       ))}
                     </select>
 
-                    {/* Device Selector */}
                     <select
                       value={selectedDeviceForService}
                       onChange={(e) => setSelectedDeviceForService(e.target.value)}
@@ -1347,7 +1781,17 @@ export default function DoctorOngoingSessionTab({
                 {/* Final Session Invoice Breakdown Summary */}
                 <div className="bg-[#414E36]/05 p-3.5 sm:p-4 rounded-2xl space-y-2 text-xs">
                   <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 text-[#5A6A51]">
-                    <span>{t.baseServiceLabel} <strong className="text-[#1F251A]">{baseBookingPrice} EGP</strong></span>
+                    <span>
+                      {t.baseServiceLabel}{" "}
+                      <strong className="text-[#1F251A]">
+                        {laserMode === "SERVICE" ? `${baseBookingPrice} EGP` : "0 EGP (Prepaid / Package Pulses)"}
+                      </strong>
+                    </span>
+                    {laserAdditionalCharge > 0 && (
+                      <span className="text-amber-800 font-bold">
+                        Extra Pulses: <strong className="text-amber-900">+{laserAdditionalCharge} EGP</strong>
+                      </span>
+                    )}
                     {additionalServicesSubtotal > 0 && (
                       <span>{t.additionalServicesSubtotal} <strong className="text-[#1F251A]">+{additionalServicesSubtotal} EGP</strong></span>
                     )}

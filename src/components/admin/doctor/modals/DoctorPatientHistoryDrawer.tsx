@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Clock, CheckCircle2, Play, ChevronRight, Pill, FileText, Package, AlertCircle, User, Phone, Mail, Calendar, ShieldAlert, MapPin, Hash, Sparkles, Plus, Trash2, Loader2, Download, ExternalLink } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, Play, ChevronRight, Pill, FileText, Package, AlertCircle, User, Phone, Mail, Calendar, ShieldAlert, MapPin, Hash, Sparkles, Plus, Trash2, Loader2, Download, ExternalLink, Zap } from "lucide-react";
 import { DoctorPatient } from "../types";
 import { parseBookingNotes, getAuthHeaders } from "../utils";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
@@ -34,10 +34,13 @@ export default function DoctorPatientHistoryDrawer({
   const [medicalRecordData, setMedicalRecordData] = useState<any | null>(null);
   const [medicalReports, setMedicalReports] = useState<any[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
+  const [laserLogs, setLaserLogs] = useState<any[]>([]);
+  const [loadingLaserLogs, setLoadingLaserLogs] = useState(false);
+  const [laserStats, setLaserStats] = useState<any>(null);
   const [showMedicalReportModal, setShowMedicalReportModal] = useState(false);
   const [customerFullData, setCustomerFullData] = useState<any | null>(null);
   const [loadingCustomerData, setLoadingCustomerData] = useState(false);
-  const [activeTab, setActiveTab] = useState<"history" | "medical" | "reports" | "personal">("history");
+  const [activeTab, setActiveTab] = useState<"history" | "laser" | "medical" | "reports" | "personal">("history");
   const [authHeadersObj, setAuthHeadersObj] = useState<{ "Content-Type": string; Authorization: string }>({
     "Content-Type": "application/json",
     Authorization: ""
@@ -136,6 +139,25 @@ export default function DoctorPatientHistoryDrawer({
       };
       fetchRx();
     }
+
+    // 4. Fetch Laser Pulse Logs & Stats
+    const fetchLaserData = async () => {
+      setLoadingLaserLogs(true);
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/laser-pulses?customerId=${encodeURIComponent(custId)}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setLaserLogs(Array.isArray(data.logs) ? data.logs : []);
+          setLaserStats(data.stats || null);
+        }
+      } catch (err) {
+        console.error("Error loading patient laser history:", err);
+      } finally {
+        setLoadingLaserLogs(false);
+      }
+    };
+    fetchLaserData();
   }, [selectedPatientHistory, medicalRecordsMap, prescriptionsMap]);
 
   const handleDeleteMedicalReport = async (reportId: string) => {
@@ -237,7 +259,7 @@ export default function DoctorPatientHistoryDrawer({
           </div>
         </div>
 
-        {/* 4 Sub-Navigation Tabs Bar */}
+        {/* 5 Sub-Navigation Tabs Bar */}
         <div className="flex items-center bg-white rounded-2xl sm:rounded-3xl p-1.5 sm:p-2 border border-[#414E36]/12 shadow-xs gap-1 sm:gap-2 overflow-x-auto no-scrollbar w-full">
           <button
             type="button"
@@ -250,6 +272,19 @@ export default function DoctorPatientHistoryDrawer({
           >
             <Clock size={16} />
             <span>Clinical History ({validBookings.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("laser")}
+            className={`flex-1 py-2.5 sm:py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-extrabold rounded-xl sm:rounded-2xl transition flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === "laser"
+                ? "bg-[#414E36] text-white shadow-sm"
+                : "text-[#5A6A51] hover:text-[#1F251A] hover:bg-[#F4F5F1]"
+            }`}
+          >
+            <Zap size={16} className="text-amber-500" />
+            <span>Laser History ({laserLogs.length})</span>
           </button>
 
           <button
@@ -294,6 +329,119 @@ export default function DoctorPatientHistoryDrawer({
             <span>Personal Info</span>
           </button>
         </div>
+
+        {/* Tab: Laser History */}
+        {activeTab === "laser" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-[#414E36]/10">
+              <h3 className="text-xs sm:text-sm font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                <Zap size={16} className="text-amber-600" /> Laser Treatment & Pulse History
+              </h3>
+              <span className="text-[11px] sm:text-xs font-bold text-[#414E36] bg-[#414E36]/10 px-2.5 sm:px-3 py-1 rounded-full">
+                {laserLogs.length} Laser Sessions
+              </span>
+            </div>
+
+            {/* Lifetime KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-white p-4 rounded-2xl border border-[#414E36]/10 shadow-xs">
+                <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider block">Total Laser Sessions</span>
+                <span className="text-xl font-black text-[#1F251A] mt-1 block">{laserLogs.length}</span>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-[#414E36]/10 shadow-xs">
+                <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider block">Total Pulses Delivered</span>
+                <span className="text-xl font-black text-[#414E36] mt-1 block">
+                  {laserLogs.reduce((sum, l) => sum + (Number(l.pulses_used || 0) + Number(l.additional_pulses || 0)), 0)} Pulses
+                </span>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-[#414E36]/10 shadow-xs">
+                <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider block">Total Additional Pulses Billed</span>
+                <span className="text-xl font-black text-amber-800 mt-1 block">
+                  {laserLogs.reduce((sum, l) => sum + Number(l.additional_charge || 0), 0)} EGP
+                </span>
+              </div>
+            </div>
+
+            {/* Laser Logs Feed */}
+            {loadingLaserLogs ? (
+              <div className="p-8 text-center text-sm text-[#5A6A51] bg-white rounded-2xl border border-[#414E36]/10 flex items-center justify-center gap-2">
+                <Loader2 size={16} className="animate-spin text-[#414E36]" /> Loading laser pulse history...
+              </div>
+            ) : laserLogs.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 p-6 space-y-2">
+                <div className="h-12 w-12 mx-auto rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center">
+                  <Zap size={22} />
+                </div>
+                <h4 className="font-bold text-sm text-[#1F251A]">No Laser Sessions Recorded Yet</h4>
+                <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
+                  Laser treatment sessions delivered via Type 1 Service, Type 2 FIFO Retail Pulses, or Type 3 Packages will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {laserLogs.map((log) => (
+                  <div key={log.id} className="bg-white rounded-2xl border border-[#414E36]/10 p-4 space-y-3 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/10 pb-2.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          log.pulse_type === "SERVICE"
+                            ? "bg-blue-50 text-blue-800 border border-blue-200"
+                            : log.pulse_type === "PULSE_PURCHASE"
+                            ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                            : "bg-purple-50 text-purple-800 border border-purple-200"
+                        }`}>
+                          {log.pulse_type === "SERVICE" ? "Type 1 · Fixed Service" : log.pulse_type === "PULSE_PURCHASE" ? "Type 2 · Retail Pulses (FIFO)" : "Type 3 · Package Pulses"}
+                        </span>
+                        <span className="text-xs font-bold text-[#1F251A]">
+                          Area: <strong className="text-[#414E36]">{log.treatment_area || "General"}</strong>
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-[#5A6A51] font-medium">
+                        {log.created_at ? new Date(log.created_at).toLocaleString() : "Recent Session"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#414E36]/10">
+                        <span className="text-[10px] text-[#5A6A51] block">Standard Pulses</span>
+                        <span className="font-extrabold text-[#1F251A]">{log.pulses_used || 0}</span>
+                      </div>
+
+                      <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#414E36]/10">
+                        <span className="text-[10px] text-[#5A6A51] block">Extra Pulses</span>
+                        <span className={`font-extrabold ${Number(log.additional_pulses) > 0 ? "text-amber-800" : "text-[#5A6A51]"}`}>
+                          {log.additional_pulses || 0} {Number(log.additional_charge) > 0 && `(+${log.additional_charge} EGP)`}
+                        </span>
+                      </div>
+
+                      <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#414E36]/10">
+                        <span className="text-[10px] text-[#5A6A51] block">Remaining After</span>
+                        <span className="font-extrabold text-[#414E36]">{log.remaining_balance_after ?? "—"}</span>
+                      </div>
+
+                      <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#414E36]/10">
+                        <span className="text-[10px] text-[#5A6A51] block">Device / Doctor</span>
+                        <span className="font-bold text-[#1F251A] block truncate">{log.device_name || "Device"} · {log.doctor_name || "Doctor"}</span>
+                      </div>
+                    </div>
+
+                    {log.additional_reason && (
+                      <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-200 text-xs text-amber-900">
+                        <strong>Reason for Extra Charge:</strong> {log.additional_reason}
+                      </div>
+                    )}
+
+                    {log.notes && (
+                      <div className="text-xs text-[#5A6A51] bg-[#FBFBF9] p-2.5 rounded-xl border border-[#414E36]/10">
+                        <strong>Doctor Notes:</strong> {log.notes}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tab 1: Clinical History & Visits */}
         {activeTab === "history" && (

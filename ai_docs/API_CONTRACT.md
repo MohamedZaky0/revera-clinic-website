@@ -1906,4 +1906,142 @@ Deletes a prescription by ID.
 
 **Response:** `{ "success": true }`
 
+---
+
+## GET /api/laser-pulses
+
+Fetches unified laser pulse logs and lifetime aggregated statistics for a patient or clinic-wide.
+
+**Query params:**
+- `customerId` / `customer_id`: Filter logs and calculate stats for a specific patient.
+- `reservationId` / `reservation_id`: Filter logs for a specific appointment session.
+- `pulseType`: Filter by `'SERVICE'`, `'PULSE_PURCHASE'`, or `'PACKAGE'`.
+- `limit`: Number of logs to return (default 100).
+
+**Response:**
+```json
+{
+  "success": true,
+  "stats": {
+    "totalSessions": number,
+    "totalPulsesDelivered": number,
+    "totalAdditionalPulses": number,
+    "totalAdditionalCharge": number
+  },
+  "logs": [
+    {
+      "id": "uuid",
+      "customer_id": "uuid",
+      "reservation_id": "uuid | null",
+      "pulse_type": "SERVICE | PULSE_PURCHASE | PACKAGE",
+      "treatment_area": "string",
+      "pulses_used": number,
+      "remaining_balance_after": number | null,
+      "additional_pulses": number,
+      "pulse_value": number,
+      "additional_charge": number,
+      "total_patient_charge": number,
+      "additional_reason": "string | null",
+      "source_id": "string | null",
+      "doctor_id": "string | null",
+      "doctor_name": "string | null",
+      "device_id": "string | null",
+      "device_name": "string | null",
+      "session_date": "ISO string",
+      "created_at": "ISO string"
+    }
+  ]
+}
+```
+
+---
+
+## POST /api/laser-pulses
+
+Records a unified laser pulse session and creates an audit log entry.
+
+**Body:**
+- `customerId` (UUID, required)
+- `reservationId` (UUID, optional)
+- `pulseType` (`"SERVICE"` | `"PULSE_PURCHASE"` | `"PACKAGE"`, required)
+- `treatmentArea` (string, required)
+- `pulsesUsed` (number, non-negative, required)
+- `additionalPulses` (number, non-negative, optional)
+- `pulseValue` (number, non-negative, optional)
+- `additionalPulsesReason` (string, mandatory if `additionalPulses > 0`)
+- `servicePrice` (number, optional)
+- `sourceId` (string, optional)
+- `remainingBalanceAfter` (number, optional)
+- `deviceId` / `deviceName` (optional)
+- `doctorId` / `doctorName` (optional)
+- `sessionDate` (ISO string, optional)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Laser pulse session logged successfully.",
+  "log": { ... }
+}
+```
+
+---
+
+## PATCH /api/customers/products (FIFO Pulse Consumption)
+
+Consumes pulses from the patient's retail active balances using First-In, First-Out (FIFO) deduction across multiple purchases.
+
+**Body:**
+- `action`: `"fifo_consume"` | `"consume_pulses"`
+- `customerId` / `customer_id`: UUID of patient
+- `quantity`: number of pulses to consume
+- `treatment_area`: string
+- `booking_id`: optional UUID
+- `notes`: optional clinical remarks
+
+**Response:**
+```json
+{
+  "success": true,
+  "consumed": number,
+  "remainingGeneralBalance": number,
+  "affectedPurchases": [
+    {
+      "purchase_id": "string",
+      "deducted": number,
+      "remaining_after": number,
+      "purchase_name": "string"
+    }
+  ],
+  "balances": [ ... ]
+}
+```
+
+---
+
+## PATCH /api/customers/packages (Package Pulse Consumption)
+
+Consumes pulses included in a patient's active package.
+
+**Body:**
+- `action`: `"consume_package_pulses"`
+- `packageId`: UUID / ID of customer package
+- `quantity`: number of pulses to consume
+- `treatment_area`: string
+- `booking_id`: optional UUID
+- `notes`: optional clinical remarks
+
+**Response:**
+```json
+{
+  "success": true,
+  "consumed": number,
+  "remainingPulses": number,
+  "includedPulses": number,
+  "usedPulses": number,
+  "log": { ... }
+}
+```
+
+
 

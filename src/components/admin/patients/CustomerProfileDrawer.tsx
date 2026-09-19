@@ -21,6 +21,7 @@ import {
   Wallet,
   CreditCard,
   Info,
+  Zap,
 } from "lucide-react";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
@@ -262,8 +263,104 @@ export default function CustomerProfileDrawer({
 
   const [showInlineManualTxnModal, setShowInlineManualTxnModal] = React.useState(false);
 
+  // Laser Pulse Counter Engine states
+  const [laserLogs, setLaserLogs] = React.useState<any[]>([]);
+  const [loadingLaserLogs, setLoadingLaserLogs] = React.useState(false);
+  const [laserStats, setLaserStats] = React.useState<any>(null);
+  const [showSellPulsesModal, setShowSellPulsesModal] = React.useState(false);
+  const [sellPulsesQty, setSellPulsesQty] = React.useState<number>(500);
+  const [sellPulsesPricePerPulse, setSellPulsesPricePerPulse] = React.useState<number>(5);
+  const [sellPulsesPaymentMethod, setSellPulsesPaymentMethod] = React.useState<string>("cash");
+  const [sellingPulses, setSellingPulses] = React.useState(false);
+
+  // Fetch unified laser history logs for this customer
+  React.useEffect(() => {
+    if (!viewingCustomerProfile?.id) {
+      setLaserLogs([]);
+      setLaserStats(null);
+      return;
+    }
+
+    const fetchLaser = async () => {
+      setLoadingLaserLogs(true);
+      try {
+        const res = await fetch(`/api/laser-pulses?customerId=${encodeURIComponent(viewingCustomerProfile.id || "")}`, {
+          headers: authenticatedJsonHeaders
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setLaserLogs(Array.isArray(data.logs) ? data.logs : []);
+          setLaserStats(data.stats || null);
+        }
+      } catch (err) {
+        console.error("Error fetching patient laser history:", err);
+      } finally {
+        setLoadingLaserLogs(false);
+      }
+    };
+    fetchLaser();
+
+    const handleLaserChange = () => fetchLaser();
+    window.addEventListener("revera-laser-change", handleLaserChange);
+    return () => window.removeEventListener("revera-laser-change", handleLaserChange);
+  }, [viewingCustomerProfile?.id]);
+
+  // Handle Sell Laser Pulses Modal submit
+  const handleSellLaserPulses = async () => {
+    if (!viewingCustomerProfile?.id || sellPulsesQty <= 0) return;
+    setSellingPulses(true);
+    try {
+      const totalPrice = sellPulsesQty * sellPulsesPricePerPulse;
+      const res = await fetch("/api/customers/products", {
+        method: "POST",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify({
+          customerId: viewingCustomerProfile.id,
+          productId: "laser-pulses-retail",
+          productName: `Laser Pulses (${sellPulsesQty} Pulses)`,
+          quantity: sellPulsesQty,
+          unitPrice: sellPulsesPricePerPulse,
+          totalPrice: totalPrice,
+          paymentMethod: sellPulsesPaymentMethod,
+          category: "laser_pulses",
+          isPulseProduct: true
+        })
+      });
+
+      if (res.ok) {
+        alert("Laser pulses sold and added to patient active balance successfully!");
+        setShowSellPulsesModal(false);
+        setCustomerProductsSubTab("current");
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("revera-laser-change"));
+          window.dispatchEvent(new CustomEvent("revera-booking-change"));
+        }
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || errData.message || "Failed to sell laser pulses.");
+      }
+    } catch (err) {
+      console.error("Error selling laser pulses:", err);
+      alert("Error selling laser pulses.");
+    } finally {
+      setSellingPulses(false);
+    }
+  };
+
   const t = adminTranslations[lang].patients.customerProfileDrawer;
   const mf = adminTranslations[lang].patients.medicalFormModal;
+
+  const totalActiveRetailPulses = useMemo(() => {
+    if (!Array.isArray(customerProductBalances)) return 0;
+    return customerProductBalances.reduce((sum: number, bal: any) => {
+      const isPulse = bal.category === "laser_pulses" || bal.is_pulse_product || (bal.product_name && bal.product_name.toLowerCase().includes("pulse"));
+      if (!isPulse) return sum;
+      const totalPurchased = bal.purchased_quantity ?? bal.total_purchased ?? bal.quantity ?? 0;
+      const totalUsed = bal.used_quantity ?? bal.total_used ?? bal.quantity_used ?? 0;
+      const remaining = bal.remaining_quantity ?? bal.remaining_balance ?? (totalPurchased - totalUsed);
+      return sum + Math.max(0, remaining);
+    }, 0);
+  }, [customerProductBalances]);
 
   const combinedPatientProductSales = useMemo(() => {
     if (!viewingCustomerProfile) return [];
@@ -662,6 +759,17 @@ export default function CustomerProfileDrawer({
         >
           <Package size={15} />
           {t.tabPackages}
+        </button>
+        <button
+          onClick={() => setCustomerProfileTab("laser")}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none min-w-max ${
+            customerProfileTab === "laser"
+              ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+              : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
+          }`}
+        >
+          <Zap size={15} className="text-amber-500" />
+          <span>Laser History {laserLogs.length > 0 ? `(${laserLogs.length})` : ""}</span>
         </button>
       </div>
 
@@ -1331,23 +1439,78 @@ export default function CustomerProfileDrawer({
               </div>
 
               {(adminRole === "superadmin" || adminRole === "admin" || adminRole === "receptionist" || adminRole === "doctor") && (
-                <button
-                  onClick={() => {
-                    setSelectedAddProductId("");
-                    setSelectedAddProductName("");
-                    setSelectedAddProductQty(1);
-                    setSelectedAddProductUnitPrice(0);
-                    setShowAddPatientProductModal(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm w-fit"
-                >
-                  <Plus size={14} /> {t.addProductBtn}
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => {
+                      setSellPulsesQty(500);
+                      setSellPulsesPricePerPulse(5);
+                      setSellPulsesPaymentMethod("cash");
+                      setShowSellPulsesModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 px-3.5 py-2 text-xs font-semibold text-white transition shadow-sm w-fit"
+                  >
+                    <Zap size={14} /> {t.sellLaserPulsesBtn || "+ Sell Laser Pulses"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedAddProductId("");
+                      setSelectedAddProductName("");
+                      setSelectedAddProductQty(1);
+                      setSelectedAddProductUnitPrice(0);
+                      setShowAddPatientProductModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm w-fit"
+                  >
+                    <Plus size={14} /> {t.addProductBtn}
+                  </button>
+                </div>
               )}
             </div>
 
             {customerProductsSubTab === "current" && (
-              <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm">
+              <div className="space-y-4">
+                {/* General Active Laser Pulse Balance Banner (FIFO) */}
+                {totalActiveRetailPulses > 0 && (
+                  <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent rounded-2xl border border-amber-300/60 p-4.5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+                        <Zap size={20} />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-sm font-bold text-[#1F251A]">{t.generalActivePulseBalance || "General Active Pulse Balance"}</h4>
+                          <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">FIFO Engine</span>
+                        </div>
+                        <p className="text-xs text-[#5A6A51] max-w-xl leading-relaxed">
+                          {t.fifoNotice || "Pulses are consumed automatically using FIFO (oldest active purchases consumed first)."}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                      <div className="text-end">
+                        <span className="block text-xl font-black text-amber-900 tracking-tight">
+                          {totalActiveRetailPulses.toLocaleString()}
+                        </span>
+                        <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">{t.totalAvailablePulses || "Pulses Available"}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSellPulsesQty(500);
+                          setSellPulsesPricePerPulse(5);
+                          setSellPulsesPaymentMethod("cash");
+                          setShowSellPulsesModal(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 text-xs font-bold transition shadow-xs"
+                      >
+                        <Plus size={14} />
+                        <span>{t.sellLaserPulsesBtn || "+ Sell Laser Pulses"}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm">
                 {loadingCustomerProducts ? (
                   <div className="p-8 text-center text-sm text-[#5A6A51]">{t.loadingProductBalances}</div>
                 ) : customerProductBalances.length === 0 ? (
@@ -1444,7 +1607,8 @@ export default function CustomerProfileDrawer({
                   </div>
                 )}
               </div>
-            )}
+            </div>
+          )}
 
             {customerProductsSubTab === "history" && (
               <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm p-6 space-y-4">
@@ -1633,6 +1797,183 @@ export default function CustomerProfileDrawer({
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Tab 7: Laser History */}
+        {customerProfileTab === "laser" && (
+          <div className="space-y-6">
+            {/* Lifetime KPI Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="rounded-2xl border border-amber-200/70 bg-amber-50/50 p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-xs font-semibold text-amber-800">
+                  <span>{t.totalLaserSessions || "Total Laser Sessions"}</span>
+                  <Zap size={14} className="text-amber-600" />
+                </div>
+                <div className="mt-2 text-xl font-black text-[#1F251A]">
+                  {laserStats?.totalSessions ?? laserLogs.length}
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5">Lifetime sessions</div>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/50 p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
+                  <span>{t.totalPulsesDelivered || "Total Pulses Delivered"}</span>
+                  <Zap size={14} className="text-emerald-600" />
+                </div>
+                <div className="mt-2 text-xl font-black text-emerald-900">
+                  {(laserStats?.totalPulsesDelivered ?? laserLogs.reduce((acc, l) => acc + (Number(l.pulses_used) || 0), 0)).toLocaleString()}
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5">All service & pulse logs</div>
+              </div>
+
+              <div className="rounded-2xl border border-sky-200/70 bg-sky-50/50 p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-xs font-semibold text-sky-800">
+                  <span>{t.totalAdditionalPulses || "Total Additional Pulses"}</span>
+                  <Plus size={14} className="text-sky-600" />
+                </div>
+                <div className="mt-2 text-xl font-black text-sky-900">
+                  {(laserStats?.totalAdditionalPulses ?? laserLogs.reduce((acc, l) => acc + (Number(l.additional_pulses) || 0), 0)).toLocaleString()}
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5">Extra billed pulses</div>
+              </div>
+
+              <div className="rounded-2xl border border-purple-200/70 bg-purple-50/50 p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-xs font-semibold text-purple-800">
+                  <span>Total Extra Billed</span>
+                  <Wallet size={14} className="text-purple-600" />
+                </div>
+                <div className="mt-2 text-xl font-black text-purple-900">
+                  EGP {(laserStats?.totalAdditionalCharge ?? laserLogs.reduce((acc, l) => acc + (Number(l.additional_charge) || 0), 0)).toLocaleString()}
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5">Surcharge revenue</div>
+              </div>
+            </div>
+
+            {/* Laser Logs Feed / Table */}
+            <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm">
+              <div className="p-4 border-b border-[#414E36]/10 bg-[#FBFBF9] flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-[#1F251A]">{t.tabLaserHistory || "Laser History"}</h4>
+                  <p className="text-xs text-[#5A6A51]">Comprehensive audit log of all laser treatments and pulse consumptions</p>
+                </div>
+                {laserLogs.length > 0 && (
+                  <span className="text-xs font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-1 rounded-lg">
+                    {laserLogs.length} {laserLogs.length === 1 ? "Session" : "Sessions"}
+                  </span>
+                )}
+              </div>
+
+              {loadingLaserLogs ? (
+                <div className="p-8 text-center text-sm text-[#5A6A51]">Loading laser history...</div>
+              ) : laserLogs.length === 0 ? (
+                <div className="p-12 text-center space-y-3">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                    <Zap size={24} />
+                  </div>
+                  <p className="text-sm font-semibold text-[#1F251A]">{t.noLaserHistoryTitle || "No Laser Sessions Recorded Yet"}</p>
+                  <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
+                    {t.noLaserHistorySubtitle || "Recorded laser pulse sessions and history logs for this patient will appear here."}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-start text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-[#414E36]/10 bg-[#FBFBF9] text-[#5A6A51] font-bold uppercase tracking-wider">
+                        <th className="py-3 px-4">{t.colDate || "Date / Time"}</th>
+                        <th className="py-3 px-4">{t.colTreatmentArea || "Treatment Area"}</th>
+                        <th className="py-3 px-4 text-center">{t.colSource || "Sale Type"}</th>
+                        <th className="py-3 px-4 text-center">{t.colPulsesUsed || "Pulses Used"}</th>
+                        <th className="py-3 px-4 text-center">{t.colAdditionalPulses || "Additional Pulses"}</th>
+                        <th className="py-3 px-4 text-center">Remaining Balance</th>
+                        <th className="py-3 px-4 text-end">{t.colDoctorStaff || "Doctor / Staff"}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#414E36]/5">
+                      {laserLogs.map((log: any) => {
+                        const dateStr = log.created_at || log.session_date
+                          ? new Date(log.created_at || log.session_date).toLocaleString(lang === "ar" ? "ar-EG" : "en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })
+                          : "—";
+
+                        return (
+                          <tr key={log.id} className="hover:bg-[#FBFBF9]/60 transition">
+                            <td className="py-3.5 px-4 font-medium text-[#1F251A] whitespace-nowrap">
+                              {dateStr}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="inline-flex items-center font-bold text-[#1F251A] bg-gray-100 px-2.5 py-1 rounded-md">
+                                {log.treatment_area || "Standard Area"}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {log.pulse_type === "SERVICE" ? (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  {t.sourceService || "Laser Service"}
+                                </span>
+                              ) : log.pulse_type === "PACKAGE" ? (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  {t.sourcePackage || "Package Pulses"}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  {t.sourcePulsePurchase || "Pulse Purchase (FIFO)"}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center font-bold text-[#1F251A]">
+                              <span className="text-sm">{Number(log.pulses_used || 0).toLocaleString()}</span> <span className="text-[10px] text-[#5A6A51]">pulses</span>
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {Number(log.additional_pulses || 0) > 0 ? (
+                                <div className="inline-flex flex-col items-center">
+                                  <span className="font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md text-xs">
+                                    +{Number(log.additional_pulses).toLocaleString()} pulses
+                                  </span>
+                                  {Number(log.additional_charge || 0) > 0 && (
+                                    <span className="text-[10px] text-rose-700 font-semibold mt-0.5">
+                                      +EGP {Number(log.additional_charge).toLocaleString()}
+                                    </span>
+                                  )}
+                                  {log.additional_reason && (
+                                    <span className="text-[9px] text-[#5A6A51] italic max-w-[120px] truncate" title={log.additional_reason}>
+                                      {log.additional_reason}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-[#8A9A81]">—</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center font-semibold">
+                              {log.remaining_balance_after !== null && log.remaining_balance_after !== undefined ? (
+                                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
+                                  {Number(log.remaining_balance_after).toLocaleString()} left
+                                </span>
+                              ) : (
+                                <span className="text-[#8A9A81] text-[11px]">N/A (Fixed Service)</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-end">
+                              <div className="font-semibold text-[#1F251A]">{log.doctor_name || "Doctor"}</div>
+                              {log.device_name && (
+                                <div className="text-[10px] text-[#5A6A51]">{log.device_name}</div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -2088,6 +2429,130 @@ export default function CustomerProfileDrawer({
                 className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-xs"
               >
                 {t.cancelBtn || "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Sell Laser Pulses to Patient (FIFO Active Balance) ── */}
+      {showSellPulsesModal && viewingCustomerProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs" onClick={() => setShowSellPulsesModal(false)} />
+          <div className="relative z-10 w-full max-w-lg bg-white rounded-3xl border border-[#414E36]/15 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs">
+                  <Zap size={18} />
+                </div>
+                <div>
+                  <h4 className="text-base font-bold text-[#1F251A]">{t.sellLaserPulsesModalTitle || "Sell Laser Pulses to Patient"}</h4>
+                  <p className="text-xs text-[#5A6A51]">{t.assignProductBalanceTo || "Assign pulse balance to"} {viewingCustomerProfile.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSellPulsesModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition p-1"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-3 text-xs text-amber-900 flex items-start gap-2">
+              <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                {t.fifoNotice || "Pulses are added to the patient's active balance and consumed using FIFO (oldest active purchases consumed first) across future laser sessions."}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Preset Quantities */}
+              <div>
+                <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.pulseQuantityLabel || "Pulse Quantity"}</label>
+                <div className="grid grid-cols-5 gap-1.5 mb-2">
+                  {[250, 500, 1000, 2000, 5000].map((qty) => (
+                    <button
+                      key={qty}
+                      type="button"
+                      onClick={() => setSellPulsesQty(qty)}
+                      className={`py-1.5 rounded-xl text-xs font-bold transition border ${
+                        sellPulsesQty === qty
+                          ? "bg-amber-500 border-amber-600 text-white shadow-xs"
+                          : "bg-white border-[#414E36]/15 text-[#1F251A] hover:bg-[#EDF1EC]"
+                      }`}
+                    >
+                      {qty.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  step="50"
+                  value={sellPulsesQty}
+                  onChange={(e) => setSellPulsesQty(Math.max(1, Number(e.target.value)))}
+                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm font-bold text-[#1F251A] outline-none focus:border-amber-500"
+                  placeholder="Enter custom pulse quantity..."
+                />
+              </div>
+
+              {/* Price per Pulse & Payment Method */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.pricePerPulseLabel || "Price per Pulse (EGP)"}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={sellPulsesPricePerPulse}
+                    onChange={(e) => setSellPulsesPricePerPulse(Math.max(0, Number(e.target.value)))}
+                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm font-bold text-[#1F251A] outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.paymentMethodLabel || "Payment Method"}</label>
+                  <select
+                    value={sellPulsesPaymentMethod}
+                    onChange={(e) => setSellPulsesPaymentMethod(e.target.value)}
+                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-amber-500"
+                  >
+                    <option value="cash">{t.paymentMethods?.cash || "Cash"}</option>
+                    <option value="card">{t.paymentMethods?.card || "Credit / Debit Card"}</option>
+                    <option value="wallet">{t.paymentMethods?.wallet || "Mobile Wallet"}</option>
+                    <option value="instapay">{t.paymentMethods?.instapay || "InstaPay"}</option>
+                    <option value="transfer">{t.paymentMethods?.transfer || "Bank Transfer"}</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Summary Calculation */}
+              <div className="bg-[#EDF1EC]/70 p-4 rounded-2xl flex items-center justify-between text-xs font-semibold text-[#1F251A]">
+                <div>
+                  <span className="block text-[#5A6A51]">{t.totalPriceLabel || "Total Price (EGP):"}</span>
+                  <span className="text-[11px] text-[#8A9A81] font-normal">{sellPulsesQty.toLocaleString()} pulses × {sellPulsesPricePerPulse} EGP</span>
+                </div>
+                <span className="text-lg font-black text-amber-900">
+                  EGP {(sellPulsesQty * sellPulsesPricePerPulse).toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#414E36]/10">
+              <button
+                type="button"
+                onClick={() => setShowSellPulsesModal(false)}
+                className="rounded-xl border border-[#414E36]/15 px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+              >
+                {t.cancelBtn || "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSellLaserPulses}
+                disabled={sellingPulses || sellPulsesQty <= 0}
+                className="rounded-xl bg-amber-600 hover:bg-amber-700 px-5 py-2 text-xs font-bold text-white transition disabled:opacity-50 shadow-sm"
+              >
+                {sellingPulses ? (t.sellingBtn || "Selling...") : (t.sellLaserPulsesBtn || "Confirm & Sell Pulses")}
               </button>
             </div>
           </div>

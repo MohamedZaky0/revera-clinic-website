@@ -2163,3 +2163,40 @@ When staff create a new appointment in `AdminNewBookingView.tsx`, they need imme
 4. **Automated Diagnostic Test Verification:**
    - Added test case `TC-066` ("Staff Weekly Shift Schedule & Working Days Persistence Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
 
+---
+
+## DEC-062: Comprehensive Laser Pulse Counter & Unified History Engine (Types 1, 2, 3)
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+The clinic required a complete, multi-tiered laser pulse counting and accounting engine to support three distinct operational models across all 17 clinical and business scenarios:
+1. **Type 1 — Sell by Service**: Patient purchases a fixed-price laser service (e.g., Full Body or Beard Laser). Routine pulse consumption is recorded for clinical tracking without altering service price (0 EGP delta). Optional additional pulses can be billed with a mandatory clinical reason, automatically staging extra charges in the reservation invoice.
+2. **Type 2 — Sell by Pulse (FIFO Engine)**: Patient purchases a volume of retail pulses (e.g., 500, 1000, 2000 pulses). Purchases are combined into a patient-level General Active Pulse Balance banner while maintaining individual purchase records. When consumed in doctor sessions, a First-In, First-Out (FIFO) algorithm automatically consumes from the oldest active purchase first, spilling over into subsequent purchases, rejecting requests exceeding total balance, and auto-transitioning fully depleted records to Purchase History.
+3. **Type 3 — Pulse Included in Package**: Predefined packages (e.g., "Full Body Laser 6 Sessions + 12,000 Pulses") track package-specific pulse balances (`included_pulses`, `used_pulses`, `remaining_pulses`), strictly isolated from retail pulse products, with automated package expiration validation.
+4. **Unified Laser History**: A centralized audit feed and lifetime KPI aggregator logging all laser deliveries across all 3 types with treatment area tags, doctor/staff attribution, device tracking, surcharge breakdowns, and post-session remaining balance snapshots.
+
+**Decisions & Implementation:**
+1. **Database Schema & Migrations (`supabase/migrations/20260920000000_create_laser_pulse_engine.sql`):**
+   - Created `laser_pulse_logs` table with columns: `id`, `customer_id`, `reservation_id`, `pulse_type` (`SERVICE`, `PULSE_PURCHASE`, `PACKAGE`), `treatment_area`, `pulses_used`, `remaining_balance_after`, `additional_pulses`, `pulse_value`, `additional_charge`, `total_patient_charge`, `additional_reason`, `source_id`, `doctor_id`, `doctor_name`, `device_id`, `device_name`, `session_date`, and `created_at`.
+2. **Unified Laser Pulses API (`/api/laser-pulses`):**
+   - `GET /api/laser-pulses`: Fetches unified logs and aggregates lifetime statistics (`totalSessions`, `totalPulsesDelivered`, `totalAdditionalPulses`, `totalAdditionalCharge`).
+   - `POST /api/laser-pulses`: Validates non-negative inputs, enforces mandatory reason for additional billed pulses, persists logs to Supabase `laser_pulse_logs`, local disk `data/laser_pulses.json`, and `page_settings.laser_pulse_logs`.
+3. **FIFO Retail Pulse Engine (`/api/customers/products`):**
+   - Exported helper `consumePatientPulsesFIFO(customerId, pulsesToConsume, sessionContext)` which sorts active purchases by `created_at ASC`, deducts from the oldest batch, marks exhausted batches as `Depleted`, and halts with HTTP 400 if balance is insufficient.
+   - Added `PATCH` action `fifo_consume` and enhanced `GET` summary with `totalActivePulses`.
+4. **Package Pulse Balance Engine (`/api/customers/packages`):**
+   - Extended customer package data models to track `includedPulses`, `usedPulses`, and `remainingPulses`.
+   - Added `PATCH` action `consume_package_pulses` validating active status, expiration date, and remaining balance.
+5. **Doctor Portal Session Counter Card (`DoctorOngoingSessionTab.tsx` & `DoctorAccountView.tsx`):**
+   - Integrated dynamic Laser Pulse Counter card in Doctor Ongoing Session with Mode Switcher (Type 1 Service, Type 2 FIFO Pulse, Type 3 Package Pulses), treatment area selector, device picker, live extra pulse calculation (`Qty × Value`), mandatory reason validation, and real-time FIFO balance projection.
+   - Integrated execution into `handleCompleteTreatment`: records unified laser log, deducts FIFO pulses / package pulses, updates device pulse counters, and stages invoice line items.
+6. **Patient Laser History Drawers & Active Pulse Banner (`DoctorPatientHistoryDrawer.tsx` & `CustomerProfileDrawer.tsx`):**
+   - Added dedicated "Laser History" tabs in both Doctor Patient History Drawer and Admin Customer Profile Drawer with lifetime KPI summary cards and chronological treatment tables.
+   - Added General Active Pulse Balance banner in Customer Profile "Purchased Products & Cart" tab with "+ Sell Laser Pulses" modal dialog for selling retail pulses directly to patient balance.
+7. **Bilingual Parity (`translations.ts` & `doctor/translations.ts`):**
+   - Added complete English and Arabic dictionaries for all pulse modes, field labels, tooltips, validation errors, and KPI cards.
+8. **Automated Diagnostic Test Verification:**
+   - Added test case `TC-067` ("Laser Pulse Counter & Unified Laser History Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
