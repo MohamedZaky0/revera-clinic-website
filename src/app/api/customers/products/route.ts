@@ -148,19 +148,35 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const {
-      customer_id,
-      customer_name,
-      customer_mobile,
-      product_id,
-      product_name,
-      product_sku,
-      quantity,
-      unit_price,
-      total_amount,
-      is_pulse_product,
-      force_new_record
-    } = body;
+    const customer_id = body.customer_id || body.customerId;
+    const customer_name = body.customer_name || body.customerName;
+    const customer_mobile = body.customer_mobile || body.customerMobile;
+    const product_id = body.product_id || body.productId;
+    const product_name = body.product_name || body.productName;
+    const product_sku = body.product_sku || body.productSku;
+    const quantity = Number(body.quantity !== undefined ? body.quantity : body.qty);
+    const unit_price = Number(body.unit_price !== undefined ? body.unit_price : (body.unitPrice !== undefined ? body.unitPrice : 0));
+    const total_amount = Number(
+      body.total_amount !== undefined
+        ? body.total_amount
+        : body.totalPrice !== undefined
+        ? body.totalPrice
+        : body.totalAmount !== undefined
+        ? body.totalAmount
+        : quantity * unit_price
+    );
+    const is_pulse_product =
+      body.is_pulse_product !== undefined
+        ? Boolean(body.is_pulse_product)
+        : body.isPulseProduct !== undefined
+        ? Boolean(body.isPulseProduct)
+        : undefined;
+    const force_new_record =
+      body.force_new_record !== undefined
+        ? Boolean(body.force_new_record)
+        : body.forceNewRecord !== undefined
+        ? Boolean(body.forceNewRecord)
+        : undefined;
 
     if (!customer_id || !product_name || !quantity || quantity <= 0) {
       return NextResponse.json(

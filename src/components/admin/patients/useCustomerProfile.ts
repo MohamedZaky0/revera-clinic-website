@@ -203,6 +203,13 @@ export function useCustomerProfile({
     if (viewingCustomerProfile?.id) {
       fetchCustomerProductBalances(viewingCustomerProfile.id);
     }
+    const handleLaserChange = () => {
+      if (viewingCustomerProfile?.id) {
+        fetchCustomerProductBalances(viewingCustomerProfile.id);
+      }
+    };
+    window.addEventListener("revera-laser-change", handleLaserChange);
+    return () => window.removeEventListener("revera-laser-change", handleLaserChange);
   }, [viewingCustomerProfile?.id, fetchCustomerProductBalances]);
 
   // Fetch customer profile packages

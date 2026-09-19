@@ -317,15 +317,25 @@ export default function CustomerProfileDrawer({
         method: "POST",
         headers: authenticatedJsonHeaders,
         body: JSON.stringify({
+          customer_id: viewingCustomerProfile.id,
           customerId: viewingCustomerProfile.id,
+          customer_name: viewingCustomerProfile.name || (viewingCustomerProfile as any).customer_name || "",
+          customerName: viewingCustomerProfile.name || (viewingCustomerProfile as any).customer_name || "",
+          product_id: "laser-pulses-retail",
           productId: "laser-pulses-retail",
+          product_name: `Laser Pulses (${sellPulsesQty} Pulses)`,
           productName: `Laser Pulses (${sellPulsesQty} Pulses)`,
           quantity: sellPulsesQty,
+          unit_price: sellPulsesPricePerPulse,
           unitPrice: sellPulsesPricePerPulse,
+          total_amount: totalPrice,
           totalPrice: totalPrice,
+          payment_method: sellPulsesPaymentMethod,
           paymentMethod: sellPulsesPaymentMethod,
           category: "laser_pulses",
-          isPulseProduct: true
+          is_pulse_product: true,
+          isPulseProduct: true,
+          force_new_record: true
         })
       });
 
