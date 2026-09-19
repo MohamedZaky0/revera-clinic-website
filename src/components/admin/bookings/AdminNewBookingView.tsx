@@ -612,65 +612,51 @@ export default function AdminNewBookingView({
     }
 
     // Fetch active packages for this customer
-    if (cust.id) {
-      await loadCustomerPackages(cust.id);
+    if (cust.id || p) {
+      await loadCustomerPackages(cust.id, p);
     } else {
       setCustomerPackages([]);
       setActivePackage(null);
     }
   }
 
-  // Fetch active packages for a customer with joined items and services
-  async function loadCustomerPackages(custId: string) {
-    if (!custId) {
+  // Fetch active packages for a customer with joined items and services via API
+  async function loadCustomerPackages(custId?: string, custPhone?: string) {
+    const idToUse = custId || foundCustomer?.id || "";
+    const rawPhone = custPhone || phone || foundCustomer?.mobile || foundCustomer?.phone || "";
+    const phoneToUse = rawPhone.replace(/\D/g, "");
+
+    if (!idToUse && phoneToUse.length < 10) {
       setCustomerPackages([]);
       setActivePackage(null);
       return;
     }
+
     setLoadingPackages(true);
     try {
-      const { data: pkgData, error: pkgErr } = await supabase
-        .from("customer_packages")
-        .select(`
-          id, package_id, status, purchased_at, expires_at, price_paid,
-          packages ( name, name_ar ),
-          customer_package_items ( id, service_id, qty_total, qty_used, qty_remaining, services ( en, ar ) )
-        `)
-        .eq("customer_id", custId)
-        .eq("status", "active")
-        .order("purchased_at", { ascending: false });
+      const params = new URLSearchParams();
+      if (idToUse) params.append("customer_id", String(idToUse));
+      if (phoneToUse) params.append("mobile", phoneToUse);
 
-      if (pkgData && pkgData.length > 0) {
-        const normalizedPkgs = pkgData.map((row: any) => ({
-          id: row.id,
-          packageId: row.package_id,
-          packageName: row.packages?.name || row.package_name || "Session Package",
-          packageNameAr: row.packages?.name_ar || null,
-          status: row.status,
-          purchasedAt: row.purchased_at,
-          expiresAt: row.expires_at,
-          pricePaid: Number(row.price_paid || 0),
-          items: (row.customer_package_items || []).map((it: any) => ({
-            id: it.id,
-            serviceId: Number(it.service_id),
-            serviceName: it.services?.en || "Service",
-            serviceNameAr: it.services?.ar || null,
-            qtyTotal: Number(it.qty_total || 0),
-            qtyUsed: Number(it.qty_used || 0),
-            qtyRemaining: Number(it.qty_remaining || 0),
-          }))
-        }));
-        setCustomerPackages(normalizedPkgs);
+      const res = await fetch(`/api/customers/packages?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        const pkgs = data.packages || [];
+        const activePkgs = pkgs.filter((p: any) => p.status === "active" || !p.status);
+        setCustomerPackages(activePkgs);
 
-        // Populate legacy activePackage for backward compatibility
-        const firstPkg = normalizedPkgs[0];
-        const totalRemaining = (firstPkg.items || []).reduce((sum: number, it: any) => sum + (it.qtyRemaining || 0), 0);
-        if (totalRemaining > 0) {
-          setActivePackage({
-            name: (lang === "ar" && firstPkg.packageNameAr) ? firstPkg.packageNameAr : firstPkg.packageName,
-            remaining: totalRemaining,
-            expiresOn: firstPkg.expiresAt ? new Date(firstPkg.expiresAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"
-          });
+        if (activePkgs.length > 0) {
+          const firstPkg = activePkgs[0];
+          const totalRemaining = (firstPkg.items || []).reduce((sum: number, it: any) => sum + (it.qtyRemaining || 0), 0);
+          if (totalRemaining > 0) {
+            setActivePackage({
+              name: (lang === "ar" && firstPkg.packageNameAr) ? firstPkg.packageNameAr : firstPkg.packageName,
+              remaining: totalRemaining,
+              expiresOn: firstPkg.expiresAt ? new Date(firstPkg.expiresAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"
+            });
+          } else {
+            setActivePackage(null);
+          }
         } else {
           setActivePackage(null);
         }
@@ -678,8 +664,8 @@ export default function AdminNewBookingView({
         setCustomerPackages([]);
         setActivePackage(null);
       }
-    } catch (e) {
-      console.error("Error loading customer package:", e);
+    } catch (err) {
+      console.error("Error loading customer packages:", err);
       setCustomerPackages([]);
       setActivePackage(null);
     } finally {
@@ -687,21 +673,46 @@ export default function AdminNewBookingView({
     }
   }
 
+  // Reactive auto-fetch packages whenever foundCustomer or entered phone changes
+  useEffect(() => {
+    const cleanDigits = phone.replace(/\D/g, "");
+    if (foundCustomer?.id || cleanDigits.length >= 10) {
+      loadCustomerPackages(foundCustomer?.id, phone);
+    } else if (!foundCustomer && cleanDigits.length < 10) {
+      setCustomerPackages([]);
+      setActivePackage(null);
+    }
+  }, [foundCustomer?.id, phone]);
+
   // Matching active package item for currently selected service
   const { matchingPackage, matchingPackageItem } = useMemo(() => {
     if (!selectedServiceId || customerPackages.length === 0) {
       return { matchingPackage: null, matchingPackageItem: null };
     }
+
+    const curSvc = dbServices.find(s => String(s.id) === String(selectedServiceId));
+    const curSvcEn = (curSvc?.en || curSvc?.name || "").toLowerCase().trim();
+    const curSvcAr = (curSvc?.ar || "").toLowerCase().trim();
+
+    const matchesService = (item: any) => {
+      if (String(item.serviceId) === String(selectedServiceId)) return true;
+      const itEn = (item.serviceName || "").toLowerCase().trim();
+      const itAr = (item.serviceNameAr || "").toLowerCase().trim();
+      if (curSvcEn && itEn && (itEn === curSvcEn || itEn.includes(curSvcEn) || curSvcEn.includes(itEn))) return true;
+      if (curSvcAr && itAr && (itAr === curSvcAr || itAr.includes(curSvcAr) || curSvcAr.includes(itAr))) return true;
+      return false;
+    };
+
     for (const pkg of customerPackages) {
-      const it = (pkg.items || []).find((item: any) => String(item.serviceId) === String(selectedServiceId) && item.qtyRemaining > 0);
+      const it = (pkg.items || []).find((item: any) => matchesService(item) && Number(item.qtyRemaining || 0) > 0);
       if (it) return { matchingPackage: pkg, matchingPackageItem: it };
     }
     for (const pkg of customerPackages) {
-      const it = (pkg.items || []).find((item: any) => String(item.serviceId) === String(selectedServiceId));
+      const it = (pkg.items || []).find((item: any) => matchesService(item));
       if (it) return { matchingPackage: pkg, matchingPackageItem: it };
     }
     return { matchingPackage: null, matchingPackageItem: null };
-  }, [selectedServiceId, customerPackages]);
+  }, [selectedServiceId, customerPackages, dbServices]);
 
   // Auto-reset package payment if selected service is no longer covered
   useEffect(() => {
