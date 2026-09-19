@@ -644,6 +644,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // as forgotten. Configurable so a clinic that runs longer sessions isn't stuck with false alarms.
   const [bookingStaleSessionHours, setBookingStaleSessionHours] = useState<number>(2);
   const [bookingFollowUpLeadDays, setBookingFollowUpLeadDays] = useState<number>(2);
+  const [bookingDefaultPricePerPulse, setBookingDefaultPricePerPulse] = useState<number>(5);
   // Rooms state
   const [rooms, setRooms] = useState<any[]>([]);
 
@@ -2374,7 +2375,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-064', name: 'Receptionist Clinical Records & Prescription Access Engine', category: 'Doctor & Clinical', endpoint: '/api/prescriptions', description: 'Verifies receptionist role permission access to issue/edit digital prescriptions, upload/delete clinical reports, and complete patient medical intake records.', status: 'idle' },
     { id: 'TC-065', name: 'New Booking Customer Packages & Session Redemption Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies customer active packages inspection, per-service session balance detection, and package redemption checkout integration in New Booking creation.', status: 'idle' },
     { id: 'TC-066', name: 'Staff Weekly Shift Schedule & Working Days Persistence Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee shift and working schedule persistence across employee_accounts and page_settings, multi-branch schedule mapping, multi-shift arrays, and 12h AM/PM time sync.', status: 'idle' },
-    { id: 'TC-067', name: 'Laser Pulse Counter & Unified Laser History Engine', category: 'Medical & Patients', endpoint: '/api/laser-pulses', description: 'Verifies Type 1 fixed service pulses & extra charges, Type 2 FIFO retail pulse active balances & deductions, Type 3 package included pulses, and unified lifetime laser history logs.', status: 'idle' }
+    { id: 'TC-067', name: 'Laser Pulse Counter & Unified Laser History Engine', category: 'Medical & Patients', endpoint: '/api/laser-pulses', description: 'Verifies Type 1 fixed service pulses & extra charges, Type 2 FIFO retail pulse active balances & deductions, Type 3 package included pulses, and unified lifetime laser history logs.', status: 'idle' },
+    { id: 'TC-068', name: 'Service Equipment Connector & Pulse Pricing Engine', category: 'Services & Bookings', endpoint: '/api/service-devices', description: 'Verifies service-to-device equipment connections without pulse limits, and booking settings default pulse pricing configuration.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -3890,6 +3892,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             setBookingDepositPercentage(data.booking.depositPercentage ?? 20);
             setBookingStaleSessionHours(data.booking.staleSessionHours ?? 2);
             setBookingFollowUpLeadDays(data.booking.followUpLeadDays ?? 2);
+            setBookingDefaultPricePerPulse(data.booking.defaultPricePerPulse ?? 5);
           }
           if (data.deposit) {
             setInstapayName(data.deposit.instapayName || "Revera Clinic");
@@ -4163,6 +4166,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             depositPercentage: bookingDepositPercentage,
             staleSessionHours: bookingStaleSessionHours,
             followUpLeadDays: bookingFollowUpLeadDays,
+            defaultPricePerPulse: bookingDefaultPricePerPulse,
             termsText: termsText,
             globalEndingSession: globalEndingSession
           },
@@ -6454,6 +6458,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   authenticatedJsonHeaders={authenticatedJsonHeaders}
                   lang={lang}
                   adminTranslations={adminTranslations}
+                  defaultPricePerPulse={bookingDefaultPricePerPulse}
                   MOCK_MEDICINES={MOCK_MEDICINES}
                 />
               )}
@@ -6839,6 +6844,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               setBookingStaleSessionHours={setBookingStaleSessionHours}
               bookingFollowUpLeadDays={bookingFollowUpLeadDays}
               setBookingFollowUpLeadDays={setBookingFollowUpLeadDays}
+              bookingDefaultPricePerPulse={bookingDefaultPricePerPulse}
+              setBookingDefaultPricePerPulse={setBookingDefaultPricePerPulse}
               globalEndingSession={globalEndingSession}
               setGlobalEndingSession={setGlobalEndingSession}
               handleSaveBookingSettings={handleSaveBookingSettings}

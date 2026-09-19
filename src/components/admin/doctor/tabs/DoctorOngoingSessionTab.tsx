@@ -35,7 +35,7 @@ export interface AdditionalServiceItem {
   price: number;
   deviceId?: string;
   deviceName?: string;
-  pulses: number;
+  pulses?: number;
 }
 
 interface DoctorOngoingSessionTabProps {
@@ -159,11 +159,6 @@ export default function DoctorOngoingSessionTab({
   // Additional Services added during ongoing treatment session
   const [additionalServices, setAdditionalServices] = useState<AdditionalServiceItem[]>([]);
   const [selectedServiceIdToAdd, setSelectedServiceIdToAdd] = useState<string>("");
-  const [selectedDeviceForService, setSelectedDeviceForService] = useState<string>("");
-  // Defaults to 0, not 100: a service with no linked device has no pulses, and pre-filling a
-  // plausible-looking count meant non-laser services silently carried a fabricated charge.
-  const [pulsesCountForService, setPulsesCountForService] = useState<number>(0);
-  const [loadingDeviceLinks, setLoadingDeviceLinks] = useState(false);
 
   // Intake Template state for the active booking's selected service
   const [activeTemplate, setActiveTemplate] = useState<MedicalRecordTemplate | null>(null);
@@ -231,6 +226,18 @@ export default function DoctorOngoingSessionTab({
       }
     });
   }, [activeSessionBooking?.customerId, activeSessionBooking?.customer_id]);
+
+  // Load clinic default price per pulse from booking settings
+  useEffect(() => {
+    fetch("/api/page-settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.booking?.defaultPricePerPulse !== undefined) {
+          setAdditionalPulseUnitPrice(Number(data.booking.defaultPricePerPulse));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const setFollowUpPresetDays = (days: number) => {
     const target = new Date();
@@ -376,32 +383,7 @@ export default function DoctorOngoingSessionTab({
     setDynamicResponses(initial);
   }, [medicalRecord, activeTemplate]);
 
-  // When a service is selected from dropdown, fetch its linked devices & default pulses from /api/service-devices
-  useEffect(() => {
-    if (!selectedServiceIdToAdd) return;
-    const fetchServiceDevices = async () => {
-      setLoadingDeviceLinks(true);
-      try {
-        const headers = await getAuthHeaders();
-        const res = await fetch(`/api/service-devices?serviceId=${selectedServiceIdToAdd}`, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          const links = data.deviceLinks || [];
-          if (links.length > 0) {
-            setSelectedDeviceForService(links[0].device_id || "");
-            setPulsesCountForService(Number(links[0].pulses_per_session) || 100);
-          } else {
-            setPulsesCountForService(100);
-          }
-        }
-      } catch (err) {
-        console.error("Error loading service devices:", err);
-      } finally {
-        setLoadingDeviceLinks(false);
-      }
-    };
-    fetchServiceDevices();
-  }, [selectedServiceIdToAdd]);
+
 
   // Preload any existing additional services from session booking notes
   useEffect(() => {
@@ -471,16 +453,11 @@ export default function DoctorOngoingSessionTab({
     const srvName = srv.en || srv.name || srv.title || "Clinical Service";
     const srvPrice = Number(srv.price || 0);
 
-    const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceForService));
-
     const newItem: AdditionalServiceItem = {
       id: Date.now(),
       serviceId: srv.id,
       name: srvName,
-      price: srvPrice,
-      deviceId: devObj?.id,
-      deviceName: devObj?.name,
-      pulses: Math.max(0, pulsesCountForService || 0)
+      price: srvPrice
     };
 
     const updated = [...additionalServices, newItem];
@@ -488,8 +465,6 @@ export default function DoctorOngoingSessionTab({
     onAdditionalServicesChange?.(updated);
     autoSyncServicesToBooking(updated);
     setSelectedServiceIdToAdd("");
-    setSelectedDeviceForService("");
-    setPulsesCountForService(0);
   };
 
   const handleRemoveServiceFromSession = (id: string | number) => {
@@ -598,7 +573,7 @@ export default function DoctorOngoingSessionTab({
   const laserAdditionalCharge = laserMode === "SERVICE" && hasAdditionalPulses ? (additionalPulsesQty * additionalPulseUnitPrice) : 0;
 
   // Total Pulses Calculated = (Delivered Laser Pulses) + (Additional Services Pulses) + (Additional Pulses)
-  const additionalPulsesTotal = additionalServices.reduce((sum, item) => sum + item.pulses, 0);
+  const additionalPulsesTotal = additionalServices.reduce((sum, item) => sum + (item.pulses || 0), 0);
   const totalSessionPulses = standardPulsesDelivered + (hasAdditionalPulses ? additionalPulsesQty : 0) + additionalPulsesTotal;
 
   // Final Session Invoice Total
@@ -745,8 +720,8 @@ export default function DoctorOngoingSessionTab({
                     sourceId: laserMode === "PACKAGE" ? selectedLaserPackageId : (laserMode === "PULSE_PURCHASE" ? "FIFO" : null),
                     sourceName: laserMode === "PACKAGE" ? patientActivePackages.find(p => String(p.id) === String(selectedLaserPackageId))?.package_name : null,
                     selectedPackage: patientActivePackages.find(p => String(p.id) === String(selectedLaserPackageId)),
-                    deviceId: selectedDeviceId || selectedDeviceForService,
-                    deviceName: devicesList.find(d => String(d.id) === String(selectedDeviceId || selectedDeviceForService))?.name
+                    deviceId: selectedDeviceId,
+                    deviceName: devicesList.find(d => String(d.id) === String(selectedDeviceId))?.name
                   };
 
                   handleCompleteTreatment(activeSessionBooking, totalSessionPulses, laserPulseData);
@@ -1356,23 +1331,28 @@ export default function DoctorOngoingSessionTab({
                 {/* MODE 1: SELL BY SERVICE */}
                 {laserMode === "SERVICE" && (
                   <div className="space-y-4 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/10 pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
                       <div>
-                        <span className="font-bold text-xs text-[#1F251A] flex items-center gap-1.5">
-                          <Layers size={14} className="text-[#414E36]" /> Fixed Service Price: <strong>{baseBookingPrice} EGP</strong>
-                        </span>
-                        <p className="text-[11px] text-[#5A6A51] mt-0.5">
-                          Standard pulses recorded for clinical tracking only (0 EGP price change).
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-[#414E36] text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                            Primary Booked Service
+                          </span>
+                          <span className="font-extrabold text-xs sm:text-sm text-[#1F251A]">
+                            {resolvedActiveServiceName}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#5A6A51] mt-1">
+                          Fixed Service Price: <strong className="text-[#414E36]">{baseBookingPrice} EGP</strong> (Standard pulses recorded for clinical tracking; 0 EGP price change).
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs font-bold text-[#5A6A51]">Delivered Pulses:</label>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <label className="text-xs font-bold text-[#5A6A51]">Primary Service Pulses:</label>
                         <input
                           type="number"
                           min={0}
                           value={standardPulsesDelivered}
                           onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
-                          className="w-28 rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                          className="w-28 rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
                           placeholder="Pulses"
                         />
                       </div>
@@ -1629,11 +1609,11 @@ export default function DoctorOngoingSessionTab({
                     <Plus size={14} className="text-[#414E36]" /> {t.addAdditionalServiceBtn}
                   </h4>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
                     <select
                       value={selectedServiceIdToAdd}
                       onChange={(e) => setSelectedServiceIdToAdd(e.target.value)}
-                      className="sm:col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                      className="w-full sm:flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
                     >
                       <option value="">{t.selectServicePlaceholder}</option>
                       {servicesList.map((s) => (
@@ -1643,43 +1623,14 @@ export default function DoctorOngoingSessionTab({
                       ))}
                     </select>
 
-                    <select
-                      value={selectedDeviceForService}
-                      onChange={(e) => setSelectedDeviceForService(e.target.value)}
-                      className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                    <button
+                      type="button"
+                      onClick={handleAddServiceToSession}
+                      disabled={!selectedServiceIdToAdd}
+                      className="w-full sm:w-auto rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer shrink-0 shadow-xs"
                     >
-                      <option value="">{t.selectDevicePlaceholder}</option>
-                      {devicesList.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.overridePulsesLabel}</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={pulsesCountForService}
-                        onChange={(e) => setPulsesCountForService(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
-                        placeholder="Pulses (e.g. 150)"
-                      />
-                    </div>
-
-                    <div className="flex items-end">
-                      <button
-                        type="button"
-                        onClick={handleAddServiceToSession}
-                        disabled={!selectedServiceIdToAdd}
-                        className="w-full rounded-xl bg-[#414E36] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <Plus size={14} /> {t.addAdditionalServiceBtn}
-                      </button>
-                    </div>
+                      <Plus size={14} /> {t.addAdditionalServiceBtn}
+                    </button>
                   </div>
 
                   {/* Added Additional Services List */}
@@ -1689,9 +1640,6 @@ export default function DoctorOngoingSessionTab({
                         <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
                           <div className="min-w-0">
                             <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
-                            <span className="text-[10px] text-[#5A6A51] block truncate">
-                              {item.deviceName ? `${t.deviceUsedLabel} ${item.deviceName} • ` : ""}{item.pulses} {t.pulsesLabel}
-                            </span>
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
                             <span className="font-extrabold text-[#414E36]">+{item.price} EGP</span>
@@ -1699,6 +1647,7 @@ export default function DoctorOngoingSessionTab({
                               type="button"
                               onClick={() => handleRemoveServiceFromSession(item.id)}
                               className="text-rose-600 hover:text-rose-800 text-xs font-bold cursor-pointer p-1"
+                              title="Remove service"
                             >
                               <Trash2 size={14} />
                             </button>

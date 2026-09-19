@@ -49,11 +49,11 @@ export async function POST(req: Request) {
 
     const normalizedItems = items.map((item: any) => ({
       deviceId: String(item.deviceId || ''),
-      pulsesPerSession: Number(item.pulsesPerSession),
+      pulsesPerSession: Number(item.pulsesPerSession || 0),
     }));
-    if (normalizedItems.some((item) => !item.deviceId || !Number.isInteger(item.pulsesPerSession) || item.pulsesPerSession <= 0)) {
+    if (normalizedItems.some((item) => !item.deviceId)) {
       return NextResponse.json(
-        { error: 'Each item requires a deviceId and a positive whole-number pulsesPerSession.' },
+        { error: 'Each item requires a valid deviceId.' },
         { status: 400 }
       );
     }

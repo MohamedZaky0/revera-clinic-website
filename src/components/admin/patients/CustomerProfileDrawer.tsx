@@ -144,6 +144,7 @@ interface CustomerProfileDrawerProps {
   authenticatedJsonHeaders: { "Content-Type": string; Authorization: string };
   lang: "en" | "ar";
   adminTranslations: any;
+  defaultPricePerPulse?: number;
   MOCK_MEDICINES: any[];
 }
 
@@ -257,6 +258,7 @@ export default function CustomerProfileDrawer({
   authenticatedJsonHeaders,
   lang,
   adminTranslations,
+  defaultPricePerPulse = 5,
   MOCK_MEDICINES,
 }: CustomerProfileDrawerProps) {
   if (!viewingCustomerProfile) return null;
@@ -1443,7 +1445,7 @@ export default function CustomerProfileDrawer({
                   <button
                     onClick={() => {
                       setSellPulsesQty(500);
-                      setSellPulsesPricePerPulse(5);
+                      setSellPulsesPricePerPulse(defaultPricePerPulse || 5);
                       setSellPulsesPaymentMethod("cash");
                       setShowSellPulsesModal(true);
                     }}

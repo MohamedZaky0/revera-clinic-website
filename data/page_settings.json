@@ -180,6 +180,7 @@
     "showDoctorNotes": true,
     "depositPercentage": 20,
     "staleSessionHours": 2,
-    "followUpLeadDays": 2
+    "followUpLeadDays": 2,
+    "defaultPricePerPulse": 5
   }
 }

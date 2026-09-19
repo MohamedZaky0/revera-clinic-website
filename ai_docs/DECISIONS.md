@@ -2200,3 +2200,36 @@ The clinic required a complete, multi-tiered laser pulse counting and accounting
 8. **Automated Diagnostic Test Verification:**
    - Added test case `TC-067` ("Laser Pulse Counter & Unified Laser History Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
 
+---
+
+## DEC-063: Default Laser Pulse Pricing in Admin Settings & Service Equipment Connection Simplification
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. **Configurable Default Laser Pulse Price:** Previously, the unit price per laser pulse (e.g., 5 EGP) was hardcoded or required manual entry when selling retail pulses to patients or billing additional pulses during doctor treatment sessions. Clinic owners required a centralized setting in Admin Settings (`/admin` -> Settings -> Booking Settings) to define the clinic-wide Default Price per Laser Pulse in EGP.
+2. **Simplified Service Device Equipment Linking:** In Admin Services (`/admin` -> Services -> Connected Devices modal), connecting an equipment device to a service previously required configuring an arbitrary "Pulses Per Session" number. Because laser pulse consumption varies by patient and treatment area (tracked dynamically in the Laser Pulse Counter engine), this fixed number was obsolete and caused user confusion.
+3. **Doctor Ongoing Session Simplification:**
+   - Primary booked service delivered pulses can now be entered and highlighted directly on the booked service card in Session Flow (Type 1 Service mode).
+   - In "Additional Clinical Services", device selection and pulse override inputs were removed, simplifying additional services to simple service item and price additions without equipment overhead.
+
+**Decisions & Implementation:**
+1. **Admin Booking Settings (`BookingSettingsView.tsx`, `page_settings.json`, `admin/page.tsx`):**
+   - Added `defaultPricePerPulse` setting with numeric validation and EGP adornment in Booking Settings.
+   - Added bilingual labels (`defaultPricePerPulse`, `defaultPricePerPulseHint`, info dialogs) in `translations.ts`.
+   - Seeded default value `5` in `data/page_settings.json`.
+   - Loaded and passed `defaultPricePerPulse` across Admin Settings and Customer Profile Drawer.
+2. **Customer Profile Sell Pulses Prefill (`CustomerProfileDrawer.tsx`):**
+   - "+ Sell Laser Pulses" modal dialog automatically prefills the Unit Price with `defaultPricePerPulse` (defaulting to 5 EGP if unset), calculating total price dynamically.
+3. **Doctor Ongoing Session Pulse Pricing & Service Cleanup (`DoctorOngoingSessionTab.tsx`):**
+   - Automatically loads `defaultPricePerPulse` from `/api/page-settings` to prefill `additionalPulseUnitPrice`.
+   - Removed device selection dropdown and pulse override inputs from "Additional Clinical Services".
+   - Highlighted `standardPulsesDelivered` input on the primary booked service card in Mode 1.
+4. **Connected Devices Simplification (`ServiceDeviceEditor.tsx` & `/api/service-devices`):**
+   - Removed `pulses_per_session` input and column from `ServiceDeviceEditor.tsx`.
+   - Updated `POST /api/service-devices` to treat `pulsesPerSession` as optional (defaulting to 0), permitting pure device-to-service equipment linking.
+5. **System Test Suite Diagnostic Verification:**
+   - Added test case `TC-068` ("Service Equipment Connector & Pulse Pricing Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
+

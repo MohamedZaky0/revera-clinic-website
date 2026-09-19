@@ -668,9 +668,9 @@ Requires a staff bearer token. Returns which devices are attached to a service a
 
 Requires a staff bearer token. Replaces every device attached to a service — deletes existing `service_devices` rows for `serviceId`, then inserts the given `items` (empty array detaches all devices).
 
-**Body:** `{ serviceId, items: [{ deviceId, pulsesPerSession }] }`
+**Body:** `{ serviceId, items: [{ deviceId, pulsesPerSession? }] }`
 
-Each item requires a positive whole-number `pulsesPerSession` and no duplicate `deviceId` within the same request. Every referenced device must exist in `inventory_devices`.
+Each item accepts an optional `pulsesPerSession` (defaults to 0 if omitted) and no duplicate `deviceId` within the same request. Every referenced device must exist in `inventory_devices`.
 
 **Response:** `{ success: true }`
 
