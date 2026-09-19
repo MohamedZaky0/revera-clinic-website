@@ -1483,7 +1483,7 @@ export default function DoctorAccountView({
               shiftType: providerRecord?.shift || (providerRecord?.working_days_hours ? "Multi-Shift Schedule" : "Day"),
               workingDays: providerRecord?.working_days || null,
               workingHours: providerRecord?.working_hours || null,
-              workingDaysHours: providerRecord?.working_days_hours,
+              workingDaysHours: providerRecord?.working_days_hours || providerRecord?.workingDaysHours,
               basicSalary: Number(providerRecord?.fixed_salary || providerRecord?.salary || 0),
               bonuses: 0,
               deductions: 0,

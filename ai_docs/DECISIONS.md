@@ -2147,16 +2147,19 @@ When staff create a new appointment in `AdminNewBookingView.tsx`, they need imme
 
 **Decisions & Implementation:**
 1. **Resilient Schedule Persistence Store (`/api/employees`):**
-   - Added persistent helper functions `getEmployeeWorkingSchedulesMap()` and `saveEmployeeWorkingSchedule()` to persist structured employee schedules in `page_settings` under the `employee_working_schedules` key, indexed across employee `id`, `email`, and `name` aliases.
+   - Added persistent helper functions `getEmployeeWorkingSchedulesMap()` and `saveEmployeeWorkingSchedule()` with dual storage: persisting structured employee schedules to both `data/employee_schedules.json` on disk and Supabase `page_settings` under the `employee_working_schedules` key, indexed across employee `id`, `email`, and `name` aliases.
    - Updated `PATCH /api/employees` and `POST /api/employees` to:
      - Extract `workingDaysHours` and attempt writing to `employee_accounts.working_days_hours` (with graceful fallback if the column is absent).
-     - Persist structured schedule data in `page_settings`.
+     - Persist structured schedule data in both disk and `page_settings`.
      - Synchronize with `providers.working_days_hours` when updating doctor accounts.
-   - Updated `GET /api/employees` to merge schedule data from `employee_accounts` and `page_settings` into each employee record, guaranteeing structured `working_days_hours` and `workingDaysHours` are returned.
+   - Updated `GET /api/employees` to merge schedule data from `employee_accounts`, local JSON, and `page_settings` into each employee record, guaranteeing structured `working_days_hours` and `workingDaysHours` are returned.
 2. **Modal State Initialization & Schedule Loading (`AdminEmployeesView.tsx`):**
    - Updated `loadEmployeeWorkingSchedule()` to recursively resolve structured working day schedules from `branch_schedules[branchId].in_person`, `in_person`, `emp.working_days_hours`, and `emp.workingDaysHours`.
    - Initialized `newEmployeeSelectedScheduleBranchId` and `newEmployeeBranchSchedules` on both "+ Add Employee" button click and Edit pencil button click.
    - Ensured `onSubmit` clears `editingEmployee` state and cleanly awaits `fetchRolesAndEmployees()` and `fetchProviders()`.
-3. **Automated Diagnostic Test Verification:**
+3. **User Profile Schedule Visualization & Multi-Shift Rendering (`UserProfileView.tsx`):**
+   - Updated `loadExtraDetails()` in `UserProfileView.tsx` to query `/api/employees` so that the profile view always receives the full enriched schedule with multi-shift arrays.
+   - Resolved `rawSched` across `user.workingDaysHours`, `user.working_days_hours`, and fetched employee/doctor records, rendering multiple distinct shift badges and accurate daily/weekly work hours in the Weekly Schedule Matrix.
+4. **Automated Diagnostic Test Verification:**
    - Added test case `TC-066` ("Staff Weekly Shift Schedule & Working Days Persistence Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
 

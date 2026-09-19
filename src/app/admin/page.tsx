@@ -6668,8 +6668,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               (adminEmail && p.email && p.email.toLowerCase() === adminEmail.toLowerCase())
             );
             const currentBranchName = branches.find(b => b.id === branch)?.name_en || "New Cairo Branch";
-            const effectiveWorkingDaysHours = matchProv?.working_days_hours || profileEmployee?.working_days_hours || null;
-            const effectiveShift = profileEmployee?.shift || matchProv?.shift || (matchProv?.working_days_hours ? "Multi-Shift Schedule" : "Day");
+            const effectiveWorkingDaysHours = profileEmployee?.working_days_hours || profileEmployee?.workingDaysHours || matchProv?.working_days_hours || matchProv?.workingDaysHours || null;
+            const effectiveShift = profileEmployee?.shift || matchProv?.shift || (effectiveWorkingDaysHours ? "Multi-Shift Schedule" : "Day");
             const effectiveWorkingHours = profileEmployee?.working_hours || (profileEmployee?.shift && profileEmployee.shift !== "Day" && profileEmployee.shift !== "Night" ? profileEmployee.shift : null);
 
             return (

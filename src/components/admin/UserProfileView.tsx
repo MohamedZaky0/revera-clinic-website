@@ -53,6 +53,7 @@ export interface UserProfileData {
   workingDays?: string;
   workingHours?: string;
   workingDaysHours?: any;
+  working_days_hours?: any;
   basicSalary?: number;
   bonuses?: number;
   deductions?: number;
@@ -194,24 +195,46 @@ export default function UserProfileView({
         const isUUID = !!(userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId));
 
         if (email || userId || phone || name) {
-          // 1. Employee query (try email, UUID id, employee_id, and phone safely)
-          let empData = null;
-          if (email) {
-            const { data } = await supabase.from("employee_accounts").select("*").eq("email", email).maybeSingle();
-            if (data) empData = data;
+          // 1. Employee query from /api/employees (which merges page_settings schedule)
+          let empData: any = null;
+          try {
+            const empRes = await fetch("/api/employees", { cache: "no-store" });
+            if (empRes.ok) {
+              const allEmps = await empRes.json();
+              if (Array.isArray(allEmps)) {
+                empData = allEmps.find((e: any) =>
+                  (email && e.email && e.email.toLowerCase() === email) ||
+                  (userId && e.id === userId) ||
+                  (userId && e.employee_id === userId) ||
+                  (phone && e.phone && e.phone === phone) ||
+                  (name && e.name && e.name.trim().toLowerCase() === name.toLowerCase())
+                ) || null;
+              }
+            }
+          } catch (apiErr) {
+            console.warn("UserProfileView: /api/employees load notice:", apiErr);
           }
-          if (!empData && isUUID) {
-            const { data } = await supabase.from("employee_accounts").select("*").eq("id", userId).maybeSingle();
-            if (data) empData = data;
+
+          // Fallback direct Supabase queries if API route was not accessible
+          if (!empData) {
+            if (email) {
+              const { data } = await supabase.from("employee_accounts").select("*").eq("email", email).maybeSingle();
+              if (data) empData = data;
+            }
+            if (!empData && isUUID) {
+              const { data } = await supabase.from("employee_accounts").select("*").eq("id", userId).maybeSingle();
+              if (data) empData = data;
+            }
+            if (!empData && userId && userId !== "my-profile" && !userId.includes("@")) {
+              const { data } = await supabase.from("employee_accounts").select("*").eq("employee_id", userId).maybeSingle();
+              if (data) empData = data;
+            }
+            if (!empData && phone) {
+              const { data } = await supabase.from("employee_accounts").select("*").eq("phone", phone).maybeSingle();
+              if (data) empData = data;
+            }
           }
-          if (!empData && userId && userId !== "my-profile" && !userId.includes("@")) {
-            const { data } = await supabase.from("employee_accounts").select("*").eq("employee_id", userId).maybeSingle();
-            if (data) empData = data;
-          }
-          if (!empData && phone) {
-            const { data } = await supabase.from("employee_accounts").select("*").eq("phone", phone).maybeSingle();
-            if (data) empData = data;
-          }
+
           if (empData) setFetchedEmployee(empData);
 
           // 2. Provider query (try UUID id, phone, name safely)
@@ -347,7 +370,7 @@ export default function UserProfileView({
 
   // Available Branch Tabs for Schedule View
   const availableScheduleBranches = useMemo(() => {
-    const rawSched = user.workingDaysHours || fetchedEmployee?.working_days_hours || fetchedProvider?.working_days_hours;
+    const rawSched = user.workingDaysHours || user.working_days_hours || fetchedEmployee?.working_days_hours || fetchedEmployee?.workingDaysHours || fetchedProvider?.working_days_hours || fetchedProvider?.workingDaysHours;
     let parsed: any = rawSched;
     if (typeof parsed === "string") {
       try { parsed = JSON.parse(parsed); } catch (e) {}
@@ -438,7 +461,7 @@ export default function UserProfileView({
       { key: "Friday", short: "Fri", id: 5, arName: "الجمعة", arShort: "جمعة" },
     ];
 
-    const rawSched = user.workingDaysHours || fetchedProvider?.working_days_hours || fetchedEmployee?.working_days_hours;
+    const rawSched = user.workingDaysHours || user.working_days_hours || fetchedEmployee?.working_days_hours || fetchedEmployee?.workingDaysHours || fetchedProvider?.working_days_hours || fetchedProvider?.workingDaysHours;
     let parsed: any = rawSched;
     if (typeof parsed === "string") {
       try { parsed = JSON.parse(parsed); } catch (e) {}
