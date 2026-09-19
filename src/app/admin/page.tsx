@@ -762,7 +762,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
     // Clinical / Doctor Portal fallbacks
     if (permKey.startsWith("clinical.")) {
-      if (adminPermissions.includes("Clinical") || adminPermissions.includes("clinical") || adminRole === "doctor" || adminRole === "Doctor") return true;
+      if (adminPermissions.includes("Clinical") || adminPermissions.includes("clinical") || adminRole === "doctor" || adminRole === "Doctor" || adminRole === "receptionist" || adminRole === "reception" || adminRole === "Receptionist") return true;
     }
 
     // Dashboard & Reception fallbacks
@@ -2370,7 +2370,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-060', name: 'Doctor Prescription Follow-Up & Reception Reminders Engine', category: 'Doctor & Clinical', endpoint: '/api/prescriptions', description: 'Verifies prescription follow-up date and clinical instructions recording, reception calendar follow-up reminders aggregation, WhatsApp reminder deep link generation, and 1-click booking conversion.', status: 'idle' },
     { id: 'TC-061', name: 'Reception Follow-Up Lead Time, Rescheduling & Action Suite Engine', category: 'Services & Bookings', endpoint: '/api/page-settings', description: 'Verifies configurable follow-up reminder lead days in booking settings, early alert banner rendering, 1-click pre-filled booking conversion, and follow-up management modal with reminder date rescheduling and atomic cancellation.', status: 'idle' },
     { id: 'TC-062', name: 'Doctor Portal Clinical Session & Data Isolation Verification Engine', category: 'Doctor & Clinical', endpoint: '/api/reservations', description: 'Verifies strict doctor reservation matching, provider UUID resolution, real-time ongoing session status management, queue-based treatment activation, and prescription deduplication.', status: 'idle' },
-    { id: 'TC-063', name: 'Patient Profile Financial Summary & Staff Shifts Resolution Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies the redesigned patient profile header card with 3-metric financial summary (total spend, wallet, outstanding) and dynamic employee shift resolution without 9-5 hardcoding.', status: 'idle' }
+    { id: 'TC-063', name: 'Patient Profile Financial Summary & Staff Shifts Resolution Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies the redesigned patient profile header card with 3-metric financial summary (total spend, wallet, outstanding) and dynamic employee shift resolution without 9-5 hardcoding.', status: 'idle' },
+    { id: 'TC-064', name: 'Receptionist Clinical Records & Prescription Access Engine', category: 'Doctor & Clinical', endpoint: '/api/prescriptions', description: 'Verifies receptionist role permission access to issue/edit digital prescriptions, upload/delete clinical reports, and complete patient medical intake records.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);

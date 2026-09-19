@@ -910,7 +910,7 @@ export default function CustomerProfileDrawer({
                 </button>
               </div>
 
-              {customerRecordsSubTab === "prescriptions" && !prescriptionEditMode && (adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor") && (
+              {customerRecordsSubTab === "prescriptions" && !prescriptionEditMode && (adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor" || adminRole === "receptionist" || adminRole === "reception" || adminRole === "Receptionist" || !hasPermission || hasPermission("bookings.manage_prescriptions") || hasPermission("clinical.create_prescriptions")) && (
                 <button
                   type="button"
                   onClick={handleStartCreatePrescription}
@@ -1133,15 +1133,27 @@ export default function CustomerProfileDrawer({
                     {loadingPrescriptions ? (
                       <div className="text-center py-12 text-[#5A6A51] text-sm">{t.loadingRecords}</div>
                     ) : customerPrescriptions.length === 0 ? (
-                      <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-2">
-                        <p className="text-sm font-semibold text-[#1F251A]">{t.noPrescriptionsTitle}</p>
-                        <p className="text-xs text-[#5A6A51]">{t.noPrescriptionsSubtitle}</p>
+                      <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-3">
+                        <FileText size={36} className="mx-auto text-[#8A9A81]" />
+                        <div>
+                          <p className="text-sm font-semibold text-[#1F251A]">{t.noPrescriptionsTitle}</p>
+                          <p className="text-xs text-[#5A6A51]">{t.noPrescriptionsSubtitle}</p>
+                        </div>
+                        {(adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor" || adminRole === "receptionist" || adminRole === "reception" || adminRole === "Receptionist" || !hasPermission || hasPermission("bookings.manage_prescriptions") || hasPermission("clinical.create_prescriptions")) && (
+                          <button
+                            type="button"
+                            onClick={handleStartCreatePrescription}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
+                          >
+                            <Plus size={14} /> {t.writePrescriptionBtn}
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-4">
                         {customerPrescriptions.map((rx) => {
                           const rxDate = new Date(rx.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-                          const isDocUser = adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor";
+                          const isDocUser = adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor" || adminRole === "receptionist" || adminRole === "reception" || adminRole === "Receptionist" || !hasPermission || hasPermission("bookings.manage_prescriptions") || hasPermission("clinical.create_prescriptions");
                           return (
                             <div key={rx.id} className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 relative overflow-hidden">
                               <div className="flex items-start sm:items-center justify-between border-b border-[#414E36]/5 pb-3 flex-wrap gap-2">

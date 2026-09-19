@@ -2073,7 +2073,7 @@ The clinic reception dashboard required dynamic responsiveness to shift state (N
        - **Total Spend** (`bg-[#F0FDF4] border-emerald-100`): Wallet icon, label with Info icon, bold amount `{spent} EGP`, subtitle "All time".
        - **Wallet** (`bg-[#F0F9FF] border-sky-100`): Wallet icon, label with Info icon, bold amount `{wallet} EGP` in primary blue, subtitle "Available balance".
        - **Outstanding** (`bg-[#FFF7ED] border-amber-100`): Credit card icon, label with Info icon, bold amount `{outstanding} EGP` in rose/amber, subtitle "Unpaid amount".
-   - Added complete English & Arabic translations in `translations.ts`.
+    - Added complete English & Arabic translations in `translations.ts`.
 2. **Dynamic Staff Shift Schedule & Safe DB Resolution:**
    - Sanitized `loadExtraDetails()` in `UserProfileView.tsx` to guard against invalid UUID syntax errors (`22P02`) when checking `id` vs `employee_id`, `email`, `phone`, and `name`.
    - Enhanced `parseShiftStringToTimes` and `weeklyScheduleData` in `UserProfileView.tsx` to parse custom time ranges (e.g. `02:00 PM to 10:00 PM`, `14:00 - 22:00`, `10:00 AM – 06:00 PM`), morning, evening, night, day shifts, and structured DB weekday schedule trees without falling back to hardcoded 9-5.
@@ -2081,3 +2081,24 @@ The clinic reception dashboard required dynamic responsiveness to shift state (N
    - Improved `Profile` view employee matching in `src/app/admin/page.tsx` across email, ID, and employee_id.
 3. **Automated Diagnostic Test Verification:**
    - Added test case `TC-063` ("Patient Profile Financial Summary & Staff Shifts Resolution Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
+---
+
+## DEC-059: Receptionist Access to Digital Prescriptions, Medical Reports & Intake Records
+
+**Date:** 2026-09-19
+**Status:** Decided & Implemented
+
+**Context:**
+Receptionists frequently need to assist doctors and patients at clinic front desks by entering medical intake forms, issuing digital prescriptions based on doctor instructions, uploading lab/medical reports or documents, and viewing previous clinical notes and prescriptions. Previously, the "+ Write Prescription" action button and prescription edit/delete tools in `CustomerProfileDrawer.tsx` were strictly gated to `superadmin`, `admin`, or `doctor` roles only.
+
+**Decisions & Implementation:**
+1. **Permission Gating Upgrade in `CustomerProfileDrawer.tsx`:**
+   - Updated `+ Write Prescription` button gate on line 913 and empty-state button to allow `adminRole === "receptionist" || adminRole === "reception" || adminRole === "Receptionist"`, alongside permission checks `hasPermission("bookings.manage_prescriptions")` and `hasPermission("clinical.create_prescriptions")`.
+   - Updated `isDocUser` (line 1144) to include receptionist roles and permissions, enabling receptionists to edit/delete digital prescriptions and view clinical notes.
+2. **Permission Evaluation Engine in `src/app/admin/page.tsx`:**
+   - Updated `hasPermission()` `clinical.` permission namespace fallback to grant access for `adminRole === "receptionist" || adminRole === "reception" || adminRole === "Receptionist"`.
+3. **Booking Details Modal Fast Prescription Launcher:**
+   - Added `+ Add Prescription` button in Card B of `BookingDetailsModal.tsx` when no prescription is recorded yet, opening `setShowDrawerPrescriptionModal(true)` directly.
+4. **Automated Diagnostic Test Verification:**
+   - Added test case `TC-064` ("Receptionist Clinical Records & Prescription Access Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).

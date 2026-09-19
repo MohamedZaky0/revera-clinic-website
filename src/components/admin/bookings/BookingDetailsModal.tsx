@@ -2830,10 +2830,19 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           <FileText size={13} className="text-[#0F3826]" />
                           <span>PRESCRIPTION</span>
                         </div>
-                        {drawerPrescriptions.length > 0 && (
+                        {drawerPrescriptions.length > 0 ? (
                           <span className="text-[10px] font-bold text-[#5A6A51] bg-gray-100 px-2 py-0.5 rounded-full">
                             {drawerPrescriptions[0].date ? new Date(drawerPrescriptions[0].date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "Recorded"}
                           </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowDrawerPrescriptionModal(true)}
+                            className="rounded-xl border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                          >
+                            <Plus size={11} />
+                            <span>Add Prescription</span>
+                          </button>
                         )}
                       </div>
 
