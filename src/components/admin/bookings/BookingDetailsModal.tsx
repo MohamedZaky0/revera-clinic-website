@@ -952,6 +952,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       String(booking?.notes || "").toLowerCase().includes("pay per pulse") ||
       String(booking?.notes || "").toLowerCase().includes("per_pulse")
     );
+    const isPackageMode = Boolean(
+      booking?.laserPaymentMode === "PACKAGE" ||
+      (booking as any)?.laser_payment_mode === "PACKAGE" ||
+      String(booking?.notes || "").toLowerCase().includes("package session") ||
+      String(booking?.notes || "").toLowerCase().includes("package redemption") ||
+      String(booking?.notes || "").toLowerCase().includes("pulses package") ||
+      String(booking?.notes || "").includes("[Laser Package]") ||
+      String(booking?.notes || "").includes("[Laser Package Redemption]") ||
+      String(booking?.notes || "").includes("[Purchasing New Pulses Package]")
+    );
     const pulseRate = Number(
       booking?.laserPricePerPulse ||
       (booking as any)?.laser_price_per_pulse ||
@@ -961,7 +971,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       })()
     ) || 1;
 
-    const finalPrice = (isPerPulseMode && isLaser) ? (pulsesVal * pulseRate) : srvPrice;
+    const finalPrice = (isPerPulseMode && isLaser)
+      ? (pulsesVal * pulseRate)
+      : (isPackageMode && isLaser)
+      ? 0
+      : srvPrice;
 
     let devId: string | undefined = undefined;
     let devName: string | undefined = undefined;
@@ -1233,7 +1247,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         String(booking?.notes || "").toLowerCase().includes("package session") ||
         String(booking?.notes || "").toLowerCase().includes("package redemption") ||
         String(booking?.notes || "").toLowerCase().includes("pulses package") ||
-        String(booking?.notes || "").includes("[Laser Package]")
+        String(booking?.notes || "").includes("[Laser Package]") ||
+        String(booking?.notes || "").includes("[Laser Package Redemption]") ||
+        String(booking?.notes || "").includes("[Purchasing New Pulses Package]")
       );
       const pulseRate = Number(
         booking?.laserPricePerPulse ||
@@ -1248,7 +1264,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const realServiceId = s.serviceId || (typeof s.id === "number" && s.id < 1000000 ? s.id : null);
         const srvObj = localServices.find((ls) => String(ls.id) === String(realServiceId));
         const isSvcLaser = s.isLaser || checkIsLaserService(srvObj);
-        const effectivePrice = (isPerPulseMode && isSvcLaser) ? (Number(s.pulses) || 0) * pulseRate : s.price;
+        const effectivePrice = (isPerPulseMode && isSvcLaser)
+          ? (Number(s.pulses) || 0) * pulseRate
+          : (isPackageMode && isSvcLaser)
+          ? 0
+          : s.price;
         lineItemWrites.push(
           fetch("/api/reservation-products", {
             method: "POST",
@@ -1257,7 +1277,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               reservationId: booking.id,
               lineType: "additional_service",
               serviceId: realServiceId ? Number(realServiceId) : null,
-              description: s.name + (Number(s.pulses) > 0 ? ` (${s.pulses} pulses)` : ""),
+              description: (isPackageMode && isSvcLaser)
+                ? `${s.name} (Package Redemption · 0 EGP)`
+                : s.name + (Number(s.pulses) > 0 ? ` (${s.pulses} pulses)` : ""),
               qty: 1,
               unitPrice: effectivePrice,
               addedByRole: "receptionist_global_ending",
@@ -1296,7 +1318,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const addSvcString = `\n[Additional Services Used]: ${additionalServices.map((s) => {
           const srvObj = localServices.find((ls) => String(ls.id) === String(s.serviceId));
           const isSvcLaser = s.isLaser || checkIsLaserService(srvObj);
-          const effectivePrice = (isPerPulseMode && isSvcLaser) ? (Number(s.pulses) || 0) * pulseRate : s.price;
+          const effectivePrice = (isPerPulseMode && isSvcLaser)
+            ? (Number(s.pulses) || 0) * pulseRate
+            : (isPackageMode && isSvcLaser)
+            ? 0
+            : s.price;
           return `${s.name} (Qty: 1 x ${effectivePrice} EGP = ${effectivePrice} EGP${Number(s.pulses) > 0 ? `, Pulses: ${s.pulses}` : ""})`;
         }).join(", ")}`;
         updatedNotes = updatedNotes.replace(/\[Additional Services(?: Used)?(?: During Session)?\]:[^\n\[]*/gi, "").trim() + addSvcString;
@@ -1437,7 +1463,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           String(booking?.notes || "").toLowerCase().includes("package session") ||
           String(booking?.notes || "").toLowerCase().includes("package redemption") ||
           String(booking?.notes || "").toLowerCase().includes("pulses package") ||
-          String(booking?.notes || "").includes("[Laser Package]")
+          String(booking?.notes || "").includes("[Laser Package]") ||
+          String(booking?.notes || "").includes("[Laser Package Redemption]") ||
+          String(booking?.notes || "").includes("[Purchasing New Pulses Package]")
         );
 
         const laserPulseRate = Number(
@@ -1514,8 +1542,27 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
           if (!existingNames.has(name.toLowerCase())) {
             existingNames.add(name.toLowerCase());
+            const matchingSvc = localServices.find((ls) =>
+              (item.serviceId && String(ls.id) === String(item.serviceId)) ||
+              ls.en?.toLowerCase() === name.toLowerCase() ||
+              ls.ar === name
+            );
+            const isItemLaser = checkIsLaserService(matchingSvc) || name.toLowerCase().includes('laser') || name.includes('ليزر');
+            let effectiveUnitPrice = unitPrice;
+            let effectiveTotal = total;
+            if (isLaserPackage && isItemLaser) {
+              effectiveUnitPrice = 0;
+              effectiveTotal = 0;
+            }
+
             if (lineType === 'additional_service') {
-              additionalServicesList.push({ name, qty, unitPrice, total, lineType });
+              additionalServicesList.push({
+                name: (isLaserPackage && isItemLaser) ? `${name} (Package Redemption · 0 EGP)` : name,
+                qty,
+                unitPrice: effectiveUnitPrice,
+                total: effectiveTotal,
+                lineType
+              });
             } else {
               productsConsumablesList.push({
                 name,
@@ -1543,7 +1590,20 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               const parsed = parseAdditionalServiceLine(item.trim());
               if (parsed && !existingNames.has(parsed.name.toLowerCase())) {
                 existingNames.add(parsed.name.toLowerCase());
-                additionalServicesList.push({ ...parsed, lineType: 'additional_service' });
+                const matchingSvc = localServices.find((ls) =>
+                  ls.en?.toLowerCase() === parsed.name.toLowerCase() ||
+                  ls.ar === parsed.name
+                );
+                const isItemLaser = checkIsLaserService(matchingSvc) || parsed.name.toLowerCase().includes('laser') || parsed.name.includes('ليزر');
+                const effectiveUnitPrice = (isLaserPackage && isItemLaser) ? 0 : parsed.unitPrice;
+                const effectiveTotal = (isLaserPackage && isItemLaser) ? 0 : parsed.total;
+                additionalServicesList.push({
+                  name: (isLaserPackage && isItemLaser) ? `${parsed.name} (Package Redemption · 0 EGP)` : parsed.name,
+                  qty: parsed.qty,
+                  unitPrice: effectiveUnitPrice,
+                  total: effectiveTotal,
+                  lineType: 'additional_service'
+                });
               }
             }
           }
@@ -1554,7 +1614,20 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             const parsed = parseAdditionalServiceLine(match[1].trim());
             if (parsed && !existingNames.has(parsed.name.toLowerCase())) {
               existingNames.add(parsed.name.toLowerCase());
-              additionalServicesList.push({ ...parsed, lineType: 'additional_service' });
+              const matchingSvc = localServices.find((ls) =>
+                ls.en?.toLowerCase() === parsed.name.toLowerCase() ||
+                ls.ar === parsed.name
+              );
+              const isItemLaser = checkIsLaserService(matchingSvc) || parsed.name.toLowerCase().includes('laser') || parsed.name.includes('ليزر');
+              const effectiveUnitPrice = (isLaserPackage && isItemLaser) ? 0 : parsed.unitPrice;
+              const effectiveTotal = (isLaserPackage && isItemLaser) ? 0 : parsed.total;
+              additionalServicesList.push({
+                name: (isLaserPackage && isItemLaser) ? `${parsed.name} (Package Redemption · 0 EGP)` : parsed.name,
+                qty: parsed.qty,
+                unitPrice: effectiveUnitPrice,
+                total: effectiveTotal,
+                lineType: 'additional_service'
+              });
             }
           }
 
@@ -1626,7 +1699,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const baseAndAttachedTotal = servicesCost + additionalServicesList.reduce((sum, s) => sum + s.total, 0) + productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
         let targetInvoiceTotal = baseAndAttachedTotal;
 
-        if (booking.notes && !isLaserPerPulse) {
+        if (booking.notes && !isLaserPerPulse && !isLaserPackage) {
           const invMatch = String(booking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP|Invoice Value:\s*(\d+(?:\.\d+)?)\s*EGP/i);
           if (invMatch) {
             const notedTotal = Number(invMatch[1] || invMatch[2]);
@@ -1679,6 +1752,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const isItemLaser = item.isLaser || checkIsLaserService(srvObj);
           const itemPrice = (isLaserPerPulse && isItemLaser)
             ? (Number(item.pulses) || 0) * laserPulseRate
+            : (isLaserPackage && isItemLaser)
+            ? 0
             : Number(item.price || 0);
           return sum + itemPrice;
         }, 0);
@@ -2518,6 +2593,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                     const isItemLaser = item.isLaser || checkIsLaserService(srvObj);
                                     const itemDisplayPrice = (isLaserPerPulse && isItemLaser)
                                       ? (Number(item.pulses) || 0) * laserPulseRate
+                                      : (isLaserPackage && isItemLaser)
+                                      ? 0
                                       : Number(item.price || 0);
 
                                     return (
@@ -2533,7 +2610,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                         </div>
                                         <div className="flex items-center gap-3 shrink-0">
                                           <span className="font-extrabold text-[#414E36]">
-                                            +{itemDisplayPrice} EGP {isLaserPerPulse && isItemLaser && Number(item.pulses) > 0 ? `(${item.pulses} × ${laserPulseRate} EGP)` : ""}
+                                            {isLaserPackage && isItemLaser ? (
+                                              <span className="text-purple-700 font-bold">0 EGP (Package Redemption)</span>
+                                            ) : (
+                                              `+${itemDisplayPrice} EGP ${isLaserPerPulse && isItemLaser && Number(item.pulses) > 0 ? `(${item.pulses} × ${laserPulseRate} EGP)` : ""}`
+                                            )}
                                           </span>
                                           <button
                                             type="button"

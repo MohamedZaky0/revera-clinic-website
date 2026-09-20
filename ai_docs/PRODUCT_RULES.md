@@ -1005,8 +1005,9 @@ The following are **not currently enforced in code**:
 3. **Scenario 3 (Standard Redemption)**:
    - When pulses delivered <= balance, 0 EGP laser charge on invoice. Pulses are deducted, and balance carries forward.
 
-4. **Mixed Non-Laser Services Session Rule**:
-   - Any non-laser service (consultation, chemical peeling, etc.) rendered during the session is always added at full catalog price on top of the package mode selection (e.g. 7,000 EGP package + 150 EGP non-laser service = 7,150 EGP total invoice).
+4. **Additional Laser Services vs Non-Laser Services in Package Mode**:
+   - Any additional service added to the session that is a **Laser Service** (`checkIsLaserService`, or keyword 'laser'/'ليزر') is **100% covered by the pulses package (0 EGP cash price)**. Its delivered pulses are deducted from the pulses package quota and its invoice line is formatted as `(Package Redemption · 0 EGP) / (استهلاك باقة · 0 ج.م)`.
+   - Only **Non-Laser Services** (e.g. consultations, chemical peeling, facials) retain their catalog price and are added to the session invoice on top of the package mode selection (e.g. 7,000 EGP package + 150 EGP non-laser service = 7,150 EGP total invoice).
 
 5. **Universal Settlement Agreement Appearance**:
    - The purple/emerald **Laser Pulses Package Settlement Agreement Banner** is displayed prominently across:
@@ -1018,5 +1019,29 @@ The following are **not currently enforced in code**:
 
 6. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-073` (`Multi-Scenario Laser Pulses Package Settlement Engine`).
+
+---
+
+## New Booking Laser Pulses Package Selection & Catalog Purchase Rules
+**Enforced in:** `src/components/admin/bookings/AdminNewBookingView.tsx`, `src/components/admin/DoctorAccountView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/app/admin/page.tsx`, `src/components/admin/translations.ts`.
+
+1. **Active Pulses Package Detection in New Booking**:
+   - For laser bookings (`isLaserService === true`), Option 3 (**Pulses Package**) distinguishes between session packages (`packageType === 'services'`) and pulses packages (`packageType === 'pulses'`).
+   - If the patient possesses an active pulses package with positive balance (`pulsesRemaining > 0`):
+     - Displays pulse quota badge (e.g., `5,000 pulses left / 5,000 نبضة متبقية`) instead of `0 sessions left`.
+     - In the package card breakdown, displays `Laser Hair Removal Treatments (All Areas)` with remaining pulse quota, eliminating the false `Selected service is not covered in this package` amber alert.
+     - Sets Booking Value to `0 EGP (Package)`, with a prominent green confirmation banner indicating that session pulses will be deducted from the patient's active package upon completion.
+     - Notes record `[Laser Package Redemption]: <Package Name>`.
+
+2. **In-Booking Catalog Pulses Package Selection (No Active Package)**:
+   - When a patient has no active pulses package, selecting Option 3 reveals interactive pulses catalog package cards loaded dynamically from `/api/packages`.
+   - Each card displays package name, pulse quota (e.g. 10,000 pulses), and price (e.g. 6,000 EGP).
+   - Selecting a catalog pulses package sets Booking Value and Amount Paid Now to that package's price (e.g., `6,000 EGP (Buy Package)`).
+   - Notes record `[Purchasing New Pulses Package]: <Name> (<Price> EGP · <Pulses> pulses)` and payload includes `purchasingPackageId`.
+   - Doctor session checkout and Reception settlement automatically activate Scenario 1 (selling the new package at invoice while treating the laser session as 100% covered).
+
+3. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-074` (`New Booking Laser Pulses Package Selection & Catalog Purchase Engine`).
+
 
 

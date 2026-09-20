@@ -23,7 +23,8 @@ import {
   MapPin,
   Wallet,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  Zap
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { adminTranslations } from "@/components/admin/translations";
@@ -253,6 +254,8 @@ export default function AdminNewBookingView({
   const [usePackagePayment, setUsePackagePayment] = useState(false);
   const [activePackage, setActivePackage] = useState<any>(null);
   const [usePackageMode, setUsePackageMode] = useState(false);
+  const [catalogPackages, setCatalogPackages] = useState<any[]>([]);
+  const [selectedCatalogPulsePkg, setSelectedCatalogPulsePkg] = useState<any>(null);
 
   // Patient Account Auto-Detection Modal & Additional Fields
   const [showPatientAccountModal, setShowPatientAccountModal] = useState(false);
@@ -361,6 +364,29 @@ export default function AdminNewBookingView({
         } else if (customers.length > 0) {
           setAllCustomers(customers);
           setCustomerList(customers);
+        }
+        // Fetch Catalog Pulses Packages for laser package selection
+        try {
+          const pRes = await fetch("/api/packages");
+          if (pRes.ok) {
+            const pData = await pRes.json();
+            const pkgs = Array.isArray(pData) ? pData : pData.packages || [];
+            const pulseOnly = pkgs.filter((p: any) =>
+              p.package_type === "pulses" ||
+              p.packageType === "pulses" ||
+              Number(p.total_pulses || p.totalPulses || 0) > 0 ||
+              p.name?.toLowerCase().includes("pulse") ||
+              p.name?.toLowerCase().includes("laser") ||
+              p.name?.includes("نبض") ||
+              p.name?.includes("ليزر")
+            );
+            setCatalogPackages(pulseOnly);
+            if (pulseOnly.length > 0) {
+              setSelectedCatalogPulsePkg(pulseOnly[0]);
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to load catalog packages:", e);
         }
       } catch (err) {
         console.error("Error initializing New Booking View data:", err);
@@ -651,11 +677,25 @@ export default function AdminNewBookingView({
 
         if (activePkgs.length > 0) {
           const firstPkg = activePkgs[0];
-          const totalRemaining = (firstPkg.items || []).reduce((sum: number, it: any) => sum + (it.qtyRemaining || 0), 0);
+          const isPulses = Boolean(
+            firstPkg.packageType === "pulses" ||
+            firstPkg.package_type === "pulses" ||
+            Number(firstPkg.totalPulses || firstPkg.total_pulses || firstPkg.includedPulses || firstPkg.included_pulses || 0) > 0 ||
+            Number(firstPkg.pulsesRemaining || firstPkg.pulses_remaining || firstPkg.remainingPulses || firstPkg.remaining_pulses || 0) > 0 ||
+            firstPkg.packageName?.toLowerCase().includes("pulse") ||
+            firstPkg.packageName?.toLowerCase().includes("laser") ||
+            firstPkg.packageName?.includes("نبض") ||
+            firstPkg.packageName?.includes("ليزر")
+          );
+          const remPulses = Number(firstPkg.pulsesRemaining ?? firstPkg.pulses_remaining ?? firstPkg.remainingPulses ?? firstPkg.remaining_pulses ?? firstPkg.totalPulses ?? 0);
+          const totalRemaining = isPulses
+            ? remPulses
+            : (firstPkg.items || []).reduce((sum: number, it: any) => sum + (it.qtyRemaining || 0), 0);
           if (totalRemaining > 0) {
             setActivePackage({
               name: (lang === "ar" && firstPkg.packageNameAr) ? firstPkg.packageNameAr : firstPkg.packageName,
               remaining: totalRemaining,
+              isPulses,
               expiresOn: firstPkg.expiresAt ? new Date(firstPkg.expiresAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"
             });
           } else {
@@ -688,6 +728,81 @@ export default function AdminNewBookingView({
     }
   }, [foundCustomer?.id, phone]);
 
+  const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
+  const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
+  const selectedBranchObj = dbBranches.find(b => String(b.id) === String(selectedBranchId)) || dbBranches[0];
+
+  // Dynamic Laser Service Determination
+  const isLaserService = useMemo(() => {
+    if (!selectedServiceObj) return false;
+    const sAny = selectedServiceObj as any;
+    return Boolean(
+      sAny.islaser ||
+      sAny.is_laser ||
+      (sAny.category && sAny.category.toLowerCase().includes("laser")) ||
+      (sAny.cat && sAny.cat.toLowerCase().includes("laser")) ||
+      (sAny.en && sAny.en.toLowerCase().includes("laser")) ||
+      (sAny.name && sAny.name.toLowerCase().includes("laser")) ||
+      (sAny.title && sAny.title.toLowerCase().includes("laser")) ||
+      (sAny.ar && sAny.ar.includes("ليزر"))
+    );
+  }, [selectedServiceObj]);
+
+  const checkIsPulsesPackage = (pkg: any) => {
+    if (!pkg) return false;
+    return Boolean(
+      pkg.packageType === "pulses" ||
+      pkg.package_type === "pulses" ||
+      Number(pkg.totalPulses || pkg.total_pulses || pkg.includedPulses || pkg.included_pulses || 0) > 0 ||
+      Number(pkg.pulsesRemaining || pkg.pulses_remaining || pkg.remainingPulses || pkg.remaining_pulses || 0) > 0 ||
+      pkg.packageName?.toLowerCase().includes("pulse") ||
+      pkg.packageName?.toLowerCase().includes("laser") ||
+      pkg.packageName?.includes("نبض") ||
+      pkg.packageName?.includes("ليزر") ||
+      pkg.name?.toLowerCase().includes("pulse") ||
+      pkg.name?.toLowerCase().includes("laser") ||
+      pkg.name?.includes("نبض") ||
+      pkg.name?.includes("ليزر")
+    );
+  };
+
+  const getPackagePulsesBalance = (pkg: any) => {
+    if (!pkg) return { remaining: 0, total: 0 };
+    const rem = Number(
+      pkg.pulsesRemaining !== undefined
+        ? pkg.pulsesRemaining
+        : pkg.pulses_remaining !== undefined
+        ? pkg.pulses_remaining
+        : pkg.remainingPulses !== undefined
+        ? pkg.remainingPulses
+        : pkg.remaining_pulses !== undefined
+        ? pkg.remaining_pulses
+        : pkg.totalPulses ?? pkg.total_pulses ?? pkg.includedPulses ?? pkg.included_pulses ?? 0
+    );
+    const tot = Number(
+      pkg.totalPulses !== undefined
+        ? pkg.totalPulses
+        : pkg.total_pulses !== undefined
+        ? pkg.total_pulses
+        : pkg.includedPulses !== undefined
+        ? pkg.includedPulses
+        : pkg.included_pulses !== undefined
+        ? pkg.included_pulses
+        : rem
+    );
+    return { remaining: rem, total: Math.max(rem, tot) };
+  };
+
+  const customerActivePulsePkg = useMemo(() => {
+    return customerPackages.find((pkg) => {
+      if (pkg.status && pkg.status !== "active") return false;
+      if (pkg.expiresAt && new Date(pkg.expiresAt) < new Date()) return false;
+      if (!checkIsPulsesPackage(pkg)) return false;
+      const { remaining } = getPackagePulsesBalance(pkg);
+      return remaining > 0;
+    }) || null;
+  }, [customerPackages]);
+
   // Matching active package item for currently selected service
   const { matchingPackage, matchingPackageItem } = useMemo(() => {
     if (!selectedServiceId || customerPackages.length === 0) {
@@ -698,6 +813,30 @@ export default function AdminNewBookingView({
     const curSvcEn = (curSvc?.en || curSvc?.name || "").toLowerCase().trim();
     const curSvcAr = (curSvc?.ar || "").toLowerCase().trim();
 
+    // 1. If current service is laser, prioritize active customer pulses package!
+    if (isLaserService) {
+      for (const pkg of customerPackages) {
+        if (checkIsPulsesPackage(pkg)) {
+          const { remaining, total } = getPackagePulsesBalance(pkg);
+          if (remaining > 0) {
+            return {
+              matchingPackage: pkg,
+              matchingPackageItem: {
+                id: `pulse-${pkg.id}`,
+                serviceId: Number(selectedServiceId),
+                serviceName: curSvc?.en || curSvc?.name || "Laser Hair Removal",
+                serviceNameAr: curSvc?.ar || "جلسة ليزر",
+                qtyRemaining: remaining,
+                qtyTotal: total,
+                isPulses: true
+              }
+            };
+          }
+        }
+      }
+    }
+
+    // 2. Regular session package matching
     const matchesService = (item: any) => {
       if (String(item.serviceId) === String(selectedServiceId)) return true;
       const itEn = (item.serviceName || "").toLowerCase().trim();
@@ -708,31 +847,38 @@ export default function AdminNewBookingView({
     };
 
     for (const pkg of customerPackages) {
-      const it = (pkg.items || []).find((item: any) => matchesService(item) && Number(item.qtyRemaining || 0) > 0);
-      if (it) return { matchingPackage: pkg, matchingPackageItem: it };
+      if (!checkIsPulsesPackage(pkg)) {
+        const it = (pkg.items || []).find((item: any) => matchesService(item) && Number(item.qtyRemaining || 0) > 0);
+        if (it) return { matchingPackage: pkg, matchingPackageItem: it };
+      }
     }
     for (const pkg of customerPackages) {
-      const it = (pkg.items || []).find((item: any) => matchesService(item));
-      if (it) return { matchingPackage: pkg, matchingPackageItem: it };
+      if (!checkIsPulsesPackage(pkg)) {
+        const it = (pkg.items || []).find((item: any) => matchesService(item));
+        if (it) return { matchingPackage: pkg, matchingPackageItem: it };
+      }
     }
     return { matchingPackage: null, matchingPackageItem: null };
-  }, [selectedServiceId, customerPackages, dbServices]);
+  }, [selectedServiceId, customerPackages, dbServices, isLaserService]);
 
   // Auto-reset package payment if selected service is no longer covered
   useEffect(() => {
     if (usePackagePayment) {
-      if (!matchingPackageItem || matchingPackageItem.qtyRemaining <= 0) {
+      if (matchingPackageItem?.isPulses) {
+        if (!isLaserService || matchingPackageItem.qtyRemaining <= 0) {
+          setUsePackagePayment(false);
+          setSelectedPackageItemId("");
+          setSelectedPackageId("");
+          setCustomBookingValue(null);
+        }
+      } else if (!matchingPackageItem || matchingPackageItem.qtyRemaining <= 0) {
         setUsePackagePayment(false);
         setSelectedPackageItemId("");
         setSelectedPackageId("");
         setCustomBookingValue(null);
       }
     }
-  }, [selectedServiceId, matchingPackageItem, usePackagePayment]);
-
-  const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
-  const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
-  const selectedBranchObj = dbBranches.find(b => String(b.id) === String(selectedBranchId)) || dbBranches[0];
+  }, [selectedServiceId, matchingPackageItem, usePackagePayment, isLaserService]);
 
   const weekdayName = useMemo(() => {
     if (!bookingDate) return "";
@@ -913,29 +1059,35 @@ export default function AdminNewBookingView({
 
   const fullPatientName = `${firstName} ${lastName}`.trim() || "Patient Name";
 
-  // Dynamic Laser Service Determination
-  const isLaserService = useMemo(() => {
-    if (!selectedServiceObj) return false;
-    const sAny = selectedServiceObj as any;
-    return Boolean(
-      sAny.islaser ||
-      sAny.is_laser ||
-      (sAny.category && sAny.category.toLowerCase().includes("laser")) ||
-      (sAny.cat && sAny.cat.toLowerCase().includes("laser")) ||
-      (sAny.en && sAny.en.toLowerCase().includes("laser")) ||
-      (sAny.name && sAny.name.toLowerCase().includes("laser")) ||
-      (sAny.title && sAny.title.toLowerCase().includes("laser")) ||
-      (sAny.ar && sAny.ar.includes("ليزر"))
-    );
-  }, [selectedServiceObj]);
-
-  const isPackageCovered = Boolean(usePackagePayment || usePackageMode || (isLaserService && laserPaymentMode === "PACKAGE"));
+  const isPackageCovered = Boolean(usePackagePayment || usePackageMode || (isLaserService && laserPaymentMode === "PACKAGE" && customerActivePulsePkg));
   const isPerPulseMode = Boolean(isLaserService && laserPaymentMode === "PER_PULSE");
+  const isNewPackagePurchase = Boolean(
+    isLaserService &&
+    laserPaymentMode === "PACKAGE" &&
+    !customerActivePulsePkg &&
+    selectedCatalogPulsePkg
+  );
   const baseServicePrice = Number(selectedServiceObj?.price || 0);
-  const autoBookingValue = isPackageCovered || isPerPulseMode ? 0 : baseServicePrice * Math.max(1, selectedTimes.length);
-  const bookingValue = isPackageCovered || isPerPulseMode ? 0 : (customBookingValue !== null && customBookingValue !== undefined ? Number(customBookingValue) : autoBookingValue);
-  const numAmountPaid = isPackageCovered || isPerPulseMode ? 0 : (typeof amountPaidNow === "number" ? amountPaidNow : 0);
-  const remainingValue = isPackageCovered || isPerPulseMode ? 0 : bookingValue - numAmountPaid;
+  const autoBookingValue = isNewPackagePurchase
+    ? Number(selectedCatalogPulsePkg?.price || 0)
+    : isPackageCovered || isPerPulseMode
+    ? 0
+    : baseServicePrice * Math.max(1, selectedTimes.length);
+  const bookingValue = isNewPackagePurchase
+    ? (customBookingValue !== null && customBookingValue !== undefined ? Number(customBookingValue) : Number(selectedCatalogPulsePkg?.price || 0))
+    : isPackageCovered || isPerPulseMode
+    ? 0
+    : (customBookingValue !== null && customBookingValue !== undefined ? Number(customBookingValue) : autoBookingValue);
+  const numAmountPaid = isNewPackagePurchase
+    ? (typeof amountPaidNow === "number" ? amountPaidNow : Number(selectedCatalogPulsePkg?.price || 0))
+    : isPackageCovered || isPerPulseMode
+    ? 0
+    : (typeof amountPaidNow === "number" ? amountPaidNow : 0);
+  const remainingValue = isNewPackagePurchase
+    ? Math.max(0, bookingValue - numAmountPaid)
+    : isPackageCovered || isPerPulseMode
+    ? 0
+    : Math.max(0, bookingValue - numAmountPaid);
   const selectedTime = selectedTimes[0] || "";
   const totalDurationMinutes = getServiceDurationMinutes(selectedServiceObj);
   const requiredSlotCount = Math.max(1, Math.ceil(totalDurationMinutes / 15));
@@ -1046,8 +1198,12 @@ export default function AdminNewBookingView({
         }
       }
 
-      const packageNote = (usePackagePayment && matchingPackage && matchingPackageItem)
-        ? `\n[Package Redemption]: ${(lang === "ar" && matchingPackage.packageNameAr) ? matchingPackage.packageNameAr : matchingPackage.packageName} - ${selectedServiceName} (Item ID: ${matchingPackageItem.id})`
+      const packageNote = isNewPackagePurchase && selectedCatalogPulsePkg
+        ? `\n[Purchasing New Pulses Package]: ${(lang === "ar" && selectedCatalogPulsePkg.name_ar) ? selectedCatalogPulsePkg.name_ar : selectedCatalogPulsePkg.name} (${Number(selectedCatalogPulsePkg.price || 0)} EGP · ${Number(selectedCatalogPulsePkg.total_pulses || selectedCatalogPulsePkg.totalPulses || 10000).toLocaleString()} pulses)`
+        : (usePackagePayment && matchingPackage && matchingPackageItem)
+        ? matchingPackageItem.isPulses
+          ? `\n[Laser Package Redemption]: ${(lang === "ar" && matchingPackage.packageNameAr) ? matchingPackage.packageNameAr : matchingPackage.packageName} (${Number(matchingPackageItem.qtyRemaining).toLocaleString()} pulses remaining)`
+          : `\n[Package Redemption]: ${(lang === "ar" && matchingPackage.packageNameAr) ? matchingPackage.packageNameAr : matchingPackage.packageName} - ${selectedServiceName} (Item ID: ${matchingPackageItem.id})`
         : "";
 
       const laserNote = isLaserService
@@ -1056,6 +1212,8 @@ export default function AdminNewBookingView({
               ? "Option 1: Pay by Service (Fixed Price)"
               : laserPaymentMode === "PER_PULSE"
               ? `Option 2: Pay per Pulse (@ ${laserPerPulsePrice} EGP/pulse)`
+              : isNewPackagePurchase && selectedCatalogPulsePkg
+              ? `Option 3: Pay with Pulses Package (New Package: ${selectedCatalogPulsePkg.name})`
               : "Option 3: Pay with Pulses Package"
           }`
         : "";
@@ -1082,6 +1240,8 @@ export default function AdminNewBookingView({
         isLaserService: isLaserService,
         laserPaymentMode: isLaserService ? laserPaymentMode : null,
         laserPricePerPulse: isLaserService && laserPaymentMode === "PER_PULSE" ? laserPerPulsePrice : null,
+        purchasingPackageId: isNewPackagePurchase ? selectedCatalogPulsePkg?.id : null,
+        packageId: isNewPackagePurchase ? selectedCatalogPulsePkg?.id : (matchingPackage?.id || null),
       };
 
       const res = await fetch("/api/reservations", {
@@ -1725,8 +1885,21 @@ export default function AdminNewBookingView({
                     <div
                       onClick={() => {
                         setLaserPaymentMode("PACKAGE");
-                        setCustomBookingValue(0);
-                        setAmountPaidNow(0);
+                        if (customerActivePulsePkg) {
+                          setSelectedPackageId(customerActivePulsePkg.id);
+                          setSelectedPackageItemId(`pulse-${customerActivePulsePkg.id}`);
+                          setUsePackagePayment(true);
+                          setCustomBookingValue(0);
+                          setAmountPaidNow(0);
+                        } else if (selectedCatalogPulsePkg) {
+                          setUsePackagePayment(true);
+                          setCustomBookingValue(Number(selectedCatalogPulsePkg.price || 0));
+                          setAmountPaidNow(Number(selectedCatalogPulsePkg.price || 0));
+                        } else {
+                          setUsePackagePayment(true);
+                          setCustomBookingValue(0);
+                          setAmountPaidNow(0);
+                        }
                       }}
                       className={`p-3.5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between ${
                         laserPaymentMode === "PACKAGE"
@@ -1748,10 +1921,103 @@ export default function AdminNewBookingView({
                       </div>
                       <div className="pt-2 mt-2 border-t border-[#414E36]/10 flex items-center justify-between">
                         <span className="text-[10px] font-bold uppercase text-[#5A6A51]">{tr.bookingValueLabel || "Booking"}:</span>
-                        <span className="text-xs font-black text-emerald-900">0 {tr.egpLabel || "EGP"} ({tr.paymentMethodPackage || "Package"})</span>
+                        <span className="text-xs font-black text-emerald-900">
+                          {customerActivePulsePkg
+                            ? `0 ${tr.egpLabel || "EGP"} (${tr.paymentMethodPackage || "Package"})`
+                            : selectedCatalogPulsePkg
+                            ? `${Number(selectedCatalogPulsePkg.price || 0)} ${tr.egpLabel || "EGP"} (${tr.buyPackageSuffix || "Buy Package"})`
+                            : `0 ${tr.egpLabel || "EGP"}`}
+                        </span>
                       </div>
                     </div>
                   </div>
+
+                  {/* If Option 3 is active: display linked package status OR catalog package selection if patient has no package */}
+                  {laserPaymentMode === "PACKAGE" && (
+                    <div className="mt-3">
+                      {customerActivePulsePkg ? (
+                        <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-300/80 flex items-center justify-between flex-wrap gap-2 text-xs animate-fadeIn">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
+                            <div>
+                              <span className="font-bold text-emerald-950 block">
+                                {lang === "ar"
+                                  ? `الجلسة مغطاة بباقة المريض النشطة: ${(customerActivePulsePkg.packageNameAr || customerActivePulsePkg.packageName)}`
+                                  : `Session covered by active patient package: ${customerActivePulsePkg.packageName}`}
+                              </span>
+                              <span className="text-[11px] text-emerald-800 font-medium">
+                                {lang === "ar"
+                                  ? `${getPackagePulsesBalance(customerActivePulsePkg).remaining.toLocaleString()} نبضة متبقية في الرصيد · 0 ج.م مستحق للحجز`
+                                  : `${getPackagePulsesBalance(customerActivePulsePkg).remaining.toLocaleString()} pulses remaining in quota · 0 EGP booking fee`}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="font-black text-xs text-emerald-900 bg-white px-2.5 py-1 rounded-lg border border-emerald-300 shadow-2xs">
+                            0 EGP
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-300/80 space-y-3 animate-fadeIn">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Zap size={16} className="text-amber-600 fill-amber-500 shrink-0" />
+                              <span className="font-bold text-xs text-amber-950">
+                                {tr.selectPulsesPackageToBuy || "Patient has no active pulses package. Select a Pulses Package to purchase with this session:"}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
+                              {lang === "ar" ? "شراء باقة جديدة" : "New Package Purchase"}
+                            </span>
+                          </div>
+                          {catalogPackages.length === 0 ? (
+                            <p className="text-xs text-amber-800">
+                              {tr.noPulsePackageNotice || "No active pulse package found for this patient. You can choose Pay by Service, Pay per Pulse, or sell a package upon arrival."}
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                              {catalogPackages.map((catPkg) => {
+                                const isSelected = selectedCatalogPulsePkg?.id === catPkg.id;
+                                const totalPulses = catPkg.total_pulses || catPkg.totalPulses || 10000;
+                                return (
+                                  <div
+                                    key={catPkg.id}
+                                    onClick={() => {
+                                      setSelectedCatalogPulsePkg(catPkg);
+                                      setCustomBookingValue(Number(catPkg.price || 0));
+                                      setAmountPaidNow(Number(catPkg.price || 0));
+                                    }}
+                                    className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                                      isSelected
+                                        ? "border-amber-600 bg-white ring-2 ring-amber-500 shadow-xs"
+                                        : "border-amber-200 bg-white/70 hover:bg-white"
+                                    }`}
+                                  >
+                                    <div className="space-y-1">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-black text-xs text-amber-950">
+                                          {(lang === "ar" && catPkg.name_ar) ? catPkg.name_ar : catPkg.name}
+                                        </span>
+                                        {isSelected && <Check size={14} className="text-amber-700 shrink-0 font-bold" />}
+                                      </div>
+                                      <span className="text-[11px] text-amber-800 font-semibold block">
+                                        {Number(totalPulses).toLocaleString()} {lang === "ar" ? "نبضة" : "pulses"}
+                                      </span>
+                                    </div>
+                                    <div className="pt-2 mt-2 border-t border-amber-100 flex items-center justify-between">
+                                      <span className="text-[10px] uppercase font-bold text-amber-800">{tr.servicePriceLabel || "Price"}:</span>
+                                      <span className="text-xs font-black text-amber-950">
+                                        {Number(catPkg.price || 0).toLocaleString()} {tr.egpLabel || "EGP"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1797,25 +2063,40 @@ export default function AdminNewBookingView({
                     {/* Packages List */}
                     <div className="space-y-3">
                       {customerPackages.map((pkg) => {
-                        const totalPkgRemaining = (pkg.items || []).reduce((sum: number, it: any) => sum + (it.qtyRemaining || 0), 0);
-                        const isServiceCoveredInThisPkg = (pkg.items || []).some(
-                          (it: any) => String(it.serviceId) === String(selectedServiceId) && it.qtyRemaining > 0
-                        );
+                        const isPulses = checkIsPulsesPackage(pkg);
+                        const { remaining: pkgPulsesRemaining, total: pkgPulsesTotal } = getPackagePulsesBalance(pkg);
+                        const totalPkgRemaining = isPulses
+                          ? pkgPulsesRemaining
+                          : (pkg.items || []).reduce((sum: number, it: any) => sum + (it.qtyRemaining || 0), 0);
+
+                        const isServiceCoveredInThisPkg = isPulses
+                          ? (isLaserService && pkgPulsesRemaining > 0)
+                          : (pkg.items || []).some(
+                              (it: any) => String(it.serviceId) === String(selectedServiceId) && it.qtyRemaining > 0
+                            );
 
                         return (
                           <div key={pkg.id} className="rounded-xl border border-[#414E36]/15 bg-white p-3.5 space-y-3 shadow-xs">
                             <div className="flex items-center justify-between flex-wrap gap-2">
                               <div>
-                                <h5 className="font-black text-xs text-[#1F251A]">
-                                  {(lang === "ar" && pkg.packageNameAr) ? pkg.packageNameAr : pkg.packageName}
+                                <h5 className="font-black text-xs text-[#1F251A] flex items-center gap-1.5">
+                                  {isPulses && <Zap size={14} className="text-amber-600 fill-amber-500 shrink-0" />}
+                                  <span>{(lang === "ar" && pkg.packageNameAr) ? pkg.packageNameAr : pkg.packageName}</span>
                                 </h5>
                                 <p className="text-[10px] text-[#5A6A51] font-semibold mt-0.5">
                                   {pkg.expiresAt ? `${tr.packageExpires || "Expires:"} ${new Date(pkg.expiresAt).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", { day: "2-digit", month: "short", year: "numeric" })}` : ""}
                                 </p>
                               </div>
-                              <span className="text-xs font-black text-emerald-800 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200/60">
-                                {totalPkgRemaining} {totalPkgRemaining === 1 ? (tr.sessionRemainingBadge || "session left") : (tr.sessionsRemainingBadge || "sessions left")}
-                              </span>
+                              {isPulses ? (
+                                <span className="text-xs font-black text-amber-900 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-300/70 flex items-center gap-1 shadow-2xs">
+                                  <Zap size={12} className="text-amber-600 fill-amber-500" />
+                                  {pkgPulsesRemaining.toLocaleString()} {lang === "ar" ? "نبضة متبقية" : (tr.pulsesRemainingBadge || "pulses left")}
+                                </span>
+                              ) : (
+                                <span className="text-xs font-black text-emerald-800 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200/60">
+                                  {totalPkgRemaining} {totalPkgRemaining === 1 ? (tr.sessionRemainingBadge || "session left") : (tr.sessionsRemainingBadge || "sessions left")}
+                                </span>
+                              )}
                             </div>
 
                             {/* Included Services List */}
@@ -1823,53 +2104,191 @@ export default function AdminNewBookingView({
                               <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">
                                 {tr.packageServicesCovered || "Included Services & Sessions:"}
                               </span>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {(pkg.items || []).map((it: any) => {
-                                  const isSelected = String(it.serviceId) === String(selectedServiceId);
-                                  const svcName = (lang === "ar" && it.serviceNameAr) ? it.serviceNameAr : it.serviceName;
+                              {isPulses ? (
+                                <div
+                                  onClick={() => {
+                                    if (!isLaserService) {
+                                      const laserSvc = dbServices.find(s => {
+                                        const sAny = s as any;
+                                        return Boolean(sAny.islaser || sAny.is_laser || sAny.category?.toLowerCase().includes("laser") || sAny.cat?.toLowerCase().includes("laser") || sAny.en?.toLowerCase().includes("laser") || sAny.ar?.includes("ليزر"));
+                                      });
+                                      if (laserSvc) setSelectedServiceId(String(laserSvc.id));
+                                    }
+                                  }}
+                                  className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition ${
+                                    isLaserService
+                                      ? "border-amber-500 bg-amber-50/80 ring-1 ring-amber-500 text-amber-950 font-bold"
+                                      : "border-gray-200 bg-gray-50/50 hover:bg-white text-[#1F251A] cursor-pointer"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 truncate">
+                                    <Zap size={14} className="text-amber-600 fill-amber-500 shrink-0" />
+                                    <span className="truncate">
+                                      {lang === "ar" ? "خدمات إزالة الشعر بالليزر (جميع المناطق)" : "Laser Hair Removal Treatments (All Areas)"}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                                      {pkgPulsesRemaining.toLocaleString()} / {pkgPulsesTotal.toLocaleString()} {lang === "ar" ? "نبضة" : (tr.pulsesWord || "pulses")}
+                                    </span>
+                                    {isLaserService && (
+                                      <span className="text-[9px] font-black uppercase text-amber-900 bg-white px-1.5 py-0.5 rounded border border-amber-300">
+                                        {tr.currentlySelectedService || "Selected"}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {(pkg.items || []).map((it: any) => {
+                                    const isSelected = String(it.serviceId) === String(selectedServiceId);
+                                    const svcName = (lang === "ar" && it.serviceNameAr) ? it.serviceNameAr : it.serviceName;
 
-                                  return (
-                                    <div
-                                      key={it.id}
-                                      onClick={() => {
-                                        if (!isSelected) {
-                                          setSelectedServiceId(String(it.serviceId));
-                                        }
-                                      }}
-                                      className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition ${
-                                        isSelected
-                                          ? "border-emerald-600 bg-emerald-50/80 ring-1 ring-emerald-600 text-emerald-900 font-bold"
-                                          : "border-gray-200 bg-gray-50/50 hover:bg-white text-[#1F251A]"
-                                      }`}
-                                    >
-                                      <div className="flex items-center gap-1.5 truncate">
-                                        {isSelected ? (
-                                          <Check size={13} className="text-emerald-700 shrink-0" />
-                                        ) : (
-                                          <Sparkles size={13} className="text-[#8B9882] shrink-0" />
-                                        )}
-                                        <span className="truncate">{svcName}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1.5 shrink-0">
-                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                          it.qtyRemaining > 0 ? "bg-emerald-100 text-emerald-800" : "bg-gray-200 text-gray-600"
-                                        }`}>
-                                          {it.qtyRemaining} / {it.qtyTotal}
-                                        </span>
-                                        {isSelected && (
-                                          <span className="text-[9px] font-black uppercase text-emerald-800 bg-white px-1.5 py-0.5 rounded border border-emerald-300">
-                                            {tr.currentlySelectedService || "Selected"}
+                                    return (
+                                      <div
+                                        key={it.id}
+                                        onClick={() => {
+                                          if (!isSelected) {
+                                            setSelectedServiceId(String(it.serviceId));
+                                          }
+                                        }}
+                                        className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition ${
+                                          isSelected
+                                            ? "border-emerald-600 bg-emerald-50/80 ring-1 ring-emerald-600 text-emerald-900 font-bold"
+                                            : "border-gray-200 bg-gray-50/50 hover:bg-white text-[#1F251A]"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-1.5 truncate">
+                                          {isSelected ? (
+                                            <Check size={13} className="text-emerald-700 shrink-0" />
+                                          ) : (
+                                            <Sparkles size={13} className="text-[#8B9882] shrink-0" />
+                                          )}
+                                          <span className="truncate">{svcName}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                            it.qtyRemaining > 0 ? "bg-emerald-100 text-emerald-800" : "bg-gray-200 text-gray-600"
+                                          }`}>
+                                            {it.qtyRemaining} / {it.qtyTotal}
                                           </span>
-                                        )}
+                                          {isSelected && (
+                                            <span className="text-[9px] font-black uppercase text-emerald-800 bg-white px-1.5 py-0.5 rounded border border-emerald-300">
+                                              {tr.currentlySelectedService || "Selected"}
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
 
                             {/* Pay with Package Checkbox / Option */}
-                            {matchingPackageItem && matchingPackageItem.qtyRemaining > 0 && matchingPackage?.id === pkg.id ? (
+                            {isPulses ? (
+                              isLaserService && pkgPulsesRemaining > 0 ? (
+                                <div className="pt-2 border-t border-[#414E36]/10">
+                                  <label
+                                    onClick={() => {
+                                      const next = !(usePackagePayment && selectedPackageId === pkg.id);
+                                      setUsePackagePayment(next);
+                                      if (next) {
+                                        setSelectedPackageId(pkg.id);
+                                        setSelectedPackageItemId(`pulse-${pkg.id}`);
+                                        setLaserPaymentMode("PACKAGE");
+                                        setCustomBookingValue(0);
+                                        setAmountPaidNow(0);
+                                      } else {
+                                        setSelectedPackageId("");
+                                        setSelectedPackageItemId("");
+                                        setLaserPaymentMode("SERVICE");
+                                        setCustomBookingValue(null);
+                                        setAmountPaidNow("");
+                                      }
+                                    }}
+                                    className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                                      usePackagePayment && selectedPackageId === pkg.id
+                                        ? "border-amber-600 bg-amber-50/80 ring-1 ring-amber-600 shadow-2xs"
+                                        : "border-gray-200 bg-[#FBFBF9] hover:bg-amber-50/40"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={usePackagePayment && selectedPackageId === pkg.id}
+                                      onChange={(e) => {
+                                        const next = e.target.checked;
+                                        setUsePackagePayment(next);
+                                        if (next) {
+                                          setSelectedPackageId(pkg.id);
+                                          setSelectedPackageItemId(`pulse-${pkg.id}`);
+                                          setLaserPaymentMode("PACKAGE");
+                                          setCustomBookingValue(0);
+                                          setAmountPaidNow(0);
+                                        } else {
+                                          setSelectedPackageId("");
+                                          setSelectedPackageItemId("");
+                                          setLaserPaymentMode("SERVICE");
+                                          setCustomBookingValue(null);
+                                          setAmountPaidNow("");
+                                        }
+                                      }}
+                                      className="mt-0.5 h-4 w-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                    />
+                                    <div className="space-y-0.5 flex-1">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-black text-xs text-amber-950">
+                                          {lang === "ar" ? "الدفع بباقة نبضات الليزر" : (tr.payWithPulsePackageOption || "Pay with Laser Pulses Package")}
+                                        </span>
+                                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-600 text-white">
+                                          0 EGP
+                                        </span>
+                                      </div>
+                                      <p className="text-[11px] text-amber-900/80 font-medium">
+                                        {lang === "ar"
+                                          ? `خصم نبضات الجلسة من رصيد باقة المريض (${pkgPulsesRemaining.toLocaleString()} نبضة متاحة · 0 ج.م مطلوب دفعه)`
+                                          : (tr.payWithPulsePackageDesc || `Deduct session pulses from patient package (${pkgPulsesRemaining.toLocaleString()} pulses available · 0 EGP to pay)`)}
+                                      </p>
+                                      {usePackagePayment && selectedPackageId === pkg.id && (
+                                        <p className="text-[10px] text-amber-900 font-bold pt-1 flex items-center gap-1">
+                                          <CheckCircle2 size={12} className="text-amber-700 shrink-0" />
+                                          <span>{lang === "ar" ? "سيتم خصم نبضات الجلسة الفعلية من رصيد الباقة بعد انتهاء الجلسة" : (tr.sessionPulsesDeductedNotice || "Session pulses will be deducted from package quota upon session completion")}</span>
+                                        </p>
+                                      )}
+                                    </div>
+                                  </label>
+                                </div>
+                              ) : !isLaserService ? (
+                                <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 text-[11px] text-amber-900 flex items-start gap-2">
+                                  <AlertCircle size={14} className="text-amber-600 mt-0.5 shrink-0" />
+                                  <div>
+                                    <span className="font-bold">
+                                      {lang === "ar"
+                                        ? "هذه باقة نبضات مخصصة لخدمات إزالة الشعر بالليزر فقط."
+                                        : (tr.pulsesCoverageNotice || "This pulses package is reserved for Laser Hair Removal treatments.")}
+                                    </span>
+                                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                                      <span className="text-[10px] text-[#5A6A51] font-semibold">
+                                        {tr.switchToCoveredService || "Switch to a covered service:"}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const laserSvc = dbServices.find(s => {
+                                            const sAny = s as any;
+                                            return Boolean(sAny.islaser || sAny.is_laser || sAny.category?.toLowerCase().includes("laser") || sAny.cat?.toLowerCase().includes("laser") || sAny.en?.toLowerCase().includes("laser") || sAny.ar?.includes("ليزر"));
+                                          });
+                                          if (laserSvc) setSelectedServiceId(String(laserSvc.id));
+                                        }}
+                                        className="text-[10px] font-bold text-amber-900 bg-white hover:bg-amber-100/60 px-2 py-0.5 rounded-md border border-amber-300 transition cursor-pointer"
+                                      >
+                                        + {lang === "ar" ? "خدمات الليزر" : "Laser Services"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : null
+                            ) : matchingPackageItem && matchingPackageItem.qtyRemaining > 0 && matchingPackage?.id === pkg.id ? (
                               <div className="pt-2 border-t border-[#414E36]/10">
                                 <label
                                   onClick={() => {

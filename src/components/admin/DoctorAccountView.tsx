@@ -18,6 +18,7 @@ import DoctorProfileTab from "./doctor/tabs/DoctorProfileTab";
 import UserProfileView, { UserProfileViewTranslations } from "./UserProfileView";
 import DoctorSessionDrawer from "./doctor/modals/DoctorSessionDrawer";
 import DoctorPatientHistoryDrawer from "./doctor/modals/DoctorPatientHistoryDrawer";
+import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
 
 // Local Date Helper to avoid UTC conversion shifts
 const getLocalDateString = (d: Date = new Date()): string => {
@@ -846,7 +847,20 @@ export default function DoctorAccountView({
   );
   const productsSubtotal = usedProducts.reduce((sum, item) => sum + item.total, 0);
   const extraPulsesSubtotal = extraPulsesCount * pricePerPulse;
-  const additionalServicesSubtotal = additionalServices.reduce((sum, item) => sum + item.price, 0);
+  const additionalServicesSubtotal = additionalServices.reduce((sum, item) => {
+    const srv = servicesList.find((s) => String(s.id) === String(item.serviceId));
+    const isLaser = item.isLaser || checkIsLaserService(srv);
+    const isBookingPackageMode = Boolean(
+      activeSessionBooking?.laser_payment_mode === "PACKAGE" ||
+      activeSessionBooking?.laserPaymentMode === "PACKAGE" ||
+      String(activeSessionBooking?.notes || "").toLowerCase().includes("package session") ||
+      String(activeSessionBooking?.notes || "").toLowerCase().includes("package redemption") ||
+      String(activeSessionBooking?.notes || "").toLowerCase().includes("pulses package") ||
+      String(activeSessionBooking?.notes || "").includes("[Laser Package]")
+    );
+    if (isBookingPackageMode && isLaser) return sum;
+    return sum + (Number(item.price) || 0);
+  }, 0);
   const updatedInvoiceTotal = baseBookingPrice + additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal;
 
   // Change Primary Service for Active Session or Drawer Booking
@@ -1011,6 +1025,10 @@ export default function DoctorAccountView({
     }
     for (const s of additionalServices) {
       const realServiceId = s.serviceId || (typeof s.id === 'number' && s.id < 1000000 ? s.id : null);
+      const srv = servicesList.find((x) => String(x.id) === String(realServiceId));
+      const isLaser = s.isLaser || checkIsLaserService(srv);
+      const isPkg = laserInfo?.pulseType === "PACKAGE";
+      const effectivePrice = (isPkg && isLaser) ? 0 : s.price;
       writes.push(
         fetch("/api/reservation-products", {
           method: "POST",
@@ -1019,9 +1037,12 @@ export default function DoctorAccountView({
             reservationId,
             lineType: "additional_service",
             serviceId: realServiceId ? Number(realServiceId) : null,
-            description: s.name,
+            description: (isPkg && isLaser)
+              ? `${s.name} (Package Redemption · 0 EGP)`
+              : s.name,
             qty: 1,
-            unitPrice: s.price,
+            unitPrice: effectivePrice,
+            totalPrice: effectivePrice,
             addedByRole: "doctor_session",
           }),
         })
@@ -1476,12 +1497,17 @@ export default function DoctorAccountView({
     // Option 2 (PER_PULSE): 0 base + per-pulse total + additional services + products
     // Option 3 (PACKAGE): 0 base + package deficit charge/package price + additional services + products
     const effectiveBasePrice = (!laserData?.pulseType || laserData.pulseType === "SERVICE") ? baseBookingPrice : 0;
-    const additionalServicesSub = (additionalServices || []).reduce((sum, s) => sum + s.price, 0);
+    const isDoctorPackage = laserData?.pulseType === "PACKAGE" || targetBooking.laser_payment_mode === "PACKAGE" || targetBooking.laserPaymentMode === "PACKAGE";
+    const additionalServicesSub = (additionalServices || []).reduce((sum, s) => {
+      const srv = servicesList.find((x) => String(x.id) === String(s.serviceId));
+      const isLaser = s.isLaser || checkIsLaserService(srv);
+      if (isDoctorPackage && isLaser) return sum;
+      return sum + (Number(s.price) || 0);
+    }, 0);
     const sessionComputedTotal = effectiveBasePrice + additionalServicesSub + productsSubtotal + effectiveLaserSessionCharge;
 
     let completionNotes = String(targetBooking.notes || "");
     const isDoctorPerPulse = laserData?.pulseType === "PER_PULSE" || targetBooking.laser_payment_mode === "PER_PULSE" || targetBooking.laserPaymentMode === "PER_PULSE";
-    const isDoctorPackage = laserData?.pulseType === "PACKAGE" || targetBooking.laser_payment_mode === "PACKAGE" || targetBooking.laserPaymentMode === "PACKAGE";
     const doctorPulseRate = Number(laserData?.pulseValue || targetBooking.laser_price_per_pulse || targetBooking.laserPricePerPulse || 1);
     const doctorDeliveredPulses = Number(laserData?.pulsesUsed || 0);
 

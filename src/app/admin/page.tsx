@@ -2387,7 +2387,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-070', name: 'Package Types & Laser Pulses Package Engine', category: 'Services & Bookings', endpoint: '/api/packages', description: 'Verifies package_type (services vs pulses) selection, total_pulses configuration in PackageAdminPanel, /api/packages CRUD validation, and package selling integration.', status: 'idle' },
     { id: 'TC-071', name: 'Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies per-pulse mode rate calculation (delivered_pulses × price_per_pulse) across primary and additional laser services, session line item writing, settlement note persistence, and invoice settlement display.', status: 'idle' },
     { id: 'TC-072', name: 'Laser Pulses Package Redemption & Session Completion Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies package pulse deduction, UUID-guarded package querying, schema-resilient session completion, 0 EGP base package redemption pricing, and zero duplicate invoice line generation.', status: 'idle' },
-    { id: 'TC-073', name: 'Multi-Scenario Laser Pulses Package Settlement Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies Scenario 1 (initial package purchase + deduction), Scenario 2 (deficit spillover to new package or per pulse), Scenario 3 (standard redemption), and mixed session add-on pricing.', status: 'idle' }
+    { id: 'TC-073', name: 'Multi-Scenario Laser Pulses Package Settlement Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies Scenario 1 (initial package purchase + deduction), Scenario 2 (deficit spillover to new package or per pulse), Scenario 3 (standard redemption), and mixed session add-on pricing.', status: 'idle' },
+    { id: 'TC-074', name: 'New Booking Laser Pulses Package Selection & Catalog Purchase Engine', category: 'Services & Bookings', endpoint: '/api/packages', description: 'Verifies pulses package detection in New Booking modal, pulse balance badge rendering, laser service quota coverage, and in-booking new pulses package catalog purchase integration.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -9212,7 +9213,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             String(checkoutBooking?.notes || "").toLowerCase().includes("package session") ||
             String(checkoutBooking?.notes || "").toLowerCase().includes("package redemption") ||
             String(checkoutBooking?.notes || "").toLowerCase().includes("pulses package") ||
-            String(checkoutBooking?.notes || "").includes("[Laser Package]")
+            String(checkoutBooking?.notes || "").includes("[Laser Package]") ||
+            String(checkoutBooking?.notes || "").includes("[Laser Package Redemption]") ||
+            String(checkoutBooking?.notes || "").includes("[Purchasing New Pulses Package]")
           );
           const checkoutPulseRate = Number(
             checkoutBooking?.laserPricePerPulse ||
@@ -9297,8 +9300,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           for (const item of rawAttached) {
             const name = String(item.name || 'Item').trim();
             const qty = Number(item.qty) || 1;
-            const unitPrice = Number(item.unitPrice || item.price || 0);
-            const total = Number(item.total) || (qty * unitPrice);
+            let unitPrice = Number(item.unitPrice || item.price || 0);
+            let total = Number(item.total) || (qty * unitPrice);
             const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
 
             if (isCheckoutPerPulse && lineType === 'device_pulses') {
@@ -9309,10 +9312,28 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               continue;
             }
 
+            const matchingSvc = localServices.find((s) =>
+              (item.serviceId && String(s.id) === String(item.serviceId)) ||
+              s.en?.toLowerCase() === name.toLowerCase() ||
+              s.ar === name
+            );
+            const isLaserService = checkIsLaserService(matchingSvc) || name.toLowerCase().includes('laser') || name.includes('ليزر');
+
+            if (isCheckoutPackage && lineType === 'additional_service' && isLaserService) {
+              unitPrice = 0;
+              total = 0;
+            }
+
             if (!existingCheckoutNames.has(name.toLowerCase())) {
               existingCheckoutNames.add(name.toLowerCase());
               if (lineType === 'additional_service') {
-                checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType });
+                checkoutAdditionalServicesList.push({
+                  name: (isCheckoutPackage && isLaserService) ? `${name} (Package Redemption · 0 EGP)` : name,
+                  qty,
+                  unitPrice,
+                  total,
+                  lineType
+                });
               } else {
                 checkoutProductsConsumablesList.push({ name, qty, unitPrice, total, lineType });
               }
@@ -9332,11 +9353,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 const parsed = parseAdditionalServiceLine(item.trim());
                 if (parsed && !existingCheckoutNames.has(parsed.name.toLowerCase())) {
                   existingCheckoutNames.add(parsed.name.toLowerCase());
+                  const matchingSvc = localServices.find((s) =>
+                    s.en?.toLowerCase() === parsed.name.toLowerCase() ||
+                    s.ar === parsed.name
+                  );
+                  const isLaserService = checkIsLaserService(matchingSvc) || parsed.name.toLowerCase().includes('laser') || parsed.name.includes('ليزر');
+                  const unitPrice = (isCheckoutPackage && isLaserService) ? 0 : parsed.unitPrice;
+                  const total = (isCheckoutPackage && isLaserService) ? 0 : parsed.total;
                   checkoutAdditionalServicesList.push({
-                    name: parsed.name,
+                    name: (isCheckoutPackage && isLaserService)
+                      ? `${parsed.name} (Package Redemption · 0 EGP)`
+                      : parsed.name,
                     qty: parsed.qty,
-                    unitPrice: parsed.unitPrice,
-                    total: parsed.total,
+                    unitPrice,
+                    total,
                     lineType: 'additional_service'
                   });
                 }
@@ -9349,11 +9379,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               const parsed = parseAdditionalServiceLine(match[1].trim());
               if (parsed && !existingCheckoutNames.has(parsed.name.toLowerCase())) {
                 existingCheckoutNames.add(parsed.name.toLowerCase());
+                const matchingSvc = localServices.find((s) =>
+                  s.en?.toLowerCase() === parsed.name.toLowerCase() ||
+                  s.ar === parsed.name
+                );
+                const isLaserService = checkIsLaserService(matchingSvc) || parsed.name.toLowerCase().includes('laser') || parsed.name.includes('ليزر');
+                const unitPrice = (isCheckoutPackage && isLaserService) ? 0 : parsed.unitPrice;
+                const total = (isCheckoutPackage && isLaserService) ? 0 : parsed.total;
                 checkoutAdditionalServicesList.push({
-                  name: parsed.name,
+                  name: (isCheckoutPackage && isLaserService)
+                    ? `${parsed.name} (Package Redemption · 0 EGP)`
+                    : parsed.name,
                   qty: parsed.qty,
-                  unitPrice: parsed.unitPrice,
-                  total: parsed.total,
+                  unitPrice,
+                  total,
                   lineType: 'additional_service'
                 });
               }
@@ -9426,7 +9465,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const baseAndAttachedTotal = baseServicesTotal + checkoutAdditionalServicesList.reduce((sum, s) => sum + s.total, 0) + checkoutProductsConsumablesList.reduce((sum, p) => sum + p.total, 0);
           let targetCheckoutTotal = baseAndAttachedTotal;
 
-          if (checkoutBooking.notes && !isCheckoutPerPulse) {
+          if (checkoutBooking.notes && !isCheckoutPerPulse && !isCheckoutPackage) {
             const invMatch = String(checkoutBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
             if (invMatch) {
               const notedTotal = Number(invMatch[1]);
@@ -9844,7 +9883,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               String(invoiceBooking.notes || "").toLowerCase().includes("package session") ||
               String(invoiceBooking.notes || "").toLowerCase().includes("package redemption") ||
               String(invoiceBooking.notes || "").toLowerCase().includes("pulses package") ||
-              String(invoiceBooking.notes || "").includes("[Laser Package]")
+              String(invoiceBooking.notes || "").includes("[Laser Package]") ||
+              String(invoiceBooking.notes || "").includes("[Laser Package Redemption]") ||
+              String(invoiceBooking.notes || "").includes("[Purchasing New Pulses Package]")
             );
             const invoicePulseRate = Number(
               invoiceBooking.laserPricePerPulse ||
@@ -10071,7 +10112,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             String(invoiceBooking.notes || "").toLowerCase().includes("package session") ||
             String(invoiceBooking.notes || "").toLowerCase().includes("package redemption") ||
             String(invoiceBooking.notes || "").toLowerCase().includes("pulses package") ||
-            String(invoiceBooking.notes || "").includes("[Laser Package]")
+            String(invoiceBooking.notes || "").includes("[Laser Package]") ||
+            String(invoiceBooking.notes || "").includes("[Laser Package Redemption]") ||
+            String(invoiceBooking.notes || "").includes("[Purchasing New Pulses Package]")
           );
           const invoicePulseRate = Number(
             invoiceBooking.laserPricePerPulse ||
@@ -10152,8 +10195,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           for (const item of rawAttached) {
             const name = String(item.name || 'Item').trim();
             const qty = Number(item.qty) || 1;
-            const unitPrice = Number(item.unitPrice || item.price || 0);
-            const total = Number(item.total) || (qty * unitPrice);
+            let unitPrice = Number(item.unitPrice || item.price || 0);
+            let total = Number(item.total) || (qty * unitPrice);
             const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
 
             // Skip device pulses counters in per-pulse mode or zero-cost counters
@@ -10165,12 +10208,24 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               continue;
             }
 
+            const matchingSvc = localServices.find((s) =>
+              (item.serviceId && String(s.id) === String(item.serviceId)) ||
+              s.en?.toLowerCase() === name.toLowerCase() ||
+              s.ar === name
+            );
+            const isLaserService = checkIsLaserService(matchingSvc) || name.toLowerCase().includes('laser') || name.includes('ليزر');
+
+            if (isInvoicePackage && lineType === 'additional_service' && isLaserService) {
+              unitPrice = 0;
+              total = 0;
+            }
+
             if (!existingNames.has(name.toLowerCase())) {
               existingNames.add(name.toLowerCase());
               if (lineType === 'additional_service') {
                 invoiceAdditionalServicesList.push({
-                  name: `${name} (Additional Service)`,
-                  nameAr: `${name} (خدمة إضافية)`,
+                  name: (isInvoicePackage && isLaserService) ? `${name} (Package Redemption · 0 EGP)` : `${name} (Additional Service)`,
+                  nameAr: (isInvoicePackage && isLaserService) ? `${name} (استهلاك باقة · 0 ج.م)` : `${name} (خدمة إضافية)`,
                   qty,
                   unitPrice,
                   price: unitPrice,
@@ -10202,13 +10257,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 const parsed = parseAdditionalServiceLine(item.trim());
                 if (parsed && !existingNames.has(parsed.name.toLowerCase())) {
                   existingNames.add(parsed.name.toLowerCase());
+                  const matchingSvc = localServices.find((s) =>
+                    s.en?.toLowerCase() === parsed.name.toLowerCase() ||
+                    s.ar === parsed.name
+                  );
+                  const isLaserService = checkIsLaserService(matchingSvc) || parsed.name.toLowerCase().includes('laser') || parsed.name.includes('ليزر');
+                  const unitPrice = (isInvoicePackage && isLaserService) ? 0 : parsed.unitPrice;
+                  const total = (isInvoicePackage && isLaserService) ? 0 : parsed.total;
                   invoiceAdditionalServicesList.push({
-                    name: `${parsed.name} (Additional Service)`,
-                    nameAr: `${parsed.name} (خدمة إضافية)`,
+                    name: (isInvoicePackage && isLaserService) ? `${parsed.name} (Package Redemption · 0 EGP)` : `${parsed.name} (Additional Service)`,
+                    nameAr: (isInvoicePackage && isLaserService) ? `${parsed.name} (استهلاك باقة · 0 ج.م)` : `${parsed.name} (خدمة إضافية)`,
                     qty: parsed.qty,
-                    unitPrice: parsed.unitPrice,
-                    price: parsed.unitPrice,
-                    total: parsed.total
+                    unitPrice,
+                    price: unitPrice,
+                    total
                   });
                 }
               }
@@ -10220,13 +10282,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               const parsed = parseAdditionalServiceLine(match[1].trim());
               if (parsed && !existingNames.has(parsed.name.toLowerCase())) {
                 existingNames.add(parsed.name.toLowerCase());
+                const matchingSvc = localServices.find((s) =>
+                  s.en?.toLowerCase() === parsed.name.toLowerCase() ||
+                  s.ar === parsed.name
+                );
+                const isLaserService = checkIsLaserService(matchingSvc) || parsed.name.toLowerCase().includes('laser') || parsed.name.includes('ليزر');
+                const unitPrice = (isInvoicePackage && isLaserService) ? 0 : parsed.unitPrice;
+                const total = (isInvoicePackage && isLaserService) ? 0 : parsed.total;
                 invoiceAdditionalServicesList.push({
-                  name: `${parsed.name} (Additional Service)`,
-                  nameAr: `${parsed.name} (خدمة إضافية)`,
+                  name: (isInvoicePackage && isLaserService) ? `${parsed.name} (Package Redemption · 0 EGP)` : `${parsed.name} (Additional Service)`,
+                  nameAr: (isInvoicePackage && isLaserService) ? `${parsed.name} (استهلاك باقة · 0 ج.م)` : `${parsed.name} (خدمة إضافية)`,
                   qty: parsed.qty,
-                  unitPrice: parsed.unitPrice,
-                  price: parsed.unitPrice,
-                  total: parsed.total
+                  unitPrice,
+                  price: unitPrice,
+                  total
                 });
               }
             }
@@ -10308,7 +10377,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const currentAttachedTotal = baseCost + invoiceAdditionalServicesList.reduce((sum: number, s: any) => sum + s.total, 0) + invoiceProductsList.reduce((sum: number, p: any) => sum + p.total, 0);
           let targetInvoiceTotal = currentAttachedTotal;
 
-          if (invoiceBooking.notes) {
+          if (invoiceBooking.notes && !isInvoicePerPulse && !isInvoicePackage) {
             const invMatch = String(invoiceBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
             if (invMatch) {
               const notedTotal = Number(invMatch[1]);

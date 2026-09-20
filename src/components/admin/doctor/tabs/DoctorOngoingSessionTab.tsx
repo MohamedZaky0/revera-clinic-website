@@ -27,6 +27,7 @@ import {
 import { DoctorTab, MedicationItem } from "../types";
 import { getAuthHeaders } from "../utils";
 import { MedicalRecordTemplate, IntakeField } from "@/app/api/medical-records/templates/route";
+import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
 
 export interface AdditionalServiceItem {
   id: string | number;
@@ -36,6 +37,7 @@ export interface AdditionalServiceItem {
   deviceId?: string;
   deviceName?: string;
   pulses?: number;
+  isLaser?: boolean;
 }
 
 interface DoctorOngoingSessionTabProps {
@@ -440,15 +442,26 @@ export default function DoctorOngoingSessionTab({
     if (!bookingId) return;
 
     const addSvcString = updated.length > 0
-      ? `\n[Additional Services Used]: ${updated.map(s => `${s.name} (Qty: 1 x ${s.price} EGP = ${s.price} EGP${Number(s.pulses) > 0 ? `, Pulses: ${s.pulses}` : ""})`).join(", ")}`
+      ? `\n[Additional Services Used]: ${updated.map(s => {
+          const srv = servicesList.find((x) => String(x.id) === String(s.serviceId));
+          const isLaser = s.isLaser || checkIsLaserService(srv);
+          const effectivePrice = (laserMode === "PACKAGE" && isLaser) ? 0 : s.price;
+          return `${s.name} (Qty: 1 x ${effectivePrice} EGP = ${effectivePrice} EGP${Number(s.pulses) > 0 ? `, Pulses: ${s.pulses}` : ""})`;
+        }).join(", ")}`
       : "";
     
     let currentNotes = String(activeSessionBooking?.notes || "");
     currentNotes = currentNotes.replace(/\[Additional Services(?: Used)?(?: During Session)?\]:[^\n\[]*/gi, "").trim();
     const newNotes = currentNotes ? `${currentNotes}${addSvcString}` : addSvcString.trim();
 
-    const addSubtotal = updated.reduce((sum, s) => sum + s.price, 0);
-    const newAmountLeft = Math.max(0, (baseBookingPrice + addSubtotal + productsSubtotal + extraPulsesSubtotal) - Number(activeSessionBooking?.amountPaid || 0));
+    const addSubtotal = updated.reduce((sum, s) => {
+      const srv = servicesList.find((x) => String(x.id) === String(s.serviceId));
+      const isLaser = s.isLaser || checkIsLaserService(srv);
+      if (laserMode === "PACKAGE" && isLaser) return sum;
+      return sum + s.price;
+    }, 0);
+    const effectiveBase = laserMode === "PACKAGE" ? 0 : (laserMode === "PER_PULSE" ? (standardPulsesDelivered * additionalPulseUnitPrice) : baseBookingPrice);
+    const newAmountLeft = Math.max(0, (effectiveBase + addSubtotal + productsSubtotal + extraPulsesSubtotal + laserAdditionalCharge) - Number(activeSessionBooking?.amountPaid || 0));
 
     getAuthHeaders().then(headers => {
       fetch(`/api/reservations?id=${encodeURIComponent(bookingId)}`, {
@@ -469,13 +482,15 @@ export default function DoctorOngoingSessionTab({
     if (!srv) return;
 
     const srvName = srv.en || srv.name || srv.title || "Clinical Service";
-    const srvPrice = Number(srv.price || 0);
+    const isLaser = checkIsLaserService(srv);
+    const srvPrice = (laserMode === "PACKAGE" && isLaser) ? 0 : Number(srv.price || 0);
 
     const newItem: AdditionalServiceItem = {
       id: Date.now(),
       serviceId: srv.id,
       name: srvName,
-      price: srvPrice
+      price: srvPrice,
+      isLaser: isLaser
     };
 
     const updated = [...additionalServices, newItem];
@@ -602,7 +617,12 @@ export default function DoctorOngoingSessionTab({
   );
 
   // Calculate Subtotals
-  const additionalServicesSubtotal = additionalServices.reduce((sum, item) => sum + item.price, 0);
+  const additionalServicesSubtotal = additionalServices.reduce((sum, item) => {
+    const srv = servicesList.find((x) => String(x.id) === String(item.serviceId));
+    const isLaser = item.isLaser || checkIsLaserService(srv);
+    if (laserMode === "PACKAGE" && isLaser) return sum;
+    return sum + (Number(item.price) || 0);
+  }, 0);
   
   // Base Service Price:
   // Option 1 (SERVICE): Fixed base booking price
@@ -1864,7 +1884,14 @@ export default function DoctorOngoingSessionTab({
                             <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-extrabold text-[#414E36]">+{item.price} EGP</span>
+                            {(() => {
+                              const srv = servicesList.find((s) => String(s.id) === String(item.serviceId));
+                              const isLaser = item.isLaser || checkIsLaserService(srv);
+                              if (laserMode === "PACKAGE" && isLaser) {
+                                return <span className="font-extrabold text-purple-700">0 EGP (Package Redemption)</span>;
+                              }
+                              return <span className="font-extrabold text-[#414E36]">+{item.price} EGP</span>;
+                            })()}
                             <button
                               type="button"
                               onClick={() => handleRemoveServiceFromSession(item.id)}

@@ -2412,6 +2412,35 @@ The clinic required a complete, multi-tiered laser pulse counting and accounting
 4. **Admin Settings System Test Suite Diagnostic Verification:**
    - Added test case `TC-073` ("Multi-Scenario Laser Pulses Package Settlement Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
 
+## DEC-070: New Booking Laser Pulses Package Selection & In-Booking Catalog Purchase Engine
+**Date:** 2026-09-20
+**Context:**
+1. In the New Booking creation modal (`AdminNewBookingView.tsx`), when a receptionist booked a laser service for a patient holding an active laser pulses package ("pulses v2"), the package card erroneously displayed `0 sessions left` and displayed an amber warning `Selected service is not covered in this package: Switch to a covered service:` because the system treated all packages as session-based (`package_items`) without supporting pulses packages (`packageType === 'pulses'`).
+2. When the patient did NOT have an active pulses package and Option 3 (Pulses Package) was clicked, there was no way to select which pulses package to purchase or charge the booking for that package upfront.
+3. Laser pulses packages cover all laser services in the clinic, so any laser service selected should automatically be recognized as covered.
+
+**Decision & Implementation:**
+1. **Active Pulses Package Detection & Quota Display (`AdminNewBookingView.tsx`):**
+   - Added `checkIsPulsesPackage(pkg)` and `getPackagePulsesBalance(pkg)` helpers to extract `pulsesRemaining` and `totalPulses`.
+   - Distinguishes pulses packages (`packageType === 'pulses'`) from session packages (`packageType === 'services'`).
+   - For patients with an active pulses package:
+     - Renders `${remaining.toLocaleString()} pulses left` badge instead of `0 sessions left`.
+     - Displays `Laser Hair Removal Treatments (All Areas)` with `${remaining} / ${total} pulses` and `Selected` badge, removing the false warning.
+     - Automatically zeros out the booking value (`0 EGP`) and shows a green confirmation banner that session pulses will be deducted upon treatment completion.
+     - Notes record `[Laser Package Redemption]: <Package Name>`.
+2. **In-Booking Catalog Pulses Package Selection (`AdminNewBookingView.tsx`):**
+   - Loads catalog packages from `GET /api/packages` in `loadData`.
+   - Filters active catalog packages where `package_type === 'pulses'` or `total_pulses > 0`.
+   - When a patient with 0 active pulses packages selects Option 3, renders interactive catalog cards with package name, pulse quota (e.g. 10,000 pulses), and price (e.g. 6,000 EGP).
+   - Selecting a package sets the booking value and amount paid now to the package's price (e.g. 6,000 EGP).
+   - Staves `[Purchasing New Pulses Package]: <Name> (<Price> EGP · <Pulses> pulses)` in the reservation notes and passes `purchasingPackageId` in the reservation payload.
+3. **Downstream Session & Settlement Integration (`DoctorAccountView.tsx`, `BookingDetailsModal.tsx`, `src/app/admin/page.tsx`):**
+   - Updated `isBookingPackageMode`, `isCheckoutPackage`, and `isInvoicePackage` to recognize `[Purchasing New Pulses Package]` and `[Laser Package Redemption]`.
+   - Resolves active session booking properly, seamlessly activating Scenario 1 (new package purchase charged on invoice, 100% covered laser session, pulses deducted and remainder carried forward).
+4. **Admin Settings System Test Suite Diagnostic Verification:**
+   - Added test case `TC-074` ("New Booking Laser Pulses Package Selection & Catalog Purchase Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
+
+
 
 
 
