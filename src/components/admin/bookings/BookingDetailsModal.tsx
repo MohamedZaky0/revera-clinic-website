@@ -185,8 +185,6 @@ export default function BookingDetailsModal({
   const [primaryServiceId, setPrimaryServiceId] = useState<string>("");
   const [additionalServices, setAdditionalServices] = useState<AdditionalServiceItem[]>([]);
   const [selectedServiceIdToAdd, setSelectedServiceIdToAdd] = useState<string>("");
-  const [selectedDeviceForService, setSelectedDeviceForService] = useState<string>("");
-  const [pulsesCountForService, setPulsesCountForService] = useState<number>(0);
   const [loadingDeviceLinks, setLoadingDeviceLinks] = useState<boolean>(false);
   const [devicesList, setDevicesList] = useState<any[]>([]);
 
@@ -371,25 +369,24 @@ export default function BookingDetailsModal({
     setDynamicResponses(initial);
   }, [medicalRecord, activeTemplate]);
 
-  // Service device lookup when selecting an additional service
+  // Service device lookup for primary service
   useEffect(() => {
-    if (!selectedServiceIdToAdd) return;
+    if (!primaryServiceId) return;
     setLoadingDeviceLinks(true);
-    fetch(`/api/service-devices?serviceId=${selectedServiceIdToAdd}`, { headers: authenticatedJsonHeaders })
+    fetch(`/api/service-devices?serviceId=${primaryServiceId}`, { headers: authenticatedJsonHeaders })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         const links = data?.deviceLinks || [];
         if (links.length > 0) {
-          setSelectedDeviceForService(links[0].device_id || "");
-          setPulsesCountForService(Number(links[0].pulses_per_session) || 100);
-        } else {
-          setSelectedDeviceForService("");
-          setPulsesCountForService(0);
+          setSelectedDeviceId(String(links[0].device_id || ""));
+          if (links[0].pulses_per_session) {
+            setExtraPulsesCount((prev) => (prev > 0 ? prev : Number(links[0].pulses_per_session)));
+          }
         }
       })
-      .catch((err) => console.warn("Error loading service devices:", err))
+      .catch((err) => console.warn("Error loading primary service devices:", err))
       .finally(() => setLoadingDeviceLinks(false));
-  }, [selectedServiceIdToAdd]);
+  }, [primaryServiceId]);
 
   useEffect(() => {
     if (booking) {
@@ -860,22 +857,17 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
     const srvName = (isRTL ? srv.ar : srv.en) || srv.en || srv.ar || "Clinical Service";
     const srvPrice = getEffectiveServicePrice(srv, booking?.branchId, branches);
-    const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceForService));
 
     const newItem: AdditionalServiceItem = {
       id: Date.now() + Math.random(),
       serviceId: srv.id,
       name: srvName,
       price: srvPrice,
-      deviceId: devObj?.id ? String(devObj.id) : undefined,
-      deviceName: devObj?.name,
-      pulses: Math.max(0, Number(pulsesCountForService) || 0)
+      pulses: 0,
     };
 
     setAdditionalServices((prev) => [...prev, newItem]);
     setSelectedServiceIdToAdd("");
-    setSelectedDeviceForService("");
-    setPulsesCountForService(0);
   };
 
   const handleRemoveServiceFromSession = (id: string | number) => {
@@ -2072,17 +2064,17 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             <span>{isRTL ? "الخدمات الإضافية ونبضات الأجهزة" : "Services, Devices & Pulses"}</span>
                           </h3>
 
-                          {(selectedDeviceId || additionalServices.some((s) => s.deviceId)) && (
+                          {(selectedDeviceId || Number(extraPulsesCount) > 0) && (
                             <div className="flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-3.5 py-1.5 text-xs font-black text-amber-900 shadow-xs">
                               <Zap size={14} className="text-amber-600 fill-amber-500 animate-pulse" />
                               <span>{isRTL ? "إجمالي النبضات:" : "Total Pulses:"}</span>
-                              <span className="text-sm text-amber-900 font-extrabold">{totalSessionPulses}</span>
+                              <span className="text-sm text-amber-900 font-extrabold">{Number(extraPulsesCount) || 0}</span>
                             </div>
                           )}
                         </div>
 
-                        {/* Primary Service Display */}
-                        <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-2">
+                        {/* Primary Service Display & Laser Pulse Tracker */}
+                        <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-3">
                           <div className="flex items-center justify-between text-xs">
                             <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
                               <Layers size={14} className="text-[#414E36]" />
@@ -2090,8 +2082,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             </span>
                             <span className="font-extrabold text-[#414E36]">{baseBookingPrice} EGP</span>
                           </div>
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
-                            <div className="flex-1 w-full">
+
+                          <div className="bg-white p-3 rounded-xl border border-[#414E36]/10 space-y-3">
+                            <div>
                               <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">
                                 {isRTL ? "تعديل الخدمة الأساسية للجلسة" : "Selected Patient Service (Changeable)"}
                               </label>
@@ -2107,6 +2100,67 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 ))}
                               </select>
                             </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#414E36]/10">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#5A6A51] mb-1 flex items-center gap-1">
+                                  <Zap size={12} className="text-amber-600" />
+                                  <span>{isRTL ? "الجهاز المستخدم" : "Assigned Laser Device"}</span>
+                                </label>
+                                <select
+                                  value={selectedDeviceId}
+                                  onChange={(e) => setSelectedDeviceId(e.target.value)}
+                                  className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                >
+                                  <option value="">{isRTL ? "-- بدون جهاز / خدمة غير مرتبطة بجهاز --" : "-- No Device / Non-Device --"}</option>
+                                  {devicesList.map((d) => (
+                                    <option key={d.id} value={d.id}>
+                                      {d.name} {d.branch_name || d.branchName ? `(${d.branch_name || d.branchName})` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#5A6A51] mb-1 flex items-center justify-between">
+                                  <span className="flex items-center gap-1">
+                                    <Zap size={12} className="text-amber-600" />
+                                    <span>{isRTL ? "عدد النبضات المستخدمة" : "Delivered Pulses"}</span>
+                                  </span>
+                                  {Number(extraPulsesCount) > 0 && (
+                                    <span className="text-[10px] font-extrabold text-amber-700">
+                                      {extraPulsesCount} {isRTL ? "نبضة" : "pulses"}
+                                    </span>
+                                  )}
+                                </label>
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={extraPulsesCount || ""}
+                                    onChange={(e) => setExtraPulsesCount(Math.max(0, parseInt(e.target.value) || 0))}
+                                    className="flex-1 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                    placeholder={isRTL ? "عدد النبضات (مثال: 500)" : "Pulses (e.g. 500)"}
+                                  />
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {[250, 500, 1000, 2000].map((preset) => (
+                                      <button
+                                        key={preset}
+                                        type="button"
+                                        onClick={() => setExtraPulsesCount(preset)}
+                                        className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                                          extraPulsesCount === preset
+                                            ? "bg-[#414E36] text-white border-[#414E36]"
+                                            : "bg-white text-[#5A6A51] border-[#414E36]/15 hover:bg-[#EDF1EC]"
+                                        }`}
+                                      >
+                                        {preset}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
 
@@ -2117,13 +2171,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             <span>{isRTL ? "إضافة خدمة إضافية للجلسة" : "Add Additional Service"}</span>
                           </h4>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="flex flex-col sm:flex-row items-center gap-2">
                             <select
                               value={selectedServiceIdToAdd}
                               onChange={(e) => setSelectedServiceIdToAdd(e.target.value)}
-                              className="sm:col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                              className="flex-1 w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
                             >
-                              <option value="">{isRTL ? "-- اختر الخدمة --" : "-- Select Additional Service --"}</option>
+                              <option value="">{isRTL ? "-- اختر الخدمة الإضافية --" : "-- Select Additional Service --"}</option>
                               {localServices.map((s) => (
                                 <option key={s.id} value={s.id}>
                                   {isRTL ? (s.ar || s.en) : (s.en || s.ar)} ({getEffectiveServicePrice(s, booking?.branchId, branches)} EGP)
@@ -2131,43 +2185,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               ))}
                             </select>
 
-                            <select
-                              value={selectedDeviceForService}
-                              onChange={(e) => setSelectedDeviceForService(e.target.value)}
-                              className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                            <button
+                              type="button"
+                              onClick={handleAddServiceToSession}
+                              disabled={!selectedServiceIdToAdd}
+                              className="w-full sm:w-auto px-5 py-2 rounded-xl bg-[#414E36] text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
                             >
-                              <option value="">{isRTL ? "-- ربط الجهاز (اختياري) --" : "-- Linked Device --"}</option>
-                              {devicesList.map((d) => (
-                                <option key={d.id} value={d.id}>{d.name}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">
-                                {isRTL ? "عدد نبضات الجهاز" : "Device Pulses"}
-                              </label>
-                              <input
-                                type="number"
-                                min={0}
-                                value={pulsesCountForService}
-                                onChange={(e) => setPulsesCountForService(Math.max(0, parseInt(e.target.value) || 0))}
-                                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
-                                placeholder="Pulses (e.g. 150)"
-                              />
-                            </div>
-
-                            <div className="flex items-end">
-                              <button
-                                type="button"
-                                onClick={handleAddServiceToSession}
-                                disabled={!selectedServiceIdToAdd}
-                                className="w-full rounded-xl bg-[#414E36] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer"
-                              >
-                                <Plus size={14} /> {isRTL ? "إضافة الخدمة" : "Add Service"}
-                              </button>
-                            </div>
+                              <Plus size={14} /> {isRTL ? "إضافة الخدمة" : "Add Service"}
+                            </button>
                           </div>
 
                           {/* Added Additional Services List */}
@@ -2177,9 +2202,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
                                   <div className="min-w-0">
                                     <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
-                                    <span className="text-[10px] text-[#5A6A51] block truncate">
-                                      {item.deviceName ? `${item.deviceName} • ` : ""}{item.pulses} Pulses
-                                    </span>
                                   </div>
                                   <div className="flex items-center gap-3 shrink-0">
                                     <span className="font-extrabold text-[#414E36]">+{item.price} EGP</span>
