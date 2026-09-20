@@ -942,3 +942,24 @@ The following are **not currently enforced in code**:
 
 5. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-071` (`Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine`).
+
+---
+
+## Laser Pulses Package Purchase & Quota Engine Rules
+**Enforced in:** `src/app/api/packages/sell/route.ts`, `src/app/api/packages/route.ts`, `src/app/api/customers/packages/route.ts`, `src/components/admin/patients/CustomerProfileDrawer.tsx`, `src/components/admin/packages/PackageAdminPanel.tsx`.
+
+1. **Zero-Item Pulses Package Exemption**:
+   - Pulses packages do not require linked service items (`package_items.length === 0`).
+   - `/api/packages/sell` recognizes any package with 0 items, `package_type === 'pulses'`, or `total_pulses > 0` as a valid Laser Pulses Package and never triggers the `"Package must contain at least one service with a positive quantity."` validation blocker.
+
+2. **Schema-Resilient Metadata Synchronization**:
+   - Package types (`services` vs `pulses`) and included total pulses are mirrored to `page_settings` under key `packages_meta` on package creation (`POST`) and updates (`PATCH`), and enriched automatically on `GET /api/packages`.
+   - When a laser pulses package is sold, pulse quotas (`total_pulses`, `pulses_remaining`) are initialized in `customer_packages` and stored in `page_settings` under key `customer_package_pulses` for seamless ecosystem access across doctor sessions, receptionist intake, and customer profiles.
+
+3. **Customer Profile Package & Quota Display**:
+   - In the Sell Package drawer modal (`CustomerProfileDrawer.tsx`), laser pulses packages display their quota (e.g. `⚡ 10,000 Pulses`) in the dropdown and an Included Pulses Quota card in the package preview.
+   - In the Active Packages list (Patient Profile Tab 5), laser pulses packages render an interactive pulse quota card with `Zap` icon, badge, remaining/total pulse counters, and a visual progress bar.
+
+4. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-070` (`Package Types & Laser Pulses Package Engine`).
+

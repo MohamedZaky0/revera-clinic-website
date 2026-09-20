@@ -119,18 +119,39 @@ export async function GET(req: Request) {
         if (!error && data && data.length > 0) {
           packages = data.map((row: any) => {
             const pulseInfo = pulseStore[row.id] || null;
+            const incPulses = pulseInfo
+              ? Number(pulseInfo.included_pulses || 0)
+              : Number((row as any).total_pulses || (row as any).included_pulses || 0);
+            const remPulses = pulseInfo
+              ? Number(pulseInfo.remaining_pulses || 0)
+              : Number((row as any).pulses_remaining || (row as any).remaining_pulses || incPulses);
+            const usedPulses = pulseInfo
+              ? Number(pulseInfo.used_pulses || 0)
+              : Number((row as any).pulses_used || (row as any).used_pulses || 0);
+            const isPulses = Boolean(
+              (row as any).package_type === 'pulses' ||
+              (row.packages as any)?.package_type === 'pulses' ||
+              pulseInfo !== null ||
+              incPulses > 0 ||
+              remPulses > 0 ||
+              (row.customer_package_items || []).length === 0
+            );
+
             return {
               id: row.id,
               packageId: row.package_id,
               packageName: row.packages?.name || row.packages?.name_ar || 'Package',
               packageNameAr: row.packages?.name_ar || null,
+              packageType: isPulses ? 'pulses' : 'services',
               status: (row.status || 'active').toLowerCase(),
               purchasedAt: row.purchased_at,
               expiresAt: row.expires_at,
               pricePaid: row.price_paid !== null ? Number(row.price_paid) : 0,
-              includedPulses: pulseInfo ? Number(pulseInfo.included_pulses || 0) : ((row as any).included_pulses || null),
-              usedPulses: pulseInfo ? Number(pulseInfo.used_pulses || 0) : ((row as any).used_pulses || 0),
-              remainingPulses: pulseInfo ? Number(pulseInfo.remaining_pulses || 0) : ((row as any).remaining_pulses || null),
+              totalPulses: incPulses,
+              includedPulses: incPulses,
+              usedPulses: usedPulses,
+              pulsesRemaining: remPulses,
+              remainingPulses: remPulses,
               pulseUsageHistory: pulseInfo?.usage_history || [],
               items: (row.customer_package_items || []).map((it: any) => ({
                 id: it.id,
@@ -169,19 +190,39 @@ export async function GET(req: Request) {
               const master = allMasterPkgs.find((m: any) => String(m.id) === String(row.package_id));
               const rowItems = allItems.filter((it: any) => String(it.customer_package_id) === String(row.id));
               const pulseInfo = pulseStore[row.id] || null;
+              const incPulses = pulseInfo
+                ? Number(pulseInfo.included_pulses || 0)
+                : Number(row.total_pulses || (row as any).included_pulses || 0);
+              const remPulses = pulseInfo
+                ? Number(pulseInfo.remaining_pulses || 0)
+                : Number(row.pulses_remaining || (row as any).remaining_pulses || incPulses);
+              const usedPulses = pulseInfo
+                ? Number(pulseInfo.used_pulses || 0)
+                : Number(row.pulses_used || (row as any).used_pulses || 0);
+              const isPulses = Boolean(
+                row.package_type === 'pulses' ||
+                (master as any)?.package_type === 'pulses' ||
+                pulseInfo !== null ||
+                incPulses > 0 ||
+                remPulses > 0 ||
+                rowItems.length === 0
+              );
 
               return {
                 id: row.id,
                 packageId: row.package_id,
                 packageName: master?.name || master?.name_ar || 'Package',
                 packageNameAr: master?.name_ar || null,
+                packageType: isPulses ? 'pulses' : 'services',
                 status: (row.status || 'active').toLowerCase(),
                 purchasedAt: row.purchased_at,
                 expiresAt: row.expires_at,
                 pricePaid: row.price_paid !== null ? Number(row.price_paid) : 0,
-                includedPulses: pulseInfo ? Number(pulseInfo.included_pulses || 0) : ((row as any).included_pulses || null),
-                usedPulses: pulseInfo ? Number(pulseInfo.used_pulses || 0) : ((row as any).used_pulses || 0),
-                remainingPulses: pulseInfo ? Number(pulseInfo.remaining_pulses || 0) : ((row as any).remaining_pulses || null),
+                totalPulses: incPulses,
+                includedPulses: incPulses,
+                usedPulses: usedPulses,
+                pulsesRemaining: remPulses,
+                remainingPulses: remPulses,
                 pulseUsageHistory: pulseInfo?.usage_history || [],
                 items: rowItems.map((it: any) => {
                   const svc = allServices.find((s: any) => Number(s.id) === Number(it.service_id));

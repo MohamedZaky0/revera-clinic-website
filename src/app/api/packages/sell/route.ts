@@ -104,18 +104,49 @@ export async function POST(req: Request) {
     if (packageItemsResult.error) throw packageItemsResult.error;
 
     const packageItems = (packageItemsResult.data || []) as PackageItemRecord[];
+
+    // Read packages_meta from page_settings for schema-resilient package attributes
+    let pkgMetaStore: Record<string, { packageType?: string; totalPulses?: number }> = {};
+    try {
+      const { data: psData } = await supabaseServer
+        .from('page_settings')
+        .select('value')
+        .eq('key', 'packages_meta')
+        .maybeSingle();
+      if (psData?.value && typeof psData.value === 'object') {
+        pkgMetaStore = psData.value;
+      }
+    } catch (e) {
+      console.warn('Error reading packages_meta:', e);
+    }
+
+    const pkgMeta = pkgMetaStore[packageId];
     const extractedPulsesFromName = (() => {
-      const m = String(pkg.name || '').match(/(\d+(?:,\d+)?)\s*(?:pulses|نبضة|نبضات)/i);
-      return m ? Number(m[1].replace(/,/g, '')) : 0;
+      const nameStr = String(pkg.name || '');
+      const kMatch = nameStr.match(/(\d+)\s*k\b/i);
+      if (kMatch) return Number(kMatch[1]) * 1000;
+      const numMatch = nameStr.match(/(\d+(?:,\d+)?)\s*(?:pulses|pulse|shots|shot|نبضة|نبضات|طلقة|طلقات)/i);
+      if (numMatch) return Number(numMatch[1].replace(/,/g, ''));
+      const genericMatch = nameStr.match(/(\d+(?:,\d+)?)/);
+      if (genericMatch && (nameStr.toLowerCase().includes('pulse') || nameStr.toLowerCase().includes('laser') || nameStr.includes('نبض') || nameStr.includes('ليزر'))) {
+        return Number(genericMatch[1].replace(/,/g, ''));
+      }
+      return 0;
     })();
 
     const isPulsesPkg = Boolean(
       pkg.package_type === 'pulses' ||
+      pkgMeta?.packageType === 'pulses' ||
       Number(pkg.total_pulses || 0) > 0 ||
+      Number(pkgMeta?.totalPulses || 0) > 0 ||
+      packageItems.length === 0 ||
       extractedPulsesFromName > 0 ||
       pkg.name?.toLowerCase().includes('pulse') ||
+      pkg.name?.toLowerCase().includes('laser') ||
+      pkg.name?.toLowerCase().includes('shot') ||
       pkg.name?.includes('نبضة') ||
-      pkg.name?.includes('نبضات')
+      pkg.name?.includes('نبضات') ||
+      pkg.name?.includes('ليزر')
     );
 
     if (!isPulsesPkg && (packageItems.length === 0 || packageItems.some((item) => !Number.isInteger(item.qty) || item.qty <= 0))) {
@@ -188,7 +219,9 @@ export async function POST(req: Request) {
       throw invoiceLineError;
     }
 
-    const totalPulsesVal = Number(pkg.total_pulses || 0);
+    const totalPulsesVal = isPulsesPkg
+      ? (Number(pkg.total_pulses || 0) || Number(pkgMeta?.totalPulses || 0) || extractedPulsesFromName || 1000)
+      : 0;
     const cpInsertPayload: any = {
       customer_id: customerId,
       package_id: pkg.id,

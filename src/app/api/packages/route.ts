@@ -145,7 +145,29 @@ export async function GET(req: Request) {
       if (s.ar) serviceNameArMap.set(Number(s.id), s.ar);
     });
 
-    const mappedPackages = (packages || []).map(mapDbPackage);
+    let metaStore: Record<string, any> = {};
+    try {
+      const { data: psData } = await supabaseServer
+        .from('page_settings')
+        .select('value')
+        .eq('key', 'packages_meta')
+        .maybeSingle();
+      if (psData?.value && typeof psData.value === 'object') {
+        metaStore = psData.value;
+      }
+    } catch (e) {
+      console.warn('Error reading packages_meta:', e);
+    }
+
+    const mappedPackages = (packages || []).map((row: any) => {
+      const mapped = mapDbPackage(row);
+      const meta = metaStore[mapped.id];
+      if (meta) {
+        if (meta.packageType) mapped.packageType = meta.packageType;
+        if (meta.totalPulses !== undefined) mapped.totalPulses = Number(meta.totalPulses);
+      }
+      return mapped;
+    });
     const itemsByPackage = new Map<string, typeof mappedPackages[0]['items']>();
 
     for (const pkg of mappedPackages) {
@@ -163,6 +185,23 @@ export async function GET(req: Request) {
           serviceNameAr: serviceNameArMap.get(Number(item.service_id)) || undefined,
           qty: Number(item.qty),
         });
+      }
+    }
+
+    // Secondary pass: if items are empty and totalPulses is unset or packageType is ambiguous, infer pulse quota
+    for (const pkg of mappedPackages) {
+      if (pkg.items.length === 0) {
+        pkg.packageType = 'pulses';
+        if (!pkg.totalPulses || pkg.totalPulses <= 0) {
+          const nameStr = String(pkg.name || '');
+          const kMatch = nameStr.match(/(\d+)\s*k\b/i);
+          if (kMatch) {
+            pkg.totalPulses = Number(kMatch[1]) * 1000;
+          } else {
+            const numMatch = nameStr.match(/(\d+(?:,\d+)?)/);
+            if (numMatch) pkg.totalPulses = Number(numMatch[1].replace(/,/g, ''));
+          }
+        }
       }
     }
 
@@ -235,6 +274,27 @@ export async function POST(req: Request) {
 
       if (itemsError) throw itemsError;
       insertedItems = insItems || [];
+    }
+
+    // Persist package metadata to page_settings for schema-resilient persistence
+    try {
+      const { data: psData } = await supabaseServer
+        .from('page_settings')
+        .select('value')
+        .eq('key', 'packages_meta')
+        .maybeSingle();
+      const metaStore = psData?.value && typeof psData.value === 'object' ? psData.value : {};
+      metaStore[packageId] = {
+        packageType: payload.packageType,
+        totalPulses: payload.totalPulses,
+      };
+      await supabaseServer.from('page_settings').upsert({
+        key: 'packages_meta',
+        value: metaStore,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (metaErr) {
+      console.warn('Error saving packages_meta:', metaErr);
     }
 
     const result = mapDbPackage(pkg);
@@ -310,6 +370,27 @@ export async function PATCH(req: Request) {
 
     const packageId = pkg.id;
 
+    // Persist package metadata to page_settings for schema-resilient persistence
+    try {
+      const { data: psData } = await supabaseServer
+        .from('page_settings')
+        .select('value')
+        .eq('key', 'packages_meta')
+        .maybeSingle();
+      const metaStore = psData?.value && typeof psData.value === 'object' ? psData.value : {};
+      metaStore[packageId] = {
+        packageType: payload.packageType,
+        totalPulses: payload.totalPulses,
+      };
+      await supabaseServer.from('page_settings').upsert({
+        key: 'packages_meta',
+        value: metaStore,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (metaErr) {
+      console.warn('Error saving packages_meta:', metaErr);
+    }
+
     if (Array.isArray(body.items)) {
       const { error: deleteItemsError } = await supabaseServer.from('package_items').delete().eq('package_id', packageId);
       if (deleteItemsError) throw deleteItemsError;
@@ -351,6 +432,8 @@ export async function PATCH(req: Request) {
     if (existingItemsError) throw existingItemsError;
 
     const result = mapDbPackage(pkg);
+    result.packageType = payload.packageType;
+    result.totalPulses = payload.totalPulses;
     result.items = (existingItems || []).map((item: any) => ({
       id: item.id,
       serviceId: Number(item.service_id),

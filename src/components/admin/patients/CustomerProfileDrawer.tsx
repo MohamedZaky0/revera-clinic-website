@@ -1670,10 +1670,22 @@ export default function CustomerProfileDrawer({
                   <div className="divide-y divide-[#414E36]/5">
                     {customerProfilePackages.filter((p: any) => p.status === "active").map((pkg: any) => {
                       const isExpired = pkg.expiresAt && new Date(pkg.expiresAt) < new Date();
+                      const isPulses = pkg.packageType === "pulses" || Number(pkg.totalPulses) > 0 || Number(pkg.includedPulses) > 0 || Number(pkg.remainingPulses) > 0 || Number(pkg.pulsesRemaining) > 0 || (pkg.items || []).length === 0;
+                      const remainingPulsesVal = pkg.pulsesRemaining ?? pkg.remainingPulses ?? pkg.totalPulses ?? pkg.includedPulses ?? 0;
+                      const totalPulsesVal = pkg.totalPulses ?? pkg.includedPulses ?? remainingPulsesVal;
+
                       return (
                         <div key={pkg.id} className="p-4 space-y-2">
                           <div className="flex items-center justify-between">
-                            <p className="font-bold text-[#1F251A] text-sm">{pkg.packageName}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-[#1F251A] text-sm">{pkg.packageName}</p>
+                              {isPulses && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300/50 px-2 py-0.5 text-[10px] font-bold">
+                                  <Zap size={11} className="text-amber-600" />
+                                  {lang === "ar" ? "باقة نبضات ليزر" : "Laser Pulses Package"}
+                                </span>
+                              )}
+                            </div>
                             <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                               isExpired ? "bg-amber-100 text-amber-800" : "bg-emerald-100/80 text-emerald-800"
                             }`}>
@@ -1686,16 +1698,40 @@ export default function CustomerProfileDrawer({
                             {pkg.expiresAt && ` · ${t.expiresPrefix} ${new Date(pkg.expiresAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`}
                             {` · EGP ${Number(pkg.pricePaid).toLocaleString()} ${t.paidSuffix}`}
                           </p>
-                          <div className="flex flex-wrap gap-2">
-                            {(pkg.items || []).map((it: any) => (
-                              <span key={it.id} className="inline-flex items-center gap-1.5 rounded-full bg-[#F9F9F7] border border-[#414E36]/10 px-2.5 py-1 text-[11px] font-semibold text-[#414E36]">
-                                {it.serviceName || `Service #${it.serviceId}`}
-                                <span className={`font-bold ${it.qtyRemaining > 0 ? "text-emerald-700" : "text-gray-400"}`}>
-                                  {it.qtyUsed}/{it.qtyTotal} {t.usedSuffix}
+                          {isPulses ? (
+                            <div className="flex items-center gap-3 bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 max-w-md">
+                              <div className="p-1.5 bg-amber-500 text-white rounded-lg shrink-0">
+                                <Zap size={14} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="font-semibold text-amber-900">{lang === "ar" ? "رصيد النبضات المتبقي" : "Remaining Pulses"}</span>
+                                  <span className="font-black text-amber-900">
+                                    {Number(remainingPulsesVal).toLocaleString()} / {Number(totalPulsesVal).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-amber-200/60 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                                  <div
+                                    className="bg-amber-500 h-full rounded-full transition-all"
+                                    style={{
+                                      width: `${totalPulsesVal > 0 ? Math.min(100, Math.max(0, (remainingPulsesVal / totalPulsesVal) * 100)) : 100}%`
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {(pkg.items || []).map((it: any) => (
+                                <span key={it.id} className="inline-flex items-center gap-1.5 rounded-full bg-[#F9F9F7] border border-[#414E36]/10 px-2.5 py-1 text-[11px] font-semibold text-[#414E36]">
+                                  {it.serviceName || `Service #${it.serviceId}`}
+                                  <span className={`font-bold ${it.qtyRemaining > 0 ? "text-emerald-700" : "text-gray-400"}`}>
+                                    {it.qtyUsed}/{it.qtyTotal} {t.usedSuffix}
+                                  </span>
                                 </span>
-                              </span>
-                            ))}
-                          </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -2118,11 +2154,14 @@ export default function CustomerProfileDrawer({
                   className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                 >
                   <option value="">{t.choosePackageOption}</option>
-                  {availablePackageOffers.map((pkg: any) => (
-                    <option key={pkg.id} value={pkg.id}>
-                      {pkg.name} - EGP {Number(pkg.price).toLocaleString()} ({pkg.items?.length || 0} {t.servicesCountSuffix})
-                    </option>
-                  ))}
+                  {availablePackageOffers.map((pkg: any) => {
+                    const isPulses = pkg.packageType === "pulses" || Number(pkg.totalPulses) > 0 || (pkg.items?.length || 0) === 0;
+                    return (
+                      <option key={pkg.id} value={pkg.id}>
+                        {pkg.name} - EGP {Number(pkg.price).toLocaleString()} ({isPulses ? `⚡ ${(pkg.totalPulses || 0).toLocaleString()} ${lang === "ar" ? "نبضة" : "Pulses"}` : `${pkg.items?.length || 0} ${t.servicesCountSuffix}`})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -2144,6 +2183,7 @@ export default function CustomerProfileDrawer({
               {selectedSellPackageId && (() => {
                 const pkg = availablePackageOffers.find((p: any) => p.id === selectedSellPackageId);
                 if (!pkg) return null;
+                const isPulses = pkg.packageType === "pulses" || Number(pkg.totalPulses) > 0 || (pkg.items?.length || 0) === 0;
                 return (
                   <div className="bg-[#EDF1EC]/60 p-3.5 rounded-xl space-y-2 text-xs text-[#1F251A]">
                     <div className="flex items-center justify-between font-semibold">
@@ -2154,13 +2194,25 @@ export default function CustomerProfileDrawer({
                       <span>{t.validityLabel}</span>
                       <span className="font-semibold">{pkg.validityDays} {t.daysSuffix}</span>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {(pkg.items || []).map((it: any) => (
-                        <span key={it.id} className="inline-flex rounded-full bg-white border border-[#414E36]/10 px-2 py-0.5 font-semibold">
-                          {it.serviceName || `Service #${it.serviceId}`} ×{it.qty}
+                    {isPulses ? (
+                      <div className="pt-1 flex items-center justify-between bg-amber-500/10 border border-amber-300/60 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                          <Zap size={14} className="text-amber-600" />
+                          <span>{lang === "ar" ? "رصيد النبضات المتضمن" : "Included Pulses Quota"}</span>
+                        </div>
+                        <span className="text-sm font-black text-amber-900">
+                          {(pkg.totalPulses || 0).toLocaleString()} {lang === "ar" ? "نبضة" : "Pulses"}
                         </span>
-                      ))}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {(pkg.items || []).map((it: any) => (
+                          <span key={it.id} className="inline-flex rounded-full bg-white border border-[#414E36]/10 px-2 py-0.5 font-semibold">
+                            {it.serviceName || `Service #${it.serviceId}`} ×{it.qty}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
