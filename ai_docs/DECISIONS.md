@@ -2509,6 +2509,38 @@ The clinic required a complete, multi-tiered laser pulse counting and accounting
 6. **Automated Diagnostic Verification:**
    - Added test case `TC-076` ("Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
 
+---
+
+## DEC-073: In-Booking Package Selling to Customer Profile & Patient Directory Search Dropdown Engine
+
+**Date:** 2026-09-21
+**Status:** Decided & Implemented
+
+**Context:**
+1. The user reported two related issues:
+   - "the painet list isnt showing": In New Booking (`AdminNewBookingView.tsx`), clicking "Browse Patients List" showed "Hide Patients List" but no dropdown appeared. This occurred because:
+     a) Dropdown container had `{showCustomerDropdown && customerList.length > 0 && ( ... )}`, which suppressed the dropdown completely if `customerList.length === 0` despite having an inner empty state.
+     b) `allCustomers` was querying `supabase.from("customers")` directly in the browser, failing silently under RLS.
+     c) `src/app/admin/page.tsx` was passing `dbCustomers` instead of the full derived `customers` prop.
+     d) Typing into phone prematurely hid the dropdown when no phone match occurred.
+   - "the pusrcahsed pacakge in the new booking page isnt showing in the painet profile": When creating a new laser booking with Option 3 (Pulses Package) and selecting a catalog package to purchase, the package was only noted as text in the reservation (`[Purchasing New Pulses Package]`). It was not inserted into `customer_packages` in the database, leaving the patient profile showing "No active packages".
+
+**Decisions & Implementation:**
+1. **In-Booking Direct Package Selling (`src/components/admin/bookings/AdminNewBookingView.tsx`):**
+   - In `handleSaveBooking`, if `isNewPackagePurchase && selectedCatalogPulsePkg`, the system resolves the customer (existing or auto-created via `POST /api/customers`) and immediately executes `POST /api/packages/sell`.
+   - The returned `customerPackage.id` is linked to `payload.packageId` and recorded in reservation notes as `[Customer Package ID]: <id>`.
+   - Dispatches `revera-laser-change`, `revera-booking-change`, and `revera-prescription-change`.
+   - Because the package is now immediately created in `customer_packages`, opening the patient's profile (`CustomerProfileDrawer.tsx`) displays the active pulses package with full quota, price paid, purchase date, and active status.
+2. **Reliable Patient Search & Dropdown Engine (`AdminNewBookingView.tsx` & `src/app/admin/page.tsx`):**
+   - In `src/app/admin/page.tsx`, updated both `AdminNewBookingView` instances and `AdminAddPreviousBookingView` to pass `customers={customers}` (the full synthesized list) instead of `dbCustomers`.
+   - In `AdminNewBookingView.tsx`, loads customers via `/api/customers` with session authorization headers and updates `allCustomers` whenever `customers` prop updates.
+   - Removed `&& customerList.length > 0` condition from the dropdown container so clicking "Browse Patients List" always renders the dropdown.
+   - Added an integrated search bar inside the dropdown to search patients by name, phone, or email.
+   - Ensured empty search states render cleanly with a "Show all patients" button.
+3. **Admin Settings System Test Suite Diagnostic Verification:**
+   - Added test case `TC-077` ("In-Booking Package Selling & Integrated Patient Search Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
+
+
 
 
 

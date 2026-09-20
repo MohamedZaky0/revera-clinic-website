@@ -1097,6 +1097,27 @@ The following are **not currently enforced in code**:
 5. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-076` (`Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine`).
 
+---
+
+## In-Booking Package Selling & Integrated Patient Search Rules
+**Enforced in:** `src/components/admin/bookings/AdminNewBookingView.tsx`, `src/app/admin/page.tsx`, `src/components/admin/patients/CustomerProfileDrawer.tsx`, `src/components/admin/patients/useCustomerProfile.ts`.
+
+1. **Immediate In-Booking Package Persistence**:
+   - When a receptionist books a laser appointment with Option 3 (Pulses Package) and selects a new pulses package to buy (`isNewPackagePurchase && selectedCatalogPulsePkg`), the package is immediately created and sold to the patient via `POST /api/packages/sell` during `handleSaveBooking`.
+   - The resulting `customerPackage.id` is linked to `reservation.packageId` and recorded in reservation notes.
+   - The package is immediately active in the PostgreSQL `customer_packages` table, making it instantly visible in the Patient Profile's "Purchased Packages" -> "Active Packages" tab with full pulses quota, purchase date, and active badge.
+
+2. **Integrated Patient Search & Persistent Dropdown**:
+   - The patient directory dropdown in New Booking is triggered by clicking "Browse Patients List" or focusing the phone input.
+   - The dropdown container renders unconditionally when `showCustomerDropdown` is active (not suppressed if filtered results count is 0).
+   - An integrated search input inside the dropdown filters patients across Name, Phone, and Email in real time.
+   - If no match is found, an explicit "No matching patients found" notice and "Show all patients" button are rendered.
+   - `src/app/admin/page.tsx` passes the comprehensive, synthesized `customers` list to `AdminNewBookingView` and `AdminAddPreviousBookingView`.
+
+3. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-077` (`In-Booking Package Selling & Integrated Patient Search Engine`).
+
+
 
 
 

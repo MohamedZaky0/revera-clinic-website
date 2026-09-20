@@ -352,19 +352,38 @@ export default function AdminNewBookingView({
           }
         }
 
-        // Fetch Customers List from Supabase
-        const { data: cData } = await supabase
-          .from("customers")
-          .select("id, name, first_name, last_name, full_name, mobile, phone, email, whatsapp")
-          .order("created_at", { ascending: false })
-          .limit(100);
-        
-        if (cData && cData.length > 0) {
-          setAllCustomers(cData);
-          setCustomerList(cData);
-        } else if (customers.length > 0) {
-          setAllCustomers(customers);
-          setCustomerList(customers);
+        // Fetch Customers List from /api/customers endpoint and Supabase
+        try {
+          const { data: authData } = await supabase.auth.getSession();
+          const authHeaders: Record<string, string> = { "Content-Type": "application/json" };
+          if (authData?.session?.access_token) {
+            authHeaders["Authorization"] = `Bearer ${authData.session.access_token}`;
+          }
+          const cRes = await fetch("/api/customers", { headers: authHeaders });
+          if (cRes.ok) {
+            const apiCustomers = await cRes.json();
+            if (Array.isArray(apiCustomers) && apiCustomers.length > 0) {
+              setAllCustomers(apiCustomers);
+              setCustomerList(apiCustomers);
+            }
+          } else {
+            const { data: cData } = await supabase
+              .from("customers")
+              .select("id, name, first_name, last_name, full_name, mobile, phone, email, whatsapp")
+              .order("created_at", { ascending: false })
+              .limit(100);
+            if (cData && cData.length > 0) {
+              setAllCustomers(cData);
+              setCustomerList(cData);
+            }
+          }
+        } catch (cErr) {
+          console.warn("Failed to load customers in New Booking View:", cErr);
+        }
+
+        if (customers && customers.length > 0) {
+          setAllCustomers(prev => (prev.length === 0 ? customers : prev));
+          setCustomerList(prev => (prev.length === 0 ? customers : prev));
         }
         // Fetch Catalog Pulses Packages for laser package selection
         try {
@@ -398,9 +417,11 @@ export default function AdminNewBookingView({
 
   // Update lists when props update
   useEffect(() => {
-    if (customers && customers.length > 0 && allCustomers.length === 0) {
+    if (customers && customers.length > 0) {
       setAllCustomers(customers);
-      setCustomerList(customers);
+      if (!phone.trim()) {
+        setCustomerList(customers);
+      }
     }
     if (branches && branches.length > 0 && dbBranches.length === 0) {
       setDbBranches(branches);
@@ -583,7 +604,7 @@ export default function AdminNewBookingView({
     });
 
     setCustomerList(filtered);
-    if (filtered.length === 0) {
+    if (filtered.length === 0 && !showCustomerDropdown) {
       setShowCustomerDropdown(false);
     }
 
@@ -1184,7 +1205,18 @@ export default function AdminNewBookingView({
     try {
       let resolvedCustomerId = foundCustomer?.id || null;
 
-      // If customer is not found in DB, auto-create customer profile with all collected fields
+      // If customer is not found in DB, search allCustomers by phone or auto-create customer profile
+      if (!resolvedCustomerId && phone) {
+        const cleanDigits = phone.replace(/\D/g, "");
+        const matchedInAll = allCustomers.find(c => {
+          const cPhone = (c.mobile || c.phone || "").replace(/\D/g, "");
+          return cPhone && (cPhone === cleanDigits || cPhone.endsWith(cleanDigits) || cleanDigits.endsWith(cPhone));
+        });
+        if (matchedInAll?.id) {
+          resolvedCustomerId = matchedInAll.id;
+        }
+      }
+
       if (!resolvedCustomerId && (firstName || phone)) {
         try {
           const custPayload = {
@@ -1224,8 +1256,42 @@ export default function AdminNewBookingView({
         }
       }
 
+      // If purchasing a new pulses package in Option 3, sell package now so it immediately exists in customer_packages
+      let createdCustomerPackageId: string | null = null;
+      if (isNewPackagePurchase && selectedCatalogPulsePkg && resolvedCustomerId) {
+        try {
+          const { data: authData } = await supabase.auth.getSession();
+          const sellHeaders: Record<string, string> = { "Content-Type": "application/json" };
+          if (authData?.session?.access_token) {
+            sellHeaders["Authorization"] = `Bearer ${authData.session.access_token}`;
+          }
+          const sellRes = await fetch("/api/packages/sell", {
+            method: "POST",
+            headers: sellHeaders,
+            body: JSON.stringify({
+              customerId: resolvedCustomerId,
+              packageId: selectedCatalogPulsePkg.id,
+              branchId: selectedBranchObj?.id || null,
+              paymentMethod: numAmountPaid > 0 ? "cash" : "cash"
+            })
+          });
+
+          if (sellRes.ok) {
+            const sellData = await sellRes.json().catch(() => null);
+            createdCustomerPackageId = sellData?.customerPackage?.id || null;
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("revera-laser-change"));
+            }
+          } else {
+            console.error("Package sale failed during booking:", await sellRes.text());
+          }
+        } catch (sellErr) {
+          console.error("Error selling package during booking:", sellErr);
+        }
+      }
+
       const packageNote = isNewPackagePurchase && selectedCatalogPulsePkg
-        ? `\n[Purchasing New Pulses Package]: ${(lang === "ar" && selectedCatalogPulsePkg.name_ar) ? selectedCatalogPulsePkg.name_ar : selectedCatalogPulsePkg.name} (${Number(selectedCatalogPulsePkg.price || 0)} EGP · ${Number(selectedCatalogPulsePkg.total_pulses || selectedCatalogPulsePkg.totalPulses || 10000).toLocaleString()} pulses)`
+        ? `\n[Purchasing New Pulses Package]: ${(lang === "ar" && selectedCatalogPulsePkg.name_ar) ? selectedCatalogPulsePkg.name_ar : selectedCatalogPulsePkg.name} (${Number(selectedCatalogPulsePkg.price || 0)} EGP · ${Number(selectedCatalogPulsePkg.total_pulses || selectedCatalogPulsePkg.totalPulses || 10000).toLocaleString()} pulses)${createdCustomerPackageId ? `\n[Customer Package ID]: ${createdCustomerPackageId}` : ""}`
         : (usePackagePayment && matchingPackage && matchingPackageItem)
         ? matchingPackageItem.isPulses
           ? `\n[Laser Package Redemption]: ${(lang === "ar" && matchingPackage.packageNameAr) ? matchingPackage.packageNameAr : matchingPackage.packageName} (${Number(matchingPackageItem.qtyRemaining).toLocaleString()} pulses remaining)`
@@ -1267,7 +1333,8 @@ export default function AdminNewBookingView({
         laserPaymentMode: isLaserService ? laserPaymentMode : null,
         laserPricePerPulse: isLaserService && laserPaymentMode === "PER_PULSE" ? laserPerPulsePrice : null,
         purchasingPackageId: isNewPackagePurchase ? selectedCatalogPulsePkg?.id : null,
-        packageId: isNewPackagePurchase ? selectedCatalogPulsePkg?.id : (matchingPackage?.id || null),
+        customerPackageId: createdCustomerPackageId || null,
+        packageId: createdCustomerPackageId || (isNewPackagePurchase ? selectedCatalogPulsePkg?.id : (matchingPackage?.id || null)),
       };
 
       const res = await fetch("/api/reservations", {
@@ -1295,6 +1362,7 @@ export default function AdminNewBookingView({
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("revera-booking-change"));
         window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+        window.dispatchEvent(new CustomEvent("revera-laser-change"));
       }
 
       if (onBookingCreated) onBookingCreated();
@@ -1378,15 +1446,16 @@ export default function AdminNewBookingView({
                       if (showCustomerDropdown) {
                         setShowCustomerDropdown(false);
                       } else {
+                        setPatientSearchQuery("");
                         setCustomerList(allCustomers);
                         setShowCustomerDropdown(true);
                       }
                     }}
-                    className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
+                    className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <Users size={13} />
                     <span>{showCustomerDropdown ? tr.hidePatientsListBtn : tr.browsePatientsBtn}</span>
-                    <ChevronDown size={13} />
+                    <ChevronDown size={13} className={`transition-transform duration-200 ${showCustomerDropdown ? "rotate-180" : ""}`} />
                   </button>
                 </div>
 
@@ -1411,12 +1480,15 @@ export default function AdminNewBookingView({
                     required
                     value={phone}
                     onFocus={() => {
-                      if (customerList.length > 0) setShowCustomerDropdown(true);
+                      if (allCustomers.length > 0) {
+                        if (!phone.trim()) setCustomerList(allCustomers);
+                        setShowCustomerDropdown(true);
+                      }
                     }}
                     onChange={(e) => {
                       setPhone(e.target.value);
                       if (e.target.value) setFormErrors((prev) => ({ ...prev, phone: false }));
-                      if (customerList.length > 0) setShowCustomerDropdown(true);
+                      setShowCustomerDropdown(true);
                     }}
                     placeholder={tr.phonePlaceholder}
                     className="w-full px-3.5 py-2.5 font-mono text-[#1F251A] outline-none font-bold placeholder:text-gray-400 placeholder:font-sans"
@@ -1441,16 +1513,61 @@ export default function AdminNewBookingView({
                 )}
 
                 {/* Scrollable Floating Customer List Dropdown */}
-                {showCustomerDropdown && customerList.length > 0 && (
-                  <div className="absolute start-0 end-0 top-full mt-1.5 z-[100] max-h-72 overflow-y-auto overscroll-contain bg-white rounded-2xl border border-[#414E36]/20 shadow-[0_12px_40px_rgba(0,0,0,0.18)] p-2 space-y-1">
+                {showCustomerDropdown && (
+                  <div className="absolute start-0 end-0 top-full mt-1.5 z-[100] max-h-80 overflow-y-auto overscroll-contain bg-white rounded-2xl border border-[#414E36]/20 shadow-[0_12px_40px_rgba(0,0,0,0.18)] p-2 space-y-1">
                     <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#5A6A51] bg-[#FBFBF9] rounded-xl flex justify-between items-center mb-1 sticky top-0 z-10 border border-[#414E36]/5">
                       <span>{tr.databasePatientsPrefix} ({customerList.length})</span>
                       <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[#1F251A] hover:text-red-700 font-bold text-xs cursor-pointer">{tr.closeBtn}</button>
                     </div>
+
+                    {/* Dedicated Patient Search Bar in Dropdown */}
+                    <div className="p-1">
+                      <div className="relative">
+                        <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                        <input
+                          type="text"
+                          placeholder={lang === "ar" ? "ابحث بالاسم أو رقم الهاتف أو البريد..." : "Search patients by name, phone, or email..."}
+                          value={patientSearchQuery}
+                          onChange={(e) => {
+                            const query = e.target.value;
+                            setPatientSearchQuery(query);
+                            const cleanQuery = query.trim().toLowerCase();
+                            const cleanDigits = query.replace(/\D/g, "");
+                            if (!cleanQuery) {
+                              setCustomerList(allCustomers);
+                            } else {
+                              const filtered = allCustomers.filter((c: any) => {
+                                const nameMatch = (c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`).toLowerCase().includes(cleanQuery);
+                                const phoneMatch = cleanDigits ? (c.mobile || c.phone || "").replace(/\D/g, "").includes(cleanDigits) : false;
+                                const emailMatch = (c.email || "").toLowerCase().includes(cleanQuery);
+                                return nameMatch || phoneMatch || emailMatch;
+                              });
+                              setCustomerList(filtered);
+                            }
+                          }}
+                          className="w-full ps-9 pe-3 py-2 text-xs rounded-xl border border-[#414E36]/20 bg-[#FBFBF9] text-[#1F251A] outline-none font-bold focus:border-emerald-700 placeholder:text-gray-400 placeholder:font-normal"
+                        />
+                      </div>
+                    </div>
                     
                     {customerList.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-[#5A6A51] font-semibold">
-                        {tr.noMatchingPatients}
+                      <div className="p-4 text-center text-xs text-[#5A6A51] font-semibold space-y-2">
+                        <p>{tr.noMatchingPatients}</p>
+                        {allCustomers.length === 0 && (
+                          <p className="text-[11px] text-amber-700">
+                            {lang === "ar" ? "جاري تحميل المرضى من قاعدة البيانات أو لم يتم العثور على سجلات." : "Loading patients from database or no records found."}
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomerList(allCustomers);
+                            setPatientSearchQuery("");
+                          }}
+                          className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
+                        >
+                          {lang === "ar" ? "عرض جميع المرضى" : "Show all patients"}
+                        </button>
                       </div>
                     ) : (
                       customerList.map((c) => {
@@ -1460,7 +1577,7 @@ export default function AdminNewBookingView({
 
                         return (
                           <div
-                            key={c.id}
+                            key={c.id || cPhone}
                             onClick={() => handleSelectCustomer(c)}
                             className={`p-2.5 sm:p-3 rounded-xl cursor-pointer transition flex items-center justify-between gap-3 border-b border-gray-100 last:border-0 ${
                               isSelected ? "bg-emerald-100/70 border-emerald-300" : "hover:bg-emerald-50/70"

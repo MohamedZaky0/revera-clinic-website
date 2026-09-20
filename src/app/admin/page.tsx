@@ -2390,7 +2390,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-073', name: 'Multi-Scenario Laser Pulses Package Settlement Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies Scenario 1 (initial package purchase + deduction), Scenario 2 (deficit spillover to new package or per pulse), Scenario 3 (standard redemption), and mixed session add-on pricing.', status: 'idle' },
     { id: 'TC-074', name: 'New Booking Laser Pulses Package Selection & Catalog Purchase Engine', category: 'Services & Bookings', endpoint: '/api/packages', description: 'Verifies pulses package detection in New Booking modal, pulse balance badge rendering, laser service quota coverage, and in-booking new pulses package catalog purchase integration.', status: 'idle' },
     { id: 'TC-075', name: 'Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies laser packages isolation to Option 3, patient multi-package selection, catalog package purchase, and package price + non-laser service total calculation.', status: 'idle' },
-    { id: 'TC-076', name: 'Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies accurate deduction of delivered laser pulses from customer pulses packages across doctor portal session finalization, reception session completion, and checkout settlement workflows with DB synchronization and idempotency.', status: 'idle' }
+    { id: 'TC-076', name: 'Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies accurate deduction of delivered laser pulses from customer pulses packages across doctor portal session finalization, reception session completion, and checkout settlement workflows with DB synchronization and idempotency.', status: 'idle' },
+    { id: 'TC-077', name: 'In-Booking Package Selling & Integrated Patient Search Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies selling catalog packages directly during new booking creation with customer_packages persistence and instant patient profile appearance, as well as integrated patient search dropdown rendering.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -7488,7 +7489,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 }}
                 services={localServices}
                 providers={providers}
-                customers={dbCustomers}
+                customers={customers}
                 branches={branches}
                 lang={lang}
                 t={adminTranslations[lang].bookings.adminNewBookingView}
@@ -7510,7 +7511,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 initialCustomer={previousBookingCustomer}
                 services={localServices}
                 providers={providers}
-                customers={dbCustomers}
+                customers={customers}
                 branches={branches}
                 activeBranchId={branch}
                 lang={lang}
@@ -7593,7 +7594,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               }}
               services={localServices}
               providers={providers}
-              customers={dbCustomers}
+              customers={customers}
               branches={branches}
               lang={lang}
               t={adminTranslations[lang].bookings.adminNewBookingView}
