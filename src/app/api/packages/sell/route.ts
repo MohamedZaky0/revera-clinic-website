@@ -85,14 +85,15 @@ export async function POST(req: Request) {
     }
     if (packageResult.error) throw packageResult.error;
 
-    const pkg = packageResult.data as PackageRecord | null;
+    const pkg = packageResult.data as (PackageRecord & { package_type?: string; total_pulses?: number }) | null;
     if (!pkg || !pkg.active) {
       return NextResponse.json({ error: 'Active package not found.' }, { status: 404 });
     }
     if (packageItemsResult.error) throw packageItemsResult.error;
 
     const packageItems = (packageItemsResult.data || []) as PackageItemRecord[];
-    if (packageItems.length === 0 || packageItems.some((item) => !Number.isInteger(item.qty) || item.qty <= 0)) {
+    const isPulsesPkg = pkg.package_type === 'pulses' || Number(pkg.total_pulses || 0) > 0;
+    if (!isPulsesPkg && (packageItems.length === 0 || packageItems.some((item) => !Number.isInteger(item.qty) || item.qty <= 0))) {
       return NextResponse.json({ error: 'Package must contain at least one service with a positive quantity.' }, { status: 400 });
     }
 
@@ -162,37 +163,87 @@ export async function POST(req: Request) {
       throw invoiceLineError;
     }
 
-    const { data: customerPackage, error: customerPackageError } = await supabaseServer
+    const totalPulsesVal = Number(pkg.total_pulses || 0);
+    const cpInsertPayload: any = {
+      customer_id: customerId,
+      package_id: pkg.id,
+      invoice_id: invoice.id,
+      expires_at: expiresAt.toISOString(),
+      price_paid: totals.grandTotal,
+      status: 'active',
+      package_type: isPulsesPkg ? 'pulses' : 'services',
+      total_pulses: isPulsesPkg ? totalPulsesVal : 0,
+      pulses_remaining: isPulsesPkg ? totalPulsesVal : 0,
+      pulses_used: 0,
+    };
+
+    let { data: customerPackage, error: customerPackageError } = await supabaseServer
       .from('customer_packages')
-      .insert({
+      .insert(cpInsertPayload)
+      .select('id, customer_id, package_id, invoice_id, purchased_at, expires_at, price_paid, status')
+      .single();
+
+    if (customerPackageError && (customerPackageError.message?.includes('column') || customerPackageError.code === '42703')) {
+      const fallbackCpPayload = {
         customer_id: customerId,
         package_id: pkg.id,
         invoice_id: invoice.id,
         expires_at: expiresAt.toISOString(),
         price_paid: totals.grandTotal,
         status: 'active',
-      })
-      .select('id, customer_id, package_id, invoice_id, purchased_at, expires_at, price_paid, status')
-      .single();
-    if (customerPackageError) {
+      };
+      const fbCpRes = await supabaseServer.from('customer_packages').insert(fallbackCpPayload).select('id, customer_id, package_id, invoice_id, purchased_at, expires_at, price_paid, status').single();
+      if (fbCpRes.error) {
+        await removeIncompleteSale(invoice.id);
+        throw fbCpRes.error;
+      }
+      customerPackage = fbCpRes.data;
+    } else if (customerPackageError) {
       await removeIncompleteSale(invoice.id);
       throw customerPackageError;
     }
 
-    const { error: customerPackageItemsError } = await supabaseServer
-      .from('customer_package_items')
-      .insert(
-        packageItems.map((item) => ({
-          customer_package_id: customerPackage.id,
-          service_id: item.service_id,
-          qty_total: item.qty,
-          qty_used: 0,
-          qty_remaining: item.qty,
-        }))
-      );
-    if (customerPackageItemsError) {
-      await removeIncompleteSale(invoice.id, customerPackage.id);
-      throw customerPackageItemsError;
+    // Persist pulses to page_settings pulse store for full ecosystem compatibility
+    if (isPulsesPkg && totalPulsesVal > 0 && customerPackage?.id) {
+      try {
+        const { data: psData } = await supabaseServer
+          .from('page_settings')
+          .select('value')
+          .eq('key', 'customer_package_pulses')
+          .maybeSingle();
+        const store = psData?.value && typeof psData.value === 'object' ? psData.value : {};
+        store[customerPackage.id] = {
+          included_pulses: totalPulsesVal,
+          used_pulses: 0,
+          remaining_pulses: totalPulsesVal,
+          usage_history: []
+        };
+        await supabaseServer.from('page_settings').upsert({
+          key: 'customer_package_pulses',
+          value: store,
+          updated_at: new Date().toISOString()
+        });
+      } catch (pulseErr) {
+        console.warn('Error saving customer package pulses in store:', pulseErr);
+      }
+    }
+
+    if (packageItems.length > 0) {
+      const { error: customerPackageItemsError } = await supabaseServer
+        .from('customer_package_items')
+        .insert(
+          packageItems.map((item) => ({
+            customer_package_id: customerPackage.id,
+            service_id: item.service_id,
+            qty_total: item.qty,
+            qty_used: 0,
+            qty_remaining: item.qty,
+          }))
+        );
+      if (customerPackageItemsError) {
+        await removeIncompleteSale(invoice.id, customerPackage.id);
+        throw customerPackageItemsError;
+      }
     }
 
     const { error: paymentError } = await supabaseServer

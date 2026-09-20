@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Package, X, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, X, Loader2, Zap } from "lucide-react";
 
 export type PackageItem = {
   id?: string;
@@ -12,6 +12,8 @@ export type PackageOffer = {
   id: string;
   name: string;
   nameAr: string | null;
+  packageType: "services" | "pulses";
+  totalPulses: number;
   branchId: string | null;
   price: number;
   taxRate: number;
@@ -47,6 +49,8 @@ export function PackageAdminPanel({ session }: { session: any }) {
   const [form, setForm] = useState({
     name: "",
     nameAr: "",
+    packageType: "services" as "services" | "pulses",
+    totalPulses: "",
     branchId: "",
     price: "",
     taxRate: "",
@@ -97,6 +101,8 @@ export function PackageAdminPanel({ session }: { session: any }) {
     setForm({
       name: "",
       nameAr: "",
+      packageType: "services",
+      totalPulses: "",
       branchId: "",
       price: "",
       taxRate: "",
@@ -116,9 +122,12 @@ export function PackageAdminPanel({ session }: { session: any }) {
 
   const openEdit = (pkg: PackageOffer) => {
     setEditingId(pkg.id);
+    const isPulses = pkg.packageType === "pulses" || Number(pkg.totalPulses || 0) > 0;
     setForm({
       name: pkg.name,
       nameAr: pkg.nameAr || "",
+      packageType: isPulses ? "pulses" : "services",
+      totalPulses: pkg.totalPulses && pkg.totalPulses > 0 ? String(pkg.totalPulses) : "",
       branchId: pkg.branchId || "",
       price: String(pkg.price),
       taxRate: String(pkg.taxRate),
@@ -140,17 +149,33 @@ export function PackageAdminPanel({ session }: { session: any }) {
 
   const handleSave = async () => {
     if (!accessToken) return;
+
+    if (form.packageType === "pulses") {
+      const parsedPulses = Number(form.totalPulses || 0);
+      if (!Number.isInteger(parsedPulses) || parsedPulses <= 0) {
+        setError("Please enter a valid positive number of pulses for this package.");
+        return;
+      }
+    } else {
+      const mappedItems = items
+        .filter((it) => it.serviceId && Number(it.qty) > 0)
+        .map((it) => ({ serviceId: Number(it.serviceId), qty: Number(it.qty), id: it.id }));
+      if (mappedItems.length === 0) {
+        setError("Add at least one service item with a positive quantity.");
+        return;
+      }
+    }
+
     const mappedItems = items
       .filter((it) => it.serviceId && Number(it.qty) > 0)
       .map((it) => ({ serviceId: Number(it.serviceId), qty: Number(it.qty), id: it.id }));
-    if (mappedItems.length === 0) {
-      setError("Add at least one service item with a positive quantity.");
-      return;
-    }
+
     const payload = {
       id: editingId || undefined,
       name: form.name.trim(),
       nameAr: form.nameAr.trim() || null,
+      packageType: form.packageType,
+      totalPulses: form.packageType === "pulses" ? Number(form.totalPulses || 0) : 0,
       branchId: form.branchId || null,
       price: Number(form.price || 0),
       taxRate: Number(form.taxRate || 0),
@@ -243,61 +268,88 @@ export function PackageAdminPanel({ session }: { session: any }) {
             <thead className="bg-[#F9F9F7]">
               <tr>
                 <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Name</th>
+                <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Type</th>
                 <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Branch</th>
                 <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Price</th>
                 <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Tax</th>
                 <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Validity</th>
                 <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">On Expiry</th>
-                <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Items</th>
+                <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Items / Quota</th>
                 <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Active</th>
                 <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Website</th>
                 <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#414E36]/6">
-              {packages.map((pkg) => (
-                <tr key={pkg.id} className="hover:bg-[#F9F9F7]">
-                  <td className="px-5 py-3 font-medium text-[#1F251A]">{pkg.name}</td>
-                  <td className="px-5 py-3 text-[#5A6A51]">
-                    {branches.find((b) => b.id === pkg.branchId)?.name_en || branches.find((b) => b.id === pkg.branchId)?.name || "All branches"}
-                  </td>
-                  <td className="px-5 py-3 text-right font-medium text-[#C4AE7C]">EGP {Number(pkg.price).toLocaleString()}</td>
-                  <td className="px-5 py-3 text-right text-[#5A6A51]">{Number(pkg.taxRate).toFixed(1)}%</td>
-                  <td className="px-5 py-3 text-right text-[#5A6A51]">{pkg.validityDays}d</td>
-                  <td className="px-5 py-3 text-left text-[#5A6A51]">
-                    {pkg.onExpiry === "extend" ? "Auto-extend" : "Recognise revenue"}
-                  </td>
-                  <td className="px-5 py-3 text-center text-[#5A6A51]">{pkg.items?.length || 0}</td>
-                  <td className="px-5 py-3 text-center">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${pkg.active ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-500"}`}>
-                      {pkg.active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-center">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${pkg.showOnWebsite ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-500"}`}>
-                      {pkg.showOnWebsite ? "Visible" : "Hidden"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => openEdit(pkg)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                        title="Edit"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(pkg.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 text-red-600 transition hover:bg-red-50"
-                        title="Delete"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {packages.map((pkg) => {
+                const isPulses = pkg.packageType === "pulses" || Number(pkg.totalPulses || 0) > 0;
+                return (
+                  <tr key={pkg.id} className="hover:bg-[#F9F9F7]">
+                    <td className="px-5 py-3 font-medium text-[#1F251A]">{pkg.name}</td>
+                    <td className="px-5 py-3 text-left">
+                      {isPulses ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-900 shadow-2xs">
+                          <Zap size={12} className="text-amber-600 fill-amber-500" />
+                          <span>Laser Pulses</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EDF1EC] border border-[#414E36]/15 px-2.5 py-1 text-xs font-bold text-[#414E36]">
+                          <Package size={12} />
+                          <span>Services</span>
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-[#5A6A51]">
+                      {branches.find((b) => b.id === pkg.branchId)?.name_en || branches.find((b) => b.id === pkg.branchId)?.name || "All branches"}
+                    </td>
+                    <td className="px-5 py-3 text-right font-medium text-[#C4AE7C]">EGP {Number(pkg.price).toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right text-[#5A6A51]">{Number(pkg.taxRate).toFixed(1)}%</td>
+                    <td className="px-5 py-3 text-right text-[#5A6A51]">{pkg.validityDays}d</td>
+                    <td className="px-5 py-3 text-left text-[#5A6A51]">
+                      {pkg.onExpiry === "extend" ? "Auto-extend" : "Recognise revenue"}
+                    </td>
+                    <td className="px-5 py-3 text-center text-[#5A6A51]">
+                      {isPulses ? (
+                        <span className="font-extrabold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 text-xs">
+                          {Number(pkg.totalPulses || 0).toLocaleString()} Pulses
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-[#414E36]">
+                          {pkg.items?.length || 0} services
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-center">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${pkg.active ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-500"}`}>
+                        {pkg.active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-center">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${pkg.showOnWebsite ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-500"}`}>
+                        {pkg.showOnWebsite ? "Visible" : "Hidden"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openEdit(pkg)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36] cursor-pointer"
+                          title="Edit"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(pkg.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 text-red-600 transition hover:bg-red-50 cursor-pointer"
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -313,18 +365,65 @@ export function PackageAdminPanel({ session }: { session: any }) {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-[#1F251A]">{editingId ? "Edit Package" : "Add Package"}</h3>
-                  <p className="text-sm text-[#5A6A51]">Bundle services, set validity and expiry behaviour.</p>
+                  <p className="text-sm text-[#5A6A51]">Bundle services, set laser pulse quota, validity and expiry behaviour.</p>
                 </div>
               </div>
               <button
                 onClick={closeModal}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] hover:bg-[#F9F9F7]"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] hover:bg-[#F9F9F7] cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
+              {/* PACKAGE TYPE SELECTOR */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">
+                  Package Type / نوع الباقة *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, packageType: "services" })}
+                    className={`flex items-start gap-3 p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+                      form.packageType === "services"
+                        ? "border-[#414E36] bg-[#EDF1EC] ring-2 ring-[#414E36]/20 shadow-xs"
+                        : "border-[#414E36]/15 bg-white hover:bg-[#F9F9F7]"
+                    }`}
+                  >
+                    <div className={`p-2 rounded-xl shrink-0 ${form.packageType === "services" ? "bg-[#414E36] text-white" : "bg-gray-100 text-[#5A6A51]"}`}>
+                      <Package size={18} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-[#1F251A]">Services Package</div>
+                      <div className="text-xs text-[#5A6A51] mt-0.5">باقة خدمات — Bundle multiple treatment sessions</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, packageType: "pulses" })}
+                    className={`flex items-start gap-3 p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+                      form.packageType === "pulses"
+                        ? "border-amber-600 bg-amber-50/70 ring-2 ring-amber-500/20 shadow-xs"
+                        : "border-[#414E36]/15 bg-white hover:bg-[#F9F9F7]"
+                    }`}
+                  >
+                    <div className={`p-2 rounded-xl shrink-0 ${form.packageType === "pulses" ? "bg-amber-600 text-white" : "bg-gray-100 text-[#5A6A51]"}`}>
+                      <Zap size={18} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-[#1F251A] flex items-center gap-1.5">
+                        <span>Laser Pulses Package</span>
+                        <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-200 text-amber-800">Laser</span>
+                      </div>
+                      <div className="text-xs text-[#5A6A51] mt-0.5">باقة نبضات ليزر — Pre-paid pulse quota</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Package Name *</label>
@@ -442,56 +541,107 @@ export function PackageAdminPanel({ session }: { session: any }) {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#414E36]">Included Services</h4>
-                  <button
-                    type="button"
-                    onClick={addItem}
-                    className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/20 bg-white px-2.5 py-1.5 text-xs font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
-                  >
-                    <Plus size={12} /> Add Service
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  {items.map((it, idx) => (
-                    <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr,120px,40px] gap-3 items-end">
-                      <div>
-                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#5A6A51]">Service</label>
-                        <select
-                          value={it.serviceId}
-                          onChange={(e) => updateItem(idx, "serviceId", e.target.value)}
-                          className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[#C4AE7C]"
-                        >
-                          <option value="">Select service</option>
-                          {services.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.en} {s.ar ? `(${s.ar})` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#5A6A51]">Quantity</label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={it.qty}
-                          onChange={(e) => updateItem(idx, "qty", e.target.value)}
-                          className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeItem(idx)}
-                        className="mb-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50"
-                      >
-                        <X size={14} />
-                      </button>
+              {/* CONDITIONAL SECTION: LASER PULSES VS SERVICES */}
+              {form.packageType === "pulses" ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-amber-900 uppercase tracking-wider">
+                      <Zap size={15} className="text-amber-600" />
+                      <span>Total Included Pulses / إجمالي عدد النبضات *</span>
                     </div>
-                  ))}
+                    {Number(form.totalPulses) > 0 && (
+                      <span className="text-xs font-extrabold text-amber-900 bg-white px-3 py-1 rounded-full border border-amber-300 shadow-2xs">
+                        {Number(form.totalPulses).toLocaleString()} Pulses
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={form.totalPulses}
+                      onChange={(e) => setForm({ ...form, totalPulses: e.target.value })}
+                      className="w-full rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-bold text-[#1F251A] outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+                      placeholder="Enter total pulses in package (e.g. 5000)"
+                    />
+
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[11px] font-semibold text-[#5A6A51] mr-1">Quick Presets:</span>
+                      {[1000, 2500, 5000, 10000, 20000].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setForm({ ...form, totalPulses: String(preset) })}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold border transition cursor-pointer ${
+                            form.totalPulses === String(preset)
+                              ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                              : "bg-white text-amber-900 border-amber-200 hover:bg-amber-100/60"
+                          }`}
+                        >
+                          {preset.toLocaleString()} Pulses
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-amber-800/80 leading-relaxed">
+                    This package provides a pre-paid laser pulse quota. Patients purchasing this package will be credited with these pulses for clinical sessions.
+                  </p>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#414E36]">Included Services</h4>
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/20 bg-white px-2.5 py-1.5 text-xs font-medium text-[#414E36] transition hover:bg-[#EDF1EC] cursor-pointer"
+                    >
+                      <Plus size={12} /> Add Service
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {items.map((it, idx) => (
+                      <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr,120px,40px] gap-3 items-end">
+                        <div>
+                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#5A6A51]">Service</label>
+                          <select
+                            value={it.serviceId}
+                            onChange={(e) => updateItem(idx, "serviceId", e.target.value)}
+                            className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[#C4AE7C]"
+                          >
+                            <option value="">Select service</option>
+                            {services.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.en} {s.ar ? `(${s.ar})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#5A6A51]">Quantity</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={it.qty}
+                            onChange={(e) => updateItem(idx, "qty", e.target.value)}
+                            className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(idx)}
+                          className="mb-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50 cursor-pointer"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
                 <button

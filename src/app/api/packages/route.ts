@@ -14,6 +14,8 @@ type PackageApiPayload = {
   id?: string;
   name: string;
   nameAr?: string | null;
+  packageType: 'services' | 'pulses';
+  totalPulses: number;
   branchId?: string | null;
   price: number;
   taxRate: number;
@@ -26,10 +28,13 @@ type PackageApiPayload = {
 };
 
 function mapDbPackage(row: any) {
+  const pkgType: 'services' | 'pulses' = row.package_type || (Number(row.total_pulses) > 0 ? 'pulses' : 'services');
   return {
     id: row.id,
     name: row.name,
     nameAr: row.name_ar || null,
+    packageType: pkgType,
+    totalPulses: row.total_pulses !== null && row.total_pulses !== undefined ? Number(row.total_pulses) : 0,
     branchId: row.branch_id,
     price: row.price !== null ? Number(row.price) : 0,
     taxRate: row.tax_rate !== null ? Number(row.tax_rate) : 0,
@@ -45,12 +50,14 @@ function mapDbPackage(row: any) {
 function validatePackagePayload(body: any): { error?: string; data?: PackageApiPayload } {
   if (!body || typeof body !== 'object') return { error: 'Invalid request body.' };
 
-  const { name, nameAr, branchId, price, taxRate, validityDays, onExpiry, extensionDays, active, showOnWebsite, items } = body;
+  const { name, nameAr, packageType, totalPulses, branchId, price, taxRate, validityDays, onExpiry, extensionDays, active, showOnWebsite, items } = body;
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return { error: 'Package name is required.' };
   }
 
+  const pkgType: 'services' | 'pulses' = packageType === 'pulses' ? 'pulses' : 'services';
+  const parsedTotalPulses = Number(totalPulses ?? 0);
   const parsedPrice = Number(price);
   const parsedTaxRate = Number(taxRate ?? 0);
   const parsedValidityDays = Number(validityDays ?? 0);
@@ -72,8 +79,14 @@ function validatePackagePayload(body: any): { error?: string; data?: PackageApiP
     return { error: 'onExpiry must be either "recognise_revenue" or "extend".' };
   }
 
+  if (pkgType === 'pulses') {
+    if (!Number.isInteger(parsedTotalPulses) || parsedTotalPulses <= 0) {
+      return { error: 'Laser Pulses Package must have a positive number of total pulses.' };
+    }
+  }
+
   const itemList = Array.isArray(items) ? items : [];
-  if (itemList.length === 0) {
+  if (pkgType === 'services' && itemList.length === 0) {
     return { error: 'Package must include at least one service item.' };
   }
 
@@ -82,10 +95,12 @@ function validatePackagePayload(body: any): { error?: string; data?: PackageApiP
     const serviceId = Number(item.serviceId ?? item.service_id);
     const qty = Number(item.qty ?? item.quantity);
     if (!Number.isFinite(serviceId) || serviceId <= 0) {
-      return { error: 'Each item must reference a valid service.' };
+      if (pkgType === 'services') return { error: 'Each item must reference a valid service.' };
+      continue;
     }
     if (!Number.isInteger(qty) || qty <= 0) {
-      return { error: 'Each item quantity must be a positive integer.' };
+      if (pkgType === 'services') return { error: 'Each item quantity must be a positive integer.' };
+      continue;
     }
     mappedItems.push({ id: item.id, serviceId, qty });
   }
@@ -94,6 +109,8 @@ function validatePackagePayload(body: any): { error?: string; data?: PackageApiP
     data: {
       name: name.trim(),
       nameAr: typeof nameAr === 'string' && nameAr.trim().length > 0 ? nameAr.trim() : null,
+      packageType: pkgType,
+      totalPulses: pkgType === 'pulses' ? parsedTotalPulses : 0,
       branchId: branchId || null,
       price: parsedPrice,
       taxRate: parsedTaxRate,
@@ -170,41 +187,60 @@ export async function POST(req: Request) {
     }
     const payload = validation.data!;
 
-    const { data: pkg, error: pkgError } = await supabaseServer
+    const insertPayload: any = {
+      name: payload.name,
+      name_ar: payload.nameAr,
+      package_type: payload.packageType,
+      total_pulses: payload.totalPulses,
+      branch_id: payload.branchId || null,
+      price: payload.price,
+      tax_rate: payload.taxRate,
+      validity_days: payload.validityDays,
+      on_expiry: payload.onExpiry,
+      extension_days: payload.extensionDays,
+      active: payload.active,
+      show_on_website: payload.showOnWebsite,
+    };
+
+    let { data: pkg, error: pkgError } = await supabaseServer
       .from('packages')
-      .insert({
-        name: payload.name,
-        name_ar: payload.nameAr,
-        branch_id: payload.branchId || null,
-        price: payload.price,
-        tax_rate: payload.taxRate,
-        validity_days: payload.validityDays,
-        on_expiry: payload.onExpiry,
-        extension_days: payload.extensionDays,
-        active: payload.active,
-        show_on_website: payload.showOnWebsite,
-      })
+      .insert(insertPayload)
       .select('*')
       .single();
 
-    if (pkgError) throw pkgError;
+    if (pkgError && (pkgError.message?.includes('column') || pkgError.code === '42703')) {
+      const fallbackPayload = { ...insertPayload };
+      delete fallbackPayload.package_type;
+      delete fallbackPayload.total_pulses;
+      const fbRes = await supabaseServer.from('packages').insert(fallbackPayload).select('*').single();
+      if (fbRes.error) throw fbRes.error;
+      pkg = fbRes.data;
+    } else if (pkgError) {
+      throw pkgError;
+    }
 
     const packageId = pkg.id;
-    const itemRows = payload.items.map((item) => ({
-      package_id: packageId,
-      service_id: item.serviceId,
-      qty: item.qty,
-    }));
+    let insertedItems: any[] = [];
+    if (payload.items.length > 0) {
+      const itemRows = payload.items.map((item) => ({
+        package_id: packageId,
+        service_id: item.serviceId,
+        qty: item.qty,
+      }));
 
-    const { data: insertedItems, error: itemsError } = await supabaseServer
-      .from('package_items')
-      .insert(itemRows)
-      .select('*');
+      const { data: insItems, error: itemsError } = await supabaseServer
+        .from('package_items')
+        .insert(itemRows)
+        .select('*');
 
-    if (itemsError) throw itemsError;
+      if (itemsError) throw itemsError;
+      insertedItems = insItems || [];
+    }
 
     const result = mapDbPackage(pkg);
-    result.items = (insertedItems || []).map((item: any) => ({
+    result.packageType = payload.packageType;
+    result.totalPulses = payload.totalPulses;
+    result.items = insertedItems.map((item: any) => ({
       id: item.id,
       serviceId: Number(item.service_id),
       qty: Number(item.qty),
@@ -236,25 +272,38 @@ export async function PATCH(req: Request) {
     }
     const payload = validation.data!;
 
-    const { data: pkg, error: pkgError } = await supabaseServer
+    const updatePayload: any = {
+      name: payload.name,
+      name_ar: payload.nameAr,
+      package_type: payload.packageType,
+      total_pulses: payload.totalPulses,
+      branch_id: payload.branchId || null,
+      price: payload.price,
+      tax_rate: payload.taxRate,
+      validity_days: payload.validityDays,
+      on_expiry: payload.onExpiry,
+      extension_days: payload.extensionDays,
+      active: payload.active,
+      show_on_website: payload.showOnWebsite,
+    };
+
+    let { data: pkg, error: pkgError } = await supabaseServer
       .from('packages')
-      .update({
-        name: payload.name,
-        name_ar: payload.nameAr,
-        branch_id: payload.branchId || null,
-        price: payload.price,
-        tax_rate: payload.taxRate,
-        validity_days: payload.validityDays,
-        on_expiry: payload.onExpiry,
-        extension_days: payload.extensionDays,
-        active: payload.active,
-        show_on_website: payload.showOnWebsite,
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select('*')
       .single();
 
-    if (pkgError) throw pkgError;
+    if (pkgError && (pkgError.message?.includes('column') || pkgError.code === '42703')) {
+      const fallbackPayload = { ...updatePayload };
+      delete fallbackPayload.package_type;
+      delete fallbackPayload.total_pulses;
+      const fbRes = await supabaseServer.from('packages').update(fallbackPayload).eq('id', id).select('*').single();
+      if (fbRes.error) throw fbRes.error;
+      pkg = fbRes.data;
+    } else if (pkgError) {
+      throw pkgError;
+    }
     if (!pkg) {
       return NextResponse.json({ error: 'Package not found.' }, { status: 404 });
     }
@@ -265,21 +314,27 @@ export async function PATCH(req: Request) {
       const { error: deleteItemsError } = await supabaseServer.from('package_items').delete().eq('package_id', packageId);
       if (deleteItemsError) throw deleteItemsError;
 
-      const itemRows = payload.items.map((item) => ({
-        package_id: packageId,
-        service_id: item.serviceId,
-        qty: item.qty,
-      }));
+      let insertedItems: any[] = [];
+      if (payload.items.length > 0) {
+        const itemRows = payload.items.map((item) => ({
+          package_id: packageId,
+          service_id: item.serviceId,
+          qty: item.qty,
+        }));
 
-      const { data: insertedItems, error: itemsError } = await supabaseServer
-        .from('package_items')
-        .insert(itemRows)
-        .select('*');
+        const { data: insItems, error: itemsError } = await supabaseServer
+          .from('package_items')
+          .insert(itemRows)
+          .select('*');
 
-      if (itemsError) throw itemsError;
+        if (itemsError) throw itemsError;
+        insertedItems = insItems || [];
+      }
 
       const result = mapDbPackage(pkg);
-      result.items = (insertedItems || []).map((item: any) => ({
+      result.packageType = payload.packageType;
+      result.totalPulses = payload.totalPulses;
+      result.items = insertedItems.map((item: any) => ({
         id: item.id,
         serviceId: Number(item.service_id),
         qty: Number(item.qty),

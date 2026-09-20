@@ -1404,6 +1404,55 @@ Unified clinical and accounting audit logs for all laser pulse treatments across
 | `session_date` | timestamptz | NOT NULL DEFAULT now() |
 | `created_at` | timestamptz | NOT NULL DEFAULT now() |
 
+---
+
+### `packages`
+
+**Updated 2026-09-20** by `20260920030000_add_package_type_and_total_pulses_to_packages.sql`.
+Package offers catalogue configured in Admin (`/admin` -> Packages).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key DEFAULT gen_random_uuid() |
+| `name` | text | NOT NULL (package name) |
+| `name_ar` | text | nullable (Arabic name) |
+| `description` | text | nullable |
+| `description_ar` | text | nullable |
+| `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable |
+| `price` | numeric(10,2) | NOT NULL DEFAULT 0.00 |
+| `tax` | numeric(10,2) | DEFAULT 0.00 |
+| `validity_days` | integer | DEFAULT 365 |
+| `package_type` | text | NOT NULL DEFAULT `'services'` (`'services'` or `'pulses'`) |
+| `total_pulses` | integer | NOT NULL DEFAULT 0 (included pulses for `'pulses'` package type) |
+| `on_expiry` | text | DEFAULT `'expire'` (`'expire'` or `'extend'`) |
+| `extension_days` | integer | DEFAULT 0 |
+| `is_active` | boolean | DEFAULT true |
+| `services` | jsonb | Array of included service items for services packages |
+| `created_at` | timestamptz | NOT NULL DEFAULT now() |
+
+---
+
+### `customer_packages`
+
+**Updated 2026-09-20** by `20260920030000_add_package_type_and_total_pulses_to_packages.sql`.
+Purchased packages assigned to customers.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key DEFAULT gen_random_uuid() |
+| `customer_id` | UUID | FK → customers.id ON DELETE CASCADE |
+| `package_id` | UUID | FK → packages.id ON DELETE SET NULL, nullable |
+| `package_name` | text | NOT NULL |
+| `price_paid` | numeric(10,2) | NOT NULL DEFAULT 0.00 |
+| `purchase_date` | date | NOT NULL DEFAULT CURRENT_DATE |
+| `expiry_date` | date | NOT NULL |
+| `status` | text | NOT NULL DEFAULT `'active'` (`'active'`, `'expired'`, `'completed'`) |
+| `services` | jsonb | Array of customer service items with total & used counts |
+| `package_type` | text | NOT NULL DEFAULT `'services'` (`'services'` or `'pulses'`) |
+| `total_pulses` | integer | NOT NULL DEFAULT 0 |
+| `pulses_remaining` | integer | NOT NULL DEFAULT 0 |
+| `created_at` | timestamptz | NOT NULL DEFAULT now() |
+
 ## Notes on Schema Gaps
 
 - Persistent patient records are stored in the `customers` table, and connected to `reservations` via `customer_id`.
