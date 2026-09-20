@@ -1692,6 +1692,45 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product', addedBy: 'Doctor Session' });
             }
           }
+
+          // g) Package Purchase matches in notes:
+          // [Purchasing New Pulses Package]: Name (6000 EGP · 10,000 pulses) or [Laser Package Purchase & Redemption]: Name (6000 EGP)
+          const pkgPurchaseMatch = notesStr.match(/\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption|Laser Package Deficit Settlement)\]:\s*(?:Choice 3A\s*-\s*)?([^(]+?)\s*\((\d+(?:\.\d+)?)\s*EGP/i);
+          if (pkgPurchaseMatch) {
+            const rawPkgName = pkgPurchaseMatch[1].trim();
+            const pkgPrice = parseFloat(pkgPurchaseMatch[2]) || 0;
+            const displayName = `Purchased Package: ${rawPkgName}`;
+            if (pkgPrice > 0 && !existingNames.has(displayName.toLowerCase()) && !existingNames.has(rawPkgName.toLowerCase())) {
+              existingNames.add(displayName.toLowerCase());
+              existingNames.add(rawPkgName.toLowerCase());
+              productsConsumablesList.push({
+                name: displayName,
+                qty: 1,
+                unitPrice: pkgPrice,
+                total: pkgPrice,
+                lineType: 'product',
+                addedBy: 'Reception Booking'
+              });
+            }
+          }
+
+          // h) Package Deficit Choice 3B (per pulse deficit in notes)
+          const deficitPerPulseMatch = notesStr.match(/\[Laser Package Deficit Settlement\]:\s*Choice 3B\s*-\s*Pay Rest per Pulse\s*\(([^)]+?)=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+          if (deficitPerPulseMatch) {
+            const deficitDesc = `Excess Pulses Deficit (${deficitPerPulseMatch[1].trim()})`;
+            const deficitPrice = parseFloat(deficitPerPulseMatch[2]) || 0;
+            if (deficitPrice > 0 && !existingNames.has(deficitDesc.toLowerCase())) {
+              existingNames.add(deficitDesc.toLowerCase());
+              productsConsumablesList.push({
+                name: deficitDesc,
+                qty: 1,
+                unitPrice: deficitPrice,
+                total: deficitPrice,
+                lineType: 'device_pulses',
+                addedBy: 'Doctor Session'
+              });
+            }
+          }
         }
 
         // 3. Fallback reconciliation: If notes or booking balance recorded a higher invoice total than the sum of parsed lines,

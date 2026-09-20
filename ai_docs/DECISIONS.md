@@ -2440,6 +2440,39 @@ The clinic required a complete, multi-tiered laser pulse counting and accounting
 4. **Admin Settings System Test Suite Diagnostic Verification:**
    - Added test case `TC-074` ("New Booking Laser Pulses Package Selection & Catalog Purchase Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
 
+---
+
+## DEC-071: Laser Package UI Isolation to Option 3 with Multi-Package Selector & Mixed Non-Laser Total Pricing
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. In the New Booking modal (`AdminNewBookingView.tsx`), booking a laser service for a patient with pulses packages caused the pulses packages to appear in the general "Patient Packages & Subscriptions" bottom section. Because that section was built for fixed-session service packages (`package_items`), it displayed confusing warnings: `0 sessions left` and `Selected service is not covered in this package`.
+2. The user required that on laser services, packages must appear **ONLY** when Option 3 (Pulses Package) is selected.
+3. If the patient has multiple active pulses packages, the receptionist must be able to choose which one to use for the session.
+4. If the patient has no active packages, Option 3 shows available catalog pulses packages to purchase upfront.
+5. The session total price must strictly equal `pulses package price (if purchasing new) + any non-laser service price if used`, with all laser services 100% covered under the package quota (`0 EGP`).
+
+**Decisions & Implementation:**
+1. **Strict UI Isolation (`src/components/admin/bookings/AdminNewBookingView.tsx`):**
+   - The general "PATIENT PACKAGES & SUBSCRIPTIONS" section at the bottom of the booking modal is wrapped in `{!isLaserService && ( ... )}` and iterates strictly over `customerServicePackages` (`customerPackages.filter(pkg => !checkIsPulsesPackage(pkg))`).
+   - Laser packages never appear in this lower section, eliminating clutter and false `0 sessions left` alerts entirely.
+2. **Option 3 Active Multi-Package Selector (`src/components/admin/bookings/AdminNewBookingView.tsx`):**
+   - Computed `customerPulsePackages` array and state `selectedCustomerPulsePkgId`.
+   - When the patient has active pulses package(s), Option 3 displays an interactive grid of cards for each package showing its remaining pulses, total pulses, progress bar, and expiry date.
+   - The receptionist clicks between cards to choose which package to use (`selectedCustomerPulsePkgId`).
+   - The booking value is set to 0 EGP with a green confirmation banner stating pulses will be deducted upon session completion.
+3. **In-Booking Catalog Package Selection (0 Active Packages):**
+   - When the patient has 0 active pulses packages, Option 3 displays interactive cards for catalog packages from `/api/packages`.
+   - Selecting a package sets the booking value and amount paid to the package price (e.g. 6,000 EGP).
+4. **Total Price Calculation Across Workflows (`BookingDetailsModal.tsx`, `DoctorOngoingSessionTab.tsx`, `DoctorAccountView.tsx`):**
+   - Total session price is strictly: `package price + non-laser services price`.
+   - Base and additional laser services are zero-rated (`0 EGP (Package Redemption)`).
+   - In `BookingDetailsModal.tsx`, note parsing for `[Purchasing New Pulses Package]`, `[Laser Package Purchase & Redemption]`, and `[Laser Package Deficit Settlement]` creates product line items so invoice recalculation cleanly aggregates package costs with any non-laser services.
+5. **Admin Settings System Test Suite Diagnostic Verification:**
+   - Added test case `TC-075` ("Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
+
 
 
 

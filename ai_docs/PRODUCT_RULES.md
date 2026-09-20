@@ -1043,5 +1043,33 @@ The following are **not currently enforced in code**:
 3. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-074` (`New Booking Laser Pulses Package Selection & Catalog Purchase Engine`).
 
+---
+
+## Laser Option 3 Multi-Package Selection & Session Pricing Rules
+**Enforced in:** `src/components/admin/bookings/AdminNewBookingView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/DoctorAccountView.tsx`, `src/app/admin/page.tsx`, `src/components/admin/translations.ts`.
+
+1. **Strict UI Isolation to Option 3 on Laser Bookings**:
+   - When a laser service is selected (`isLaserService === true`), laser pulses packages appear **exclusively inside Option 3 (Pulses Package)**.
+   - The general "Patient Packages & Subscriptions" bottom section is completely hidden for laser appointments (`{!isLaserService && ( ... )}`), eliminating clutter and preventing erroneous `0 sessions left` / `Selected service is not covered in this package` notices.
+   - For non-laser appointments (`!isLaserService`), that section shows strictly non-laser service packages (`customerServicePackages`).
+
+2. **Multiple Active Pulses Packages Selection**:
+   - If the patient owns more than one active laser pulses package, Option 3 renders an interactive selection grid of all active packages owned by the patient.
+   - Receptionists can click between cards to select which package quota (`selectedCustomerPulsePkgId`) to deduct session pulses from.
+   - The laser booking value is 0 EGP with a green confirmation banner that pulses will be deducted upon treatment completion.
+
+3. **In-Booking Catalog Package Purchase When Patient Has No Active Package**:
+   - If the patient has 0 active pulses packages, Option 3 reveals interactive pulses catalog package cards loaded dynamically from `/api/packages`.
+   - Selecting a catalog package updates the booking value and amount paid now to that package's price (e.g., 6,000 EGP).
+
+4. **Total Session Price Calculation Across All Workflows**:
+   - The total price of the session is strictly:
+     `pulses package price (if purchasing new) + 0 EGP for laser session(s) + any other non-laser service price if used`.
+   - Additional laser services added during the session are 100% covered under the pulses package (`Package Redemption · 0 EGP`).
+   - Additional non-laser services (dermatology, facial, peelings, etc.) retain their full catalog price and are added to the session invoice total.
+
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-075` (`Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine`).
+
 
 
