@@ -2473,6 +2473,43 @@ The clinic required a complete, multi-tiered laser pulse counting and accounting
 5. **Admin Settings System Test Suite Diagnostic Verification:**
    - Added test case `TC-075` ("Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
 
+---
+
+## DEC-072: Laser Package Used Pulses Deduction, Cross-Workflow Execution & Database Column Synchronization
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. The user requested: "make sure the used pulses is being deducted from the pacakges".
+2. In-depth audit revealed several critical failure points:
+   - **PostgreSQL Column Mismatch**: Migration `20260920030000_add_package_type_and_total_pulses_to_packages.sql` created columns `pulses_used` and `pulses_remaining` on `customer_packages`. However, `PATCH /api/customers/packages` (`consume_package_pulses`) was writing to non-existent columns `used_pulses` and `remaining_pulses`, causing silent Postgres 42703 errors inside `try/catch` and leaving database records untouched.
+   - **Pulse Store Initialization Disconnect**: If a package was not yet registered in `page_settings` `customer_package_pulses`, the endpoint initialized `used_pulses: 0` and ignored the database's existing `pulses_used` / `pulses_remaining` balances.
+   - **Doctor Portal Property Casing**: `GET /api/customers/packages` returns camelCase (`remainingPulses`, `totalPulses`, `pulsesRemaining`). `DoctorOngoingSessionTab.tsx` was filtering with `p.remaining_pulses` and `p.included_pulses` (snake_case), evaluating `rem` to `NaN` and hiding the patient's active pulses packages from the doctor.
+   - **Doctor Target Package Fallback**: If `laserData.sourceId` was empty, `DoctorAccountView.tsx` failed to deduct pulses even if the booking had a linked package.
+   - **Receptionist Global End Session Gap**: `BookingDetailsModal.tsx` (`handleFinalizeSessionStandalone`) deducted device hardware pulses, but had zero code to deduct pulses from the customer's package.
+   - **Deficit Rejection**: Deductions exceeding balance threw HTTP 400 instead of consuming available balance and completing the package.
+
+**Decisions & Implementation:**
+1. **API Endpoint Column Synchronization & Robust Deduction (`src/app/api/customers/packages/route.ts`):**
+   - Fixed `PATCH /api/customers/packages` (`consume_package_pulses`): writes to both `pulses_used` / `pulses_remaining` (the true DB columns) with fallback to `used_pulses` / `remaining_pulses`.
+   - Initializes pulse balances from the database row (`pkgRow.pulses_used`, `pkgRow.pulses_remaining`).
+   - Capped deduction: `actualDeduct = Math.min(qtyToDeduct, pkgPulses.remaining_pulses)`. If balance reaches 0, updates package status to `'completed'`.
+   - Idempotency guard: verifies `booking_id` in `usage_history` so duplicate triggers from doctor, receptionist, or checkout never double-deduct pulses.
+2. **Doctor Ongoing Session Component (`DoctorOngoingSessionTab.tsx`):**
+   - Added robust property fallback chain (`p.remainingPulses ?? p.pulsesRemaining ?? p.remaining_pulses ?? p.pulses_remaining`).
+   - Auto-selects the session's booked package (`activeSessionBooking.packageId`).
+   - Aggregates delivered pulses across primary and all additional laser services in `laserPulseData.pulsesUsed`.
+3. **Doctor Session Finalization Pipeline (`DoctorAccountView.tsx`):**
+   - Resolves target package from `laserData.sourceId`, `targetBooking.packageId`, `targetBooking.package_id`, or queries the patient's active pulses package via `/api/customers/packages`.
+4. **Receptionist Session Ending Engine (`BookingDetailsModal.tsx`):**
+   - Added Step 5b in `handleFinalizeSessionStandalone`: resolves active or newly purchased package and calls `consume_package_pulses` for total laser pulses delivered.
+5. **Checkout Settlement Safeguard (`src/app/admin/page.tsx`):**
+   - Added automated deduction safeguard on payment settlement (`handleSavePayment`).
+6. **Automated Diagnostic Verification:**
+   - Added test case `TC-076` ("Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
+
+
 
 
 

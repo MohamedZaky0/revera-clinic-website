@@ -1216,6 +1216,100 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         }
       }
 
+      // 5b. Deduct Used Pulses from Patient's Laser Pulses Package (when in Package Mode)
+      const isPackageModeEnding = Boolean(
+        booking?.laserPaymentMode === "PACKAGE" ||
+        (booking as any)?.laser_payment_mode === "PACKAGE" ||
+        String(booking?.notes || "").toLowerCase().includes("package session") ||
+        String(booking?.notes || "").toLowerCase().includes("package redemption") ||
+        String(booking?.notes || "").toLowerCase().includes("pulses package") ||
+        String(booking?.notes || "").includes("[Laser Package]") ||
+        String(booking?.notes || "").includes("[Laser Package Redemption]") ||
+        String(booking?.notes || "").includes("[Purchasing New Pulses Package]")
+      );
+
+      const totalLaserPulsesToDeduct = (isPrimaryLaser ? primaryPulses : 0) + additionalServices.reduce((sum, s) => {
+        const srvObj = localServices.find((ls) => String(ls.id) === String(s.serviceId));
+        return sum + ((s.isLaser || checkIsLaserService(srvObj)) ? Number(s.pulses || 0) : 0);
+      }, 0);
+
+      if (isPackageModeEnding && totalLaserPulsesToDeduct > 0) {
+        try {
+          let targetPkgId = (booking as any).packageId || (booking as any).package_id || null;
+          
+          // Check if patient booked by purchasing a new package that needs initialization
+          const purchasingPkgId = (booking as any).purchasingPackageId || (booking as any).purchasing_package_id;
+          if (purchasingPkgId && custId) {
+            try {
+              const checkRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(custId)}`, { headers: authenticatedJsonHeaders });
+              if (checkRes.ok) {
+                const checkData = await checkRes.json();
+                const existingList = checkData.customerPackages || checkData.packages || [];
+                const alreadySold = existingList.find((cp: any) => String(cp.packageId || cp.package_id) === String(purchasingPkgId));
+                if (alreadySold) {
+                  targetPkgId = alreadySold.id;
+                } else {
+                  const sellRes = await fetch("/api/packages/sell", {
+                    method: "POST",
+                    headers: authenticatedJsonHeaders,
+                    body: JSON.stringify({
+                      customerId: custId,
+                      packageId: purchasingPkgId,
+                      paymentMethod: "cash"
+                    })
+                  });
+                  if (sellRes.ok) {
+                    const sellData = await sellRes.json().catch(() => null);
+                    if (sellData?.customerPackage?.id) {
+                      targetPkgId = sellData.customerPackage.id;
+                    }
+                  }
+                }
+              }
+            } catch (sellErr) {
+              console.warn("Auto-create purchased package on end session fallback:", sellErr);
+            }
+          }
+
+          // If no package ID yet, find patient's active pulses package
+          if (!targetPkgId && custId) {
+            const pRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(custId)}`, {
+              headers: authenticatedJsonHeaders
+            });
+            if (pRes.ok) {
+              const pData = await pRes.json();
+              const pkgs = pData.customerPackages || pData.packages || [];
+              const activePulsePkg = pkgs.find((p: any) => {
+                const rem = Number(p.remainingPulses ?? p.pulsesRemaining ?? p.remaining_pulses ?? p.pulses_remaining ?? 0);
+                return (p.status || "active").toLowerCase() === "active" && rem > 0;
+              });
+              if (activePulsePkg) targetPkgId = activePulsePkg.id;
+            }
+          }
+
+          if (targetPkgId) {
+            await fetch("/api/customers/packages", {
+              method: "PATCH",
+              headers: authenticatedJsonHeaders,
+              body: JSON.stringify({
+                action: "consume_package_pulses",
+                customer_package_id: targetPkgId,
+                package_id: targetPkgId,
+                quantity_used: totalLaserPulsesToDeduct,
+                pulses: totalLaserPulsesToDeduct,
+                booking_id: booking.id,
+                reservationId: booking.id,
+                treatment_area: "Laser Treatment",
+                used_by: "Receptionist",
+                notes: `Global Ending Session pulse deduction (${totalLaserPulsesToDeduct} pulses deducted)`
+              })
+            });
+          }
+        } catch (pkgDeductErr) {
+          console.error("Error deducting package pulses during global session completion:", pkgDeductErr);
+        }
+      }
+
       // 6. Persist Line Items to reservation_products
       const lineItemWrites: Promise<any>[] = [];
       for (const p of usedProducts) {

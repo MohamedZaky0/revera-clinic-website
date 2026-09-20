@@ -399,27 +399,59 @@ export async function PATCH(req: Request) {
         }
       }
 
-      const initialTotalPulses = Number((pkgRow as any)?.total_pulses || (pkgRow as any)?.included_pulses || (pkgRow as any)?.pulses || 10000);
+      const initialTotalPulses = Number(
+        (pkgRow as any)?.total_pulses ||
+        (pkgRow as any)?.included_pulses ||
+        (pkgRow as any)?.pulses ||
+        10000
+      );
+      const initialUsed = Number(
+        (pkgRow as any)?.pulses_used ??
+        (pkgRow as any)?.used_pulses ??
+        0
+      );
+      const initialRemaining = Number(
+        (pkgRow as any)?.pulses_remaining ??
+        (pkgRow as any)?.remaining_pulses ??
+        Math.max(0, initialTotalPulses - initialUsed)
+      );
+
       const pkgPulses = pulseStore[pkgId] || {
         included_pulses: initialTotalPulses,
-        used_pulses: Number((pkgRow as any)?.used_pulses || 0),
-        remaining_pulses: Number((pkgRow as any)?.remaining_pulses !== undefined ? (pkgRow as any).remaining_pulses : initialTotalPulses),
+        used_pulses: initialUsed,
+        remaining_pulses: initialRemaining,
         usage_history: []
       };
 
-      if (qtyToDeduct > pkgPulses.remaining_pulses) {
+      // Idempotency check: if this exact booking has already deducted pulses, do not double-deduct
+      if (booking_id && Array.isArray(pkgPulses.usage_history)) {
+        const alreadyConsumed = pkgPulses.usage_history.find((log: any) => String(log.booking_id) === String(booking_id));
+        if (alreadyConsumed) {
+          return NextResponse.json({
+            success: true,
+            alreadyDeducted: true,
+            consumed: alreadyConsumed.quantity_used,
+            remainingPulses: pkgPulses.remaining_pulses,
+            packagePulses: pkgPulses
+          });
+        }
+      }
+
+      // Deduct up to available pulses without throwing 400 rejection (ensures pulses are always deducted)
+      const actualDeduct = Math.min(qtyToDeduct, Math.max(0, pkgPulses.remaining_pulses));
+      if (actualDeduct <= 0 && pkgPulses.remaining_pulses <= 0) {
         return NextResponse.json({
           success: false,
-          error: `Insufficient package pulse balance. Available: ${pkgPulses.remaining_pulses} pulses, Requested: ${qtyToDeduct} pulses.`
+          error: `Package has 0 remaining pulses.`
         }, { status: 400 });
       }
 
-      pkgPulses.used_pulses = (pkgPulses.used_pulses || 0) + qtyToDeduct;
+      pkgPulses.used_pulses = (pkgPulses.used_pulses || 0) + actualDeduct;
       pkgPulses.remaining_pulses = Math.max(0, pkgPulses.included_pulses - pkgPulses.used_pulses);
 
       const usageLog: PackagePulseUsageLog = {
         id: `ppul-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        quantity_used: qtyToDeduct,
+        quantity_used: actualDeduct,
         used_at: new Date().toISOString(),
         used_by: used_by || (access.access.user as any)?.name || access.access.user?.email || 'Staff',
         notes: notes || '',
@@ -432,25 +464,40 @@ export async function PATCH(req: Request) {
       pulseStore[pkgId] = pkgPulses;
       await savePackagePulsesStore(pulseStore);
 
-      // Also try syncing to native customer_packages table if UUID
+      // Sync to native customer_packages table if UUID (supports both pulses_used/pulses_remaining and used_pulses/remaining_pulses)
       if (isUuid && pkgRow) {
+        const isDepleted = pkgPulses.remaining_pulses <= 0;
         try {
           await supabaseServer
             .from('customer_packages')
             .update({
-              used_pulses: pkgPulses.used_pulses,
-              remaining_pulses: pkgPulses.remaining_pulses,
+              pulses_used: pkgPulses.used_pulses,
+              pulses_remaining: pkgPulses.remaining_pulses,
+              ...(isDepleted ? { status: 'completed' } : {}),
               updated_at: new Date().toISOString()
             })
             .eq('id', pkgId);
-        } catch (dbUpdateErr) {
-          console.warn('Syncing remaining_pulses to customer_packages table failed silently (non-fatal):', dbUpdateErr);
+        } catch (dbErr1) {
+          try {
+            await supabaseServer
+              .from('customer_packages')
+              .update({
+                used_pulses: pkgPulses.used_pulses,
+                remaining_pulses: pkgPulses.remaining_pulses,
+                ...(isDepleted ? { status: 'completed' } : {}),
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', pkgId);
+          } catch (dbErr2) {
+            console.warn('Syncing pulses to customer_packages table failed silently (non-fatal):', dbErr2);
+          }
         }
       }
 
       return NextResponse.json({
         success: true,
-        consumed: qtyToDeduct,
+        consumed: actualDeduct,
+        requested: qtyToDeduct,
         remainingPulses: pkgPulses.remaining_pulses,
         packagePulses: pkgPulses
       });

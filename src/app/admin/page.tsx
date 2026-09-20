@@ -2389,7 +2389,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-072', name: 'Laser Pulses Package Redemption & Session Completion Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies package pulse deduction, UUID-guarded package querying, schema-resilient session completion, 0 EGP base package redemption pricing, and zero duplicate invoice line generation.', status: 'idle' },
     { id: 'TC-073', name: 'Multi-Scenario Laser Pulses Package Settlement Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies Scenario 1 (initial package purchase + deduction), Scenario 2 (deficit spillover to new package or per pulse), Scenario 3 (standard redemption), and mixed session add-on pricing.', status: 'idle' },
     { id: 'TC-074', name: 'New Booking Laser Pulses Package Selection & Catalog Purchase Engine', category: 'Services & Bookings', endpoint: '/api/packages', description: 'Verifies pulses package detection in New Booking modal, pulse balance badge rendering, laser service quota coverage, and in-booking new pulses package catalog purchase integration.', status: 'idle' },
-    { id: 'TC-075', name: 'Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies laser packages isolation to Option 3, patient multi-package selection, catalog package purchase, and package price + non-laser service total calculation.', status: 'idle' }
+    { id: 'TC-075', name: 'Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies laser packages isolation to Option 3, patient multi-package selection, catalog package purchase, and package price + non-laser service total calculation.', status: 'idle' },
+    { id: 'TC-076', name: 'Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies accurate deduction of delivered laser pulses from customer pulses packages across doctor portal session finalization, reception session completion, and checkout settlement workflows with DB synchronization and idempotency.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -9538,6 +9539,60 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     console.error("Error consuming package session:", consumeErr);
                     const svc = bookingServicesList.find((s: any) => String(s.serviceId) === serviceIdStr);
                     consumeFailures.push(`${svc?.name || `Service #${serviceIdStr}`}: redemption failed`);
+                  }
+                }
+
+                // Consume Laser Package Pulses if applicable and not yet deducted
+                const isLaserPkgCheckout = Boolean(
+                  checkoutBooking.laserPaymentMode === "PACKAGE" ||
+                  (checkoutBooking as any).laser_payment_mode === "PACKAGE" ||
+                  String(checkoutBooking.notes || "").toLowerCase().includes("package redemption") ||
+                  String(checkoutBooking.notes || "").includes("[Laser Package]") ||
+                  String(checkoutBooking.notes || "").includes("[Laser Package Redemption]")
+                );
+                if (isLaserPkgCheckout) {
+                  try {
+                    const deliveredPulsesVal = Number(
+                      checkoutBooking.deliveredPulses ||
+                      (checkoutBooking as any).delivered_pulses ||
+                      (() => {
+                        const m = String(checkoutBooking.notes || "").match(/(\d+(?:,\d+)?)\s*pulses/i);
+                        return m ? Number(m[1].replace(/,/g, '')) : 0;
+                      })()
+                    );
+                    const targetCustId = customerRecord?.id || (checkoutBooking as any).customerId || (checkoutBooking as any).customer_id;
+                    let targetPkgId = checkoutBooking.packageId || (checkoutBooking as any).package_id;
+                    if (!targetPkgId && targetCustId) {
+                      const pRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(targetCustId)}`, { headers: authenticatedJsonHeaders });
+                      if (pRes.ok) {
+                        const pData = await pRes.json();
+                        const pList = pData.customerPackages || pData.packages || [];
+                        const actPkg = pList.find((p: any) => {
+                          const rem = Number(p.remainingPulses ?? p.pulsesRemaining ?? p.remaining_pulses ?? p.pulses_remaining ?? 0);
+                          return (p.status || "active").toLowerCase() === "active" && rem > 0;
+                        });
+                        if (actPkg) targetPkgId = actPkg.id;
+                      }
+                    }
+                    if (targetPkgId && deliveredPulsesVal > 0) {
+                      await fetch("/api/customers/packages", {
+                        method: "PATCH",
+                        headers: authenticatedJsonHeaders,
+                        body: JSON.stringify({
+                          action: "consume_package_pulses",
+                          customer_package_id: targetPkgId,
+                          package_id: targetPkgId,
+                          quantity_used: deliveredPulsesVal,
+                          pulses: deliveredPulsesVal,
+                          booking_id: checkoutBooking.id,
+                          reservationId: checkoutBooking.id,
+                          used_by: "Checkout Settlement",
+                          notes: `Checkout pulse deduction (${deliveredPulsesVal} pulses deducted)`
+                        })
+                      });
+                    }
+                  } catch (pulseErr) {
+                    console.error("Error consuming laser package pulses at checkout:", pulseErr);
                   }
                 }
 

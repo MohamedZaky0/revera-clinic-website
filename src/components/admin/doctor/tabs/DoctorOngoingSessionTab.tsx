@@ -229,12 +229,23 @@ export default function DoctorOngoingSessionTab({
           const pkgData = await pkgRes.json();
           const pkgs = pkgData.customerPackages || pkgData.packages || [];
           const activePulsePkgs = pkgs.filter((p: any) => {
-            const rem = Number(p.remaining_pulses !== undefined ? p.remaining_pulses : (p.included_pulses - (p.used_pulses || 0)));
-            const isNotExpired = !p.expires_at || new Date(p.expires_at) >= new Date();
-            return p.status === "active" && rem > 0 && isNotExpired;
+            const rem = Number(
+              p.remainingPulses ??
+              p.pulsesRemaining ??
+              p.remaining_pulses ??
+              p.pulses_remaining ??
+              (Number(p.totalPulses ?? p.includedPulses ?? p.total_pulses ?? p.included_pulses ?? 0) - Number(p.usedPulses ?? p.used_pulses ?? 0))
+            );
+            const exp = p.expiresAt || p.expires_at;
+            const isNotExpired = !exp || new Date(exp) >= new Date();
+            const isPulseType = p.packageType === "pulses" || p.package_type === "pulses" || Number(p.totalPulses || p.total_pulses || 0) > 0 || (p.items || []).length === 0;
+            return (p.status || "active").toLowerCase() === "active" && rem > 0 && isNotExpired && isPulseType;
           });
           setPatientActivePackages(activePulsePkgs);
-          if (activePulsePkgs.length > 0 && !selectedLaserPackageId) {
+          const bookingLinkedPkgId = activeSessionBooking.packageId || activeSessionBooking.package_id;
+          if (bookingLinkedPkgId && activePulsePkgs.some((p: any) => String(p.id) === String(bookingLinkedPkgId))) {
+            setSelectedLaserPackageId(String(bookingLinkedPkgId));
+          } else if (activePulsePkgs.length > 0 && (!selectedLaserPackageId || !activePulsePkgs.some((p: any) => String(p.id) === String(selectedLaserPackageId)))) {
             setSelectedLaserPackageId(String(activePulsePkgs[0].id));
           }
         }
@@ -244,7 +255,7 @@ export default function DoctorOngoingSessionTab({
         setLoadingLaserData(false);
       }
     });
-  }, [activeSessionBooking?.customerId, activeSessionBooking?.customer_id]);
+  }, [activeSessionBooking?.customerId, activeSessionBooking?.customer_id, activeSessionBooking?.packageId, activeSessionBooking?.package_id]);
 
   // Load clinic default price per pulse from booking settings
   useEffect(() => {
@@ -598,9 +609,23 @@ export default function DoctorOngoingSessionTab({
 
   // Active Package & Deficit Calculation
   const selectedPkg = patientActivePackages.find((p) => String(p.id) === String(selectedLaserPackageId)) || patientActivePackages[0];
-  const availablePkgPulses = selectedPkg ? Number(selectedPkg.remaining_pulses !== undefined ? selectedPkg.remaining_pulses : (selectedPkg.remainingPulses !== undefined ? selectedPkg.remainingPulses : (selectedPkg.pulsesRemaining !== undefined ? selectedPkg.pulsesRemaining : (Number(selectedPkg.included_pulses || selectedPkg.total_pulses || 0) - Number(selectedPkg.used_pulses || 0))))) : 0;
+  const availablePkgPulses = selectedPkg ? Number(
+    selectedPkg.remainingPulses ??
+    selectedPkg.pulsesRemaining ??
+    selectedPkg.remaining_pulses ??
+    selectedPkg.pulses_remaining ??
+    (Number(selectedPkg.totalPulses ?? selectedPkg.includedPulses ?? selectedPkg.total_pulses ?? selectedPkg.included_pulses ?? 0) - Number(selectedPkg.usedPulses ?? selectedPkg.used_pulses ?? 0))
+  ) : 0;
   const isNoActivePackage = patientActivePackages.length === 0;
-  const packageDeficit = isNoActivePackage ? 0 : Math.max(0, standardPulsesDelivered - availablePkgPulses);
+
+  // Additional laser pulses delivered in this session
+  const additionalLaserPulses = additionalServices.reduce((sum, item) => {
+    const srv = servicesList.find((x) => String(x.id) === String(item.serviceId));
+    const isLaser = item.isLaser || checkIsLaserService(srv);
+    return sum + (isLaser ? Number(item.pulses || 0) : 0);
+  }, 0);
+  const totalLaserDeliveredPulses = standardPulsesDelivered + additionalLaserPulses;
+  const packageDeficit = isNoActivePackage ? 0 : Math.max(0, totalLaserDeliveredPulses - availablePkgPulses);
 
   // Helper to extract total pulses in catalog package for purchase
   const newPackageTotalPulses = Number(
@@ -781,7 +806,7 @@ export default function DoctorOngoingSessionTab({
                   const laserPulseData = {
                     pulseType: laserMode,
                     treatmentArea: treatmentArea === "Custom" ? customTreatmentArea || "Custom Area" : treatmentArea,
-                    pulsesUsed: standardPulsesDelivered,
+                    pulsesUsed: laserMode === "PACKAGE" ? totalLaserDeliveredPulses : standardPulsesDelivered,
                     additionalPulses: hasAdditionalPulses && laserMode === "SERVICE" ? additionalPulsesQty : (laserMode === "PACKAGE" && packageDeficit > 0 && effectiveChoice === "PAY_PER_PULSE" ? packageDeficit : 0),
                     pulseValue: additionalPulseUnitPrice,
                     additionalCharge: laserAdditionalCharge,
@@ -1689,10 +1714,17 @@ export default function DoctorOngoingSessionTab({
                             className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
                           >
                             {patientActivePackages.map((pkg) => {
-                              const rem = Number(pkg.remaining_pulses !== undefined ? pkg.remaining_pulses : (pkg.included_pulses - (pkg.used_pulses || 0)));
+                              const rem = Number(
+                                pkg.remainingPulses ??
+                                pkg.pulsesRemaining ??
+                                pkg.remaining_pulses ??
+                                pkg.pulses_remaining ??
+                                (Number(pkg.totalPulses ?? pkg.includedPulses ?? 0) - Number(pkg.usedPulses ?? pkg.used_pulses ?? 0))
+                              );
+                              const exp = pkg.expiresAt || pkg.expires_at;
                               return (
                                 <option key={pkg.id} value={pkg.id}>
-                                  {pkg.package_name || pkg.name} ({rem} pulses remaining · Expires: {pkg.expires_at ? new Date(pkg.expires_at).toLocaleDateString() : "No Expiry"})
+                                  {(pkg.packageNameAr || pkg.packageName || pkg.package_name || pkg.name)} ({rem.toLocaleString()} pulses remaining{exp ? ` · Exp: ${new Date(exp).toLocaleDateString()}` : ""})
                                 </option>
                               );
                             })}
@@ -1705,15 +1737,15 @@ export default function DoctorOngoingSessionTab({
                             <div className="grid grid-cols-3 gap-2 text-center text-xs">
                               <div className="bg-[#FBFBF9] p-2 rounded-lg border border-[#414E36]/10">
                                 <span className="text-[10px] text-[#5A6A51] block">Included</span>
-                                <span className="font-black text-[#1F251A]">{Number(selectedPkg.included_pulses || 0)}</span>
+                                <span className="font-black text-[#1F251A]">{Number(selectedPkg.totalPulses ?? selectedPkg.includedPulses ?? selectedPkg.total_pulses ?? selectedPkg.included_pulses ?? 0).toLocaleString()}</span>
                               </div>
                               <div className="bg-[#FBFBF9] p-2 rounded-lg border border-[#414E36]/10">
                                 <span className="text-[10px] text-[#5A6A51] block">Used</span>
-                                <span className="font-black text-[#5A6A51]">{Number(selectedPkg.used_pulses || 0)}</span>
+                                <span className="font-black text-[#5A6A51]">{Number(selectedPkg.usedPulses ?? selectedPkg.used_pulses ?? 0).toLocaleString()}</span>
                               </div>
                               <div className="bg-purple-50 p-2 rounded-lg border border-purple-200">
                                 <span className="text-[10px] text-purple-800 block">Remaining</span>
-                                <span className="font-black text-purple-950">{availablePkgPulses}</span>
+                                <span className="font-black text-purple-950">{availablePkgPulses.toLocaleString()}</span>
                               </div>
                             </div>
 

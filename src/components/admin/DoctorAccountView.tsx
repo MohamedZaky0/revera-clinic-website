@@ -1335,19 +1335,44 @@ export default function DoctorAccountView({
             }
           } else {
             // Scenario 2 & 3: Patient has existing active package
-            const availablePkgPulses = laserData.selectedPackage ? Number(laserData.selectedPackage.remaining_pulses ?? laserData.selectedPackage.remainingPulses ?? pulsesUsed) : 0;
-            const pulsesToDeductFromActivePkg = Math.min(availablePkgPulses, pulsesUsed);
+            const availablePkgPulses = laserData.selectedPackage ? Number(
+              laserData.selectedPackage.remainingPulses ??
+              laserData.selectedPackage.pulsesRemaining ??
+              laserData.selectedPackage.remaining_pulses ??
+              laserData.selectedPackage.pulses_remaining ??
+              pulsesUsed
+            ) : pulsesUsed;
+            const pulsesToDeductFromActivePkg = Math.min(availablePkgPulses > 0 ? availablePkgPulses : pulsesUsed, pulsesUsed);
+
+            // Resolve target pulses package ID from multiple sources to guarantee deduction
+            let targetPkgId = laserData.sourceId || targetBooking?.packageId || targetBooking?.package_id || (targetBooking as any)?.packageId || null;
+            if (!targetPkgId && custId) {
+              try {
+                const pkgLookupRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(custId)}`, { headers });
+                if (pkgLookupRes.ok) {
+                  const pkgLookupData = await pkgLookupRes.json();
+                  const pList = pkgLookupData.customerPackages || pkgLookupData.packages || [];
+                  const foundActive = pList.find((p: any) => {
+                    const rem = Number(p.remainingPulses ?? p.pulsesRemaining ?? p.remaining_pulses ?? p.pulses_remaining ?? 0);
+                    return (p.status || "active").toLowerCase() === "active" && rem > 0;
+                  });
+                  if (foundActive) targetPkgId = foundActive.id;
+                }
+              } catch (lookupErr) {
+                console.warn("Could not lookup active pulse package for customer:", lookupErr);
+              }
+            }
 
             // Deduct available pulses from current active package
-            if (laserData.sourceId && pulsesToDeductFromActivePkg > 0) {
+            if (targetPkgId && pulsesToDeductFromActivePkg > 0) {
               try {
                 await fetch("/api/customers/packages", {
                   method: "PATCH",
                   headers,
                   body: JSON.stringify({
                     action: "consume_package_pulses",
-                    customer_package_id: laserData.sourceId,
-                    package_id: laserData.sourceId,
+                    customer_package_id: targetPkgId,
+                    package_id: targetPkgId,
                     quantity_used: pulsesToDeductFromActivePkg,
                     pulses: pulsesToDeductFromActivePkg,
                     booking_id: bookingTargetId,

@@ -1071,5 +1071,32 @@ The following are **not currently enforced in code**:
 5. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-075` (`Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine`).
 
+---
+
+## Laser Package Used Pulses Deduction & Synchronization Rules
+**Enforced in:** `src/app/api/customers/packages/route.ts`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/DoctorAccountView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/app/admin/page.tsx`.
+
+1. **Dual Column Persistence on Supabase (`customer_packages`)**:
+   - Whenever pulses are deducted via `PATCH /api/customers/packages` (`action: 'consume_package_pulses'`), updates are written to `pulses_used` and `pulses_remaining` (the PostgreSQL table columns per migration `20260920030000_add_package_type_and_total_pulses_to_packages.sql`) with dual fallback to `used_pulses` and `remaining_pulses`.
+   - If the package is not yet initialized in the `page_settings` store, initial balances are populated directly from the existing `customer_packages` database record (`pulses_used`, `pulses_remaining`).
+
+2. **Full Laser Service Pulses Aggregation**:
+   - Delivered pulses from both the **Base Laser Service** and all **Additional Laser Services** are summed into total session delivered pulses (`totalLaserDeliveredPulses`).
+   - The total delivered pulses count is passed for package deduction. Non-laser services are excluded from pulse deduction.
+
+3. **Multi-Point Execution & Cross-Workflow Idempotency**:
+   - Pulses are deducted whenever a session is finalized:
+     - **Doctor Portal**: Doctor clicks "Complete Session" in `DoctorOngoingSessionTab.tsx` / `DoctorAccountView.tsx`.
+     - **Reception Dashboard**: Receptionist clicks "End Session" in `BookingDetailsModal.tsx` (`handleFinalizeSessionStandalone` Step 5b).
+     - **Checkout Settlement**: Staff processes payment settlement in `page.tsx` (`handleSavePayment`).
+   - Every deduction records `booking_id` in the package's `usage_history`. If the reservation's pulses were already deducted by an earlier workflow action, subsequent calls gracefully no-op, preventing double deduction.
+
+4. **Deficit Cap & Completion Status**:
+   - When delivered pulses exceed remaining pulses, the system consumes the remaining balance (`actualDeduct = Math.min(qtyToDeduct, pkgPulses.remaining_pulses)`) and sets package status to `'completed'`, avoiding HTTP 400 transaction aborts.
+
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-076` (`Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine`).
+
+
 
 
