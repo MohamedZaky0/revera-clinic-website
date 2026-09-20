@@ -914,22 +914,31 @@ The following are **not currently enforced in code**:
 ---
 
 ## Laser Per-Pulse Calculation & Invoice Settlement Engine Rules
-**Enforced in:** `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/app/admin/page.tsx`, `src/lib/printUtils.ts`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`.
+**Enforced in:** `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/app/admin/page.tsx`, `src/lib/printUtils.ts`, `src/app/api/reservations/route.ts`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`.
 
 1. **Per-Pulse Pricing Formula**:
    - When a booking is established in `PER_PULSE` mode (Option 2: Pay per Pulse), all laser services delivered during the session (both Primary Booked Service and Additional Services) are charged dynamically based on delivered pulses:
      $$\text{Price} = \text{delivered\_pulses} \times \text{agreed\_price\_per\_pulse}$$
    - Non-laser services rendered in the same session retain their standard catalog / branch pricing.
    - Example: Primary laser service (250 pulses) + Additional laser service (250 pulses) @ 1 EGP/pulse = 500 EGP subtotal, rather than catalog prices.
+   - `writeCheckoutInvoice` in `src/app/api/reservations/route.ts` recognizes per-pulse mode and writes accurate line totals into the invoice ledger.
 
-2. **Laser Settlement Agreement Notice**:
+2. **Booking Details Modal Payment Mode & Settlement Display**:
+   - The standard Booking Details Modal (`BookingDetailsModal.tsx`) clearly displays the session payment method:
+     - **Top Laser Per-Pulse Settlement Banner**: Amber banner with `Zap` icon, agreed pulse rate (`@ ${rate} EGP/pulse`), full bilingual agreement text, and Total Pulses Delivered counter badge.
+     - **3-Metrics Row (Card C)**: "Session Type & Payment Mode" card with explicit `Pay per Pulse (@ ${rate} EGP)` indicator and `Per Pulse` badge.
+     - **Service Details Card**: Shows primary and additional laser services with delivered pulse badges, live multipliers `(${pulses} pulses × ${rate} EGP)`, and accurate total price.
+     - **Payment Summary Card**: Includes a dedicated `Payment Mode` row displaying `⚡ Pay per Pulse (@ ${rate} EGP)`.
+
+3. **Laser Settlement Agreement Notice**:
    - In ending session finalization, checkout settlement, invoice preview modal, and printed invoice PDFs, an explicit golden Laser Settlement Notice is rendered:
      - **English**: `Settled that laser services in this session are charged per pulse (500 pulses × 1 EGP = 500 EGP)`
      - **Arabic**: `تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (500 نبضة × 1 ج.م = 500 ج.م)`
    - Structured notes tags `[Laser Settlement]: ...` and `[Laser Pulses Delivered]: ...` are automatically persisted to `reservations.notes`.
 
-3. **Safe Additional Service Note Parsing**:
+4. **Safe Additional Service & Primary Pulses Note Parsing**:
    - `parseAdditionalServiceLine` extracts service names, quantities, unit prices, totals, and pulses without regex leakage or corruption from `, Pulses: <num>` suffixes.
+   - `extractPrimaryPulses` accurately parses primary delivered pulses from structured strings (`[Laser Pulses Delivered]: Primary: <N> pulses...`), preventing fallback to static catalog prices.
 
-4. **Automated Diagnostic Verification**:
+5. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-071` (`Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine`).

@@ -128,6 +128,15 @@ export function parseAdditionalServiceLine(trimmed: string): { name: string; qty
   return null;
 }
 
+export function extractPrimaryPulses(notes: string): number {
+  if (!notes) return 0;
+  const m = notes.match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
+            notes.match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
+            notes.match(/Primary:\s*(\d+)\s*pulses/i) ||
+            notes.match(/\[Extra Device Pulses\]:\s*(\d+)/i);
+  return m ? Number(m[1]) : 0;
+}
+
 interface BookingDetailsModalProps {
   booking: Req;
   onClose: () => void;
@@ -1368,12 +1377,47 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           31: 400, 32: 350, 33: 400, 34: 500
         };
 
+        const isLaserPerPulse = Boolean(
+          booking?.laserPaymentMode === "PER_PULSE" ||
+          (booking as any)?.laser_payment_mode === "PER_PULSE" ||
+          String(booking?.notes || "").toLowerCase().includes("pay per pulse") ||
+          String(booking?.notes || "").toLowerCase().includes("per_pulse") ||
+          String(booking?.notes || "").includes("[Laser Settlement]")
+        );
+
+        const laserPulseRate = Number(
+          booking?.laserPricePerPulse ||
+          (booking as any)?.laser_price_per_pulse ||
+          (() => {
+            const m = String(booking?.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+            return m ? Number(m[1]) : 1;
+          })()
+        ) || 1;
+
+        const primaryDeliveredPulses = extractPrimaryPulses(String(booking?.notes || ""));
+        const settlementMatch = String(booking?.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
+
         const bookingServices = selectedServiceIds.map(id => {
           const s = localServices.find(item => item.id === id);
+          const isLaser = checkIsLaserService(s);
+          let price = s ? getEffectiveServicePrice(s, booking.branchId, branches) : (prices[id] ?? 500);
+          let pulseDetails = "";
+
+          if (isLaserPerPulse && isLaser && primaryDeliveredPulses > 0) {
+            price = primaryDeliveredPulses * laserPulseRate;
+            pulseDetails = ` (${primaryDeliveredPulses} pulses × ${laserPulseRate} EGP)`;
+          } else if (isLaserPerPulse && isLaser) {
+            pulseDetails = ` (Per pulse @ ${laserPulseRate} EGP)`;
+          }
+
           return {
             id,
             name: s ? s.en : `Service #${id}`,
-            price: s ? getEffectiveServicePrice(s, booking.branchId, branches) : (prices[id] ?? 500)
+            nameAr: s ? s.ar : `خدمة #${id}`,
+            rawName: s ? s.en : `Service #${id}`,
+            price,
+            isLaser,
+            pulseDetails,
           };
         });
 
@@ -1542,22 +1586,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           : Math.max(0, totalPrice - sessionPaid);
 
         const isInvoicePaid = (rawLeft !== null && rawLeft !== undefined && Number(rawLeft) <= 0 && sessionPaid > 0) || (sessionLeft <= 0 && sessionPaid > 0) || (sessionPaid >= totalPrice && totalPrice > 0);
-
-        const isLaserPerPulse = Boolean(
-          booking?.laserPaymentMode === "PER_PULSE" ||
-          (booking as any)?.laser_payment_mode === "PER_PULSE" ||
-          String(booking?.notes || "").toLowerCase().includes("pay per pulse") ||
-          String(booking?.notes || "").toLowerCase().includes("per_pulse")
-        );
-
-        const laserPulseRate = Number(
-          booking?.laserPricePerPulse ||
-          (booking as any)?.laser_price_per_pulse ||
-          (() => {
-            const m = String(booking?.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
-            return m ? Number(m[1]) : 1;
-          })()
-        ) || 1;
 
         // Primary effective service for end session
         const primaryServiceObj = localServices.find(
@@ -2791,7 +2819,49 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </div>
                   </div>
 
-                  {/* 2. 3-METRICS ROW: SERVICE, DATE & TIME, SESSION TYPE */}
+                  {/* Laser Per-Pulse Settlement Agreement Banner */}
+                  {isLaserPerPulse && (
+                    <div className="rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 via-amber-50/90 to-amber-100/60 p-4 text-xs text-amber-950 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fadeIn">
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className="h-10 w-10 rounded-2xl bg-amber-500/20 text-amber-800 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                          <Zap size={20} className="text-amber-700 fill-amber-600" />
+                        </div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-black text-amber-950 text-sm">
+                              {isRTL ? "نظام المحاسبة: الدفع بالنبضة" : "Payment Mode: Pay per Pulse"}
+                            </span>
+                            <span className="rounded-full bg-amber-200/90 px-2.5 py-0.5 text-[10.5px] font-black text-amber-950 border border-amber-300 shadow-2xs">
+                              {laserPulseRate} EGP / {isRTL ? "نبضة" : "pulse"}
+                            </span>
+                          </div>
+                          <p className="text-[11.5px] text-amber-900 font-medium mt-0.5 leading-relaxed">
+                            {settlementMatch ? settlementMatch[1] : (
+                              isRTL
+                                ? `تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${laserPulseRate} ج.م لكل نبضة)`
+                                : `Agreed that laser services in this session are settled per pulse (@ ${laserPulseRate} EGP/pulse)`
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      {primaryDeliveredPulses > 0 && (
+                        <div className="text-left sm:text-right shrink-0 bg-white/80 sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:rounded-none w-full sm:w-auto border sm:border-0 border-amber-200">
+                          <span className="text-[10px] text-amber-800 font-bold block uppercase tracking-wider">
+                            {isRTL ? "إجمالي النبضات المنفذة" : "Total Pulses Delivered"}
+                          </span>
+                          <span className="font-black text-sm sm:text-base text-amber-950 flex items-center sm:justify-end gap-1 mt-0.5">
+                            <Zap size={14} className="text-amber-600 fill-amber-500" />
+                            <span>{primaryDeliveredPulses + additionalServicesList.reduce((sum, s) => {
+                              const m = s.name.match(/(\d+)\s*pulses/i);
+                              return sum + (m ? Number(m[1]) : 0);
+                            }, 0)} {isRTL ? "نبضة" : "pulses"}</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 2. 3-METRICS ROW: SERVICE, DATE & TIME, SESSION TYPE & PAYMENT MODE */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* Card A: SERVICE */}
                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
@@ -2851,18 +2921,30 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       </p>
                     </div>
 
-                    {/* Card C: SESSION TYPE */}
+                    {/* Card C: SESSION TYPE & PAYMENT MODE */}
                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
-                      <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
-                        <User size={13} className="text-[#0F3826]" />
-                        <span>SESSION TYPE</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
+                          <User size={13} className="text-[#0F3826]" />
+                          <span>SESSION TYPE</span>
+                        </div>
+                        {isLaserPerPulse && (
+                          <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[9px] font-black text-amber-800">
+                            <Zap size={9} className="text-amber-600 fill-amber-500" />
+                            <span>Per Pulse</span>
+                          </span>
+                        )}
                       </div>
                       <p className="font-black text-xs text-[#1F251A] pt-0.5">
                         {booking.sessionType === 'online' ? "Online Consultation" : "In Person"}
                       </p>
                       <p className="text-xs text-[#5A6A51] font-medium flex items-center gap-1.5">
-                        <span className={`h-2 w-2 rounded-full ${booking.sessionType === 'online' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
-                        <span>{booking.sessionType === 'online' ? "Virtual Consultation" : "In Clinic Visit"}</span>
+                        <span className={`h-2 w-2 rounded-full ${booking.sessionType === 'online' ? 'bg-blue-500' : isLaserPerPulse ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                        <span>
+                          {isLaserPerPulse 
+                            ? `Pay per Pulse (@ ${laserPulseRate} EGP)` 
+                            : (booking.sessionType === 'online' ? "Virtual Consultation" : "In Clinic Visit")}
+                        </span>
                       </p>
                     </div>
                   </div>
@@ -2946,11 +3028,21 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     <div className="space-y-2 text-xs">
                       {bookingServices.map((bs, index) => (
                         <div key={`bs-${bs.id}-${index}`} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
-                          <span className="font-semibold text-[#1F251A]">
-                            {index + 1}. {bs.name}
-                          </span>
                           <div className="flex items-center gap-2">
-                            <span className="font-extrabold text-[#1F251A]">{bs.price} EGP</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {index + 1}. {bs.rawName || bs.name}
+                            </span>
+                            {bs.isLaser && isLaserPerPulse && (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 shrink-0">
+                                <Zap size={10} className="text-amber-600 fill-amber-500" />
+                                <span>{primaryDeliveredPulses > 0 ? `${primaryDeliveredPulses} pulses` : "Per Pulse"}</span>
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-[#1F251A]">
+                              {bs.price} EGP {bs.pulseDetails && <span className="text-[10px] text-[#5A6A51] font-normal">{bs.pulseDetails}</span>}
+                            </span>
                             {bookingServices.length > 1 && hasPermission("bookings.edit") && booking.status !== 'completed' && (
                               <button
                                 type="button"
@@ -3495,6 +3587,20 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </div>
 
                     <div className="space-y-2.5 text-xs">
+                      <div className="flex justify-between items-center text-[#1F251A]">
+                        <span className="font-semibold text-[#5A6A51]">{isRTL ? "طريقة المحاسبة" : "Payment Mode"}</span>
+                        <span className={`font-bold inline-flex items-center gap-1 ${isLaserPerPulse ? "text-amber-800" : "text-[#1F251A]"}`}>
+                          {isLaserPerPulse ? (
+                            <>
+                              <Zap size={12} className="text-amber-600 fill-amber-500" />
+                              <span>{isRTL ? `دفع بالنبضة (${laserPulseRate} ج.م/نبضة)` : `Pay per Pulse (@ ${laserPulseRate} EGP)`}</span>
+                            </>
+                          ) : (
+                            <span>{isRTL ? "سعر الخدمة الثابت" : "Standard Service"}</span>
+                          )}
+                        </span>
+                      </div>
+
                       <div className="flex justify-between items-center text-[#1F251A]">
                         <span className="font-semibold text-[#5A6A51]">Service Price</span>
                         <span className="font-bold">{totalPrice} EGP</span>

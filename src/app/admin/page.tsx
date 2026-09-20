@@ -9211,7 +9211,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               return m ? Number(m[1]) : 1;
             })()
           ) || 1;
-          const primaryPulsesMatch = String(checkoutBooking?.notes || "").match(/\[Laser Pulses Delivered\]:\s*(\d+)/i);
+          const primaryPulsesMatch = String(checkoutBooking?.notes || "").match(/(?:\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*|\[Laser Pulses Delivered\]:\s*|Primary:\s*|\[Extra Device Pulses\]:\s*)(\d+)/i);
           const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
 
           // 1. Calculate service cost
@@ -9995,7 +9995,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               return m ? Number(m[1]) : 1;
             })()
           ) || 1;
-          const primaryPulsesMatch = String(invoiceBooking.notes || "").match(/\[Laser Pulses Delivered\]:\s*(\d+)/i);
+          const primaryPulsesMatch = String(invoiceBooking.notes || "").match(/(?:\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*|\[Laser Pulses Delivered\]:\s*|Primary:\s*|\[Extra Device Pulses\]:\s*)(\d+)/i);
           const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
           const settlementMatch = String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
           const invoiceSettlementText = invoiceBooking.laserSettlementNote || (settlementMatch ? settlementMatch[1] : (

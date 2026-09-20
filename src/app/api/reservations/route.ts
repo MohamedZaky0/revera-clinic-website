@@ -348,7 +348,47 @@ async function writeCheckoutInvoice(params: {
   if (svcErr) throw svcErr;
   if (!services || services.length === 0) return;
 
+  const { data: resRow } = await supabaseServer
+    .from('reservations')
+    .select('laser_payment_mode, laser_price_per_pulse, notes')
+    .eq('id', reservationId)
+    .maybeSingle();
+
+  const isPerPulseMode = Boolean(
+    resRow?.laser_payment_mode === 'PER_PULSE' ||
+    String(resRow?.notes || '').toLowerCase().includes('pay per pulse') ||
+    String(resRow?.notes || '').toLowerCase().includes('per_pulse') ||
+    String(resRow?.notes || '').includes('[Laser Settlement]')
+  );
+  const pulseRate = Number(
+    resRow?.laser_price_per_pulse ||
+    (() => {
+      const m = String(resRow?.notes || '').match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+      return m ? Number(m[1]) : 1;
+    })()
+  ) || 1;
+  const primaryPulsesMatch = String(resRow?.notes || '').match(/(?:\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*|\[Laser Pulses Delivered\]:\s*|Primary:\s*|\[Extra Device Pulses\]:\s*)(\d+)/i);
+  const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
+
   const lines = services.map((svc: any) => {
+    const isLaser = Boolean(
+      (svc.en && svc.en.toLowerCase().includes('laser')) ||
+      (svc.category && String(svc.category).toLowerCase().includes('laser'))
+    );
+
+    if (isPerPulseMode && isLaser && primaryDeliveredPulses > 0) {
+      const perPulseTotal = primaryDeliveredPulses * pulseRate;
+      return buildInvoiceLine({
+        lineType: 'service',
+        description: `${svc.en || `Service #${svc.id}`} (${primaryDeliveredPulses} pulses × ${pulseRate} EGP)`,
+        qty: 1,
+        unitPrice: perPulseTotal,
+        discount: 0,
+        serviceId: svc.id,
+        providerId: providerId ?? undefined,
+      });
+    }
+
     const priceDetails = getServicePriceDetails(
       { price: svc.price !== null ? Number(svc.price) : 0, branchPricing: svc.branch_pricing },
       targetBranchName

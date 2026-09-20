@@ -2333,17 +2333,20 @@ The clinic required a complete, multi-tiered laser pulse counting and accounting
 3. Regex parsing in `BookingDetailsModal.tsx` and `src/app/admin/page.tsx` was corrupted by `, Pulses: <num>` suffixes leaking into service names.
 
 **Decisions & Implementation:**
-1. **Centralized Note Parsing Helper (`parseAdditionalServiceLine` in `BookingDetailsModal.tsx`):**
-   - Robustly parses service line format `Name (Qty: 1 x 150 EGP = 150 EGP, Pulses: 250)` without name corruption or regex fallthrough.
+1. **Centralized Note Parsing Helper (`parseAdditionalServiceLine` & `extractPrimaryPulses` in `BookingDetailsModal.tsx`):**
+   - `parseAdditionalServiceLine`: Robustly parses service line format `Name (Qty: 1 x 150 EGP = 150 EGP, Pulses: 250)` without name corruption or regex fallthrough.
+   - `extractPrimaryPulses`: Reliably extracts primary pulses from structured notes (`[Laser Pulses Delivered]: Primary: 250 pulses...` as well as direct digits and extra pulse formats).
 2. **Dynamic Per-Pulse Rate Calculation:**
    - In `BookingDetailsModal.tsx`, `handleAddServiceToSession` sets `price = pulsesVal * pulseRate` for additional laser services in per-pulse sessions.
    - `handleConfirmEndSession` writes line items to `reservation-products` with effective prices, appends `[Laser Settlement]` and `[Laser Pulses Delivered]` notes, and updates total invoice.
    - `baseBookingPrice`, `additionalServicesSubtotal`, and `endSessionInvoiceTotal` compute `pulses × laserPulseRate`.
+   - `bookingServices` in standard Booking Details view dynamically evaluates `primaryDeliveredPulses * laserPulseRate` with per-pulse badge and calculation string.
    - In `src/app/admin/page.tsx`, `checkoutBooking` and `invoiceBooking` calculate primary laser prices by `primaryDeliveredPulses * pulseRate`, parse additional services using `parseAdditionalServiceLine`, and display live pulse multipliers.
-3. **Laser Per-Pulse Settlement Agreement Banner:**
-   - Rendered across Ending Session view, Payment Settlement checkout modal, Invoice preview popup modal, and printed PDF template (`printUtils.ts`).
+   - In `src/app/api/reservations/route.ts`, `writeCheckoutInvoice` verifies per-pulse mode and writes accurate per-pulse invoice line totals into the ledger.
+3. **Laser Per-Pulse Settlement Agreement Banner & Detailed Payment Mode UI:**
+   - Rendered across Ending Session view, standard Booking Details view (top settlement agreement banner with delivered pulses counter), 3-metrics row ("Session Type & Payment Mode" card with `Pay per Pulse (@ ${rate} EGP)`), Service Details card (with pulses count badge), Payment Summary card (with explicit Payment Mode row), Payment Settlement checkout modal, Invoice preview popup modal, and printed PDF template (`printUtils.ts`).
 4. **Automated Diagnostic Verification:**
-   - Added test case `TC-071` ("Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine") to `INITIAL_SYSTEM_TEST_SUITES`.
+   - Verified under test case `TC-071` ("Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine") in `INITIAL_SYSTEM_TEST_SUITES`.
 
 
 
