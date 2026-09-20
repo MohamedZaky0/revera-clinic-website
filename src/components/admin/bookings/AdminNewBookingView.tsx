@@ -1273,7 +1273,8 @@ export default function AdminNewBookingView({
               customerId: resolvedCustomerId || phone,
               packageId: selectedCatalogPulsePkg.id,
               branchId: selectedBranchObj?.id || null,
-              paymentMethod: numAmountPaid > 0 ? "cash" : "cash"
+              paymentMethod: numAmountPaid > 0 ? "cash" : "cash",
+              amountPaid: numAmountPaid
             })
           });
 

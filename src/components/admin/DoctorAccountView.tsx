@@ -1520,7 +1520,7 @@ export default function DoctorAccountView({
     // Compute final session total according to laser mode:
     // Option 1 (SERVICE): Base catalog price + additional services + products + extra pulses
     // Option 2 (PER_PULSE): 0 base + per-pulse total + additional services + products
-    // Option 3 (PACKAGE): 0 base + package deficit charge/package price + additional services + products
+    // Option 3 (PACKAGE): package price (from booking) + additional non-laser services + products + deficit charge
     const effectiveBasePrice = (!laserData?.pulseType || laserData.pulseType === "SERVICE") ? baseBookingPrice : 0;
     const isDoctorPackage = laserData?.pulseType === "PACKAGE" || targetBooking.laser_payment_mode === "PACKAGE" || targetBooking.laserPaymentMode === "PACKAGE";
     const additionalServicesSub = (additionalServices || []).reduce((sum, s) => {
@@ -1529,7 +1529,27 @@ export default function DoctorAccountView({
       if (isDoctorPackage && isLaser) return sum;
       return sum + (Number(s.price) || 0);
     }, 0);
-    const sessionComputedTotal = effectiveBasePrice + additionalServicesSub + productsSubtotal + effectiveLaserSessionCharge;
+    const sessionComputedRaw = effectiveBasePrice + additionalServicesSub + productsSubtotal + effectiveLaserSessionCharge;
+
+    // For PACKAGE mode: the booking may have an in-booking package purchase price recorded in notes.
+    // We must not collapse total to 0 when effectiveLaserSessionCharge and effectiveBasePrice are both 0
+    // (which happens for standard package redemption with no deficit). Use the higher of:
+    //  - computed session charges
+    //  - booked package price parsed from notes ([Purchasing New Pulses Package]: Name (PRICE EGP))
+    //  - amountPaid + existing amountLeft (the original booking commitment)
+    let bookedPackagePrice = 0;
+    if (isDoctorPackage) {
+      const pkgPriceMatch = String(targetBooking.notes || "").match(
+        /\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption)\]:[^(]+\((\d+(?:\.\d+)?)\s*EGP/i
+      );
+      if (pkgPriceMatch) {
+        bookedPackagePrice = parseFloat(pkgPriceMatch[1]) || 0;
+      }
+    }
+    const originalBookingCommitment = Number(targetBooking.amountPaid ?? 0) + Number(targetBooking.amountLeft ?? 0);
+    const sessionComputedTotal = isDoctorPackage
+      ? Math.max(sessionComputedRaw, bookedPackagePrice, originalBookingCommitment)
+      : sessionComputedRaw;
 
     let completionNotes = String(targetBooking.notes || "");
     const isDoctorPerPulse = laserData?.pulseType === "PER_PULSE" || targetBooking.laser_payment_mode === "PER_PULSE" || targetBooking.laserPaymentMode === "PER_PULSE";

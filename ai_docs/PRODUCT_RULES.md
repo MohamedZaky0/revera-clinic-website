@@ -1134,8 +1134,53 @@ The following are **not currently enforced in code**:
 3. **Multi-Workflow Patient Profile Synchronization**:
    - `useCustomerProfile.ts` subscribes to `revera-laser-change` to immediately re-fetch both product balances and customer packages (`fetchCustomerProfilePackages`), ensuring packages created or updated in New Booking, Doctor Portal, or Reception Dashboard appear instantly in open patient profiles.
 
+---
 
+## In-Booking Package Partial Payment Rules (DEC-075)
 
+These rules govern the case where a patient purchases a new pulses package during the booking creation process and makes a partial payment upfront.
 
+### Core Invariant: Outstanding Balance MUST Always Be Preserved
+
+**The booking's financial commitment must NEVER be silently zeroed out.**
+
+Specifically, `amountLeft` in the `reservations` table MUST reflect the true unpaid balance — it must not be overwritten to 0 if the patient paid less than the total package price.
+
+### Rules
+
+1. **`amountPaid` Must Be Passed in the Sell Body**:
+   - When `AdminNewBookingView.tsx` calls `POST /api/packages/sell` during Option 3 (In-Booking Package Purchase), it MUST include `amountPaid: numAmountPaid` in the request body.
+   - The API must NOT default to full payment (grandTotal) when `amountPaid` is not explicitly provided.
+
+2. **Package Sell API Must Record Partial Payment Correctly** (`/api/packages/sell`):
+   - `actualPaid = min(grandTotal, max(0, amountPaid))`
+   - `remainingDue = grandTotal - actualPaid`
+   - `invoiceStatus = 'paid' | 'partially_paid' | 'issued'` (based on actualPaid vs. grandTotal)
+   - The `payments` row records `actualPaid`, not grandTotal.
+   - The `transaction_ledger` records `actualPaid`.
+   - Customer `outstanding` is incremented by `remainingDue` if > 0.
+
+3. **Session Completion Must NOT Collapse PACKAGE Mode Total to Zero** (`DoctorAccountView.tsx`, `BookingDetailsModal.tsx`):
+   - For PACKAGE mode bookings, `effectiveBasePrice = 0` and there is typically no `effectiveLaserSessionCharge` (standard redemption, no deficit). The naive formula `sessionTotal = 0 + 0 + 0` is WRONG.
+   - The session total floor must be the MAXIMUM of:
+     - Raw computed session charges (additional services, products, deficit)
+     - The booked package price parsed from booking notes: `[Purchasing New Pulses Package]: Name (PRICE EGP)`
+     - The original booking commitment: `amountPaid + amountLeft` from the reservation record
+   - Formula: `sessionComputedTotal = max(sessionComputedRaw, bookedPackagePrice, amountPaid + amountLeft)`
+
+4. **Booking Notes Package Price Parsing**:
+   - The booked package purchase price can be reliably recovered from booking notes using this regex:
+     ```
+     /\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption)\]:[^(]+\((\d+(?:\.\d+)?)\s*EGP/i
+     ```
+   - This regex is stable because the booking note format is always: `[Purchasing New Pulses Package]: <Name> (<price> EGP · <pulses> pulses)`
+
+5. **Payment Mode Label Must Be Correct**:
+   - When `isLaserPackage` is `true` (any of: `laserPaymentMode === "PACKAGE"`, notes contain `"pulses package"` / `"[Purchasing New Pulses Package]"` / `"package redemption"`), the Payment Mode badge must display **"Pulses Package"** / **"باقة نبضات"** (with a purple Zap icon).
+   - "Standard Service" is ONLY shown when neither `isLaserPerPulse` nor `isLaserPackage` is true.
+
+6. **`isInvoicePaid` Evaluation**:
+   - `isInvoicePaid = (sessionPaid >= totalPrice && totalPrice > 0) || (sessionLeft <= 0 && sessionPaid > 0)`
+   - The `rawLeft <= 0` condition alone MUST NOT determine paid status, because it can be a stale/incorrect DB value from a prior buggy session completion. Use the recomputed `totalPrice` (which includes the booked package price) as the authoritative floor.
 
 

@@ -61,7 +61,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { customerId, packageId, branchId, paymentMethod: rawPaymentMethod } = await req.json();
+    const body = await req.json();
+    const { customerId, packageId, branchId, paymentMethod: rawPaymentMethod, amountPaid, paidAmount } = body;
     if (!customerId || !packageId) {
       return NextResponse.json(
         { error: 'customerId and packageId are required.' },
@@ -240,6 +241,12 @@ export async function POST(req: Request) {
       packageId: pkg.id,
     });
     const totals = buildInvoiceTotals([line]);
+    const isPartialSpecified = (amountPaid !== undefined || paidAmount !== undefined);
+    const actualPaid = isPartialSpecified
+      ? Math.min(totals.grandTotal, Math.max(0, Number(amountPaid !== undefined ? amountPaid : paidAmount)))
+      : totals.grandTotal;
+    const remainingDue = Math.max(0, totals.grandTotal - actualPaid);
+    const invoiceStatus = actualPaid >= totals.grandTotal ? 'paid' : (actualPaid > 0 ? 'partially_paid' : 'issued');
 
     // Wallet guard: check balance before proceeding, refuse with 409 if short
     if (paymentMethod === 'wallet') {
@@ -250,9 +257,10 @@ export async function POST(req: Request) {
         .maybeSingle();
       if (walletReadErr) throw walletReadErr;
       const available = Number(walletRow?.wallet_balance || 0);
-      if (available < totals.grandTotal) {
+      const requiredWallet = actualPaid > 0 ? actualPaid : totals.grandTotal;
+      if (available < requiredWallet) {
         return NextResponse.json(
-          { error: `Insufficient wallet balance — EGP ${available} available, EGP ${totals.grandTotal} required.` },
+          { error: `Insufficient wallet balance — EGP ${available} available, EGP ${requiredWallet} required.` },
           { status: 409 }
         );
       }
@@ -272,9 +280,9 @@ export async function POST(req: Request) {
         subtotal: totals.subtotal,
         discount_total: totals.discountTotal,
         grand_total: totals.grandTotal,
-        status: 'issued',
+        status: invoiceStatus,
       })
-      .select('id, invoice_no, subtotal, discount_total, grand_total, branch_id')
+      .select('id, invoice_no, subtotal, discount_total, grand_total, branch_id, status')
       .single();
     if (invoiceError) throw invoiceError;
 
@@ -371,56 +379,62 @@ export async function POST(req: Request) {
       }
     }
 
-    const { error: paymentError } = await supabaseServer
-      .from('payments')
-      .insert({
-        invoice_id: invoice.id,
-        amount: totals.grandTotal,
-        method: paymentMethod,
-        received_by_employee_id: access.access.employee.id,
+    if (actualPaid > 0) {
+      const { error: paymentError } = await supabaseServer
+        .from('payments')
+        .insert({
+          invoice_id: invoice.id,
+          amount: actualPaid,
+          method: paymentMethod,
+          received_by_employee_id: access.access.employee.id,
+        });
+      if (paymentError) {
+        await removeIncompleteSale(invoice.id, customerPackage.id);
+        throw paymentError;
+      }
+
+      // Customer-facing history (RISK-076).
+      await recordTransaction({
+        type: 'payment',
+        amount: actualPaid,
+        description: `Package purchase — ${pkg.name}${remainingDue > 0 ? ` (Deposit paid: ${actualPaid} EGP, Remaining: ${remainingDue} EGP)` : ''}`,
+        customerId: finalCustomerId,
+        branchId: branchId || null,
+        invoiceId: invoice.id,
+        paymentMethod,
+        createdByEmployeeId: access.access.employee.id,
       });
-    if (paymentError) {
-      await removeIncompleteSale(invoice.id, customerPackage.id);
-      throw paymentError;
     }
 
-    // Customer-facing history (RISK-076). Reached once per successful sale — every earlier failure
-    // path rolls back via removeIncompleteSale and throws before this point.
-    await recordTransaction({
-      type: 'payment',
-      amount: totals.grandTotal,
-      description: `Package purchase — ${pkg.name}`,
-      customerId: finalCustomerId,
-      branchId: branchId || null,
-      invoiceId: invoice.id,
-      paymentMethod,
-      createdByEmployeeId: access.access.employee.id,
-    });
-
-    // Update spent_amount on the customer (read-then-write, same shape as addToCustomerSpend)
+    // Update spent_amount and outstanding on the customer
     try {
       const { data: customer, error: readErr } = await supabaseServer
         .from('customers')
-        .select('spent_amount, wallet_balance')
+        .select('spent_amount, wallet_balance, outstanding')
         .eq('id', finalCustomerId)
         .maybeSingle();
 
       if (!readErr && customer) {
+        const updatePayload: any = {
+          spent_amount: Number(customer.spent_amount || 0) + actualPaid,
+          updated_at: new Date().toISOString()
+        };
+        if (remainingDue > 0 && customer.outstanding !== undefined) {
+          updatePayload.outstanding = Number(customer.outstanding || 0) + remainingDue;
+        }
+
         await supabaseServer
           .from('customers')
-          .update({
-            spent_amount: Number(customer.spent_amount || 0) + totals.grandTotal,
-            updated_at: new Date().toISOString()
-          })
+          .update(updatePayload)
           .eq('id', finalCustomerId);
 
         // Deduct wallet if paying from wallet
-        if (paymentMethod === 'wallet') {
-          const newBalance = Math.max(0, Number(customer.wallet_balance || 0) - totals.grandTotal);
+        if (paymentMethod === 'wallet' && actualPaid > 0) {
+          const newBalance = Math.max(0, Number(customer.wallet_balance || 0) - actualPaid);
           await recordWalletMovement({
             customerId: finalCustomerId,
             direction: 'out',
-            amount: totals.grandTotal,
+            amount: actualPaid,
             reason: 'package sale payment',
             newBalance,
             invoiceId: invoice.id,

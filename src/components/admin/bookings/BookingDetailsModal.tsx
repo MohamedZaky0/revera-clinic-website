@@ -1847,8 +1847,24 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const additionalServicesCost = additionalServicesList.reduce((sum, s) => sum + s.total, 0);
         const productsCost = productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
         const calculatedTotal = servicesCost + additionalServicesCost + productsCost;
+
+        // For package mode: recover the booked package purchase price from notes so we don't collapse to 0
+        let bookedPackagePurchasePrice = 0;
+        if (isLaserPackage) {
+          const pkgPriceMatch = String(booking?.notes || "").match(
+            /\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption)\]:[^(]+\((\d+(?:\.\d+)?)\s*EGP/i
+          );
+          if (pkgPriceMatch) {
+            bookedPackagePurchasePrice = parseFloat(pkgPriceMatch[1]) || 0;
+          }
+        }
+
         const totalPrice = (isLaserPerPulse || isLaserPackage)
-          ? calculatedTotal
+          ? Math.max(
+              calculatedTotal,
+              bookedPackagePurchasePrice,
+              rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
+            )
           : Math.max(
               calculatedTotal,
               targetInvoiceTotal,
@@ -1860,7 +1876,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           ? Number(rawLeft)
           : Math.max(0, totalPrice - sessionPaid);
 
-        const isInvoicePaid = (rawLeft !== null && rawLeft !== undefined && Number(rawLeft) <= 0 && sessionPaid > 0) || (sessionLeft <= 0 && sessionPaid > 0) || (sessionPaid >= totalPrice && totalPrice > 0);
+        const isInvoicePaid = (sessionPaid >= totalPrice && totalPrice > 0) || (sessionLeft <= 0 && sessionPaid > 0);
 
         // Primary effective service for end session
         const primaryServiceObj = localServices.find(
@@ -1895,7 +1911,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const extraPulsesSubtotal = isLaserPerPulse ? 0 : (primaryPulses * (Number(pricePerPulse) || 0));
         const additionalPulsesTotal = additionalServices.reduce((sum, item) => sum + Number(item.pulses || 0), 0);
         const totalSessionPulses = primaryPulses + additionalPulsesTotal;
-        const endSessionInvoiceTotal = baseBookingPrice + additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal;
+        // For isLaserPackage: include the booked package purchase price so amountLeft is preserved
+        const endSessionInvoiceTotal = isLaserPackage
+          ? Math.max(
+              baseBookingPrice + additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal,
+              bookedPackagePurchasePrice,
+              rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
+            )
+          : baseBookingPrice + additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal;
         const endSessionAmountLeft = Math.max(0, endSessionInvoiceTotal - sessionPaid);
 
         // First visit check
@@ -3920,11 +3943,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     <div className="space-y-2.5 text-xs">
                       <div className="flex justify-between items-center text-[#1F251A]">
                         <span className="font-semibold text-[#5A6A51]">{isRTL ? "طريقة المحاسبة" : "Payment Mode"}</span>
-                        <span className={`font-bold inline-flex items-center gap-1 ${isLaserPerPulse ? "text-amber-800" : "text-[#1F251A]"}`}>
+                        <span className={`font-bold inline-flex items-center gap-1 ${isLaserPerPulse ? "text-amber-800" : isLaserPackage ? "text-purple-800" : "text-[#1F251A]"}`}>
                           {isLaserPerPulse ? (
                             <>
                               <Zap size={12} className="text-amber-600 fill-amber-500" />
                               <span>{isRTL ? `دفع بالنبضة (${laserPulseRate} ج.م/نبضة)` : `Pay per Pulse (@ ${laserPulseRate} EGP)`}</span>
+                            </>
+                          ) : isLaserPackage ? (
+                            <>
+                              <Zap size={12} className="text-purple-600 fill-purple-400" />
+                              <span>{isRTL ? "باقة نبضات" : "Pulses Package"}</span>
                             </>
                           ) : (
                             <span>{isRTL ? "سعر الخدمة الثابت" : "Standard Service"}</span>

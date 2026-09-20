@@ -2577,9 +2577,34 @@ The clinic required a complete, multi-tiered laser pulse counting and accounting
 4. **Resilience in Inventory POS Sales (`src/app/api/inventory/products/sales/route.ts`):**
    - Added `UUID_REGEX` and synthetic ID auto-resolution/creation to prevent 22P02 crashes during product sales.
 
+---
 
+## DEC-075: In-Booking Package Partial Payment & Session Balance Preservation
 
+**Date:** 2026-09-21
+**Status:** Decided — active
 
+**Context:**
+When booking a new patient who didn't have an existing pulses package, the receptionist could select Option 3 (In-Booking Package Purchase), choose a 1000 EGP package, and enter 500 EGP as the amount paid now. After the session started and ended via the doctor portal, the system showed the invoice as "fully settled" even though 500 EGP remained outstanding. The outstanding balance was silently zeroed out.
+
+**Root Causes:**
+1. **`/api/packages/sell`**: The POST body never received `amountPaid` from `AdminNewBookingView.tsx`, so it always defaulted to full payment (grandTotal). Invoice status was always `'issued'` with full 1000 EGP payment recorded.
+2. **`DoctorAccountView.tsx` session completion**: In PACKAGE mode, `effectiveBasePrice = 0` and `effectiveLaserSessionCharge = 0` (standard redemption, no deficit), so `sessionComputedTotal = 0`, causing the PATCH to set `amountLeft = max(0, 0 - 500) = 0`, wiping the outstanding balance.
+3. **`BookingDetailsModal.tsx` end session total**: `baseBookingPrice` was forced to `0` for isLaserPackage mode, and the legacy `totalPrice` computation for laser modes used only `calculatedTotal` (derived from the services cost line items, not the package purchase price), so `endSessionInvoiceTotal = 0` and `endSessionAmountLeft = 0`.
+4. **`BookingDetailsModal.tsx` Payment Mode label**: The label only checked `isLaserPerPulse` — if false, it always rendered "Standard Service" even when `isLaserPackage` was true.
+
+**Decisions & Implementation:**
+1. **`AdminNewBookingView.tsx`**: Added `amountPaid: numAmountPaid` to the `/api/packages/sell` POST body so the actual partial payment flows through correctly.
+2. **`/api/packages/sell`**: Updated POST handler to extract `amountPaid`/`paidAmount` from request body. Computes `actualPaid = min(grandTotal, max(0, amountPaid))`, `remainingDue = grandTotal - actualPaid`, and sets correct `invoiceStatus` (`'paid'` | `'partially_paid'` | `'issued'`). Payment row, transaction ledger, and customer `outstanding` now reflect the actual partial payment.
+3. **`DoctorAccountView.tsx`**: For PACKAGE mode, computes `bookedPackagePrice` by parsing `[Purchasing New Pulses Package]: Name (PRICE EGP)` from booking notes. Also reads `originalBookingCommitment = amountPaid + amountLeft` from the booking record. `sessionComputedTotal = max(sessionComputedRaw, bookedPackagePrice, originalBookingCommitment)` — ensuring total is never collapsed to zero for package purchases.
+4. **`BookingDetailsModal.tsx` (session panel)**:
+   - Recovers `bookedPackagePurchasePrice` from booking notes for isLaserPackage bookings.
+   - `totalPrice` for laser modes now uses `max(calculatedTotal, bookedPackagePurchasePrice, rawPaid + rawLeft)` to preserve the original financial commitment.
+   - `isInvoicePaid` now correctly checks `sessionPaid >= totalPrice` (not the rawLeft-zero condition which could false-positive).
+   - `endSessionInvoiceTotal` for isLaserPackage uses `max(computed, bookedPackagePurchasePrice, rawPaid + rawLeft)`.
+   - Payment Mode label now shows "Pulses Package" / "باقة نبضات" (with purple Zap icon) when `isLaserPackage` is true, instead of always falling back to "Standard Service".
+
+**Rule:** When computing session totals for PACKAGE mode laser bookings, NEVER collapse the total to a value less than the original booking commitment (`amountPaid + amountLeft`). Always parse the booked package price from booking notes as a floor for the invoice total.
 
 
 
