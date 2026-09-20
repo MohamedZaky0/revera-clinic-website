@@ -986,4 +986,37 @@ The following are **not currently enforced in code**:
 5. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-072` (`Laser Pulses Package Redemption & Session Completion Engine`).
 
+---
+
+## Multi-Scenario Laser Pulses Package Settlement Rules
+**Enforced in:** `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/DoctorAccountView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/app/admin/page.tsx`, `src/lib/printUtils.ts`.
+
+1. **Scenario 1 (No Active Package Purchase + Session Coverage)**:
+   - When a patient with no active pulses packages attends a laser session with `laserPaymentMode === "PACKAGE"`, they choose an available pulses package from the catalog (e.g. 10,000 Pulses @ 7,000 EGP).
+   - The session invoice bills strictly the price of the purchased package (`+ 7,000 EGP`).
+   - The base laser service itself is 100% covered by the newly purchased package (`0 EGP (Package Redemption)`).
+   - Delivered pulses (e.g. 5,000) are consumed from this new package (`customerPackage.id`), and remaining pulses (5,000) carry forward for future sessions without paying again.
+
+2. **Scenario 2 (Existing Package with Deficit Spillover)**:
+   - When delivered pulses exceed remaining pulses in the active package (e.g. 10,000 delivered vs 5,000 balance -> 5,000 pulse deficit), two resolution choices are presented:
+     - **Choice 3A (Buy New Package)**: The patient purchases a new package. The deficit pulses are deducted from the new package, the package price is billed on the invoice, and remaining pulses carry forward.
+     - **Choice 3B (Pay Rest per Pulse)**: The excess deficit pulses are billed on the invoice at the agreed per-pulse rate (`deficit × pulseRate`, e.g. 5,000 × 1 EGP = 5,000 EGP).
+
+3. **Scenario 3 (Standard Redemption)**:
+   - When pulses delivered <= balance, 0 EGP laser charge on invoice. Pulses are deducted, and balance carries forward.
+
+4. **Mixed Non-Laser Services Session Rule**:
+   - Any non-laser service (consultation, chemical peeling, etc.) rendered during the session is always added at full catalog price on top of the package mode selection (e.g. 7,000 EGP package + 150 EGP non-laser service = 7,150 EGP total invoice).
+
+5. **Universal Settlement Agreement Appearance**:
+   - The purple/emerald **Laser Pulses Package Settlement Agreement Banner** is displayed prominently across:
+     - Doctor Ongoing Session tab (with live remaining pulses preview).
+     - Booking Details Modal (top banner and `Package` badge).
+     - Payment Settlement Modal (checkout notice).
+     - Booking Invoice Preview Modal.
+     - Printed Invoice PDFs (`printUtils.ts`).
+
+6. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-073` (`Multi-Scenario Laser Pulses Package Settlement Engine`).
+
 

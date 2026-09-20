@@ -45,7 +45,17 @@ export function printInvoice(
     booking.laserSettlementNote ||
     String(booking.notes || "").toLowerCase().includes("pay per pulse") ||
     String(booking.notes || "").toLowerCase().includes("per_pulse") ||
-    String(booking.notes || "").includes("[Laser Settlement]")
+    String(booking.notes || "").includes("[Laser Settlement]") && String(booking.notes || "").includes("per pulse")
+  );
+
+  const isPackage = Boolean(
+    booking.laserPaymentMode === "PACKAGE" ||
+    (booking as any).laser_payment_mode === "PACKAGE" ||
+    String(booking.notes || "").toLowerCase().includes("pay with package") ||
+    String(booking.notes || "").toLowerCase().includes("package session") ||
+    String(booking.notes || "").toLowerCase().includes("package redemption") ||
+    String(booking.notes || "").toLowerCase().includes("pulses package") ||
+    String(booking.notes || "").includes("[Laser Package]")
   );
 
   let settlementHtml = '';
@@ -55,6 +65,15 @@ export function printInvoice(
     settlementHtml = `
       <div style="margin-top: 15px; margin-bottom: 20px; padding: 12px 16px; background-color: #FEF9C3; border: 1px solid #FACC15; border-radius: 12px; font-size: 12px; color: #713F12; line-height: 1.5;">
         <strong>⚡ Laser Per-Pulse Settlement / اتفاقية محاسبة نبضات الليزر:</strong><br/>
+        <span>${noteContent}</span>
+      </div>
+    `;
+  } else if (isPackage) {
+    const pkgMatch = String(booking.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
+    const noteContent = pkgMatch ? pkgMatch[1] : 'Laser services in this session are covered by patient pulses package / خدمات الليزر في هذه الجلسة مغطاة بنظام باقات النبضات';
+    settlementHtml = `
+      <div style="margin-top: 15px; margin-bottom: 20px; padding: 12px 16px; background-color: #F3E8FF; border: 1px solid #D8B4FE; border-radius: 12px; font-size: 12px; color: #581C87; line-height: 1.5;">
+        <strong>📦 Laser Package Settlement / اتفاقية باقة نبضات الليزر:</strong><br/>
         <span>${noteContent}</span>
       </div>
     `;
@@ -77,12 +96,22 @@ export function printInvoice(
     })
     .map(
       (s) => {
+        const nameLower = String(s.name || '').toLowerCase();
+        const isLaser = nameLower.includes('laser') || nameLower.includes('ليزر');
+        let displayName = s.name;
+        let uPrice = Number(s.unitPrice !== undefined ? s.unitPrice : (s.price !== undefined ? s.price : 0));
+        let itemTotal = Number(s.total !== undefined ? s.total : (Number(s.qty || 1) * uPrice));
+
+        if (isPackage && isLaser && !nameLower.includes('new package') && !nameLower.includes('excess') && !nameLower.includes('deficit')) {
+          displayName = `${s.name} (Package Redemption)`;
+          uPrice = 0;
+          itemTotal = 0;
+        }
+
         const qty = Number(s.qty) || 1;
-        const uPrice = Number(s.unitPrice !== undefined ? s.unitPrice : (s.price !== undefined ? s.price : 0));
-        const itemTotal = Number(s.total !== undefined ? s.total : (qty * uPrice));
         return `
       <tr>
-        <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: left; color: #111827; font-weight: 600;">${s.name}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: left; color: #111827; font-weight: 600;">${displayName}</td>
         <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: center; color: #4B5563;">${qty}</td>
         <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: right; color: #111827;">EGP ${uPrice.toLocaleString()}</td>
         <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: right; color: #111827; font-weight: bold;">EGP ${itemTotal.toLocaleString()}</td>

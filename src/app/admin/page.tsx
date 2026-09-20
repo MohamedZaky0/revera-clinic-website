@@ -2386,7 +2386,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-069', name: 'Laser Services Multi-Payment Mode & Deficit Spillover Engine', category: 'Services & Bookings', endpoint: '/api/services', description: 'Verifies islaser service flag persistence, 3 laser payment options (Fixed Service, Pay per Pulse, Package), doctor session live math, package deficit spillover choices, and unified laser history logging.', status: 'idle' },
     { id: 'TC-070', name: 'Package Types & Laser Pulses Package Engine', category: 'Services & Bookings', endpoint: '/api/packages', description: 'Verifies package_type (services vs pulses) selection, total_pulses configuration in PackageAdminPanel, /api/packages CRUD validation, and package selling integration.', status: 'idle' },
     { id: 'TC-071', name: 'Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies per-pulse mode rate calculation (delivered_pulses × price_per_pulse) across primary and additional laser services, session line item writing, settlement note persistence, and invoice settlement display.', status: 'idle' },
-    { id: 'TC-072', name: 'Laser Pulses Package Redemption & Session Completion Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies package pulse deduction, UUID-guarded package querying, schema-resilient session completion, 0 EGP base package redemption pricing, and zero duplicate invoice line generation.', status: 'idle' }
+    { id: 'TC-072', name: 'Laser Pulses Package Redemption & Session Completion Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies package pulse deduction, UUID-guarded package querying, schema-resilient session completion, 0 EGP base package redemption pricing, and zero duplicate invoice line generation.', status: 'idle' },
+    { id: 'TC-073', name: 'Multi-Scenario Laser Pulses Package Settlement Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies Scenario 1 (initial package purchase + deduction), Scenario 2 (deficit spillover to new package or per pulse), Scenario 3 (standard redemption), and mixed session add-on pricing.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -9202,7 +9203,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             (checkoutBooking as any)?.laser_payment_mode === "PER_PULSE" ||
             String(checkoutBooking?.notes || "").toLowerCase().includes("pay per pulse") ||
             String(checkoutBooking?.notes || "").toLowerCase().includes("per_pulse") ||
-            String(checkoutBooking?.notes || "").includes("[Laser Settlement]")
+            String(checkoutBooking?.notes || "").includes("[Laser Settlement]") && String(checkoutBooking?.notes || "").includes("per pulse")
+          );
+          const isCheckoutPackage = Boolean(
+            checkoutBooking?.laserPaymentMode === "PACKAGE" ||
+            (checkoutBooking as any)?.laser_payment_mode === "PACKAGE" ||
+            String(checkoutBooking?.notes || "").toLowerCase().includes("pay with package") ||
+            String(checkoutBooking?.notes || "").toLowerCase().includes("package session") ||
+            String(checkoutBooking?.notes || "").toLowerCase().includes("package redemption") ||
+            String(checkoutBooking?.notes || "").toLowerCase().includes("pulses package") ||
+            String(checkoutBooking?.notes || "").includes("[Laser Package]")
           );
           const checkoutPulseRate = Number(
             checkoutBooking?.laserPricePerPulse ||
@@ -9220,6 +9230,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             String(checkoutBooking?.notes || "").match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
             String(checkoutBooking?.notes || "").match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
           const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
+          const checkoutPackageMatch = String(checkoutBooking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
+          const checkoutPackageSettlementText = checkoutPackageMatch ? checkoutPackageMatch[1] : (
+            isRTL
+              ? "تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مغطاة بنظام باقات النبضات"
+              : "Agreed that laser services in this session are covered under patient Pulses Package"
+          );
 
           // 1. Calculate service cost
           const svcIds = Array.isArray(checkoutBooking.serviceIds) ? checkoutBooking.serviceIds : [checkoutBooking.serviceId];
@@ -9245,6 +9261,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 price = 0;
                 pulseDetails = ` (Pay per Pulse @ ${checkoutPulseRate} EGP)`;
               }
+            } else if (isCheckoutPackage && isLaser) {
+              price = 0;
+              pulseDetails = ` (Package Redemption · 0 EGP)`;
             }
 
             // Match service with active package item
@@ -9561,6 +9580,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     </div>
                   )}
 
+                  {/* Laser Package Settlement Agreement Notice */}
+                  {isCheckoutPackage && (
+                    <div className="rounded-2xl border border-purple-300 bg-purple-50/90 p-3.5 text-xs text-purple-900 space-y-1 animate-fadeIn">
+                      <div className="flex items-center gap-1.5 font-bold text-purple-950">
+                        <Package size={15} className="text-purple-700 shrink-0" />
+                        <span>Laser Package Settlement / اتفاقية باقة نبضات الليزر</span>
+                      </div>
+                      <p className="text-[11.5px] leading-relaxed text-purple-800">
+                        {checkoutPackageSettlementText}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Services Invoice details */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
                     <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Services List / الخدمات</p>
@@ -9803,7 +9835,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               invoiceBooking.laserSettlementNote ||
               String(invoiceBooking.notes || "").toLowerCase().includes("pay per pulse") ||
               String(invoiceBooking.notes || "").toLowerCase().includes("per_pulse") ||
-              String(invoiceBooking.notes || "").includes("[Laser Settlement]")
+              String(invoiceBooking.notes || "").includes("[Laser Settlement]") && String(invoiceBooking.notes || "").includes("per pulse")
+            );
+            const isInvoicePackage = Boolean(
+              invoiceBooking.laserPaymentMode === "PACKAGE" ||
+              (invoiceBooking as any)?.laser_payment_mode === "PACKAGE" ||
+              String(invoiceBooking.notes || "").toLowerCase().includes("pay with package") ||
+              String(invoiceBooking.notes || "").toLowerCase().includes("package session") ||
+              String(invoiceBooking.notes || "").toLowerCase().includes("package redemption") ||
+              String(invoiceBooking.notes || "").toLowerCase().includes("pulses package") ||
+              String(invoiceBooking.notes || "").includes("[Laser Package]")
             );
             const invoicePulseRate = Number(
               invoiceBooking.laserPricePerPulse ||
@@ -9819,6 +9860,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 ? `Settled that laser services in this session are charged per pulse (@ ${invoicePulseRate} EGP/pulse) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${invoicePulseRate} ج.م/نبضة)`
                 : ""
             ));
+            const packageSettlementMatch = String(invoiceBooking.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
+            const invoicePackageSettlementText = packageSettlementMatch ? packageSettlementMatch[1] : (
+              isRTL
+                ? "تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مغطاة بنظام باقات النبضات"
+                : "Agreed that laser services in this session are covered under patient Pulses Package"
+            );
 
             const allInvoiceItems = ledgerInvoice.lines.map((line: any) => ({
               name: isRTL ? (line.nameAr || line.nameEn || line.description) : (line.nameEn || line.description),
@@ -9913,6 +9960,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       </div>
                     )}
 
+                    {/* Laser Package Settlement Agreement Notice */}
+                    {isInvoicePackage && (
+                      <div className="rounded-xl border border-purple-300 bg-purple-50/90 p-3 text-xs text-purple-900 space-y-1 animate-fadeIn">
+                        <div className="flex items-center gap-1.5 font-bold text-purple-950">
+                          <Package size={15} className="text-purple-700 shrink-0" />
+                          <span>Laser Package Settlement / اتفاقية باقة نبضات الليزر</span>
+                        </div>
+                        <p className="text-[11.5px] leading-relaxed text-purple-800">
+                          {invoicePackageSettlementText}
+                        </p>
+                      </div>
+                    )}
+
                     {/* Table of Services & Add-ons */}
                     <div className="overflow-x-auto border border-gray-100 rounded-xl bg-white shadow-sm">
                       <table className="w-full text-left text-xs border-collapse">
@@ -10002,7 +10062,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             invoiceBooking.laserSettlementNote ||
             String(invoiceBooking.notes || "").toLowerCase().includes("pay per pulse") ||
             String(invoiceBooking.notes || "").toLowerCase().includes("per_pulse") ||
-            String(invoiceBooking.notes || "").includes("[Laser Settlement]")
+            String(invoiceBooking.notes || "").includes("[Laser Settlement]") && String(invoiceBooking.notes || "").includes("per pulse")
+          );
+          const isInvoicePackage = Boolean(
+            invoiceBooking.laserPaymentMode === "PACKAGE" ||
+            (invoiceBooking as any)?.laser_payment_mode === "PACKAGE" ||
+            String(invoiceBooking.notes || "").toLowerCase().includes("pay with package") ||
+            String(invoiceBooking.notes || "").toLowerCase().includes("package session") ||
+            String(invoiceBooking.notes || "").toLowerCase().includes("package redemption") ||
+            String(invoiceBooking.notes || "").toLowerCase().includes("pulses package") ||
+            String(invoiceBooking.notes || "").includes("[Laser Package]")
           );
           const invoicePulseRate = Number(
             invoiceBooking.laserPricePerPulse ||
@@ -10026,6 +10095,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               ? `Settled that laser services in this session are charged per pulse (@ ${invoicePulseRate} EGP/pulse) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${invoicePulseRate} ج.م/نبضة)`
               : ""
           ));
+          const packageSettlementMatch = String(invoiceBooking.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
+          const invoicePackageSettlementText = packageSettlementMatch ? packageSettlementMatch[1] : (
+            isRTL
+              ? "تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مغطاة بنظام باقات النبضات"
+              : "Agreed that laser services in this session are covered under patient Pulses Package"
+          );
 
           // 1. Calculate service cost
           const svcIds = Array.isArray(invoiceBooking.serviceIds) ? invoiceBooking.serviceIds : (invoiceBooking.serviceId ? [invoiceBooking.serviceId] : []);
@@ -10039,18 +10114,24 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               } else {
                 price = 0;
               }
+            } else if (isInvoicePackage && isLaser) {
+              price = 0;
             }
             return {
               name: (isInvoicePerPulse && isLaser)
                 ? (primaryDeliveredPulses > 0
                     ? `${s?.en || `Service #${id}`} (${primaryDeliveredPulses} pulses × ${invoicePulseRate} EGP)`
                     : `${s?.en || `Service #${id}`} (Pay per Pulse @ ${invoicePulseRate} EGP)`)
-                : (s?.en || `Service #${id}`),
+                : (isInvoicePackage && isLaser)
+                  ? `${s?.en || `Service #${id}`} (Package Redemption · 0 EGP)`
+                  : (s?.en || `Service #${id}`),
               nameAr: (isInvoicePerPulse && isLaser)
                 ? (primaryDeliveredPulses > 0
                     ? `${s?.ar || `خدمة #${id}`} (${primaryDeliveredPulses} نبضة × ${invoicePulseRate} ج.م)`
                     : `${s?.ar || `خدمة #${id}`} (حساب بالنبضة @ ${invoicePulseRate} ج.م)`)
-                : (s?.ar || `خدمة #${id}`),
+                : (isInvoicePackage && isLaser)
+                  ? `${s?.ar || `خدمة #${id}`} (استهلاك باقة · 0 ج.م)`
+                  : (s?.ar || `خدمة #${id}`),
               qty: 1,
               unitPrice: price,
               price: price,
@@ -10328,6 +10409,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       </div>
                       <p className="text-[11.5px] leading-relaxed text-amber-800">
                         {invoiceSettlementText}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Laser Package Settlement Agreement Notice */}
+                  {isInvoicePackage && (
+                    <div className="rounded-xl border border-purple-300 bg-purple-50/90 p-3 text-xs text-purple-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-purple-950">
+                        <Package size={14} className="text-purple-600 shrink-0" />
+                        <span>Laser Package Settlement / اتفاقية محاسبة باقات الليزر</span>
+                      </div>
+                      <p className="text-[11.5px] leading-relaxed text-purple-800">
+                        {invoicePackageSettlementText}
                       </p>
                     </div>
                   )}

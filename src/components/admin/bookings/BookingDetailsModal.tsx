@@ -1227,6 +1227,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         String(booking?.notes || "").toLowerCase().includes("pay per pulse") ||
         String(booking?.notes || "").toLowerCase().includes("per_pulse")
       );
+      const isPackageMode = Boolean(
+        booking?.laserPaymentMode === "PACKAGE" ||
+        (booking as any)?.laser_payment_mode === "PACKAGE" ||
+        String(booking?.notes || "").toLowerCase().includes("package session") ||
+        String(booking?.notes || "").toLowerCase().includes("package redemption") ||
+        String(booking?.notes || "").toLowerCase().includes("pulses package") ||
+        String(booking?.notes || "").includes("[Laser Package]")
+      );
       const pulseRate = Number(
         booking?.laserPricePerPulse ||
         (booking as any)?.laser_price_per_pulse ||
@@ -1315,6 +1323,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const totalLaserCost = totalLaserPulses * pulseRate;
         const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are charged per pulse (${totalLaserPulses} pulses × ${pulseRate} EGP = ${totalLaserCost} EGP) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${totalLaserPulses} نبضة × ${pulseRate} ج.م = ${totalLaserCost} ج.م)`;
         updatedNotes = updatedNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
+      } else if (isPackageMode) {
+        const pkgMatch = String(booking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
+        const pkgDetails = pkgMatch ? pkgMatch[1] : `Delivered ${primaryPulses} pulses covered by pulses package`;
+        const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are covered by Pulses Package (${pkgDetails}) / تم الاتفاق على أن تكون خدمات الليزر مغطاة بباقة النبضات`;
+        updatedNotes = updatedNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
       }
 
       const patchRes = await fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}`, {
@@ -1333,6 +1346,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             laserPaymentMode: "PER_PULSE",
             laser_price_per_pulse: pulseRate,
             laserPricePerPulse: pulseRate,
+            delivered_pulses: primaryPulses,
+          } : isPackageMode ? {
+            laser_payment_mode: "PACKAGE",
+            laserPaymentMode: "PACKAGE",
             delivered_pulses: primaryPulses,
           } : {}),
           ...(rxHasFollowUp && rxFollowUpDate ? { followUpDate: rxFollowUpDate } : {})
@@ -1357,6 +1374,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   laserPaymentMode: "PER_PULSE",
                   laser_price_per_pulse: pulseRate,
                   laserPricePerPulse: pulseRate,
+                  delivered_pulses: primaryPulses,
+                } : isPackageMode ? {
+                  laser_payment_mode: "PACKAGE",
+                  laserPaymentMode: "PACKAGE",
                   delivered_pulses: primaryPulses,
                 } : {}),
               }
@@ -1406,7 +1427,17 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           (booking as any)?.laser_payment_mode === "PER_PULSE" ||
           String(booking?.notes || "").toLowerCase().includes("pay per pulse") ||
           String(booking?.notes || "").toLowerCase().includes("per_pulse") ||
-          String(booking?.notes || "").includes("[Laser Settlement]")
+          String(booking?.notes || "").includes("[Laser Settlement]") && String(booking?.notes || "").includes("per pulse")
+        );
+
+        const isLaserPackage = Boolean(
+          booking?.laserPaymentMode === "PACKAGE" ||
+          (booking as any)?.laser_payment_mode === "PACKAGE" ||
+          String(booking?.notes || "").toLowerCase().includes("pay with package") ||
+          String(booking?.notes || "").toLowerCase().includes("package session") ||
+          String(booking?.notes || "").toLowerCase().includes("package redemption") ||
+          String(booking?.notes || "").toLowerCase().includes("pulses package") ||
+          String(booking?.notes || "").includes("[Laser Package]")
         );
 
         const laserPulseRate = Number(
@@ -1420,6 +1451,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
         const primaryDeliveredPulses = extractPrimaryPulses(String(booking?.notes || ""), booking);
         const settlementMatch = String(booking?.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
+        const packageRedemptionMatch = String(booking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
 
         const bookingServices = selectedServiceIds.map(id => {
           const s = localServices.find(item => item.id === id);
@@ -1435,6 +1467,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               price = 0;
               pulseDetails = ` (Pay per Pulse @ ${laserPulseRate} EGP)`;
             }
+          } else if (isLaserPackage && isLaser) {
+            price = 0;
+            pulseDetails = ` (Package Redemption · 0 EGP)`;
           }
 
           return {
@@ -1606,7 +1641,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const additionalServicesCost = additionalServicesList.reduce((sum, s) => sum + s.total, 0);
         const productsCost = productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
         const calculatedTotal = servicesCost + additionalServicesCost + productsCost;
-        const totalPrice = isLaserPerPulse
+        const totalPrice = (isLaserPerPulse || isLaserPackage)
           ? calculatedTotal
           : Math.max(
               calculatedTotal,
@@ -1635,6 +1670,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
         const baseBookingPrice = (isLaserPerPulse && isPrimaryLaser)
           ? (primaryPulses * laserPulseRate)
+          : (isLaserPackage && isPrimaryLaser)
+          ? 0
           : catalogPrice;
 
         const additionalServicesSubtotal = additionalServices.reduce((sum, item) => {
@@ -2895,6 +2932,45 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </div>
                   )}
 
+                  {/* Laser Pulses Package Settlement Agreement Banner */}
+                  {isLaserPackage && (
+                    <div className="rounded-2xl border border-purple-300 bg-gradient-to-r from-purple-50 via-purple-50/90 to-purple-100/60 p-4 text-xs text-purple-950 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fadeIn">
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className="h-10 w-10 rounded-2xl bg-purple-500/20 text-purple-800 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                          <Sparkles size={20} className="text-purple-700 fill-purple-600" />
+                        </div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-black text-purple-950 text-sm">
+                              {isRTL ? "نظام المحاسبة: باقة نبضات الليزر" : "Payment Mode: Pulses Package"}
+                            </span>
+                            <span className="rounded-full bg-purple-200/90 px-2.5 py-0.5 text-[10.5px] font-black text-purple-950 border border-purple-300 shadow-2xs">
+                              {isRTL ? "تغطية باقة" : "Package Covered"}
+                            </span>
+                          </div>
+                          <p className="text-[11.5px] text-purple-900 font-medium mt-0.5 leading-relaxed">
+                            {packageRedemptionMatch ? packageRedemptionMatch[1] : (
+                              isRTL
+                                ? "تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مغطاة بنظام باقات النبضات"
+                                : "Agreed that laser services in this session are covered under patient Pulses Package"
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      {primaryDeliveredPulses > 0 && (
+                        <div className="text-left sm:text-right shrink-0 bg-white/80 sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:rounded-none w-full sm:w-auto border sm:border-0 border-purple-200">
+                          <span className="text-[10px] text-purple-800 font-bold block uppercase tracking-wider">
+                            {isRTL ? "النبضات المستهلكة من الباقة" : "Package Pulses Redeemed"}
+                          </span>
+                          <span className="font-black text-sm sm:text-base text-purple-950 flex items-center sm:justify-end gap-1 mt-0.5">
+                            <Sparkles size={14} className="text-purple-600 fill-purple-500" />
+                            <span>{primaryDeliveredPulses} {isRTL ? "نبضة" : "pulses"}</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* 2. 3-METRICS ROW: SERVICE, DATE & TIME, SESSION TYPE & PAYMENT MODE */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* Card A: SERVICE */}
@@ -2962,21 +3038,28 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           <User size={13} className="text-[#0F3826]" />
                           <span>SESSION TYPE</span>
                         </div>
-                        {isLaserPerPulse && (
+                        {isLaserPerPulse ? (
                           <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[9px] font-black text-amber-800">
                             <Zap size={9} className="text-amber-600 fill-amber-500" />
                             <span>Per Pulse</span>
                           </span>
-                        )}
+                        ) : isLaserPackage ? (
+                          <span className="inline-flex items-center gap-0.5 rounded-md bg-purple-50 border border-purple-200 px-1.5 py-0.5 text-[9px] font-black text-purple-800">
+                            <Sparkles size={9} className="text-purple-600 fill-purple-500" />
+                            <span>Package</span>
+                          </span>
+                        ) : null}
                       </div>
                       <p className="font-black text-xs text-[#1F251A] pt-0.5">
                         {booking.sessionType === 'online' ? "Online Consultation" : "In Person"}
                       </p>
                       <p className="text-xs text-[#5A6A51] font-medium flex items-center gap-1.5">
-                        <span className={`h-2 w-2 rounded-full ${booking.sessionType === 'online' ? 'bg-blue-500' : isLaserPerPulse ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                        <span className={`h-2 w-2 rounded-full ${booking.sessionType === 'online' ? 'bg-blue-500' : isLaserPerPulse ? 'bg-amber-500' : isLaserPackage ? 'bg-purple-500' : 'bg-emerald-500'}`} />
                         <span>
                           {isLaserPerPulse 
                             ? `Pay per Pulse (@ ${laserPulseRate} EGP)` 
+                            : isLaserPackage
+                            ? "Pay with Pulses Package"
                             : (booking.sessionType === 'online' ? "Virtual Consultation" : "In Clinic Visit")}
                         </span>
                       </p>

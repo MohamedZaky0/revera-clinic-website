@@ -2377,6 +2377,41 @@ The clinic required a complete, multi-tiered laser pulse counting and accounting
 5. **Automated Diagnostic Verification:**
    - Added test case `TC-072` ("Laser Pulses Package Redemption & Session Completion Engine") to `INITIAL_SYSTEM_TEST_SUITES`.
 
+---
+
+## DEC-069: Multi-Scenario Laser Pulses Package Settlement Architecture
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. In `laserPaymentMode === "PACKAGE"`, clinics encounter multiple real-world scenarios:
+   - **Scenario 1 (No existing package)**: A patient without an active pulses package books a laser session and selects Package mode. The patient must be able to select and purchase a new pulses package during the session checkout. The session invoice charges only the price of the purchased package (the laser session itself is 100% covered). Pulses delivered in this session are deducted from this new package, and the remaining pulses carry forward for future sessions without paying again.
+   - **Scenario 2 (Existing package + Deficit spillover)**: When delivered pulses exceed remaining pulses in the patient's existing package (e.g. 10,000 delivered vs 5,000 remaining = 5,000 pulse deficit), the system offers two explicit resolution choices:
+     - **Choice 3A (Buy New Package)**: The patient purchases a new package. The deficit pulses are deducted from the new package, the new package price is charged on the invoice, and remaining pulses carry forward.
+     - **Choice 3B (Pay per pulse)**: The patient pays for the deficit pulses at the agreed per-pulse rate (`deficit × pulseRate`).
+   - **Scenario 3 (Standard redemption)**: The patient has sufficient pulses. 0 EGP laser charge on invoice, pulses are deducted, remaining balance carries forward.
+   - **Mixed Sessions**: Non-laser services (e.g. consultations, peelings) attached to the session are always added at full catalog price on top of the package mode choice (e.g. 7,000 EGP package + 150 EGP non-laser service = 7,150 EGP total invoice).
+2. The package settlement agreement notice and badge must be surfaced prominently across the entire booking lifecycle: Doctor Ongoing Session live breakdown, Receptionist Booking Details modal, Payment Settlement checkout modal, Invoice Preview modal, and printed invoice PDFs with bilingual EN/AR statement.
+
+**Decisions & Implementation:**
+1. **Doctor Ongoing Session Engine (`DoctorOngoingSessionTab.tsx` & `DoctorAccountView.tsx`):**
+   - Added live detection for `isNoActivePackage` in Mode 3 (`PACKAGE`), rendering the **Scenario 1 Package Selection Card** with searchable package picker, pulse delivery input with quick presets, live remaining balance calculation (`packageTotalPulses - deliveredPulses`), and invoice breakdown preview.
+   - For Scenario 2, upgraded **Package Deficit Spillover Card** with side-by-side **Choice 3A** (Buy New Package) and **Choice 3B** (Pay per pulse) cards, live deficit calculations, and invoice impact breakdowns.
+   - In `DoctorAccountView.tsx`, integrated automated package purchase via `POST /api/packages/sell`, captures the resulting `customerPackage.id`, and automatically calls `PATCH /api/customers/packages` (`consume_package_pulses`) for both Scenario 1 and Scenario 2 Choice 3A, plus Choice 3B excess pulse lines and standard redemption.
+   - Formatted bilingual completion notes with `[Laser Package Redemption]` and `[Laser Settlement]` tags.
+2. **Booking Details Modal & Settlement Notice (`BookingDetailsModal.tsx`):**
+   - Automatically detects package redemption matches from notes or `laserPaymentMode === "PACKAGE"`.
+   - Zeros out the base laser service price (`0 EGP (Package Redemption)`), ensuring the patient is not double-charged for the procedure while preserving the service line for clinical audit trails.
+   - Renders a prominent purple/emerald **Laser Pulses Package Settlement Agreement Banner** at the top of the modal and an explicit `Package` badge in the 3-metrics row.
+   - Supports mixed sessions by combining package purchases/deficit lines with standard non-laser services.
+3. **Checkout, Invoice Modal & PDF Print Engine (`src/app/admin/page.tsx` & `src/lib/printUtils.ts`):**
+   - In Payment Settlement checkout modal and Invoice Preview modals, dynamically identifies package sessions and renders the bilingual **Laser Package Settlement Notice**.
+   - Zeroes out the base laser service line (`(Package Redemption · 0 EGP) / (استهلاك باقة · 0 ج.م)`).
+   - In `printUtils.ts`, renders the `📦 Laser Package Settlement` agreement banner in the printed PDF and formats the laser service row at 0 EGP with redemption notes.
+4. **Admin Settings System Test Suite Diagnostic Verification:**
+   - Added test case `TC-073` ("Multi-Scenario Laser Pulses Package Settlement Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
+
 
 
 
