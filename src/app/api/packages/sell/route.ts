@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       supabaseServer.from('customers').select('id').eq('id', customerId).maybeSingle(),
       supabaseServer
         .from('packages')
-        .select('id, name, branch_id, price, tax_rate, validity_days, active')
+        .select('id, name, branch_id, price, tax_rate, validity_days, active, package_type, total_pulses')
         .eq('id', packageId)
         .maybeSingle(),
       supabaseServer
@@ -83,16 +83,41 @@ export async function POST(req: Request) {
     if (!customerResult.data) {
       return NextResponse.json({ error: 'Customer not found.' }, { status: 404 });
     }
-    if (packageResult.error) throw packageResult.error;
+    
+    let pkgData: any = packageResult.data;
+    if (packageResult.error && (packageResult.error.message?.includes('column') || packageResult.error.code === '42703')) {
+      const fallbackPkgRes = await supabaseServer
+        .from('packages')
+        .select('id, name, branch_id, price, tax_rate, validity_days, active')
+        .eq('id', packageId)
+        .maybeSingle();
+      if (fallbackPkgRes.error) throw fallbackPkgRes.error;
+      pkgData = fallbackPkgRes.data;
+    } else if (packageResult.error) {
+      throw packageResult.error;
+    }
 
-    const pkg = packageResult.data as (PackageRecord & { package_type?: string; total_pulses?: number }) | null;
+    const pkg = pkgData as (PackageRecord & { package_type?: string; total_pulses?: number }) | null;
     if (!pkg || !pkg.active) {
       return NextResponse.json({ error: 'Active package not found.' }, { status: 404 });
     }
     if (packageItemsResult.error) throw packageItemsResult.error;
 
     const packageItems = (packageItemsResult.data || []) as PackageItemRecord[];
-    const isPulsesPkg = pkg.package_type === 'pulses' || Number(pkg.total_pulses || 0) > 0;
+    const extractedPulsesFromName = (() => {
+      const m = String(pkg.name || '').match(/(\d+(?:,\d+)?)\s*(?:pulses|نبضة|نبضات)/i);
+      return m ? Number(m[1].replace(/,/g, '')) : 0;
+    })();
+
+    const isPulsesPkg = Boolean(
+      pkg.package_type === 'pulses' ||
+      Number(pkg.total_pulses || 0) > 0 ||
+      extractedPulsesFromName > 0 ||
+      pkg.name?.toLowerCase().includes('pulse') ||
+      pkg.name?.includes('نبضة') ||
+      pkg.name?.includes('نبضات')
+    );
+
     if (!isPulsesPkg && (packageItems.length === 0 || packageItems.some((item) => !Number.isInteger(item.qty) || item.qty <= 0))) {
       return NextResponse.json({ error: 'Package must contain at least one service with a positive quantity.' }, { status: 400 });
     }

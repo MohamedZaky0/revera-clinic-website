@@ -343,7 +343,7 @@ async function writeCheckoutInvoice(params: {
 
   const { data: services, error: svcErr } = await supabaseServer
     .from('services')
-    .select('id, en, price, branch_pricing')
+    .select('id, en, ar, name, price, branch_pricing, islaser, is_laser, category')
     .in('id', serviceIds);
   if (svcErr) throw svcErr;
   if (!services || services.length === 0) return;
@@ -367,26 +367,48 @@ async function writeCheckoutInvoice(params: {
       return m ? Number(m[1]) : 1;
     })()
   ) || 1;
-  const primaryPulsesMatch = String(resRow?.notes || '').match(/(?:\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*|\[Laser Pulses Delivered\]:\s*|Primary:\s*|\[Extra Device Pulses\]:\s*)(\d+)/i);
+  const primaryPulsesMatch = String(resRow?.notes || '').match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
+    String(resRow?.notes || '').match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
+    String(resRow?.notes || '').match(/Primary:\s*(\d+)\s*pulses/i) ||
+    String(resRow?.notes || '').match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
+    String(resRow?.notes || '').match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
+    String(resRow?.notes || '').match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
+    String(resRow?.notes || '').match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
   const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
 
   const lines = services.map((svc: any) => {
     const isLaser = Boolean(
+      svc.islaser ||
+      svc.is_laser ||
       (svc.en && svc.en.toLowerCase().includes('laser')) ||
+      (svc.name && svc.name.toLowerCase().includes('laser')) ||
+      (svc.ar && svc.ar.includes('ليزر')) ||
       (svc.category && String(svc.category).toLowerCase().includes('laser'))
     );
 
-    if (isPerPulseMode && isLaser && primaryDeliveredPulses > 0) {
-      const perPulseTotal = primaryDeliveredPulses * pulseRate;
-      return buildInvoiceLine({
-        lineType: 'service',
-        description: `${svc.en || `Service #${svc.id}`} (${primaryDeliveredPulses} pulses × ${pulseRate} EGP)`,
-        qty: 1,
-        unitPrice: perPulseTotal,
-        discount: 0,
-        serviceId: svc.id,
-        providerId: providerId ?? undefined,
-      });
+    if (isPerPulseMode && isLaser) {
+      if (primaryDeliveredPulses > 0) {
+        const perPulseTotal = primaryDeliveredPulses * pulseRate;
+        return buildInvoiceLine({
+          lineType: 'service',
+          description: `${svc.en || svc.name || `Service #${svc.id}`} (${primaryDeliveredPulses} pulses × ${pulseRate} EGP)`,
+          qty: 1,
+          unitPrice: perPulseTotal,
+          discount: 0,
+          serviceId: svc.id,
+          providerId: providerId ?? undefined,
+        });
+      } else {
+        return buildInvoiceLine({
+          lineType: 'service',
+          description: `${svc.en || svc.name || `Service #${svc.id}`} (Pay per Pulse @ ${pulseRate} EGP)`,
+          qty: 1,
+          unitPrice: 0,
+          discount: 0,
+          serviceId: svc.id,
+          providerId: providerId ?? undefined,
+        });
+      }
     }
 
     const priceDetails = getServicePriceDetails(
@@ -426,16 +448,24 @@ async function writeCheckoutInvoice(params: {
   if (rpErr) {
     console.error('Failed to fetch pending reservation_products for invoice (non-fatal, service lines still write):', rpErr.message, '| reservation:', reservationId);
   }
-  const addonLines = (pendingReservationProducts || []).map((p: any) =>
-    buildInvoiceLine({
-      lineType: 'product',
-      description: p.description,
-      qty: Number(p.qty) || 1,
-      unitPrice: Number(p.unit_price) || 0,
-      serviceId: p.line_type === 'additional_service' ? (p.service_id ?? undefined) : undefined,
-      providerId: providerId ?? undefined,
+  const addonLines = (pendingReservationProducts || [])
+    .filter((p: any) => {
+      // In per-pulse mode, device_pulses are purely equipment tracking and should not be billed as an extra customer product
+      if (isPerPulseMode && p.line_type === 'device_pulses') return false;
+      const isZeroCostPulse = (p.line_type === 'device_pulses' || String(p.description || '').toLowerCase().includes('pulse')) && Number(p.unit_price || 0) === 0;
+      if (isZeroCostPulse) return false;
+      return true;
     })
-  );
+    .map((p: any) =>
+      buildInvoiceLine({
+        lineType: p.line_type === 'additional_service' ? 'service' : 'product',
+        description: p.description,
+        qty: Number(p.qty) || 1,
+        unitPrice: Number(p.unit_price) || 0,
+        serviceId: p.line_type === 'additional_service' ? (p.service_id ?? undefined) : undefined,
+        providerId: providerId ?? undefined,
+      })
+    );
 
   const allLines = [...lines, ...addonLines];
   const totals = buildInvoiceTotals(allLines);
@@ -1561,7 +1591,7 @@ export async function PATCH(req: Request) {
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
-    } else if (status || notes !== undefined || doctorNotes !== undefined || receptionNotes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined || newDate !== undefined || followUpDate !== undefined || body.follow_up_date !== undefined) {
+    } else if (status || notes !== undefined || doctorNotes !== undefined || receptionNotes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined || newDate !== undefined || followUpDate !== undefined || body.follow_up_date !== undefined || body.laserPaymentMode !== undefined || body.laser_payment_mode !== undefined || body.laserPricePerPulse !== undefined || body.laser_price_per_pulse !== undefined || body.total_price !== undefined || body.totalPrice !== undefined || body.price !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (status === 'completed' && target.status !== 'completed') {
@@ -1608,6 +1638,13 @@ export async function PATCH(req: Request) {
       else if (body.follow_up_date !== undefined) updates.follow_up_date = body.follow_up_date || null;
       if (body.follow_up_notes !== undefined) updates.follow_up_notes = body.follow_up_notes || null;
       else if (body.followUpNotes !== undefined) updates.follow_up_notes = body.followUpNotes || null;
+      if (body.laserPaymentMode !== undefined) updates.laser_payment_mode = body.laserPaymentMode;
+      if (body.laser_payment_mode !== undefined) updates.laser_payment_mode = body.laser_payment_mode;
+      if (body.laserPricePerPulse !== undefined) updates.laser_price_per_pulse = body.laserPricePerPulse;
+      if (body.laser_price_per_pulse !== undefined) updates.laser_price_per_pulse = body.laser_price_per_pulse;
+      if (body.total_price !== undefined) updates.total_price = Number(body.total_price);
+      else if (body.totalPrice !== undefined) updates.total_price = Number(body.totalPrice);
+      if (body.price !== undefined) updates.price = Number(body.price);
 
       // Determine total service cost to accurately resolve amount_left if null or missing
       const effectiveServiceIds: number[] =
@@ -1618,6 +1655,30 @@ export async function PATCH(req: Request) {
             : (serviceId !== undefined ? Number(serviceId) : target.service_id)
               ? [serviceId !== undefined ? Number(serviceId) : Number(target.service_id)]
               : [];
+
+      const isPerPulseMode = Boolean(
+        updates.laser_payment_mode === 'PER_PULSE' ||
+        target.laser_payment_mode === 'PER_PULSE' ||
+        String(updates.notes || target.notes || '').toLowerCase().includes('pay per pulse') ||
+        String(updates.notes || target.notes || '').toLowerCase().includes('per_pulse') ||
+        String(updates.notes || target.notes || '').includes('[Laser Settlement]')
+      );
+      const pulseRate = Number(
+        updates.laser_price_per_pulse ||
+        target.laser_price_per_pulse ||
+        (() => {
+          const m = String(updates.notes || target.notes || '').match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+          return m ? Number(m[1]) : 1;
+        })()
+      ) || 1;
+      const primaryPulsesMatch = String(updates.notes || target.notes || '').match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
+        String(updates.notes || target.notes || '').match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
+        String(updates.notes || target.notes || '').match(/Primary:\s*(\d+)\s*pulses/i) ||
+        String(updates.notes || target.notes || '').match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
+        String(updates.notes || target.notes || '').match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
+        String(updates.notes || target.notes || '').match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
+        String(updates.notes || target.notes || '').match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
+      const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
 
       let derivedTotalCost = 0;
       if (effectiveServiceIds.length > 0) {
@@ -1638,10 +1699,21 @@ export async function PATCH(req: Request) {
 
         const { data: svcs } = await supabaseServer
           .from('services')
-          .select('id, price, branch_pricing')
+          .select('id, en, ar, name, price, branch_pricing, islaser, is_laser, category')
           .in('id', effectiveServiceIds);
         if (svcs && svcs.length > 0) {
           derivedTotalCost = svcs.reduce((sum: number, s: any) => {
+            const isLaser = Boolean(
+              s.islaser ||
+              s.is_laser ||
+              (s.en && s.en.toLowerCase().includes('laser')) ||
+              (s.name && s.name.toLowerCase().includes('laser')) ||
+              (s.ar && s.ar.includes('ليزر')) ||
+              (s.category && String(s.category).toLowerCase().includes('laser'))
+            );
+            if (isPerPulseMode && isLaser) {
+              return sum + (primaryDeliveredPulses > 0 ? (primaryDeliveredPulses * pulseRate) : 0);
+            }
             const mappedService = { price: s.price !== null ? Number(s.price) : 0, branchPricing: s.branch_pricing };
             return sum + getEffectiveServicePrice(mappedService, targetBranchName);
           }, 0);
@@ -1653,11 +1725,17 @@ export async function PATCH(req: Request) {
       try {
         const { data: resProducts } = await supabaseServer
           .from('reservation_products')
-          .select('total, unit_price, price, qty')
+          .select('line_type, description, total, unit_price, price, qty')
           .eq('reservation_id', id);
         if (resProducts && resProducts.length > 0) {
           attachedProductsCost = resProducts.reduce(
-            (sum: number, p: any) => sum + (Number(p.total) || (Number(p.qty || 1) * Number(p.unit_price || p.price || 0))),
+            (sum: number, p: any) => {
+              // In per-pulse mode, skip device_pulses lines so pulses are not double-counted
+              if (isPerPulseMode && p.line_type === 'device_pulses') return sum;
+              const isZeroCostPulse = (p.line_type === 'device_pulses' || String(p.description || '').toLowerCase().includes('pulse')) && Number(p.unit_price || 0) === 0;
+              if (isZeroCostPulse) return sum;
+              return sum + (Number(p.total) || (Number(p.qty || 1) * Number(p.unit_price || p.price || 0)));
+            },
             0
           );
         }

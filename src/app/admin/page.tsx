@@ -9211,7 +9211,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               return m ? Number(m[1]) : 1;
             })()
           ) || 1;
-          const primaryPulsesMatch = String(checkoutBooking?.notes || "").match(/(?:\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*|\[Laser Pulses Delivered\]:\s*|Primary:\s*|\[Extra Device Pulses\]:\s*)(\d+)/i);
+          const primaryPulsesMatch = String(checkoutBooking?.notes || "").match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
+            String(checkoutBooking?.notes || "").match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
+            String(checkoutBooking?.notes || "").match(/Primary:\s*(\d+)\s*pulses/i) ||
+            String(checkoutBooking?.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
+            String(checkoutBooking?.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
+            String(checkoutBooking?.notes || "").match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
+            String(checkoutBooking?.notes || "").match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
           const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
 
           // 1. Calculate service cost
@@ -9230,9 +9236,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             let price = details ? details.discountedPrice : 500;
             let pulseDetails = "";
 
-            if (isCheckoutPerPulse && isLaser && primaryDeliveredPulses > 0) {
-              price = primaryDeliveredPulses * checkoutPulseRate;
-              pulseDetails = ` (${primaryDeliveredPulses} pulses × ${checkoutPulseRate} EGP)`;
+            if (isCheckoutPerPulse && isLaser) {
+              if (primaryDeliveredPulses > 0) {
+                price = primaryDeliveredPulses * checkoutPulseRate;
+                pulseDetails = ` (${primaryDeliveredPulses} pulses × ${checkoutPulseRate} EGP)`;
+              } else {
+                price = 0;
+                pulseDetails = ` (Pay per Pulse @ ${checkoutPulseRate} EGP)`;
+              }
             }
 
             // Match service with active package item
@@ -9270,6 +9281,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             const total = Number(item.total) || (qty * unitPrice);
             const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
 
+            if (isCheckoutPerPulse && lineType === 'device_pulses') {
+              continue;
+            }
             const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
             if (isPulse && (total === 0 || unitPrice === 0)) {
               continue;
@@ -9361,14 +9375,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               }
             }
 
-            // e) Extra Device Pulses matches
-            const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
-            for (const match of pulseMatches) {
-              const name = "Extra Device Pulses";
-              const total = parseFloat(match[2]) || 0;
-              if (total > 0 && !existingCheckoutNames.has(name.toLowerCase())) {
-                existingCheckoutNames.add(name.toLowerCase());
-                checkoutProductsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses' });
+            // e) Extra Device Pulses matches (only in non-per-pulse mode)
+            if (!isCheckoutPerPulse) {
+              const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
+              for (const match of pulseMatches) {
+                const name = "Extra Device Pulses";
+                const total = parseFloat(match[2]) || 0;
+                if (total > 0 && !existingCheckoutNames.has(name.toLowerCase())) {
+                  existingCheckoutNames.add(name.toLowerCase());
+                  checkoutProductsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses' });
+                }
               }
             }
 
@@ -9390,7 +9406,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const baseAndAttachedTotal = baseServicesTotal + checkoutAdditionalServicesList.reduce((sum, s) => sum + s.total, 0) + checkoutProductsConsumablesList.reduce((sum, p) => sum + p.total, 0);
           let targetCheckoutTotal = baseAndAttachedTotal;
 
-          if (checkoutBooking.notes) {
+          if (checkoutBooking.notes && !isCheckoutPerPulse) {
             const invMatch = String(checkoutBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
             if (invMatch) {
               const notedTotal = Number(invMatch[1]);
@@ -9995,7 +10011,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               return m ? Number(m[1]) : 1;
             })()
           ) || 1;
-          const primaryPulsesMatch = String(invoiceBooking.notes || "").match(/(?:\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*|\[Laser Pulses Delivered\]:\s*|Primary:\s*|\[Extra Device Pulses\]:\s*)(\d+)/i);
+          const primaryPulsesMatch = String(invoiceBooking.notes || "").match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
+            String(invoiceBooking.notes || "").match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
+            String(invoiceBooking.notes || "").match(/Primary:\s*(\d+)\s*pulses/i) ||
+            String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
+            String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
+            String(invoiceBooking.notes || "").match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
+            String(invoiceBooking.notes || "").match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
           const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
           const settlementMatch = String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
           const invoiceSettlementText = invoiceBooking.laserSettlementNote || (settlementMatch ? settlementMatch[1] : (
@@ -10010,15 +10032,23 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             const s = localServices.find(srv => srv.id === id);
             const isLaser = checkIsLaserService(s);
             let price = s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500;
-            if (isInvoicePerPulse && isLaser && primaryDeliveredPulses > 0) {
-              price = primaryDeliveredPulses * invoicePulseRate;
+            if (isInvoicePerPulse && isLaser) {
+              if (primaryDeliveredPulses > 0) {
+                price = primaryDeliveredPulses * invoicePulseRate;
+              } else {
+                price = 0;
+              }
             }
             return {
-              name: (isInvoicePerPulse && isLaser && primaryDeliveredPulses > 0)
-                ? `${s?.en || `Service #${id}`} (${primaryDeliveredPulses} pulses × ${invoicePulseRate} EGP)`
+              name: (isInvoicePerPulse && isLaser)
+                ? (primaryDeliveredPulses > 0
+                    ? `${s?.en || `Service #${id}`} (${primaryDeliveredPulses} pulses × ${invoicePulseRate} EGP)`
+                    : `${s?.en || `Service #${id}`} (Pay per Pulse @ ${invoicePulseRate} EGP)`)
                 : (s?.en || `Service #${id}`),
-              nameAr: (isInvoicePerPulse && isLaser && primaryDeliveredPulses > 0)
-                ? `${s?.ar || `خدمة #${id}`} (${primaryDeliveredPulses} نبضة × ${invoicePulseRate} ج.م)`
+              nameAr: (isInvoicePerPulse && isLaser)
+                ? (primaryDeliveredPulses > 0
+                    ? `${s?.ar || `خدمة #${id}`} (${primaryDeliveredPulses} نبضة × ${invoicePulseRate} ج.م)`
+                    : `${s?.ar || `خدمة #${id}`} (حساب بالنبضة @ ${invoicePulseRate} ج.م)`)
                 : (s?.ar || `خدمة #${id}`),
               qty: 1,
               unitPrice: price,
@@ -10044,7 +10074,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             const total = Number(item.total) || (qty * unitPrice);
             const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
 
-            // Skip device pulses counters from customer invoice
+            // Skip device pulses counters in per-pulse mode or zero-cost counters
+            if (isInvoicePerPulse && lineType === 'device_pulses') {
+              continue;
+            }
             const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
             if (isPulse && (total === 0 || unitPrice === 0)) {
               continue;

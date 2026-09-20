@@ -128,12 +128,20 @@ export function parseAdditionalServiceLine(trimmed: string): { name: string; qty
   return null;
 }
 
-export function extractPrimaryPulses(notes: string): number {
+export function extractPrimaryPulses(notes: string, booking?: any): number {
+  if (booking) {
+    if (typeof booking.delivered_pulses === "number" && booking.delivered_pulses > 0) return booking.delivered_pulses;
+    if (typeof booking.deliveredPulses === "number" && booking.deliveredPulses > 0) return booking.deliveredPulses;
+    if (typeof booking.primaryPulses === "number" && booking.primaryPulses > 0) return booking.primaryPulses;
+  }
   if (!notes) return 0;
   const m = notes.match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
             notes.match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
             notes.match(/Primary:\s*(\d+)\s*pulses/i) ||
-            notes.match(/\[Extra Device Pulses\]:\s*(\d+)/i);
+            notes.match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
+            notes.match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
+            notes.match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
+            notes.match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
   return m ? Number(m[1]) : 0;
 }
 
@@ -1318,6 +1326,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           amountLeft: finalAmountLeft,
           total_price: finalInvoiceAmount,
           price: finalInvoiceAmount,
+          ...(isPerPulseMode ? {
+            laser_payment_mode: "PER_PULSE",
+            laserPaymentMode: "PER_PULSE",
+            laser_price_per_pulse: pulseRate,
+            laserPricePerPulse: pulseRate,
+            delivered_pulses: primaryPulses,
+          } : {}),
           ...(rxHasFollowUp && rxFollowUpDate ? { followUpDate: rxFollowUpDate } : {})
         })
       });
@@ -1334,7 +1349,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 notes: updatedNotes,
                 amountLeft: finalAmountLeft,
                 total_price: finalInvoiceAmount,
-                price: finalInvoiceAmount
+                price: finalInvoiceAmount,
+                ...(isPerPulseMode ? {
+                  laser_payment_mode: "PER_PULSE",
+                  laserPaymentMode: "PER_PULSE",
+                  laser_price_per_pulse: pulseRate,
+                  laserPricePerPulse: pulseRate,
+                  delivered_pulses: primaryPulses,
+                } : {}),
               }
             : null
         );
@@ -1394,7 +1416,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           })()
         ) || 1;
 
-        const primaryDeliveredPulses = extractPrimaryPulses(String(booking?.notes || ""));
+        const primaryDeliveredPulses = extractPrimaryPulses(String(booking?.notes || ""), booking);
         const settlementMatch = String(booking?.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
 
         const bookingServices = selectedServiceIds.map(id => {
@@ -1403,11 +1425,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           let price = s ? getEffectiveServicePrice(s, booking.branchId, branches) : (prices[id] ?? 500);
           let pulseDetails = "";
 
-          if (isLaserPerPulse && isLaser && primaryDeliveredPulses > 0) {
-            price = primaryDeliveredPulses * laserPulseRate;
-            pulseDetails = ` (${primaryDeliveredPulses} pulses × ${laserPulseRate} EGP)`;
-          } else if (isLaserPerPulse && isLaser) {
-            pulseDetails = ` (Per pulse @ ${laserPulseRate} EGP)`;
+          if (isLaserPerPulse && isLaser) {
+            if (primaryDeliveredPulses > 0) {
+              price = primaryDeliveredPulses * laserPulseRate;
+              pulseDetails = ` (${primaryDeliveredPulses} pulses × ${laserPulseRate} EGP)`;
+            } else {
+              price = 0;
+              pulseDetails = ` (Pay per Pulse @ ${laserPulseRate} EGP)`;
+            }
           }
 
           return {
@@ -1441,7 +1466,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const total = Number(item.total) || (qty * unitPrice);
           const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
 
-          // Skip zero-cost device pulse counter tracking from billing products list
+          // Skip device pulse counters from billing products list in per-pulse mode or zero-cost tracking
+          if (isLaserPerPulse && lineType === 'device_pulses') {
+            continue;
+          }
           const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
           if (isPulse && (total === 0 || unitPrice === 0)) {
             continue;
@@ -1529,14 +1557,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             }
           }
 
-          // e) Extra Device Pulses matches
-          const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
-          for (const match of pulseMatches) {
-            const name = "Extra Device Pulses";
-            const total = parseFloat(match[2]) || 0;
-            if (total > 0 && !existingNames.has(name.toLowerCase())) {
-              existingNames.add(name.toLowerCase());
-              productsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses', addedBy: 'Doctor Session' });
+          // e) Extra Device Pulses matches (only in non-per-pulse mode)
+          if (!isLaserPerPulse) {
+            const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
+            for (const match of pulseMatches) {
+              const name = "Extra Device Pulses";
+              const total = parseFloat(match[2]) || 0;
+              if (total > 0 && !existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                productsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses', addedBy: 'Doctor Session' });
+              }
             }
           }
 
@@ -1559,7 +1589,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const baseAndAttachedTotal = servicesCost + additionalServicesList.reduce((sum, s) => sum + s.total, 0) + productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
         let targetInvoiceTotal = baseAndAttachedTotal;
 
-        if (booking.notes) {
+        if (booking.notes && !isLaserPerPulse) {
           const invMatch = String(booking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP|Invoice Value:\s*(\d+(?:\.\d+)?)\s*EGP/i);
           if (invMatch) {
             const notedTotal = Number(invMatch[1] || invMatch[2]);
@@ -1574,11 +1604,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const additionalServicesCost = additionalServicesList.reduce((sum, s) => sum + s.total, 0);
         const productsCost = productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
         const calculatedTotal = servicesCost + additionalServicesCost + productsCost;
-        const totalPrice = Math.max(
-          calculatedTotal,
-          targetInvoiceTotal,
-          rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
-        );
+        const totalPrice = isLaserPerPulse
+          ? calculatedTotal
+          : Math.max(
+              calculatedTotal,
+              targetInvoiceTotal,
+              rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
+            );
 
         const sessionPaid = rawPaid;
         const sessionLeft = (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)))

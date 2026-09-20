@@ -288,13 +288,13 @@ export function PackageAdminPanel({ session }: { session: any }) {
                     <td className="px-5 py-3 font-medium text-[#1F251A]">{pkg.name}</td>
                     <td className="px-5 py-3 text-left">
                       {isPulses ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-900 shadow-2xs">
-                          <Zap size={12} className="text-amber-600 fill-amber-500" />
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10.5px] font-bold text-amber-900 shadow-2xs whitespace-nowrap">
+                          <Zap size={10} className="text-amber-600 fill-amber-500 shrink-0" />
                           <span>Laser Pulses</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EDF1EC] border border-[#414E36]/15 px-2.5 py-1 text-xs font-bold text-[#414E36]">
-                          <Package size={12} />
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#EDF1EC] border border-[#414E36]/15 px-2 py-0.5 text-[10.5px] font-bold text-[#414E36] whitespace-nowrap">
+                          <Package size={10} className="shrink-0" />
                           <span>Services</span>
                         </span>
                       )}
@@ -310,11 +310,11 @@ export function PackageAdminPanel({ session }: { session: any }) {
                     </td>
                     <td className="px-5 py-3 text-center text-[#5A6A51]">
                       {isPulses ? (
-                        <span className="font-extrabold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 text-xs">
+                        <span className="font-extrabold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 text-[10.5px] inline-block whitespace-nowrap">
                           {Number(pkg.totalPulses || 0).toLocaleString()} Pulses
                         </span>
                       ) : (
-                        <span className="font-semibold text-[#414E36]">
+                        <span className="font-semibold text-[#414E36] text-[10.5px] whitespace-nowrap">
                           {pkg.items?.length || 0} services
                         </span>
                       )}

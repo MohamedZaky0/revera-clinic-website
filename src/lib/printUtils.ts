@@ -63,10 +63,13 @@ export function printInvoice(
   const serviceRows = servicesList
     .filter((s) => {
       const name = String(s.name || '').toLowerCase();
-      const isPulse = name.includes('pulse') || name.includes('device —') || name.includes('device -');
+      const isPulse = name.includes('pulse') || name.includes('device —') || name.includes('device -') || name.includes('نبضة');
       const qty = Number(s.qty) || 1;
       const uPrice = Number(s.unitPrice !== undefined ? s.unitPrice : (s.price !== undefined ? s.price : 0));
       const itemTotal = Number(s.total !== undefined ? s.total : (qty * uPrice));
+      if (isPerPulse && isPulse) {
+        return false;
+      }
       if (isPulse && (itemTotal === 0 || uPrice === 0)) {
         return false;
       }

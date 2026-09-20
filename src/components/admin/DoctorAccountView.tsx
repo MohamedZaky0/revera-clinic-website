@@ -986,7 +986,7 @@ export default function DoctorAccountView({
   // Failures here are logged, not thrown -- a doctor completing a session must not be blocked by
   // this new write path failing; the pre-existing amountLeft/notes PATCH is still the number that
   // matters to the patient's balance.
-  const persistSessionLineItems = async (targetBooking: any, pulsesToDeduct: number, deviceName: string) => {
+  const persistSessionLineItems = async (targetBooking: any, pulsesToDeduct: number, deviceName: string, laserInfo?: any) => {
     const headers = await getAuthHeaders();
     const reservationId = targetBooking?.id || targetBooking?.booking_id || targetBooking?.bookingId;
     if (!reservationId) return;
@@ -1027,7 +1027,7 @@ export default function DoctorAccountView({
         })
       );
     }
-    if (pulsesToDeduct > 0) {
+    if (pulsesToDeduct > 0 && (!laserInfo || laserInfo.pulseType !== "PER_PULSE")) {
       writes.push(
         fetch("/api/reservation-products", {
           method: "POST",
@@ -1212,8 +1212,9 @@ export default function DoctorAccountView({
           const deliveredPulses = Number(laserData.pulsesUsed || 0);
           const unitRate = Number(laserData.pulseValue || 0);
           effectiveLaserSessionCharge = deliveredPulses * unitRate;
-
-          if (effectiveLaserSessionCharge > 0) {
+          // Primary service bills delivered_pulses × unitRate directly.
+          // We record usage for device tracking with unitPrice = 0 so the patient invoice is not double-billed.
+          if (deliveredPulses > 0) {
             try {
               await fetch("/api/reservation-products", {
                 method: "POST",
@@ -1223,13 +1224,13 @@ export default function DoctorAccountView({
                   lineType: "device_pulses",
                   productName: `Laser Pulses Delivered (${deliveredPulses} pulses @ ${unitRate} EGP - ${laserData.treatmentArea || "Treatment"})`,
                   quantity: deliveredPulses,
-                  unitPrice: unitRate,
-                  totalPrice: effectiveLaserSessionCharge,
+                  unitPrice: 0,
+                  totalPrice: 0,
                   addedByRole: "doctor_session"
                 })
               });
             } catch (e) {
-              console.error("Error persisting per-pulse line item:", e);
+              console.error("Error persisting per-pulse device tracking item:", e);
             }
           }
         }
@@ -1358,7 +1359,7 @@ export default function DoctorAccountView({
 
     try {
       const deviceNameForPulses = devicesList.find((d) => String(d.id) === String(activeDevId))?.name || "Device";
-      await persistSessionLineItems({ ...targetBooking, id: bookingTargetId }, pulsesToDeduct, deviceNameForPulses);
+      await persistSessionLineItems({ ...targetBooking, id: bookingTargetId }, pulsesToDeduct, deviceNameForPulses, laserData);
     } catch (e) {
       console.error("persistSessionLineItems threw (non-fatal, continuing to complete treatment):", e);
     }
@@ -1371,6 +1372,19 @@ export default function DoctorAccountView({
     const additionalServicesSub = (additionalServices || []).reduce((sum, s) => sum + s.price, 0);
     const sessionComputedTotal = effectiveBasePrice + additionalServicesSub + productsSubtotal + effectiveLaserSessionCharge;
 
+    let completionNotes = String(targetBooking.notes || "");
+    const isDoctorPerPulse = laserData?.pulseType === "PER_PULSE" || targetBooking.laser_payment_mode === "PER_PULSE" || targetBooking.laserPaymentMode === "PER_PULSE";
+    const doctorPulseRate = Number(laserData?.pulseValue || targetBooking.laser_price_per_pulse || targetBooking.laserPricePerPulse || 1);
+    const doctorDeliveredPulses = Number(laserData?.pulsesUsed || 0);
+
+    if (isDoctorPerPulse && doctorDeliveredPulses > 0) {
+      const totalLaserCost = doctorDeliveredPulses * doctorPulseRate;
+      const pulseString = `\n[Laser Pulses Delivered]: Primary: ${doctorDeliveredPulses} pulses (@ ${doctorPulseRate} EGP/pulse = ${totalLaserCost} EGP), Total: ${doctorDeliveredPulses} pulses`;
+      completionNotes = completionNotes.replace(/\[(?:Laser Pulses Delivered|Extra Device Pulses)\]:[^\n\[]*/gi, "").trim() + pulseString;
+      const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are charged per pulse (${doctorDeliveredPulses} pulses × ${doctorPulseRate} EGP = ${totalLaserCost} EGP) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${doctorDeliveredPulses} نبضة × ${doctorPulseRate} ج.م = ${totalLaserCost} ج.م)`;
+      completionNotes = completionNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
+    }
+
     try {
       const headers = await getAuthHeaders();
       const res = await fetch(`/api/reservations?id=${encodeURIComponent(bookingTargetId)}`, {
@@ -1380,7 +1394,17 @@ export default function DoctorAccountView({
           id: bookingTargetId,
           status: "completed",
           doctorNotes: clinicalNote || "",
-          amountLeft: Math.max(0, sessionComputedTotal - Number(targetBooking.amountPaid ?? 0))
+          notes: completionNotes,
+          total_price: sessionComputedTotal,
+          price: sessionComputedTotal,
+          amountLeft: Math.max(0, sessionComputedTotal - Number(targetBooking.amountPaid ?? 0)),
+          ...(isDoctorPerPulse ? {
+            laser_payment_mode: "PER_PULSE",
+            laserPaymentMode: "PER_PULSE",
+            laser_price_per_pulse: doctorPulseRate,
+            laserPricePerPulse: doctorPulseRate,
+            delivered_pulses: doctorDeliveredPulses,
+          } : {})
         })
       });
 
@@ -1393,7 +1417,17 @@ export default function DoctorAccountView({
                   ...r,
                   status: "completed",
                   doctorNotes: clinicalNote || "",
-                  amountLeft: Math.max(0, sessionComputedTotal - Number(targetBooking.amountPaid ?? 0))
+                  notes: completionNotes,
+                  total_price: sessionComputedTotal,
+                  price: sessionComputedTotal,
+                  amountLeft: Math.max(0, sessionComputedTotal - Number(targetBooking.amountPaid ?? 0)),
+                  ...(isDoctorPerPulse ? {
+                    laser_payment_mode: "PER_PULSE",
+                    laserPaymentMode: "PER_PULSE",
+                    laser_price_per_pulse: doctorPulseRate,
+                    laserPricePerPulse: doctorPulseRate,
+                    delivered_pulses: doctorDeliveredPulses,
+                  } : {})
                 }
               : r
           )
