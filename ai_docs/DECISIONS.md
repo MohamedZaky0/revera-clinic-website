@@ -2232,4 +2232,52 @@ The clinic required a complete, multi-tiered laser pulse counting and accounting
 5. **System Test Suite Diagnostic Verification:**
    - Added test case `TC-068` ("Service Equipment Connector & Pulse Pricing Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
 
+---
+
+## DEC-064: Laser Services Multi-Payment Mode Architecture & Deficit Spillover Engine
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. **`islaser` Service Flag & Equipment Connection:** Clinic services are now explicitly categorized with an `islaser` (or `is_laser`) boolean in the database and catalog. Standard services (`islaser: false`) behave normally, while laser services (`islaser: true`) require connected equipment devices and enforce a 3-tier payment selection workflow.
+2. **3 Structured Payment Options for Laser Services:**
+   - **Option 1: Pay by Service (Fixed Price)** (`SERVICE`): Patient pays the catalog price regardless of pulses delivered. Any extra pulses beyond baseline can optionally carry an extra charge with a mandatory reason.
+   - **Option 2: Pay per Pulse (Post-Session Actuals)** (`PER_PULSE`): Reception/doctor agrees on a per-pulse rate (e.g., $1 or 5 EGP). Final session total equals `Delivered Pulses × Unit Rate`.
+   - **Option 3: Pay with Pulses Package (Package Redemption + Spillover Engine)** (`PACKAGE`):
+     - Active package pulses are redeemed during the session.
+     - If patient has no package, prompts package purchase.
+     - **Package Deficit Spillover Engine**: When delivered pulses exceed remaining package pulses (e.g. 6,000 delivered vs 4,000 balance -> 2,000 pulse deficit), two explicit resolution choices are presented:
+       - **Choice 3A (Buy New Package)**: Deducts the deficit from a newly purchased package and adds the package price to the session invoice.
+       - **Choice 3B (Pay Rest per Pulse)**: Billed excess pulses directly on the session invoice at the per-pulse rate.
+3. **Patient Profile Retail Pulse Decoupling:** Standalone retail pulse purchase buttons were removed from the patient profile drawer, consolidating all pulse accounting through structured reception bookings and doctor session flows while retaining the full lifetime Laser History audit tab.
+
+**Decisions & Implementation:**
+1. **Database Migration (`supabase/migrations/20260920010000_add_islaser_to_services.sql`):**
+   - Added `islaser` and `is_laser` boolean columns to `services` table with default `false` and indexed query performance.
+   - Auto-tagged existing laser services matching `laser|pulse|hair removal|ليزر|نبضة` keywords.
+2. **Catalog & API Support (`src/lib/services.ts` & `src/app/api/services/route.ts`):**
+   - Added `islaser?: boolean; is_laser?: boolean;` to `ServiceItem` interface.
+   - Updated `mapServiceRow` and `mapServiceToDb` in API routes to read and persist `islaser`.
+3. **Admin Services View (`AdminServicesView.tsx` & `admin/page.tsx`):**
+   - Added `Laser` badge in services table with `Sparkles` icon.
+   - Added "Laser Service" toggle switch card in Add/Edit Service modal with live status indicator.
+4. **Reception & New Booking Flow (`AdminNewBookingView.tsx`):**
+   - Dynamically detects `isLaserService`.
+   - Renders 3 interactive Laser Payment Mode selection cards (Fixed Service, Pay per Pulse, Pulses Package).
+   - In Mode 2, displays live per-pulse unit price input prefilled from Booking Settings.
+   - Persists selected mode and rate into booking notes and metadata.
+   - Shows selected mode in Booking Confirmation summary modal.
+5. **Doctor Ongoing Session & LIVE Math (`DoctorOngoingSessionTab.tsx` & `DoctorAccountView.tsx`):**
+   - Mode selector tabs: Option 1 (`SERVICE`), Option 2 (`PER_PULSE`), Option 3 (`PACKAGE`).
+   - Auto-detects payment mode from booking metadata.
+   - Mode 2 calculates live session total: `standardPulsesDelivered * additionalPulseUnitPrice`.
+   - Mode 3 integrates the **Package Deficit Spillover Interactive Card** with **Choice 3A** and **Choice 3B**.
+   - `handleCompleteTreatment` stages line items in `reservation-products`, consumes package pulses, triggers package purchases, records unified laser history in `/api/laser-pulses`, and updates equipment device counters.
+6. **Patient Profile Cleanup (`CustomerProfileDrawer.tsx`):**
+   - Removed loose `+ Sell Laser Pulses` button and modal dialog from the products tab while preserving the dedicated Laser History tab.
+7. **System Test Suite Diagnostic Verification:**
+   - Added test case `TC-069` ("Laser Services Multi-Payment Mode & Deficit Spillover Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
+
 

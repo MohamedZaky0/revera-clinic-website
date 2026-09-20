@@ -269,11 +269,6 @@ export default function CustomerProfileDrawer({
   const [laserLogs, setLaserLogs] = React.useState<any[]>([]);
   const [loadingLaserLogs, setLoadingLaserLogs] = React.useState(false);
   const [laserStats, setLaserStats] = React.useState<any>(null);
-  const [showSellPulsesModal, setShowSellPulsesModal] = React.useState(false);
-  const [sellPulsesQty, setSellPulsesQty] = React.useState<number>(500);
-  const [sellPulsesPricePerPulse, setSellPulsesPricePerPulse] = React.useState<number>(5);
-  const [sellPulsesPaymentMethod, setSellPulsesPaymentMethod] = React.useState<string>("cash");
-  const [sellingPulses, setSellingPulses] = React.useState(false);
 
   // Fetch unified laser history logs for this customer
   React.useEffect(() => {
@@ -306,58 +301,6 @@ export default function CustomerProfileDrawer({
     window.addEventListener("revera-laser-change", handleLaserChange);
     return () => window.removeEventListener("revera-laser-change", handleLaserChange);
   }, [viewingCustomerProfile?.id]);
-
-  // Handle Sell Laser Pulses Modal submit
-  const handleSellLaserPulses = async () => {
-    if (!viewingCustomerProfile?.id || sellPulsesQty <= 0) return;
-    setSellingPulses(true);
-    try {
-      const totalPrice = sellPulsesQty * sellPulsesPricePerPulse;
-      const res = await fetch("/api/customers/products", {
-        method: "POST",
-        headers: authenticatedJsonHeaders,
-        body: JSON.stringify({
-          customer_id: viewingCustomerProfile.id,
-          customerId: viewingCustomerProfile.id,
-          customer_name: viewingCustomerProfile.name || (viewingCustomerProfile as any).customer_name || "",
-          customerName: viewingCustomerProfile.name || (viewingCustomerProfile as any).customer_name || "",
-          product_id: "laser-pulses-retail",
-          productId: "laser-pulses-retail",
-          product_name: `Laser Pulses (${sellPulsesQty} Pulses)`,
-          productName: `Laser Pulses (${sellPulsesQty} Pulses)`,
-          quantity: sellPulsesQty,
-          unit_price: sellPulsesPricePerPulse,
-          unitPrice: sellPulsesPricePerPulse,
-          total_amount: totalPrice,
-          totalPrice: totalPrice,
-          payment_method: sellPulsesPaymentMethod,
-          paymentMethod: sellPulsesPaymentMethod,
-          category: "laser_pulses",
-          is_pulse_product: true,
-          isPulseProduct: true,
-          force_new_record: true
-        })
-      });
-
-      if (res.ok) {
-        alert("Laser pulses sold and added to patient active balance successfully!");
-        setShowSellPulsesModal(false);
-        setCustomerProductsSubTab("current");
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("revera-laser-change"));
-          window.dispatchEvent(new CustomEvent("revera-booking-change"));
-        }
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        alert(errData.error || errData.message || "Failed to sell laser pulses.");
-      }
-    } catch (err) {
-      console.error("Error selling laser pulses:", err);
-      alert("Error selling laser pulses.");
-    } finally {
-      setSellingPulses(false);
-    }
-  };
 
   const t = adminTranslations[lang].patients.customerProfileDrawer;
   const mf = adminTranslations[lang].patients.medicalFormModal;
@@ -1454,17 +1397,6 @@ export default function CustomerProfileDrawer({
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => {
-                      setSellPulsesQty(500);
-                      setSellPulsesPricePerPulse(defaultPricePerPulse || 5);
-                      setSellPulsesPaymentMethod("cash");
-                      setShowSellPulsesModal(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 px-3.5 py-2 text-xs font-semibold text-white transition shadow-sm w-fit"
-                  >
-                    <Zap size={14} /> {t.sellLaserPulsesBtn || "+ Sell Laser Pulses"}
-                  </button>
-                  <button
-                    onClick={() => {
                       setSelectedAddProductId("");
                       setSelectedAddProductName("");
                       setSelectedAddProductQty(1);
@@ -1505,19 +1437,6 @@ export default function CustomerProfileDrawer({
                         </span>
                         <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">{t.totalAvailablePulses || "Pulses Available"}</span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSellPulsesQty(500);
-                          setSellPulsesPricePerPulse(5);
-                          setSellPulsesPaymentMethod("cash");
-                          setShowSellPulsesModal(true);
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 text-xs font-bold transition shadow-xs"
-                      >
-                        <Plus size={14} />
-                        <span>{t.sellLaserPulsesBtn || "+ Sell Laser Pulses"}</span>
-                      </button>
                     </div>
                   </div>
                 )}
@@ -2448,128 +2367,6 @@ export default function CustomerProfileDrawer({
       )}
 
       {/* ── Modal: Sell Laser Pulses to Patient (FIFO Active Balance) ── */}
-      {showSellPulsesModal && viewingCustomerProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs" onClick={() => setShowSellPulsesModal(false)} />
-          <div className="relative z-10 w-full max-w-lg bg-white rounded-3xl border border-[#414E36]/15 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs">
-                  <Zap size={18} />
-                </div>
-                <div>
-                  <h4 className="text-base font-bold text-[#1F251A]">{t.sellLaserPulsesModalTitle || "Sell Laser Pulses to Patient"}</h4>
-                  <p className="text-xs text-[#5A6A51]">{t.assignProductBalanceTo || "Assign pulse balance to"} {viewingCustomerProfile.name}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowSellPulsesModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition p-1"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-3 text-xs text-amber-900 flex items-start gap-2">
-              <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
-              <p className="leading-relaxed">
-                {t.fifoNotice || "Pulses are added to the patient's active balance and consumed using FIFO (oldest active purchases consumed first) across future laser sessions."}
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {/* Preset Quantities */}
-              <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.pulseQuantityLabel || "Pulse Quantity"}</label>
-                <div className="grid grid-cols-5 gap-1.5 mb-2">
-                  {[250, 500, 1000, 2000, 5000].map((qty) => (
-                    <button
-                      key={qty}
-                      type="button"
-                      onClick={() => setSellPulsesQty(qty)}
-                      className={`py-1.5 rounded-xl text-xs font-bold transition border ${
-                        sellPulsesQty === qty
-                          ? "bg-amber-500 border-amber-600 text-white shadow-xs"
-                          : "bg-white border-[#414E36]/15 text-[#1F251A] hover:bg-[#EDF1EC]"
-                      }`}
-                    >
-                      {qty.toLocaleString()}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="number"
-                  min="1"
-                  step="50"
-                  value={sellPulsesQty}
-                  onChange={(e) => setSellPulsesQty(Math.max(1, Number(e.target.value)))}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm font-bold text-[#1F251A] outline-none focus:border-amber-500"
-                  placeholder="Enter custom pulse quantity..."
-                />
-              </div>
-
-              {/* Price per Pulse & Payment Method */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.pricePerPulseLabel || "Price per Pulse (EGP)"}</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={sellPulsesPricePerPulse}
-                    onChange={(e) => setSellPulsesPricePerPulse(Math.max(0, Number(e.target.value)))}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm font-bold text-[#1F251A] outline-none focus:border-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.paymentMethodLabel || "Payment Method"}</label>
-                  <select
-                    value={sellPulsesPaymentMethod}
-                    onChange={(e) => setSellPulsesPaymentMethod(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-amber-500"
-                  >
-                    <option value="cash">{t.paymentMethods?.cash || "Cash"}</option>
-                    <option value="card">{t.paymentMethods?.card || "Credit / Debit Card"}</option>
-                    <option value="wallet">{t.paymentMethods?.wallet || "Mobile Wallet"}</option>
-                    <option value="instapay">{t.paymentMethods?.instapay || "InstaPay"}</option>
-                    <option value="transfer">{t.paymentMethods?.transfer || "Bank Transfer"}</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Summary Calculation */}
-              <div className="bg-[#EDF1EC]/70 p-4 rounded-2xl flex items-center justify-between text-xs font-semibold text-[#1F251A]">
-                <div>
-                  <span className="block text-[#5A6A51]">{t.totalPriceLabel || "Total Price (EGP):"}</span>
-                  <span className="text-[11px] text-[#8A9A81] font-normal">{sellPulsesQty.toLocaleString()} pulses × {sellPulsesPricePerPulse} EGP</span>
-                </div>
-                <span className="text-lg font-black text-amber-900">
-                  EGP {(sellPulsesQty * sellPulsesPricePerPulse).toLocaleString()}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#414E36]/10">
-              <button
-                type="button"
-                onClick={() => setShowSellPulsesModal(false)}
-                className="rounded-xl border border-[#414E36]/15 px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
-              >
-                {t.cancelBtn || "Cancel"}
-              </button>
-              <button
-                type="button"
-                onClick={handleSellLaserPulses}
-                disabled={sellingPulses || sellPulsesQty <= 0}
-                className="rounded-xl bg-amber-600 hover:bg-amber-700 px-5 py-2 text-xs font-bold text-white transition disabled:opacity-50 shadow-sm"
-              >
-                {sellingPulses ? (t.sellingBtn || "Selling...") : (t.sellLaserPulsesBtn || "Confirm & Sell Pulses")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

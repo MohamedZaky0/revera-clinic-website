@@ -297,6 +297,10 @@ export default function AdminNewBookingView({
   const [customBookingValue, setCustomBookingValue] = useState<number | null>(null);
   const [amountPaidNow, setAmountPaidNow] = useState<number | "">("");
 
+  // Laser Payment Mode (Option 1: Service Fixed, Option 2: Pay per Pulse, Option 3: Pulses Package)
+  const [laserPaymentMode, setLaserPaymentMode] = useState<"SERVICE" | "PER_PULSE" | "PACKAGE">("SERVICE");
+  const [laserPerPulsePrice, setLaserPerPulsePrice] = useState<number>(5);
+
   // DB Lists
   const [dbServices, setDbServices] = useState<ServiceItem[]>(services);
   const [dbDoctors, setDbDoctors] = useState<ProviderItem[]>(providers);
@@ -909,12 +913,29 @@ export default function AdminNewBookingView({
 
   const fullPatientName = `${firstName} ${lastName}`.trim() || "Patient Name";
 
-  const isPackageCovered = Boolean(usePackagePayment || usePackageMode);
+  // Dynamic Laser Service Determination
+  const isLaserService = useMemo(() => {
+    if (!selectedServiceObj) return false;
+    const sAny = selectedServiceObj as any;
+    return Boolean(
+      sAny.islaser ||
+      sAny.is_laser ||
+      (sAny.category && sAny.category.toLowerCase().includes("laser")) ||
+      (sAny.cat && sAny.cat.toLowerCase().includes("laser")) ||
+      (sAny.en && sAny.en.toLowerCase().includes("laser")) ||
+      (sAny.name && sAny.name.toLowerCase().includes("laser")) ||
+      (sAny.title && sAny.title.toLowerCase().includes("laser")) ||
+      (sAny.ar && sAny.ar.includes("ليزر"))
+    );
+  }, [selectedServiceObj]);
+
+  const isPackageCovered = Boolean(usePackagePayment || usePackageMode || (isLaserService && laserPaymentMode === "PACKAGE"));
+  const isPerPulseMode = Boolean(isLaserService && laserPaymentMode === "PER_PULSE");
   const baseServicePrice = Number(selectedServiceObj?.price || 0);
-  const autoBookingValue = isPackageCovered ? 0 : baseServicePrice * Math.max(1, selectedTimes.length);
-  const bookingValue = isPackageCovered ? 0 : (customBookingValue !== null && customBookingValue !== undefined ? Number(customBookingValue) : autoBookingValue);
-  const numAmountPaid = isPackageCovered ? 0 : (typeof amountPaidNow === "number" ? amountPaidNow : 0);
-  const remainingValue = isPackageCovered ? 0 : bookingValue - numAmountPaid;
+  const autoBookingValue = isPackageCovered || isPerPulseMode ? 0 : baseServicePrice * Math.max(1, selectedTimes.length);
+  const bookingValue = isPackageCovered || isPerPulseMode ? 0 : (customBookingValue !== null && customBookingValue !== undefined ? Number(customBookingValue) : autoBookingValue);
+  const numAmountPaid = isPackageCovered || isPerPulseMode ? 0 : (typeof amountPaidNow === "number" ? amountPaidNow : 0);
+  const remainingValue = isPackageCovered || isPerPulseMode ? 0 : bookingValue - numAmountPaid;
   const selectedTime = selectedTimes[0] || "";
   const totalDurationMinutes = getServiceDurationMinutes(selectedServiceObj);
   const requiredSlotCount = Math.max(1, Math.ceil(totalDurationMinutes / 15));
@@ -1029,6 +1050,18 @@ export default function AdminNewBookingView({
         ? `\n[Package Redemption]: ${(lang === "ar" && matchingPackage.packageNameAr) ? matchingPackage.packageNameAr : matchingPackage.packageName} - ${selectedServiceName} (Item ID: ${matchingPackageItem.id})`
         : "";
 
+      const laserNote = isLaserService
+        ? `\n[Laser Service Payment Mode]: ${
+            laserPaymentMode === "SERVICE"
+              ? "Option 1: Pay by Service (Fixed Price)"
+              : laserPaymentMode === "PER_PULSE"
+              ? `Option 2: Pay per Pulse (@ ${laserPerPulsePrice} EGP/pulse)`
+              : "Option 3: Pay with Pulses Package"
+          }`
+        : "";
+
+      const combinedNotes = (notes ? `${notes}${packageNote}${laserNote}` : `${packageNote}${laserNote}`.trim()) || null;
+
       const payload = {
         name: fullPatientName,
         phone: phone,
@@ -1040,12 +1073,15 @@ export default function AdminNewBookingView({
         date: bookingDate,
         requestedTime: selectedTime,
         sessionType: sessionType === "in_person" ? "in_person" : "online",
-        notes: (notes ? notes + packageNote : packageNote.trim()) || null,
+        notes: combinedNotes,
         isManual: true,
         status: "approved",
         explicitCustomerId: resolvedCustomerId,
         amountPaid: numAmountPaid,
-        amountLeft: Math.max(0, remainingValue)
+        amountLeft: Math.max(0, remainingValue),
+        isLaserService: isLaserService,
+        laserPaymentMode: isLaserService ? laserPaymentMode : null,
+        laserPricePerPulse: isLaserService && laserPaymentMode === "PER_PULSE" ? laserPerPulsePrice : null,
       };
 
       const res = await fetch("/api/reservations", {
@@ -1590,6 +1626,135 @@ export default function AdminNewBookingView({
                 </div>
               </div>
 
+              {/* ── LASER SERVICE PAYMENT MODE SELECTOR (When Service is Laser) ── */}
+              {isLaserService && (
+                <div className="space-y-3 rounded-2xl border-2 border-emerald-700/30 bg-gradient-to-br from-emerald-50/50 via-white to-emerald-50/20 p-4 sm:p-5 shadow-xs animate-fadeIn">
+                  <div className="flex items-center justify-between border-b border-emerald-800/10 pb-3 flex-wrap gap-2">
+                    <div className="flex items-center gap-2 text-emerald-950">
+                      <div className="h-7 w-7 rounded-xl bg-emerald-700 text-white flex items-center justify-center shadow-xs">
+                        <Sparkles size={16} />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-xs sm:text-sm uppercase tracking-wider text-emerald-950 flex items-center gap-2">
+                          <span>{tr.laserOptionsHeading || "Laser Service Payment Mode"}</span>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300/60">
+                            Laser Service
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-[#5A6A51] font-medium mt-0.5">
+                          {tr.laserOptionsSub || "Select the agreed payment method for this laser booking:"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3 Payment Options Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Option 1: Pay by Service */}
+                    <div
+                      onClick={() => {
+                        setLaserPaymentMode("SERVICE");
+                        setCustomBookingValue(null);
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between ${
+                        laserPaymentMode === "SERVICE"
+                          ? "border-emerald-700 bg-emerald-50/90 ring-2 ring-emerald-700/20 shadow-xs"
+                          : "border-[#414E36]/15 bg-white hover:border-emerald-600/50 hover:bg-[#FBFBF9]"
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-xs text-[#1F251A] flex items-center gap-1.5">
+                            <span className="h-5 w-5 rounded-full bg-[#EDF1EC] text-emerald-800 flex items-center justify-center text-[10px] font-black">1</span>
+                            {tr.laserOption1Title || "Option 1: Pay by Service"}
+                          </span>
+                          {laserPaymentMode === "SERVICE" && <Check size={16} className="text-emerald-700 shrink-0 font-bold" />}
+                        </div>
+                        <p className="text-[11px] text-[#5A6A51] leading-relaxed">
+                          {tr.laserOption1Desc || "Fixed catalog price regardless of pulses delivered."}
+                        </p>
+                      </div>
+                      <div className="pt-2 mt-2 border-t border-[#414E36]/10 flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase text-[#5A6A51]">{tr.servicePriceLabel || "Price"}:</span>
+                        <span className="text-xs font-black text-emerald-900">{baseServicePrice} {tr.egpLabel || "EGP"}</span>
+                      </div>
+                    </div>
+
+                    {/* Option 2: Pay per Pulse */}
+                    <div
+                      onClick={() => {
+                        setLaserPaymentMode("PER_PULSE");
+                        setCustomBookingValue(0);
+                        setAmountPaidNow(0);
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between ${
+                        laserPaymentMode === "PER_PULSE"
+                          ? "border-emerald-700 bg-emerald-50/90 ring-2 ring-emerald-700/20 shadow-xs"
+                          : "border-[#414E36]/15 bg-white hover:border-emerald-600/50 hover:bg-[#FBFBF9]"
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-xs text-[#1F251A] flex items-center gap-1.5">
+                            <span className="h-5 w-5 rounded-full bg-[#EDF1EC] text-emerald-800 flex items-center justify-center text-[10px] font-black">2</span>
+                            {tr.laserOption2Title || "Option 2: Pay per Pulse"}
+                          </span>
+                          {laserPaymentMode === "PER_PULSE" && <Check size={16} className="text-emerald-700 shrink-0 font-bold" />}
+                        </div>
+                        <p className="text-[11px] text-[#5A6A51] leading-relaxed">
+                          {tr.laserOption2Desc || "Deal per pulse at reception. Invoiced after session based on actual pulses used."}
+                        </p>
+                      </div>
+                      <div className="pt-2 mt-2 border-t border-[#414E36]/10 flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+                        <label className="text-[10px] font-bold text-[#5A6A51] shrink-0">{tr.ratePerPulseLabel || "Rate"}:</label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min={0.1}
+                            step={0.5}
+                            value={laserPerPulsePrice}
+                            onChange={(e) => setLaserPerPulsePrice(Math.max(0.1, parseFloat(e.target.value) || 1))}
+                            className="w-16 rounded-lg border border-[#414E36]/20 bg-white px-2 py-0.5 text-xs font-black text-[#1F251A] text-end outline-none focus:border-emerald-700"
+                          />
+                          <span className="text-[10px] font-bold text-[#5A6A51]">{tr.egpLabel || "EGP"}/p</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Option 3: Pay with Pulse Package */}
+                    <div
+                      onClick={() => {
+                        setLaserPaymentMode("PACKAGE");
+                        setCustomBookingValue(0);
+                        setAmountPaidNow(0);
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between ${
+                        laserPaymentMode === "PACKAGE"
+                          ? "border-emerald-700 bg-emerald-50/90 ring-2 ring-emerald-700/20 shadow-xs"
+                          : "border-[#414E36]/15 bg-white hover:border-emerald-600/50 hover:bg-[#FBFBF9]"
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-xs text-[#1F251A] flex items-center gap-1.5">
+                            <span className="h-5 w-5 rounded-full bg-[#EDF1EC] text-emerald-800 flex items-center justify-center text-[10px] font-black">3</span>
+                            {tr.laserOption3Title || "Option 3: Pulses Package"}
+                          </span>
+                          {laserPaymentMode === "PACKAGE" && <Check size={16} className="text-emerald-700 shrink-0 font-bold" />}
+                        </div>
+                        <p className="text-[11px] text-[#5A6A51] leading-relaxed">
+                          {tr.laserOption3Desc || "Deduct session pulses from patient package with deficit spillover support."}
+                        </p>
+                      </div>
+                      <div className="pt-2 mt-2 border-t border-[#414E36]/10 flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase text-[#5A6A51]">{tr.bookingValueLabel || "Booking"}:</span>
+                        <span className="text-xs font-black text-emerald-900">0 {tr.egpLabel || "EGP"} ({tr.paymentMethodPackage || "Package"})</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ── CUSTOMER PACKAGES & SUBSCRIPTIONS SECTION ── */}
               <div className="pt-1 pb-1">
                 {!foundCustomer && !phone ? (
@@ -2130,8 +2295,28 @@ export default function AdminNewBookingView({
 
               <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
                 <span className="text-[#5A6A51] font-semibold">{tr.serviceLabel.replace(" *", "")}</span>
-                <span className="font-extrabold text-[#1F251A] text-end">{selectedServiceName}</span>
+                <div className="text-end">
+                  <span className="font-extrabold text-[#1F251A] block">{selectedServiceName}</span>
+                  {isLaserService && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded mt-0.5">
+                      <Sparkles size={10} /> Laser Service
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {isLaserService && (
+                <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
+                  <span className="text-[#5A6A51] font-semibold">{tr.laserPaymentModeLabel || "Laser Payment"}</span>
+                  <span className="font-bold text-emerald-900 text-end text-xs">
+                    {laserPaymentMode === "SERVICE"
+                      ? (tr.laserOption1Title || "Pay by Service (Fixed Price)")
+                      : laserPaymentMode === "PER_PULSE"
+                      ? `${tr.laserOption2Title || "Pay per Pulse"} (@ ${laserPerPulsePrice} ${tr.egpLabel || "EGP"}/p)`
+                      : (tr.laserOption3Title || "Pay with Pulse Package")}
+                  </span>
+                </div>
+              )}
 
               <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
                 <span className="text-[#5A6A51] font-semibold">{tr.doctorLabel.replace(" *", "")}</span>

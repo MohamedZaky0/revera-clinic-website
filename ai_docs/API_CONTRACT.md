@@ -153,10 +153,11 @@ Deletes a category by its key.
 
 Returns all services ordered by `sort_order`.
 
-**Response:** `ServiceRow[]` — `{ id, en, ar, img, cat, unit, price, sortOrder, duration, duration_minutes, descriptionEn, descriptionAr, isShared, enableReminder, branchPricing, visible, active, createdAt }`
+**Response:** `ServiceRow[]` — `{ id, en, ar, img, cat, unit, price, sortOrder, duration, duration_minutes, descriptionEn, descriptionAr, isShared, enableReminder, branchPricing, islaser, visible, active, createdAt }`
 
 `duration_minutes` (nullable, integer) — **Added 2026-07-25**, prefer this over the legacy free-text
 `duration`; see `DB_SCHEMA.md`.
+`islaser` / `is_laser` (boolean) — **Added 2026-09-20** (DEC-064), marks service as laser equipment service requiring device linking and enabling 3-tier laser payment options at booking and doctor sessions.
 
 ---
 
@@ -165,7 +166,7 @@ Returns all services ordered by `sort_order`.
 Upsert one or many services. `id` is only included on an existing service being re-saved — see
 `services.id`'s note in `DB_SCHEMA.md` (RISK-033: this column's identity mode matters for upsert).
 
-**Body:** Single service object OR array (all fields from ServiceRow)
+**Body:** Single service object OR array (all fields from ServiceRow including `islaser` / `is_laser`)
 
 **Response:** Upserted service(s)
 

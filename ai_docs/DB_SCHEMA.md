@@ -239,6 +239,7 @@ read-only `/api/availability`. An admin can double-book a doctor from the panel.
 | `is_shared` | boolean | Default false |
 | `enable_reminder` | boolean | Default true |
 | `branch_pricing` | JSONB | Array of `{name, price, visible, status, isDefault}`, default `{}` |
+| `islaser` / `is_laser` | boolean | Default false. **Added 2026-09-20** by `20260920010000_add_islaser_to_services.sql`. Marks service as laser service requiring equipment device connection and enabling 3-tier payment options. |
 | `visible` | boolean | default true |
 | `active` | boolean | default true |
 | `created_at` | timestamptz | |

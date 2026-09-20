@@ -1198,6 +1198,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [serviceDescAr, setServiceDescAr] = useState("");
   const [serviceSortOrder, setServiceSortOrder] = useState(0);
   const [serviceIsShared, setServiceIsShared] = useState(false);
+  const [serviceIsLaser, setServiceIsLaser] = useState(false);
   const [serviceEnableReminder, setServiceEnableReminder] = useState(true);
   const [serviceImageUrl, setServiceImageUrl] = useState("");
   const [servicePrice, setServicePrice] = useState<number>(0);
@@ -1227,6 +1228,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     setServiceDescAr(svc.descriptionAr || "");
     setServiceSortOrder(svc.sortOrder ?? 0);
     setServiceIsShared(svc.isShared ?? false);
+    setServiceIsLaser(Boolean(svc.islaser ?? svc.is_laser ?? false));
     setServiceEnableReminder(svc.enableReminder ?? true);
     setServiceImageUrl(svc.img || "");
     setServicePrice(svc.price ?? 0);
@@ -2376,7 +2378,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-065', name: 'New Booking Customer Packages & Session Redemption Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies customer active packages inspection, per-service session balance detection, and package redemption checkout integration in New Booking creation.', status: 'idle' },
     { id: 'TC-066', name: 'Staff Weekly Shift Schedule & Working Days Persistence Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee shift and working schedule persistence across employee_accounts and page_settings, multi-branch schedule mapping, multi-shift arrays, and 12h AM/PM time sync.', status: 'idle' },
     { id: 'TC-067', name: 'Laser Pulse Counter & Unified Laser History Engine', category: 'Medical & Patients', endpoint: '/api/laser-pulses', description: 'Verifies Type 1 fixed service pulses & extra charges, Type 2 FIFO retail pulse active balances & deductions, Type 3 package included pulses, and unified lifetime laser history logs.', status: 'idle' },
-    { id: 'TC-068', name: 'Service Equipment Connector & Pulse Pricing Engine', category: 'Services & Bookings', endpoint: '/api/service-devices', description: 'Verifies service-to-device equipment connections without pulse limits, and booking settings default pulse pricing configuration.', status: 'idle' }
+    { id: 'TC-068', name: 'Service Equipment Connector & Pulse Pricing Engine', category: 'Services & Bookings', endpoint: '/api/service-devices', description: 'Verifies service-to-device equipment connections without pulse limits, and booking settings default pulse pricing configuration.', status: 'idle' },
+    { id: 'TC-069', name: 'Laser Services Multi-Payment Mode & Deficit Spillover Engine', category: 'Services & Bookings', endpoint: '/api/services', description: 'Verifies islaser service flag persistence, 3 laser payment options (Fixed Service, Pay per Pulse, Package), doctor session live math, package deficit spillover choices, and unified laser history logging.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -6134,6 +6137,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               setServiceSortOrder={setServiceSortOrder}
               serviceIsShared={serviceIsShared}
               setServiceIsShared={setServiceIsShared}
+              serviceIsLaser={serviceIsLaser}
+              setServiceIsLaser={setServiceIsLaser}
               serviceEnableReminder={serviceEnableReminder}
               setServiceEnableReminder={setServiceEnableReminder}
               serviceImageUrl={serviceImageUrl}

@@ -1177,52 +1177,156 @@ export default function DoctorAccountView({
       }
     }
 
-    // 4. Laser Pulse Counter Engine: Type 2 FIFO / Type 3 Package Deductions & Unified Log
+    // 4. Laser Pulse Counter Engine: 3 Modes (SERVICE, PER_PULSE, PACKAGE) & Deficit Spillover Engine
+    let effectiveLaserSessionCharge = 0;
     if (laserData) {
       try {
         const headers = await getAuthHeaders();
 
-        // a) Type 2: FIFO Retail Pulse Deduction
-        if (laserData.pulseType === "PULSE_PURCHASE" && Number(laserData.pulsesUsed) > 0) {
-          try {
-            await fetch("/api/customers/products", {
-              method: "PATCH",
-              headers,
-              body: JSON.stringify({
-                action: "fifo_consume",
-                customerId: custId,
-                pulses: Number(laserData.pulsesUsed),
-                reservationId: bookingTargetId,
-                doctorId: doctorDbId || null,
-                treatmentArea: laserData.treatmentArea
-              })
-            });
-          } catch (e) {
-            console.error("Error executing FIFO pulse consumption:", e);
+        // Mode 1 (SERVICE): Base catalog price applies; extra pulses charged if any
+        if (laserData.pulseType === "SERVICE") {
+          effectiveLaserSessionCharge = Number(laserData.additionalCharge || 0);
+          if (effectiveLaserSessionCharge > 0) {
+            try {
+              await fetch("/api/reservation-products", {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                  reservationId: bookingTargetId,
+                  lineType: "device_pulses",
+                  productName: `Additional Laser Pulses (${laserData.treatmentArea || "Treatment"})`,
+                  quantity: Number(laserData.additionalPulses) || 1,
+                  unitPrice: Number(laserData.pulseValue) || 0,
+                  totalPrice: effectiveLaserSessionCharge,
+                  addedByRole: "doctor_session"
+                })
+              });
+            } catch (e) {
+              console.error("Error persisting additional pulses line item:", e);
+            }
           }
         }
 
-        // b) Type 3: Package Pulse Deduction
-        if (laserData.pulseType === "PACKAGE" && laserData.sourceId && Number(laserData.pulsesUsed) > 0) {
-          try {
-            await fetch("/api/customers/packages", {
-              method: "PATCH",
-              headers,
-              body: JSON.stringify({
-                action: "consume_package_pulses",
-                customerPackageId: laserData.sourceId,
-                pulses: Number(laserData.pulsesUsed),
-                reservationId: bookingTargetId,
-                doctorId: doctorDbId || null,
-                treatmentArea: laserData.treatmentArea
-              })
-            });
-          } catch (e) {
-            console.error("Error executing package pulse consumption:", e);
+        // Mode 2 (PER_PULSE): Pay per pulse (Delivered Pulses × Unit Price)
+        else if (laserData.pulseType === "PER_PULSE") {
+          const deliveredPulses = Number(laserData.pulsesUsed || 0);
+          const unitRate = Number(laserData.pulseValue || 0);
+          effectiveLaserSessionCharge = deliveredPulses * unitRate;
+
+          if (effectiveLaserSessionCharge > 0) {
+            try {
+              await fetch("/api/reservation-products", {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                  reservationId: bookingTargetId,
+                  lineType: "device_pulses",
+                  productName: `Laser Pulses Delivered (${deliveredPulses} pulses @ ${unitRate} EGP - ${laserData.treatmentArea || "Treatment"})`,
+                  quantity: deliveredPulses,
+                  unitPrice: unitRate,
+                  totalPrice: effectiveLaserSessionCharge,
+                  addedByRole: "doctor_session"
+                })
+              });
+            } catch (e) {
+              console.error("Error persisting per-pulse line item:", e);
+            }
           }
         }
 
-        // c) Record Unified Laser History Log
+        // Mode 3 (PACKAGE): Redeem from existing active package + Deficit resolution
+        else if (laserData.pulseType === "PACKAGE") {
+          const pulsesUsed = Number(laserData.pulsesUsed || 0);
+          const availablePkgPulses = laserData.selectedPackage ? Number(laserData.selectedPackage.remaining_pulses ?? laserData.selectedPackage.remainingPulses ?? pulsesUsed) : 0;
+          const pulsesToDeductFromActivePkg = Math.min(availablePkgPulses, pulsesUsed);
+
+          // Deduct from current active package if valid
+          if (laserData.sourceId && pulsesToDeductFromActivePkg > 0) {
+            try {
+              await fetch("/api/customers/packages", {
+                method: "PATCH",
+                headers,
+                body: JSON.stringify({
+                  action: "consume_package_pulses",
+                  customer_package_id: laserData.sourceId,
+                  package_id: laserData.sourceId,
+                  quantity_used: pulsesToDeductFromActivePkg,
+                  pulses: pulsesToDeductFromActivePkg,
+                  booking_id: bookingTargetId,
+                  reservationId: bookingTargetId,
+                  treatment_area: laserData.treatmentArea,
+                  used_by: doctorName || "Doctor",
+                  notes: `Laser session deduction: ${pulsesToDeductFromActivePkg} pulses`
+                })
+              });
+            } catch (e) {
+              console.error("Error executing package pulse deduction:", e);
+            }
+          }
+
+          // Handle package deficit (Delivered Pulses > Package Balance)
+          const deficitPulses = Number(laserData.deficitPulses || 0);
+          if (deficitPulses > 0) {
+            if (laserData.spilloverChoice === "BUY_NEW_PACKAGE" && laserData.newPackageToBuy) {
+              const newPkgPrice = Number(laserData.newPackageToBuy.price || 0);
+              effectiveLaserSessionCharge = newPkgPrice;
+
+              try {
+                // 1. Sell package to patient
+                await fetch("/api/packages/sell", {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify({
+                    customerId: custId,
+                    packageId: laserData.newPackageToBuy.id,
+                    paymentMethod: "cash"
+                  })
+                });
+
+                // 2. Add line item to session invoice
+                await fetch("/api/reservation-products", {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify({
+                    reservationId: bookingTargetId,
+                    lineType: "product",
+                    productName: `New Package: ${laserData.newPackageToBuy.name || laserData.newPackageToBuy.title || "Laser Package"}`,
+                    quantity: 1,
+                    unitPrice: newPkgPrice,
+                    totalPrice: newPkgPrice,
+                    addedByRole: "doctor_session"
+                  })
+                });
+              } catch (e) {
+                console.error("Error selling new package for deficit resolution:", e);
+              }
+            } else if (laserData.spilloverChoice === "PAY_PER_PULSE") {
+              const excessRate = Number(laserData.pulseValue || 0);
+              const excessTotal = deficitPulses * excessRate;
+              effectiveLaserSessionCharge = excessTotal;
+
+              try {
+                await fetch("/api/reservation-products", {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify({
+                    reservationId: bookingTargetId,
+                    lineType: "device_pulses",
+                    productName: `Excess Laser Pulses Deficit (${deficitPulses} pulses @ ${excessRate} EGP)`,
+                    quantity: deficitPulses,
+                    unitPrice: excessRate,
+                    totalPrice: excessTotal,
+                    addedByRole: "doctor_session"
+                  })
+                });
+              } catch (e) {
+                console.error("Error recording deficit excess pulse charge:", e);
+              }
+            }
+          }
+        }
+
+        // Record Unified Laser History Log for clinic & patient records
         await fetch("/api/laser-pulses", {
           method: "POST",
           headers,
@@ -1240,34 +1344,13 @@ export default function DoctorAccountView({
             pulses_used: Number(laserData.pulsesUsed) || 0,
             additional_pulses: Number(laserData.additionalPulses) || 0,
             pulse_value: Number(laserData.pulseValue) || 0,
-            additional_charge: Number(laserData.additionalCharge) || 0,
+            additional_charge: effectiveLaserSessionCharge,
             additional_reason: laserData.additionalReason || "",
             source_id: laserData.sourceId || null,
             source_name: laserData.sourceName || null,
             notes: clinicalNote || ""
           })
         });
-
-        // d) If Type 1 Additional Pulses carry a charge, stage into reservation_products
-        if (laserData.pulseType === "SERVICE" && Number(laserData.additionalCharge) > 0) {
-          try {
-            await fetch("/api/reservation-products", {
-              method: "POST",
-              headers,
-              body: JSON.stringify({
-                reservationId: bookingTargetId,
-                lineType: "device_pulses",
-                productName: `Additional Laser Pulses (${laserData.treatmentArea})`,
-                quantity: Number(laserData.additionalPulses) || 1,
-                unitPrice: Number(laserData.pulseValue) || 0,
-                totalPrice: Number(laserData.additionalCharge) || 0,
-                addedByRole: "doctor_session"
-              })
-            });
-          } catch (e) {
-            console.error("Error persisting additional pulses line item:", e);
-          }
-        }
       } catch (e) {
         console.error("Error during laser pulse processing:", e);
       }
@@ -1280,11 +1363,13 @@ export default function DoctorAccountView({
       console.error("persistSessionLineItems threw (non-fatal, continuing to complete treatment):", e);
     }
 
-    // Compute final session total according to laser mode
-    const effectiveBasePrice = laserData?.pulseType && laserData.pulseType !== "SERVICE" ? 0 : baseBookingPrice;
+    // Compute final session total according to laser mode:
+    // Option 1 (SERVICE): Base catalog price + additional services + products + extra pulses
+    // Option 2 (PER_PULSE): 0 base + per-pulse total + additional services + products
+    // Option 3 (PACKAGE): 0 base + package deficit charge/package price + additional services + products
+    const effectiveBasePrice = (!laserData?.pulseType || laserData.pulseType === "SERVICE") ? baseBookingPrice : 0;
     const additionalServicesSub = (additionalServices || []).reduce((sum, s) => sum + s.price, 0);
-    const laserExtraCharge = Number(laserData?.additionalCharge || 0);
-    const sessionComputedTotal = effectiveBasePrice + additionalServicesSub + productsSubtotal + laserExtraCharge;
+    const sessionComputedTotal = effectiveBasePrice + additionalServicesSub + productsSubtotal + effectiveLaserSessionCharge;
 
     try {
       const headers = await getAuthHeaders();

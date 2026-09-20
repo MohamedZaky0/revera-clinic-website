@@ -13,6 +13,7 @@ import {
   MoreVertical,
   Pencil,
   Trash2,
+  Sparkles,
 } from "lucide-react";
 import { ServiceItem, getDurationLabel } from "@/lib/services";
 import {
@@ -75,6 +76,8 @@ interface AdminServicesViewProps {
   setServiceSortOrder: React.Dispatch<React.SetStateAction<number>>;
   serviceIsShared: boolean;
   setServiceIsShared: React.Dispatch<React.SetStateAction<boolean>>;
+  serviceIsLaser: boolean;
+  setServiceIsLaser: React.Dispatch<React.SetStateAction<boolean>>;
   serviceEnableReminder: boolean;
   setServiceEnableReminder: React.Dispatch<React.SetStateAction<boolean>>;
   serviceImageUrl: string;
@@ -153,6 +156,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
     serviceDescAr, setServiceDescAr,
     serviceSortOrder, setServiceSortOrder,
     serviceIsShared, setServiceIsShared,
+    serviceIsLaser, setServiceIsLaser,
     serviceEnableReminder, setServiceEnableReminder,
     serviceImageUrl, setServiceImageUrl,
     servicePrice, setServicePrice,
@@ -558,6 +562,12 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                 <td className="px-5 py-3">
                                   <div className="flex items-center gap-2">
                                     <p className={`font-semibold ${ rowFaded ? "line-through text-[#5A6A51]" : "text-[#1F251A]" }`}>{svc.en}</p>
+                                    {(svc.islaser || svc.is_laser) && (
+                                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
+                                        <Sparkles size={11} className="text-emerald-600" />
+                                        <span>Laser</span>
+                                      </span>
+                                    )}
                                     {isInactive && (
                                       <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-500">{t.statusInactive}</span>
                                     )}
@@ -1090,6 +1100,35 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
               {/* Toggles */}
               <div className="space-y-4 pt-2">
+                {/* Laser Service Toggle */}
+                <div className="flex items-start justify-between gap-4 p-3.5 rounded-xl border border-emerald-500/25 bg-emerald-50/50 shadow-2xs">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-emerald-600 text-white mt-0.5 shadow-xs">
+                      <Sparkles size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-[#1F251A]">{t.isLaserLabel || "Laser Service (Requires Device & Pulse Billing)"}</span>
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.2 text-[10px] font-bold text-emerald-800 border border-emerald-300/60">Laser</span>
+                      </div>
+                      <span className="text-xs text-[#5A6A51] mt-0.5">
+                        {t.isLaserDesc || "Marks this procedure as a laser treatment requiring equipment device connection, pulse counting, and 3 reception payment options (Pay by Service, Pay per Pulse, Pay with Pulses Package)."}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setServiceIsLaser(!serviceIsLaser)}
+                    className="relative h-6 w-11 flex-shrink-0 rounded-full focus:outline-none transition-colors duration-300 cursor-pointer"
+                    style={{ backgroundColor: serviceIsLaser ? "#059669" : "#E2E8F0" }}
+                  >
+                    <span
+                      className="absolute top-[4px] h-4 w-4 rounded-full bg-white shadow-md transition-all duration-300"
+                      style={{ left: serviceIsLaser ? "24px" : "4px" }}
+                    />
+                  </button>
+                </div>
+
                 {/* Is Shared Toggle */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex flex-col">
@@ -1190,6 +1229,8 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                           descriptionAr: serviceDescAr.trim(),
                           sortOrder: serviceSortOrder,
                           isShared: serviceIsShared,
+                          islaser: serviceIsLaser,
+                          is_laser: serviceIsLaser,
                           enableReminder: serviceEnableReminder,
                           img: serviceImageUrl,
                           branchPricing: serviceBranchPricing.map(bp => ({ ...bp, price: servicePrice })),
@@ -1212,6 +1253,8 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       descriptionAr: serviceDescAr.trim(),
                       sortOrder: serviceSortOrder,
                       isShared: serviceIsShared,
+                      islaser: serviceIsLaser,
+                      is_laser: serviceIsLaser,
                       enableReminder: serviceEnableReminder,
                       img: serviceImageUrl,
                       branchPricing: serviceBranchPricing.map(bp => ({ ...bp, price: servicePrice })),
