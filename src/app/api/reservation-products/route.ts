@@ -28,23 +28,25 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { reservationId, lineType, productId, serviceId, description, qty, unitPrice, addedByRole } = body;
+    const reservationId = body.reservationId || body.booking_id || body.reservation_id;
+    const lineType = body.lineType || body.line_type || 'product';
+    const productId = body.productId || body.product_id || null;
+    const serviceId = body.serviceId || body.service_id || null;
+    const description = body.description || body.productName || body.name || body.serviceName || 'Session Item';
+    const addedByRole = body.addedByRole || body.added_by_role || 'doctor_session';
 
-    if (!reservationId || !lineType || !description || !addedByRole) {
+    if (!reservationId || !lineType || !description) {
       return NextResponse.json(
-        { error: 'reservationId, lineType, description and addedByRole are required.' },
+        { error: 'reservationId, lineType, and description are required.' },
         { status: 400 }
       );
     }
     if (!['product', 'additional_service', 'device_pulses'].includes(lineType)) {
       return NextResponse.json({ error: 'Invalid lineType.' }, { status: 400 });
     }
-    if (!['doctor_session', 'receptionist'].includes(addedByRole)) {
-      return NextResponse.json({ error: 'Invalid addedByRole.' }, { status: 400 });
-    }
 
-    const qtyNum = Number(qty) || 1;
-    const unitPriceNum = Number(unitPrice) || 0;
+    const qtyNum = Number(body.qty !== undefined ? body.qty : (body.quantity !== undefined ? body.quantity : 1)) || 1;
+    const unitPriceNum = Number(body.unitPrice !== undefined ? body.unitPrice : (body.unit_price !== undefined ? body.unit_price : (body.price !== undefined ? body.price : 0))) || 0;
     const total = Math.max(0, qtyNum * unitPriceNum);
 
     const { data: reservation, error: resError } = await supabaseServer

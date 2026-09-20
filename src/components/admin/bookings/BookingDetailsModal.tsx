@@ -1267,8 +1267,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               reservationId: booking.id,
               lineType: "device_pulses",
               description: `${devName} — ${totalPulses} pulses`,
+              productName: `${devName} — ${totalPulses} pulses`,
               qty: totalPulses,
-              unitPrice: isPerPulseMode ? pulseRate : pricePerPulse,
+              quantity: totalPulses,
+              unitPrice: 0,
               addedByRole: "receptionist_global_ending",
             }),
           })

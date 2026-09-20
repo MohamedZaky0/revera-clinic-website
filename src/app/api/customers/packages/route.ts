@@ -376,12 +376,21 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ success: false, error: 'Quantity of pulses to consume must be greater than 0.' }, { status: 400 });
       }
 
-      // 1. Verify package existence & expiry in database
-      const { data: pkgRow, error: pErr } = await supabaseServer
-        .from('customer_packages')
-        .select('*')
-        .eq('id', pkgId)
-        .maybeSingle();
+      // 1. Verify package existence & expiry in database (safely guard UUID to avoid 22P02 syntax error on synthetic IDs)
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(pkgId));
+      let pkgRow: any = null;
+      if (isUuid) {
+        try {
+          const { data, error: pErr } = await supabaseServer
+            .from('customer_packages')
+            .select('*')
+            .eq('id', pkgId)
+            .maybeSingle();
+          if (!pErr) pkgRow = data;
+        } catch (e) {
+          console.warn('Customer package DB lookup error (non-fatal):', e);
+        }
+      }
 
       if (pkgRow?.expires_at) {
         const expiryDate = new Date(pkgRow.expires_at);
@@ -390,10 +399,11 @@ export async function PATCH(req: Request) {
         }
       }
 
+      const initialTotalPulses = Number((pkgRow as any)?.total_pulses || (pkgRow as any)?.included_pulses || (pkgRow as any)?.pulses || 10000);
       const pkgPulses = pulseStore[pkgId] || {
-        included_pulses: (pkgRow as any)?.included_pulses || 10000,
-        used_pulses: 0,
-        remaining_pulses: (pkgRow as any)?.included_pulses || 10000,
+        included_pulses: initialTotalPulses,
+        used_pulses: Number((pkgRow as any)?.used_pulses || 0),
+        remaining_pulses: Number((pkgRow as any)?.remaining_pulses !== undefined ? (pkgRow as any).remaining_pulses : initialTotalPulses),
         usage_history: []
       };
 
@@ -421,6 +431,22 @@ export async function PATCH(req: Request) {
       pkgPulses.usage_history = [usageLog, ...(pkgPulses.usage_history || [])];
       pulseStore[pkgId] = pkgPulses;
       await savePackagePulsesStore(pulseStore);
+
+      // Also try syncing to native customer_packages table if UUID
+      if (isUuid && pkgRow) {
+        try {
+          await supabaseServer
+            .from('customer_packages')
+            .update({
+              used_pulses: pkgPulses.used_pulses,
+              remaining_pulses: pkgPulses.remaining_pulses,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', pkgId);
+        } catch (dbUpdateErr) {
+          console.warn('Syncing remaining_pulses to customer_packages table failed silently (non-fatal):', dbUpdateErr);
+        }
+      }
 
       return NextResponse.json({
         success: true,

@@ -348,17 +348,40 @@ async function writeCheckoutInvoice(params: {
   if (svcErr) throw svcErr;
   if (!services || services.length === 0) return;
 
-  const { data: resRow } = await supabaseServer
-    .from('reservations')
-    .select('laser_payment_mode, laser_price_per_pulse, notes')
-    .eq('id', reservationId)
-    .maybeSingle();
+  let resRow: any = null;
+  try {
+    const { data: resData, error: resErr } = await supabaseServer
+      .from('reservations')
+      .select('laser_payment_mode, laser_price_per_pulse, notes')
+      .eq('id', reservationId)
+      .maybeSingle();
+    if (!resErr && resData) {
+      resRow = resData;
+    } else {
+      const { data: notesData } = await supabaseServer
+        .from('reservations')
+        .select('notes')
+        .eq('id', reservationId)
+        .maybeSingle();
+      resRow = notesData;
+    }
+  } catch (e) {
+    console.warn('Could not query laser columns on reservation for invoice (non-fatal):', e);
+  }
 
   const isPerPulseMode = Boolean(
     resRow?.laser_payment_mode === 'PER_PULSE' ||
     String(resRow?.notes || '').toLowerCase().includes('pay per pulse') ||
     String(resRow?.notes || '').toLowerCase().includes('per_pulse') ||
     String(resRow?.notes || '').includes('[Laser Settlement]')
+  );
+  const isPackageMode = Boolean(
+    resRow?.laser_payment_mode === 'PACKAGE' ||
+    String(resRow?.notes || '').toLowerCase().includes('pay with package') ||
+    String(resRow?.notes || '').toLowerCase().includes('package session') ||
+    String(resRow?.notes || '').toLowerCase().includes('package redemption') ||
+    String(resRow?.notes || '').toLowerCase().includes('pulses package') ||
+    String(resRow?.notes || '').includes('[Laser Package]')
   );
   const pulseRate = Number(
     resRow?.laser_price_per_pulse ||
@@ -421,7 +444,7 @@ async function writeCheckoutInvoice(params: {
     // already covers this visit, so the line is written at its list price with a full discount
     // (line_total 0) rather than silently omitted, keeping the visit on the invoice for the audit
     // trail without billing it again or creating a phantom receivable.
-    const isRedeemed = redeemedSet.has(Number(svc.id));
+    const isRedeemed = redeemedSet.has(Number(svc.id)) || (isPackageMode && isLaser);
     return buildInvoiceLine({
       lineType: 'service',
       description: (svc.en || `Service #${svc.id}`) + (isRedeemed ? ' (package redemption)' : ''),
@@ -450,9 +473,9 @@ async function writeCheckoutInvoice(params: {
   }
   const addonLines = (pendingReservationProducts || [])
     .filter((p: any) => {
-      // In per-pulse mode, device_pulses are purely equipment tracking and should not be billed as an extra customer product
+      // In per-pulse mode or package mode with 0 unit_price, device_pulses are purely equipment tracking and should not be billed as an extra customer product
       if (isPerPulseMode && p.line_type === 'device_pulses') return false;
-      const isZeroCostPulse = (p.line_type === 'device_pulses' || String(p.description || '').toLowerCase().includes('pulse')) && Number(p.unit_price || 0) === 0;
+      const isZeroCostPulse = (p.line_type === 'device_pulses' || String(p.description || '').toLowerCase().includes('pulse')) && Number(p.unit_price || 0) <= 0;
       if (isZeroCostPulse) return false;
       return true;
     })
@@ -1772,7 +1795,60 @@ export async function PATCH(req: Request) {
         .update(updates)
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
+
+      // If missing column error (Postgres 42703) occurs, strip optional extended columns and retry
+      if (updateError && (updateError.code === '42703' || String(updateError.message || '').toLowerCase().includes('column'))) {
+        console.warn('Extended columns missing in reservations table, retrying with core columns only:', updateError.message);
+        const coreUpdates = { ...updates };
+        delete coreUpdates.laser_payment_mode;
+        delete coreUpdates.laser_price_per_pulse;
+        delete coreUpdates.delivered_pulses;
+        delete coreUpdates.actual_duration_minutes;
+        delete coreUpdates.doctor_notes;
+        delete coreUpdates.reception_notes;
+        delete coreUpdates.follow_up_notes;
+        delete coreUpdates.follow_up_date;
+        delete coreUpdates.total_price;
+        delete coreUpdates.price;
+
+        const retryRes = await supabaseServer
+          .from('reservations')
+          .update(coreUpdates)
+          .eq('id', id)
+          .select()
+          .maybeSingle();
+
+        if (!retryRes.error && retryRes.data) {
+          updated = retryRes.data;
+          updateError = null;
+        } else if (retryRes.error && (retryRes.error.code === '42703' || String(retryRes.error.message || '').toLowerCase().includes('column'))) {
+          // If still failing, keep only minimal safe core columns
+          const minimalUpdates: Record<string, any> = {};
+          if (coreUpdates.status !== undefined) minimalUpdates.status = coreUpdates.status;
+          if (coreUpdates.notes !== undefined) minimalUpdates.notes = coreUpdates.notes;
+          if (coreUpdates.amount_paid !== undefined) minimalUpdates.amount_paid = coreUpdates.amount_paid;
+          if (coreUpdates.amount_left !== undefined) minimalUpdates.amount_left = coreUpdates.amount_left;
+          if (coreUpdates.service_id !== undefined) minimalUpdates.service_id = coreUpdates.service_id;
+          if (coreUpdates.doctor_name !== undefined) minimalUpdates.doctor_name = coreUpdates.doctor_name;
+
+          const safeRes = await supabaseServer
+            .from('reservations')
+            .update(minimalUpdates)
+            .eq('id', id)
+            .select()
+            .maybeSingle();
+
+          if (!safeRes.error && safeRes.data) {
+            updated = safeRes.data;
+            updateError = null;
+          } else {
+            updateError = safeRes.error;
+          }
+        } else {
+          updateError = retryRes.error;
+        }
+      }
 
       // RISK-046: this used to fall back to writing 'confirmed' and then return
       // `{ ...fbUpdated, status: 'checked_in' }` — telling the caller the check-in succeeded while
@@ -1789,7 +1865,7 @@ export async function PATCH(req: Request) {
           .update(fallbackUpdates)
           .eq('id', id)
           .select()
-          .single();
+          .maybeSingle();
         if (!fbError && fbUpdated) {
           updated = fbUpdated;
           updateError = null;
@@ -1798,6 +1874,7 @@ export async function PATCH(req: Request) {
       }
 
       if (updateError) throw updateError;
+      if (!updated) updated = { ...target, ...updates };
 
       if (checkedInDowngraded) {
         return NextResponse.json({

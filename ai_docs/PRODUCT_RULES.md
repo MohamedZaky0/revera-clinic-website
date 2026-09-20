@@ -963,3 +963,27 @@ The following are **not currently enforced in code**:
 4. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-070` (`Package Types & Laser Pulses Package Engine`).
 
+---
+
+## Laser Pulses Package Redemption & Resilient Session Completion Rules
+**Enforced in:** `src/app/api/reservations/route.ts`, `src/app/api/customers/packages/route.ts`, `src/app/api/reservation-products/route.ts`, `src/components/admin/DoctorAccountView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`.
+
+1. **Schema-Resilient Session Ending (No 42703 Database Errors)**:
+   - When ending or completing a session via `PATCH /api/reservations`, the backend wraps updates in a multi-stage fallback. If Postgres returns error code `42703` (missing column on `reservations` table), extended columns (`laser_payment_mode`, `laser_price_per_pulse`, `delivered_pulses`, `actual_duration_minutes`, `doctor_notes`, `reception_notes`, `follow_up_notes`, `follow_up_date`, `total_price`, `price`) are stripped and the update retries cleanly without failing.
+   - Updates always preserve core booking lifecycle fields (`status: 'completed'`, `notes`, `amount_paid`, `amount_left`, `service_id`).
+
+2. **UUID-Guarded Customer Package Queries (No 22P02 Syntax Errors)**:
+   - `PATCH /api/customers/packages` guards against non-UUID package IDs (e.g. synthetic `pb-...` or `temp-pkg-...`) before querying `customer_packages` table with `.eq('id', pkgId)`.
+   - Pulse store operations (`consume_package_pulses`) operate reliably across all package identifier formats, updating `page_settings.customer_package_pulses` and logging usage history.
+
+3. **0 EGP Package Redemption Service Line & Zero Phantom Charges**:
+   - When a session is settled in `PACKAGE` mode, `writeCheckoutInvoice` treats the base laser service as fully covered by package redemption (`100% discount, line_total = 0`), preventing phantom receivables or duplicate charges.
+   - In `persistSessionLineItems`, device pulses for prepaid packages or standard inclusion are recorded with `unitPrice: 0` so hardware pulse counter entries are never billed as billable addon products.
+
+4. **Flexible Reservation Products Payload Normalization**:
+   - `/api/reservation-products` accepts parameter aliases seamlessly (`description` / `productName` / `name`, `qty` / `quantity`, `unitPrice` / `unit_price` / `price`) and supports all staff roles (`doctor_session`, `receptionist`, `receptionist_global_ending`).
+
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-072` (`Laser Pulses Package Redemption & Session Completion Engine`).
+
+

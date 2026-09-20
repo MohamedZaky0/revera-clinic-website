@@ -1027,7 +1027,11 @@ export default function DoctorAccountView({
         })
       );
     }
-    if (pulsesToDeduct > 0 && (!laserInfo || laserInfo.pulseType !== "PER_PULSE")) {
+    if (pulsesToDeduct > 0) {
+      // In PACKAGE mode, PER_PULSE mode, or standard SERVICE mode without extra pulse fees,
+      // pulses are recorded for hardware tracking with unitPrice: 0 so patient is not double billed.
+      const isExtraFee = laserInfo?.pulseType === "SERVICE" && Number(laserInfo?.additionalCharge || 0) > 0;
+      const unitRate = isExtraFee ? Number(laserInfo?.pulseValue || pricePerPulse) : 0;
       writes.push(
         fetch("/api/reservation-products", {
           method: "POST",
@@ -1036,8 +1040,10 @@ export default function DoctorAccountView({
             reservationId,
             lineType: "device_pulses",
             description: `${deviceName} — ${pulsesToDeduct} pulses`,
+            productName: `${deviceName} — ${pulsesToDeduct} pulses`,
             qty: pulsesToDeduct,
-            unitPrice: pricePerPulse,
+            quantity: pulsesToDeduct,
+            unitPrice: unitRate,
             addedByRole: "doctor_session",
           }),
         })
@@ -1194,7 +1200,9 @@ export default function DoctorAccountView({
                 body: JSON.stringify({
                   reservationId: bookingTargetId,
                   lineType: "device_pulses",
+                  description: `Additional Laser Pulses (${laserData.treatmentArea || "Treatment"})`,
                   productName: `Additional Laser Pulses (${laserData.treatmentArea || "Treatment"})`,
+                  qty: Number(laserData.additionalPulses) || 1,
                   quantity: Number(laserData.additionalPulses) || 1,
                   unitPrice: Number(laserData.pulseValue) || 0,
                   totalPrice: effectiveLaserSessionCharge,
@@ -1222,7 +1230,9 @@ export default function DoctorAccountView({
                 body: JSON.stringify({
                   reservationId: bookingTargetId,
                   lineType: "device_pulses",
+                  description: `Laser Pulses Delivered (${deliveredPulses} pulses @ ${unitRate} EGP - ${laserData.treatmentArea || "Treatment"})`,
                   productName: `Laser Pulses Delivered (${deliveredPulses} pulses @ ${unitRate} EGP - ${laserData.treatmentArea || "Treatment"})`,
+                  qty: deliveredPulses,
                   quantity: deliveredPulses,
                   unitPrice: 0,
                   totalPrice: 0,
@@ -1291,7 +1301,9 @@ export default function DoctorAccountView({
                   body: JSON.stringify({
                     reservationId: bookingTargetId,
                     lineType: "product",
+                    description: `New Package: ${laserData.newPackageToBuy.name || laserData.newPackageToBuy.title || "Laser Package"}`,
                     productName: `New Package: ${laserData.newPackageToBuy.name || laserData.newPackageToBuy.title || "Laser Package"}`,
+                    qty: 1,
                     quantity: 1,
                     unitPrice: newPkgPrice,
                     totalPrice: newPkgPrice,
@@ -1313,7 +1325,9 @@ export default function DoctorAccountView({
                   body: JSON.stringify({
                     reservationId: bookingTargetId,
                     lineType: "device_pulses",
+                    description: `Excess Laser Pulses Deficit (${deficitPulses} pulses @ ${excessRate} EGP)`,
                     productName: `Excess Laser Pulses Deficit (${deficitPulses} pulses @ ${excessRate} EGP)`,
+                    qty: deficitPulses,
                     quantity: deficitPulses,
                     unitPrice: excessRate,
                     totalPrice: excessTotal,
@@ -1374,6 +1388,7 @@ export default function DoctorAccountView({
 
     let completionNotes = String(targetBooking.notes || "");
     const isDoctorPerPulse = laserData?.pulseType === "PER_PULSE" || targetBooking.laser_payment_mode === "PER_PULSE" || targetBooking.laserPaymentMode === "PER_PULSE";
+    const isDoctorPackage = laserData?.pulseType === "PACKAGE" || targetBooking.laser_payment_mode === "PACKAGE" || targetBooking.laserPaymentMode === "PACKAGE";
     const doctorPulseRate = Number(laserData?.pulseValue || targetBooking.laser_price_per_pulse || targetBooking.laserPricePerPulse || 1);
     const doctorDeliveredPulses = Number(laserData?.pulsesUsed || 0);
 
@@ -1383,6 +1398,10 @@ export default function DoctorAccountView({
       completionNotes = completionNotes.replace(/\[(?:Laser Pulses Delivered|Extra Device Pulses)\]:[^\n\[]*/gi, "").trim() + pulseString;
       const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are charged per pulse (${doctorDeliveredPulses} pulses × ${doctorPulseRate} EGP = ${totalLaserCost} EGP) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${doctorDeliveredPulses} نبضة × ${doctorPulseRate} ج.م = ${totalLaserCost} ج.م)`;
       completionNotes = completionNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
+    } else if (isDoctorPackage && doctorDeliveredPulses > 0) {
+      const pkgName = laserData?.sourceName || "Laser Pulses Package";
+      const pulseString = `\n[Laser Package Redemption]: Deducted ${doctorDeliveredPulses} pulses from ${pkgName}`;
+      completionNotes = completionNotes.replace(/\[Laser Package Redemption\]:[^\n\[]*/gi, "").trim() + pulseString;
     }
 
     try {
@@ -1398,12 +1417,12 @@ export default function DoctorAccountView({
           total_price: sessionComputedTotal,
           price: sessionComputedTotal,
           amountLeft: Math.max(0, sessionComputedTotal - Number(targetBooking.amountPaid ?? 0)),
+          laser_payment_mode: isDoctorPerPulse ? "PER_PULSE" : isDoctorPackage ? "PACKAGE" : "SERVICE",
+          laserPaymentMode: isDoctorPerPulse ? "PER_PULSE" : isDoctorPackage ? "PACKAGE" : "SERVICE",
+          delivered_pulses: doctorDeliveredPulses,
           ...(isDoctorPerPulse ? {
-            laser_payment_mode: "PER_PULSE",
-            laserPaymentMode: "PER_PULSE",
             laser_price_per_pulse: doctorPulseRate,
             laserPricePerPulse: doctorPulseRate,
-            delivered_pulses: doctorDeliveredPulses,
           } : {})
         })
       });
@@ -1421,12 +1440,12 @@ export default function DoctorAccountView({
                   total_price: sessionComputedTotal,
                   price: sessionComputedTotal,
                   amountLeft: Math.max(0, sessionComputedTotal - Number(targetBooking.amountPaid ?? 0)),
+                  laser_payment_mode: isDoctorPerPulse ? "PER_PULSE" : isDoctorPackage ? "PACKAGE" : "SERVICE",
+                  laserPaymentMode: isDoctorPerPulse ? "PER_PULSE" : isDoctorPackage ? "PACKAGE" : "SERVICE",
+                  delivered_pulses: doctorDeliveredPulses,
                   ...(isDoctorPerPulse ? {
-                    laser_payment_mode: "PER_PULSE",
-                    laserPaymentMode: "PER_PULSE",
                     laser_price_per_pulse: doctorPulseRate,
                     laserPricePerPulse: doctorPulseRate,
-                    delivered_pulses: doctorDeliveredPulses,
                   } : {})
                 }
               : r

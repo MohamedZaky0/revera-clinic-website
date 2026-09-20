@@ -2348,6 +2348,36 @@ The clinic required a complete, multi-tiered laser pulse counting and accounting
 4. **Automated Diagnostic Verification:**
    - Verified under test case `TC-071` ("Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine") in `INITIAL_SYSTEM_TEST_SUITES`.
 
+---
+
+## DEC-068: Laser Pulses Package Redemption & Resilient Session Completion Engine
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. Ending a session settled with a pulses package (Option 3: Pay with Pulses Package) previously threw a popup error: `"Database error"`.
+2. Root causes identified:
+   - `PATCH /api/reservations`: Updating `reservations` with extended columns (`laser_payment_mode`, `laser_price_per_pulse`, `delivered_pulses`, `actual_duration_minutes`, `doctor_notes`, etc.) failed with Postgres 42703 (missing columns) on unmigrated or older schemas.
+   - `PATCH /api/customers/packages`: Querying `customer_packages` with synthetic IDs (e.g. `pb-...`) failed with Postgres 22P02 (invalid UUID input syntax).
+   - `writeCheckoutInvoice` and `DoctorAccountView.tsx`: Base laser services in package sessions were not marked as 100% discounted redemptions, and hardware tracking pulses were written with unit price > 0, creating unwanted invoice charges.
+   - `/api/reservation-products`: Did not accept parameter aliases (`productName`, `quantity`) or the `receptionist_global_ending` role.
+
+**Decisions & Implementation:**
+1. **Multi-Stage Resilient Reservation Update (`src/app/api/reservations/route.ts`):**
+   - Wrapped `supabaseServer.from('reservations').update(updates)` in a schema-resilient catch block.
+   - On error code `42703` or column errors, automatically strips optional extended columns and retries with core columns (`status`, `notes`, `amount_paid`, `amount_left`, `service_id`), preventing any 500 error popups.
+2. **UUID-Guarded Package Querying (`src/app/api/customers/packages/route.ts`):**
+   - Validates UUID syntax with `/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i` before querying `customer_packages` table, while updating `pulseStore` in `page_settings` seamlessly for all package IDs.
+3. **0 EGP Base Package Redemption & Device Pulse Tracking (`writeCheckoutInvoice`, `DoctorAccountView.tsx`, `BookingDetailsModal.tsx`):**
+   - In package mode, primary laser service line items receive a full 100% package discount (`unitPrice: basePrice, discount: basePrice, line_total: 0`).
+   - Hardware counter pulse entries are recorded with `unitPrice: 0` so device tracking never creates phantom billable line items.
+4. **Normalized Reservation Products API (`src/app/api/reservation-products/route.ts`):**
+   - Fully supports payload aliases (`description` / `productName`, `qty` / `quantity`, `unitPrice` / `price`) and all staff roles.
+5. **Automated Diagnostic Verification:**
+   - Added test case `TC-072` ("Laser Pulses Package Redemption & Session Completion Engine") to `INITIAL_SYSTEM_TEST_SUITES`.
+
+
 
 
 

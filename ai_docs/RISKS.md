@@ -4095,6 +4095,30 @@ live reproduction described above.
 
 ---
 
+## RISK-089: "Database error" Popup Modal on Ending Laser Session Settled with Pulses Package (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Correctness / Error handling / Schema resilience
+**Found:** 2026-09-20, live-reported by user with screenshot ("that appeared when i tryed ending a session that is was setteled to be payed by a pulses package"). **Fixed same day.**
+
+**What it was:**
+1. When completing or ending a session settled with a laser pulses package in `DoctorAccountView.tsx` or `BookingDetailsModal.tsx`, `PATCH /api/reservations` attempted to update columns (`laser_payment_mode`, `laser_price_per_pulse`, `delivered_pulses`, `actual_duration_minutes`, `doctor_notes`, `reception_notes`, etc.) that may not exist on the database table in unmigrated environments, causing Postgres error `42703` (`column does not exist`). Line 1800 had `if (updateError) throw updateError;`, which got caught and returned HTTP 500 `{ error: 'Database error' }`, displaying `alert("Database error")`.
+2. In `PATCH /api/customers/packages`, consuming pulses executed `.eq('id', pkgId)` without checking if `pkgId` is a valid UUID, throwing Postgres error `22P02` (`invalid input syntax for type uuid`) on synthetic or custom package IDs.
+3. In `writeCheckoutInvoice`, laser services paid via pulses packages were not flagged as 100% discounted package redemptions, and hardware tracking pulse line items were assigned unit price > 0 in `persistSessionLineItems`, adding unintended phantom charges.
+4. In `src/app/api/reservation-products/route.ts`, required payload field names strictly expected `description` and `qty`, failing calls sending `productName` and `quantity`, and rejected `receptionist_global_ending` role.
+
+**Fix:**
+1. Added multi-stage resilient retry in `PATCH /api/reservations`: catches Postgres 42703 errors, strips extended columns, and retries with core columns (`status`, `notes`, `amount_paid`, `amount_left`, `service_id`).
+2. UUID-guarded database queries in `PATCH /api/customers/packages` before calling `.from('customer_packages')`.
+3. In `writeCheckoutInvoice`, recognized `isPackageMode` to treat base laser services as 100% discounted package redemptions (`line_total: 0`), and ensured pulse counter entries with `unit_price <= 0` are omitted from customer billable invoice lines.
+4. In `DoctorAccountView.tsx` and `BookingDetailsModal.tsx`, set `unitPrice: 0` for hardware tracking pulse records.
+5. In `/api/reservation-products`, supported payload aliases (`description` / `productName`, `qty` / `quantity`, `unitPrice` / `price`) and all staff roles.
+
+**Verify:**
+- Verified with `npm run build` with 0 compiler / TypeScript errors.
+- Verified under System Test Suite `TC-072` (`Laser Pulses Package Redemption & Session Completion Engine`).
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:
@@ -4102,3 +4126,4 @@ See `PROPOSALS.md` for:
   making fork-per-client a one-file-edit operation.
 - **PROPOSAL-002** — the Finance & Management Accounting module. Its Phase 0 is the remediation
   plan for RISK-010 … RISK-015 and RISK-018.
+
