@@ -439,18 +439,68 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verify the customer actually exists before touching stock or writing anything. Without
-    // this, a mistyped/stale customer_id violates product_sales.customer_id's FK constraint,
-    // which made the native insert fail and fall through to the page_settings blob — the exact
-    // RISK-014 failure mode, just triggered by a different input. Once the native table has any
-    // rows, getStoredSalesData() trusts it exclusively and never merges the blob back in, so that
-    // sale becomes permanently invisible in sales history — while deductInventoryStock still runs
-    // unconditionally below, so stock is genuinely lost with no discoverable record. Found and
-    // fixed 2026-07-26 while manually verifying task 1.11 — see FINANCE_PHASE_1_MANUAL_TESTS.md.
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let finalCustomerId: string | null = null;
+
+    if (UUID_REGEX.test(customer_id)) {
+      finalCustomerId = customer_id;
+    } else {
+      // It's a synthetic ID like "res-cust-01016302772" or phone number
+      const digits = (customer_mobile || customer_id).replace(/\D/g, '');
+      const last9Digits = digits.length >= 9 ? digits.slice(-9) : digits;
+
+      if (last9Digits) {
+        const { data: matchedCust } = await supabaseServer
+          .from('customers')
+          .select('id')
+          .or(`mobile.ilike.%${last9Digits}%,phone.ilike.%${last9Digits}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (matchedCust?.id) {
+          finalCustomerId = matchedCust.id;
+        } else {
+          // Look in reservations for patient details to create the real customer record
+          const { data: resv } = await supabaseServer
+            .from('reservations')
+            .select('name, phone, email')
+            .or(`phone.ilike.%${last9Digits}%`)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const { data: newCust, error: createCustErr } = await supabaseServer
+            .from('customers')
+            .insert({
+              name: customer_name || resv?.name || 'Patient',
+              mobile: digits,
+              phone: digits,
+              email: customer_email || resv?.email || null,
+            })
+            .select('id')
+            .single();
+
+          if (createCustErr) {
+            console.error('Failed to auto-create customer in product sale:', createCustErr);
+          } else if (newCust?.id) {
+            finalCustomerId = newCust.id;
+          }
+        }
+      }
+    }
+
+    if (!finalCustomerId) {
+      return NextResponse.json(
+        { success: false, error: `Customer '${customer_id}' does not exist.` },
+        { status: 404 }
+      );
+    }
+
+    // Verify the customer actually exists before touching stock or writing anything.
     const { data: customerExists, error: customerCheckErr } = await supabaseServer
       .from('customers')
       .select('id')
-      .eq('id', customer_id)
+      .eq('id', finalCustomerId)
       .maybeSingle();
     if (customerCheckErr) throw customerCheckErr;
     if (!customerExists) {
@@ -521,7 +571,7 @@ export async function POST(req: Request) {
       const { data: walletRow, error: walletReadErr } = await supabaseServer
         .from('customers')
         .select('wallet_balance')
-        .eq('id', customer_id)
+        .eq('id', finalCustomerId)
         .maybeSingle();
       if (walletReadErr) throw walletReadErr;
       const available = Number(walletRow?.wallet_balance || 0);
@@ -541,7 +591,7 @@ export async function POST(req: Request) {
       product_id,
       product_name: product_name || 'Product',
       product_sku: product_sku || '',
-      customer_id,
+      customer_id: finalCustomerId,
       customer_name: customer_name || 'Customer',
       customer_mobile: customer_mobile || '',
       customer_email: customer_email || '',
@@ -563,9 +613,9 @@ export async function POST(req: Request) {
       .single();
 
     await deductInventoryStock(product_id || product_name, Number(quantity));
-    await addToCustomerSpend(customer_id, newSale.total_amount);
+    await addToCustomerSpend(finalCustomerId, newSale.total_amount);
     if (payingFromWallet) {
-      await deductFromWallet(customer_id, newSale.total_amount);
+      await deductFromWallet(finalCustomerId, newSale.total_amount);
     }
 
     if (!dbInsertErr && insertedDb) {

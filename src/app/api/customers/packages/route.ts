@@ -52,6 +52,7 @@ async function savePackagePulsesStore(store: Record<string, any>) {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let customerId = searchParams.get('customer_id');
     const mobile = searchParams.get('mobile') || searchParams.get('phone');
 
@@ -60,11 +61,22 @@ export async function GET(req: Request) {
     }
 
     const customerIds: string[] = [];
-    if (customerId) customerIds.push(customerId);
-
-    // If customerId is provided, also look up their mobile/phone to find all alias customer accounts
     let lookupMobile = mobile;
-    if (customerId && !lookupMobile) {
+
+    // Handle synthetic customer IDs like "res-cust-01016302772"
+    if (customerId) {
+      if (UUID_REGEX.test(customerId)) {
+        customerIds.push(customerId);
+      } else {
+        // Extract phone number from synthetic ID or raw phone string
+        if (!lookupMobile) {
+          lookupMobile = customerId.replace(/^res-cust-/, '');
+        }
+      }
+    }
+
+    // If customerId is a valid UUID, also look up their mobile/phone to find all alias customer accounts
+    if (customerId && UUID_REGEX.test(customerId) && !lookupMobile) {
       try {
         const { data: cRow } = await supabaseServer
           .from('customers')
@@ -91,7 +103,9 @@ export async function GET(req: Request) {
             .or(`mobile.ilike.%${last9Digits}%,phone.ilike.%${last9Digits}%`);
           if (matchedCusts && matchedCusts.length > 0) {
             for (const c of matchedCusts) {
-              if (!customerIds.includes(c.id)) customerIds.push(c.id);
+              if (c.id && UUID_REGEX.test(c.id) && !customerIds.includes(c.id)) {
+                customerIds.push(c.id);
+              }
             }
           }
         } catch (mErr) {
@@ -100,11 +114,12 @@ export async function GET(req: Request) {
       }
     }
 
+    const validCustomerIds = customerIds.filter((id) => UUID_REGEX.test(id));
     const pulseStore = await getPackagePulsesStore();
     let packages: any[] = [];
 
-    // 1. Fetch from native customer_packages table
-    if (customerIds.length > 0) {
+    // 1. Fetch from native customer_packages table (only with valid UUIDs to avoid 22P02 error)
+    if (validCustomerIds.length > 0) {
       try {
         const { data, error } = await supabaseServer
           .from('customer_packages')
@@ -113,7 +128,7 @@ export async function GET(req: Request) {
             packages ( id, name, name_ar ),
             customer_package_items ( id, service_id, qty_total, qty_used, qty_remaining, services ( id, en, ar, name, price ) )
           `)
-          .in('customer_id', customerIds)
+          .in('customer_id', validCustomerIds)
           .order('purchased_at', { ascending: false });
 
         if (!error && data && data.length > 0) {
@@ -169,7 +184,7 @@ export async function GET(req: Request) {
           const { data: rawCustPkgs } = await supabaseServer
             .from('customer_packages')
             .select('*')
-            .in('customer_id', customerIds)
+            .in('customer_id', validCustomerIds)
             .order('purchased_at', { ascending: false });
 
           if (rawCustPkgs && rawCustPkgs.length > 0) {
@@ -262,6 +277,7 @@ export async function GET(req: Request) {
         if (psData?.value?.balances && Array.isArray(psData.value.balances)) {
           pbList = psData.value.balances.filter((b: any) =>
             customerIds.includes(b.customer_id) ||
+            (customerId && b.customer_id === customerId) ||
             (lookupMobile && b.customer_mobile && b.customer_mobile.includes(lookupMobile.replace(/\D/g, '')))
           );
         }

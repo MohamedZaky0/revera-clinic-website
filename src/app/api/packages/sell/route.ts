@@ -41,6 +41,19 @@ async function removeIncompleteSale(invoiceId: string, customerPackageId?: strin
   if (error) console.error('Failed to remove incomplete package invoice:', error);
 }
 
+export async function GET(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  return NextResponse.json({
+    status: 'ok',
+    feature: 'packages_sell_engine',
+    supportedPaymentMethods: VALID_PAYMENT_METHODS,
+  });
+}
+
 export async function POST(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
@@ -66,8 +79,62 @@ export async function POST(req: Request) {
       );
     }
 
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let finalCustomerId: string | null = null;
+
+    if (UUID_REGEX.test(customerId)) {
+      finalCustomerId = customerId;
+    } else {
+      // It's a synthetic ID like "res-cust-01016302772" or phone number
+      const digits = String(customerId).replace(/\D/g, "");
+      if (digits) {
+        const last9Digits = digits.length >= 9 ? digits.slice(-9) : digits;
+        // Try finding existing customer by mobile or phone
+        const { data: matchedCust } = await supabaseServer
+          .from('customers')
+          .select('id')
+          .or(`mobile.ilike.%${last9Digits}%,phone.ilike.%${last9Digits}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (matchedCust?.id) {
+          finalCustomerId = matchedCust.id;
+        } else {
+          // Look in reservations for patient details to create the real customer record
+          const { data: resv } = await supabaseServer
+            .from('reservations')
+            .select('name, phone, email')
+            .or(`phone.ilike.%${last9Digits}%`)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const { data: newCust, error: createCustErr } = await supabaseServer
+            .from('customers')
+            .insert({
+              name: resv?.name || 'Patient',
+              mobile: digits,
+              phone: digits,
+              email: resv?.email || null,
+            })
+            .select('id')
+            .single();
+
+          if (createCustErr) {
+            console.error('Failed to auto-create customer in package sale:', createCustErr);
+          } else if (newCust?.id) {
+            finalCustomerId = newCust.id;
+          }
+        }
+      }
+    }
+
+    if (!finalCustomerId) {
+      return NextResponse.json({ error: 'Customer not found or invalid customer ID.' }, { status: 404 });
+    }
+
     const [customerResult, packageResult, packageItemsResult] = await Promise.all([
-      supabaseServer.from('customers').select('id').eq('id', customerId).maybeSingle(),
+      supabaseServer.from('customers').select('id, spent_amount, wallet_balance').eq('id', finalCustomerId).maybeSingle(),
       supabaseServer
         .from('packages')
         .select('id, name, branch_id, price, tax_rate, validity_days, active, package_type, total_pulses')
@@ -179,7 +246,7 @@ export async function POST(req: Request) {
       const { data: walletRow, error: walletReadErr } = await supabaseServer
         .from('customers')
         .select('wallet_balance')
-        .eq('id', customerId)
+        .eq('id', finalCustomerId)
         .maybeSingle();
       if (walletReadErr) throw walletReadErr;
       const available = Number(walletRow?.wallet_balance || 0);
@@ -200,7 +267,7 @@ export async function POST(req: Request) {
       .from('invoices')
       .insert({
         invoice_no: formatInvoiceNo(Number(sequenceValue)),
-        customer_id: customerId,
+        customer_id: finalCustomerId,
         branch_id: branchId || pkg.branch_id,
         subtotal: totals.subtotal,
         discount_total: totals.discountTotal,
@@ -223,7 +290,7 @@ export async function POST(req: Request) {
       ? (Number(pkg.total_pulses || 0) || Number(pkgMeta?.totalPulses || 0) || extractedPulsesFromName || 1000)
       : 0;
     const cpInsertPayload: any = {
-      customer_id: customerId,
+      customer_id: finalCustomerId,
       package_id: pkg.id,
       invoice_id: invoice.id,
       expires_at: expiresAt.toISOString(),
@@ -243,7 +310,7 @@ export async function POST(req: Request) {
 
     if (customerPackageError && (customerPackageError.message?.includes('column') || customerPackageError.code === '42703')) {
       const fallbackCpPayload = {
-        customer_id: customerId,
+        customer_id: finalCustomerId,
         package_id: pkg.id,
         invoice_id: invoice.id,
         expires_at: expiresAt.toISOString(),
@@ -323,7 +390,7 @@ export async function POST(req: Request) {
       type: 'payment',
       amount: totals.grandTotal,
       description: `Package purchase — ${pkg.name}`,
-      customerId,
+      customerId: finalCustomerId,
       branchId: branchId || null,
       invoiceId: invoice.id,
       paymentMethod,
@@ -335,7 +402,7 @@ export async function POST(req: Request) {
       const { data: customer, error: readErr } = await supabaseServer
         .from('customers')
         .select('spent_amount, wallet_balance')
-        .eq('id', customerId)
+        .eq('id', finalCustomerId)
         .maybeSingle();
 
       if (!readErr && customer) {
@@ -345,13 +412,13 @@ export async function POST(req: Request) {
             spent_amount: Number(customer.spent_amount || 0) + totals.grandTotal,
             updated_at: new Date().toISOString()
           })
-          .eq('id', customerId);
+          .eq('id', finalCustomerId);
 
         // Deduct wallet if paying from wallet
         if (paymentMethod === 'wallet') {
           const newBalance = Math.max(0, Number(customer.wallet_balance || 0) - totals.grandTotal);
           await recordWalletMovement({
-            customerId,
+            customerId: finalCustomerId,
             direction: 'out',
             amount: totals.grandTotal,
             reason: 'package sale payment',

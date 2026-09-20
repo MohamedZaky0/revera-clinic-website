@@ -1117,6 +1117,24 @@ The following are **not currently enforced in code**:
 3. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-077` (`In-Booking Package Selling & Integrated Patient Search Engine`).
 
+---
+
+## Synthetic Customer ID Resolution & Cross-Workflow Profile Sync Rules
+**Enforced in:** `src/app/api/packages/sell/route.ts`, `src/app/api/customers/packages/route.ts`, `src/app/api/inventory/products/sales/route.ts`, `src/components/admin/patients/useCustomerProfile.ts`.
+
+1. **Synthetic Patient ID Resolution (`res-cust-...`)**:
+   - Reservation-derived patient records with pseudo-IDs (e.g., `res-cust-01016302772`) MUST NEVER be passed directly to database queries targeting PostgreSQL `UUID` columns (`customers.id`, `invoices.customer_id`, `customer_packages.customer_id`).
+   - `POST /api/packages/sell` and `POST /api/inventory/products/sales` validate customer IDs against `UUID_REGEX`. If a synthetic ID or phone number is passed, the system extracts phone digits, looks up existing customer UUIDs, or auto-creates a real customer record from reservation history.
+   - `useCustomerProfile.ts` resolves or creates the real customer record before calling `/api/packages/sell` or `/api/inventory/products/sales`, updating `viewingCustomerProfile.id` with the generated UUID.
+
+2. **Safe UUID Filtering on Package Lookups**:
+   - `GET /api/customers/packages` guards against non-UUID customer IDs by extracting phone numbers and querying `customers` by phone.
+   - Database queries against `customer_packages` and `customer_product_balances` only query valid UUIDs (`.in('customer_id', validCustomerIds)`), eliminating PostgreSQL `22P02 invalid input syntax for type uuid` errors.
+
+3. **Multi-Workflow Patient Profile Synchronization**:
+   - `useCustomerProfile.ts` subscribes to `revera-laser-change` to immediately re-fetch both product balances and customer packages (`fetchCustomerProfilePackages`), ensuring packages created or updated in New Booking, Doctor Portal, or Reception Dashboard appear instantly in open patient profiles.
+
+
 
 
 

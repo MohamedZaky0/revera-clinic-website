@@ -2540,6 +2540,44 @@ The clinic required a complete, multi-tiered laser pulse counting and accounting
 3. **Admin Settings System Test Suite Diagnostic Verification:**
    - Added test case `TC-077` ("In-Booking Package Selling & Integrated Patient Search Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
 
+---
+
+## DEC-074: Synthetic Customer UUID Crash (22P02) Resolution & Multi-Workflow Patient Profile Package Synchronization
+
+**Date:** 2026-09-21
+**Status:** Decided & Implemented
+
+**Context:**
+1. The user reported two related errors:
+   - "the pusrcahsed pacakge in the new booking page isnt showing in the painet profile"
+   - "that is happend when i tryed to purchase a package from the painet profile" (Error modal: `invalid input syntax for type uuid: "res-cust-01016302772"`).
+2. Root Cause Analysis:
+   - **Synthetic Customer IDs**: In `src/app/admin/page.tsx:3526`, patients created from historical reservations who do not yet have a corresponding row in `customers` table are synthesized with ID `res-cust-<phone>`.
+   - **Postgres 22P02 Syntax Crash**: When opening such a patient profile and clicking "+ Sell Package", `useCustomerProfile.ts` sent `customerId: "res-cust-01016302772"` to `POST /api/packages/sell`. The endpoint executed `.eq('id', customerId)` and `.insert({ customer_id: customerId })` against tables with PostgreSQL `UUID` columns (`customers`, `invoices`, `customer_packages`), immediately crashing with `22P02: invalid input syntax for type uuid: "res-cust-01016302772"`.
+   - **Query Crashing on Package Fetch**: In `src/app/api/customers/packages/route.ts`, `GET` passed `customerId` directly into `.in('customer_id', [customerId])` without verifying UUID format. For synthetic IDs, this threw 22P02, returning 500 error or empty packages, causing newly purchased packages to fail to render in the patient profile.
+   - **Profile Package Refresh Event Gap**: `useCustomerProfile.ts` only listened to `revera-laser-change` for `fetchCustomerProductBalances`, but neglected to call `fetchCustomerProfilePackages`. When a package was purchased in New Booking, the profile never refreshed its package list.
+
+**Decisions & Implementation:**
+1. **Synthetic ID Resolution & Auto-Creation in `/api/packages/sell` (`src/app/api/packages/sell/route.ts`):**
+   - Added `UUID_REGEX` validation. If `customerId` is a synthetic ID (`res-cust-...`) or raw phone string:
+     - Extracts the phone digits.
+     - Searches `customers` table by phone number (`mobile` or `phone`).
+     - If no customer exists, auto-creates the real customer row using patient information from reservations.
+     - Uses `finalCustomerId` (valid UUID) for customer verification, `invoices` insert, `customer_packages` insert, `recordTransaction` ledger, customer `spent_amount` updates, and wallet movements.
+   - Added `GET` handler returning status 200 for diagnostic verification in System Test Suite (`TC-077`).
+2. **Hardening Patient Profile Client (`src/components/admin/patients/useCustomerProfile.ts`):**
+   - In `handleSellPackageToCustomer`: detects non-UUID `customerId`, resolves or creates the real customer record via `POST /api/customers`, and updates `viewingCustomerProfile.id`.
+   - On sale completion: updates `viewingCustomerProfile.id` with `data.customerPackage.customer_id` and immediately re-fetches customer packages.
+   - In `handleAddProductToPatient`: applies the same synthetic ID resolution to prevent 22P02 crashes when adding inventory products to reservation-synthesized patients.
+   - In `useEffect`: wired `revera-laser-change` to re-fetch `fetchCustomerProfilePackages` and `fetchCustomerPackageRedemptions` so cross-component purchases (New Booking, Doctor Session, Receptionist Session) immediately reflect in open patient profiles.
+3. **Safe UUID Filtering & Synthetic Lookup in `/api/customers/packages` (`src/app/api/customers/packages/route.ts`):**
+   - When `customerId` is synthetic (`res-cust-...`), extracts digits to `lookupMobile` and matches all associated UUIDs in `customers`.
+   - Filters `validCustomerIds = customerIds.filter(id => UUID_REGEX.test(id))` before running `.in('customer_id', validCustomerIds)` on `customer_packages` and `customer_product_balances`.
+   - Prevents all 22P02 UUID crashes while finding packages belonging to this phone number.
+4. **Resilience in Inventory POS Sales (`src/app/api/inventory/products/sales/route.ts`):**
+   - Added `UUID_REGEX` and synthetic ID auto-resolution/creation to prevent 22P02 crashes during product sales.
+
+
 
 
 

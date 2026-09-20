@@ -199,31 +199,12 @@ export function useCustomerProfile({
     }
   }, [session]);
 
-  useEffect(() => {
-    if (viewingCustomerProfile?.id) {
-      fetchCustomerProductBalances(viewingCustomerProfile.id);
-    }
-    const handleLaserChange = () => {
-      if (viewingCustomerProfile?.id) {
-        fetchCustomerProductBalances(viewingCustomerProfile.id);
-      }
-    };
-    window.addEventListener("revera-laser-change", handleLaserChange);
-    return () => window.removeEventListener("revera-laser-change", handleLaserChange);
-  }, [viewingCustomerProfile?.id, fetchCustomerProductBalances]);
-
   // Fetch customer profile packages
   const fetchCustomerProfilePackages = useCallback(async (customerId: string) => {
     setLoadingCustomerPackages(true);
     await fetchCustomerPackagesInto(customerId, setCustomerProfilePackages);
     setLoadingCustomerPackages(false);
   }, [fetchCustomerPackagesInto]);
-
-  useEffect(() => {
-    if (viewingCustomerProfile?.id) {
-      fetchCustomerProfilePackages(viewingCustomerProfile.id);
-    }
-  }, [viewingCustomerProfile?.id, fetchCustomerProfilePackages]);
 
   // Fetch customer package redemptions
   const fetchCustomerPackageRedemptions = useCallback(async (customerId: string) => {
@@ -243,11 +224,23 @@ export function useCustomerProfile({
 
   useEffect(() => {
     if (viewingCustomerProfile?.id) {
+      fetchCustomerProductBalances(viewingCustomerProfile.id);
+      fetchCustomerProfilePackages(viewingCustomerProfile.id);
       fetchCustomerPackageRedemptions(viewingCustomerProfile.id);
     } else {
       setCustomerPackageRedemptions([]);
     }
-  }, [viewingCustomerProfile?.id, fetchCustomerPackageRedemptions]);
+
+    const handleLaserChange = () => {
+      if (viewingCustomerProfile?.id) {
+        fetchCustomerProductBalances(viewingCustomerProfile.id);
+        fetchCustomerProfilePackages(viewingCustomerProfile.id);
+        fetchCustomerPackageRedemptions(viewingCustomerProfile.id);
+      }
+    };
+    window.addEventListener("revera-laser-change", handleLaserChange);
+    return () => window.removeEventListener("revera-laser-change", handleLaserChange);
+  }, [viewingCustomerProfile?.id, fetchCustomerProductBalances, fetchCustomerProfilePackages, fetchCustomerPackageRedemptions]);
 
   // ════════════════════════════════════════════════════════════════
   // Handlers
@@ -267,9 +260,37 @@ export function useCustomerProfile({
 
   const handleSellPackageToCustomer = async () => {
     if (!viewingCustomerProfile?.id || !selectedSellPackageId) return;
-    const customerId = viewingCustomerProfile.id;
+    let customerId = viewingCustomerProfile.id;
     setSellingPackage(true);
     try {
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      // If customer is a synthetic ID from reservations (res-cust-...), resolve or create real customer first
+      if (!UUID_REGEX.test(customerId)) {
+        const phone = viewingCustomerProfile.mobile || viewingCustomerProfile.phone || customerId.replace(/^res-cust-/, "");
+        try {
+          const custRes = await fetch("/api/customers", {
+            method: "POST",
+            headers: authenticatedJsonHeaders,
+            body: JSON.stringify({
+              name: viewingCustomerProfile.name || "Patient",
+              mobile: phone,
+              phone: phone,
+              email: viewingCustomerProfile.email || null,
+            }),
+          });
+          if (custRes.ok) {
+            const custData = await custRes.json();
+            const resolvedId = custData?.id || custData?.customer?.id;
+            if (resolvedId) {
+              customerId = resolvedId;
+              setViewingCustomerProfile((prev: any) => prev ? { ...prev, id: customerId } : null);
+            }
+          }
+        } catch (e) {
+          console.warn("Could not auto-create customer in profile before package sale:", e);
+        }
+      }
+
       const res = await fetch("/api/packages/sell", {
         method: "POST",
         headers: authenticatedJsonHeaders,
@@ -282,7 +303,12 @@ export function useCustomerProfile({
       });
       const data = await res.json();
       if (res.ok) {
-        await fetchCustomerProfilePackages(customerId);
+        const finalCustId = data.customerPackage?.customer_id || customerId;
+        if (finalCustId !== viewingCustomerProfile.id) {
+          setViewingCustomerProfile((prev: any) => prev ? { ...prev, id: finalCustId } : null);
+        }
+        await fetchCustomerProfilePackages(finalCustId);
+        window.dispatchEvent(new CustomEvent("revera-laser-change"));
         setShowSellPackageModal(false);
         setSelectedSellPackageId("");
         setSellPackagePaymentMethod("cash");
@@ -329,7 +355,7 @@ export function useCustomerProfile({
   };
 
   const handleAddProductToPatient = async () => {
-    if (!viewingCustomerProfile || !selectedAddProductName || !selectedAddProductQty || selectedAddProductQty <= 0) return;
+    if (!viewingCustomerProfile?.id || !selectedAddProductName || !selectedAddProductQty || selectedAddProductQty <= 0) return;
     // A real inventory product is required. This used to fall back to a fabricated
     // `prod-<timestamp>` id, which the sales API accepted (product_id is plain text with no FK),
     // producing a real invoice and real revenue against a product that does not exist — and
@@ -340,6 +366,34 @@ export function useCustomerProfile({
     }
     try {
       setAddingProductToPatient(true);
+      let customerId: string = viewingCustomerProfile.id;
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!UUID_REGEX.test(customerId)) {
+        const phone = viewingCustomerProfile.mobile || viewingCustomerProfile.phone || customerId.replace(/^res-cust-/, "");
+        try {
+          const custRes = await fetch("/api/customers", {
+            method: "POST",
+            headers: authenticatedJsonHeaders,
+            body: JSON.stringify({
+              name: viewingCustomerProfile.name || "Patient",
+              mobile: phone,
+              phone: phone,
+              email: viewingCustomerProfile.email || null,
+            }),
+          });
+          if (custRes.ok) {
+            const custData = await custRes.json();
+            const resolvedId = custData?.id || custData?.customer?.id;
+            if (resolvedId) {
+              customerId = resolvedId;
+              setViewingCustomerProfile((prev: any) => prev ? { ...prev, id: customerId } : null);
+            }
+          }
+        } catch (e) {
+          console.warn("Could not auto-create customer in profile before product sale:", e);
+        }
+      }
+
       const totalAmt = Number(selectedAddProductUnitPrice || 0) * Number(selectedAddProductQty || 1);
       // One request: the sale is the financial record and owns stock movement, and it writes the
       // patient's product balance itself via track_balance. Previously these were two separate
@@ -351,7 +405,7 @@ export function useCustomerProfile({
         body: JSON.stringify({
           product_id: selectedAddProductId,
           product_name: selectedAddProductName,
-          customer_id: viewingCustomerProfile.id,
+          customer_id: customerId,
           customer_name: viewingCustomerProfile.name || '',
           customer_mobile: viewingCustomerProfile.mobile || viewingCustomerProfile.phone || '',
           quantity: Number(selectedAddProductQty),

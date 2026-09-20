@@ -1247,8 +1247,9 @@ export default function AdminNewBookingView({
 
           if (createCustRes.ok) {
             const newCust = await createCustRes.json();
-            if (newCust && newCust.id) {
-              resolvedCustomerId = newCust.id;
+            const newId = newCust?.id || newCust?.customer?.id;
+            if (newId) {
+              resolvedCustomerId = newId;
             }
           }
         } catch (custErr) {
@@ -1258,7 +1259,7 @@ export default function AdminNewBookingView({
 
       // If purchasing a new pulses package in Option 3, sell package now so it immediately exists in customer_packages
       let createdCustomerPackageId: string | null = null;
-      if (isNewPackagePurchase && selectedCatalogPulsePkg && resolvedCustomerId) {
+      if (isNewPackagePurchase && selectedCatalogPulsePkg && (resolvedCustomerId || phone)) {
         try {
           const { data: authData } = await supabase.auth.getSession();
           const sellHeaders: Record<string, string> = { "Content-Type": "application/json" };
@@ -1269,7 +1270,7 @@ export default function AdminNewBookingView({
             method: "POST",
             headers: sellHeaders,
             body: JSON.stringify({
-              customerId: resolvedCustomerId,
+              customerId: resolvedCustomerId || phone,
               packageId: selectedCatalogPulsePkg.id,
               branchId: selectedBranchObj?.id || null,
               paymentMethod: numAmountPaid > 0 ? "cash" : "cash"
@@ -1279,6 +1280,9 @@ export default function AdminNewBookingView({
           if (sellRes.ok) {
             const sellData = await sellRes.json().catch(() => null);
             createdCustomerPackageId = sellData?.customerPackage?.id || null;
+            if (sellData?.customerPackage?.customer_id && !resolvedCustomerId) {
+              resolvedCustomerId = sellData.customerPackage.customer_id;
+            }
             if (typeof window !== "undefined") {
               window.dispatchEvent(new CustomEvent("revera-laser-change"));
             }
