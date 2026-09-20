@@ -10,6 +10,10 @@ export interface InvoiceBookingData {
   doctorName?: string;
   amountPaid: number;
   amountLeft: number;
+  notes?: string;
+  laserPaymentMode?: string;
+  laserPricePerPulse?: number;
+  laserSettlementNote?: string;
 }
 
 export interface ServiceItemData {
@@ -35,6 +39,26 @@ export function printInvoice(
   }
 
   const invoiceNo = `INV-${booking.id.slice(0, 8).toUpperCase()}`;
+
+  const isPerPulse = Boolean(
+    booking.laserPaymentMode === "PER_PULSE" ||
+    booking.laserSettlementNote ||
+    String(booking.notes || "").toLowerCase().includes("pay per pulse") ||
+    String(booking.notes || "").toLowerCase().includes("per_pulse") ||
+    String(booking.notes || "").includes("[Laser Settlement]")
+  );
+
+  let settlementHtml = '';
+  if (isPerPulse) {
+    const settlementMatch = String(booking.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
+    const noteContent = booking.laserSettlementNote || (settlementMatch ? settlementMatch[1] : 'Settled that laser services in this session are charged per pulse / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات');
+    settlementHtml = `
+      <div style="margin-top: 15px; margin-bottom: 20px; padding: 12px 16px; background-color: #FEF9C3; border: 1px solid #FACC15; border-radius: 12px; font-size: 12px; color: #713F12; line-height: 1.5;">
+        <strong>⚡ Laser Per-Pulse Settlement / اتفاقية محاسبة نبضات الليزر:</strong><br/>
+        <span>${noteContent}</span>
+      </div>
+    `;
+  }
 
   const serviceRows = servicesList
     .filter((s) => {
@@ -234,6 +258,8 @@ export function printInvoice(
             </tbody>
           </table>
         </div>
+
+        ${settlementHtml}
 
         <table class="summary-table">
           <tr>

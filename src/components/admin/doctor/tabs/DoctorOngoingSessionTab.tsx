@@ -414,15 +414,16 @@ export default function DoctorOngoingSessionTab({
       for (const item of items) {
         const trimmed = item.trim();
         if (!trimmed) continue;
-        const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+        const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP(?:\s*,\s*Pulses:\s*(\d+))?[^)]*\)/i);
         if (m1) {
           const srvName = m1[1].trim();
-          const srvPrice = Number(m1[3]) || 0;
+          const srvPrice = Number(m1[4]) || Number(m1[3]) || 0;
+          const pulsesCount = m1[5] ? Number(m1[5]) : 0;
           parsed.push({
             id: Date.now() + Math.random(),
             name: srvName,
             price: srvPrice,
-            pulses: 0
+            pulses: pulsesCount
           });
         }
       }
@@ -439,7 +440,7 @@ export default function DoctorOngoingSessionTab({
     if (!bookingId) return;
 
     const addSvcString = updated.length > 0
-      ? `\n[Additional Services Used]: ${updated.map(s => `${s.name} (Qty: 1 x ${s.price} EGP = ${s.price} EGP)`).join(", ")}`
+      ? `\n[Additional Services Used]: ${updated.map(s => `${s.name} (Qty: 1 x ${s.price} EGP = ${s.price} EGP${Number(s.pulses) > 0 ? `, Pulses: ${s.pulses}` : ""})`).join(", ")}`
       : "";
     
     let currentNotes = String(activeSessionBooking?.notes || "");

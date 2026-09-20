@@ -2279,5 +2279,72 @@ The clinic required a complete, multi-tiered laser pulse counting and accounting
 7. **System Test Suite Diagnostic Verification:**
    - Added test case `TC-069` ("Laser Services Multi-Payment Mode & Deficit Spillover Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
 
+---
+
+## DEC-065: Laser-Only Delivered Pulses Intake & Automated Equipment Device Resolution
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. In Receptionist session finalization and ending session flow (`BookingDetailsModal.tsx`), manual equipment device dropdown selectors created unnecessary friction for non-technical receptionists.
+2. Laser services are mapped to physical devices in Admin Settings (`/api/service-devices`). Pulses intake should strictly appear only for laser services (`checkIsLaserService`), and device resolution should happen automatically in the background.
+
+**Decisions & Implementation:**
+1. **Laser-Only Pulses Intake:**
+   - Pulses input was gated behind `isLaser` / `checkIsLaserService` for both Primary Booked Service and Additional Services. Non-laser procedures do not display pulses intake.
+   - Additional laser services prompt for delivered pulses with quick presets (`250`, `500`, `1,000`, `2,000`) before saving into session.
+2. **Automated Equipment Device Resolution:**
+   - Completely removed device selection dropdowns from Receptionist view.
+   - Automatically queries `/api/service-devices?serviceId=...` on service selection and binds `deviceId`/`deviceName` in the background for pulse counter logging.
+
+---
+
+## DEC-066: Package Types & Laser Pulses Package Engine
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. Clinics require selling dedicated Laser Pulses Packages (e.g. 5,000 pulses, 10,000 pulses) in addition to traditional multi-service packages.
+2. Package creation must offer explicit package type selection (`services` vs `pulses`) and configure total pulse quotas with quick presets.
+
+**Decisions & Implementation:**
+1. **Database Schema & Migrations (`20260920020000_add_package_types_and_pulses.sql`):**
+   - Added `package_type` (`'services' | 'pulses'`) and `total_pulses` integer to `packages` and `customer_packages` tables.
+2. **Admin Package Management (`PackageAdminPanel.tsx`):**
+   - Added interactive Package Type selector (`Services Package` vs `Laser Pulses Package`).
+   - When Pulses Package is selected, renders pulse quota input with quick preset buttons (`1,000`, `2,500`, `5,000`, `10,000`, `20,000` pulses) without service requirement.
+3. **Automated Diagnostic Verification:**
+   - Added test case `TC-070` ("Package Types & Laser Pulses Package Engine") to `INITIAL_SYSTEM_TEST_SUITES`.
+
+---
+
+## DEC-067: Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. When Option 2 (Pay per Pulse / `PER_PULSE`) is selected in New Booking (e.g. rate = 1 EGP/pulse), all laser services delivered in that session (primary service + additional services) must be dynamically calculated: `delivered_pulses × agreed_price_per_pulse` (e.g. 250 pulses primary + 250 pulses additional @ 1 EGP = 500 EGP total invoice instead of catalog prices).
+2. The invoice (Ending session summary, Checkout settlement modal, Invoice preview, and printed PDF) must explicitly display the settlement agreement statement:
+   - English: `Settled that laser services in this session are charged per pulse (500 pulses × 1 EGP = 500 EGP)`
+   - Arabic: `تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (500 نبضة × 1 ج.م = 500 ج.م)`
+3. Regex parsing in `BookingDetailsModal.tsx` and `src/app/admin/page.tsx` was corrupted by `, Pulses: <num>` suffixes leaking into service names.
+
+**Decisions & Implementation:**
+1. **Centralized Note Parsing Helper (`parseAdditionalServiceLine` in `BookingDetailsModal.tsx`):**
+   - Robustly parses service line format `Name (Qty: 1 x 150 EGP = 150 EGP, Pulses: 250)` without name corruption or regex fallthrough.
+2. **Dynamic Per-Pulse Rate Calculation:**
+   - In `BookingDetailsModal.tsx`, `handleAddServiceToSession` sets `price = pulsesVal * pulseRate` for additional laser services in per-pulse sessions.
+   - `handleConfirmEndSession` writes line items to `reservation-products` with effective prices, appends `[Laser Settlement]` and `[Laser Pulses Delivered]` notes, and updates total invoice.
+   - `baseBookingPrice`, `additionalServicesSubtotal`, and `endSessionInvoiceTotal` compute `pulses × laserPulseRate`.
+   - In `src/app/admin/page.tsx`, `checkoutBooking` and `invoiceBooking` calculate primary laser prices by `primaryDeliveredPulses * pulseRate`, parse additional services using `parseAdditionalServiceLine`, and display live pulse multipliers.
+3. **Laser Per-Pulse Settlement Agreement Banner:**
+   - Rendered across Ending Session view, Payment Settlement checkout modal, Invoice preview popup modal, and printed PDF template (`printUtils.ts`).
+4. **Automated Diagnostic Verification:**
+   - Added test case `TC-071` ("Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine") to `INITIAL_SYSTEM_TEST_SUITES`.
+
+
 
 

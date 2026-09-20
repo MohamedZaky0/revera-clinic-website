@@ -910,3 +910,26 @@ The following are **not currently enforced in code**:
 
 4. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test cases `TC-060` & `TC-061` (`Clinical Prescription Follow-Up Visit & Reception Calendar Integration Engine`).
+
+---
+
+## Laser Per-Pulse Calculation & Invoice Settlement Engine Rules
+**Enforced in:** `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/app/admin/page.tsx`, `src/lib/printUtils.ts`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`.
+
+1. **Per-Pulse Pricing Formula**:
+   - When a booking is established in `PER_PULSE` mode (Option 2: Pay per Pulse), all laser services delivered during the session (both Primary Booked Service and Additional Services) are charged dynamically based on delivered pulses:
+     $$\text{Price} = \text{delivered\_pulses} \times \text{agreed\_price\_per\_pulse}$$
+   - Non-laser services rendered in the same session retain their standard catalog / branch pricing.
+   - Example: Primary laser service (250 pulses) + Additional laser service (250 pulses) @ 1 EGP/pulse = 500 EGP subtotal, rather than catalog prices.
+
+2. **Laser Settlement Agreement Notice**:
+   - In ending session finalization, checkout settlement, invoice preview modal, and printed invoice PDFs, an explicit golden Laser Settlement Notice is rendered:
+     - **English**: `Settled that laser services in this session are charged per pulse (500 pulses × 1 EGP = 500 EGP)`
+     - **Arabic**: `تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (500 نبضة × 1 ج.م = 500 ج.م)`
+   - Structured notes tags `[Laser Settlement]: ...` and `[Laser Pulses Delivered]: ...` are automatically persisted to `reservations.notes`.
+
+3. **Safe Additional Service Note Parsing**:
+   - `parseAdditionalServiceLine` extracts service names, quantities, unit prices, totals, and pulses without regex leakage or corruption from `, Pulses: <num>` suffixes.
+
+4. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-071` (`Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine`).

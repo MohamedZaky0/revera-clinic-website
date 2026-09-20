@@ -39,7 +39,7 @@ import CustomerFormModal from "@/components/admin/patients/CustomerFormModal";
 import PatientsDirectoryView from "@/components/admin/patients/PatientsDirectoryView";
 import { useCustomerProfile } from "@/components/admin/patients/useCustomerProfile";
 import CustomerProfileDrawer from "@/components/admin/patients/CustomerProfileDrawer";
-import BookingDetailsModal from "@/components/admin/bookings/BookingDetailsModal";
+import BookingDetailsModal, { checkIsLaserService, parseAdditionalServiceLine } from "@/components/admin/bookings/BookingDetailsModal";
 import {
   AlarmClock,
   ArrowLeft,
@@ -190,6 +190,10 @@ export type Req = {
   createdByEmployeeId?: string | null;
   followUpDate?: string | null;
   followUpNotes?: string | null;
+  laserPaymentMode?: string | null;
+  laserPricePerPulse?: number | null;
+  laserSettlementNote?: string | null;
+  attachedProducts?: any[];
 };
 
 function getStatusBadgeClass(status: string): string {
@@ -2380,7 +2384,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-067', name: 'Laser Pulse Counter & Unified Laser History Engine', category: 'Medical & Patients', endpoint: '/api/laser-pulses', description: 'Verifies Type 1 fixed service pulses & extra charges, Type 2 FIFO retail pulse active balances & deductions, Type 3 package included pulses, and unified lifetime laser history logs.', status: 'idle' },
     { id: 'TC-068', name: 'Service Equipment Connector & Pulse Pricing Engine', category: 'Services & Bookings', endpoint: '/api/service-devices', description: 'Verifies service-to-device equipment connections without pulse limits, and booking settings default pulse pricing configuration.', status: 'idle' },
     { id: 'TC-069', name: 'Laser Services Multi-Payment Mode & Deficit Spillover Engine', category: 'Services & Bookings', endpoint: '/api/services', description: 'Verifies islaser service flag persistence, 3 laser payment options (Fixed Service, Pay per Pulse, Package), doctor session live math, package deficit spillover choices, and unified laser history logging.', status: 'idle' },
-    { id: 'TC-070', name: 'Package Types & Laser Pulses Package Engine', category: 'Services & Bookings', endpoint: '/api/packages', description: 'Verifies package_type (services vs pulses) selection, total_pulses configuration in PackageAdminPanel, /api/packages CRUD validation, and package selling integration.', status: 'idle' }
+    { id: 'TC-070', name: 'Package Types & Laser Pulses Package Engine', category: 'Services & Bookings', endpoint: '/api/packages', description: 'Verifies package_type (services vs pulses) selection, total_pulses configuration in PackageAdminPanel, /api/packages CRUD validation, and package selling integration.', status: 'idle' },
+    { id: 'TC-071', name: 'Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies per-pulse mode rate calculation (delivered_pulses × price_per_pulse) across primary and additional laser services, session line item writing, settlement note persistence, and invoice settlement display.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -9190,6 +9195,25 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       {/* ── PAYMENT SETTLEMENT MODAL ── */}
       {checkoutBooking && (
         (() => {
+          // Laser per-pulse mode detection and rate resolution
+          const isCheckoutPerPulse = Boolean(
+            checkoutBooking?.laserPaymentMode === "PER_PULSE" ||
+            (checkoutBooking as any)?.laser_payment_mode === "PER_PULSE" ||
+            String(checkoutBooking?.notes || "").toLowerCase().includes("pay per pulse") ||
+            String(checkoutBooking?.notes || "").toLowerCase().includes("per_pulse") ||
+            String(checkoutBooking?.notes || "").includes("[Laser Settlement]")
+          );
+          const checkoutPulseRate = Number(
+            checkoutBooking?.laserPricePerPulse ||
+            (checkoutBooking as any)?.laser_price_per_pulse ||
+            (() => {
+              const m = String(checkoutBooking?.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+              return m ? Number(m[1]) : 1;
+            })()
+          ) || 1;
+          const primaryPulsesMatch = String(checkoutBooking?.notes || "").match(/\[Laser Pulses Delivered\]:\s*(\d+)/i);
+          const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
+
           // 1. Calculate service cost
           const svcIds = Array.isArray(checkoutBooking.serviceIds) ? checkoutBooking.serviceIds : [checkoutBooking.serviceId];
           // A deposit collected at reservation time (BookingModal's "declare deposit paid" step)
@@ -9202,12 +9226,23 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const bookingServicesList = svcIds.map((id: number) => {
             const s = localServices.find(srv => srv.id === id);
             const details = s ? getServicePriceDetails(s, checkoutBooking.branchId, branches) : null;
+            const isLaser = checkIsLaserService(s);
+            let price = details ? details.discountedPrice : 500;
+            let pulseDetails = "";
+
+            if (isCheckoutPerPulse && isLaser && primaryDeliveredPulses > 0) {
+              price = primaryDeliveredPulses * checkoutPulseRate;
+              pulseDetails = ` (${primaryDeliveredPulses} pulses × ${checkoutPulseRate} EGP)`;
+            }
+
             // Match service with active package item
             const redeemableItem = activeCustomerPackageItems.find((it: any) => Number(it.serviceId) === Number(id) && it.qtyRemaining > 0) || null;
             return {
               serviceId: id,
               name: s?.en || `Service #${id}`,
-              price: details ? details.discountedPrice : 500,
+              price,
+              pulseDetails,
+              isLaser,
               hasPromotion: details?.hasPromotion || false,
               promotionText: details?.promotionText || "",
               redeemableItem,
@@ -9260,43 +9295,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               const rawBlock = addSvcBlockMatch[1];
               const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
               for (const item of items) {
-                const trimmed = item.trim();
-                if (!trimmed || trimmed.startsWith("[")) continue;
-                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-                if (m1) {
-                  const name = m1[1].trim();
-                  const qty = Number(m1[2]) || 1;
-                  const unitPrice = Number(m1[3]) || 0;
-                  const total = Number(m1[4]) || (qty * unitPrice);
-                  if (!existingCheckoutNames.has(name.toLowerCase())) {
-                    existingCheckoutNames.add(name.toLowerCase());
-                    checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                  }
-                  continue;
-                }
-                const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-                if (m2) {
-                  const name = m2[1].trim();
-                  const qty = Number(m2[2]) || 1;
-                  const unitPrice = Number(m2[3]) || 0;
-                  const total = qty * unitPrice;
-                  if (!existingCheckoutNames.has(name.toLowerCase())) {
-                    existingCheckoutNames.add(name.toLowerCase());
-                    checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                  }
-                  continue;
-                }
-                const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
-                if (m3) {
-                  const name = m3[1].trim();
-                  const qty = m3[2] ? Number(m3[2]) : 1;
-                  const total = Number(m3[3]) || 0;
-                  const unitPrice = qty > 0 ? total / qty : total;
-                  if (!existingCheckoutNames.has(name.toLowerCase())) {
-                    existingCheckoutNames.add(name.toLowerCase());
-                    checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                  }
-                  continue;
+                const parsed = parseAdditionalServiceLine(item.trim());
+                if (parsed && !existingCheckoutNames.has(parsed.name.toLowerCase())) {
+                  existingCheckoutNames.add(parsed.name.toLowerCase());
+                  checkoutAdditionalServicesList.push({
+                    name: parsed.name,
+                    qty: parsed.qty,
+                    unitPrice: parsed.unitPrice,
+                    total: parsed.total,
+                    lineType: 'additional_service'
+                  });
                 }
               }
             }
@@ -9304,30 +9312,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             // b) Added Service matches
             const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service|Extra Service)\]:\s+(.*?)(?=\n|$)/gi);
             for (const match of addedServiceMatches) {
-              const rawLine = match[1].trim();
-              const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-              if (m1) {
-                const name = m1[1].trim();
-                const qty = Number(m1[2]) || 1;
-                const unitPrice = Number(m1[3]) || 0;
-                const total = Number(m1[4]) || (qty * unitPrice);
-                if (!existingCheckoutNames.has(name.toLowerCase())) {
-                  existingCheckoutNames.add(name.toLowerCase());
-                  checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                }
-                continue;
-              }
-              const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
-              if (m2) {
-                const name = m2[1].trim();
-                const qty = m2[2] ? Number(m2[2]) : 1;
-                const total = Number(m2[3]);
-                const unitPrice = qty > 0 ? total / qty : total;
-                if (!existingCheckoutNames.has(name.toLowerCase())) {
-                  existingCheckoutNames.add(name.toLowerCase());
-                  checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                }
-                continue;
+              const parsed = parseAdditionalServiceLine(match[1].trim());
+              if (parsed && !existingCheckoutNames.has(parsed.name.toLowerCase())) {
+                existingCheckoutNames.add(parsed.name.toLowerCase());
+                checkoutAdditionalServicesList.push({
+                  name: parsed.name,
+                  qty: parsed.qty,
+                  unitPrice: parsed.unitPrice,
+                  total: parsed.total,
+                  lineType: 'additional_service'
+                });
               }
             }
 
@@ -9498,6 +9492,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             }
           };
 
+          const settlementMatch = String(checkoutBooking.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
+          const settlementText = checkoutBooking.laserSettlementNote || (settlementMatch ? settlementMatch[1] : (
+            isCheckoutPerPulse
+              ? `Settled that laser services in this session are charged per pulse (@ ${checkoutPulseRate} EGP/pulse) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${checkoutPulseRate} ج.م/نبضة)`
+              : ""
+          ));
+
           return (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
               <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto my-auto rounded-3xl bg-[#FBFBF9] p-6 sm:p-8 shadow-2xl border border-[#414E36]/10 space-y-6">
@@ -9530,6 +9531,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     <p className="text-xs text-[#5A6A51] mt-0.5">{checkoutBooking.phone}</p>
                   </div>
 
+                  {/* Laser Per-Pulse Settlement Agreement Notice */}
+                  {isCheckoutPerPulse && (
+                    <div className="rounded-2xl border border-amber-300 bg-amber-50/90 p-3.5 text-xs text-amber-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                        <Zap size={15} className="text-amber-600 shrink-0" />
+                        <span>Laser Per-Pulse Settlement / اتفاقية محاسبة نبضات الليزر</span>
+                      </div>
+                      <p className="text-[11.5px] leading-relaxed text-amber-800">
+                        {settlementText}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Services Invoice details */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
                     <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Services List / الخدمات</p>
@@ -9546,8 +9560,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                                 </span>
                               )}
                             </span>
-                            <span className={isRedeemed ? "line-through text-[#5A6A51]" : ""}>
-                              {svc.price} EGP
+                            <span className={isRedeemed ? "line-through text-[#5A6A51]" : "text-right"}>
+                              <span>{svc.price} EGP</span>
+                              {svc.pulseDetails && <span className="text-[11px] font-normal text-amber-700 block">{svc.pulseDetails}</span>}
                             </span>
                           </div>
                           {svc.redeemableItem && (
@@ -9765,6 +9780,29 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           // Brief 32: If we have a real ledger invoice, use immutable data instead of live-recomputing
           if (ledgerInvoice) {
             const inv = ledgerInvoice.invoice;
+            const isInvoicePerPulse = Boolean(
+              invoiceBooking.laserPaymentMode === "PER_PULSE" ||
+              (invoiceBooking as any)?.laser_payment_mode === "PER_PULSE" ||
+              invoiceBooking.laserSettlementNote ||
+              String(invoiceBooking.notes || "").toLowerCase().includes("pay per pulse") ||
+              String(invoiceBooking.notes || "").toLowerCase().includes("per_pulse") ||
+              String(invoiceBooking.notes || "").includes("[Laser Settlement]")
+            );
+            const invoicePulseRate = Number(
+              invoiceBooking.laserPricePerPulse ||
+              (invoiceBooking as any)?.laser_price_per_pulse ||
+              (() => {
+                const m = String(invoiceBooking.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+                return m ? Number(m[1]) : 1;
+              })()
+            ) || 1;
+            const settlementMatch = String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
+            const invoiceSettlementText = invoiceBooking.laserSettlementNote || (settlementMatch ? settlementMatch[1] : (
+              isInvoicePerPulse
+                ? `Settled that laser services in this session are charged per pulse (@ ${invoicePulseRate} EGP/pulse) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${invoicePulseRate} ج.م/نبضة)`
+                : ""
+            ));
+
             const allInvoiceItems = ledgerInvoice.lines.map((line: any) => ({
               name: isRTL ? (line.nameAr || line.nameEn || line.description) : (line.nameEn || line.description),
               nameAr: line.nameAr || line.description,
@@ -9844,6 +9882,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                         <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
                       </div>
                     </div>
+
+                    {/* Laser Per-Pulse Settlement Agreement Notice */}
+                    {isInvoicePerPulse && (
+                      <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-3 text-xs text-amber-900 space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                          <Zap size={14} className="text-amber-600 shrink-0" />
+                          <span>Laser Per-Pulse Settlement / اتفاقية محاسبة نبضات الليزر</span>
+                        </div>
+                        <p className="text-[11.5px] leading-relaxed text-amber-800">
+                          {invoiceSettlementText}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Table of Services & Add-ons */}
                     <div className="overflow-x-auto border border-gray-100 rounded-xl bg-white shadow-sm">
@@ -9928,14 +9979,47 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           }
 
           // === FALLBACK: pre-ledger bookings (no invoice row) — existing logic unchanged ===
+          const isInvoicePerPulse = Boolean(
+            invoiceBooking.laserPaymentMode === "PER_PULSE" ||
+            (invoiceBooking as any)?.laser_payment_mode === "PER_PULSE" ||
+            invoiceBooking.laserSettlementNote ||
+            String(invoiceBooking.notes || "").toLowerCase().includes("pay per pulse") ||
+            String(invoiceBooking.notes || "").toLowerCase().includes("per_pulse") ||
+            String(invoiceBooking.notes || "").includes("[Laser Settlement]")
+          );
+          const invoicePulseRate = Number(
+            invoiceBooking.laserPricePerPulse ||
+            (invoiceBooking as any)?.laser_price_per_pulse ||
+            (() => {
+              const m = String(invoiceBooking.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+              return m ? Number(m[1]) : 1;
+            })()
+          ) || 1;
+          const primaryPulsesMatch = String(invoiceBooking.notes || "").match(/\[Laser Pulses Delivered\]:\s*(\d+)/i);
+          const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
+          const settlementMatch = String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
+          const invoiceSettlementText = invoiceBooking.laserSettlementNote || (settlementMatch ? settlementMatch[1] : (
+            isInvoicePerPulse
+              ? `Settled that laser services in this session are charged per pulse (@ ${invoicePulseRate} EGP/pulse) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${invoicePulseRate} ج.م/نبضة)`
+              : ""
+          ));
+
           // 1. Calculate service cost
           const svcIds = Array.isArray(invoiceBooking.serviceIds) ? invoiceBooking.serviceIds : (invoiceBooking.serviceId ? [invoiceBooking.serviceId] : []);
           const baseServicesList = svcIds.map((id: number) => {
             const s = localServices.find(srv => srv.id === id);
-            const price = s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500;
+            const isLaser = checkIsLaserService(s);
+            let price = s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500;
+            if (isInvoicePerPulse && isLaser && primaryDeliveredPulses > 0) {
+              price = primaryDeliveredPulses * invoicePulseRate;
+            }
             return {
-              name: s?.en || `Service #${id}`,
-              nameAr: s?.ar || `خدمة #${id}`,
+              name: (isInvoicePerPulse && isLaser && primaryDeliveredPulses > 0)
+                ? `${s?.en || `Service #${id}`} (${primaryDeliveredPulses} pulses × ${invoicePulseRate} EGP)`
+                : (s?.en || `Service #${id}`),
+              nameAr: (isInvoicePerPulse && isLaser && primaryDeliveredPulses > 0)
+                ? `${s?.ar || `خدمة #${id}`} (${primaryDeliveredPulses} نبضة × ${invoicePulseRate} ج.م)`
+                : (s?.ar || `خدمة #${id}`),
               qty: 1,
               unitPrice: price,
               price: price,
@@ -10000,64 +10084,17 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               const rawBlock = addSvcBlockMatch[1];
               const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
               for (const item of items) {
-                const trimmed = item.trim();
-                if (!trimmed || trimmed.startsWith("[")) continue;
-                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-                if (m1) {
-                  const name = m1[1].trim();
-                  const qty = Number(m1[2]) || 1;
-                  const unitPrice = Number(m1[3]) || 0;
-                  const total = Number(m1[4]) || (qty * unitPrice);
-                  if (!existingNames.has(name.toLowerCase())) {
-                    existingNames.add(name.toLowerCase());
-                    invoiceAdditionalServicesList.push({
-                      name: `${name} (Additional Service)`,
-                      nameAr: `${name} (خدمة إضافية)`,
-                      qty,
-                      unitPrice,
-                      price: unitPrice,
-                      total
-                    });
-                  }
-                  continue;
-                }
-                const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-                if (m2) {
-                  const name = m2[1].trim();
-                  const qty = Number(m2[2]) || 1;
-                  const unitPrice = Number(m2[3]) || 0;
-                  const total = qty * unitPrice;
-                  if (!existingNames.has(name.toLowerCase())) {
-                    existingNames.add(name.toLowerCase());
-                    invoiceAdditionalServicesList.push({
-                      name: `${name} (Additional Service)`,
-                      nameAr: `${name} (خدمة إضافية)`,
-                      qty,
-                      unitPrice,
-                      price: unitPrice,
-                      total
-                    });
-                  }
-                  continue;
-                }
-                const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
-                if (m3) {
-                  const name = m3[1].trim();
-                  const qty = m3[2] ? Number(m3[2]) : 1;
-                  const total = Number(m3[3]) || 0;
-                  const unitPrice = qty > 0 ? total / qty : total;
-                  if (!existingNames.has(name.toLowerCase())) {
-                    existingNames.add(name.toLowerCase());
-                    invoiceAdditionalServicesList.push({
-                      name: `${name} (Additional Service)`,
-                      nameAr: `${name} (خدمة إضافية)`,
-                      qty,
-                      unitPrice,
-                      price: unitPrice,
-                      total
-                    });
-                  }
-                  continue;
+                const parsed = parseAdditionalServiceLine(item.trim());
+                if (parsed && !existingNames.has(parsed.name.toLowerCase())) {
+                  existingNames.add(parsed.name.toLowerCase());
+                  invoiceAdditionalServicesList.push({
+                    name: `${parsed.name} (Additional Service)`,
+                    nameAr: `${parsed.name} (خدمة إضافية)`,
+                    qty: parsed.qty,
+                    unitPrice: parsed.unitPrice,
+                    price: parsed.unitPrice,
+                    total: parsed.total
+                  });
                 }
               }
             }
@@ -10065,44 +10102,17 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             // b) Added Service format: [Added Service]: Name - 350 EGP or [Additional Service]: Name - 200 EGP
             const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service|Extra Service)\]:\s+(.*?)(?=\n|$)/gi);
             for (const match of addedServiceMatches) {
-              const rawLine = match[1].trim();
-              const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-              if (m1) {
-                const name = m1[1].trim();
-                const qty = Number(m1[2]) || 1;
-                const unitPrice = Number(m1[3]) || 0;
-                const total = Number(m1[4]) || (qty * unitPrice);
-                if (!existingNames.has(name.toLowerCase())) {
-                  existingNames.add(name.toLowerCase());
-                  invoiceAdditionalServicesList.push({
-                    name: `${name} (Additional Service)`,
-                    nameAr: `${name} (خدمة إضافية)`,
-                    qty,
-                    unitPrice,
-                    price: unitPrice,
-                    total
-                  });
-                }
-                continue;
-              }
-              const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
-              if (m2) {
-                const name = m2[1].trim();
-                const qty = m2[2] ? Number(m2[2]) : 1;
-                const total = Number(m2[3]);
-                const unitPrice = qty > 0 ? total / qty : total;
-                if (!existingNames.has(name.toLowerCase())) {
-                  existingNames.add(name.toLowerCase());
-                  invoiceAdditionalServicesList.push({
-                    name: `${name} (Additional Service)`,
-                    nameAr: `${name} (خدمة إضافية)`,
-                    qty,
-                    unitPrice,
-                    price: unitPrice,
-                    total
-                  });
-                }
-                continue;
+              const parsed = parseAdditionalServiceLine(match[1].trim());
+              if (parsed && !existingNames.has(parsed.name.toLowerCase())) {
+                existingNames.add(parsed.name.toLowerCase());
+                invoiceAdditionalServicesList.push({
+                  name: `${parsed.name} (Additional Service)`,
+                  nameAr: `${parsed.name} (خدمة إضافية)`,
+                  qty: parsed.qty,
+                  unitPrice: parsed.unitPrice,
+                  price: parsed.unitPrice,
+                  total: parsed.total
+                });
               }
             }
 
@@ -10274,6 +10284,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
                     </div>
                   </div>
+
+                  {/* Laser Per-Pulse Settlement Agreement Notice */}
+                  {isInvoicePerPulse && (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-3 text-xs text-amber-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                        <Zap size={14} className="text-amber-600 shrink-0" />
+                        <span>Laser Per-Pulse Settlement / اتفاقية محاسبة نبضات الليزر</span>
+                      </div>
+                      <p className="text-[11.5px] leading-relaxed text-amber-800">
+                        {invoiceSettlementText}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Table of Services & Add-ons */}
                   <div className="overflow-x-auto border border-gray-100 rounded-xl bg-white shadow-sm">

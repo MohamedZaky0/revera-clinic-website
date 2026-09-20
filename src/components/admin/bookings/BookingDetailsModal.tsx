@@ -66,6 +66,8 @@ export function checkIsLaserService(srv: any): boolean {
   return Boolean(
     srv.islaser ||
     srv.is_laser ||
+    srv.isLaser ||
+    srv.is_laser_service ||
     (srv.category && String(srv.category).toLowerCase().includes("laser")) ||
     (srv.cat && String(srv.cat).toLowerCase().includes("laser")) ||
     (srv.en && String(srv.en).toLowerCase().includes("laser")) ||
@@ -74,6 +76,56 @@ export function checkIsLaserService(srv: any): boolean {
     (srv.ar && String(srv.ar).includes("ليزر")) ||
     (srv.name_ar && String(srv.name_ar).includes("ليزر"))
   );
+}
+
+export function parseAdditionalServiceLine(trimmed: string): { name: string; qty: number; unitPrice: number; total: number; pulses?: number } | null {
+  if (!trimmed || trimmed.startsWith("[")) return null;
+
+  // Format 1: Name (Qty: 1 x 150 EGP = 150 EGP, Pulses: 250) or Name (Qty: 1 x 150 EGP = 150 EGP)
+  const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP(?:\s*,\s*Pulses:\s*(\d+))?[^)]*\)/i);
+  if (m1) {
+    const name = m1[1].replace(/^[,\s-]+/, "").trim();
+    const qty = Number(m1[2]) || 1;
+    const unitPrice = Number(m1[3]) || 0;
+    const total = Number(m1[4]) || (qty * unitPrice);
+    const pulses = m1[5] ? Number(m1[5]) : undefined;
+    return { name, qty, unitPrice, total, pulses };
+  }
+
+  // Format 2: Name (Qty: 1 x 150 EGP, Pulses: 250) or Name (Qty: 1 x 150 EGP)
+  const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP(?:\s*,\s*Pulses:\s*(\d+))?[^)]*\)/i);
+  if (m2) {
+    const name = m2[1].replace(/^[,\s-]+/, "").trim();
+    const qty = Number(m2[2]) || 1;
+    const unitPrice = Number(m2[3]) || 0;
+    const total = qty * unitPrice;
+    const pulses = m2[4] ? Number(m2[4]) : undefined;
+    return { name, qty, unitPrice, total, pulses };
+  }
+
+  // If the line contains "(Qty:", do not let loose fallback match it and corrupt the name
+  if (trimmed.toLowerCase().includes("(qty:")) {
+    const genericQtyMatch = trimmed.match(/^([^()]+)\s*\(Qty:\s*(\d+).*?=\s*(\d+(?:\.\d+)?)\s*EGP.*?\)/i);
+    if (genericQtyMatch) {
+      const name = genericQtyMatch[1].replace(/^[,\s-]+/, "").trim();
+      const qty = Number(genericQtyMatch[2]) || 1;
+      const total = Number(genericQtyMatch[3]) || 0;
+      const unitPrice = qty > 0 ? total / qty : total;
+      return { name, qty, unitPrice, total };
+    }
+  }
+
+  // Format 3: Name - 200 EGP or Name (200 EGP) or Name: 200 EGP or Name @ 200 EGP
+  const m3 = trimmed.match(/^([^()\-@:]+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+  if (m3) {
+    const name = m3[1].replace(/^[,\s-]+/, "").trim();
+    const qty = m3[2] ? Number(m3[2]) : 1;
+    const total = Number(m3[3]) || 0;
+    const unitPrice = qty > 0 ? total / qty : total;
+    return { name, qty, unitPrice, total };
+  }
+
+  return null;
 }
 
 interface BookingDetailsModalProps {
@@ -877,6 +929,23 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     const isLaser = checkIsLaserService(srv);
     const pulsesVal = isLaser ? Number(additionalServicePulsesInput) || 0 : 0;
 
+    const isPerPulseMode = Boolean(
+      booking?.laserPaymentMode === "PER_PULSE" ||
+      (booking as any)?.laser_payment_mode === "PER_PULSE" ||
+      String(booking?.notes || "").toLowerCase().includes("pay per pulse") ||
+      String(booking?.notes || "").toLowerCase().includes("per_pulse")
+    );
+    const pulseRate = Number(
+      booking?.laserPricePerPulse ||
+      (booking as any)?.laser_price_per_pulse ||
+      (() => {
+        const m = String(booking?.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+        return m ? Number(m[1]) : 1;
+      })()
+    ) || 1;
+
+    const finalPrice = (isPerPulseMode && isLaser) ? (pulsesVal * pulseRate) : srvPrice;
+
     let devId: string | undefined = undefined;
     let devName: string | undefined = undefined;
     if (isLaser) {
@@ -900,7 +969,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       id: Date.now() + Math.random(),
       serviceId: srv.id,
       name: srvName,
-      price: srvPrice,
+      price: finalPrice,
       pulses: pulsesVal,
       isLaser,
       deviceId: devId,
@@ -1135,8 +1204,26 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           })
         );
       }
+      const isPerPulseMode = Boolean(
+        booking?.laserPaymentMode === "PER_PULSE" ||
+        (booking as any)?.laser_payment_mode === "PER_PULSE" ||
+        String(booking?.notes || "").toLowerCase().includes("pay per pulse") ||
+        String(booking?.notes || "").toLowerCase().includes("per_pulse")
+      );
+      const pulseRate = Number(
+        booking?.laserPricePerPulse ||
+        (booking as any)?.laser_price_per_pulse ||
+        (() => {
+          const m = String(booking?.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+          return m ? Number(m[1]) : 1;
+        })()
+      ) || 1;
+
       for (const s of additionalServices) {
         const realServiceId = s.serviceId || (typeof s.id === "number" && s.id < 1000000 ? s.id : null);
+        const srvObj = localServices.find((ls) => String(ls.id) === String(realServiceId));
+        const isSvcLaser = s.isLaser || checkIsLaserService(srvObj);
+        const effectivePrice = (isPerPulseMode && isSvcLaser) ? (Number(s.pulses) || 0) * pulseRate : s.price;
         lineItemWrites.push(
           fetch("/api/reservation-products", {
             method: "POST",
@@ -1147,7 +1234,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               serviceId: realServiceId ? Number(realServiceId) : null,
               description: s.name + (Number(s.pulses) > 0 ? ` (${s.pulses} pulses)` : ""),
               qty: 1,
-              unitPrice: s.price,
+              unitPrice: effectivePrice,
               addedByRole: "receptionist_global_ending",
             }),
           })
@@ -1164,7 +1251,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               lineType: "device_pulses",
               description: `${devName} — ${totalPulses} pulses`,
               qty: totalPulses,
-              unitPrice: pricePerPulse,
+              unitPrice: isPerPulseMode ? pulseRate : pricePerPulse,
               addedByRole: "receptionist_global_ending",
             }),
           })
@@ -1179,7 +1266,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       // Build structured notes summary
       let updatedNotes = String(booking.notes || "");
       if (additionalServices.length > 0) {
-        const addSvcString = `\n[Additional Services Used]: ${additionalServices.map((s) => `${s.name} (Qty: 1 x ${s.price} EGP = ${s.price} EGP${Number(s.pulses) > 0 ? `, Pulses: ${s.pulses}` : ""})`).join(", ")}`;
+        const addSvcString = `\n[Additional Services Used]: ${additionalServices.map((s) => {
+          const srvObj = localServices.find((ls) => String(ls.id) === String(s.serviceId));
+          const isSvcLaser = s.isLaser || checkIsLaserService(srvObj);
+          const effectivePrice = (isPerPulseMode && isSvcLaser) ? (Number(s.pulses) || 0) * pulseRate : s.price;
+          return `${s.name} (Qty: 1 x ${effectivePrice} EGP = ${effectivePrice} EGP${Number(s.pulses) > 0 ? `, Pulses: ${s.pulses}` : ""})`;
+        }).join(", ")}`;
         updatedNotes = updatedNotes.replace(/\[Additional Services(?: Used)?(?: During Session)?\]:[^\n\[]*/gi, "").trim() + addSvcString;
       }
       if (usedProducts.length > 0) {
@@ -1187,8 +1279,23 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         updatedNotes = updatedNotes.replace(/\[Products Used During Session\]:[^\n\[]*/gi, "").trim() + prodString;
       }
       if (totalPulses > 0) {
-        const pulseString = `\n[Extra Device Pulses]: ${totalPulses} pulses = ${primaryPulses * (Number(pricePerPulse) || 0)} EGP`;
-        updatedNotes = updatedNotes.replace(/\[Extra Device Pulses\]:[^\n\[]*/gi, "").trim() + pulseString;
+        if (isPerPulseMode) {
+          const addPulses = additionalServices.reduce((sum, s) => sum + Number(s.pulses || 0), 0);
+          const pulseString = `\n[Laser Pulses Delivered]: Primary: ${primaryPulses} pulses (@ ${pulseRate} EGP/pulse = ${primaryPulses * pulseRate} EGP), Additional: ${addPulses} pulses (@ ${pulseRate} EGP/pulse = ${addPulses * pulseRate} EGP), Total: ${totalPulses} pulses`;
+          updatedNotes = updatedNotes.replace(/\[(?:Laser Pulses Delivered|Extra Device Pulses)\]:[^\n\[]*/gi, "").trim() + pulseString;
+        } else {
+          const pulseString = `\n[Extra Device Pulses]: ${totalPulses} pulses = ${primaryPulses * (Number(pricePerPulse) || 0)} EGP`;
+          updatedNotes = updatedNotes.replace(/\[Extra Device Pulses\]:[^\n\[]*/gi, "").trim() + pulseString;
+        }
+      }
+      if (isPerPulseMode) {
+        const totalLaserPulses = (isPrimaryLaser ? primaryPulses : 0) + additionalServices.reduce((sum, s) => {
+          const srvObj = localServices.find((ls) => String(ls.id) === String(s.serviceId));
+          return sum + ((s.isLaser || checkIsLaserService(srvObj)) ? Number(s.pulses || 0) : 0);
+        }, 0);
+        const totalLaserCost = totalLaserPulses * pulseRate;
+        const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are charged per pulse (${totalLaserPulses} pulses × ${pulseRate} EGP = ${totalLaserCost} EGP) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${totalLaserPulses} نبضة × ${pulseRate} ج.م = ${totalLaserCost} ج.م)`;
+        updatedNotes = updatedNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
       }
 
       const patchRes = await fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}`, {
@@ -1324,46 +1431,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             // Split by comma or newline outside parentheses
             const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
             for (const item of items) {
-              const trimmed = item.trim();
-              if (!trimmed || trimmed.startsWith("[")) continue;
-              // Format 1: Name (Qty: 1 x 200 EGP = 200 EGP)
-              const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-              if (m1) {
-                const name = m1[1].replace(/^[,\s-]+/, '').trim();
-                const qty = Number(m1[2]) || 1;
-                const unitPrice = Number(m1[3]) || 0;
-                const total = Number(m1[4]) || (qty * unitPrice);
-                if (!existingNames.has(name.toLowerCase())) {
-                  existingNames.add(name.toLowerCase());
-                  additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                }
-                continue;
-              }
-              // Format 2: Name (Qty: 1 x 200 EGP)
-              const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-              if (m2) {
-                const name = m2[1].replace(/^[,\s-]+/, '').trim();
-                const qty = Number(m2[2]) || 1;
-                const unitPrice = Number(m2[3]) || 0;
-                const total = qty * unitPrice;
-                if (!existingNames.has(name.toLowerCase())) {
-                  existingNames.add(name.toLowerCase());
-                  additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                }
-                continue;
-              }
-              // Format 3: Name - 200 EGP or Name (200 EGP) or Name: 200 EGP or Name @ 200 EGP
-              const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
-              if (m3) {
-                const name = m3[1].replace(/^[,\s-]+/, '').trim();
-                const qty = m3[2] ? Number(m3[2]) : 1;
-                const total = Number(m3[3]) || 0;
-                const unitPrice = qty > 0 ? total / qty : total;
-                if (!existingNames.has(name.toLowerCase())) {
-                  existingNames.add(name.toLowerCase());
-                  additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                }
-                continue;
+              const parsed = parseAdditionalServiceLine(item.trim());
+              if (parsed && !existingNames.has(parsed.name.toLowerCase())) {
+                existingNames.add(parsed.name.toLowerCase());
+                additionalServicesList.push({ ...parsed, lineType: 'additional_service' });
               }
             }
           }
@@ -1371,30 +1442,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           // b) Added Service format: [Added Service]: Name - 350 EGP or [Additional Service]: Name - 200 EGP
           const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service|Extra Service)\]:\s+(.*?)(?=\n|$)/gi);
           for (const match of addedServiceMatches) {
-            const rawLine = match[1].trim();
-            const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-            if (m1) {
-              const name = m1[1].replace(/^[,\s-]+/, '').trim();
-              const qty = Number(m1[2]) || 1;
-              const unitPrice = Number(m1[3]) || 0;
-              const total = Number(m1[4]) || (qty * unitPrice);
-              if (!existingNames.has(name.toLowerCase())) {
-                existingNames.add(name.toLowerCase());
-                additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-              }
-              continue;
-            }
-            const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
-            if (m2) {
-              const name = m2[1].replace(/^[,\s-]+/, '').trim();
-              const qty = m2[2] ? Number(m2[2]) : 1;
-              const total = Number(m2[3]);
-              const unitPrice = qty > 0 ? total / qty : total;
-              if (!existingNames.has(name.toLowerCase())) {
-                existingNames.add(name.toLowerCase());
-                additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-              }
-              continue;
+            const parsed = parseAdditionalServiceLine(match[1].trim());
+            if (parsed && !existingNames.has(parsed.name.toLowerCase())) {
+              existingNames.add(parsed.name.toLowerCase());
+              additionalServicesList.push({ ...parsed, lineType: 'additional_service' });
             }
           }
 
@@ -1492,21 +1543,49 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
         const isInvoicePaid = (rawLeft !== null && rawLeft !== undefined && Number(rawLeft) <= 0 && sessionPaid > 0) || (sessionLeft <= 0 && sessionPaid > 0) || (sessionPaid >= totalPrice && totalPrice > 0);
 
+        const isLaserPerPulse = Boolean(
+          booking?.laserPaymentMode === "PER_PULSE" ||
+          (booking as any)?.laser_payment_mode === "PER_PULSE" ||
+          String(booking?.notes || "").toLowerCase().includes("pay per pulse") ||
+          String(booking?.notes || "").toLowerCase().includes("per_pulse")
+        );
+
+        const laserPulseRate = Number(
+          booking?.laserPricePerPulse ||
+          (booking as any)?.laser_price_per_pulse ||
+          (() => {
+            const m = String(booking?.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+            return m ? Number(m[1]) : 1;
+          })()
+        ) || 1;
+
         // Primary effective service for end session
         const primaryServiceObj = localServices.find(
           (s) => String(s.id) === String(primaryServiceId || booking.serviceId || (booking.serviceIds && booking.serviceIds[0])) ||
                  (s.en && s.en === ((booking as any).service || (booking as any).service_name)) ||
                  (s.ar && s.ar === ((booking as any).service || (booking as any).service_name))
         );
-        const baseBookingPrice = primaryServiceObj 
+        const isPrimaryLaser = checkIsLaserService(primaryServiceObj);
+        const primaryPulses = isPrimaryLaser ? (Number(extraPulsesCount) || 0) : 0;
+        const catalogPrice = primaryServiceObj 
           ? getEffectiveServicePrice(primaryServiceObj, booking.branchId, branches)
           : (servicesCost || Number((booking as any).total_price || (booking as any).price || 0) || 500);
 
-        const additionalServicesSubtotal = additionalServices.reduce((sum, item) => sum + Number(item.price || 0), 0);
+        const baseBookingPrice = (isLaserPerPulse && isPrimaryLaser)
+          ? (primaryPulses * laserPulseRate)
+          : catalogPrice;
+
+        const additionalServicesSubtotal = additionalServices.reduce((sum, item) => {
+          const srvObj = localServices.find((s) => String(s.id) === String(item.serviceId));
+          const isItemLaser = item.isLaser || checkIsLaserService(srvObj);
+          const itemPrice = (isLaserPerPulse && isItemLaser)
+            ? (Number(item.pulses) || 0) * laserPulseRate
+            : Number(item.price || 0);
+          return sum + itemPrice;
+        }, 0);
+
         const productsSubtotal = usedProducts.reduce((sum, item) => sum + Number(item.total || 0), 0);
-        const isPrimaryLaser = checkIsLaserService(primaryServiceObj);
-        const primaryPulses = isPrimaryLaser ? (Number(extraPulsesCount) || 0) : 0;
-        const extraPulsesSubtotal = primaryPulses * (Number(pricePerPulse) || 0);
+        const extraPulsesSubtotal = isLaserPerPulse ? 0 : (primaryPulses * (Number(pricePerPulse) || 0));
         const additionalPulsesTotal = additionalServices.reduce((sum, item) => sum + Number(item.pulses || 0), 0);
         const totalSessionPulses = primaryPulses + additionalPulsesTotal;
         const endSessionInvoiceTotal = baseBookingPrice + additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal;
@@ -1594,6 +1673,26 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       </div>
                     </div>
                   </div>
+
+                  {/* LASER PER-PULSE AGREEMENT NOTICE */}
+                  {isLaserPerPulse && (
+                    <div className="rounded-3xl border border-amber-300 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-emerald-500/10 p-5 shadow-xs space-y-1.5 animate-fadeIn">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 font-black text-[#1F251A] text-sm">
+                          <Zap size={18} className="text-amber-600 fill-amber-500 animate-pulse" />
+                          <span>{isRTL ? "اتفاقية محاسبة خدمات الليزر بنظام حساب النبضات" : "Laser Per-Pulse Settlement Agreement"}</span>
+                        </div>
+                        <span className="rounded-full bg-amber-200 text-amber-900 border border-amber-300 px-3 py-1 text-xs font-black">
+                          {laserPulseRate} EGP / {isRTL ? "نبضة" : "pulse"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#1F251A] font-semibold leading-relaxed">
+                        {isRTL
+                          ? `تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${totalSessionPulses} نبضة × ${laserPulseRate} ج.م = ${totalSessionPulses * laserPulseRate} ج.م)`
+                          : `Settled that laser services in this session are charged per pulse (${totalSessionPulses} pulses × ${laserPulseRate} EGP = ${totalSessionPulses * laserPulseRate} EGP)`}
+                      </p>
+                    </div>
+                  )}
 
                   {/* 2-COLUMN CLINICAL GRID */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -2140,7 +2239,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                     </span>
                                   )}
                                 </span>
-                                <span className="font-extrabold text-[#414E36]">{baseBookingPrice} EGP</span>
+                                <span className="font-extrabold text-[#414E36]">
+                                  {baseBookingPrice} EGP {isLaserPerPulse && isPrimaryLaser && Number(primaryPulses) > 0 ? `(${primaryPulses} × ${laserPulseRate} EGP)` : ""}
+                                </span>
                               </div>
 
                               <div className="bg-white p-3 rounded-xl border border-[#414E36]/10 space-y-3">
@@ -2313,29 +2414,39 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               {/* Added Additional Services List */}
                               {additionalServices.length > 0 && (
                                 <div className="space-y-2 pt-2 border-t border-[#414E36]/10">
-                                  {additionalServices.map((item) => (
-                                    <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
-                                      <div className="min-w-0 flex items-center gap-2">
-                                        <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
-                                        {(item.isLaser || Number(item.pulses) > 0) && (
-                                          <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-extrabold text-amber-800 shrink-0">
-                                            <Zap size={10} className="text-amber-600 fill-amber-500" />
-                                            <span>{item.pulses || 0} {isRTL ? "نبضة" : "pulses"}</span>
+                                  {additionalServices.map((item) => {
+                                    const srvObj = localServices.find((ls) => String(ls.id) === String(item.serviceId));
+                                    const isItemLaser = item.isLaser || checkIsLaserService(srvObj);
+                                    const itemDisplayPrice = (isLaserPerPulse && isItemLaser)
+                                      ? (Number(item.pulses) || 0) * laserPulseRate
+                                      : Number(item.price || 0);
+
+                                    return (
+                                      <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
+                                        <div className="min-w-0 flex items-center gap-2">
+                                          <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
+                                          {(item.isLaser || Number(item.pulses) > 0) && (
+                                            <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-extrabold text-amber-800 shrink-0">
+                                              <Zap size={10} className="text-amber-600 fill-amber-500" />
+                                              <span>{item.pulses || 0} {isRTL ? "نبضة" : "pulses"}</span>
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-3 shrink-0">
+                                          <span className="font-extrabold text-[#414E36]">
+                                            +{itemDisplayPrice} EGP {isLaserPerPulse && isItemLaser && Number(item.pulses) > 0 ? `(${item.pulses} × ${laserPulseRate} EGP)` : ""}
                                           </span>
-                                        )}
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveServiceFromSession(item.id)}
+                                            className="text-rose-600 hover:text-rose-800 text-xs font-bold cursor-pointer p-1"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </div>
                                       </div>
-                                      <div className="flex items-center gap-3 shrink-0">
-                                        <span className="font-extrabold text-[#414E36]">+{item.price} EGP</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleRemoveServiceFromSession(item.id)}
-                                          className="text-rose-600 hover:text-rose-800 text-xs font-bold cursor-pointer p-1"
-                                        >
-                                          <Trash2 size={14} />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
