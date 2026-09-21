@@ -19,6 +19,7 @@ import UserProfileView, { UserProfileViewTranslations } from "./UserProfileView"
 import DoctorSessionDrawer from "./doctor/modals/DoctorSessionDrawer";
 import DoctorPatientHistoryDrawer from "./doctor/modals/DoctorPatientHistoryDrawer";
 import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
+import { resolveLaserPulseRate } from "@/lib/laserRate";
 
 // Local Date Helper to avoid UTC conversion shifts
 const getLocalDateString = (d: Date = new Date()): string => {
@@ -1150,6 +1151,23 @@ export default function DoctorAccountView({
       return;
     }
 
+    const requiresPerPulseRate = laserData?.pulseType === "PER_PULSE" ||
+      targetBooking.laser_payment_mode === "PER_PULSE" ||
+      targetBooking.laserPaymentMode === "PER_PULSE" || (
+      laserData?.pulseType === "PACKAGE" &&
+      Number(laserData?.deficitPulses || 0) > 0 &&
+      laserData?.spilloverChoice === "PAY_PER_PULSE"
+    );
+    const resolvedDoctorPulseRate = resolveLaserPulseRate({
+      reservationRate: targetBooking.laser_price_per_pulse ?? targetBooking.laserPricePerPulse,
+      clinicDefaultRate: laserData?.pulseValue,
+      notes: targetBooking.notes,
+    });
+    if (requiresPerPulseRate && resolvedDoctorPulseRate === null) {
+      alert("Per-pulse rate not configured — set it in Booking Settings.");
+      return;
+    }
+
     // 2. Deduct Used Products from Inventory Stock DB via /api/inventory/products/sales
     if (usedProducts && usedProducts.length > 0) {
       try {
@@ -1485,7 +1503,7 @@ export default function DoctorAccountView({
                 completedPackageSettlement = { oldPackagePulses: pulsesToDeductFromActivePkg, newPackagePulses: deficitPulses };
                 abortOnLaserError = false;
               } else if (laserData.spilloverChoice === "PAY_PER_PULSE") {
-                const excessRate = Number(laserData.pulseValue || 1);
+                const excessRate = resolvedDoctorPulseRate!;
                 const excessTotal = deficitPulses * excessRate;
                 effectiveLaserSessionCharge = excessTotal;
 
@@ -1590,7 +1608,7 @@ export default function DoctorAccountView({
 
     let completionNotes = String(targetBooking.notes || "");
     const isDoctorPerPulse = laserData?.pulseType === "PER_PULSE" || targetBooking.laser_payment_mode === "PER_PULSE" || targetBooking.laserPaymentMode === "PER_PULSE";
-    const doctorPulseRate = Number(laserData?.pulseValue || targetBooking.laser_price_per_pulse || targetBooking.laserPricePerPulse || 1);
+    const doctorPulseRate = resolvedDoctorPulseRate!;
     const doctorDeliveredPulses = Number(laserData?.pulsesUsed || 0);
 
     if (isDoctorPerPulse && doctorDeliveredPulses > 0) {
@@ -1618,7 +1636,7 @@ export default function DoctorAccountView({
           const settlementString = `\n[Laser Settlement]: Settled that laser services deficit is covered via New Pulses Package (${pkgName}) / تم الاتفاق على تغطية عجز النبضات عبر شراء باقة جديدة (${pkgName})`;
           completionNotes = completionNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
         } else {
-          const deficitRate = Number(laserData?.pulseValue || 1);
+          const deficitRate = resolvedDoctorPulseRate!;
           const deficitCost = deficit * deficitRate;
           const deficitString = `\n[Laser Package Redemption]: Existing package exhausted. Excess ${deficit} pulses charged per pulse @ ${deficitRate} EGP = ${deficitCost} EGP / تم استهلاك الباقة واحتساب ${deficit} نبضة إضافية بنظام النبضة`;
           completionNotes = completionNotes.replace(/\[(?:Laser Package Redemption|Laser Package Settlement)\]:[^\n\[]*/gi, "").trim() + deficitString;

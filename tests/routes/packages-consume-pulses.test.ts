@@ -146,7 +146,7 @@ describe('PATCH /api/customers/packages consume_package_pulses', () => {
     expect(body).toMatchObject({ consumed: 25, requested: 25, remainingPulses: 75 });
   });
 
-  it.fails('rejects an unknown UUID instead of fabricating a pulse quota', async () => {
+  it('rejects an unknown UUID instead of fabricating a pulse quota', async () => {
     const response = await PATCH(request(consumeBody({ customer_package_id: UNKNOWN_PACKAGE_ID, quantity_used: 1 })));
     expect(response.status).toBe(400);
   });

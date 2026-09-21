@@ -11,6 +11,7 @@ import { normalizeEgyptMobile, isOwnIdentity } from '@/lib/customerIdentity';
 import { recordWalletMovement } from '@/lib/wallet';
 import { recordTransaction } from '@/lib/transactionLedger';
 import { classifyCaller } from '@/app/api/customers/route';
+import { resolveLaserPulseRate } from '@/lib/laserRate';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -20,6 +21,17 @@ import { classifyCaller } from '@/app/api/customers/route';
 function fmtDate(d: unknown): string {
   if (d instanceof Date) return d.toISOString().slice(0, 10);
   return String(d).slice(0, 10); // already a YYYY-MM-DD string
+}
+
+async function getClinicDefaultPricePerPulse(): Promise<number | null> {
+  const { data, error } = await supabaseServer
+    .from('page_settings')
+    .select('value')
+    .eq('key', 'home')
+    .maybeSingle();
+  if (error) throw error;
+  const rate = Number(data?.value?.booking?.defaultPricePerPulse);
+  return Number.isFinite(rate) && rate > 0 ? rate : null;
 }
 
 /**
@@ -383,13 +395,15 @@ async function writeCheckoutInvoice(params: {
     String(resRow?.notes || '').toLowerCase().includes('pulses package') ||
     String(resRow?.notes || '').includes('[Laser Package]')
   );
-  const pulseRate = Number(
-    resRow?.laser_price_per_pulse ||
-    (() => {
-      const m = String(resRow?.notes || '').match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
-      return m ? Number(m[1]) : 1;
-    })()
-  ) || 1;
+  const pulseRate = resolveLaserPulseRate({
+    reservationRate: resRow?.laser_price_per_pulse,
+    clinicDefaultRate: isPerPulseMode ? await getClinicDefaultPricePerPulse() : null,
+    notes: resRow?.notes,
+  });
+  if (isPerPulseMode && pulseRate === null) {
+    throw new Error('Per-pulse rate not configured — set it in Booking Settings.');
+  }
+  const checkoutPulseRate = pulseRate!;
   const primaryPulsesMatch = String(resRow?.notes || '').match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
     String(resRow?.notes || '').match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
     String(resRow?.notes || '').match(/Primary:\s*(\d+)\s*pulses/i) ||
@@ -411,10 +425,10 @@ async function writeCheckoutInvoice(params: {
 
     if (isPerPulseMode && isLaser) {
       if (primaryDeliveredPulses > 0) {
-        const perPulseTotal = primaryDeliveredPulses * pulseRate;
+        const perPulseTotal = primaryDeliveredPulses * checkoutPulseRate;
         return buildInvoiceLine({
           lineType: 'service',
-          description: `${svc.en || svc.name || `Service #${svc.id}`} (${primaryDeliveredPulses} pulses × ${pulseRate} EGP)`,
+          description: `${svc.en || svc.name || `Service #${svc.id}`} (${primaryDeliveredPulses} pulses × ${checkoutPulseRate} EGP)`,
           qty: 1,
           unitPrice: perPulseTotal,
           discount: 0,
@@ -424,7 +438,7 @@ async function writeCheckoutInvoice(params: {
       } else {
         return buildInvoiceLine({
           lineType: 'service',
-          description: `${svc.en || svc.name || `Service #${svc.id}`} (Pay per Pulse @ ${pulseRate} EGP)`,
+          description: `${svc.en || svc.name || `Service #${svc.id}`} (Pay per Pulse @ ${checkoutPulseRate} EGP)`,
           qty: 1,
           unitPrice: 0,
           discount: 0,
@@ -1686,14 +1700,15 @@ export async function PATCH(req: Request) {
         String(updates.notes || target.notes || '').toLowerCase().includes('per_pulse') ||
         String(updates.notes || target.notes || '').includes('[Laser Settlement]')
       );
-      const pulseRate = Number(
-        updates.laser_price_per_pulse ||
-        target.laser_price_per_pulse ||
-        (() => {
-          const m = String(updates.notes || target.notes || '').match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
-          return m ? Number(m[1]) : 1;
-        })()
-      ) || 1;
+      const pulseRate = resolveLaserPulseRate({
+        reservationRate: updates.laser_price_per_pulse ?? target.laser_price_per_pulse,
+        clinicDefaultRate: isPerPulseMode ? await getClinicDefaultPricePerPulse() : null,
+        notes: updates.notes ?? target.notes,
+      });
+      if (isPerPulseMode && pulseRate === null) {
+        return NextResponse.json({ error: 'Per-pulse rate not configured — set it in Booking Settings.' }, { status: 400 });
+      }
+      const updatePulseRate = pulseRate!;
       const primaryPulsesMatch = String(updates.notes || target.notes || '').match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
         String(updates.notes || target.notes || '').match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
         String(updates.notes || target.notes || '').match(/Primary:\s*(\d+)\s*pulses/i) ||
@@ -1735,7 +1750,7 @@ export async function PATCH(req: Request) {
               (s.category && String(s.category).toLowerCase().includes('laser'))
             );
             if (isPerPulseMode && isLaser) {
-              return sum + (primaryDeliveredPulses > 0 ? (primaryDeliveredPulses * pulseRate) : 0);
+              return sum + (primaryDeliveredPulses > 0 ? (primaryDeliveredPulses * updatePulseRate) : 0);
             }
             const mappedService = { price: s.price !== null ? Number(s.price) : 0, branchPricing: s.branch_pricing };
             return sum + getEffectiveServicePrice(mappedService, targetBranchName);
