@@ -1790,6 +1790,7 @@ export async function PATCH(req: Request) {
         }
       }
 
+      let droppedColumns: string[] = [];
       let { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
         .update(updates)
@@ -1799,18 +1800,22 @@ export async function PATCH(req: Request) {
 
       // If missing column error (Postgres 42703) occurs, strip optional extended columns and retry
       if (updateError && (updateError.code === '42703' || String(updateError.message || '').toLowerCase().includes('column'))) {
-        console.warn('Extended columns missing in reservations table, retrying with core columns only:', updateError.message);
         const coreUpdates = { ...updates };
-        delete coreUpdates.laser_payment_mode;
-        delete coreUpdates.laser_price_per_pulse;
-        delete coreUpdates.delivered_pulses;
-        delete coreUpdates.actual_duration_minutes;
-        delete coreUpdates.doctor_notes;
-        delete coreUpdates.reception_notes;
-        delete coreUpdates.follow_up_notes;
-        delete coreUpdates.follow_up_date;
-        delete coreUpdates.total_price;
-        delete coreUpdates.price;
+        const extendedColumns = [
+          'laser_payment_mode',
+          'laser_price_per_pulse',
+          'delivered_pulses',
+          'actual_duration_minutes',
+          'doctor_notes',
+          'reception_notes',
+          'follow_up_notes',
+          'follow_up_date',
+          'total_price',
+          'price',
+        ];
+        droppedColumns = extendedColumns.filter((key) => key in coreUpdates);
+        for (const key of droppedColumns) delete coreUpdates[key];
+        console.warn('Extended columns missing in reservations table; retrying without:', droppedColumns, updateError.message);
 
         const retryRes = await supabaseServer
           .from('reservations')
@@ -1831,6 +1836,9 @@ export async function PATCH(req: Request) {
           if (coreUpdates.amount_left !== undefined) minimalUpdates.amount_left = coreUpdates.amount_left;
           if (coreUpdates.service_id !== undefined) minimalUpdates.service_id = coreUpdates.service_id;
           if (coreUpdates.doctor_name !== undefined) minimalUpdates.doctor_name = coreUpdates.doctor_name;
+          const minimalDroppedColumns = Object.keys(coreUpdates).filter((key) => !(key in minimalUpdates));
+          droppedColumns = [...new Set([...droppedColumns, ...minimalDroppedColumns])];
+          console.warn('Reservations retry still found missing columns; retrying with minimal fields and dropping:', minimalDroppedColumns);
 
           const safeRes = await supabaseServer
             .from('reservations')
@@ -2086,7 +2094,15 @@ export async function PATCH(req: Request) {
         });
       }
 
-      return NextResponse.json(mapRow(updated));
+      const response = mapRow(updated);
+      if (droppedColumns.length > 0) {
+        return NextResponse.json({
+          ...response,
+          warning: `Saved, but ${droppedColumns.length} field(s) were not persisted because this database is missing columns.`,
+          droppedColumns,
+        });
+      }
+      return NextResponse.json(response);
     } else {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }

@@ -1607,8 +1607,6 @@ export default function DoctorAccountView({
           status: "completed",
           doctorNotes: clinicalNote || "",
           notes: completionNotes,
-          total_price: sessionComputedTotal,
-          price: sessionComputedTotal,
           amountLeft: Math.max(0, sessionComputedTotal - Number(targetBooking.amountPaid ?? 0)),
           laser_payment_mode: isDoctorPerPulse ? "PER_PULSE" : isDoctorPackage ? "PACKAGE" : "SERVICE",
           laserPaymentMode: isDoctorPerPulse ? "PER_PULSE" : isDoctorPackage ? "PACKAGE" : "SERVICE",
