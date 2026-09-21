@@ -37,7 +37,7 @@
 ### Callers still work with the auth requirement (RISK-090)
 
 - [ ] **New Booking** (`AdminNewBookingView`): pick a patient who has a package, confirm the package/pulse-balance badge still appears. (This screen previously sent **no** token; it now sends the session token. Network tab: the `/api/customers/packages` request carries an `Authorization` header and returns 200.)
-- [ ] **Doctor portal → Ongoing session**: open an active session for a patient with a pulses package, confirm the package selector still populates.
+- [ ] **Doctor portal → Ongoing session**: open an active session for a patient with a pulses package, confirm the package selector still populates. (Needs a doctor login; not run. Statically checked: the doctor screens send the bearer token via `getAuthHeaders()`.)
 - [ ] **Booking details modal / Checkout**: open a booking for a patient with a package and confirm nothing regressed (no new console 401s).
 
 ### `customerId` param (RISK-091)
@@ -49,7 +49,9 @@
 
 - [x] **Issue 1 — a package bought during New Booking appears under the patient's Purchased Packages.** Brand-new patient → Option 3 → buy `pulses v2` → confirm; the package is listed (10,000 / active / 1,000 paid) and the booking note carries its ID. — Verified 2026-09-21 after RISK-092/093 (the original cause was those two, **not** the `customerId` param).
 - [x] **Issue 1, existing patient** (has a patient record but no package): same flow, the package is credited. — Verified 2026-09-21 (`ZZTEST4`), no extra `POST /api/customers`, see Evidence log.
-- [ ] **Issue 1, Checkout variant — doctor portal.** In the doctor session screen, switch a no-package patient to Option 3, pick a package to buy, end the session, confirm the package appears in the profile. Needs a doctor login; not run. It uses the same `/api/packages/sell` route fixed in RISK-092.
+- [x] **Issue 1, "Checkout" variant: N/A as a test — corrected 2026-09-21.** "Checkout" means the **reception** End Session / payment-settlement screen (Booking details), not the doctor portal, and that screen has **no package-purchase step**: a package is only ever sold at booking time (covered above). An earlier draft of this checklist wrongly listed a doctor-portal purchase; selling packages is reception's job, so it is not a required test.
+- [ ] **Known gap, not a test:** a booking that was paid for a package but never had the package created (the pre-fix state of RISK-092/093) cannot be recovered at End Session. The fallback in `BookingDetailsModal.tsx` (~line 1241) needs `booking.purchasingPackageId`, which the reservations route never saves, so it never runs (and if it did, it sells without `amountPaid`, recording the full price as a second payment). See RISK-093 "Still open".
+- [ ] **Product decision (not a test):** the doctor session screen (`DoctorOngoingSessionTab.tsx`) still offers "buy a new package" under Option 3 when the patient has none. It uses the same `/api/packages/sell` route fixed in RISK-092 but was not exercised (it needs a doctor login). Whether the doctor screen should be able to sell at all is undecided.
 - [x] **Issue 2 — pulses used in a package-paid session are deducted.** Patient with an active package, "Pay via Package", session with 2,500 pulses → balance drops by exactly 2,500. — Verified 2026-09-21 (10,000 → 7,500, then 7,500 → 5,000).
 - [x] The deduction happens **once**: each session added exactly one history entry.
 - [x] Public-site patient booking that buys a package: **N/A** — the public flow (`src/components/BookingModal.tsx`) contains no package code at all, so there is nothing to test.
