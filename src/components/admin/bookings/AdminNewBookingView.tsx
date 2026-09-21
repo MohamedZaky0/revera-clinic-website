@@ -1222,6 +1222,14 @@ export default function AdminNewBookingView({
         }
       }
 
+      // One session lookup for every authenticated call below. POST /api/customers and
+      // POST /api/packages/sell both require a staff bearer token.
+      const { data: submitAuth } = await supabase.auth.getSession();
+      const submitAuthHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (submitAuth?.session?.access_token) {
+        submitAuthHeaders["Authorization"] = `Bearer ${submitAuth.session.access_token}`;
+      }
+
       if (!resolvedCustomerId && (firstName || phone)) {
         try {
           const custPayload = {
@@ -1244,9 +1252,11 @@ export default function AdminNewBookingView({
             outstanding: Number(outstandingBalance || 0)
           };
 
+          // This call used to send no Authorization header, so POST /api/customers answered 401,
+          // resolvedCustomerId stayed null, and the package sale below could not find the patient.
           const createCustRes = await fetch("/api/customers", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: submitAuthHeaders,
             body: JSON.stringify(custPayload)
           });
 
@@ -1266,14 +1276,9 @@ export default function AdminNewBookingView({
       let createdCustomerPackageId: string | null = null;
       if (isNewPackagePurchase && selectedCatalogPulsePkg && (resolvedCustomerId || phone)) {
         try {
-          const { data: authData } = await supabase.auth.getSession();
-          const sellHeaders: Record<string, string> = { "Content-Type": "application/json" };
-          if (authData?.session?.access_token) {
-            sellHeaders["Authorization"] = `Bearer ${authData.session.access_token}`;
-          }
           const sellRes = await fetch("/api/packages/sell", {
             method: "POST",
-            headers: sellHeaders,
+            headers: submitAuthHeaders,
             body: JSON.stringify({
               customerId: resolvedCustomerId || phone,
               packageId: selectedCatalogPulsePkg.id,
@@ -1298,6 +1303,14 @@ export default function AdminNewBookingView({
         } catch (sellErr) {
           console.error("Error selling package during booking:", sellErr);
         }
+      }
+
+      // The reservation POST never creates the package itself (it does not read purchasingPackageId),
+      // so if the sale did not happen the booking would bill the package price and the patient would
+      // receive nothing. Stop here instead of creating that booking.
+      if (isNewPackagePurchase && selectedCatalogPulsePkg && !createdCustomerPackageId) {
+        alert(tr.packageSaleFailedAlert);
+        return;
       }
 
       const packageNote = isNewPackagePurchase && selectedCatalogPulsePkg

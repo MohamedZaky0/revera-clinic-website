@@ -246,7 +246,11 @@ export async function POST(req: Request) {
       ? Math.min(totals.grandTotal, Math.max(0, Number(amountPaid !== undefined ? amountPaid : paidAmount)))
       : totals.grandTotal;
     const remainingDue = Math.max(0, totals.grandTotal - actualPaid);
-    const invoiceStatus = actualPaid >= totals.grandTotal ? 'paid' : (actualPaid > 0 ? 'partially_paid' : 'issued');
+    // invoices.status is CHECK (status IN ('draft','issued','void')), and customerBalances.ts only
+    // counts 'issued' invoices. How much was paid lives in `payments` and customers.outstanding, not
+    // here. This used to write 'paid' / 'partially_paid', which violates the constraint, so every
+    // package sale with any money attached failed with a 500 (only a 0-EGP sale went through).
+    const invoiceStatus = 'issued';
 
     // Wallet guard: check balance before proceeding, refuse with 409 if short
     if (paymentMethod === 'wallet') {

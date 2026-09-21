@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **62 resolved** · 82 tracked total.
+**7 open** · **13 partially resolved** · **64 resolved** · 84 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4172,13 +4172,16 @@ neither param present the route returned `400`, and each of those callers only a
   `PATCH … consume_package_pulses` was never sent;
 - the doctor session tab never populated the patient's active pulse packages.
 
-**Relationship to the reported "known issues":** this matches both — *(1) a package bought during
-booking/checkout does not show under the patient's Purchased Packages* and *(2) pulses used in a
-package-paid session are not deducted from the remaining balance (10,000 → should be 7,500)*. It is a
-strong, code-level cause of both, but **it has not been re-verified end to end**: the dev database
-currently has no customer with any package rows, so a real sell → consume → balance check could not be
-run, and other defects on those paths (RISK-089's schema-resilience work, `packages/sell`) may also
-contribute. Treat both issues as open until reproduced and re-tested through the UI.
+**Relationship to the reported "known issues" (verified live 2026-09-21, dev DB, test patients
+`ZZTEST*` — since deactivated):**
+- *(2) pulses used in a package-paid session are not deducted* — **this was the cause.** A patient who
+  already held a package (7,500 remaining) booked "Pay via Package" (note `[Laser Package
+  Redemption]`, no Customer Package ID), and a session used 2,500 pulses: the balance went
+  **7,500 → 5,000**, deducted once, history `2500→5000`. That path finds the package only through
+  `?customerId=`, which is exactly what used to 400.
+- *(1) a package bought during booking does not appear under Purchased Packages* — **this was NOT
+  this bug**; it had two separate causes, see RISK-092 and RISK-093. (The alias only mattered for the
+  read-back.)
 
 **Fix:** the route now accepts `customerId` as an alias for `customer_id` (`route.ts`, the same
 tolerance `customers/products` and `inventory/products/sales` already got in DEC-072/073).
@@ -4186,6 +4189,67 @@ tolerance `customers/products` and `inventory/products/sales` already got in DEC
 **Verified:** `tests/routes/customers-packages.test.ts` "accepts the camelCase `customerId` param" —
 confirmed to fail with `400` before the change; live against the dev server, `?customerId=<uuid>` now
 returns `200` (was `400`).
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_090_091_MANUAL_TESTS.md`
+
+---
+
+## RISK-092: `POST /api/packages/sell` Wrote Invoice Status `paid` / `partially_paid`, Which The Schema Forbids, So Every Package Sale With Money Attached Returned 500 (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Correctness / money
+**Found:** 2026-09-21, reproducing the reported "purchased package is not credited to the patient" issue
+live. **Fixed same day.**
+
+**What it was:** `invoices.status` is `CHECK (status IN ('draft','issued','void'))`
+(`20260726010000_create_invoices.sql`), and `customerBalances.ts` only counts `'issued'` invoices.
+`src/app/api/packages/sell/route.ts` computed
+`actualPaid >= grandTotal ? 'paid' : (actualPaid > 0 ? 'partially_paid' : 'issued')`, so the insert
+failed with Postgres `23514 invoices_status_check` whenever the sale had any payment attached — full
+or partial. Only a 0-EGP sale worked. The route rolled back and returned 500, so **no package was ever
+created**. Server log: `new row for relation "invoices" violates check constraint "invoices_status_check"`.
+
+**Fix:** the invoice is always written as `'issued'`; how much was paid lives in `payments` and
+`customers.outstanding`, which the route already maintained.
+
+**Verified:** live — a fully paid `pulses v2` (10,000 pulses, 1,000 EGP) sale from New Booking now
+returns 201 and the patient's package shows 10,000 total / 10,000 remaining / active / 1,000 paid.
+`tests/routes/packages-sell.test.ts` (new, 6 cases; `supabaseFake` does not enforce CHECK constraints,
+so the test asserts the written status against the allowed set) — the two payment cases were confirmed
+to fail with the old line.
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_090_091_MANUAL_TESTS.md`
+
+---
+
+## RISK-093: New Booking Silently Billed The Package Price When The Package Sale Failed, And Its "Create Patient" Call Sent No Auth Token (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Correctness / money · **Found:** 2026-09-21 (live repro).
+**Fixed same day.**
+
+**What it was:** `AdminNewBookingView.tsx`'s submit handler (a) called `POST /api/customers` with **no
+`Authorization` header**, so for a brand-new patient it got 401 and `resolvedCustomerId` stayed null;
+(b) then sold the package with `customerId: <phone>`, which `/api/packages/sell` could not resolve
+(404); and (c) **carried on regardless**, creating the reservation with the package price as
+`amountPaid`. The reservations route never reads `purchasingPackageId`, so nothing else would ever
+create the package. Reproduced exactly: reservation paid 1,000 EGP, note "Purchasing New Pulses
+Package: pulses v2", patient created, **zero packages**, no error shown.
+
+**Fix:** the submit handler reads the session once and sends the bearer token on both
+`/api/customers` and `/api/packages/sell`; and if a new-package purchase did not produce a customer
+package, it now alerts (`packageSaleFailedAlert`, EN + AR) and **stops before creating the booking**, so
+a patient can no longer be billed for a package they did not receive.
+
+**Verified:** live — brand-new patient, laser service, Option 3, buy `pulses v2`: `POST /api/customers`
+201, sale 201, booking created, note carries `[Customer Package ID]`, package listed. Before the
+RISK-092 fix the new guard was seen firing correctly (booking blocked, nothing charged).
+
+**Still open, not fixed here:** `BookingDetailsModal.tsx`'s end-session "package purchased at booking"
+fallback (~line 1241) depends on `booking.purchasingPackageId`, which is never persisted, so it never
+runs; if it did, it sells without `amountPaid` and would record the full price as a second payment. The
+booking payload also sends `explicitCustomerId` while the reservations route reads `customerId`, so the
+resolved patient id is ignored (it falls back to a phone lookup). Neither was needed for the fix above.
+The **doctor-portal** "buy a package at end of session" path was not exercised live (it needs a doctor
+login); it shares the `/api/packages/sell` route fixed in RISK-092.
 
 **Manual test checklist:** `ai_docs/manual_tests/RISK_090_091_MANUAL_TESTS.md`
 

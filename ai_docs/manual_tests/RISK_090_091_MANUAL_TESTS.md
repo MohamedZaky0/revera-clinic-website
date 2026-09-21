@@ -1,5 +1,8 @@
-# RISK-090 / RISK-091 Manual Test Checklist — `GET /api/customers/packages` Auth + `customerId` Param
+# RISK-090 / 091 / 092 / 093 Manual Test Checklist — Package Lookup Auth, `customerId`, Package Sale, New Booking Purchase
 
+> Covers RISK-090 (no auth on `GET /api/customers/packages`), RISK-091 (`?customerId=` ignored), RISK-092
+> (`/api/packages/sell` invoice status 500) and RISK-093 (New Booking billed for an unsold package).
+>
 > **Living document.** Update this file with dated dev evidence as each check is run.
 > **Environment:** linked dev database. Use a real logged-in staff session (e.g. a `superadmin` or
 > `reception` account) for every authenticated check below.
@@ -14,7 +17,11 @@
 |---|---|---|---|---|
 | 2026-09-21 | Unauthenticated calls are rejected | Local dev (`localhost:3000`), dev DB, `finance-test@revera.com` | Fetch with **no** `Authorization` header: `?customer_id=<uuid>` → 401, `?mobile=<phone>` → 401, no params → 401. | PASS |
 | 2026-09-21 | Staff calls still work, both param spellings | same | Staff bearer token: `?customer_id=<uuid>` → 200, `?customerId=<uuid>` → 200 (was 400 before RISK-091), no params → 400. | PASS |
-| 2026-09-21 | Real package data returned | same | **Not run** — none of the 14 dev customers has any `customer_packages` rows, so both spellings returned `[]`. Needs a sold package first (see the outstanding end-to-end section). | NOT RUN |
+| 2026-09-21 | Issue 1 repro (before fix) — new patient buys a package in New Booking | Local dev, dev DB, test patient `ZZTEST` (01099990001) | Laser Hair Removal → Option 3 → `pulses v2` (10,000 pulses, 1,000 EGP) → confirm. Console: `POST /api/customers` **401**, `POST /api/packages/sell` **404**. Booking was still created: `amountPaid` 1000, note "Purchasing New Pulses Package", patient created, **0 packages**, no error shown. | REPRODUCED |
+| 2026-09-21 | Same flow after the auth-token fix | `ZZTEST2` (…0002) | `POST /api/customers` **201**, but `POST /api/packages/sell` **500**: `invoices_status_check` violated (route wrote `paid`). New guard fired correctly: alert "package could not be added … booking was not created and nothing was charged", nothing billed. | REPRODUCED (2nd cause) |
+| 2026-09-21 | Same flow after the invoice-status fix | `ZZTEST3` (…0003) | Sale 201, booking created, note has `[Customer Package ID]`. Patient package: `pulses v2`, total 10,000, remaining 10,000, used 0, active, paid 1,000; patient `spent` 1,000. | PASS |
+| 2026-09-21 | Issue 2 — session on the just-bought package | `ZZTEST3` | Check In → Start Session → End Session, Delivered Pulses **2,500**: package **10,000 → 7,500**, history `2500→7500`, booking completed, 0 outstanding. | PASS |
+| 2026-09-21 | Issue 2 — existing package, new "Pay via Package" booking (the reported scenario) | `ZZTEST3` | Booking note `[Laser Package Redemption]: pulses v2 (7,500 pulses remaining)` (no Customer Package ID, so completion must use the `?customerId=` lookup). Session with **2,500** pulses: **7,500 → 5,000**, history `2500→5000`, `2500→7500` (deducted once per session), booking completed, 0 EGP charged. | PASS |
 
 ## Per-check list
 
@@ -35,12 +42,17 @@
 ### `customerId` param (RISK-091)
 
 - [x] `GET /api/customers/packages?customerId=<uuid>` (camelCase, as the UI sends it) returns **200**, not 400.
-- [ ] Network tab, **Booking details modal → complete a package-paid laser session**: the lookup request `/api/customers/packages?customerId=…` returns 200 and is followed by `PATCH /api/customers/packages` (`consume_package_pulses`).
+- [x] **Booking details modal → complete a package-paid laser session** for a patient who already holds a package: the balance is deducted. — Verified 2026-09-21 (7,500 → 5,000), see Evidence log.
 
-### Outstanding: the two reported end-to-end issues (NOT yet re-verified)
+### The two reported end-to-end issues
 
-RISK-091 is a strong candidate root cause for both, but neither has been reproduced/re-tested through the UI, and the dev DB currently has no patient with a package. Run these before closing either issue:
+- [x] **Issue 1 — a package bought during New Booking appears under the patient's Purchased Packages.** Brand-new patient → Option 3 → buy `pulses v2` → confirm; the package is listed (10,000 / active / 1,000 paid) and the booking note carries its ID. — Verified 2026-09-21 after RISK-092/093 (the original cause was those two, **not** the `customerId` param).
+- [ ] **Issue 1, existing patient** (has a patient record but no package): same flow, confirm the package is credited. Not run separately — the code path is the same sale call, but it skips the customer-create step.
+- [ ] **Issue 1, Checkout variant — doctor portal.** In the doctor session screen, switch a no-package patient to Option 3, pick a package to buy, end the session, confirm the package appears in the profile. Needs a doctor login; not run. It uses the same `/api/packages/sell` route fixed in RISK-092.
+- [x] **Issue 2 — pulses used in a package-paid session are deducted.** Patient with an active package, "Pay via Package", session with 2,500 pulses → balance drops by exactly 2,500. — Verified 2026-09-21 (10,000 → 7,500, then 7,500 → 5,000).
+- [x] The deduction happens **once**: each session added exactly one history entry.
+- [ ] Public-site patient booking that buys a package: not covered here.
 
-- [ ] **Issue 1 — package purchased during booking/checkout must appear under the patient's Purchased Packages.** New Booking → patient with no laser package → 3rd payment option (Pay via Package) → buy a new package in the prompt → complete booking + payment. Open that patient's profile → the package is listed under **Purchased Packages**. Repeat the purchase from the **Checkout** screen.
-- [ ] **Issue 2 — pulses used in a package-paid session must be deducted.** Patient with an active pulses package (e.g. 10,000). New Booking, laser service, **Pay via Package**. Run a session using 2,500 pulses and complete it. The package's remaining balance is **7,500** in the patient's profile (and in `GET /api/customers/packages`).
-- [ ] Confirm the deduction happens **once** — completing/refreshing the session again does not deduct a second time.
+### Test data left in the dev database (2026-09-21)
+
+The three test patients (`ZZTEST`, `ZZTEST2`, `ZZTEST3` PulsePatient — phones 01099990001/2/3) were **deactivated** (soft delete) and the 3 test reservations were deleted. Not removable through the API (ledger rows): the invoice(s) written by the package sale and by the two session checkouts, with their invoice lines and payments (the single 1,000 EGP package payment) — exact row counts not checked, the matching `transactions` rows, the `ZZTEST3` `customer_packages` row (`pulses v2`, now 5,000 remaining) with its pulse-usage history, and a `customer_package_pulses` entry in `page_settings`. Remove them in Supabase if a clean dev DB is wanted.
