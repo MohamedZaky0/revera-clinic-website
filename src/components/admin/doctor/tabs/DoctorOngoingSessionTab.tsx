@@ -28,6 +28,7 @@ import { DoctorTab, MedicationItem } from "../types";
 import { getAuthHeaders } from "../utils";
 import { MedicalRecordTemplate, IntakeField } from "@/app/api/medical-records/templates/route";
 import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
+import { computeDeficitInvoiceImpact, computePackageDeficit, resolveDeliveredPulses } from "@/lib/laserDeficit";
 
 export interface AdditionalServiceItem {
   id: string | number;
@@ -624,8 +625,12 @@ export default function DoctorOngoingSessionTab({
     const isLaser = item.isLaser || checkIsLaserService(srv);
     return sum + (isLaser ? Number(item.pulses || 0) : 0);
   }, 0);
-  const totalLaserDeliveredPulses = standardPulsesDelivered + additionalLaserPulses;
-  const packageDeficit = isNoActivePackage ? 0 : Math.max(0, totalLaserDeliveredPulses - availablePkgPulses);
+  const totalLaserDeliveredPulses = resolveDeliveredPulses(standardPulsesDelivered, additionalLaserPulses);
+  const packageDeficit = computePackageDeficit({
+    deliveredPulses: totalLaserDeliveredPulses,
+    remainingPulses: availablePkgPulses,
+    hasActivePackage: !isNoActivePackage,
+  });
 
   // Helper to extract total pulses in catalog package for purchase
   const newPackageTotalPulses = Number(
@@ -666,7 +671,12 @@ export default function DoctorOngoingSessionTab({
     ? (isNoActivePackage
         ? Number(selectedNewPackageToBuy?.price || 0)
         : packageDeficit > 0
-        ? (packageSpilloverChoice === "PAY_PER_PULSE" ? (packageDeficit * additionalPulseUnitPrice) : Number(selectedNewPackageToBuy?.price || 0))
+        ? computeDeficitInvoiceImpact({
+            deficitPulses: packageDeficit,
+            choice: packageSpilloverChoice,
+            pricePerPulse: additionalPulseUnitPrice,
+            newPackagePrice: selectedNewPackageToBuy?.price,
+          })
         : 0)
     : 0;
 
