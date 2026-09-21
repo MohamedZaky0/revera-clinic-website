@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **59 resolved** · 79 tracked total.
+**7 open** · **13 partially resolved** · **62 resolved** · 82 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4116,6 +4116,78 @@ live reproduction described above.
 **Verify:**
 - Verified with `npm run build` with 0 compiler / TypeScript errors.
 - Verified under System Test Suite `TC-072` (`Laser Pulses Package Redemption & Session Completion Engine`).
+
+---
+
+## RISK-090: `GET /api/customers/packages` Had No Authentication, So Anyone Could Read Any Patient's Packages By Phone Number (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Security / patient data exposure
+**Found:** 2026-09-21, while fixing a test that expected this route to return 401 for an unauthenticated caller. **Fixed same day.**
+
+**What it was:** only the `PATCH` handler in `src/app/api/customers/packages/route.ts` called
+`requireStaffAccess`; `GET` had no auth check at all, and the auth sweep's registry already declared
+it `staff`. The handler accepts a `mobile`/`phone` param and looks up every customer whose phone
+contains the last 9 digits, so an anonymous caller — no login, no token — could enumerate any phone
+number and get back that patient's packages, `price_paid`, laser-pulse usage history (treatment area,
+who delivered it, remaining balance) and product balances. Patient OTP login is UI-only, so no
+patient-side session ever legitimately needed this endpoint; every real caller is staff.
+
+**How it surfaced:** the route arrived with the DEC-062…DEC-076 laser/package commits. The auth
+sweep already listed it as `staff`, so its `401`/`403` assertions for this route were red on
+`origin/dev` right after that batch landed (`expected 400 to be 401`) — the sweep did flag it, it
+just wasn't acted on. Note the sweep calls handlers with *no* query params, so even when green it
+could not prove the real leak (valid params, no token); `customers-packages.test.ts` does.
+
+**Fix:** `GET` now calls `requireStaffAccess` first — before param validation, so an unauthenticated
+caller gets `401`, never a `400` that reveals the route's shape. One caller sent no token at all
+(`AdminNewBookingView.tsx`'s `loadCustomerPackages`); it now sends the session bearer token the way
+the same file's `/api/customers` and `/api/packages/sell` calls already did. Every other caller
+already went through `getAuthHeaders()`/`authenticatedJsonHeaders`.
+
+**Verified:** live against the dev server + dev database — no token → `401` for `customer_id=`,
+`mobile=` and no-param requests; staff token → `200`; staff with no params → `400`.
+
+**Tests:** `tests/routes/customers-packages.test.ts` (new, 8 cases). The four auth cases were
+confirmed to fail with the guard removed. `auth-sweep.test.ts` `/api/customers/packages` rows pass
+(311/311).
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_090_091_MANUAL_TESTS.md`
+
+---
+
+## RISK-091: UI Callers Looked Up A Patient's Package With `?customerId=` But The Route Only Read `customer_id`, So Every Lookup Returned 400 And Was Silently Skipped (RESOLVED — end-to-end symptoms not yet re-verified)
+
+**Severity:** High (P1) · **Type:** Correctness / silent failure (money-adjacent)
+**Found:** 2026-09-21, during the RISK-090 caller audit. **Fixed same day** (the param mismatch itself).
+
+**What it was:** `GET /api/customers/packages` read `searchParams.get('customer_id')` only (plus
+`mobile`/`phone`). `BookingDetailsModal.tsx` (2 call sites), `DoctorAccountView.tsx`,
+`DoctorOngoingSessionTab.tsx` and `admin/page.tsx` (checkout) all called it with `?customerId=`. With
+neither param present the route returned `400`, and each of those callers only acts inside
+`if (res.ok) { … }` — so the lookup failed **silently**, with no error shown:
+- "is this package already sold to this patient?" (`BookingDetailsModal`, before selling a package
+  during booking/checkout) never found an existing package;
+- "which of this patient's packages do I deduct pulses from?" (`BookingDetailsModal`,
+  `DoctorAccountView`, `admin/page.tsx` checkout) never found a target package, so the follow-up
+  `PATCH … consume_package_pulses` was never sent;
+- the doctor session tab never populated the patient's active pulse packages.
+
+**Relationship to the reported "known issues":** this matches both — *(1) a package bought during
+booking/checkout does not show under the patient's Purchased Packages* and *(2) pulses used in a
+package-paid session are not deducted from the remaining balance (10,000 → should be 7,500)*. It is a
+strong, code-level cause of both, but **it has not been re-verified end to end**: the dev database
+currently has no customer with any package rows, so a real sell → consume → balance check could not be
+run, and other defects on those paths (RISK-089's schema-resilience work, `packages/sell`) may also
+contribute. Treat both issues as open until reproduced and re-tested through the UI.
+
+**Fix:** the route now accepts `customerId` as an alias for `customer_id` (`route.ts`, the same
+tolerance `customers/products` and `inventory/products/sales` already got in DEC-072/073).
+
+**Verified:** `tests/routes/customers-packages.test.ts` "accepts the camelCase `customerId` param" —
+confirmed to fail with `400` before the change; live against the dev server, `?customerId=<uuid>` now
+returns `200` (was `400`).
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_090_091_MANUAL_TESTS.md`
 
 ---
 

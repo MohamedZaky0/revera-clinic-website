@@ -50,10 +50,15 @@ async function savePackagePulsesStore(store: Record<string, any>) {
 // Lists everything a customer has bought under the packages feature (customer_packages +
 // customer_package_items, joined for display names) — active, expired, and fully_used alike.
 export async function GET(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    let customerId = searchParams.get('customer_id');
+    const customerId = searchParams.get('customer_id') || searchParams.get('customerId');
     const mobile = searchParams.get('mobile') || searchParams.get('phone');
 
     if (!customerId && !mobile) {

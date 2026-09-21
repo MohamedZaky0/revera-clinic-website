@@ -690,7 +690,12 @@ export default function AdminNewBookingView({
       if (idToUse) params.append("customer_id", String(idToUse));
       if (phoneToUse) params.append("mobile", phoneToUse);
 
-      const res = await fetch(`/api/customers/packages?${params.toString()}`);
+      const { data: authData } = await supabase.auth.getSession();
+      const pkgHeaders: Record<string, string> = {};
+      if (authData?.session?.access_token) {
+        pkgHeaders["Authorization"] = `Bearer ${authData.session.access_token}`;
+      }
+      const res = await fetch(`/api/customers/packages?${params.toString()}`, { headers: pkgHeaders });
       if (res.ok) {
         const data = await res.json();
         const pkgs = data.packages || [];
