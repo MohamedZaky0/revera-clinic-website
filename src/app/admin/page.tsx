@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback, useRef, Fragment } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -5436,12 +5437,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           <p className="text-xs text-[#5A6A51] font-medium leading-relaxed">
             All staff, doctors, receptionists, and administrators must authenticate through the unified Staff Login portal. Redirecting...
           </p>
-          <a
+          <Link
             href="/login"
             className="mt-4 inline-flex items-center justify-center w-full rounded-2xl bg-[#414E36] py-3.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
           >
             Go to Staff Login
-          </a>
+          </Link>
         </div>
       </div>
     );
