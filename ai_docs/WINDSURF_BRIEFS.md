@@ -152,12 +152,216 @@ referencing that file.
 
 # QUEUED BRIEFS
 
-> **Do not start Brief 35 until Brief 34 has landed and been reviewed.** It depends on Brief 34's migration, `src/lib/laserDeficit.ts` and the per-pulse rate chain.
+> **Do not start Brief 34B until Brief 34 has landed and been reviewed.**
+
+## Brief 34B — Laser package pulses: move the balance off the JSON blob
+
+**Read first:** Brief 34 in this file (land it first — this brief assumes `src/lib/laserDeficit.ts`
+exists). Then `.windsurf/rules/00-core.md` (rule 1), `10-database.md`, `20-api-auth.md`;
+`ai_docs/DB_SCHEMA.md` → `customer_packages`, `packages`, `laser_pulse_logs`, `page_settings`;
+`ai_docs/DECISIONS.md` DEC-062, DEC-064, DEC-072; `ai_docs/RISKS.md` RISK-004, RISK-086, RISK-090…093.
+Then `src/app/api/customers/packages/route.ts` and `src/app/api/packages/sell/route.ts` end to end.
+
+**Why this exists.** Every patient's pulse balance in the whole clinic lives in **one** `page_settings`
+row. Every consume reads that row, mutates one key, and writes the whole row back. Two receptionists
+checking out two *different* patients at the same moment can silently erase one deduction — the clinic
+gives away laser pulses it was paid for and nothing anywhere records it. Brief 34 deliberately left
+this alone. Mohamed has now decided to fix it **before** Brief 35, because Brief 35 wants to build its
+checkout operation on this store's idempotency guard. **No user-facing behaviour changes.** The API
+response contract, the GET field names and the UI stay identical; only where the number lives changes.
+
+### Investigation findings — verify each before you change it
+
+1. **The blob is the primary store.** `src/app/api/customers/packages/route.ts:19-48` —
+   `getPackagePulsesStore()` / `savePackagePulsesStore()` read and upsert the whole `page_settings`
+   row `key = 'customer_package_pulses'`, a map `{ [customerPackageId]: { included_pulses,
+   used_pulses, remaining_pulses, usage_history[] } }`. The consume path (`:394-525`) reads the map
+   (`:380`), mutates one entry (`:470-485`), upserts the whole map (`:486`). Read-modify-write across
+   all patients. **This is the CLAUDE.md rule 7 / RISK-004 pattern. Do not extend it — remove it.**
+2. **The save cannot fail loudly, and cannot even fail quietly correctly.** `:36-48` wraps the upsert
+   in `try/catch` and `console.warn`s. But supabase-js **returns** `{ error }`, it does not throw — and
+   the code never destructures `error` at all. So a rejected upsert is invisible: the endpoint returns
+   `success: true` with a balance that was never stored. Same shape at `:20-33` for the read.
+3. **The native columns are written blind, after the fact.** `customer_packages.total_pulses /
+   pulses_used / pulses_remaining` exist (`supabase/migrations/20260920030000_…sql`) and are updated
+   best-effort at `:489-516` — again inside a `try/catch` around a call that returns `{error}` instead
+   of throwing. **The update at `:497` and `:508` sets `status: 'completed'`, but the real CHECK is
+   `status IN ('active','expired','fully_used')`** (`supabase/migrations/20260726010500_create_customer_packages.sql:19-20`).
+   So on depletion the **whole** UPDATE is rejected and the native row keeps stale pulses **and** stays
+   `active` — exactly when the package is exhausted. Confirm this yourself.
+4. **The doc is the root cause of (3).** `ai_docs/DB_SCHEMA.md` has **two** `customer_packages`
+   sections. The first (~`:990`) is correct. The second (~`:1435`, added 2026-09-20) states
+   `status … ('active','expired','completed')`, omits `pulses_used`, and invents `package_name`,
+   `purchase_date`, `expiry_date`, `services jsonb` — none of which are in any migration. The
+   `laser_pulse_logs` block (~`:1378`) likewise lists `additional_reason` and `session_date`; the
+   migration has `additional_pulses_reason`, `created_at`, `updated_at`. **Deduplicating and correcting
+   these two blocks is in scope** (rule: DB_SCHEMA.md is the single source of truth).
+5. **GET is blob-first and its primary query cannot see the columns.** `:129-137`'s select list is
+   `id, customer_id, package_id, status, purchased_at, expires_at, price_paid, packages(…),
+   customer_package_items(…)` — no `package_type`, no `total_pulses`, no `pulses_*`. `:140-150` prefers
+   `pulseStore[row.id]` and only then falls back to `(row as any).total_pulses`, which is always
+   `undefined` on this path. (The *secondary* fallback at `:189-193` does `select('*')`, so it reads
+   them — your fix must cover both branches.) Net: a real pulses package with no blob entry reports
+   `totalPulses: 0, remainingPulses: 0` today.
+6. **Idempotency lives inside the blob.** `:448-459` scans `usage_history[].booking_id`. Brief 35
+   plans to depend on it. It must survive this brief with the same response shape.
+7. **Fabricated totals — rule 1 violations, four sites not three.**
+   `customers/packages/route.ts:423-428` → `|| 10000`. `packages/sell/route.ts:302` →
+   `Number(pkg.total_pulses || 0) || Number(pkgMeta?.totalPulses || 0) || extractedPulsesFromName || 1000`
+   — **two** fabrications on one line, the name regex being `:192-205`. `src/app/api/packages/route.ts:191-203`
+   parses the package *name* (`/(\d+)\s*k\b/` × 1000). `DoctorOngoingSessionTab.tsx:631-641` parses the
+   name of `selectedNewPackageToBuy` (the **catalog** package, from `GET /api/packages` — not the
+   patient's `customer_packages` row) with a final `10000`. `AdminNewBookingView.tsx:1317` and `:2225`
+   have their own `|| 10000`.
+8. **`POST /api/packages/sell:343-366` writes the blob too** — and `tests/routes/packages-sell.test.ts:107`
+   asserts on it, so that test changes with you.
+9. **`/api/laser-pulses` is not a balance store** — verify and then leave it alone. It writes an audit
+   log three ways: local disk `data/laser_pulses.json` (`route.ts:59-66`, read-only on Vercel, RISK-086
+   precedent), `page_settings` key `laser_pulse_logs`, then `upsert` into the native table (`:122`).
+   Its `id` is `` `lpl-${Date.now()}-…` `` (`:243`) while `laser_pulse_logs.id` is `uuid` — so that
+   upsert fails 22P02 **every time** and is swallowed at `:125`. Assume the native table is empty.
+   **Report this; do not fix it here.**
+
+### Scope — each item labelled
+
+**(1) Usage table + atomic consume function — DELIBERATE FIX.**
+New `supabase/migrations/YYYYMMDDHHMMSS_package_pulse_balance_to_columns.sql`, idempotent
+(`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, `pg_constraint`-guarded constraints, per
+`20260920030000`'s shape):
+- `public.package_pulse_usage` — `id uuid pk default gen_random_uuid()`,
+  `customer_package_id uuid NOT NULL REFERENCES customer_packages(id) ON DELETE CASCADE`,
+  `reservation_id uuid REFERENCES reservations(id) ON DELETE SET NULL`, `quantity_used integer NOT NULL`,
+  `remaining_after integer NOT NULL`, `used_by text`, `treatment_area text`, `notes text`,
+  `created_at timestamptz NOT NULL DEFAULT now()`; index on `customer_package_id`; RLS enabled like its
+  neighbours; **`CREATE UNIQUE INDEX … ON package_pulse_usage (customer_package_id, reservation_id)
+  WHERE reservation_id IS NOT NULL`**. Do **not** reuse `laser_pulse_logs`: it is customer-scoped, has
+  no `customer_package_id`, no uniqueness, and per finding 9 is effectively never written.
+- `public.consume_package_pulses(p_customer_package_id uuid, p_qty integer, p_reservation_id uuid,
+  p_used_by text, p_treatment_area text, p_notes text)` — `plpgsql`, `SECURITY INVOKER` (the default — the route calls it with the service-role client, which needs no elevated rights), `SET search_path = public`, followed by `REVOKE ALL ON FUNCTION … FROM PUBLIC, anon, authenticated;` and `GRANT EXECUTE ON FUNCTION … TO service_role;`. **Why:** PostgREST exposes every function in `public` at `/rest/v1/rpc/…` to anyone holding the anon key, and that key ships in the browser bundle — without the REVOKE anyone could drain any patient's pulses. `public.next_invoice_no()` (`20260726010600`) is the shape precedent (plpgsql function called via `supabaseServer.rpc`) but it has **no** grants at all, which is harmless for a sequence and unacceptable here — do not copy that part. One transaction:
+  `SELECT … FROM customer_packages WHERE id = p_customer_package_id FOR UPDATE` (the row lock is what
+  makes concurrent consumes serialise — a bare `UPDATE … WHERE pulses_remaining > 0 RETURNING` is
+  atomic for the decrement but cannot carry the idempotency read and the usage insert in the same
+  statement); if a `package_pulse_usage` row already exists for `(id, reservation_id)` return it with
+  `already_deducted := true` and change nothing; else `v_consumed := least(p_qty, greatest(pulses_remaining, 0))`;
+  `UPDATE customer_packages SET pulses_used = pulses_used + v_consumed, pulses_remaining = greatest(0, pulses_remaining - v_consumed),
+  status = CASE WHEN pulses_remaining - v_consumed <= 0 THEN 'fully_used' ELSE status END`; insert the
+  usage row; `RETURN` `(consumed, requested, remaining, already_deducted, used_total, total_pulses)`.
+  **`'fully_used'`, never `'completed'`** — see finding 3. Raise (so the route can 400) on: package not
+  found, `expires_at < now()`, `pulses_remaining <= 0`, `total_pulses <= 0` (unknown total → error, not a
+  guess), `p_qty <= 0`. **Do not apply the migration** (`10-database.md`); say so in the report.
+
+**(2) Consume route on the RPC — DELIBERATE FIX, contract-preserving.**
+`customers/packages/route.ts`: delete `getPackagePulsesStore`/`savePackagePulsesStore` and every use.
+`action: 'consume_package_pulses' | 'deduct_pulses'` becomes one `supabaseServer.rpc('consume_package_pulses', …)`
+whose `{ data, error }` is **destructured and checked** — an error is a real HTTP error, never
+`success: true`. The response body keeps **exactly** today's keys: `success, consumed, requested,
+remainingPulses, alreadyDeducted, packagePulses` — and the 400s for `quantity_used <= 0` (`:396`),
+0 remaining (`:463-468`) and expired (`:416-421`). `packagePulses` is now built from the columns +
+the `package_pulse_usage` rows (`{ included_pulses, used_pulses, remaining_pulses, usage_history[] }`,
+same field names) so the 5 callers keep working untouched: `DoctorAccountView.tsx:1299/1369/1417`,
+`BookingDetailsModal.tsx:1291`, `admin/page.tsx:9580`. Non-UUID/synthetic ids must still 400 cleanly without a 22P02 (`:401`); the same applies to `booking_id` / `reservationId` when present but not a UUID — 400, never a 22P02 leaking from the RPC cast. `action: 'set_included_pulses'` writes `total_pulses`/`pulses_remaining` on
+the row instead of the blob. Delete the `|| 10000` at `:427`.
+
+**(3) GET reads the columns — DELIBERATE FIX.**
+Add `package_type, total_pulses, pulses_used, pulses_remaining` to the select at `:131-135`, drop
+`pulseStore` from both mapping branches, source `pulseUsageHistory` from `package_pulse_usage`
+(one batched query by `customer_package_id in (…)`). **Every response field name stays**: `packageType,
+totalPulses, includedPulses, usedPulses, pulsesRemaining, remainingPulses, pulseUsageHistory, items, …`.
+
+**(4) Sell route — DELIBERATE FIX.**
+`packages/sell/route.ts`: delete `:343-366` (the blob write). Keep the column writes at `:312-314`.
+Replace `:302` with: `packages.total_pulses` only. If a pulses-type package has `total_pulses <= 0`,
+**refuse** with a real 400 ("this package has no pulse quota configured — set Total Pulses in Admin →
+Packages") and write nothing — no name regex, no `1000`. Update `tests/routes/packages-sell.test.ts:107`
+to assert the `customer_packages` columns instead of the blob.
+
+**(5) Unknown total never becomes a number in the UI — DELIBERATE FIX.**
+`DoctorOngoingSessionTab.tsx:631-641`: `newPackageTotalPulses` comes from the catalog package's real
+`total_pulses` only; when it is 0/absent, block the 3A "buy new package" choice with "this package has
+no pulse quota configured — set it in Admin → Packages" and surface no number. Assuming Brief 34 has
+landed, the arithmetic now lives in `src/lib/laserDeficit.ts`: its `computeDeficitInvoiceImpact({ …,
+newPackagePrice })` gains no new input — what changes is the **source** feeding
+`newPackageTotalPulses` at the call site, which must be `number | null` and propagate `null` as a block,
+not a default. Also remove the `|| 10000` at `AdminNewBookingView.tsx:1317` and `:2225`, and the
+name-parse at `src/app/api/packages/route.ts:191-203` (return the real `total_pulses`, `0` if unset —
+the UI decides what to show).
+
+**(6) Backfill + docs — DELIBERATE FIX.**
+Second migration file, idempotent and safe when the blob row is absent, `NULL`, or malformed: for each `customer_packages` row that has a blob entry **and no `package_pulse_usage` rows yet** (i.e. not yet touched by the new code), set `total_pulses/pulses_used/pulses_remaining` from the blob **unconditionally — the blob wins** — set `status = 'fully_used'` when the blob's remaining is 0 (this also repairs rows the CHECK violation left `active`), and insert its `usage_history[]` into `package_pulse_usage` with `ON CONFLICT DO NOTHING`. **Why blob-wins, not "fill only zeros":** the blob is today's source of truth (GET is blob-first) and finding 3 means the native columns are stale *exactly for exhausted packages* — a fill-only-zeros rule would leave a depleted package showing its pre-depletion balance and hand out free pulses. **Why the "no usage rows yet" guard:** it makes the migration safe to re-run *before* the deploy and impossible to overwrite balances the new code has already moved. Anything unresolvable — no blob entry **and**
+`total_pulses = 0` on a `package_type='pulses'` row — is **listed via `RAISE NOTICE`**, one line per
+`customer_packages.id`, and left alone. **Never guess a total.** Do not delete the `page_settings` row
+(it is the rollback). Update both `customer_packages` blocks in `DB_SCHEMA.md` into one correct block
+(finding 4), fix the `laser_pulse_logs` block, and add `package_pulse_usage` — same commit.
+
+**After this brief, `grep -rn "customer_package_pulses" src/` must return nothing.** Only the two
+migrations and `ai_docs/*` may mention it. **Do not keep a transition-window dual write** — a second
+writer re-introduces exactly the race we are removing; the owner's ordering below makes it unnecessary.
+
+**(7) Depleted packages stop looking usable — DELIBERATE FIX.**
+Now that depletion actually persists as `'fully_used'`, check every `status === 'active'` filter reads
+correctly: `admin/page.tsx:537`, `:9254`, `:9574`; `AdminNewBookingView.tsx:702`;
+`CustomerProfileDrawer.tsx:1649`, `:1671`; `DoctorOngoingSessionTab.tsx:227-241`;
+`BookingDetailsModal.tsx:1283`; `DoctorAccountView.tsx:1356`. A `fully_used` package must not appear as
+selectable for redemption; it must still appear in history. **Also fix `src/app/api/packages/consume/route.ts:143`**,
+which writes the same illegal `'completed'` — that one line only, nothing else in that route.
+
+### Deliberately not in scope
+FEFO / draining several active packages (Brief D) — but `consume_package_pulses` takes **one**
+`customer_package_id` and must be safe to call in a loop, so FEFO is additive later, not a redesign.
+The checkout deficit prompt (Brief 35). The master per-pulse price (Brief C). The legacy
+`[Laser Settlement]` / `[Laser Package Redemption]` notes tags — keep writing them, unchanged.
+Migrating the doctor flow (Brief D). `/api/laser-pulses` (report only, finding 9).
+`src/lib/billing.ts`, `ledger.ts`, `wallet.ts`, `customerBalances.ts`.
+
+### Method
+One commit per numbered item, in order (1)→(7). (1) is additive SQL. (2)(3)(4) must be green
+(`npm run check`) before (5)(6)(7). Keep each diff to the lines the item names.
+
+### Verification
+`npm run check` green; `npx tsc --noEmit` and `npx eslint` output pasted. New
+`tests/routes/packages-consume-pulses-columns.test.ts` using `tests/helpers/supabaseFake.ts` with
+`fake.setRpc('consume_package_pulses', …)` (style: `tests/routes/reservations-patch.test.ts`).
+**Be honest: the fake cannot prove atomicity.** It *can* prove: the route calls the RPC and never
+touches `page_settings` (assert no `page_settings` read/write occurs); the response keys and values
+match the old contract in every branch; clamp (`consumed < requested`); exactly-equal; 0 remaining →
+400; expired → 400; `quantity_used <= 0` → 400; non-UUID id → 400, no 22P02; unknown id → 404/400;
+repeat call with the same `reservation_id` returns `alreadyDeducted: true` and does not deduct;
+depletion writes `'fully_used'`; unauthenticated → 401. Atomicity gets **two manual checks** instead:
+(a) fire two PATCHes for **different** patients simultaneously (e.g. two browser tabs, or two `curl`s
+backgrounded) and confirm both balances moved; (b) fire two PATCHes for the **same** reservation
+simultaneously and confirm exactly one usage row exists and the balance moved once. Plus an
+**SQL review checklist** in the PR: `FOR UPDATE` present; no `SECURITY DEFINER`; `REVOKE`/`GRANT` present, and calling `/rest/v1/rpc/consume_package_pulses` with the **anon** key is denied (test it); the unique index is partial on
+`reservation_id IS NOT NULL`; `least()` clamp; `greatest(0, …)`; status only ever `'fully_used'`;
+function idempotent to re-create; migration re-runnable.
+Browser click-path: Admin → Packages → create a pulses package with Total Pulses 10,000 → sell it to a
+test patient → Patient profile shows 10,000/10,000 → Doctor → active session → Option 3 → deliver 4,000
+→ profile shows 6,000 → reception Checkout the same booking (which consumes again on the same
+`booking_id`) → balance is **still** 6,000, one usage row → deliver 6,000 more → package reads 0 and its
+status is `fully_used`, and it no longer offers itself for redemption in New Booking or the doctor tab.
+Then: create a pulses package with Total Pulses left at 0 → selling it must refuse with a real error.
+
+### Report back
+Status of each of the 7 items separately. Which findings you confirmed, which were stale. **Both
+migrations are unapplied — say so**, and state the exact order the owner must run things:
+(i) apply migration 1 (table + function + columns), (ii) apply migration 2 (backfill) **immediately before the deploy, while reception is not checking out** — the old code keeps consuming into the blob until the deploy, and the backfill only sees what the blob holds at that moment — and read its NOTICE list, (iii) resolve every listed package by setting Total Pulses in Admin → Packages,
+(iv) **then** deploy the code — the new code reads columns only, so deploying before the backfill shows
+zero balances. Rollback: revert the deploy; the `page_settings` blob is untouched and the old code
+resumes from it; the new table and columns are harmless if left in place. List the NOTICE-able cases
+you could not resolve from code. The `grep -rn "customer_package_pulses" src/` output (must be empty).
+Every `status === 'active'` site you checked for item (7). Plus the standing convention: Dev Notes
+block, `ai_docs/manual_tests/LASER_PULSE_BALANCE_BRIEF_34B_MANUAL_TESTS.md` (follow
+`RISK_029_MANUAL_TESTS.md`: Evidence log table + `- [ ]` checks), and a new `RISKS.md` entry — next
+free id is **RISK-095** (RISK-094 is reserved by Brief 34; verify against `RISKS.md` before writing) —
+covering the cross-patient read-modify-write race, the invisible save failure, and the
+`status: 'completed'` CHECK violation, referencing that file.
+
+---
+
+> **Do not start Brief 35 until Briefs 34 and 34B have landed and been reviewed.** It depends on Brief 34's migration, `src/lib/laserDeficit.ts` and the per-pulse rate chain, and on Brief 34B's `package_pulse_usage` table and `consume_package_pulses` function — the new server operation must call that RPC, never write pulse balances itself.
 
 ## Brief 35 — Receptionist checkout: resolve the pulse deficit before taking money
 
-**Read first:** Brief 34 (this depends on its migration, `src/lib/laserDeficit.ts` and the rate chain
-— do not start until it has landed). Then DEC-069, DEC-072 item 5, DEC-075, and
+**Read first:** Briefs 34 and 34B (this depends on Brief 34's migration, `src/lib/laserDeficit.ts` and the rate chain, and on Brief 34B's `package_pulse_usage` table and `consume_package_pulses` function — the new server operation must call that RPC and never write pulse balances itself; do not start until both have landed). Then DEC-069, DEC-072 item 5, DEC-075, and
 `src/app/api/packages/sell/route.ts` end to end.
 
 **What this delivers.** At checkout, when a session's delivered laser pulses exceed the patient's
@@ -171,8 +375,7 @@ is never asked; the deficit is silently absorbed.
 1. **Checkout already consumes pulses, and already loses the deficit.**
    `src/app/admin/page.tsx:9547-9599` (inside `handleConfirmCheckout`, defined `:9509`, modal at
    `:9203`) resolves the patient's first active pulses package and PATCHes `consume_package_pulses`
-   for the full delivered count. The server clamps to the remaining balance (Brief 34, finding 1), the
-   response is discarded, and the excess is never billed. `BookingDetailsModal.tsx:1219-1311` does the
+   for the full delivered count. The server clamps to the remaining balance (Brief 34, finding 1), the response is discarded, and the excess is never billed. As of Brief 34B the clamp happens inside the Postgres function `public.consume_package_pulses`, not in the route; the response contract is unchanged. `BookingDetailsModal.tsx:1219-1311` does the
    same thing in the receptionist "end session" flow. **So "checkout only displays laser settlement"
    is wrong — it writes.** Both are silent-clamp sites; both must stop being silent.
 2. **The consume happens *after* the money PATCH.** `:9512-9524` writes
@@ -185,14 +388,12 @@ is never asked; the deficit is silently absorbed.
    re-resolves the package price server-side from the `packages` row (`:141`), writes
    `invoices` + `invoice_lines` + `customer_packages` (with `total_pulses`/`pulses_remaining`) +
    `payments` with the **real** `method` (`:387-392`) + customer balances, supports partial
-   `amountPaid`, and has rollback helpers at `:30-42`. Note its own `|| 1000` pulse fallback at `:302`
-   — report it, do not fix it here. Also note every current caller hardcodes `paymentMethod: "cash"`
+   `amountPaid`, and has rollback helpers at `:30-42`. Brief 34B removed that `|| 1000` pulse fallback: `/api/packages/sell` now refuses a pulses package whose `packages.total_pulses` is 0. The 3A path must surface that refusal to the receptionist, not retry. Also note every current caller hardcodes `paymentMethod: "cash"`
    (`DoctorAccountView.tsx:1287`, `:1405`, `BookingDetailsModal.tsx:1258`); the new path must pass what
    the receptionist actually collected.
 5. **Deficit is computed against ONE package.** `DoctorOngoingSessionTab.tsx:611` picks the
    doctor-selected package, defaulting to the first active pulses package returned by
-   `GET /api/customers/packages`; `page.tsx:9572` and `BookingDetailsModal.tsx:1282` both pick the
-   first active one with `remaining > 0`. There is no FIFO across several packages. **Follow the
+   `GET /api/customers/packages`; `page.tsx:9572` and `BookingDetailsModal.tsx:1282` both pick the first active one with `remaining > 0`. (Re-grep these line numbers after Brief 34B item (7) touches those filters; a depleted package is now `fully_used`, so "first active" and "first active with remaining > 0" finally agree.) There is no FIFO across several packages. **Follow the
    existing behaviour** (single package, explicitly chosen at checkout when there is more than one) and
    log the "should it drain all active packages first?" question as a decision for Mohamed.
 
@@ -209,9 +410,7 @@ deduct the deficit from the new package, or write a single `reservation_products
 rate from Brief 34's chain. Client sends no amounts. If the rate is unresolvable, refuse with a real
 error — no 1 EGP.
 
-**Idempotency, keyed by reservation.** The pulse store's `booking_id` guard
-(`customers/packages/route.ts:448-459`) protects the consume; it does **not** protect the invoice line
-or the package sale. Add a persisted, queryable marker: prefer a real column
+**Idempotency, keyed by reservation.** The consume is protected by `UNIQUE(customer_package_id, reservation_id)` on `package_pulse_usage` (Brief 34B): a repeat call returns the first result and deducts nothing. That guard still does **not** protect the invoice line or the package sale, so the reservation-level marker below is still required. Add a persisted, queryable marker: prefer a real column
 (`reservations.laser_deficit_resolution text` + `laser_deficit_pulses integer`, nullable, no default,
 idempotent migration + `DB_SCHEMA.md` in the same commit) over regex on `notes`. The existing
 `[Laser Settlement]` / `[Laser Package Redemption]` tags written by
@@ -220,7 +419,7 @@ fallback** for bookings created before this column exists, and say in the PR how
 the two. A second call for the same reservation returns the first result, changes nothing, and the UI
 says "already resolved".
 
-**Cases the design must state an answer for:** no active package at all (no deficit — this is the
+**Cases the design must state an answer for:** a package with an unknown total (`total_pulses = 0`) — refuse with Brief 34B's error, never compute a deficit against a guessed total; no active package at all (no deficit — this is the
 "initial purchase" path, out of scope, must not prompt); exactly-equal balance (no deficit, no
 prompt); multiple active packages (receptionist picks; default = the one the doctor used, read from
 the marker); expired package (`route.ts:416-421` refuses — surface it, do not silently skip);
@@ -242,7 +441,7 @@ checkout). Do not restructure either file.
 ### Deliberately not in scope
 Migrating the doctor flow (`DoctorAccountView.tsx:1392-1479`) onto the new server operation —
 **recommended as the next brief**, but not here; after Brief 35 the doctor path stays as Brief 34 left
-it, and the marker keeps the two from double-billing. FIFO across packages. The master-rate decision
+it, and the marker keeps the two from double-billing. FEFO (earliest-expiry-first) across packages — Brief D. The master-rate decision
 (future Brief C). `src/lib/billing.ts`, `ledger.ts`, `wallet.ts`, `customerBalances.ts`,
 `computeSettledBalances()`.
 
@@ -269,18 +468,22 @@ server-operation + marker design, and a `RISKS.md` entry for anything you found 
 
 ### Queued, not yet written
 
-- **Brief C — master per-pulse price location** (device vs service vs clinic default). Product decision pending. Briefs 34/35 resolve the rate only through the fallback chain (reservation snapshot → clinic default → error) so they stay valid whichever is chosen.
-- **Brief D — migrate the doctor deficit flow** (`DoctorAccountView.tsx` 3A/3B) onto Brief 35's server operation, so both paths share one idempotent implementation.
+- **Brief C — master per-pulse price location** (device vs service vs clinic default). Product decision pending. Briefs 34/34B/35 resolve the rate only through the fallback chain (reservation snapshot → clinic default → error) so they stay valid whichever is chosen.
+- **Brief D — unify the doctor and checkout deficit paths, and add FEFO.** Migrate `DoctorAccountView.tsx`'s 3A/3B onto Brief 35's server operation, **and** extend that operation to drain **all** of a patient's active pulses packages, earliest expiry first, calling Brief 34B's `consume_package_pulses` once per package in a loop. Doctor and checkout must get FEFO in the same brief — shipping it to one path only re-creates the divergence Brief D exists to remove.
 - Translation of the Pages Settings tabs extracted in Brief 27 is also an obvious next brief, not yet written.
 
-### Open decisions for Mohamed (do NOT decide these in code)
+### Decisions log for Mohamed
 
+**Decided:**
+- FEFO across active packages, earliest expiry first → **Brief D**, applied to the doctor and checkout paths together. Briefs 34B/35 stay single-package.
+- Move the pulse balance off the `page_settings` blob → **Brief 34B**.
+- Package total pulses come from the real `total_pulses` column only; unknown is an error the user resolves in Admin → Packages, never a guess → **Brief 34B** items (4)/(5).
+- Keep writing the legacy `[Laser Settlement]` / `[Laser Package Redemption]` notes tags, but stop depending on them for reads once Brief 35's marker column exists.
+
+**Still open (do NOT decide these in code):**
 1. Where the master per-pulse price lives (Brief C).
-2. Should a deficit drain *all* active pulses packages (FIFO) or only the selected one? Today: one package.
-3. `customer_packages` pulse balance lives primarily in the `page_settings` JSON blob (`customer_package_pulses`), not the real columns — migrate off it, or accept? (Brief 34 records it as a RISK and leaves it.)
-4. Package total-pulses is parsed from the package *name* with a `10000` fallback (`DoctorOngoingSessionTab.tsx:631-641`) — how should it be fixed?
-5. Once a real marker column exists, keep writing the legacy `[Laser Settlement]` notes tags or stop?
-
+2. `packages.total_pulses` is `NOT NULL DEFAULT 0`, so "unset" and "zero" are indistinguishable. Brief 34B assumes 0 = unset and refuses. Confirm no legitimate zero-quota pulses package exists.
+3. The live DB cannot be inspected from code: `DB_SCHEMA.md` had a duplicate, wrong `customer_packages` block (columns no migration creates). Brief 34B assumes the migrations are right and the doc was wrong; if the live DB was hand-edited the backfill changes.
 ---
 ---
 
