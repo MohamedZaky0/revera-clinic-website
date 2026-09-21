@@ -43,7 +43,7 @@ export interface AdditionalServiceItem {
 
 interface DoctorOngoingSessionTabProps {
   activeSessionBooking: any;
-  handleCompleteTreatment: (booking: any, totalPulses?: number, laserData?: any) => void;
+  handleCompleteTreatment: (booking: any, totalPulses?: number, laserData?: any) => Promise<void>;
   medicalRecord: any;
   medicalRecordLoading: boolean;
   showMedicalForm: boolean;
@@ -778,7 +778,7 @@ export default function DoctorOngoingSessionTab({
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   if (isFirstVisit && !medicalRecord) {
                     alert("Cannot complete treatment: Medical record intake is strictly required for first-visit patients. Please complete and save the intake form before ending the session.");
                     setShowMedicalForm(true);
@@ -841,7 +841,7 @@ export default function DoctorOngoingSessionTab({
                     newPackageTotalPulses: newPackageTotalPulses
                   };
 
-                  handleCompleteTreatment(activeSessionBooking, totalSessionPulses, laserPulseData);
+                  await handleCompleteTreatment(activeSessionBooking, totalSessionPulses, laserPulseData);
                 }}
                 className={`w-full sm:w-auto justify-center flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition cursor-pointer shadow-md ${
                   isFirstVisit && !medicalRecord
