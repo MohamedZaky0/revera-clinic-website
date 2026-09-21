@@ -22,6 +22,7 @@
 | 2026-09-21 | Same flow after the invoice-status fix | `ZZTEST3` (…0003) | Sale 201, booking created, note has `[Customer Package ID]`. Patient package: `pulses v2`, total 10,000, remaining 10,000, used 0, active, paid 1,000; patient `spent` 1,000. | PASS |
 | 2026-09-21 | Issue 2 — session on the just-bought package | `ZZTEST3` | Check In → Start Session → End Session, Delivered Pulses **2,500**: package **10,000 → 7,500**, history `2500→7500`, booking completed, 0 outstanding. | PASS |
 | 2026-09-21 | Issue 2 — existing package, new "Pay via Package" booking (the reported scenario) | `ZZTEST3` | Booking note `[Laser Package Redemption]: pulses v2 (7,500 pulses remaining)` (no Customer Package ID, so completion must use the `?customerId=` lookup). Session with **2,500** pulses: **7,500 → 5,000**, history `2500→5000`, `2500→7500` (deducted once per session), booking completed, 0 EGP charged. | PASS |
+| 2026-09-21 | Issue 1 — EXISTING patient with no package buys a package in New Booking | `ZZTEST4` (…0004), driven by a Haiku subagent, then re-checked directly against the API by the lead | Step 1: plain Option 1 booking created the patient (0 packages). Step 2: same phone → "Patient found", Option 3, `pulses v2` (1,000 EGP): `POST /api/packages/sell` **201**, **no** new `POST /api/customers`. API: one package `pulses v2`, total 10,000 / remaining 10,000 / used 0 / active / paid 1,000; booking approved, paid 1,000, note has `[Customer Package ID]`. Only ZZTEST4 was created. | PASS |
 
 ## Per-check list
 
@@ -47,12 +48,12 @@
 ### The two reported end-to-end issues
 
 - [x] **Issue 1 — a package bought during New Booking appears under the patient's Purchased Packages.** Brand-new patient → Option 3 → buy `pulses v2` → confirm; the package is listed (10,000 / active / 1,000 paid) and the booking note carries its ID. — Verified 2026-09-21 after RISK-092/093 (the original cause was those two, **not** the `customerId` param).
-- [ ] **Issue 1, existing patient** (has a patient record but no package): same flow, confirm the package is credited. Not run separately — the code path is the same sale call, but it skips the customer-create step.
+- [x] **Issue 1, existing patient** (has a patient record but no package): same flow, the package is credited. — Verified 2026-09-21 (`ZZTEST4`), no extra `POST /api/customers`, see Evidence log.
 - [ ] **Issue 1, Checkout variant — doctor portal.** In the doctor session screen, switch a no-package patient to Option 3, pick a package to buy, end the session, confirm the package appears in the profile. Needs a doctor login; not run. It uses the same `/api/packages/sell` route fixed in RISK-092.
 - [x] **Issue 2 — pulses used in a package-paid session are deducted.** Patient with an active package, "Pay via Package", session with 2,500 pulses → balance drops by exactly 2,500. — Verified 2026-09-21 (10,000 → 7,500, then 7,500 → 5,000).
 - [x] The deduction happens **once**: each session added exactly one history entry.
-- [ ] Public-site patient booking that buys a package: not covered here.
+- [x] Public-site patient booking that buys a package: **N/A** — the public flow (`src/components/BookingModal.tsx`) contains no package code at all, so there is nothing to test.
 
 ### Test data left in the dev database (2026-09-21)
 
-The three test patients (`ZZTEST`, `ZZTEST2`, `ZZTEST3` PulsePatient — phones 01099990001/2/3) were **deactivated** (soft delete) and the 3 test reservations were deleted. Not removable through the API (ledger rows): the invoice(s) written by the package sale and by the two session checkouts, with their invoice lines and payments (the single 1,000 EGP package payment) — exact row counts not checked, the matching `transactions` rows, the `ZZTEST3` `customer_packages` row (`pulses v2`, now 5,000 remaining) with its pulse-usage history, and a `customer_package_pulses` entry in `page_settings`. Remove them in Supabase if a clean dev DB is wanted.
+The four test patients (`ZZTEST`, `ZZTEST2`, `ZZTEST3`, `ZZTEST4` PulsePatient — phones 01099990001/2/3/4) were **deactivated** (soft delete) and all 5 test reservations were deleted by exact ID. Not removable through the API (ledger rows): the invoice(s) written by the package sale and by the two session checkouts, with their invoice lines and payments (the single 1,000 EGP package payment) — exact row counts not checked, the matching `transactions` rows, the `ZZTEST3` `customer_packages` row (`pulses v2`, now 5,000 remaining) with its pulse-usage history and the `ZZTEST4` `customer_packages` row (`pulses v2`, 10,000 remaining, 1,000 EGP paid), and a `customer_package_pulses` entry in `page_settings`. Remove them in Supabase if a clean dev DB is wanted.
