@@ -102,7 +102,7 @@ describe('checkout — handleCompleteTreatment', () => {
     await user.click(await screen.findByText('Complete Treatment'));
 
     await waitFor(() => expect(fetchFake.calls.some((c) => c.method === 'PATCH' && c.path === '/api/reservations')).toBe(true));
-    expect(alertSpy).toHaveBeenCalledWith('Session completed successfully! Product stock & device pulses deducted.');
+    expect(alertSpy).toHaveBeenCalledWith('Session completed successfully! Laser pulses, products & charges recorded.');
   });
 
   it('shows the server error instead of a false success alert when the completion PATCH fails', async () => {

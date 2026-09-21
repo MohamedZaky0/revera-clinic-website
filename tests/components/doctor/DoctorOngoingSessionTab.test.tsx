@@ -22,6 +22,14 @@ const fetchFake = createFetchFake();
 
 beforeEach(() => {
   fetchFake.reset();
+  // Requests the tab fires on mount for every session. Registering them (with empty, realistic
+  // payloads) keeps the output clean while an UNEXPECTED request still throws loudly — see
+  // fetchFake.ts on why silently-unmatched routes are the failure mode to avoid.
+  fetchFake.on('GET', '/api/packages', () => ({ status: 200, body: [] }));
+  fetchFake.on('GET', '/api/customers/packages', () => ({ status: 200, body: { packages: [] } }));
+  fetchFake.on('GET', '/api/page-settings', () => ({ status: 200, body: {} }));
+  fetchFake.on('GET', '/api/prescriptions', () => ({ status: 200, body: [] }));
+  fetchFake.on('GET', '/api/medical-records/templates', () => ({ status: 200, body: { templates: [] } }));
   vi.stubGlobal('fetch', fetchFake.fetch);
 });
 
@@ -132,68 +140,44 @@ describe('session state switching', () => {
   });
 });
 
-describe('additional services — money math', () => {
-  it('fetches the linked device and default pulses for the selected service, then adding it uses that default', async () => {
-    fetchFake.on('GET', '/api/service-devices', (call) => {
-      expect(call.query.get('serviceId')).toBe('srv-2');
-      return { status: 200, body: { deviceLinks: [{ device_id: 'dev-1', pulses_per_session: 250 }] } };
-    });
-    const user = userEvent.setup();
-    render(<DoctorOngoingSessionTab {...baseProps()} />);
-
+describe('additional services + laser extra pulses — money math', () => {
+  // The old per-service "Pulses (e.g. 150)" input and its /api/service-devices lookup were removed
+  // when pulse intake was isolated to the laser section (DEC-062/069). An added service now carries
+  // only a name and a price; pulses are entered once, in the laser panel, and priced by laserMode.
+  async function addSecondService(user: ReturnType<typeof userEvent.setup>) {
     const panel = additionalServicesPanel();
     const [serviceSelect] = within(panel).getAllByRole('combobox');
     await user.selectOptions(serviceSelect, 'srv-2');
-
-    await waitFor(() => expect(fetchFake.calls.some((c) => c.path === '/api/service-devices')).toBe(true));
-    await waitFor(() => expect(within(panel).getByPlaceholderText('Pulses (e.g. 150)')).toHaveValue(250));
-
     await user.click(within(panel).getByRole('button', { name: /addAdditionalServiceBtn/ }));
+  }
+
+  // Standard Pulses / Additional Qty / Price Per Pulse / Reason are all plain inputs whose value
+  // starts at 0 or "", so typing would append — fireEvent.change sets the value outright.
+  function enableChargedPulses(qty: number, unitPrice: number, reason?: string) {
+    fireEvent.click(screen.getByLabelText(/Add Additional Charged Pulses/));
+    fireEvent.change(screen.getByPlaceholderText('e.g. 100'), { target: { value: String(qty) } });
+    fireEvent.change(screen.getByPlaceholderText('5'), { target: { value: String(unitPrice) } });
+    if (reason) {
+      fireEvent.change(screen.getByPlaceholderText(/Extended session for high hair density/), { target: { value: reason } });
+    }
+  }
+
+  it('adding a service adds its price to the final total, and the line item and breakdown agree', async () => {
+    const user = userEvent.setup();
+    render(<DoctorOngoingSessionTab {...baseProps()} />);
+    await addSecondService(user);
 
     // "+300 EGP" appears twice by design: the added line item, and the additionalServicesSubtotal
     // in the breakdown summary — both must agree.
     expect(screen.getAllByText('+300 EGP')).toHaveLength(2);
-    // finalSessionTotal = baseBookingPrice(800) + additionalServicesSubtotal(300) + productsSubtotal(0) + extraPulsesSubtotal(0)
+    // finalSessionTotal = base(800) + additionalServicesSubtotal(300) + products(0) + laser extra(0)
     expect(screen.getByText('1100 EGP')).toBeInTheDocument();
   });
 
-  it('defaults pulses to 100 when the selected service has no linked device', async () => {
-    fetchFake.on('GET', '/api/service-devices', () => ({ status: 200, body: { deviceLinks: [] } }));
-    const user = userEvent.setup();
-    render(<DoctorOngoingSessionTab {...baseProps()} />);
-
-    const panel = additionalServicesPanel();
-    const [serviceSelect] = within(panel).getAllByRole('combobox');
-    await user.selectOptions(serviceSelect, 'srv-2');
-
-    await waitFor(() => expect(within(panel).getByPlaceholderText('Pulses (e.g. 150)')).toHaveValue(100));
-  });
-
-  it('a manual negative pulses override is clamped to zero, not sent as a negative charge', async () => {
-    fetchFake.on('GET', '/api/service-devices', () => ({ status: 200, body: { deviceLinks: [] } }));
-    const user = userEvent.setup();
-    render(<DoctorOngoingSessionTab {...baseProps()} />);
-
-    const panel = additionalServicesPanel();
-    const [serviceSelect] = within(panel).getAllByRole('combobox');
-    await user.selectOptions(serviceSelect, 'srv-2');
-    await waitFor(() => expect(within(panel).getByPlaceholderText('Pulses (e.g. 150)')).toHaveValue(100));
-
-    const pulsesInput = within(panel).getByPlaceholderText('Pulses (e.g. 150)');
-    fireEvent.change(pulsesInput, { target: { value: '-50' } });
-    expect(pulsesInput).toHaveValue(0);
-  });
-
   it('removing an added service subtracts it back out of the final total', async () => {
-    fetchFake.on('GET', '/api/service-devices', () => ({ status: 200, body: { deviceLinks: [] } }));
     const user = userEvent.setup();
     render(<DoctorOngoingSessionTab {...baseProps()} />);
-
-    const panel = additionalServicesPanel();
-    const [serviceSelect] = within(panel).getAllByRole('combobox');
-    await user.selectOptions(serviceSelect, 'srv-2');
-    await waitFor(() => expect(within(panel).getByPlaceholderText('Pulses (e.g. 150)')).toHaveValue(100));
-    await user.click(within(panel).getByRole('button', { name: /addAdditionalServiceBtn/ }));
+    await addSecondService(user);
     expect(screen.getByText('1100 EGP')).toBeInTheDocument();
 
     // The remove button is icon-only with no accessible name, so it's found by scoping to the
@@ -207,31 +191,64 @@ describe('additional services — money math', () => {
     expect(within(finalRow).getByText('800 EGP')).toBeInTheDocument();
   });
 
-  it('completing treatment passes the sum of extra pulses and every added service pulses to the parent handler', async () => {
-    fetchFake.on('GET', '/api/service-devices', () => ({ status: 200, body: { deviceLinks: [{ device_id: 'dev-1', pulses_per_session: 40 }] } }));
+  it('includes the products subtotal passed in from the parent in the final invoice total', () => {
+    render(<DoctorOngoingSessionTab {...baseProps({ productsSubtotal: 150 })} />);
+    // finalSessionTotal = 800 (base) + 0 (no additional services) + 150 (products)
+    expect(screen.getByText('950 EGP')).toBeInTheDocument();
+  });
+
+  it('charges additional pulses (qty × price per pulse) on top of the fixed service price', () => {
+    render(<DoctorOngoingSessionTab {...baseProps({ productsSubtotal: 150 })} />);
+    enableChargedPulses(20, 5, 'High hair density');
+    // 800 (fixed service) + 150 (products) + 20 × 5 (additional charged pulses)
+    expect(screen.getByText('1050 EGP')).toBeInTheDocument();
+  });
+
+  it('completing treatment passes standard + charged additional pulses and the laser charge to the parent handler', async () => {
     const handleCompleteTreatment = vi.fn();
     const user = userEvent.setup();
     // This test is about the pulse-sum math, not the first-visit medical-intake guard (4acad04) —
     // a truthy medicalRecord keeps that unrelated guard out of the way, same as a returning
     // patient with intake already on file.
-    render(<DoctorOngoingSessionTab {...baseProps({ handleCompleteTreatment, extraPulsesCount: 60, medicalRecord: { id: 'mr-1' } })} />);
+    render(<DoctorOngoingSessionTab {...baseProps({ handleCompleteTreatment, medicalRecord: { id: 'mr-1' } })} />);
 
-    const panel = additionalServicesPanel();
-    const [serviceSelect] = within(panel).getAllByRole('combobox');
-    await user.selectOptions(serviceSelect, 'srv-2');
-    await waitFor(() => expect(within(panel).getByPlaceholderText('Pulses (e.g. 150)')).toHaveValue(40));
-    await user.click(within(panel).getByRole('button', { name: /addAdditionalServiceBtn/ }));
-
+    fireEvent.change(screen.getByPlaceholderText('Pulses'), { target: { value: '40' } });
+    enableChargedPulses(60, 5, 'Extended session');
     await user.click(screen.getByText('completeTreatmentBtn'));
 
-    // totalSessionPulses = extraPulsesCount(60) + additionalPulsesTotal(40) = 100
-    expect(handleCompleteTreatment).toHaveBeenCalledWith(expect.objectContaining({ id: 'res-1' }), 100);
+    // totalSessionPulses = standard(40) + additional(60) = 100
+    expect(handleCompleteTreatment).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'res-1' }),
+      100,
+      expect.objectContaining({
+        pulseType: 'SERVICE',
+        pulsesUsed: 40,
+        additionalPulses: 60,
+        pulseValue: 5,
+        additionalCharge: 300,
+        additionalReason: 'Extended session',
+      })
+    );
   });
 
-  it('includes products and extra-pulses subtotals passed in from the parent in the final invoice total', () => {
-    render(<DoctorOngoingSessionTab {...baseProps({ productsSubtotal: 150, extraPulsesSubtotal: 200 })} />);
-    // finalSessionTotal = 800 (base) + 0 (no additional services) + 150 (products) + 200 (extra pulses)
-    expect(screen.getByText('1150 EGP')).toBeInTheDocument();
+  it('refuses to complete while a charged additional-pulse line has no reason', async () => {
+    const handleCompleteTreatment = vi.fn();
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(<DoctorOngoingSessionTab {...baseProps({ handleCompleteTreatment, medicalRecord: { id: 'mr-1' } })} />);
+
+    enableChargedPulses(60, 5); // no reason
+    await user.click(screen.getByText('completeTreatmentBtn'));
+
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('reason'));
+    expect(handleCompleteTreatment).not.toHaveBeenCalled();
+  });
+
+  it('a negative Standard Pulses entry is clamped to zero, not carried into the total', () => {
+    render(<DoctorOngoingSessionTab {...baseProps()} />);
+    const pulsesInput = screen.getByPlaceholderText('Pulses');
+    fireEvent.change(pulsesInput, { target: { value: '-50' } });
+    expect(pulsesInput).toHaveValue(0);
   });
 });
 
