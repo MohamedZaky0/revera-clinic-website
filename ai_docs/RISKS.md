@@ -4255,6 +4255,34 @@ login); it shares the `/api/packages/sell` route fixed in RISK-092.
 
 ---
 
+## RISK-094: Laser Package Deficit Settlement Had No Safety Net and Could Bill an Unsold Package (PARTIALLY RESOLVED)
+
+**Severity:** Critical (P0) · **Type:** Money / data integrity / concurrency
+**Found:** 2026-09-21, Brief 34 investigation. **Safety-net fixes completed 2026-09-21; the shared pulse-store race remains open for Brief 34B.**
+
+**What was confirmed:**
+1. `PATCH /api/customers/packages` correctly clamps a request to the package's remaining pulses and returns both `consumed` and `requested`, with booking-keyed idempotency. Its primary balance and idempotency store is nevertheless the single `page_settings` row `customer_package_pulses`; concurrent read-modify-write requests can overwrite one another, and the native `customer_packages` sync is best-effort. Brief 34 deliberately did not move this store.
+2. Choice 3A in `DoctorAccountView.tsx` consumed the old package before selling the replacement package, ignored failed sale/deduction responses, still wrote a full-price `New Package:` line, and then completed the session. A patient could therefore be billed for a package that was never sold while the pulse deficit remained unresolved.
+3. Reservation laser snapshot fields were referenced before any migration documented them. The 42703 compatibility retry silently stripped real columns alongside missing ones and returned an apparently successful reservation.
+4. Six money-path rate calculations silently substituted 1 EGP per pulse. Package consumption also invented a 10,000-pulse quota for unknown or unconfigured package rows.
+
+**Safety-net fix:**
+- Added the unapplied, idempotent migration `20260921000000_add_laser_settlement_columns_to_reservations.sql` and matching `DB_SCHEMA.md` entries for nullable `laser_payment_mode`, `laser_price_per_pulse`, and `delivered_pulses`, with no historical defaults.
+- The 42703 compatibility path now logs and returns its exact `droppedColumns`; the doctor completion payload no longer sends nonexistent `reservations.price` / `total_price` keys.
+- Added route tests for package clamping, validation, synthetic IDs, expiry, authentication, unknown UUIDs, and booking idempotency, plus pure deficit/rate tests.
+- Choice 3A now runs sale → new-package deficit deduction → invoice line → old-package deduction → completion. Every required response is checked; a failure keeps the session open and reports which irreversible steps already occurred.
+- Per-pulse rates now resolve only through reservation snapshot → Booking Settings `booking.defaultPricePerPulse` → legacy notes regex. An unresolved rate returns/alerts a real configuration error and writes no per-pulse line. Unknown package quotas are rejected instead of becoming 10,000.
+
+**Still open, deliberately not fixed here:**
+- The cross-patient lost-update race in the shared `page_settings.customer_package_pulses` blob; queued Brief 34B moves the balance and idempotency guard to relational storage.
+- `DoctorOngoingSessionTab.tsx` still derives a missing catalog package quota from its name and falls back to 10,000; resolving unknown totals needs the queued product decision.
+- `totalLaserDeliveredPulses` counts only laser additional services while `totalSessionPulses` counts pulse values from all additional services, so package and device deductions can disagree.
+- The master per-pulse price location remains undecided; the implemented chain does not presume device vs service vs clinic ownership.
+
+**Manual test checklist:** `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_34_MANUAL_TESTS.md`
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:
