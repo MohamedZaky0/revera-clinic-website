@@ -19,6 +19,7 @@ import UserProfileView, { UserProfileViewTranslations } from "./UserProfileView"
 import DoctorSessionDrawer from "./doctor/modals/DoctorSessionDrawer";
 import DoctorPatientHistoryDrawer from "./doctor/modals/DoctorPatientHistoryDrawer";
 import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
+import { resolveLaserPulseRate } from "@/lib/laserRate";
 
 // Local Date Helper to avoid UTC conversion shifts
 const getLocalDateString = (d: Date = new Date()): string => {
@@ -506,7 +507,7 @@ export default function DoctorAccountView({
   const fetchDoctorReservations = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      let queryUrl = "/api/reservations?limit=250";
+      const queryUrl = "/api/reservations?limit=250";
       const headers = await getAuthHeaders();
       const res = await fetch(queryUrl, { headers });
       if (res.ok) {
@@ -1150,6 +1151,23 @@ export default function DoctorAccountView({
       return;
     }
 
+    const requiresPerPulseRate = laserData?.pulseType === "PER_PULSE" ||
+      targetBooking.laser_payment_mode === "PER_PULSE" ||
+      targetBooking.laserPaymentMode === "PER_PULSE" || (
+      laserData?.pulseType === "PACKAGE" &&
+      Number(laserData?.deficitPulses || 0) > 0 &&
+      laserData?.spilloverChoice === "PAY_PER_PULSE"
+    );
+    const resolvedDoctorPulseRate = resolveLaserPulseRate({
+      reservationRate: targetBooking.laser_price_per_pulse ?? targetBooking.laserPricePerPulse,
+      clinicDefaultRate: laserData?.pulseValue,
+      notes: targetBooking.notes,
+    });
+    if (requiresPerPulseRate && resolvedDoctorPulseRate === null) {
+      alert("Per-pulse rate not configured — set it in Booking Settings.");
+      return;
+    }
+
     // 2. Deduct Used Products from Inventory Stock DB via /api/inventory/products/sales
     if (usedProducts && usedProducts.length > 0) {
       try {
@@ -1206,6 +1224,8 @@ export default function DoctorAccountView({
 
     // 4. Laser Pulse Counter Engine: 3 Modes (SERVICE, PER_PULSE, PACKAGE) & Deficit Spillover Engine
     let effectiveLaserSessionCharge = 0;
+    let completedPackageSettlement: { oldPackagePulses: number; newPackagePulses: number } | null = null;
+    let abortOnLaserError = false;
     if (laserData) {
       try {
         const headers = await getAuthHeaders();
@@ -1343,6 +1363,8 @@ export default function DoctorAccountView({
               pulsesUsed
             ) : pulsesUsed;
             const pulsesToDeductFromActivePkg = Math.min(availablePkgPulses > 0 ? availablePkgPulses : pulsesUsed, pulsesUsed);
+            const deficitPulses = Number(laserData.deficitPulses || 0);
+            const isBuyNewPackageDeficit = deficitPulses > 0 && laserData.spilloverChoice === "BUY_NEW_PACKAGE" && laserData.newPackageToBuy;
 
             // Resolve target pulses package ID from multiple sources to guarantee deduction
             let targetPkgId = laserData.sourceId || targetBooking?.packageId || targetBooking?.package_id || (targetBooking as any)?.packageId || null;
@@ -1363,8 +1385,8 @@ export default function DoctorAccountView({
               }
             }
 
-            // Deduct available pulses from current active package
-            if (targetPkgId && pulsesToDeductFromActivePkg > 0) {
+            // Choice 3A settles the new package first, so the old balance remains retryable if the sale fails.
+            if (!isBuyNewPackageDeficit && targetPkgId && pulsesToDeductFromActivePkg > 0) {
               try {
                 await fetch("/api/customers/packages", {
                   method: "PATCH",
@@ -1388,71 +1410,100 @@ export default function DoctorAccountView({
             }
 
             // Handle package deficit (Delivered Pulses > Package Balance)
-            const deficitPulses = Number(laserData.deficitPulses || 0);
             if (deficitPulses > 0) {
-              if (laserData.spilloverChoice === "BUY_NEW_PACKAGE" && laserData.newPackageToBuy) {
+              if (isBuyNewPackageDeficit) {
+                abortOnLaserError = true;
                 const newPkgPrice = Number(laserData.newPackageToBuy.price || 0);
                 effectiveLaserSessionCharge = newPkgPrice;
 
-                try {
-                  // 1. Sell new package to patient
-                  const sellRes = await fetch("/api/packages/sell", {
-                    method: "POST",
-                    headers,
-                    body: JSON.stringify({
-                      customerId: custId,
-                      packageId: laserData.newPackageToBuy.id,
-                      paymentMethod: "cash"
-                    })
-                  });
-
-                  let newCustPkgId: string | null = null;
-                  if (sellRes.ok) {
-                    const sellData = await sellRes.json().catch(() => null);
-                    newCustPkgId = sellData?.customerPackage?.id || null;
-                  }
-
-                  // 2. Deduct deficit pulses from the new package!
-                  if (newCustPkgId && deficitPulses > 0) {
-                    await fetch("/api/customers/packages", {
-                      method: "PATCH",
-                      headers,
-                      body: JSON.stringify({
-                        action: "consume_package_pulses",
-                        customer_package_id: newCustPkgId,
-                        package_id: newCustPkgId,
-                        quantity_used: deficitPulses,
-                        pulses: deficitPulses,
-                        booking_id: bookingTargetId,
-                        reservationId: bookingTargetId,
-                        treatment_area: laserData.treatmentArea,
-                        used_by: doctorName || "Doctor",
-                        notes: `Deficit spillover deduction from new package (${deficitPulses} pulses deducted)`
-                      })
-                    });
-                  }
-
-                  // 3. Add line item to session invoice
-                  await fetch("/api/reservation-products", {
-                    method: "POST",
-                    headers,
-                    body: JSON.stringify({
-                      reservationId: bookingTargetId,
-                      lineType: "product",
-                      description: `New Package: ${laserData.newPackageToBuy.name || laserData.newPackageToBuy.title || "Laser Package"}`,
-                      productName: `New Package: ${laserData.newPackageToBuy.name || laserData.newPackageToBuy.title || "Laser Package"}`,
-                      qty: 1,
-                      quantity: 1,
-                      unitPrice: newPkgPrice,
-                      totalPrice: newPkgPrice,
-                      addedByRole: "doctor_session"
-                    })
-                  });
-                } catch (e) {
-                  console.error("Error selling new package for deficit resolution:", e);
+                if (pulsesToDeductFromActivePkg > 0 && !targetPkgId) {
+                  throw new Error("Cannot resolve the existing package. Nothing was charged and the session was not completed.");
                 }
+
+                const sellRes = await fetch("/api/packages/sell", {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify({
+                    customerId: custId,
+                    packageId: laserData.newPackageToBuy.id,
+                    paymentMethod: "cash"
+                  })
+                });
+                const sellData = await sellRes.json().catch(() => null);
+                if (!sellRes.ok) {
+                  throw new Error(`${sellData?.error || sellData?.message || "Failed to sell the new package."} Nothing was charged and the session was not completed.`);
+                }
+                const newCustPkgId = sellData?.customerPackage?.id;
+                if (!newCustPkgId) {
+                  throw new Error("The package sale returned no customer package. Nothing was charged and the session was not completed.");
+                }
+
+                const deficitRes = await fetch("/api/customers/packages", {
+                  method: "PATCH",
+                  headers,
+                  body: JSON.stringify({
+                    action: "consume_package_pulses",
+                    customer_package_id: newCustPkgId,
+                    package_id: newCustPkgId,
+                    quantity_used: deficitPulses,
+                    pulses: deficitPulses,
+                    booking_id: bookingTargetId,
+                    reservationId: bookingTargetId,
+                    treatment_area: laserData.treatmentArea,
+                    used_by: doctorName || "Doctor",
+                    notes: `Deficit spillover deduction from new package (${deficitPulses} pulses deducted)`
+                  })
+                });
+                const deficitData = await deficitRes.json().catch(() => null);
+                if (!deficitRes.ok || Number(deficitData?.consumed) < deficitPulses) {
+                  throw new Error(`The new package was sold, but the ${deficitPulses}-pulse deficit was not fully deducted. The old package was not consumed and the session was not completed.`);
+                }
+
+                const lineRes = await fetch("/api/reservation-products", {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify({
+                    reservationId: bookingTargetId,
+                    lineType: "product",
+                    description: `New Package: ${laserData.newPackageToBuy.name || laserData.newPackageToBuy.title || "Laser Package"}`,
+                    productName: `New Package: ${laserData.newPackageToBuy.name || laserData.newPackageToBuy.title || "Laser Package"}`,
+                    qty: 1,
+                    quantity: 1,
+                    unitPrice: newPkgPrice,
+                    totalPrice: newPkgPrice,
+                    addedByRole: "doctor_session"
+                  })
+                });
+                if (!lineRes.ok) {
+                  throw new Error(`The new package was sold and ${deficitPulses} deficit pulses were deducted, but its session invoice line was not saved. The old package was not consumed and the session was not completed.`);
+                }
+
+                if (targetPkgId && pulsesToDeductFromActivePkg > 0) {
+                  const oldPackageRes = await fetch("/api/customers/packages", {
+                    method: "PATCH",
+                    headers,
+                    body: JSON.stringify({
+                      action: "consume_package_pulses",
+                      customer_package_id: targetPkgId,
+                      package_id: targetPkgId,
+                      quantity_used: pulsesToDeductFromActivePkg,
+                      pulses: pulsesToDeductFromActivePkg,
+                      booking_id: bookingTargetId,
+                      reservationId: bookingTargetId,
+                      treatment_area: laserData.treatmentArea,
+                      used_by: doctorName || "Doctor",
+                      notes: `Laser session deduction: ${pulsesToDeductFromActivePkg} pulses`
+                    })
+                  });
+                  const oldPackageData = await oldPackageRes.json().catch(() => null);
+                  if (!oldPackageRes.ok || Number(oldPackageData?.consumed) < pulsesToDeductFromActivePkg) {
+                    throw new Error(`The new package was sold, ${deficitPulses} deficit pulses were deducted, and its invoice line was saved, but the old package's ${pulsesToDeductFromActivePkg} pulses were not fully deducted. The session was not completed.`);
+                  }
+                }
+                completedPackageSettlement = { oldPackagePulses: pulsesToDeductFromActivePkg, newPackagePulses: deficitPulses };
+                abortOnLaserError = false;
               } else if (laserData.spilloverChoice === "PAY_PER_PULSE") {
-                const excessRate = Number(laserData.pulseValue || 1);
+                const excessRate = resolvedDoctorPulseRate!;
                 const excessTotal = deficitPulses * excessRate;
                 effectiveLaserSessionCharge = excessTotal;
 
@@ -1507,6 +1558,10 @@ export default function DoctorAccountView({
         });
       } catch (e) {
         console.error("Error during laser pulse processing:", e);
+        if (abortOnLaserError) {
+          alert(e instanceof Error ? e.message : "Laser package settlement failed. The session was not completed.");
+          return;
+        }
       }
     }
 
@@ -1553,7 +1608,7 @@ export default function DoctorAccountView({
 
     let completionNotes = String(targetBooking.notes || "");
     const isDoctorPerPulse = laserData?.pulseType === "PER_PULSE" || targetBooking.laser_payment_mode === "PER_PULSE" || targetBooking.laserPaymentMode === "PER_PULSE";
-    const doctorPulseRate = Number(laserData?.pulseValue || targetBooking.laser_price_per_pulse || targetBooking.laserPricePerPulse || 1);
+    const doctorPulseRate = resolvedDoctorPulseRate!;
     const doctorDeliveredPulses = Number(laserData?.pulsesUsed || 0);
 
     if (isDoctorPerPulse && doctorDeliveredPulses > 0) {
@@ -1581,7 +1636,7 @@ export default function DoctorAccountView({
           const settlementString = `\n[Laser Settlement]: Settled that laser services deficit is covered via New Pulses Package (${pkgName}) / تم الاتفاق على تغطية عجز النبضات عبر شراء باقة جديدة (${pkgName})`;
           completionNotes = completionNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
         } else {
-          const deficitRate = Number(laserData?.pulseValue || 1);
+          const deficitRate = resolvedDoctorPulseRate!;
           const deficitCost = deficit * deficitRate;
           const deficitString = `\n[Laser Package Redemption]: Existing package exhausted. Excess ${deficit} pulses charged per pulse @ ${deficitRate} EGP = ${deficitCost} EGP / تم استهلاك الباقة واحتساب ${deficit} نبضة إضافية بنظام النبضة`;
           completionNotes = completionNotes.replace(/\[(?:Laser Package Redemption|Laser Package Settlement)\]:[^\n\[]*/gi, "").trim() + deficitString;
@@ -1607,8 +1662,6 @@ export default function DoctorAccountView({
           status: "completed",
           doctorNotes: clinicalNote || "",
           notes: completionNotes,
-          total_price: sessionComputedTotal,
-          price: sessionComputedTotal,
           amountLeft: Math.max(0, sessionComputedTotal - Number(targetBooking.amountPaid ?? 0)),
           laser_payment_mode: isDoctorPerPulse ? "PER_PULSE" : isDoctorPackage ? "PACKAGE" : "SERVICE",
           laserPaymentMode: isDoctorPerPulse ? "PER_PULSE" : isDoctorPackage ? "PACKAGE" : "SERVICE",
@@ -1661,11 +1714,17 @@ export default function DoctorAccountView({
         }
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(err.error || err.message || "Failed to complete treatment session.");
+        const settlementState = completedPackageSettlement
+          ? ` The package settlement already deducted ${completedPackageSettlement.oldPackagePulses} pulses from the old package and ${completedPackageSettlement.newPackagePulses} deficit pulses from the new package; the session itself remains incomplete.`
+          : "";
+        alert(`${err.error || err.message || "Failed to complete treatment session."}${settlementState}`);
       }
     } catch (err: any) {
       console.error("Error completing session:", err);
-      alert(err.message || "Error completing session.");
+      const settlementState = completedPackageSettlement
+        ? ` The package settlement already deducted ${completedPackageSettlement.oldPackagePulses} pulses from the old package and ${completedPackageSettlement.newPackagePulses} deficit pulses from the new package; the session itself remains incomplete.`
+        : "";
+      alert(`${err.message || "Error completing session."}${settlementState}`);
     }
   };
 

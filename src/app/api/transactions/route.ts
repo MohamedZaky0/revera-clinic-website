@@ -512,7 +512,7 @@ export async function POST(req: Request) {
 
     // Update Customer scalar balances
     let newWallet = Number(customer.wallet_balance || 0);
-    let newOutstanding = Number(customer.outstanding || 0);
+    const newOutstanding = Number(customer.outstanding || 0);
     let newSpent = Number(customer.spent_amount || 0);
 
     if (transaction_type === 'refund') {

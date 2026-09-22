@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **64 resolved** · 84 tracked total.
+**7 open** · **13 partially resolved** · **65 resolved** · 85 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4254,6 +4254,83 @@ option should exist is a product decision; it shares the `/api/packages/sell` ro
 Reception's End Session has no purchase step at all: a package is only sold at booking time.
 
 **Manual test checklist:** `ai_docs/manual_tests/RISK_090_091_MANUAL_TESTS.md`
+
+---
+
+## RISK-094: Laser Package Deficit Settlement Had No Safety Net and Could Bill an Unsold Package (PARTIALLY RESOLVED)
+
+**Severity:** Critical (P0) · **Type:** Money / data integrity / concurrency
+**Found:** 2026-09-21, Brief 34 investigation. **Safety-net fixes completed 2026-09-21; the shared pulse-store race remains open for Brief 34B.**
+
+**What was confirmed:**
+1. `PATCH /api/customers/packages` correctly clamps a request to the package's remaining pulses and returns both `consumed` and `requested`, with booking-keyed idempotency. Its primary balance and idempotency store is nevertheless the single `page_settings` row `customer_package_pulses`; concurrent read-modify-write requests can overwrite one another, and the native `customer_packages` sync is best-effort. Brief 34 deliberately did not move this store.
+2. Choice 3A in `DoctorAccountView.tsx` consumed the old package before selling the replacement package, ignored failed sale/deduction responses, still wrote a full-price `New Package:` line, and then completed the session. A patient could therefore be billed for a package that was never sold while the pulse deficit remained unresolved.
+3. Reservation laser snapshot fields were referenced before any migration documented them. The 42703 compatibility retry silently stripped real columns alongside missing ones and returned an apparently successful reservation.
+4. Six money-path rate calculations silently substituted 1 EGP per pulse. Package consumption also invented a 10,000-pulse quota for unknown or unconfigured package rows.
+
+**Safety-net fix:**
+- Added the unapplied, idempotent migration `20260921000000_add_laser_settlement_columns_to_reservations.sql` and matching `DB_SCHEMA.md` entries for nullable `laser_payment_mode`, `laser_price_per_pulse`, and `delivered_pulses`, with no historical defaults.
+- The 42703 compatibility path now logs and returns its exact `droppedColumns`; the doctor completion payload no longer sends nonexistent `reservations.price` / `total_price` keys.
+- Added route tests for package clamping, validation, synthetic IDs, expiry, authentication, unknown UUIDs, and booking idempotency, plus pure deficit/rate tests.
+- Choice 3A now runs sale → new-package deficit deduction → invoice line → old-package deduction → completion. Every required response is checked; a failure keeps the session open and reports which irreversible steps already occurred.
+- Per-pulse rates now resolve only through reservation snapshot → Booking Settings `booking.defaultPricePerPulse` → legacy notes regex. An unresolved rate returns/alerts a real configuration error and writes no per-pulse line. Unknown package quotas are rejected instead of becoming 10,000.
+
+**Still open, deliberately not fixed here:**
+- The cross-patient lost-update race in the shared `page_settings.customer_package_pulses` blob; queued Brief 34B moves the balance and idempotency guard to relational storage.
+- `DoctorOngoingSessionTab.tsx` still derives a missing catalog package quota from its name and falls back to 10,000; resolving unknown totals needs the queued product decision.
+- `totalLaserDeliveredPulses` counts only laser additional services while `totalSessionPulses` counts pulse values from all additional services, so package and device deductions can disagree.
+- The master per-pulse price location remains undecided; the implemented chain does not presume device vs service vs clinic ownership.
+
+**Manual test checklist:** `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_34_MANUAL_TESTS.md`
+
+---
+
+## RISK-095: RISK-094's Own Rate-Resolution Fix Blocked Every Choice-3A Completion, Because `[Laser Settlement]` Is Written By Every Laser Branch (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Regression / correctness · **Found:** 2026-09-22, live-verifying
+RISK-094's fixes against the dev server and dev database (doctor login, real reservation, real
+`consume_package_pulses` calls — not the test suite). **Fixed same day.**
+
+**What it was:** RISK-094's item 5 made `PATCH /api/reservations` refuse to complete a laser session
+when a per-pulse rate is required but unresolved (`resolveLaserPulseRate()` → `null`). It decides
+"required" with `isPerPulseMode`, which included
+`String(notes).includes('[Laser Settlement]')` — but `DoctorAccountView.tsx` writes a
+`[Laser Settlement]:` tag in **every** laser completion branch: plain per-pulse, an initial package
+purchase, Choice 3A (deficit resolved by buying a new package — billed at that package's flat price,
+no rate involved), Choice 3B (deficit resolved by charging the excess per pulse), and a plain
+no-deficit redemption. Only two of those five actually multiply pulses by a rate. The presence of the
+tag proves nothing about which branch ran, so the guard fired for all five — meaning any environment
+with no clinic-wide default price-per-pulse configured (this dev database, at the time) could not
+complete **any** laser package session, deficit or not.
+
+**Reproduced live:** doctor completes a Choice-3A session (patient's package already fully drained,
+new package correctly sold, deficit correctly deducted from it) → the settlement steps all succeed →
+the final `PATCH /api/reservations` (`status: 'completed'`) → **400 "Per-pulse rate not configured —
+set it in Booking Settings."** The reservation stayed `started`; nothing about this failure was
+predicted by RISK-094's own fail-closed design (that covers steps *inside* the settlement chain, not
+this outer completion call, which never needed a rate for 3A in the first place).
+
+**Fix:** in both `isPerPulseMode` definitions in `src/app/api/reservations/route.ts`
+(`writeCheckoutInvoice` and the `PATCH` handler), replaced the `[Laser Settlement]` substring check
+with `charged per pulse` — the one phrase that appears only in the two branches that actually resolve
+a rate (plain Option 2, and Choice 3B's deficit line), never in 3A's "Purchased new package" tag, the
+initial-purchase tag, or the plain-redemption tag. Verified against the real dev database:
+Choice-3A-shaped notes now complete (200) with no rate configured anywhere; a genuine per-pulse
+session with no rate still correctly refuses (400, unchanged).
+
+**Tests:** `tests/routes/reservations-patch.test.ts`, new describe block "laser per-pulse rate guard
+(RISK-095)" — 6 cases covering all five note shapes plus a resolved-rate positive case. Confirmed to
+fail (3 of 6) with the fix reverted, matching exactly the branches that should never have required a
+rate.
+
+**Note on how this got past RISK-094's own verification:** RISK-094's report listed the file/rate
+call sites checked, but the "browser click-path" verification step in Brief 34 was written as a
+checklist, not actually run before this session picked the work back up — the gap between
+"`npm run check` is green" and "a human clicked through it" is exactly the distinction
+`ai_docs/TESTING.md` and this project's working agreement call out. This bug only existed in the
+one path static checks and unit tests (written against the code as it stood) could not see: the
+interaction between two already-tested pieces (the notes-tag writer and the rate guard) once wired
+together and clicked through for real.
 
 ---
 

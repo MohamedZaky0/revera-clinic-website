@@ -420,12 +420,19 @@ export async function PATCH(req: Request) {
         }
       }
 
+      const storedPulses = pulseStore[pkgId];
+      if (!storedPulses && !pkgRow) {
+        return NextResponse.json({ success: false, error: 'Customer package not found.' }, { status: 400 });
+      }
       const initialTotalPulses = Number(
-        (pkgRow as any)?.total_pulses ||
-        (pkgRow as any)?.included_pulses ||
-        (pkgRow as any)?.pulses ||
-        10000
+        storedPulses?.included_pulses ??
+        (pkgRow as any)?.total_pulses ??
+        (pkgRow as any)?.included_pulses ??
+        (pkgRow as any)?.pulses
       );
+      if (!Number.isFinite(initialTotalPulses) || initialTotalPulses <= 0) {
+        return NextResponse.json({ success: false, error: 'Package pulse quota is not configured.' }, { status: 400 });
+      }
       const initialUsed = Number(
         (pkgRow as any)?.pulses_used ??
         (pkgRow as any)?.used_pulses ??

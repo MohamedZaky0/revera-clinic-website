@@ -427,7 +427,7 @@ export default function UserProfileView({
 
     const parts = clean.split(":");
     if (parts.length >= 2) {
-      let hour = parseInt(parts[0], 10);
+      const hour = parseInt(parts[0], 10);
       const min = parts[1].slice(0, 2);
       if (!isNaN(hour)) {
         const isPm = hour >= 12;
@@ -895,7 +895,7 @@ export default function UserProfileView({
         });
 
         // 3. Query reservations table for Target Progress (Completed/Confirmed Revenue)
-        let qRes = supabase
+        const qRes = supabase
           .from("reservations")
           .select("amount_paid, price, status, date, doctor_name, provider_id, created_by_employee_id")
           .gte("date", startStr)

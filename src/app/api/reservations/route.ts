@@ -11,6 +11,7 @@ import { normalizeEgyptMobile, isOwnIdentity } from '@/lib/customerIdentity';
 import { recordWalletMovement } from '@/lib/wallet';
 import { recordTransaction } from '@/lib/transactionLedger';
 import { classifyCaller } from '@/app/api/customers/route';
+import { resolveLaserPulseRate } from '@/lib/laserRate';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -20,6 +21,17 @@ import { classifyCaller } from '@/app/api/customers/route';
 function fmtDate(d: unknown): string {
   if (d instanceof Date) return d.toISOString().slice(0, 10);
   return String(d).slice(0, 10); // already a YYYY-MM-DD string
+}
+
+async function getClinicDefaultPricePerPulse(): Promise<number | null> {
+  const { data, error } = await supabaseServer
+    .from('page_settings')
+    .select('value')
+    .eq('key', 'home')
+    .maybeSingle();
+  if (error) throw error;
+  const rate = Number(data?.value?.booking?.defaultPricePerPulse);
+  return Number.isFinite(rate) && rate > 0 ? rate : null;
 }
 
 /**
@@ -373,7 +385,12 @@ async function writeCheckoutInvoice(params: {
     resRow?.laser_payment_mode === 'PER_PULSE' ||
     String(resRow?.notes || '').toLowerCase().includes('pay per pulse') ||
     String(resRow?.notes || '').toLowerCase().includes('per_pulse') ||
-    String(resRow?.notes || '').includes('[Laser Settlement]')
+    // `[Laser Settlement]` is written by DoctorAccountView.tsx for EVERY laser completion branch
+    // (PER_PULSE, package-initial-purchase, 3A buy-new-package, 3B pay-per-pulse deficit, and plain
+    // package redemption), so its mere presence proves nothing about whether a rate was used. Only
+    // the branches that actually multiply pulses by a rate write "charged per pulse" — 3A's tag says
+    // "Purchased new package" instead. Match that phrase, not the universal tag.
+    String(resRow?.notes || '').toLowerCase().includes('charged per pulse')
   );
   const isPackageMode = Boolean(
     resRow?.laser_payment_mode === 'PACKAGE' ||
@@ -383,13 +400,15 @@ async function writeCheckoutInvoice(params: {
     String(resRow?.notes || '').toLowerCase().includes('pulses package') ||
     String(resRow?.notes || '').includes('[Laser Package]')
   );
-  const pulseRate = Number(
-    resRow?.laser_price_per_pulse ||
-    (() => {
-      const m = String(resRow?.notes || '').match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
-      return m ? Number(m[1]) : 1;
-    })()
-  ) || 1;
+  const pulseRate = resolveLaserPulseRate({
+    reservationRate: resRow?.laser_price_per_pulse,
+    clinicDefaultRate: isPerPulseMode ? await getClinicDefaultPricePerPulse() : null,
+    notes: resRow?.notes,
+  });
+  if (isPerPulseMode && pulseRate === null) {
+    throw new Error('Per-pulse rate not configured — set it in Booking Settings.');
+  }
+  const checkoutPulseRate = pulseRate!;
   const primaryPulsesMatch = String(resRow?.notes || '').match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
     String(resRow?.notes || '').match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
     String(resRow?.notes || '').match(/Primary:\s*(\d+)\s*pulses/i) ||
@@ -411,10 +430,10 @@ async function writeCheckoutInvoice(params: {
 
     if (isPerPulseMode && isLaser) {
       if (primaryDeliveredPulses > 0) {
-        const perPulseTotal = primaryDeliveredPulses * pulseRate;
+        const perPulseTotal = primaryDeliveredPulses * checkoutPulseRate;
         return buildInvoiceLine({
           lineType: 'service',
-          description: `${svc.en || svc.name || `Service #${svc.id}`} (${primaryDeliveredPulses} pulses × ${pulseRate} EGP)`,
+          description: `${svc.en || svc.name || `Service #${svc.id}`} (${primaryDeliveredPulses} pulses × ${checkoutPulseRate} EGP)`,
           qty: 1,
           unitPrice: perPulseTotal,
           discount: 0,
@@ -424,7 +443,7 @@ async function writeCheckoutInvoice(params: {
       } else {
         return buildInvoiceLine({
           lineType: 'service',
-          description: `${svc.en || svc.name || `Service #${svc.id}`} (Pay per Pulse @ ${pulseRate} EGP)`,
+          description: `${svc.en || svc.name || `Service #${svc.id}`} (Pay per Pulse @ ${checkoutPulseRate} EGP)`,
           qty: 1,
           unitPrice: 0,
           discount: 0,
@@ -1684,16 +1703,23 @@ export async function PATCH(req: Request) {
         target.laser_payment_mode === 'PER_PULSE' ||
         String(updates.notes || target.notes || '').toLowerCase().includes('pay per pulse') ||
         String(updates.notes || target.notes || '').toLowerCase().includes('per_pulse') ||
-        String(updates.notes || target.notes || '').includes('[Laser Settlement]')
+        // See the matching comment in writeCheckoutInvoice's isPerPulseMode above: `[Laser
+        // Settlement]` is written for every laser branch including 3A (buy a new package, billed at
+        // a flat price), so it cannot signal "needs a resolved per-pulse rate" by itself — doing so
+        // made every 3A completion fail with "Per-pulse rate not configured" whenever no clinic
+        // default was set. Only the rate-using branches (plain PER_PULSE, and 3B's deficit payout)
+        // write "charged per pulse".
+        String(updates.notes || target.notes || '').toLowerCase().includes('charged per pulse')
       );
-      const pulseRate = Number(
-        updates.laser_price_per_pulse ||
-        target.laser_price_per_pulse ||
-        (() => {
-          const m = String(updates.notes || target.notes || '').match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
-          return m ? Number(m[1]) : 1;
-        })()
-      ) || 1;
+      const pulseRate = resolveLaserPulseRate({
+        reservationRate: updates.laser_price_per_pulse ?? target.laser_price_per_pulse,
+        clinicDefaultRate: isPerPulseMode ? await getClinicDefaultPricePerPulse() : null,
+        notes: updates.notes ?? target.notes,
+      });
+      if (isPerPulseMode && pulseRate === null) {
+        return NextResponse.json({ error: 'Per-pulse rate not configured — set it in Booking Settings.' }, { status: 400 });
+      }
+      const updatePulseRate = pulseRate!;
       const primaryPulsesMatch = String(updates.notes || target.notes || '').match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
         String(updates.notes || target.notes || '').match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
         String(updates.notes || target.notes || '').match(/Primary:\s*(\d+)\s*pulses/i) ||
@@ -1735,7 +1761,7 @@ export async function PATCH(req: Request) {
               (s.category && String(s.category).toLowerCase().includes('laser'))
             );
             if (isPerPulseMode && isLaser) {
-              return sum + (primaryDeliveredPulses > 0 ? (primaryDeliveredPulses * pulseRate) : 0);
+              return sum + (primaryDeliveredPulses > 0 ? (primaryDeliveredPulses * updatePulseRate) : 0);
             }
             const mappedService = { price: s.price !== null ? Number(s.price) : 0, branchPricing: s.branch_pricing };
             return sum + getEffectiveServicePrice(mappedService, targetBranchName);
@@ -1790,6 +1816,7 @@ export async function PATCH(req: Request) {
         }
       }
 
+      let droppedColumns: string[] = [];
       let { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
         .update(updates)
@@ -1799,18 +1826,22 @@ export async function PATCH(req: Request) {
 
       // If missing column error (Postgres 42703) occurs, strip optional extended columns and retry
       if (updateError && (updateError.code === '42703' || String(updateError.message || '').toLowerCase().includes('column'))) {
-        console.warn('Extended columns missing in reservations table, retrying with core columns only:', updateError.message);
         const coreUpdates = { ...updates };
-        delete coreUpdates.laser_payment_mode;
-        delete coreUpdates.laser_price_per_pulse;
-        delete coreUpdates.delivered_pulses;
-        delete coreUpdates.actual_duration_minutes;
-        delete coreUpdates.doctor_notes;
-        delete coreUpdates.reception_notes;
-        delete coreUpdates.follow_up_notes;
-        delete coreUpdates.follow_up_date;
-        delete coreUpdates.total_price;
-        delete coreUpdates.price;
+        const extendedColumns = [
+          'laser_payment_mode',
+          'laser_price_per_pulse',
+          'delivered_pulses',
+          'actual_duration_minutes',
+          'doctor_notes',
+          'reception_notes',
+          'follow_up_notes',
+          'follow_up_date',
+          'total_price',
+          'price',
+        ];
+        droppedColumns = extendedColumns.filter((key) => key in coreUpdates);
+        for (const key of droppedColumns) delete coreUpdates[key];
+        console.warn('Extended columns missing in reservations table; retrying without:', droppedColumns, updateError.message);
 
         const retryRes = await supabaseServer
           .from('reservations')
@@ -1831,6 +1862,9 @@ export async function PATCH(req: Request) {
           if (coreUpdates.amount_left !== undefined) minimalUpdates.amount_left = coreUpdates.amount_left;
           if (coreUpdates.service_id !== undefined) minimalUpdates.service_id = coreUpdates.service_id;
           if (coreUpdates.doctor_name !== undefined) minimalUpdates.doctor_name = coreUpdates.doctor_name;
+          const minimalDroppedColumns = Object.keys(coreUpdates).filter((key) => !(key in minimalUpdates));
+          droppedColumns = [...new Set([...droppedColumns, ...minimalDroppedColumns])];
+          console.warn('Reservations retry still found missing columns; retrying with minimal fields and dropping:', minimalDroppedColumns);
 
           const safeRes = await supabaseServer
             .from('reservations')
@@ -2086,7 +2120,15 @@ export async function PATCH(req: Request) {
         });
       }
 
-      return NextResponse.json(mapRow(updated));
+      const response = mapRow(updated);
+      if (droppedColumns.length > 0) {
+        return NextResponse.json({
+          ...response,
+          warning: `Saved, but ${droppedColumns.length} field(s) were not persisted because this database is missing columns.`,
+          droppedColumns,
+        });
+      }
+      return NextResponse.json(response);
     } else {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }

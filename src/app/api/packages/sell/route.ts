@@ -314,11 +314,13 @@ export async function POST(req: Request) {
       pulses_used: 0,
     };
 
-    let { data: customerPackage, error: customerPackageError } = await supabaseServer
+    const cpInsertResult = await supabaseServer
       .from('customer_packages')
       .insert(cpInsertPayload)
       .select('id, customer_id, package_id, invoice_id, purchased_at, expires_at, price_paid, status')
       .single();
+    let customerPackage = cpInsertResult.data;
+    const customerPackageError = cpInsertResult.error;
 
     if (customerPackageError && (customerPackageError.message?.includes('column') || customerPackageError.code === '42703')) {
       const fallbackCpPayload = {

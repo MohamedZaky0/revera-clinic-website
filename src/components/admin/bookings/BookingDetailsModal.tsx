@@ -49,6 +49,7 @@ import { printInvoice, printPrescription } from "@/lib/printUtils";
 import { Branch } from "@/types";
 import { adminTranslations } from "../translations";
 import type { Req } from "@/app/admin/page";
+import { resolveLaserPulseRate } from "@/lib/laserRate";
 
 export interface AdditionalServiceItem {
   id: string | number;
@@ -230,6 +231,23 @@ export default function BookingDetailsModal({
   const [drawerRxNotes, setDrawerRxNotes] = useState("");
   const [drawerRxHasFollowUp, setDrawerRxHasFollowUp] = useState(false);
   const [drawerRxFollowUpDate, setDrawerRxFollowUpDate] = useState("");
+  const [clinicDefaultPricePerPulse, setClinicDefaultPricePerPulse] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/page-settings")
+      .then((response) => response.json())
+      .then((data) => {
+        const rate = Number(data?.booking?.defaultPricePerPulse);
+        if (active) setClinicDefaultPricePerPulse(Number.isFinite(rate) && rate > 0 ? rate : null);
+      })
+      .catch(() => {
+        if (active) setClinicDefaultPricePerPulse(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
   const [drawerRxFollowUpNotes, setDrawerRxFollowUpNotes] = useState("");
   const [savingDrawerRx, setSavingDrawerRx] = useState(false);
 
@@ -1345,21 +1363,23 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         String(booking?.notes || "").includes("[Laser Package Redemption]") ||
         String(booking?.notes || "").includes("[Purchasing New Pulses Package]")
       );
-      const pulseRate = Number(
-        booking?.laserPricePerPulse ||
-        (booking as any)?.laser_price_per_pulse ||
-        (() => {
-          const m = String(booking?.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
-          return m ? Number(m[1]) : 1;
-        })()
-      ) || 1;
+      const pulseRate = resolveLaserPulseRate({
+        reservationRate: booking?.laserPricePerPulse ?? (booking as any)?.laser_price_per_pulse,
+        clinicDefaultRate: clinicDefaultPricePerPulse,
+        notes: booking?.notes,
+      });
+      if (isPerPulseMode && pulseRate === null) {
+        alert("Per-pulse rate not configured — set it in Booking Settings.");
+        return;
+      }
+      const resolvedPulseRate = pulseRate!;
 
       for (const s of additionalServices) {
         const realServiceId = s.serviceId || (typeof s.id === "number" && s.id < 1000000 ? s.id : null);
         const srvObj = localServices.find((ls) => String(ls.id) === String(realServiceId));
         const isSvcLaser = s.isLaser || checkIsLaserService(srvObj);
         const effectivePrice = (isPerPulseMode && isSvcLaser)
-          ? (Number(s.pulses) || 0) * pulseRate
+          ? (Number(s.pulses) || 0) * resolvedPulseRate
           : (isPackageMode && isSvcLaser)
           ? 0
           : s.price;
@@ -1413,7 +1433,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const srvObj = localServices.find((ls) => String(ls.id) === String(s.serviceId));
           const isSvcLaser = s.isLaser || checkIsLaserService(srvObj);
           const effectivePrice = (isPerPulseMode && isSvcLaser)
-            ? (Number(s.pulses) || 0) * pulseRate
+            ? (Number(s.pulses) || 0) * resolvedPulseRate
             : (isPackageMode && isSvcLaser)
             ? 0
             : s.price;
@@ -1428,7 +1448,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       if (totalPulses > 0) {
         if (isPerPulseMode) {
           const addPulses = additionalServices.reduce((sum, s) => sum + Number(s.pulses || 0), 0);
-          const pulseString = `\n[Laser Pulses Delivered]: Primary: ${primaryPulses} pulses (@ ${pulseRate} EGP/pulse = ${primaryPulses * pulseRate} EGP), Additional: ${addPulses} pulses (@ ${pulseRate} EGP/pulse = ${addPulses * pulseRate} EGP), Total: ${totalPulses} pulses`;
+          const pulseString = `\n[Laser Pulses Delivered]: Primary: ${primaryPulses} pulses (@ ${resolvedPulseRate} EGP/pulse = ${primaryPulses * resolvedPulseRate} EGP), Additional: ${addPulses} pulses (@ ${resolvedPulseRate} EGP/pulse = ${addPulses * resolvedPulseRate} EGP), Total: ${totalPulses} pulses`;
           updatedNotes = updatedNotes.replace(/\[(?:Laser Pulses Delivered|Extra Device Pulses)\]:[^\n\[]*/gi, "").trim() + pulseString;
         } else {
           const pulseString = `\n[Extra Device Pulses]: ${totalPulses} pulses = ${primaryPulses * (Number(pricePerPulse) || 0)} EGP`;
@@ -1440,8 +1460,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const srvObj = localServices.find((ls) => String(ls.id) === String(s.serviceId));
           return sum + ((s.isLaser || checkIsLaserService(srvObj)) ? Number(s.pulses || 0) : 0);
         }, 0);
-        const totalLaserCost = totalLaserPulses * pulseRate;
-        const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are charged per pulse (${totalLaserPulses} pulses × ${pulseRate} EGP = ${totalLaserCost} EGP) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${totalLaserPulses} نبضة × ${pulseRate} ج.م = ${totalLaserCost} ج.م)`;
+        const totalLaserCost = totalLaserPulses * resolvedPulseRate;
+        const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are charged per pulse (${totalLaserPulses} pulses × ${resolvedPulseRate} EGP = ${totalLaserCost} EGP) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${totalLaserPulses} نبضة × ${resolvedPulseRate} ج.م = ${totalLaserCost} ج.م)`;
         updatedNotes = updatedNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
       } else if (isPackageMode) {
         const pkgMatch = String(booking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
@@ -1464,8 +1484,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           ...(isPerPulseMode ? {
             laser_payment_mode: "PER_PULSE",
             laserPaymentMode: "PER_PULSE",
-            laser_price_per_pulse: pulseRate,
-            laserPricePerPulse: pulseRate,
+            laser_price_per_pulse: resolvedPulseRate,
+            laserPricePerPulse: resolvedPulseRate,
             delivered_pulses: primaryPulses,
           } : isPackageMode ? {
             laser_payment_mode: "PACKAGE",
@@ -1492,8 +1512,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 ...(isPerPulseMode ? {
                   laser_payment_mode: "PER_PULSE",
                   laserPaymentMode: "PER_PULSE",
-                  laser_price_per_pulse: pulseRate,
-                  laserPricePerPulse: pulseRate,
+                  laser_price_per_pulse: resolvedPulseRate,
+                  laserPricePerPulse: resolvedPulseRate,
                   delivered_pulses: primaryPulses,
                 } : isPackageMode ? {
                   laser_payment_mode: "PACKAGE",

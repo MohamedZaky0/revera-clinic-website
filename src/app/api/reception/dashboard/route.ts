@@ -181,7 +181,7 @@ export async function GET(req: Request) {
     // 3. Resolve Branch Information
     let branchNameEn = "New Cairo Branch";
     let branchNameAr = "فرع التجمع الخامس";
-    let branchId = emp?.branch_id || null;
+    const branchId = emp?.branch_id || null;
 
     const { data: branchRows } = await supabaseServer
       .from("branches")
