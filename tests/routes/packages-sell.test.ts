@@ -103,9 +103,26 @@ describe('POST /api/packages/sell — invoice status must satisfy the schema (RI
     const invoice = fake.rows('invoices')[0];
     expect(fake.rows('payments')[0]).toMatchObject({ invoice_id: invoice.id, amount: 1000, method: 'cash' });
 
-    const cpId = fake.rows('customer_packages')[0].id;
-    const store = fake.rows('page_settings').find((r) => r.key === 'customer_package_pulses')!.value;
-    expect(store[cpId]).toMatchObject({ included_pulses: 10000, remaining_pulses: 10000, used_pulses: 0 });
+    // Brief 34B: the balance lives on the customer_packages columns, not the page_settings blob.
+    expect(fake.rows('customer_packages')[0]).toMatchObject({
+      total_pulses: 10000, pulses_remaining: 10000, pulses_used: 0, package_type: 'pulses',
+    });
+    expect(fake.rows('page_settings').some((r) => r.key === 'customer_package_pulses')).toBe(false);
+  });
+});
+
+describe('POST /api/packages/sell — pulse quota must be real (Brief 34B)', () => {
+  it('refuses a pulses-type package with no configured total_pulses and writes nothing', async () => {
+    fake.seed('packages', [{
+      id: PACKAGE_ID, name: 'Laser Pulses', branch_id: null, price: 1000, tax_rate: 0,
+      validity_days: 365, active: true, package_type: 'pulses', total_pulses: 0,
+    }]);
+
+    const res = await POST(sellReq({ customerId: CUSTOMER_ID, packageId: PACKAGE_ID, amountPaid: 1000 }));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: expect.stringContaining('pulse quota') });
+    expect(fake.rows('customer_packages')).toHaveLength(0);
+    expect(fake.rows('invoices')).toHaveLength(0);
   });
 });
 
