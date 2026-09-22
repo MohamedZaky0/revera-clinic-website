@@ -591,7 +591,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setLocalCategories(data);
           saveDynamicCategories(data);
           setExpandedCategories(prev => {
@@ -1426,6 +1426,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
     await Promise.all(removedServiceIds.map(id => deleteServiceFromApi(id)));
     await loadServicesFromApi();
+    await loadCategoriesFromApi();
 
     setExpandedCategories(prev => {
       const copy = { ...prev };
@@ -2514,7 +2515,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-075', name: 'Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies laser packages isolation to Option 3, patient multi-package selection, catalog package purchase, and package price + non-laser service total calculation.', status: 'idle' },
     { id: 'TC-076', name: 'Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies accurate deduction of delivered laser pulses from customer pulses packages across doctor portal session finalization, reception session completion, and checkout settlement workflows with DB synchronization and idempotency.', status: 'idle' },
     { id: 'TC-077', name: 'In-Booking Package Selling & Integrated Patient Search Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies selling catalog packages directly during new booking creation with customer_packages persistence and instant patient profile appearance, as well as integrated patient search dropdown rendering.', status: 'idle' },
-    { id: 'TC-078', name: 'In-Booking Package Partial Payment & Session Balance Preservation Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies that when a patient purchases a new pulses package during booking with a partial payment (e.g. 500 EGP of 1000 EGP), the remaining 500 EGP outstanding balance is preserved correctly through doctor portal session completion and receptionist session finalization — preventing amountLeft from being zeroed out. Also verifies Payment Mode displays Pulses Package and Pay & Settle Invoice button remains visible.', status: 'idle' }
+    { id: 'TC-078', name: 'In-Booking Package Partial Payment & Session Balance Preservation Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies that when a patient purchases a new pulses package during booking with a partial payment (e.g. 500 EGP of 1000 EGP), the remaining 500 EGP outstanding balance is preserved correctly through doctor portal session completion and receptionist session finalization — preventing amountLeft from being zeroed out. Also verifies Payment Mode displays Pulses Package and Pay & Settle Invoice button remains visible.', status: 'idle' },
+    { id: 'TC-079', name: 'Database-Driven Service Categories & Zero Mock Defaults Engine', category: 'Services & Bookings', endpoint: '/api/categories', description: 'Verifies dynamic database-driven categories CRUD, zero hardcoded/mock defaults, instant category deletion without re-seeding resurrection, and associated service cascade cleanup.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
