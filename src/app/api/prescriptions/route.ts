@@ -168,6 +168,8 @@ export async function POST(req: Request) {
   const generalNotes = body.general_notes || body.instructions || body.notes;
   const doctorName = body.doctor_name || body.doctorName || null;
   const doctorId = body.doctor_id || body.doctorId || null;
+  const followUpDate = body.follow_up_date || body.followUpDate || null;
+  const followUpNotes = body.follow_up_notes || body.followUpNotes || null;
 
   if (!patientName && !customerId) {
     return NextResponse.json({ error: 'patient_name or customer_id is required' }, { status: 400 });
@@ -183,7 +185,8 @@ export async function POST(req: Request) {
     doctor_notes: body.doctor_notes || null,
     doctor_name: doctorName,
     doctor_id: doctorId,
-    follow_up_date: body.follow_up_date || null,
+    follow_up_date: followUpDate,
+    follow_up_notes: followUpNotes,
     updated_at: new Date().toISOString()
   };
 
@@ -262,11 +265,14 @@ export async function POST(req: Request) {
         if (error && (
           error.code === '23503' ||
           error.code === 'PGRST204' ||
+          error.code === '42703' ||
           error.message?.includes('booking_id') ||
+          error.message?.includes('follow_up_notes') ||
           error.message?.includes('foreign key constraint') ||
           error.message?.includes('prescriptions_booking_id_fkey')
         )) {
-          delete newVersionData.booking_id;
+          if (error.message?.includes('booking_id') || error.code === '23503') delete newVersionData.booking_id;
+          if (error.message?.includes('follow_up_notes') || error.code === '42703' || error.code === 'PGRST204') delete newVersionData.follow_up_notes;
           const retry = await supabaseServer
             .from('prescriptions')
             .insert(newVersionData)
@@ -300,11 +306,14 @@ export async function POST(req: Request) {
         if (error && (
           error.code === '23503' ||
           error.code === 'PGRST204' ||
+          error.code === '42703' ||
           error.message?.includes('booking_id') ||
+          error.message?.includes('follow_up_notes') ||
           error.message?.includes('foreign key constraint') ||
           error.message?.includes('prescriptions_booking_id_fkey')
         )) {
-          delete newPrescriptionPayload.booking_id;
+          if (error.message?.includes('booking_id') || error.code === '23503') delete newPrescriptionPayload.booking_id;
+          if (error.message?.includes('follow_up_notes') || error.code === '42703' || error.code === 'PGRST204') delete newPrescriptionPayload.follow_up_notes;
           const retry = await supabaseServer
             .from('prescriptions')
             .insert(newPrescriptionPayload)
@@ -331,6 +340,16 @@ export async function POST(req: Request) {
         }
 
         result = data;
+      }
+
+      // Automatically sync follow_up_date to the corresponding reservation record
+      if (cleanBookingId && followUpDate) {
+        try {
+          await supabaseServer
+            .from('reservations')
+            .update({ follow_up_date: followUpDate })
+            .eq('id', cleanBookingId);
+        } catch (_) {}
       }
 
       return NextResponse.json(result, { status: id ? 200 : 201 });
@@ -443,6 +462,80 @@ export async function DELETE(req: Request) {
     }
   } catch (err: any) {
     console.error('DELETE /api/prescriptions error:', err);
+    return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  try {
+    const { searchParams } = new URL(req.url);
+    const body = await req.json();
+    const id = searchParams.get('id') || body.id;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Prescription ID is required' }, { status: 400 });
+    }
+
+    const updates: Record<string, any> = {};
+    if (body.follow_up_date !== undefined) updates.follow_up_date = body.follow_up_date || null;
+    if (body.followUpDate !== undefined) updates.follow_up_date = body.followUpDate || null;
+    if (body.follow_up_notes !== undefined) updates.follow_up_notes = body.follow_up_notes || null;
+    if (body.followUpNotes !== undefined) updates.follow_up_notes = body.followUpNotes || null;
+
+    try {
+      const { data: rxItem } = await supabaseServer
+        .from('prescriptions')
+        .select('id, root_prescription_id, booking_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      const rootId = rxItem?.root_prescription_id || id;
+
+      const { data, error } = await supabaseServer
+        .from('prescriptions')
+        .update(updates)
+        .or(`id.eq.${id},root_prescription_id.eq.${rootId}`)
+        .select();
+
+      if (error) {
+        if (error.code === 'PGRST205') throw error;
+        throw error;
+      }
+
+      // If linked to a booking, sync follow_up_date to reservations table too
+      const bookingId = rxItem?.booking_id || body.booking_id;
+      if (bookingId && updates.follow_up_date !== undefined) {
+        try {
+          await supabaseServer
+            .from('reservations')
+            .update({ follow_up_date: updates.follow_up_date })
+            .eq('id', bookingId);
+        } catch (_) {}
+      }
+
+      return NextResponse.json(data || { success: true });
+    } catch (dbErr: any) {
+      if (dbErr.code === 'PGRST205' || dbErr.message?.includes('relation "public.prescriptions" does not exist')) {
+        const local = readLocalPrescriptions();
+        const rxItem = local.find((p: any) => p.id === id);
+        const rootId = rxItem?.root_prescription_id || id;
+        local.forEach((p: any) => {
+          if (p.id === id || String(p.root_prescription_id) === String(rootId)) {
+            Object.assign(p, updates);
+          }
+        });
+        writeLocalPrescriptions(local);
+        return NextResponse.json({ success: true });
+      }
+      throw dbErr;
+    }
+  } catch (err: any) {
+    console.error('PATCH /api/prescriptions error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
   }
 }

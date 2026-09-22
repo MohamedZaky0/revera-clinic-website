@@ -23,7 +23,12 @@ vi.mock('@/lib/supabaseServer', () => ({
 
 import { POST } from '@/app/api/inventory/products/sales/route';
 
-const CUSTOMER_ID = 'cust-1';
+// customers.id is a UUID in production. The route treats any NON-UUID customer_id as a synthetic
+// id ("res-cust-<phone>") or raw phone and resolves/creates a customer by phone (DEC-073/074), so a
+// non-UUID fixture id here would silently exercise that path and make these tests pass for the
+// wrong reason.
+const CUSTOMER_ID = '22222222-2222-4222-8222-222222222222';
+const MISSING_CUSTOMER_ID = '99999999-9999-4999-8999-999999999999';
 const PRODUCT_ID = 'prod-real';
 const EMP_ID = 'emp-1';
 const USER_ID = 'user-1';
@@ -113,9 +118,48 @@ describe('product existence (RISK-076)', () => {
     expect(res.status).toBe(409);
   });
 
-  it('rejects an unknown customer', async () => {
-    const res = await POST(saleReq(baseSale({ customer_id: 'nobody' })));
+  it('rejects a real (UUID) customer id that matches no customer, and writes nothing', async () => {
+    const res = await POST(saleReq(baseSale({ customer_id: MISSING_CUSTOMER_ID })));
     expect(res.status).toBe(404);
+    expect(fake.rows('product_sales')).toHaveLength(0);
+    expect(fake.rows('customers')).toHaveLength(1); // no customer was invented for a bad UUID
+    expect(fake.rows('inventory_products')[0].stock_quantity).toBe(10); // stock untouched
+  });
+
+  it('rejects a non-UUID id that carries no phone number to resolve, and writes nothing', async () => {
+    const res = await POST(saleReq(baseSale({ customer_id: 'nobody', customer_mobile: '' })));
+    expect(res.status).toBe(404);
+    expect(fake.rows('product_sales')).toHaveLength(0);
+    expect(fake.rows('customers')).toHaveLength(1);
+  });
+});
+
+describe('synthetic reservation customer ids (DEC-073/074)', () => {
+  const PHONE = '01016302772';
+  const REAL_ID = '33333333-3333-4333-8333-333333333333';
+
+  it('resolves "res-cust-<phone>" to the existing customer with that phone instead of creating a duplicate', async () => {
+    fake.seed('customers', [
+      { id: CUSTOMER_ID, name: 'Test Patient', wallet_balance: 0, spent_amount: 0, outstanding: 0 },
+      { id: REAL_ID, name: 'Phone Match', mobile: PHONE, wallet_balance: 0, spent_amount: 0, outstanding: 0 },
+    ]);
+    const res = await POST(saleReq(baseSale({ customer_id: `res-cust-${PHONE}`, customer_mobile: PHONE })));
+    expect(res.status).toBe(200);
+    expect(fake.rows('customers')).toHaveLength(2);
+    expect(fake.rows('product_sales')[0].customer_id).toBe(REAL_ID);
+  });
+
+  it('creates the patient when no customer has that phone, and records the sale against the new row', async () => {
+    const res = await POST(saleReq(baseSale({
+      customer_id: 'res-cust-01099998888',
+      customer_mobile: '01099998888',
+      customer_name: 'Guest Patient',
+    })));
+    expect(res.status).toBe(200);
+
+    const created = fake.rows('customers').find((c) => c.mobile === '01099998888');
+    expect(created).toMatchObject({ name: 'Guest Patient', phone: '01099998888' });
+    expect(fake.rows('product_sales')[0].customer_id).toBe(created!.id);
   });
 });
 

@@ -200,6 +200,30 @@ export default function AdminEmployeesView({
     setNewEmployeeShiftEnd(parsed.end);
   };
 
+  const formatEmployeeDisplayHours = (shiftStr?: string): string => {
+    if (!shiftStr || shiftStr === "Day") return t.doctorSection.dayHours;
+    if (shiftStr === "Night") return t.doctorSection.nightHours;
+    if (shiftStr.includes("to") || shiftStr.includes("–") || shiftStr.includes("-")) {
+      const parts = shiftStr.split(/\s*(?:to|–|-)\s*/i);
+      if (parts.length === 2 && parts[0] && parts[1]) {
+        return `${formatTime12Hour(parseTime12Hour(parts[0]))} - ${formatTime12Hour(parseTime12Hour(parts[1]))}`;
+      }
+    }
+    return shiftStr;
+  };
+
+  const formatEmployeeShiftTypeDetails = (shiftStr?: string): string => {
+    if (!shiftStr || shiftStr === "Day") return t.doctorSection.shiftTypeDetails(false);
+    if (shiftStr === "Night") return t.doctorSection.shiftTypeDetails(true);
+    return shiftStr;
+  };
+
+  const formatEmployeeBreakTime = (shiftStr?: string): string => {
+    if (!shiftStr || shiftStr === "Day") return t.doctorSection.dayBreak;
+    if (shiftStr === "Night") return t.doctorSection.nightBreak;
+    return "01:00 PM - 02:00 PM";
+  };
+
   const computeShiftSummary = (workingDays: Record<string, { isOpen: boolean; start: string; end: string; shifts?: Array<{ start: string; end: string }> }>): string => {
     if (!workingDays || typeof workingDays !== 'object') return "Day";
     const openDays = Object.values(workingDays).filter(d => d && d.isOpen);
@@ -227,15 +251,21 @@ export default function AdminEmployeesView({
 
   const loadEmployeeWorkingSchedule = (emp: any, matchProv?: any, branchIdToUse?: string) => {
     const targetBranch = branchIdToUse || emp?.branch_id || (matchProv?.workingDaysHours?.branch_ids?.[0]) || "";
-    const rawWdh = (targetBranch && matchProv?.workingDaysHours?.branch_schedules?.[targetBranch]?.in_person)
-      || matchProv?.workingDaysHours?.in_person 
-      || matchProv?.workingDaysHours 
-      || (targetBranch && emp?.working_days_hours?.branch_schedules?.[targetBranch]?.in_person)
-      || emp?.working_days_hours?.in_person
-      || emp?.working_days_hours
-      || (targetBranch && emp?.workingDaysHours?.branch_schedules?.[targetBranch]?.in_person)
-      || emp?.workingDaysHours?.in_person
-      || emp?.workingDaysHours;
+    const rawObj = matchProv?.workingDaysHours || emp?.working_days_hours || emp?.workingDaysHours;
+
+    let rawWdh: any = null;
+    if (rawObj && typeof rawObj === 'object') {
+      if (rawObj.branch_schedules) {
+        const bs = rawObj.branch_schedules;
+        rawWdh = (targetBranch && bs[targetBranch]?.in_person)
+          || (targetBranch && bs[targetBranch])
+          || (Object.keys(bs).length > 0 ? (bs[Object.keys(bs)[0]]?.in_person || bs[Object.keys(bs)[0]]) : null);
+      } else if (rawObj.in_person) {
+        rawWdh = rawObj.in_person;
+      } else {
+        rawWdh = rawObj;
+      }
+    }
 
     if (rawWdh && typeof rawWdh === 'object' && ('Sunday' in rawWdh || 'Monday' in rawWdh)) {
       const normalized: Record<string, { isOpen: boolean; start: string; end: string; shifts?: Array<{ start: string; end: string }> }> = {};
@@ -247,8 +277,8 @@ export default function AdminEmployeesView({
           : [{ start: item.start || "09:00", end: item.end || "17:00" }];
         normalized[d] = {
           isOpen: !!item.isOpen,
-          start: shifts[0].start,
-          end: shifts[0].end,
+          start: shifts[0]?.start || item.start || "09:00",
+          end: shifts[0]?.end || item.end || "17:00",
           shifts: shifts
         };
       }
@@ -794,20 +824,20 @@ export default function AdminEmployeesView({
               <div class="value">${t.profile.shiftLabel(emp.shift)}</div>
             </div>
             <div>
-              <div class="label">{t.profile.shiftDetails}</div>
-              <div class="value">${t.doctorSection.shiftTypeDetails(emp.shift === "Night")}</div>
+              <div class="label">${t.profile.shiftDetails}</div>
+              <div class="value">${formatEmployeeShiftTypeDetails(emp.shift)}</div>
             </div>
             <div>
-              <div class="label">{t.profile.workingDays}</div>
+              <div class="label">${t.profile.workingDays}</div>
               <div class="value">${t.profile.workingDaysDefault}</div>
             </div>
             <div>
-              <div class="label">{t.profile.workingHours}</div>
-              <div class="value">${emp.shift === "Night" ? t.doctorSection.nightHours : t.doctorSection.dayHours}</div>
+              <div class="label">${t.profile.workingHours}</div>
+              <div class="value">${formatEmployeeDisplayHours(emp.shift)}</div>
             </div>
             <div>
-              <div class="label">{t.profile.breakTime}</div>
-              <div class="value">${emp.shift === "Night" ? t.doctorSection.nightBreak : t.doctorSection.dayBreak}</div>
+              <div class="label">${t.profile.breakTime}</div>
+              <div class="value">${formatEmployeeBreakTime(emp.shift)}</div>
             </div>
             <div>
               <div class="label">{t.profile.monthlySalary}</div>
@@ -989,7 +1019,9 @@ export default function AdminEmployeesView({
             setNewEmployeeCommissionFixedComponent("0");
             setNewEmployeeServiceCommissions([]);
             setNewEmployeeScheduleTab("in_person");
-            setNewEmployeeBranchIds(branches.length > 0 ? [branches[0].id] : []);
+            const defaultBranchId = branches.length > 0 ? branches[0].id : "";
+            setNewEmployeeBranchIds(defaultBranchId ? [defaultBranchId] : []);
+            setNewEmployeeSelectedScheduleBranchId(defaultBranchId);
             const defaultDays = {
               Sunday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
               Monday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
@@ -999,6 +1031,7 @@ export default function AdminEmployeesView({
               Friday: { isOpen: false, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
               Saturday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] }
             };
+            setNewEmployeeBranchSchedules(defaultBranchId ? { [defaultBranchId]: { in_person: defaultDays, online: defaultDays } } : {});
             setNewEmployeeWorkingDaysHours(defaultDays);
             setNewEmployeeOnlineWorkingDaysHours(defaultDays);
             setIsEditingEmployeeModalOpen(true);
@@ -1225,10 +1258,16 @@ export default function AdminEmployeesView({
                                     bIds = [branches[0].id];
                                   }
                                   setNewEmployeeBranchIds(bIds);
+                                  setNewEmployeeSelectedScheduleBranchId(bIds[0] || "");
                                   const sched = loadEmployeeWorkingSchedule(emp, matchProv, bIds[0]);
                                   setNewEmployeeWorkingDaysHours(sched);
                                   const onlineSched = (bIds[0] && matchProv?.workingDaysHours?.branch_schedules?.[bIds[0]]?.online) || matchProv?.workingDaysHours?.online || sched;
                                   setNewEmployeeOnlineWorkingDaysHours(onlineSched);
+                                  const existingBranchSchedules = emp?.working_days_hours?.branch_schedules
+                                    || emp?.workingDaysHours?.branch_schedules
+                                    || matchProv?.workingDaysHours?.branch_schedules
+                                    || (bIds[0] ? { [bIds[0]]: { in_person: sched, online: onlineSched } } : {});
+                                  setNewEmployeeBranchSchedules(existingBranchSchedules);
                                   setIsEditingEmployeeModalOpen(true);
                                 }}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
@@ -1409,9 +1448,12 @@ export default function AdminEmployeesView({
                     });
                     if (res.ok) {
                       setIsEditingEmployeeModalOpen(false);
+                      setEditingEmployee(null);
                       clearFetchCache();
-                      fetchRolesAndEmployees();
-                      fetchProviders();
+                      await Promise.all([
+                        fetchRolesAndEmployees ? fetchRolesAndEmployees() : Promise.resolve(),
+                        fetchProviders ? fetchProviders() : Promise.resolve()
+                      ]);
                     } else {
                       const d = await res.json();
                       alert(d.error || t.form.updateFailed);
@@ -1467,9 +1509,12 @@ export default function AdminEmployeesView({
                     if (res.ok) {
                       setNewEmployeePassword("");
                       setIsEditingEmployeeModalOpen(false);
+                      setEditingEmployee(null);
                       clearFetchCache();
-                      fetchRolesAndEmployees();
-                      fetchProviders();
+                      await Promise.all([
+                        fetchRolesAndEmployees ? fetchRolesAndEmployees() : Promise.resolve(),
+                        fetchProviders ? fetchProviders() : Promise.resolve()
+                      ]);
                     } else {
                       const d = await res.json();
                       alert(d.error || t.form.inviteFailed);
@@ -2809,19 +2854,19 @@ export default function AdminEmployeesView({
                   <div>
                     <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.shiftDetails}</span>
                     <span className="font-semibold text-[#1F251A]">
-                      {t.doctorSection.shiftTypeDetails(viewingEmployee.shift === "Night")}
+                      {formatEmployeeShiftTypeDetails(viewingEmployee.shift)}
                     </span>
                   </div>
                   <div>
                     <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.workingHours}</span>
                     <span className="font-semibold text-[#1F251A]">
-                      {viewingEmployee.shift === "Night" ? t.doctorSection.nightHours : t.doctorSection.dayHours}
+                      {formatEmployeeDisplayHours(viewingEmployee.shift)}
                     </span>
                   </div>
                   <div>
                     <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.breakTime}</span>
                     <span className="font-semibold text-[#1F251A]">
-                      {viewingEmployee.shift === "Night" ? t.doctorSection.nightBreak : t.doctorSection.dayBreak}
+                      {formatEmployeeBreakTime(viewingEmployee.shift)}
                     </span>
                   </div>
                   <div>

@@ -910,3 +910,277 @@ The following are **not currently enforced in code**:
 
 4. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test cases `TC-060` & `TC-061` (`Clinical Prescription Follow-Up Visit & Reception Calendar Integration Engine`).
+
+---
+
+## Laser Per-Pulse Calculation & Invoice Settlement Engine Rules
+**Enforced in:** `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/app/admin/page.tsx`, `src/lib/printUtils.ts`, `src/app/api/reservations/route.ts`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`.
+
+1. **Per-Pulse Pricing Formula**:
+   - When a booking is established in `PER_PULSE` mode (Option 2: Pay per Pulse), all laser services delivered during the session (both Primary Booked Service and Additional Services) are charged dynamically based on delivered pulses:
+     $$\text{Price} = \text{delivered\_pulses} \times \text{agreed\_price\_per\_pulse}$$
+   - Non-laser services rendered in the same session retain their standard catalog / branch pricing.
+   - Example: Primary laser service (250 pulses) + Additional laser service (250 pulses) @ 1 EGP/pulse = 500 EGP subtotal, rather than catalog prices.
+   - `writeCheckoutInvoice` in `src/app/api/reservations/route.ts` recognizes per-pulse mode and writes accurate line totals into the invoice ledger.
+
+2. **Booking Details Modal Payment Mode & Settlement Display**:
+   - The standard Booking Details Modal (`BookingDetailsModal.tsx`) clearly displays the session payment method:
+     - **Top Laser Per-Pulse Settlement Banner**: Amber banner with `Zap` icon, agreed pulse rate (`@ ${rate} EGP/pulse`), full bilingual agreement text, and Total Pulses Delivered counter badge.
+     - **3-Metrics Row (Card C)**: "Session Type & Payment Mode" card with explicit `Pay per Pulse (@ ${rate} EGP)` indicator and `Per Pulse` badge.
+     - **Service Details Card**: Shows primary and additional laser services with delivered pulse badges, live multipliers `(${pulses} pulses × ${rate} EGP)`, and accurate total price.
+     - **Payment Summary Card**: Includes a dedicated `Payment Mode` row displaying `⚡ Pay per Pulse (@ ${rate} EGP)`.
+
+3. **Laser Settlement Agreement Notice**:
+   - In ending session finalization, checkout settlement, invoice preview modal, and printed invoice PDFs, an explicit golden Laser Settlement Notice is rendered:
+     - **English**: `Settled that laser services in this session are charged per pulse (500 pulses × 1 EGP = 500 EGP)`
+     - **Arabic**: `تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (500 نبضة × 1 ج.م = 500 ج.م)`
+   - Structured notes tags `[Laser Settlement]: ...` and `[Laser Pulses Delivered]: ...` are automatically persisted to `reservations.notes`.
+
+4. **Safe Additional Service & Primary Pulses Note Parsing**:
+   - `parseAdditionalServiceLine` extracts service names, quantities, unit prices, totals, and pulses without regex leakage or corruption from `, Pulses: <num>` suffixes.
+   - `extractPrimaryPulses` accurately parses primary delivered pulses from structured strings (`[Laser Pulses Delivered]: Primary: <N> pulses...`), preventing fallback to static catalog prices.
+
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-071` (`Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine`).
+
+---
+
+## Laser Pulses Package Purchase & Quota Engine Rules
+**Enforced in:** `src/app/api/packages/sell/route.ts`, `src/app/api/packages/route.ts`, `src/app/api/customers/packages/route.ts`, `src/components/admin/patients/CustomerProfileDrawer.tsx`, `src/components/admin/packages/PackageAdminPanel.tsx`.
+
+1. **Zero-Item Pulses Package Exemption**:
+   - Pulses packages do not require linked service items (`package_items.length === 0`).
+   - `/api/packages/sell` recognizes any package with 0 items, `package_type === 'pulses'`, or `total_pulses > 0` as a valid Laser Pulses Package and never triggers the `"Package must contain at least one service with a positive quantity."` validation blocker.
+
+2. **Schema-Resilient Metadata Synchronization**:
+   - Package types (`services` vs `pulses`) and included total pulses are mirrored to `page_settings` under key `packages_meta` on package creation (`POST`) and updates (`PATCH`), and enriched automatically on `GET /api/packages`.
+   - When a laser pulses package is sold, pulse quotas (`total_pulses`, `pulses_remaining`) are initialized in `customer_packages` and stored in `page_settings` under key `customer_package_pulses` for seamless ecosystem access across doctor sessions, receptionist intake, and customer profiles.
+
+3. **Customer Profile Package & Quota Display**:
+   - In the Sell Package drawer modal (`CustomerProfileDrawer.tsx`), laser pulses packages display their quota (e.g. `⚡ 10,000 Pulses`) in the dropdown and an Included Pulses Quota card in the package preview.
+   - In the Active Packages list (Patient Profile Tab 5), laser pulses packages render an interactive pulse quota card with `Zap` icon, badge, remaining/total pulse counters, and a visual progress bar.
+
+4. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-070` (`Package Types & Laser Pulses Package Engine`).
+
+---
+
+## Laser Pulses Package Redemption & Resilient Session Completion Rules
+**Enforced in:** `src/app/api/reservations/route.ts`, `src/app/api/customers/packages/route.ts`, `src/app/api/reservation-products/route.ts`, `src/components/admin/DoctorAccountView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`.
+
+1. **Schema-Resilient Session Ending (No 42703 Database Errors)**:
+   - When ending or completing a session via `PATCH /api/reservations`, the backend wraps updates in a multi-stage fallback. If Postgres returns error code `42703` (missing column on `reservations` table), extended columns (`laser_payment_mode`, `laser_price_per_pulse`, `delivered_pulses`, `actual_duration_minutes`, `doctor_notes`, `reception_notes`, `follow_up_notes`, `follow_up_date`, `total_price`, `price`) are stripped and the update retries cleanly without failing.
+   - Updates always preserve core booking lifecycle fields (`status: 'completed'`, `notes`, `amount_paid`, `amount_left`, `service_id`).
+
+2. **UUID-Guarded Customer Package Queries (No 22P02 Syntax Errors)**:
+   - `PATCH /api/customers/packages` guards against non-UUID package IDs (e.g. synthetic `pb-...` or `temp-pkg-...`) before querying `customer_packages` table with `.eq('id', pkgId)`.
+   - Pulse store operations (`consume_package_pulses`) operate reliably across all package identifier formats, updating `page_settings.customer_package_pulses` and logging usage history.
+
+3. **0 EGP Package Redemption Service Line & Zero Phantom Charges**:
+   - When a session is settled in `PACKAGE` mode, `writeCheckoutInvoice` treats the base laser service as fully covered by package redemption (`100% discount, line_total = 0`), preventing phantom receivables or duplicate charges.
+   - In `persistSessionLineItems`, device pulses for prepaid packages or standard inclusion are recorded with `unitPrice: 0` so hardware pulse counter entries are never billed as billable addon products.
+
+4. **Flexible Reservation Products Payload Normalization**:
+   - `/api/reservation-products` accepts parameter aliases seamlessly (`description` / `productName` / `name`, `qty` / `quantity`, `unitPrice` / `unit_price` / `price`) and supports all staff roles (`doctor_session`, `receptionist`, `receptionist_global_ending`).
+
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-072` (`Laser Pulses Package Redemption & Session Completion Engine`).
+
+---
+
+## Multi-Scenario Laser Pulses Package Settlement Rules
+**Enforced in:** `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/DoctorAccountView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/app/admin/page.tsx`, `src/lib/printUtils.ts`.
+
+1. **Scenario 1 (No Active Package Purchase + Session Coverage)**:
+   - When a patient with no active pulses packages attends a laser session with `laserPaymentMode === "PACKAGE"`, they choose an available pulses package from the catalog (e.g. 10,000 Pulses @ 7,000 EGP).
+   - The session invoice bills strictly the price of the purchased package (`+ 7,000 EGP`).
+   - The base laser service itself is 100% covered by the newly purchased package (`0 EGP (Package Redemption)`).
+   - Delivered pulses (e.g. 5,000) are consumed from this new package (`customerPackage.id`), and remaining pulses (5,000) carry forward for future sessions without paying again.
+
+2. **Scenario 2 (Existing Package with Deficit Spillover)**:
+   - When delivered pulses exceed remaining pulses in the active package (e.g. 10,000 delivered vs 5,000 balance -> 5,000 pulse deficit), two resolution choices are presented:
+     - **Choice 3A (Buy New Package)**: The patient purchases a new package. The deficit pulses are deducted from the new package, the package price is billed on the invoice, and remaining pulses carry forward.
+     - **Choice 3B (Pay Rest per Pulse)**: The excess deficit pulses are billed on the invoice at the agreed per-pulse rate (`deficit × pulseRate`, e.g. 5,000 × 1 EGP = 5,000 EGP).
+
+3. **Scenario 3 (Standard Redemption)**:
+   - When pulses delivered <= balance, 0 EGP laser charge on invoice. Pulses are deducted, and balance carries forward.
+
+4. **Additional Laser Services vs Non-Laser Services in Package Mode**:
+   - Any additional service added to the session that is a **Laser Service** (`checkIsLaserService`, or keyword 'laser'/'ليزر') is **100% covered by the pulses package (0 EGP cash price)**. Its delivered pulses are deducted from the pulses package quota and its invoice line is formatted as `(Package Redemption · 0 EGP) / (استهلاك باقة · 0 ج.م)`.
+   - Only **Non-Laser Services** (e.g. consultations, chemical peeling, facials) retain their catalog price and are added to the session invoice on top of the package mode selection (e.g. 7,000 EGP package + 150 EGP non-laser service = 7,150 EGP total invoice).
+
+5. **Universal Settlement Agreement Appearance**:
+   - The purple/emerald **Laser Pulses Package Settlement Agreement Banner** is displayed prominently across:
+     - Doctor Ongoing Session tab (with live remaining pulses preview).
+     - Booking Details Modal (top banner and `Package` badge).
+     - Payment Settlement Modal (checkout notice).
+     - Booking Invoice Preview Modal.
+     - Printed Invoice PDFs (`printUtils.ts`).
+
+6. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-073` (`Multi-Scenario Laser Pulses Package Settlement Engine`).
+
+---
+
+## New Booking Laser Pulses Package Selection & Catalog Purchase Rules
+**Enforced in:** `src/components/admin/bookings/AdminNewBookingView.tsx`, `src/components/admin/DoctorAccountView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/app/admin/page.tsx`, `src/components/admin/translations.ts`.
+
+1. **Active Pulses Package Detection in New Booking**:
+   - For laser bookings (`isLaserService === true`), Option 3 (**Pulses Package**) distinguishes between session packages (`packageType === 'services'`) and pulses packages (`packageType === 'pulses'`).
+   - If the patient possesses an active pulses package with positive balance (`pulsesRemaining > 0`):
+     - Displays pulse quota badge (e.g., `5,000 pulses left / 5,000 نبضة متبقية`) instead of `0 sessions left`.
+     - In the package card breakdown, displays `Laser Hair Removal Treatments (All Areas)` with remaining pulse quota, eliminating the false `Selected service is not covered in this package` amber alert.
+     - Sets Booking Value to `0 EGP (Package)`, with a prominent green confirmation banner indicating that session pulses will be deducted from the patient's active package upon completion.
+     - Notes record `[Laser Package Redemption]: <Package Name>`.
+
+2. **In-Booking Catalog Pulses Package Selection (No Active Package)**:
+   - When a patient has no active pulses package, selecting Option 3 reveals interactive pulses catalog package cards loaded dynamically from `/api/packages`.
+   - Each card displays package name, pulse quota (e.g. 10,000 pulses), and price (e.g. 6,000 EGP).
+   - Selecting a catalog pulses package sets Booking Value and Amount Paid Now to that package's price (e.g., `6,000 EGP (Buy Package)`).
+   - Notes record `[Purchasing New Pulses Package]: <Name> (<Price> EGP · <Pulses> pulses)` and payload includes `purchasingPackageId`.
+   - Doctor session checkout and Reception settlement automatically activate Scenario 1 (selling the new package at invoice while treating the laser session as 100% covered).
+
+3. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-074` (`New Booking Laser Pulses Package Selection & Catalog Purchase Engine`).
+
+---
+
+## Laser Option 3 Multi-Package Selection & Session Pricing Rules
+**Enforced in:** `src/components/admin/bookings/AdminNewBookingView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/DoctorAccountView.tsx`, `src/app/admin/page.tsx`, `src/components/admin/translations.ts`.
+
+1. **Strict UI Isolation to Option 3 on Laser Bookings**:
+   - When a laser service is selected (`isLaserService === true`), laser pulses packages appear **exclusively inside Option 3 (Pulses Package)**.
+   - The general "Patient Packages & Subscriptions" bottom section is completely hidden for laser appointments (`{!isLaserService && ( ... )}`), eliminating clutter and preventing erroneous `0 sessions left` / `Selected service is not covered in this package` notices.
+   - For non-laser appointments (`!isLaserService`), that section shows strictly non-laser service packages (`customerServicePackages`).
+
+2. **Multiple Active Pulses Packages Selection**:
+   - If the patient owns more than one active laser pulses package, Option 3 renders an interactive selection grid of all active packages owned by the patient.
+   - Receptionists can click between cards to select which package quota (`selectedCustomerPulsePkgId`) to deduct session pulses from.
+   - The laser booking value is 0 EGP with a green confirmation banner that pulses will be deducted upon treatment completion.
+
+3. **In-Booking Catalog Package Purchase When Patient Has No Active Package**:
+   - If the patient has 0 active pulses packages, Option 3 reveals interactive pulses catalog package cards loaded dynamically from `/api/packages`.
+   - Selecting a catalog package updates the booking value and amount paid now to that package's price (e.g., 6,000 EGP).
+
+4. **Total Session Price Calculation Across All Workflows**:
+   - The total price of the session is strictly:
+     `pulses package price (if purchasing new) + 0 EGP for laser session(s) + any other non-laser service price if used`.
+   - Additional laser services added during the session are 100% covered under the pulses package (`Package Redemption · 0 EGP`).
+   - Additional non-laser services (dermatology, facial, peelings, etc.) retain their full catalog price and are added to the session invoice total.
+
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-075` (`Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine`).
+
+---
+
+## Laser Package Used Pulses Deduction & Synchronization Rules
+**Enforced in:** `src/app/api/customers/packages/route.ts`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/DoctorAccountView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/app/admin/page.tsx`.
+
+1. **Dual Column Persistence on Supabase (`customer_packages`)**:
+   - Whenever pulses are deducted via `PATCH /api/customers/packages` (`action: 'consume_package_pulses'`), updates are written to `pulses_used` and `pulses_remaining` (the PostgreSQL table columns per migration `20260920030000_add_package_type_and_total_pulses_to_packages.sql`) with dual fallback to `used_pulses` and `remaining_pulses`.
+   - If the package is not yet initialized in the `page_settings` store, initial balances are populated directly from the existing `customer_packages` database record (`pulses_used`, `pulses_remaining`).
+
+2. **Full Laser Service Pulses Aggregation**:
+   - Delivered pulses from both the **Base Laser Service** and all **Additional Laser Services** are summed into total session delivered pulses (`totalLaserDeliveredPulses`).
+   - The total delivered pulses count is passed for package deduction. Non-laser services are excluded from pulse deduction.
+
+3. **Multi-Point Execution & Cross-Workflow Idempotency**:
+   - Pulses are deducted whenever a session is finalized:
+     - **Doctor Portal**: Doctor clicks "Complete Session" in `DoctorOngoingSessionTab.tsx` / `DoctorAccountView.tsx`.
+     - **Reception Dashboard**: Receptionist clicks "End Session" in `BookingDetailsModal.tsx` (`handleFinalizeSessionStandalone` Step 5b).
+     - **Checkout Settlement**: Staff processes payment settlement in `page.tsx` (`handleSavePayment`).
+   - Every deduction records `booking_id` in the package's `usage_history`. If the reservation's pulses were already deducted by an earlier workflow action, subsequent calls gracefully no-op, preventing double deduction.
+
+4. **Deficit Cap & Completion Status**:
+   - When delivered pulses exceed remaining pulses, the system consumes the remaining balance (`actualDeduct = Math.min(qtyToDeduct, pkgPulses.remaining_pulses)`) and sets package status to `'completed'`, avoiding HTTP 400 transaction aborts.
+
+5. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-076` (`Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine`).
+
+---
+
+## In-Booking Package Selling & Integrated Patient Search Rules
+**Enforced in:** `src/components/admin/bookings/AdminNewBookingView.tsx`, `src/app/admin/page.tsx`, `src/components/admin/patients/CustomerProfileDrawer.tsx`, `src/components/admin/patients/useCustomerProfile.ts`.
+
+1. **Immediate In-Booking Package Persistence**:
+   - When a receptionist books a laser appointment with Option 3 (Pulses Package) and selects a new pulses package to buy (`isNewPackagePurchase && selectedCatalogPulsePkg`), the package is immediately created and sold to the patient via `POST /api/packages/sell` during `handleSaveBooking`.
+   - The resulting `customerPackage.id` is linked to `reservation.packageId` and recorded in reservation notes.
+   - The package is immediately active in the PostgreSQL `customer_packages` table, making it instantly visible in the Patient Profile's "Purchased Packages" -> "Active Packages" tab with full pulses quota, purchase date, and active badge.
+
+2. **Integrated Patient Search & Persistent Dropdown**:
+   - The patient directory dropdown in New Booking is triggered by clicking "Browse Patients List" or focusing the phone input.
+   - The dropdown container renders unconditionally when `showCustomerDropdown` is active (not suppressed if filtered results count is 0).
+   - An integrated search input inside the dropdown filters patients across Name, Phone, and Email in real time.
+   - If no match is found, an explicit "No matching patients found" notice and "Show all patients" button are rendered.
+   - `src/app/admin/page.tsx` passes the comprehensive, synthesized `customers` list to `AdminNewBookingView` and `AdminAddPreviousBookingView`.
+
+3. **Automated Diagnostic Verification**:
+   - Verified under System Test Suite test case `TC-077` (`In-Booking Package Selling & Integrated Patient Search Engine`).
+
+---
+
+## Synthetic Customer ID Resolution & Cross-Workflow Profile Sync Rules
+**Enforced in:** `src/app/api/packages/sell/route.ts`, `src/app/api/customers/packages/route.ts`, `src/app/api/inventory/products/sales/route.ts`, `src/components/admin/patients/useCustomerProfile.ts`.
+
+1. **Synthetic Patient ID Resolution (`res-cust-...`)**:
+   - Reservation-derived patient records with pseudo-IDs (e.g., `res-cust-01016302772`) MUST NEVER be passed directly to database queries targeting PostgreSQL `UUID` columns (`customers.id`, `invoices.customer_id`, `customer_packages.customer_id`).
+   - `POST /api/packages/sell` and `POST /api/inventory/products/sales` validate customer IDs against `UUID_REGEX`. If a synthetic ID or phone number is passed, the system extracts phone digits, looks up existing customer UUIDs, or auto-creates a real customer record from reservation history.
+   - `useCustomerProfile.ts` resolves or creates the real customer record before calling `/api/packages/sell` or `/api/inventory/products/sales`, updating `viewingCustomerProfile.id` with the generated UUID.
+
+2. **Safe UUID Filtering on Package Lookups**:
+   - `GET /api/customers/packages` guards against non-UUID customer IDs by extracting phone numbers and querying `customers` by phone.
+   - Database queries against `customer_packages` and `customer_product_balances` only query valid UUIDs (`.in('customer_id', validCustomerIds)`), eliminating PostgreSQL `22P02 invalid input syntax for type uuid` errors.
+
+3. **Multi-Workflow Patient Profile Synchronization**:
+   - `useCustomerProfile.ts` subscribes to `revera-laser-change` to immediately re-fetch both product balances and customer packages (`fetchCustomerProfilePackages`), ensuring packages created or updated in New Booking, Doctor Portal, or Reception Dashboard appear instantly in open patient profiles.
+
+---
+
+## In-Booking Package Partial Payment Rules (DEC-075)
+
+These rules govern the case where a patient purchases a new pulses package during the booking creation process and makes a partial payment upfront.
+
+### Core Invariant: Outstanding Balance MUST Always Be Preserved
+
+**The booking's financial commitment must NEVER be silently zeroed out.**
+
+Specifically, `amountLeft` in the `reservations` table MUST reflect the true unpaid balance — it must not be overwritten to 0 if the patient paid less than the total package price.
+
+### Rules
+
+1. **`amountPaid` Must Be Passed in the Sell Body**:
+   - When `AdminNewBookingView.tsx` calls `POST /api/packages/sell` during Option 3 (In-Booking Package Purchase), it MUST include `amountPaid: numAmountPaid` in the request body.
+   - The API must NOT default to full payment (grandTotal) when `amountPaid` is not explicitly provided.
+
+2. **Package Sell API Must Record Partial Payment Correctly** (`/api/packages/sell`):
+   - `actualPaid = min(grandTotal, max(0, amountPaid))`
+   - `remainingDue = grandTotal - actualPaid`
+   - `invoiceStatus = 'paid' | 'partially_paid' | 'issued'` (based on actualPaid vs. grandTotal)
+   - The `payments` row records `actualPaid`, not grandTotal.
+   - The `transaction_ledger` records `actualPaid`.
+   - Customer `outstanding` is incremented by `remainingDue` if > 0.
+
+3. **Session Completion Must NOT Collapse PACKAGE Mode Total to Zero** (`DoctorAccountView.tsx`, `BookingDetailsModal.tsx`):
+   - For PACKAGE mode bookings, `effectiveBasePrice = 0` and there is typically no `effectiveLaserSessionCharge` (standard redemption, no deficit). The naive formula `sessionTotal = 0 + 0 + 0` is WRONG.
+   - The session total floor must be the MAXIMUM of:
+     - Raw computed session charges (additional services, products, deficit)
+     - The booked package price parsed from booking notes: `[Purchasing New Pulses Package]: Name (PRICE EGP)`
+     - The original booking commitment: `amountPaid + amountLeft` from the reservation record
+   - Formula: `sessionComputedTotal = max(sessionComputedRaw, bookedPackagePrice, amountPaid + amountLeft)`
+
+4. **Booking Notes Package Price Parsing**:
+   - The booked package purchase price can be reliably recovered from booking notes using this regex:
+     ```
+     /\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption)\]:[^(]+\((\d+(?:\.\d+)?)\s*EGP/i
+     ```
+   - This regex is stable because the booking note format is always: `[Purchasing New Pulses Package]: <Name> (<price> EGP · <pulses> pulses)`
+
+5. **Payment Mode Label Must Be Correct**:
+   - When `isLaserPackage` is `true` (any of: `laserPaymentMode === "PACKAGE"`, notes contain `"pulses package"` / `"[Purchasing New Pulses Package]"` / `"package redemption"`), the Payment Mode badge must display **"Pulses Package"** / **"باقة نبضات"** (with a purple Zap icon).
+   - "Standard Service" is ONLY shown when neither `isLaserPerPulse` nor `isLaserPackage` is true.
+
+6. **`isInvoicePaid` Evaluation**:
+   - `isInvoicePaid = (sessionPaid >= totalPrice && totalPrice > 0) || (sessionLeft <= 0 && sessionPaid > 0)`
+   - The `rawLeft <= 0` condition alone MUST NOT determine paid status, because it can be a stale/incorrect DB value from a prior buggy session completion. Use the recomputed `totalPrice` (which includes the booked package price) as the authoritative floor.
+
+

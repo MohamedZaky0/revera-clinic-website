@@ -239,6 +239,7 @@ read-only `/api/availability`. An admin can double-book a doctor from the panel.
 | `is_shared` | boolean | Default false |
 | `enable_reminder` | boolean | Default true |
 | `branch_pricing` | JSONB | Array of `{name, price, visible, status, isDefault}`, default `{}` |
+| `islaser` / `is_laser` | boolean | Default false. **Added 2026-09-20** by `20260920010000_add_islaser_to_services.sql`. Marks service as laser service requiring equipment device connection and enabling 3-tier payment options. |
 | `visible` | boolean | default true |
 | `active` | boolean | default true |
 | `created_at` | timestamptz | |
@@ -1370,6 +1371,86 @@ Immutable audit logs tracking financial transaction creations, refunds, adjustme
 | `performed_by_employee_id` | UUID | FK → employee_accounts.id ON DELETE SET NULL, nullable |
 | `performed_by_name` | text | nullable |
 | `details` | jsonb | DEFAULT `'{}'::jsonb` |
+| `created_at` | timestamptz | NOT NULL DEFAULT now() |
+
+---
+
+### `laser_pulse_logs`
+
+**Added 2026-09-20** by `20260920000000_create_laser_pulse_engine.sql`.
+Unified clinical and accounting audit logs for all laser pulse treatments across Type 1 (Fixed Service), Type 2 (Retail FIFO Pulses), and Type 3 (Included Package Pulses).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key DEFAULT gen_random_uuid() |
+| `customer_id` | UUID | FK → customers.id ON DELETE CASCADE |
+| `reservation_id` | UUID | FK → reservations.id ON DELETE SET NULL, nullable |
+| `pulse_type` | text | NOT NULL (`'SERVICE'`, `'PULSE_PURCHASE'`, `'PACKAGE'`) |
+| `treatment_area` | text | NOT NULL DEFAULT `'Standard Area'` (e.g. `'Full Body'`, `'Face'`, `'Beard'`, `'Underarms'`) |
+| `pulses_used` | integer | NOT NULL DEFAULT 0 (standard session pulses delivered) |
+| `remaining_balance_after` | integer | nullable (remaining balance snapshot after session) |
+| `additional_pulses` | integer | NOT NULL DEFAULT 0 (extra pulses delivered beyond standard) |
+| `pulse_value` | numeric(10,2) | NOT NULL DEFAULT 0.00 (unit price per additional pulse) |
+| `additional_charge` | numeric(10,2) | NOT NULL DEFAULT 0.00 (`additional_pulses * pulse_value`) |
+| `total_patient_charge` | numeric(10,2) | NOT NULL DEFAULT 0.00 (total billed for this session) |
+| `additional_reason` | text | nullable (mandatory when `additional_pulses > 0`) |
+| `source_id` | text | nullable (linked package ID or product balance ID) |
+| `doctor_id` | text | nullable (doctor UUID or identifier) |
+| `doctor_name` | text | nullable (doctor display name) |
+| `device_id` | text | nullable (laser equipment device ID) |
+| `device_name` | text | nullable (laser equipment device name) |
+| `added_by` | text | NOT NULL DEFAULT `'Staff'` |
+| `notes` | text | nullable |
+| `session_date` | timestamptz | NOT NULL DEFAULT now() |
+| `created_at` | timestamptz | NOT NULL DEFAULT now() |
+
+---
+
+### `packages`
+
+**Updated 2026-09-20** by `20260920030000_add_package_type_and_total_pulses_to_packages.sql`.
+Package offers catalogue configured in Admin (`/admin` -> Packages).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key DEFAULT gen_random_uuid() |
+| `name` | text | NOT NULL (package name) |
+| `name_ar` | text | nullable (Arabic name) |
+| `description` | text | nullable |
+| `description_ar` | text | nullable |
+| `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable |
+| `price` | numeric(10,2) | NOT NULL DEFAULT 0.00 |
+| `tax` | numeric(10,2) | DEFAULT 0.00 |
+| `validity_days` | integer | DEFAULT 365 |
+| `package_type` | text | NOT NULL DEFAULT `'services'` (`'services'` or `'pulses'`) |
+| `total_pulses` | integer | NOT NULL DEFAULT 0 (included pulses for `'pulses'` package type) |
+| `on_expiry` | text | DEFAULT `'expire'` (`'expire'` or `'extend'`) |
+| `extension_days` | integer | DEFAULT 0 |
+| `is_active` | boolean | DEFAULT true |
+| `services` | jsonb | Array of included service items for services packages |
+| `created_at` | timestamptz | NOT NULL DEFAULT now() |
+
+---
+
+### `customer_packages`
+
+**Updated 2026-09-20** by `20260920030000_add_package_type_and_total_pulses_to_packages.sql`.
+Purchased packages assigned to customers.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key DEFAULT gen_random_uuid() |
+| `customer_id` | UUID | FK → customers.id ON DELETE CASCADE |
+| `package_id` | UUID | FK → packages.id ON DELETE SET NULL, nullable |
+| `package_name` | text | NOT NULL |
+| `price_paid` | numeric(10,2) | NOT NULL DEFAULT 0.00 |
+| `purchase_date` | date | NOT NULL DEFAULT CURRENT_DATE |
+| `expiry_date` | date | NOT NULL |
+| `status` | text | NOT NULL DEFAULT `'active'` (`'active'`, `'expired'`, `'completed'`) |
+| `services` | jsonb | Array of customer service items with total & used counts |
+| `package_type` | text | NOT NULL DEFAULT `'services'` (`'services'` or `'pulses'`) |
+| `total_pulses` | integer | NOT NULL DEFAULT 0 |
+| `pulses_remaining` | integer | NOT NULL DEFAULT 0 |
 | `created_at` | timestamptz | NOT NULL DEFAULT now() |
 
 ## Notes on Schema Gaps

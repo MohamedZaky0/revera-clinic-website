@@ -25,6 +25,8 @@ interface BookingSettingsViewProps {
   setBookingStaleSessionHours: (v: number) => void;
   bookingFollowUpLeadDays?: number;
   setBookingFollowUpLeadDays?: (v: number) => void;
+  bookingDefaultPricePerPulse?: number;
+  setBookingDefaultPricePerPulse?: (v: number) => void;
   globalEndingSession?: boolean;
   setGlobalEndingSession?: (v: boolean) => void;
   handleSaveBookingSettings: () => Promise<void>;
@@ -51,6 +53,8 @@ export default function BookingSettingsView({
   setBookingStaleSessionHours,
   bookingFollowUpLeadDays = 2,
   setBookingFollowUpLeadDays,
+  bookingDefaultPricePerPulse = 5,
+  setBookingDefaultPricePerPulse,
   globalEndingSession = false,
   setGlobalEndingSession,
   handleSaveBookingSettings,
@@ -222,6 +226,42 @@ export default function BookingSettingsView({
                 ))}
               </select>
               <span className="text-[11px] text-[#8A9A81] mt-1 block">{t.followUpLeadDaysHint}</span>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">
+                  {t.defaultPricePerPulse || "Default Price per Pulse (EGP)"}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setActiveInfoFeature({
+                    title: t.defaultPricePerPulseInfoTitle || t.defaultPricePerPulse || "Default Laser Pulse Price",
+                    description: t.defaultPricePerPulseInfoDesc || "This setting defines the standard clinic-wide price per single laser pulse in Egyptian Pounds (EGP). This default price automatically prefills the pulse selling interface and additional pulse calculations in ongoing treatment sessions."
+                  })}
+                  className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                  title={t.clickForInfo}
+                >
+                  <Info size={13} />
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={bookingDefaultPricePerPulse ?? 5}
+                  onChange={(e) => setBookingDefaultPricePerPulse?.(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm font-bold text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                  placeholder="5"
+                />
+                <span className="absolute end-4 top-1/2 -translate-y-1/2 text-xs font-bold text-[#5A6A51] pointer-events-none">
+                  EGP
+                </span>
+              </div>
+              <span className="text-[11px] text-[#8A9A81] mt-1 block">
+                {t.defaultPricePerPulseHint || "Standard unit price for selling laser pulses and calculating additional pulses."}
+              </span>
             </div>
 
           </div>
@@ -399,7 +439,7 @@ export default function BookingSettingsView({
                     ✓ Medical Intake
                   </span>
                   <span className="inline-block rounded-lg bg-[#EDF1EC] px-2 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
-                    ✓ Digital Rx
+                    ✓ Digital Prescription
                   </span>
                   <span className="inline-block rounded-lg bg-[#EDF1EC] px-2 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
                     ✓ Consumables &amp; Pulses

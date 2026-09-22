@@ -15,9 +15,20 @@ import { createSupabaseFake } from '../../helpers/supabaseFake';
 
 const fake = createSupabaseFake();
 
-vi.mock('@/lib/supabaseClient', () => ({
-  supabase: { from: (table: string) => fake.client.from(table) },
-}));
+// The view also opens a realtime channel (`supabase.channel(...).on(...).on(...).subscribe()`) so
+// follow-up reminders update without a reload. Realtime is not what these tests cover, so the
+// channel is an inert chainable stub — but it must exist, or the mount effect throws and every
+// render in this file fails.
+vi.mock('@/lib/supabaseClient', () => {
+  const channel: any = { on: () => channel, subscribe: () => channel };
+  return {
+    supabase: {
+      from: (table: string) => fake.client.from(table),
+      channel: () => channel,
+      removeChannel: () => undefined,
+    },
+  };
+});
 
 import { AdminBookingsView } from '@/components/admin/bookings/AdminBookingsView';
 

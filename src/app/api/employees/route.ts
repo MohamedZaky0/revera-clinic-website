@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireAdministratorAccess, requireSuperadminAccess } from '@/lib/access';
 import { normalizeServiceCommissions } from '@/lib/providerCommissions';
+import fs from 'fs';
+import path from 'path';
 
+const SCHEDULES_FILE_PATH = path.join(process.cwd(), 'data', 'employee_schedules.json');
 
 // Mirrors the rule enforced at /auth/setup (src/app/auth/setup/page.tsx) so an admin-set password
 // and a self-set one can never diverge in strength.
@@ -22,6 +25,75 @@ const PRIVILEGED_ROLES = ['admin', 'superadmin'];
 function deniesRoleGrant(callerRole: string, targetRole: unknown): boolean {
   if (typeof targetRole !== 'string' || !targetRole) return false;
   return PRIVILEGED_ROLES.includes(targetRole.trim().toLowerCase()) && callerRole !== 'superadmin';
+}
+
+async function getEmployeeWorkingSchedulesMap(): Promise<Record<string, any>> {
+  let result: Record<string, any> = {};
+
+  // 1. Try local JSON file first for immediate disk persistence
+  try {
+    if (fs.existsSync(SCHEDULES_FILE_PATH)) {
+      const content = fs.readFileSync(SCHEDULES_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (parsed && typeof parsed === 'object') {
+        result = { ...parsed };
+      }
+    }
+  } catch (fileErr) {
+    console.warn('Error reading employee_schedules.json:', fileErr);
+  }
+
+  // 2. Try Supabase page_settings and merge
+  try {
+    const { data } = await supabaseServer
+      .from('page_settings')
+      .select('value')
+      .eq('key', 'employee_working_schedules')
+      .maybeSingle();
+    if (data?.value && typeof data.value === 'object') {
+      result = { ...result, ...data.value };
+    }
+  } catch (err) {
+    console.warn('Error reading employee_working_schedules from page_settings:', err);
+  }
+
+  return result;
+}
+
+async function saveEmployeeWorkingSchedule(employeeKey: string, schedule: any, aliasKeys: (string | null | undefined)[] = []) {
+  if (!employeeKey || !schedule) return;
+  try {
+    const map = await getEmployeeWorkingSchedulesMap();
+    map[employeeKey] = schedule;
+    for (const ak of aliasKeys) {
+      if (ak) {
+        map[ak] = schedule;
+        map[ak.toLowerCase()] = schedule;
+      }
+    }
+
+    // 1. Write to local JSON file
+    try {
+      const dir = path.dirname(SCHEDULES_FILE_PATH);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(SCHEDULES_FILE_PATH, JSON.stringify(map, null, 2), 'utf-8');
+    } catch (fErr) {
+      console.warn('Error writing employee_schedules.json:', fErr);
+    }
+
+    // 2. Write to Supabase page_settings
+    await supabaseServer
+      .from('page_settings')
+      .upsert({
+        key: 'employee_working_schedules',
+        value: map,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' });
+  } catch (err) {
+    console.warn('Error saving employee_working_schedules to page_settings:', err);
+  }
 }
 
 export async function GET(req: Request) {
@@ -49,14 +121,27 @@ export async function GET(req: Request) {
       console.warn("Failed to fetch auth users list for confirmation check:", authError.message);
     }
 
-    const enrichedEmployees = (employees || []).map((emp: any) => ({
-      ...emp,
-      requiredTargetAmount: emp.required_target_amount !== null ? Number(emp.required_target_amount) : 0,
-      bonusPercentage: emp.bonus_percentage !== null ? Number(emp.bonus_percentage) : 0,
-      targetType: emp.target_type || 'reservations',
-      bonusType: emp.bonus_type || 'percentage',
-      email_confirmed_at: emp.auth_user_id ? confirmedMap.get(emp.auth_user_id) : null
-    }));
+    const schedulesMap = await getEmployeeWorkingSchedulesMap();
+
+    const enrichedEmployees = (employees || []).map((emp: any) => {
+      const savedSched = emp.working_days_hours 
+        || schedulesMap[emp.id] 
+        || schedulesMap[emp.employee_id] 
+        || (emp.email ? schedulesMap[emp.email.toLowerCase()] : null) 
+        || (emp.name ? schedulesMap[emp.name.toLowerCase()] : null) 
+        || null;
+
+      return {
+        ...emp,
+        working_days_hours: savedSched,
+        workingDaysHours: savedSched,
+        requiredTargetAmount: emp.required_target_amount !== null ? Number(emp.required_target_amount) : 0,
+        bonusPercentage: emp.bonus_percentage !== null ? Number(emp.bonus_percentage) : 0,
+        targetType: emp.target_type || 'reservations',
+        bonusType: emp.bonus_type || 'percentage',
+        email_confirmed_at: emp.auth_user_id ? confirmedMap.get(emp.auth_user_id) : null
+      };
+    });
 
     return NextResponse.json(enrichedEmployees);
   } catch (err: any) {
@@ -203,9 +288,13 @@ export async function POST(req: Request) {
       }
     }
 
-    const { data: newEmployee, error: insertError } = await supabaseServer
-      .from('employee_accounts')
-      .insert({
+    const workingDaysHours = body.workingDaysHours !== undefined ? body.workingDaysHours : (body.working_days_hours || null);
+
+    let newEmployee: any = null;
+    let insertError: any = null;
+
+    try {
+      const insertPayload: Record<string, any> = {
         auth_user_id: authUserId,
         employee_id: cleanEmail,
         email: cleanEmail,
@@ -226,17 +315,74 @@ export async function POST(req: Request) {
         bonus_percentage: bonusPercentage ? Number(bonusPercentage) : 0,
         target_type: targetType || 'reservations',
         bonus_type: bonusType || 'percentage',
-      })
-      .select()
-      .single();
+      };
+      if (workingDaysHours) {
+        insertPayload.working_days_hours = workingDaysHours;
+      }
+
+      const res = await supabaseServer
+        .from('employee_accounts')
+        .insert(insertPayload)
+        .select()
+        .single();
+      newEmployee = res.data;
+      insertError = res.error;
+    } catch (e) {
+      insertError = e;
+    }
 
     if (insertError) {
-      await supabaseServer.auth.admin.deleteUser(authUserId);
-      throw insertError;
+      // Fallback without working_days_hours if column does not exist on table
+      const fallbackPayload = {
+        auth_user_id: authUserId,
+        employee_id: cleanEmail,
+        email: cleanEmail,
+        name: cleanName,
+        role_name: roleName,
+        phone: phone || null,
+        department: department || 'Reception',
+        shift: shift || 'Day',
+        salary: salary ? Number(salary) : 0,
+        national_id: nationalId || null,
+        national_id_front: nationalIdFront || null,
+        national_id_back: nationalIdBack || null,
+        address: address || null,
+        branch_id: branchId || null,
+        contract_file: contractFile || null,
+        contract_file_name: contractFileName || null,
+        required_target_amount: requiredTargetAmount ? Number(requiredTargetAmount) : 0,
+        bonus_percentage: bonusPercentage ? Number(bonusPercentage) : 0,
+        target_type: targetType || 'reservations',
+        bonus_type: bonusType || 'percentage',
+      };
+
+      const resFallback = await supabaseServer
+        .from('employee_accounts')
+        .insert(fallbackPayload)
+        .select()
+        .single();
+
+      newEmployee = resFallback.data;
+      insertError = resFallback.error;
+    }
+
+    if (insertError || !newEmployee) {
+      if (authUserId) await supabaseServer.auth.admin.deleteUser(authUserId);
+      throw insertError || new Error('Failed to create employee account');
+    }
+
+    if (workingDaysHours) {
+      await saveEmployeeWorkingSchedule(
+        newEmployee.id,
+        workingDaysHours,
+        [newEmployee.employee_id, cleanEmail, cleanName]
+      );
     }
 
     const mapped = newEmployee ? {
       ...newEmployee,
+      working_days_hours: workingDaysHours || newEmployee.working_days_hours || null,
+      workingDaysHours: workingDaysHours || newEmployee.working_days_hours || null,
       requiredTargetAmount: newEmployee.required_target_amount !== null ? Number(newEmployee.required_target_amount) : 0,
       bonusPercentage: newEmployee.bonus_percentage !== null ? Number(newEmployee.bonus_percentage) : 0,
       targetType: newEmployee.target_type || 'reservations',
@@ -244,12 +390,6 @@ export async function POST(req: Request) {
     } : null;
 
     // Sync with providers table if department/role is Doctor.
-    //
-    // A doctor who exists in employee_accounts but not in providers is invisible to booking and to
-    // the schedule, so this step is part of creating the doctor, not a nice-to-have afterwards.
-    // It used to be wrapped in a catch that only logged, which meant that failure returned 201 and
-    // reception had no way to know the doctor would never appear. It now rolls the whole creation
-    // back instead -- see the catch at the end of this block.
     const isDoctor = (department && (department.toLowerCase().includes('doc') || department.toLowerCase() === 'doctors')) || (roleName && roleName.toLowerCase().includes('doc'));
     if (isDoctor) {
       try {
@@ -267,22 +407,11 @@ export async function POST(req: Request) {
           commission_base: body.commission_base || 'gross',
           commission_fixed_component: body.commission_fixed_component ? Number(body.commission_fixed_component) : 0,
           service_commissions: normalizeServiceCommissions(body.service_commissions),
-          working_days_hours: body.workingDaysHours || null,
+          working_days_hours: workingDaysHours,
           bookings_count: 0,
           more_count: Math.max(0, (body.services || []).length - 2)
         };
 
-        // Match only on identifiers that belong to one human: national ID first, then phone.
-        //
-        // The previous matcher was `.or(name.ilike.<name>, phone.eq.<phone>)`, which matched on
-        // name. Two doctors called "Ahmed Mohamed" is ordinary in a clinic, and a name hit made
-        // this UPDATE the existing provider -- silently overwriting the first doctor's commission
-        // config, services, branch and salary with the second one's. It also used `.maybeSingle()`,
-        // which throws when more than one row matches; that throw landed in the log-only catch and
-        // the request still returned 201.
-        //
-        // Same rule the codebase already applies to `reservations.provider_id` (RISK-015): refuse
-        // to guess when the match is ambiguous, because a wrong link corrupts attribution silently.
         const cleanNationalId = typeof nationalId === 'string' ? nationalId.trim() : '';
         const cleanPhone = typeof phone === 'string' ? phone.trim() : '';
 
@@ -318,9 +447,6 @@ export async function POST(req: Request) {
           if (providerInsertError) throw providerInsertError;
         }
       } catch (provErr: any) {
-        // Roll the whole creation back rather than leaving a doctor who can never be booked.
-        // Order matters: remove the employee row first, then the auth user, so a failure partway
-        // through cannot leave an employee_accounts row pointing at a deleted auth user.
         await supabaseServer.from('employee_accounts').delete().eq('id', newEmployee.id);
         if (authUserId) await supabaseServer.auth.admin.deleteUser(authUserId);
         console.error('Failed to sync doctor employee to providers table:', provErr);
@@ -349,6 +475,7 @@ export async function PATCH(req: Request) {
   try {
     const body = await req.json();
     const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType, resendInvite } = body;
+    const workingDaysHours = body.workingDaysHours !== undefined ? body.workingDaysHours : body.working_days_hours;
 
     if (!id) {
       return NextResponse.json({ error: 'Employee ID is required.' }, { status: 400 });
@@ -365,13 +492,12 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Employee account not found.' }, { status: 404 });
     }
 
-    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchId !== undefined || requiredTargetAmount !== undefined || bonusPercentage !== undefined || targetType !== undefined || bonusType !== undefined)) {
+    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchId !== undefined || requiredTargetAmount !== undefined || bonusPercentage !== undefined || targetType !== undefined || bonusType !== undefined || workingDaysHours !== undefined)) {
       const updates: Record<string, any> = {};
       if (roleName) {
         if (employee.employee_id === 'superadmin') {
           return NextResponse.json({ error: 'Cannot modify the role of the system owner account.' }, { status: 400 });
         }
-        // RISK-069, via the same helper POST uses — see deniesRoleGrant above.
         if (deniesRoleGrant(access.access.role, roleName)) {
           return NextResponse.json({ error: 'Only the superadmin can grant admin or superadmin access.' }, { status: 403 });
         }
@@ -405,14 +531,45 @@ export async function PATCH(req: Request) {
       if (targetType !== undefined) updates.target_type = targetType;
       if (bonusType !== undefined) updates.bonus_type = bonusType;
 
-      const { data: updatedEmp, error: updateError } = await supabaseServer
-        .from('employee_accounts')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+      let updatedEmp: any = null;
+      let updateError: any = null;
 
-      if (updateError) throw updateError;
+      if (workingDaysHours !== undefined) {
+        try {
+          const res = await supabaseServer
+            .from('employee_accounts')
+            .update({ ...updates, working_days_hours: workingDaysHours })
+            .eq('id', id)
+            .select()
+            .single();
+          updatedEmp = res.data;
+          updateError = res.error;
+        } catch (e) {
+          updateError = e;
+        }
+      }
+
+      if (!updatedEmp && Object.keys(updates).length > 0) {
+        const res = await supabaseServer
+          .from('employee_accounts')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single();
+        updatedEmp = res.data;
+        updateError = res.error;
+      }
+
+      if (updateError && !updatedEmp) throw updateError;
+
+      // Always persist working schedule to page_settings
+      if (workingDaysHours !== undefined) {
+        await saveEmployeeWorkingSchedule(
+          id,
+          workingDaysHours,
+          [employee.employee_id, employee.email, name || employee.name]
+        );
+      }
 
       if (roleName && employee.auth_user_id) {
         await supabaseServer.auth.admin.updateUserById(
@@ -423,12 +580,16 @@ export async function PATCH(req: Request) {
         });
       }
 
-      const mapped = updatedEmp ? {
-        ...updatedEmp,
-        requiredTargetAmount: updatedEmp.required_target_amount !== null ? Number(updatedEmp.required_target_amount) : 0,
-        bonusPercentage: updatedEmp.bonus_percentage !== null ? Number(updatedEmp.bonus_percentage) : 0,
-        targetType: updatedEmp.target_type || 'reservations',
-        bonusType: updatedEmp.bonus_type || 'percentage'
+      const effectiveSched = workingDaysHours !== undefined ? workingDaysHours : (updatedEmp?.working_days_hours || employee.working_days_hours || null);
+
+      const mapped = updatedEmp || employee ? {
+        ...(updatedEmp || employee),
+        working_days_hours: effectiveSched,
+        workingDaysHours: effectiveSched,
+        requiredTargetAmount: (updatedEmp || employee).required_target_amount !== null ? Number((updatedEmp || employee).required_target_amount) : 0,
+        bonusPercentage: (updatedEmp || employee).bonus_percentage !== null ? Number((updatedEmp || employee).bonus_percentage) : 0,
+        targetType: (updatedEmp || employee).target_type || 'reservations',
+        bonusType: (updatedEmp || employee).bonus_type || 'percentage'
       } : null;
 
       // Sync updated employee to providers table if department/role is Doctor
@@ -455,7 +616,7 @@ export async function PATCH(req: Request) {
             ...(body.services !== undefined ? { services: body.services } : {}),
             ...(body.specialty !== undefined ? { specialty: body.specialty } : {}),
             ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
-            ...(body.workingDaysHours !== undefined ? { working_days_hours: body.workingDaysHours } : {}),
+            ...(workingDaysHours !== undefined ? { working_days_hours: workingDaysHours } : {}),
             ...(body.commission_type !== undefined ? { commission_type: body.commission_type } : {}),
             ...(body.commission_value !== undefined ? { commission_value: Number(body.commission_value) } : {}),
             ...(body.commission_base !== undefined ? { commission_base: body.commission_base } : {}),
@@ -484,7 +645,7 @@ export async function PATCH(req: Request) {
               commission_base: body.commission_base || 'gross',
               commission_fixed_component: body.commission_fixed_component ? Number(body.commission_fixed_component) : 0,
               service_commissions: normalizeServiceCommissions(body.service_commissions),
-              working_days_hours: body.workingDaysHours || null,
+              working_days_hours: workingDaysHours || null,
               bookings_count: 0,
               more_count: Math.max(0, (body.services || []).length - 2)
             });

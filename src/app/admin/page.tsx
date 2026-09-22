@@ -39,7 +39,7 @@ import CustomerFormModal from "@/components/admin/patients/CustomerFormModal";
 import PatientsDirectoryView from "@/components/admin/patients/PatientsDirectoryView";
 import { useCustomerProfile } from "@/components/admin/patients/useCustomerProfile";
 import CustomerProfileDrawer from "@/components/admin/patients/CustomerProfileDrawer";
-import BookingDetailsModal from "@/components/admin/bookings/BookingDetailsModal";
+import BookingDetailsModal, { checkIsLaserService, parseAdditionalServiceLine } from "@/components/admin/bookings/BookingDetailsModal";
 import {
   AlarmClock,
   ArrowLeft,
@@ -190,6 +190,10 @@ export type Req = {
   createdByEmployeeId?: string | null;
   followUpDate?: string | null;
   followUpNotes?: string | null;
+  laserPaymentMode?: string | null;
+  laserPricePerPulse?: number | null;
+  laserSettlementNote?: string | null;
+  attachedProducts?: any[];
 };
 
 function getStatusBadgeClass(status: string): string {
@@ -579,12 +583,80 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     "Authorization": `Bearer ${session?.access_token || ""}`
   };
 
+  // Category CRUD helpers — backed by /api/categories and Supabase
+  const loadCategoriesFromApi = useCallback(async () => {
+    try {
+      const res = await fetch("/api/categories", {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLocalCategories(data);
+          saveDynamicCategories(data);
+          setExpandedCategories(prev => {
+            const exp = { ...prev };
+            data.forEach((c: LocalCategory) => {
+              if (exp[c.key] === undefined) exp[c.key] = true;
+            });
+            return exp;
+          });
+          return data;
+        }
+      }
+    } catch (err) {
+      console.error("Error loading categories from API:", err);
+    }
+    const fallback = getDynamicCategories();
+    setLocalCategories(fallback);
+    return fallback;
+  }, []);
+
+  const syncCategoriesToApi = useCallback(async (categories: LocalCategory[]) => {
+    saveDynamicCategories(categories);
+    if (!session?.access_token) return categories;
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify(categories),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const saved = Array.isArray(data) ? data : [data];
+        setLocalCategories(saved);
+        saveDynamicCategories(saved);
+        return saved;
+      }
+    } catch (err) {
+      console.error("Error saving categories to API:", err);
+    }
+    return categories;
+  }, [session?.access_token, authenticatedJsonHeaders]);
+
+  const deleteCategoryFromApi = useCallback(async (key: string) => {
+    if (!session?.access_token) return false;
+    try {
+      const res = await fetch(`/api/categories?key=${encodeURIComponent(key)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      return res.ok;
+    } catch (err) {
+      console.error("Error deleting category from API:", err);
+      return false;
+    }
+  }, [session?.access_token]);
+
   // Service CRUD helpers — services are now database-primary, not localStorage (RISK-025)
   const loadServicesFromApi = useCallback(async () => {
-    if (!session?.access_token) return;
     try {
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
       const res = await fetch("/api/services", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers,
         cache: "no-store",
       });
       if (!res.ok) {
@@ -592,10 +664,45 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         return;
       }
       const data = await res.json();
-      setLocalServices(Array.isArray(data) ? data : []);
-      const storedToggles = getServiceToggles();
-      const defaults = Object.fromEntries((Array.isArray(data) ? data : []).map((s: ServiceItem) => [s.id, { visible: true, active: true }]));
-      setServiceToggles({ ...defaults, ...storedToggles });
+      const servicesList: ServiceItem[] = Array.isArray(data) ? data : [];
+      setLocalServices(servicesList);
+
+      // Build database-driven toggles directly from database active & visible columns
+      const dbToggles = Object.fromEntries(
+        servicesList.map((s: ServiceItem) => [
+          s.id,
+          { visible: s.visible !== false, active: s.active !== false }
+        ])
+      );
+      setServiceToggles(dbToggles);
+
+      // Auto-discover any missing categories from database services so no service is ever hidden
+      setLocalCategories(prevCats => {
+        const knownKeys = new Set(prevCats.map(c => c.key));
+        const missingKeys = new Set<string>();
+        servicesList.forEach(s => {
+          if (s.cat && !knownKeys.has(s.cat)) {
+            missingKeys.add(s.cat);
+          }
+        });
+        if (missingKeys.size > 0) {
+          const autoCats: LocalCategory[] = Array.from(missingKeys).map((catKey, idx) => ({
+            key: catKey,
+            en: catKey.charAt(0).toUpperCase() + catKey.slice(1).replace(/_/g, " "),
+            ar: catKey.charAt(0).toUpperCase() + catKey.slice(1).replace(/_/g, " "),
+            sortOrder: prevCats.length + idx,
+          }));
+          const merged = [...prevCats, ...autoCats];
+          saveDynamicCategories(merged);
+          setExpandedCategories(prevExp => {
+            const exp = { ...prevExp };
+            autoCats.forEach(c => { exp[c.key] = true; });
+            return exp;
+          });
+          return merged;
+        }
+        return prevCats;
+      });
     } catch (err) {
       console.error("Error loading services from API:", err);
     }
@@ -644,6 +751,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // as forgotten. Configurable so a clinic that runs longer sessions isn't stuck with false alarms.
   const [bookingStaleSessionHours, setBookingStaleSessionHours] = useState<number>(2);
   const [bookingFollowUpLeadDays, setBookingFollowUpLeadDays] = useState<number>(2);
+  const [bookingDefaultPricePerPulse, setBookingDefaultPricePerPulse] = useState<number>(5);
   // Rooms state
   const [rooms, setRooms] = useState<any[]>([]);
 
@@ -762,7 +870,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
     // Clinical / Doctor Portal fallbacks
     if (permKey.startsWith("clinical.")) {
-      if (adminPermissions.includes("Clinical") || adminPermissions.includes("clinical") || adminRole === "doctor" || adminRole === "Doctor") return true;
+      if (adminPermissions.includes("Clinical") || adminPermissions.includes("clinical") || adminRole === "doctor" || adminRole === "Doctor" || adminRole === "receptionist" || adminRole === "reception" || adminRole === "Receptionist") return true;
     }
 
     // Dashboard & Reception fallbacks
@@ -1197,6 +1305,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [serviceDescAr, setServiceDescAr] = useState("");
   const [serviceSortOrder, setServiceSortOrder] = useState(0);
   const [serviceIsShared, setServiceIsShared] = useState(false);
+  const [serviceIsLaser, setServiceIsLaser] = useState(false);
   const [serviceEnableReminder, setServiceEnableReminder] = useState(true);
   const [serviceImageUrl, setServiceImageUrl] = useState("");
   const [servicePrice, setServicePrice] = useState<number>(0);
@@ -1226,6 +1335,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     setServiceDescAr(svc.descriptionAr || "");
     setServiceSortOrder(svc.sortOrder ?? 0);
     setServiceIsShared(svc.isShared ?? false);
+    setServiceIsLaser(Boolean(svc.islaser ?? svc.is_laser ?? false));
     setServiceEnableReminder(svc.enableReminder ?? true);
     setServiceImageUrl(svc.img || "");
     setServicePrice(svc.price ?? 0);
@@ -1282,7 +1392,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [dragOverCatKey, setDragOverCatKey] = useState<string | null>(null);
   const [catDraggable, setCatDraggable] = useState<Record<string, boolean>>({});
 
-  const handleReorderCategories = (draggedKey: string, targetKey: string) => {
+  const handleReorderCategories = async (draggedKey: string, targetKey: string) => {
     const draggedIndex = localCategories.findIndex(c => c.key === draggedKey);
     const targetIndex = localCategories.findIndex(c => c.key === targetKey);
     if (draggedIndex === -1 || targetIndex === -1) return;
@@ -1297,6 +1407,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
     setLocalCategories(updatedCategories);
     saveDynamicCategories(updatedCategories);
+    await syncCategoriesToApi(updatedCategories);
   };
 
   function toggleCategoryExpand(cat: string) {
@@ -1308,6 +1419,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     const updatedCats = localCategories.filter(c => c.key !== catKey);
     setLocalCategories(updatedCats);
     saveDynamicCategories(updatedCats);
+    await deleteCategoryFromApi(catKey);
 
     const updatedSvcs = localServices.filter(s => s.cat !== catKey);
     setLocalServices(updatedSvcs);
@@ -2232,17 +2344,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }, []);
 
   useEffect(() => {
-    const cats = getDynamicCategories();
-    setLocalCategories(cats);
-
-    // Set all categories expanded by default
-    const exp: Record<string, boolean> = {};
-    cats.forEach(c => { exp[c.key] = true; });
-    setExpandedCategories(exp);
-  }, []);
+    loadCategoriesFromApi();
+  }, [loadCategoriesFromApi]);
 
   useEffect(() => {
-    if (session?.access_token) loadServicesFromApi();
+    loadServicesFromApi();
   }, [session?.access_token, loadServicesFromApi]);
   // BRANCHES is now derived from the real branches state loaded from Supabase
 
@@ -2278,14 +2384,37 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }, [filteredServices, localCategories]);
 
   function toggleService(id: number, field: "visible" | "active") {
+    let serviceToSync: ServiceItem | undefined;
+
     setServiceToggles((prev) => {
       const current = prev[id] ?? { visible: true, active: true };
       const newValue = !current[field];
       const updated = { ...prev, [id]: { ...current, [field]: newValue } };
-      // Persist to localStorage so user-facing pages reflect the change
       setServiceToggle(id, field, newValue);
       return updated;
     });
+
+    setLocalServices((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id === id) {
+          const toggled = {
+            ...s,
+            [field]: !(s[field] ?? true),
+          };
+          serviceToSync = toggled;
+          return toggled;
+        }
+        return s;
+      });
+      return updated;
+    });
+
+    // Persist active/visible change to database
+    if (serviceToSync) {
+      syncServicesToApi([serviceToSync]).catch((err) => {
+        console.error("Failed to sync service toggle to database:", err);
+      });
+    }
   }
 
   const [eCommerceExpanded, setECommerceExpanded] = useState(false);
@@ -2368,8 +2497,24 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-058', name: 'User Profile Working Details & Schedule Visualization Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee profile schedule extraction, multi-branch weekly matrix normalization, 12h time formatting, and dynamic fallback resolution.', status: 'idle' },
     { id: 'TC-059', name: 'Doctor View Real-time Started Session Detection & Synchronization Engine', category: 'Doctor & Clinical', endpoint: '/api/reservations', description: 'Verifies reservation doctor query filtering with provider_id and doctor_name, starting session status transitions, and real-time active session propagation.', status: 'idle' },
     { id: 'TC-060', name: 'Doctor Prescription Follow-Up & Reception Reminders Engine', category: 'Doctor & Clinical', endpoint: '/api/prescriptions', description: 'Verifies prescription follow-up date and clinical instructions recording, reception calendar follow-up reminders aggregation, WhatsApp reminder deep link generation, and 1-click booking conversion.', status: 'idle' },
-    { id: 'TC-061', name: 'Reception Follow-Up Lead Time & Auto Pre-Filled Booking Engine', category: 'Services & Bookings', endpoint: '/api/page-settings', description: 'Verifies configurable follow-up reminder lead days in booking settings, early receptionist alert banner rendering, full-width session banner styling, and 1-click new booking pre-fill with patient, doctor, service, and date.', status: 'idle' },
-    { id: 'TC-062', name: 'Doctor Portal Clinical Session & Data Isolation Verification Engine', category: 'Doctor & Clinical', endpoint: '/api/reservations', description: 'Verifies strict doctor reservation matching, provider UUID resolution, real-time ongoing session status management, queue-based treatment activation, and prescription deduplication.', status: 'idle' }
+    { id: 'TC-061', name: 'Reception Follow-Up Lead Time, Rescheduling & Action Suite Engine', category: 'Services & Bookings', endpoint: '/api/page-settings', description: 'Verifies configurable follow-up reminder lead days in booking settings, early alert banner rendering, 1-click pre-filled booking conversion, and follow-up management modal with reminder date rescheduling and atomic cancellation.', status: 'idle' },
+    { id: 'TC-062', name: 'Doctor Portal Clinical Session & Data Isolation Verification Engine', category: 'Doctor & Clinical', endpoint: '/api/reservations', description: 'Verifies strict doctor reservation matching, provider UUID resolution, real-time ongoing session status management, queue-based treatment activation, and prescription deduplication.', status: 'idle' },
+    { id: 'TC-063', name: 'Patient Profile Financial Summary & Staff Shifts Resolution Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies the redesigned patient profile header card with 3-metric financial summary (total spend, wallet, outstanding) and dynamic employee shift resolution without 9-5 hardcoding.', status: 'idle' },
+    { id: 'TC-064', name: 'Receptionist Clinical Records & Prescription Access Engine', category: 'Doctor & Clinical', endpoint: '/api/prescriptions', description: 'Verifies receptionist role permission access to issue/edit digital prescriptions, upload/delete clinical reports, and complete patient medical intake records.', status: 'idle' },
+    { id: 'TC-065', name: 'New Booking Customer Packages & Session Redemption Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies customer active packages inspection, per-service session balance detection, and package redemption checkout integration in New Booking creation.', status: 'idle' },
+    { id: 'TC-066', name: 'Staff Weekly Shift Schedule & Working Days Persistence Engine', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee shift and working schedule persistence across employee_accounts and page_settings, multi-branch schedule mapping, multi-shift arrays, and 12h AM/PM time sync.', status: 'idle' },
+    { id: 'TC-067', name: 'Laser Pulse Counter & Unified Laser History Engine', category: 'Medical & Patients', endpoint: '/api/laser-pulses', description: 'Verifies Type 1 fixed service pulses & extra charges, Type 2 FIFO retail pulse active balances & deductions, Type 3 package included pulses, and unified lifetime laser history logs.', status: 'idle' },
+    { id: 'TC-068', name: 'Service Equipment Connector & Pulse Pricing Engine', category: 'Services & Bookings', endpoint: '/api/service-devices', description: 'Verifies service-to-device equipment connections without pulse limits, and booking settings default pulse pricing configuration.', status: 'idle' },
+    { id: 'TC-069', name: 'Laser Services Multi-Payment Mode & Deficit Spillover Engine', category: 'Services & Bookings', endpoint: '/api/services', description: 'Verifies islaser service flag persistence, 3 laser payment options (Fixed Service, Pay per Pulse, Package), doctor session live math, package deficit spillover choices, and unified laser history logging.', status: 'idle' },
+    { id: 'TC-070', name: 'Package Types & Laser Pulses Package Engine', category: 'Services & Bookings', endpoint: '/api/packages', description: 'Verifies package_type (services vs pulses) selection, total_pulses configuration in PackageAdminPanel, /api/packages CRUD validation, and package selling integration.', status: 'idle' },
+    { id: 'TC-071', name: 'Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies per-pulse mode rate calculation (delivered_pulses × price_per_pulse) across primary and additional laser services, session line item writing, settlement note persistence, and invoice settlement display.', status: 'idle' },
+    { id: 'TC-072', name: 'Laser Pulses Package Redemption & Session Completion Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies package pulse deduction, UUID-guarded package querying, schema-resilient session completion, 0 EGP base package redemption pricing, and zero duplicate invoice line generation.', status: 'idle' },
+    { id: 'TC-073', name: 'Multi-Scenario Laser Pulses Package Settlement Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies Scenario 1 (initial package purchase + deduction), Scenario 2 (deficit spillover to new package or per pulse), Scenario 3 (standard redemption), and mixed session add-on pricing.', status: 'idle' },
+    { id: 'TC-074', name: 'New Booking Laser Pulses Package Selection & Catalog Purchase Engine', category: 'Services & Bookings', endpoint: '/api/packages', description: 'Verifies pulses package detection in New Booking modal, pulse balance badge rendering, laser service quota coverage, and in-booking new pulses package catalog purchase integration.', status: 'idle' },
+    { id: 'TC-075', name: 'Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies laser packages isolation to Option 3, patient multi-package selection, catalog package purchase, and package price + non-laser service total calculation.', status: 'idle' },
+    { id: 'TC-076', name: 'Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies accurate deduction of delivered laser pulses from customer pulses packages across doctor portal session finalization, reception session completion, and checkout settlement workflows with DB synchronization and idempotency.', status: 'idle' },
+    { id: 'TC-077', name: 'In-Booking Package Selling & Integrated Patient Search Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies selling catalog packages directly during new booking creation with customer_packages persistence and instant patient profile appearance, as well as integrated patient search dropdown rendering.', status: 'idle' },
+    { id: 'TC-078', name: 'In-Booking Package Partial Payment & Session Balance Preservation Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies that when a patient purchases a new pulses package during booking with a partial payment (e.g. 500 EGP of 1000 EGP), the remaining 500 EGP outstanding balance is preserved correctly through doctor portal session completion and receptionist session finalization — preventing amountLeft from being zeroed out. Also verifies Payment Mode displays Pulses Package and Pay & Settle Invoice button remains visible.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -3885,6 +4030,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             setBookingDepositPercentage(data.booking.depositPercentage ?? 20);
             setBookingStaleSessionHours(data.booking.staleSessionHours ?? 2);
             setBookingFollowUpLeadDays(data.booking.followUpLeadDays ?? 2);
+            setBookingDefaultPricePerPulse(data.booking.defaultPricePerPulse ?? 5);
           }
           if (data.deposit) {
             setInstapayName(data.deposit.instapayName || "Revera Clinic");
@@ -4158,6 +4304,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             depositPercentage: bookingDepositPercentage,
             staleSessionHours: bookingStaleSessionHours,
             followUpLeadDays: bookingFollowUpLeadDays,
+            defaultPricePerPulse: bookingDefaultPricePerPulse,
             termsText: termsText,
             globalEndingSession: globalEndingSession
           },
@@ -6125,6 +6272,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               setServiceSortOrder={setServiceSortOrder}
               serviceIsShared={serviceIsShared}
               setServiceIsShared={setServiceIsShared}
+              serviceIsLaser={serviceIsLaser}
+              setServiceIsLaser={setServiceIsLaser}
               serviceEnableReminder={serviceEnableReminder}
               setServiceEnableReminder={setServiceEnableReminder}
               serviceImageUrl={serviceImageUrl}
@@ -6168,6 +6317,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               syncServicesToApi={syncServicesToApi}
               loadServicesFromApi={loadServicesFromApi}
               deleteServiceFromApi={deleteServiceFromApi}
+              syncCategoriesToApi={syncCategoriesToApi}
+              loadCategoriesFromApi={loadCategoriesFromApi}
+              deleteCategoryFromApi={deleteCategoryFromApi}
               authenticatedJsonHeaders={authenticatedJsonHeaders}
               hasPermission={hasPermission}
               lang={lang}
@@ -6449,6 +6601,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   authenticatedJsonHeaders={authenticatedJsonHeaders}
                   lang={lang}
                   adminTranslations={adminTranslations}
+                  defaultPricePerPulse={bookingDefaultPricePerPulse}
                   MOCK_MEDICINES={MOCK_MEDICINES}
                 />
               )}
@@ -6650,37 +6803,52 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           {/* ── SETTINGS VIEWS ── */}
           {activeNav === "Profile" && (() => {
             const isSuperadminBypass = adminRole === "superadmin";
-            const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+            const profileEmployee = employeesList.find(emp => 
+              (emp.email && adminEmail && emp.email.toLowerCase() === adminEmail.toLowerCase()) ||
+              (emp.id && adminDbId && emp.id === adminDbId) ||
+              (emp.employee_id && adminEmployeeId && emp.employee_id === adminEmployeeId) ||
+              (emp.name && profileName && emp.name.trim().toLowerCase() === profileName.trim().toLowerCase())
+            );
+            const matchProv = providers.find(p => 
+              (profileEmployee?.name && p.name && p.name.trim().toLowerCase() === profileEmployee.name.trim().toLowerCase()) ||
+              (profileEmployee?.phone && p.phone && p.phone === profileEmployee.phone) ||
+              (profileEmployee?.id && p.id === profileEmployee.id) ||
+              (profileName && p.name && p.name.trim().toLowerCase() === profileName.trim().toLowerCase()) ||
+              (adminEmail && p.email && p.email.toLowerCase() === adminEmail.toLowerCase())
+            );
             const currentBranchName = branches.find(b => b.id === branch)?.name_en || "New Cairo Branch";
+            const effectiveWorkingDaysHours = profileEmployee?.working_days_hours || profileEmployee?.workingDaysHours || matchProv?.working_days_hours || matchProv?.workingDaysHours || null;
+            const effectiveShift = profileEmployee?.shift || matchProv?.shift || (effectiveWorkingDaysHours ? "Multi-Shift Schedule" : "Day");
+            const effectiveWorkingHours = profileEmployee?.working_hours || (profileEmployee?.shift && profileEmployee.shift !== "Day" && profileEmployee.shift !== "Night" ? profileEmployee.shift : null);
 
             return (
               <UserProfileView
                 user={{
-                  id: profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile",
-                  name: profileName || profileEmployee?.name || (isSuperadminBypass ? "zaki" : "Employee Account"),
+                  id: profileEmployee?.id || profileEmployee?.employee_id || matchProv?.id || adminEmail || "my-profile",
+                  name: profileName || profileEmployee?.name || matchProv?.name || (isSuperadminBypass ? "zaki" : "Employee Account"),
                   email: adminEmail || profileEmployee?.email || "",
-                  phone: profilePhone || profileEmployee?.phone || "",
+                  phone: profilePhone || profileEmployee?.phone || matchProv?.phone || "",
                   address: profileAddress || profileEmployee?.address || "",
-                  role: isSuperadminBypass ? "Superadmin" : (profileEmployee?.role_name || "Employee"),
+                  role: isSuperadminBypass ? "Superadmin" : (profileEmployee?.role_name || (matchProv ? "Doctor" : "Employee")),
                   branch: currentBranchName,
                   branchesList: Array.isArray(profileEmployee?.branches) && profileEmployee.branches.length > 0
                     ? profileEmployee.branches
                     : [currentBranchName],
-                  department: profileEmployee?.department || "Reception",
-                  employeeId: isSuperadminBypass ? "EMP-SUPER" : (profileEmployee?.employee_id || "EMP-001"),
+                  department: profileEmployee?.department || (matchProv ? "Doctor" : "Reception"),
+                  employeeId: isSuperadminBypass ? "EMP-SUPER" : (profileEmployee?.employee_id || (matchProv?.id ? `DOC-${matchProv.id.slice(0, 5).toUpperCase()}` : "EMP-001")),
                   employmentType: "Full Time",
-                  joiningDate: profileEmployee?.created_at
-                    ? new Date(profileEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                  joiningDate: profileEmployee?.created_at || matchProv?.created_at
+                    ? new Date(profileEmployee?.created_at || matchProv?.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
                     : "July 21, 2026",
-                  shiftType: profileEmployee?.shift_type || profileEmployee?.shift || "Day",
+                  shiftType: effectiveShift,
                   workingDays: profileEmployee?.working_days || null,
-                  workingHours: profileEmployee?.working_hours || null,
-                  workingDaysHours: profileEmployee?.working_days_hours || null,
-                  basicSalary: Number(profileEmployee?.salary || 0),
+                  workingHours: effectiveWorkingHours,
+                  workingDaysHours: effectiveWorkingDaysHours,
+                  basicSalary: Number(profileEmployee?.salary || matchProv?.fixed_salary || matchProv?.salary || 0),
                   bonuses: Number(profileEmployee?.bonus || 0),
                   deductions: Number(profileEmployee?.deductions || 0),
                   monthlyTarget: Number(profileEmployee?.required_target_amount || 0),
-                  avatarUrl: customerAvatars[profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile"] || null
+                  avatarUrl: customerAvatars[profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile"] || matchProv?.image || null
                 }}
                 lang="en"
                 t={adminTranslations.en.userProfile as UserProfileViewTranslations}
@@ -6819,6 +6987,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               setBookingStaleSessionHours={setBookingStaleSessionHours}
               bookingFollowUpLeadDays={bookingFollowUpLeadDays}
               setBookingFollowUpLeadDays={setBookingFollowUpLeadDays}
+              bookingDefaultPricePerPulse={bookingDefaultPricePerPulse}
+              setBookingDefaultPricePerPulse={setBookingDefaultPricePerPulse}
               globalEndingSession={globalEndingSession}
               setGlobalEndingSession={setGlobalEndingSession}
               handleSaveBookingSettings={handleSaveBookingSettings}
@@ -7445,7 +7615,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 }}
                 services={localServices}
                 providers={providers}
-                customers={dbCustomers}
+                customers={customers}
                 branches={branches}
                 lang={lang}
                 t={adminTranslations[lang].bookings.adminNewBookingView}
@@ -7467,7 +7637,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 initialCustomer={previousBookingCustomer}
                 services={localServices}
                 providers={providers}
-                customers={dbCustomers}
+                customers={customers}
                 branches={branches}
                 activeBranchId={branch}
                 lang={lang}
@@ -7550,7 +7720,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               }}
               services={localServices}
               providers={providers}
-              customers={dbCustomers}
+              customers={customers}
               branches={branches}
               lang={lang}
               t={adminTranslations[lang].bookings.adminNewBookingView}
@@ -9130,6 +9300,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       setPostponeBooking(null);
                       setViewingBooking(null);
                       fetchAllReservations();
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("revera-booking-change"));
+                        window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+                      }
                     } else {
                       const err = await res.json();
                       alert(err.error || "Failed to postpone booking.");
@@ -9153,6 +9327,48 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       {/* ── PAYMENT SETTLEMENT MODAL ── */}
       {checkoutBooking && (
         (() => {
+          // Laser per-pulse mode detection and rate resolution
+          const isCheckoutPerPulse = Boolean(
+            checkoutBooking?.laserPaymentMode === "PER_PULSE" ||
+            (checkoutBooking as any)?.laser_payment_mode === "PER_PULSE" ||
+            String(checkoutBooking?.notes || "").toLowerCase().includes("pay per pulse") ||
+            String(checkoutBooking?.notes || "").toLowerCase().includes("per_pulse") ||
+            String(checkoutBooking?.notes || "").includes("[Laser Settlement]") && String(checkoutBooking?.notes || "").includes("per pulse")
+          );
+          const isCheckoutPackage = Boolean(
+            checkoutBooking?.laserPaymentMode === "PACKAGE" ||
+            (checkoutBooking as any)?.laser_payment_mode === "PACKAGE" ||
+            String(checkoutBooking?.notes || "").toLowerCase().includes("pay with package") ||
+            String(checkoutBooking?.notes || "").toLowerCase().includes("package session") ||
+            String(checkoutBooking?.notes || "").toLowerCase().includes("package redemption") ||
+            String(checkoutBooking?.notes || "").toLowerCase().includes("pulses package") ||
+            String(checkoutBooking?.notes || "").includes("[Laser Package]") ||
+            String(checkoutBooking?.notes || "").includes("[Laser Package Redemption]") ||
+            String(checkoutBooking?.notes || "").includes("[Purchasing New Pulses Package]")
+          );
+          const checkoutPulseRate = Number(
+            checkoutBooking?.laserPricePerPulse ||
+            (checkoutBooking as any)?.laser_price_per_pulse ||
+            (() => {
+              const m = String(checkoutBooking?.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+              return m ? Number(m[1]) : 1;
+            })()
+          ) || 1;
+          const primaryPulsesMatch = String(checkoutBooking?.notes || "").match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
+            String(checkoutBooking?.notes || "").match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
+            String(checkoutBooking?.notes || "").match(/Primary:\s*(\d+)\s*pulses/i) ||
+            String(checkoutBooking?.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
+            String(checkoutBooking?.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
+            String(checkoutBooking?.notes || "").match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
+            String(checkoutBooking?.notes || "").match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
+          const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
+          const checkoutPackageMatch = String(checkoutBooking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
+          const checkoutPackageSettlementText = checkoutPackageMatch ? checkoutPackageMatch[1] : (
+            isRTL
+              ? "تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مغطاة بنظام باقات النبضات"
+              : "Agreed that laser services in this session are covered under patient Pulses Package"
+          );
+
           // 1. Calculate service cost
           const svcIds = Array.isArray(checkoutBooking.serviceIds) ? checkoutBooking.serviceIds : [checkoutBooking.serviceId];
           // A deposit collected at reservation time (BookingModal's "declare deposit paid" step)
@@ -9165,12 +9381,31 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const bookingServicesList = svcIds.map((id: number) => {
             const s = localServices.find(srv => srv.id === id);
             const details = s ? getServicePriceDetails(s, checkoutBooking.branchId, branches) : null;
+            const isLaser = checkIsLaserService(s);
+            let price = details ? details.discountedPrice : 500;
+            let pulseDetails = "";
+
+            if (isCheckoutPerPulse && isLaser) {
+              if (primaryDeliveredPulses > 0) {
+                price = primaryDeliveredPulses * checkoutPulseRate;
+                pulseDetails = ` (${primaryDeliveredPulses} pulses × ${checkoutPulseRate} EGP)`;
+              } else {
+                price = 0;
+                pulseDetails = ` (Pay per Pulse @ ${checkoutPulseRate} EGP)`;
+              }
+            } else if (isCheckoutPackage && isLaser) {
+              price = 0;
+              pulseDetails = ` (Package Redemption · 0 EGP)`;
+            }
+
             // Match service with active package item
             const redeemableItem = activeCustomerPackageItems.find((it: any) => Number(it.serviceId) === Number(id) && it.qtyRemaining > 0) || null;
             return {
               serviceId: id,
               name: s?.en || `Service #${id}`,
-              price: details ? details.discountedPrice : 500,
+              price,
+              pulseDetails,
+              isLaser,
               hasPromotion: details?.hasPromotion || false,
               promotionText: details?.promotionText || "",
               redeemableItem,
@@ -9194,19 +9429,40 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           for (const item of rawAttached) {
             const name = String(item.name || 'Item').trim();
             const qty = Number(item.qty) || 1;
-            const unitPrice = Number(item.unitPrice || item.price || 0);
-            const total = Number(item.total) || (qty * unitPrice);
+            let unitPrice = Number(item.unitPrice || item.price || 0);
+            let total = Number(item.total) || (qty * unitPrice);
             const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
 
+            if (isCheckoutPerPulse && lineType === 'device_pulses') {
+              continue;
+            }
             const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
             if (isPulse && (total === 0 || unitPrice === 0)) {
               continue;
             }
 
+            const matchingSvc = localServices.find((s) =>
+              (item.serviceId && String(s.id) === String(item.serviceId)) ||
+              s.en?.toLowerCase() === name.toLowerCase() ||
+              s.ar === name
+            );
+            const isLaserService = checkIsLaserService(matchingSvc) || name.toLowerCase().includes('laser') || name.includes('ليزر');
+
+            if (isCheckoutPackage && lineType === 'additional_service' && isLaserService) {
+              unitPrice = 0;
+              total = 0;
+            }
+
             if (!existingCheckoutNames.has(name.toLowerCase())) {
               existingCheckoutNames.add(name.toLowerCase());
               if (lineType === 'additional_service') {
-                checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType });
+                checkoutAdditionalServicesList.push({
+                  name: (isCheckoutPackage && isLaserService) ? `${name} (Package Redemption · 0 EGP)` : name,
+                  qty,
+                  unitPrice,
+                  total,
+                  lineType
+                });
               } else {
                 checkoutProductsConsumablesList.push({ name, qty, unitPrice, total, lineType });
               }
@@ -9223,43 +9479,25 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               const rawBlock = addSvcBlockMatch[1];
               const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
               for (const item of items) {
-                const trimmed = item.trim();
-                if (!trimmed || trimmed.startsWith("[")) continue;
-                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-                if (m1) {
-                  const name = m1[1].trim();
-                  const qty = Number(m1[2]) || 1;
-                  const unitPrice = Number(m1[3]) || 0;
-                  const total = Number(m1[4]) || (qty * unitPrice);
-                  if (!existingCheckoutNames.has(name.toLowerCase())) {
-                    existingCheckoutNames.add(name.toLowerCase());
-                    checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                  }
-                  continue;
-                }
-                const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-                if (m2) {
-                  const name = m2[1].trim();
-                  const qty = Number(m2[2]) || 1;
-                  const unitPrice = Number(m2[3]) || 0;
-                  const total = qty * unitPrice;
-                  if (!existingCheckoutNames.has(name.toLowerCase())) {
-                    existingCheckoutNames.add(name.toLowerCase());
-                    checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                  }
-                  continue;
-                }
-                const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
-                if (m3) {
-                  const name = m3[1].trim();
-                  const qty = m3[2] ? Number(m3[2]) : 1;
-                  const total = Number(m3[3]) || 0;
-                  const unitPrice = qty > 0 ? total / qty : total;
-                  if (!existingCheckoutNames.has(name.toLowerCase())) {
-                    existingCheckoutNames.add(name.toLowerCase());
-                    checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                  }
-                  continue;
+                const parsed = parseAdditionalServiceLine(item.trim());
+                if (parsed && !existingCheckoutNames.has(parsed.name.toLowerCase())) {
+                  existingCheckoutNames.add(parsed.name.toLowerCase());
+                  const matchingSvc = localServices.find((s) =>
+                    s.en?.toLowerCase() === parsed.name.toLowerCase() ||
+                    s.ar === parsed.name
+                  );
+                  const isLaserService = checkIsLaserService(matchingSvc) || parsed.name.toLowerCase().includes('laser') || parsed.name.includes('ليزر');
+                  const unitPrice = (isCheckoutPackage && isLaserService) ? 0 : parsed.unitPrice;
+                  const total = (isCheckoutPackage && isLaserService) ? 0 : parsed.total;
+                  checkoutAdditionalServicesList.push({
+                    name: (isCheckoutPackage && isLaserService)
+                      ? `${parsed.name} (Package Redemption · 0 EGP)`
+                      : parsed.name,
+                    qty: parsed.qty,
+                    unitPrice,
+                    total,
+                    lineType: 'additional_service'
+                  });
                 }
               }
             }
@@ -9267,30 +9505,25 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             // b) Added Service matches
             const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service|Extra Service)\]:\s+(.*?)(?=\n|$)/gi);
             for (const match of addedServiceMatches) {
-              const rawLine = match[1].trim();
-              const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-              if (m1) {
-                const name = m1[1].trim();
-                const qty = Number(m1[2]) || 1;
-                const unitPrice = Number(m1[3]) || 0;
-                const total = Number(m1[4]) || (qty * unitPrice);
-                if (!existingCheckoutNames.has(name.toLowerCase())) {
-                  existingCheckoutNames.add(name.toLowerCase());
-                  checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                }
-                continue;
-              }
-              const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
-              if (m2) {
-                const name = m2[1].trim();
-                const qty = m2[2] ? Number(m2[2]) : 1;
-                const total = Number(m2[3]);
-                const unitPrice = qty > 0 ? total / qty : total;
-                if (!existingCheckoutNames.has(name.toLowerCase())) {
-                  existingCheckoutNames.add(name.toLowerCase());
-                  checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                }
-                continue;
+              const parsed = parseAdditionalServiceLine(match[1].trim());
+              if (parsed && !existingCheckoutNames.has(parsed.name.toLowerCase())) {
+                existingCheckoutNames.add(parsed.name.toLowerCase());
+                const matchingSvc = localServices.find((s) =>
+                  s.en?.toLowerCase() === parsed.name.toLowerCase() ||
+                  s.ar === parsed.name
+                );
+                const isLaserService = checkIsLaserService(matchingSvc) || parsed.name.toLowerCase().includes('laser') || parsed.name.includes('ليزر');
+                const unitPrice = (isCheckoutPackage && isLaserService) ? 0 : parsed.unitPrice;
+                const total = (isCheckoutPackage && isLaserService) ? 0 : parsed.total;
+                checkoutAdditionalServicesList.push({
+                  name: (isCheckoutPackage && isLaserService)
+                    ? `${parsed.name} (Package Redemption · 0 EGP)`
+                    : parsed.name,
+                  qty: parsed.qty,
+                  unitPrice,
+                  total,
+                  lineType: 'additional_service'
+                });
               }
             }
 
@@ -9330,14 +9563,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               }
             }
 
-            // e) Extra Device Pulses matches
-            const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
-            for (const match of pulseMatches) {
-              const name = "Extra Device Pulses";
-              const total = parseFloat(match[2]) || 0;
-              if (total > 0 && !existingCheckoutNames.has(name.toLowerCase())) {
-                existingCheckoutNames.add(name.toLowerCase());
-                checkoutProductsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses' });
+            // e) Extra Device Pulses matches (only in non-per-pulse mode)
+            if (!isCheckoutPerPulse) {
+              const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
+              for (const match of pulseMatches) {
+                const name = "Extra Device Pulses";
+                const total = parseFloat(match[2]) || 0;
+                if (total > 0 && !existingCheckoutNames.has(name.toLowerCase())) {
+                  existingCheckoutNames.add(name.toLowerCase());
+                  checkoutProductsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses' });
+                }
               }
             }
 
@@ -9359,7 +9594,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const baseAndAttachedTotal = baseServicesTotal + checkoutAdditionalServicesList.reduce((sum, s) => sum + s.total, 0) + checkoutProductsConsumablesList.reduce((sum, p) => sum + p.total, 0);
           let targetCheckoutTotal = baseAndAttachedTotal;
 
-          if (checkoutBooking.notes) {
+          if (checkoutBooking.notes && !isCheckoutPerPulse && !isCheckoutPackage) {
             const invMatch = String(checkoutBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
             if (invMatch) {
               const notedTotal = Number(invMatch[1]);
@@ -9434,6 +9669,60 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   }
                 }
 
+                // Consume Laser Package Pulses if applicable and not yet deducted
+                const isLaserPkgCheckout = Boolean(
+                  checkoutBooking.laserPaymentMode === "PACKAGE" ||
+                  (checkoutBooking as any).laser_payment_mode === "PACKAGE" ||
+                  String(checkoutBooking.notes || "").toLowerCase().includes("package redemption") ||
+                  String(checkoutBooking.notes || "").includes("[Laser Package]") ||
+                  String(checkoutBooking.notes || "").includes("[Laser Package Redemption]")
+                );
+                if (isLaserPkgCheckout) {
+                  try {
+                    const deliveredPulsesVal = Number(
+                      checkoutBooking.deliveredPulses ||
+                      (checkoutBooking as any).delivered_pulses ||
+                      (() => {
+                        const m = String(checkoutBooking.notes || "").match(/(\d+(?:,\d+)?)\s*pulses/i);
+                        return m ? Number(m[1].replace(/,/g, '')) : 0;
+                      })()
+                    );
+                    const targetCustId = customerRecord?.id || (checkoutBooking as any).customerId || (checkoutBooking as any).customer_id;
+                    let targetPkgId = checkoutBooking.packageId || (checkoutBooking as any).package_id;
+                    if (!targetPkgId && targetCustId) {
+                      const pRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(targetCustId)}`, { headers: authenticatedJsonHeaders });
+                      if (pRes.ok) {
+                        const pData = await pRes.json();
+                        const pList = pData.customerPackages || pData.packages || [];
+                        const actPkg = pList.find((p: any) => {
+                          const rem = Number(p.remainingPulses ?? p.pulsesRemaining ?? p.remaining_pulses ?? p.pulses_remaining ?? 0);
+                          return (p.status || "active").toLowerCase() === "active" && rem > 0;
+                        });
+                        if (actPkg) targetPkgId = actPkg.id;
+                      }
+                    }
+                    if (targetPkgId && deliveredPulsesVal > 0) {
+                      await fetch("/api/customers/packages", {
+                        method: "PATCH",
+                        headers: authenticatedJsonHeaders,
+                        body: JSON.stringify({
+                          action: "consume_package_pulses",
+                          customer_package_id: targetPkgId,
+                          package_id: targetPkgId,
+                          quantity_used: deliveredPulsesVal,
+                          pulses: deliveredPulsesVal,
+                          booking_id: checkoutBooking.id,
+                          reservationId: checkoutBooking.id,
+                          used_by: "Checkout Settlement",
+                          notes: `Checkout pulse deduction (${deliveredPulsesVal} pulses deducted)`
+                        })
+                      });
+                    }
+                  } catch (pulseErr) {
+                    console.error("Error consuming laser package pulses at checkout:", pulseErr);
+                  }
+                }
+
                 setCheckoutBooking(null);
                 setCheckoutAmountPaid("");
                 setUseWalletBalance(false);
@@ -9460,6 +9749,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               setSavingCheckout(false);
             }
           };
+
+          const settlementMatch = String(checkoutBooking.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
+          const settlementText = checkoutBooking.laserSettlementNote || (settlementMatch ? settlementMatch[1] : (
+            isCheckoutPerPulse
+              ? `Settled that laser services in this session are charged per pulse (@ ${checkoutPulseRate} EGP/pulse) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${checkoutPulseRate} ج.م/نبضة)`
+              : ""
+          ));
 
           return (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
@@ -9493,6 +9789,32 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     <p className="text-xs text-[#5A6A51] mt-0.5">{checkoutBooking.phone}</p>
                   </div>
 
+                  {/* Laser Per-Pulse Settlement Agreement Notice */}
+                  {isCheckoutPerPulse && (
+                    <div className="rounded-2xl border border-amber-300 bg-amber-50/90 p-3.5 text-xs text-amber-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                        <Zap size={15} className="text-amber-600 shrink-0" />
+                        <span>Laser Per-Pulse Settlement / اتفاقية محاسبة نبضات الليزر</span>
+                      </div>
+                      <p className="text-[11.5px] leading-relaxed text-amber-800">
+                        {settlementText}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Laser Package Settlement Agreement Notice */}
+                  {isCheckoutPackage && (
+                    <div className="rounded-2xl border border-purple-300 bg-purple-50/90 p-3.5 text-xs text-purple-900 space-y-1 animate-fadeIn">
+                      <div className="flex items-center gap-1.5 font-bold text-purple-950">
+                        <Package size={15} className="text-purple-700 shrink-0" />
+                        <span>Laser Package Settlement / اتفاقية باقة نبضات الليزر</span>
+                      </div>
+                      <p className="text-[11.5px] leading-relaxed text-purple-800">
+                        {checkoutPackageSettlementText}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Services Invoice details */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
                     <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Services List / الخدمات</p>
@@ -9509,8 +9831,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                                 </span>
                               )}
                             </span>
-                            <span className={isRedeemed ? "line-through text-[#5A6A51]" : ""}>
-                              {svc.price} EGP
+                            <span className={isRedeemed ? "line-through text-[#5A6A51]" : "text-right"}>
+                              <span>{svc.price} EGP</span>
+                              {svc.pulseDetails && <span className="text-[11px] font-normal text-amber-700 block">{svc.pulseDetails}</span>}
                             </span>
                           </div>
                           {svc.redeemableItem && (
@@ -9728,6 +10051,46 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           // Brief 32: If we have a real ledger invoice, use immutable data instead of live-recomputing
           if (ledgerInvoice) {
             const inv = ledgerInvoice.invoice;
+            const isInvoicePerPulse = Boolean(
+              invoiceBooking.laserPaymentMode === "PER_PULSE" ||
+              (invoiceBooking as any)?.laser_payment_mode === "PER_PULSE" ||
+              invoiceBooking.laserSettlementNote ||
+              String(invoiceBooking.notes || "").toLowerCase().includes("pay per pulse") ||
+              String(invoiceBooking.notes || "").toLowerCase().includes("per_pulse") ||
+              String(invoiceBooking.notes || "").includes("[Laser Settlement]") && String(invoiceBooking.notes || "").includes("per pulse")
+            );
+            const isInvoicePackage = Boolean(
+              invoiceBooking.laserPaymentMode === "PACKAGE" ||
+              (invoiceBooking as any)?.laser_payment_mode === "PACKAGE" ||
+              String(invoiceBooking.notes || "").toLowerCase().includes("pay with package") ||
+              String(invoiceBooking.notes || "").toLowerCase().includes("package session") ||
+              String(invoiceBooking.notes || "").toLowerCase().includes("package redemption") ||
+              String(invoiceBooking.notes || "").toLowerCase().includes("pulses package") ||
+              String(invoiceBooking.notes || "").includes("[Laser Package]") ||
+              String(invoiceBooking.notes || "").includes("[Laser Package Redemption]") ||
+              String(invoiceBooking.notes || "").includes("[Purchasing New Pulses Package]")
+            );
+            const invoicePulseRate = Number(
+              invoiceBooking.laserPricePerPulse ||
+              (invoiceBooking as any)?.laser_price_per_pulse ||
+              (() => {
+                const m = String(invoiceBooking.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+                return m ? Number(m[1]) : 1;
+              })()
+            ) || 1;
+            const settlementMatch = String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
+            const invoiceSettlementText = invoiceBooking.laserSettlementNote || (settlementMatch ? settlementMatch[1] : (
+              isInvoicePerPulse
+                ? `Settled that laser services in this session are charged per pulse (@ ${invoicePulseRate} EGP/pulse) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${invoicePulseRate} ج.م/نبضة)`
+                : ""
+            ));
+            const packageSettlementMatch = String(invoiceBooking.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
+            const invoicePackageSettlementText = packageSettlementMatch ? packageSettlementMatch[1] : (
+              isRTL
+                ? "تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مغطاة بنظام باقات النبضات"
+                : "Agreed that laser services in this session are covered under patient Pulses Package"
+            );
+
             const allInvoiceItems = ledgerInvoice.lines.map((line: any) => ({
               name: isRTL ? (line.nameAr || line.nameEn || line.description) : (line.nameEn || line.description),
               nameAr: line.nameAr || line.description,
@@ -9807,6 +10170,32 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                         <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
                       </div>
                     </div>
+
+                    {/* Laser Per-Pulse Settlement Agreement Notice */}
+                    {isInvoicePerPulse && (
+                      <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-3 text-xs text-amber-900 space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                          <Zap size={14} className="text-amber-600 shrink-0" />
+                          <span>Laser Per-Pulse Settlement / اتفاقية محاسبة نبضات الليزر</span>
+                        </div>
+                        <p className="text-[11.5px] leading-relaxed text-amber-800">
+                          {invoiceSettlementText}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Laser Package Settlement Agreement Notice */}
+                    {isInvoicePackage && (
+                      <div className="rounded-xl border border-purple-300 bg-purple-50/90 p-3 text-xs text-purple-900 space-y-1 animate-fadeIn">
+                        <div className="flex items-center gap-1.5 font-bold text-purple-950">
+                          <Package size={15} className="text-purple-700 shrink-0" />
+                          <span>Laser Package Settlement / اتفاقية باقة نبضات الليزر</span>
+                        </div>
+                        <p className="text-[11.5px] leading-relaxed text-purple-800">
+                          {invoicePackageSettlementText}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Table of Services & Add-ons */}
                     <div className="overflow-x-auto border border-gray-100 rounded-xl bg-white shadow-sm">
@@ -9891,14 +10280,84 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           }
 
           // === FALLBACK: pre-ledger bookings (no invoice row) — existing logic unchanged ===
+          const isInvoicePerPulse = Boolean(
+            invoiceBooking.laserPaymentMode === "PER_PULSE" ||
+            (invoiceBooking as any)?.laser_payment_mode === "PER_PULSE" ||
+            invoiceBooking.laserSettlementNote ||
+            String(invoiceBooking.notes || "").toLowerCase().includes("pay per pulse") ||
+            String(invoiceBooking.notes || "").toLowerCase().includes("per_pulse") ||
+            String(invoiceBooking.notes || "").includes("[Laser Settlement]") && String(invoiceBooking.notes || "").includes("per pulse")
+          );
+          const isInvoicePackage = Boolean(
+            invoiceBooking.laserPaymentMode === "PACKAGE" ||
+            (invoiceBooking as any)?.laser_payment_mode === "PACKAGE" ||
+            String(invoiceBooking.notes || "").toLowerCase().includes("pay with package") ||
+            String(invoiceBooking.notes || "").toLowerCase().includes("package session") ||
+            String(invoiceBooking.notes || "").toLowerCase().includes("package redemption") ||
+            String(invoiceBooking.notes || "").toLowerCase().includes("pulses package") ||
+            String(invoiceBooking.notes || "").includes("[Laser Package]") ||
+            String(invoiceBooking.notes || "").includes("[Laser Package Redemption]") ||
+            String(invoiceBooking.notes || "").includes("[Purchasing New Pulses Package]")
+          );
+          const invoicePulseRate = Number(
+            invoiceBooking.laserPricePerPulse ||
+            (invoiceBooking as any)?.laser_price_per_pulse ||
+            (() => {
+              const m = String(invoiceBooking.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+              return m ? Number(m[1]) : 1;
+            })()
+          ) || 1;
+          const primaryPulsesMatch = String(invoiceBooking.notes || "").match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
+            String(invoiceBooking.notes || "").match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
+            String(invoiceBooking.notes || "").match(/Primary:\s*(\d+)\s*pulses/i) ||
+            String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
+            String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
+            String(invoiceBooking.notes || "").match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
+            String(invoiceBooking.notes || "").match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
+          const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
+          const settlementMatch = String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
+          const invoiceSettlementText = invoiceBooking.laserSettlementNote || (settlementMatch ? settlementMatch[1] : (
+            isInvoicePerPulse
+              ? `Settled that laser services in this session are charged per pulse (@ ${invoicePulseRate} EGP/pulse) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${invoicePulseRate} ج.م/نبضة)`
+              : ""
+          ));
+          const packageSettlementMatch = String(invoiceBooking.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
+          const invoicePackageSettlementText = packageSettlementMatch ? packageSettlementMatch[1] : (
+            isRTL
+              ? "تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مغطاة بنظام باقات النبضات"
+              : "Agreed that laser services in this session are covered under patient Pulses Package"
+          );
+
           // 1. Calculate service cost
           const svcIds = Array.isArray(invoiceBooking.serviceIds) ? invoiceBooking.serviceIds : (invoiceBooking.serviceId ? [invoiceBooking.serviceId] : []);
           const baseServicesList = svcIds.map((id: number) => {
             const s = localServices.find(srv => srv.id === id);
-            const price = s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500;
+            const isLaser = checkIsLaserService(s);
+            let price = s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500;
+            if (isInvoicePerPulse && isLaser) {
+              if (primaryDeliveredPulses > 0) {
+                price = primaryDeliveredPulses * invoicePulseRate;
+              } else {
+                price = 0;
+              }
+            } else if (isInvoicePackage && isLaser) {
+              price = 0;
+            }
             return {
-              name: s?.en || `Service #${id}`,
-              nameAr: s?.ar || `خدمة #${id}`,
+              name: (isInvoicePerPulse && isLaser)
+                ? (primaryDeliveredPulses > 0
+                    ? `${s?.en || `Service #${id}`} (${primaryDeliveredPulses} pulses × ${invoicePulseRate} EGP)`
+                    : `${s?.en || `Service #${id}`} (Pay per Pulse @ ${invoicePulseRate} EGP)`)
+                : (isInvoicePackage && isLaser)
+                  ? `${s?.en || `Service #${id}`} (Package Redemption · 0 EGP)`
+                  : (s?.en || `Service #${id}`),
+              nameAr: (isInvoicePerPulse && isLaser)
+                ? (primaryDeliveredPulses > 0
+                    ? `${s?.ar || `خدمة #${id}`} (${primaryDeliveredPulses} نبضة × ${invoicePulseRate} ج.م)`
+                    : `${s?.ar || `خدمة #${id}`} (حساب بالنبضة @ ${invoicePulseRate} ج.م)`)
+                : (isInvoicePackage && isLaser)
+                  ? `${s?.ar || `خدمة #${id}`} (استهلاك باقة · 0 ج.م)`
+                  : (s?.ar || `خدمة #${id}`),
               qty: 1,
               unitPrice: price,
               price: price,
@@ -9919,22 +10378,37 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           for (const item of rawAttached) {
             const name = String(item.name || 'Item').trim();
             const qty = Number(item.qty) || 1;
-            const unitPrice = Number(item.unitPrice || item.price || 0);
-            const total = Number(item.total) || (qty * unitPrice);
+            let unitPrice = Number(item.unitPrice || item.price || 0);
+            let total = Number(item.total) || (qty * unitPrice);
             const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
 
-            // Skip device pulses counters from customer invoice
+            // Skip device pulses counters in per-pulse mode or zero-cost counters
+            if (isInvoicePerPulse && lineType === 'device_pulses') {
+              continue;
+            }
             const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
             if (isPulse && (total === 0 || unitPrice === 0)) {
               continue;
+            }
+
+            const matchingSvc = localServices.find((s) =>
+              (item.serviceId && String(s.id) === String(item.serviceId)) ||
+              s.en?.toLowerCase() === name.toLowerCase() ||
+              s.ar === name
+            );
+            const isLaserService = checkIsLaserService(matchingSvc) || name.toLowerCase().includes('laser') || name.includes('ليزر');
+
+            if (isInvoicePackage && lineType === 'additional_service' && isLaserService) {
+              unitPrice = 0;
+              total = 0;
             }
 
             if (!existingNames.has(name.toLowerCase())) {
               existingNames.add(name.toLowerCase());
               if (lineType === 'additional_service') {
                 invoiceAdditionalServicesList.push({
-                  name: `${name} (Additional Service)`,
-                  nameAr: `${name} (خدمة إضافية)`,
+                  name: (isInvoicePackage && isLaserService) ? `${name} (Package Redemption · 0 EGP)` : `${name} (Additional Service)`,
+                  nameAr: (isInvoicePackage && isLaserService) ? `${name} (استهلاك باقة · 0 ج.م)` : `${name} (خدمة إضافية)`,
                   qty,
                   unitPrice,
                   price: unitPrice,
@@ -9963,64 +10437,24 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               const rawBlock = addSvcBlockMatch[1];
               const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
               for (const item of items) {
-                const trimmed = item.trim();
-                if (!trimmed || trimmed.startsWith("[")) continue;
-                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-                if (m1) {
-                  const name = m1[1].trim();
-                  const qty = Number(m1[2]) || 1;
-                  const unitPrice = Number(m1[3]) || 0;
-                  const total = Number(m1[4]) || (qty * unitPrice);
-                  if (!existingNames.has(name.toLowerCase())) {
-                    existingNames.add(name.toLowerCase());
-                    invoiceAdditionalServicesList.push({
-                      name: `${name} (Additional Service)`,
-                      nameAr: `${name} (خدمة إضافية)`,
-                      qty,
-                      unitPrice,
-                      price: unitPrice,
-                      total
-                    });
-                  }
-                  continue;
-                }
-                const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-                if (m2) {
-                  const name = m2[1].trim();
-                  const qty = Number(m2[2]) || 1;
-                  const unitPrice = Number(m2[3]) || 0;
-                  const total = qty * unitPrice;
-                  if (!existingNames.has(name.toLowerCase())) {
-                    existingNames.add(name.toLowerCase());
-                    invoiceAdditionalServicesList.push({
-                      name: `${name} (Additional Service)`,
-                      nameAr: `${name} (خدمة إضافية)`,
-                      qty,
-                      unitPrice,
-                      price: unitPrice,
-                      total
-                    });
-                  }
-                  continue;
-                }
-                const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
-                if (m3) {
-                  const name = m3[1].trim();
-                  const qty = m3[2] ? Number(m3[2]) : 1;
-                  const total = Number(m3[3]) || 0;
-                  const unitPrice = qty > 0 ? total / qty : total;
-                  if (!existingNames.has(name.toLowerCase())) {
-                    existingNames.add(name.toLowerCase());
-                    invoiceAdditionalServicesList.push({
-                      name: `${name} (Additional Service)`,
-                      nameAr: `${name} (خدمة إضافية)`,
-                      qty,
-                      unitPrice,
-                      price: unitPrice,
-                      total
-                    });
-                  }
-                  continue;
+                const parsed = parseAdditionalServiceLine(item.trim());
+                if (parsed && !existingNames.has(parsed.name.toLowerCase())) {
+                  existingNames.add(parsed.name.toLowerCase());
+                  const matchingSvc = localServices.find((s) =>
+                    s.en?.toLowerCase() === parsed.name.toLowerCase() ||
+                    s.ar === parsed.name
+                  );
+                  const isLaserService = checkIsLaserService(matchingSvc) || parsed.name.toLowerCase().includes('laser') || parsed.name.includes('ليزر');
+                  const unitPrice = (isInvoicePackage && isLaserService) ? 0 : parsed.unitPrice;
+                  const total = (isInvoicePackage && isLaserService) ? 0 : parsed.total;
+                  invoiceAdditionalServicesList.push({
+                    name: (isInvoicePackage && isLaserService) ? `${parsed.name} (Package Redemption · 0 EGP)` : `${parsed.name} (Additional Service)`,
+                    nameAr: (isInvoicePackage && isLaserService) ? `${parsed.name} (استهلاك باقة · 0 ج.م)` : `${parsed.name} (خدمة إضافية)`,
+                    qty: parsed.qty,
+                    unitPrice,
+                    price: unitPrice,
+                    total
+                  });
                 }
               }
             }
@@ -10028,44 +10462,24 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             // b) Added Service format: [Added Service]: Name - 350 EGP or [Additional Service]: Name - 200 EGP
             const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service|Extra Service)\]:\s+(.*?)(?=\n|$)/gi);
             for (const match of addedServiceMatches) {
-              const rawLine = match[1].trim();
-              const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-              if (m1) {
-                const name = m1[1].trim();
-                const qty = Number(m1[2]) || 1;
-                const unitPrice = Number(m1[3]) || 0;
-                const total = Number(m1[4]) || (qty * unitPrice);
-                if (!existingNames.has(name.toLowerCase())) {
-                  existingNames.add(name.toLowerCase());
-                  invoiceAdditionalServicesList.push({
-                    name: `${name} (Additional Service)`,
-                    nameAr: `${name} (خدمة إضافية)`,
-                    qty,
-                    unitPrice,
-                    price: unitPrice,
-                    total
-                  });
-                }
-                continue;
-              }
-              const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
-              if (m2) {
-                const name = m2[1].trim();
-                const qty = m2[2] ? Number(m2[2]) : 1;
-                const total = Number(m2[3]);
-                const unitPrice = qty > 0 ? total / qty : total;
-                if (!existingNames.has(name.toLowerCase())) {
-                  existingNames.add(name.toLowerCase());
-                  invoiceAdditionalServicesList.push({
-                    name: `${name} (Additional Service)`,
-                    nameAr: `${name} (خدمة إضافية)`,
-                    qty,
-                    unitPrice,
-                    price: unitPrice,
-                    total
-                  });
-                }
-                continue;
+              const parsed = parseAdditionalServiceLine(match[1].trim());
+              if (parsed && !existingNames.has(parsed.name.toLowerCase())) {
+                existingNames.add(parsed.name.toLowerCase());
+                const matchingSvc = localServices.find((s) =>
+                  s.en?.toLowerCase() === parsed.name.toLowerCase() ||
+                  s.ar === parsed.name
+                );
+                const isLaserService = checkIsLaserService(matchingSvc) || parsed.name.toLowerCase().includes('laser') || parsed.name.includes('ليزر');
+                const unitPrice = (isInvoicePackage && isLaserService) ? 0 : parsed.unitPrice;
+                const total = (isInvoicePackage && isLaserService) ? 0 : parsed.total;
+                invoiceAdditionalServicesList.push({
+                  name: (isInvoicePackage && isLaserService) ? `${parsed.name} (Package Redemption · 0 EGP)` : `${parsed.name} (Additional Service)`,
+                  nameAr: (isInvoicePackage && isLaserService) ? `${parsed.name} (استهلاك باقة · 0 ج.م)` : `${parsed.name} (خدمة إضافية)`,
+                  qty: parsed.qty,
+                  unitPrice,
+                  price: unitPrice,
+                  total
+                });
               }
             }
 
@@ -10146,7 +10560,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const currentAttachedTotal = baseCost + invoiceAdditionalServicesList.reduce((sum: number, s: any) => sum + s.total, 0) + invoiceProductsList.reduce((sum: number, p: any) => sum + p.total, 0);
           let targetInvoiceTotal = currentAttachedTotal;
 
-          if (invoiceBooking.notes) {
+          if (invoiceBooking.notes && !isInvoicePerPulse && !isInvoicePackage) {
             const invMatch = String(invoiceBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
             if (invMatch) {
               const notedTotal = Number(invMatch[1]);
@@ -10237,6 +10651,32 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
                     </div>
                   </div>
+
+                  {/* Laser Per-Pulse Settlement Agreement Notice */}
+                  {isInvoicePerPulse && (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-3 text-xs text-amber-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                        <Zap size={14} className="text-amber-600 shrink-0" />
+                        <span>Laser Per-Pulse Settlement / اتفاقية محاسبة نبضات الليزر</span>
+                      </div>
+                      <p className="text-[11.5px] leading-relaxed text-amber-800">
+                        {invoiceSettlementText}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Laser Package Settlement Agreement Notice */}
+                  {isInvoicePackage && (
+                    <div className="rounded-xl border border-purple-300 bg-purple-50/90 p-3 text-xs text-purple-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-purple-950">
+                        <Package size={14} className="text-purple-600 shrink-0" />
+                        <span>Laser Package Settlement / اتفاقية محاسبة باقات الليزر</span>
+                      </div>
+                      <p className="text-[11.5px] leading-relaxed text-purple-800">
+                        {invoicePackageSettlementText}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Table of Services & Add-ons */}
                   <div className="overflow-x-auto border border-gray-100 rounded-xl bg-white shadow-sm">

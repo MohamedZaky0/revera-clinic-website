@@ -161,8 +161,8 @@ export default function ProfilePage() {
     const fetchRefData = async () => {
       try {
         const [servicesRes, branchesRes] = await Promise.all([
-          fetch("/api/services"),
-          fetch("/api/branches")
+          fetch("/api/services", { cache: "no-store" }),
+          fetch("/api/branches", { cache: "no-store" })
         ]);
         if (servicesRes.ok) {
           const svcs = await servicesRes.json();

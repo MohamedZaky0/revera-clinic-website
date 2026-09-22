@@ -58,6 +58,91 @@ export interface AdditionalServiceItem {
   deviceId?: string;
   deviceName?: string;
   pulses: number;
+  isLaser?: boolean;
+}
+
+export function checkIsLaserService(srv: any): boolean {
+  if (!srv) return false;
+  return Boolean(
+    srv.islaser ||
+    srv.is_laser ||
+    srv.isLaser ||
+    srv.is_laser_service ||
+    (srv.category && String(srv.category).toLowerCase().includes("laser")) ||
+    (srv.cat && String(srv.cat).toLowerCase().includes("laser")) ||
+    (srv.en && String(srv.en).toLowerCase().includes("laser")) ||
+    (srv.name && String(srv.name).toLowerCase().includes("laser")) ||
+    (srv.title && String(srv.title).toLowerCase().includes("laser")) ||
+    (srv.ar && String(srv.ar).includes("ليزر")) ||
+    (srv.name_ar && String(srv.name_ar).includes("ليزر"))
+  );
+}
+
+export function parseAdditionalServiceLine(trimmed: string): { name: string; qty: number; unitPrice: number; total: number; pulses?: number } | null {
+  if (!trimmed || trimmed.startsWith("[")) return null;
+
+  // Format 1: Name (Qty: 1 x 150 EGP = 150 EGP, Pulses: 250) or Name (Qty: 1 x 150 EGP = 150 EGP)
+  const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP(?:\s*,\s*Pulses:\s*(\d+))?[^)]*\)/i);
+  if (m1) {
+    const name = m1[1].replace(/^[,\s-]+/, "").trim();
+    const qty = Number(m1[2]) || 1;
+    const unitPrice = Number(m1[3]) || 0;
+    const total = Number(m1[4]) || (qty * unitPrice);
+    const pulses = m1[5] ? Number(m1[5]) : undefined;
+    return { name, qty, unitPrice, total, pulses };
+  }
+
+  // Format 2: Name (Qty: 1 x 150 EGP, Pulses: 250) or Name (Qty: 1 x 150 EGP)
+  const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP(?:\s*,\s*Pulses:\s*(\d+))?[^)]*\)/i);
+  if (m2) {
+    const name = m2[1].replace(/^[,\s-]+/, "").trim();
+    const qty = Number(m2[2]) || 1;
+    const unitPrice = Number(m2[3]) || 0;
+    const total = qty * unitPrice;
+    const pulses = m2[4] ? Number(m2[4]) : undefined;
+    return { name, qty, unitPrice, total, pulses };
+  }
+
+  // If the line contains "(Qty:", do not let loose fallback match it and corrupt the name
+  if (trimmed.toLowerCase().includes("(qty:")) {
+    const genericQtyMatch = trimmed.match(/^([^()]+)\s*\(Qty:\s*(\d+).*?=\s*(\d+(?:\.\d+)?)\s*EGP.*?\)/i);
+    if (genericQtyMatch) {
+      const name = genericQtyMatch[1].replace(/^[,\s-]+/, "").trim();
+      const qty = Number(genericQtyMatch[2]) || 1;
+      const total = Number(genericQtyMatch[3]) || 0;
+      const unitPrice = qty > 0 ? total / qty : total;
+      return { name, qty, unitPrice, total };
+    }
+  }
+
+  // Format 3: Name - 200 EGP or Name (200 EGP) or Name: 200 EGP or Name @ 200 EGP
+  const m3 = trimmed.match(/^([^()\-@:]+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+  if (m3) {
+    const name = m3[1].replace(/^[,\s-]+/, "").trim();
+    const qty = m3[2] ? Number(m3[2]) : 1;
+    const total = Number(m3[3]) || 0;
+    const unitPrice = qty > 0 ? total / qty : total;
+    return { name, qty, unitPrice, total };
+  }
+
+  return null;
+}
+
+export function extractPrimaryPulses(notes: string, booking?: any): number {
+  if (booking) {
+    if (typeof booking.delivered_pulses === "number" && booking.delivered_pulses > 0) return booking.delivered_pulses;
+    if (typeof booking.deliveredPulses === "number" && booking.deliveredPulses > 0) return booking.deliveredPulses;
+    if (typeof booking.primaryPulses === "number" && booking.primaryPulses > 0) return booking.primaryPulses;
+  }
+  if (!notes) return 0;
+  const m = notes.match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
+            notes.match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
+            notes.match(/Primary:\s*(\d+)\s*pulses/i) ||
+            notes.match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
+            notes.match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
+            notes.match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
+            notes.match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
+  return m ? Number(m[1]) : 0;
 }
 
 interface BookingDetailsModalProps {
@@ -185,8 +270,7 @@ export default function BookingDetailsModal({
   const [primaryServiceId, setPrimaryServiceId] = useState<string>("");
   const [additionalServices, setAdditionalServices] = useState<AdditionalServiceItem[]>([]);
   const [selectedServiceIdToAdd, setSelectedServiceIdToAdd] = useState<string>("");
-  const [selectedDeviceForService, setSelectedDeviceForService] = useState<string>("");
-  const [pulsesCountForService, setPulsesCountForService] = useState<number>(0);
+  const [additionalServicePulsesInput, setAdditionalServicePulsesInput] = useState<number>(0);
   const [loadingDeviceLinks, setLoadingDeviceLinks] = useState<boolean>(false);
   const [devicesList, setDevicesList] = useState<any[]>([]);
 
@@ -371,25 +455,24 @@ export default function BookingDetailsModal({
     setDynamicResponses(initial);
   }, [medicalRecord, activeTemplate]);
 
-  // Service device lookup when selecting an additional service
+  // Service device lookup for primary service
   useEffect(() => {
-    if (!selectedServiceIdToAdd) return;
+    if (!primaryServiceId) return;
     setLoadingDeviceLinks(true);
-    fetch(`/api/service-devices?serviceId=${selectedServiceIdToAdd}`, { headers: authenticatedJsonHeaders })
+    fetch(`/api/service-devices?serviceId=${primaryServiceId}`, { headers: authenticatedJsonHeaders })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         const links = data?.deviceLinks || [];
         if (links.length > 0) {
-          setSelectedDeviceForService(links[0].device_id || "");
-          setPulsesCountForService(Number(links[0].pulses_per_session) || 100);
-        } else {
-          setSelectedDeviceForService("");
-          setPulsesCountForService(0);
+          setSelectedDeviceId(String(links[0].device_id || ""));
+          if (links[0].pulses_per_session) {
+            setExtraPulsesCount((prev) => (prev > 0 ? prev : Number(links[0].pulses_per_session)));
+          }
         }
       })
-      .catch((err) => console.warn("Error loading service devices:", err))
+      .catch((err) => console.warn("Error loading primary service devices:", err))
       .finally(() => setLoadingDeviceLinks(false));
-  }, [selectedServiceIdToAdd]);
+  }, [primaryServiceId]);
 
   useEffect(() => {
     if (booking) {
@@ -853,29 +936,80 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     }
   };
 
-  const handleAddServiceToSession = () => {
+  const handleAddServiceToSession = async () => {
     if (!selectedServiceIdToAdd) return;
     const srv = localServices.find((s) => String(s.id) === String(selectedServiceIdToAdd));
     if (!srv) return;
 
     const srvName = (isRTL ? srv.ar : srv.en) || srv.en || srv.ar || "Clinical Service";
     const srvPrice = getEffectiveServicePrice(srv, booking?.branchId, branches);
-    const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceForService));
+    const isLaser = checkIsLaserService(srv);
+    const pulsesVal = isLaser ? Number(additionalServicePulsesInput) || 0 : 0;
+
+    const isPerPulseMode = Boolean(
+      booking?.laserPaymentMode === "PER_PULSE" ||
+      (booking as any)?.laser_payment_mode === "PER_PULSE" ||
+      String(booking?.notes || "").toLowerCase().includes("pay per pulse") ||
+      String(booking?.notes || "").toLowerCase().includes("per_pulse")
+    );
+    const isPackageMode = Boolean(
+      booking?.laserPaymentMode === "PACKAGE" ||
+      (booking as any)?.laser_payment_mode === "PACKAGE" ||
+      String(booking?.notes || "").toLowerCase().includes("package session") ||
+      String(booking?.notes || "").toLowerCase().includes("package redemption") ||
+      String(booking?.notes || "").toLowerCase().includes("pulses package") ||
+      String(booking?.notes || "").includes("[Laser Package]") ||
+      String(booking?.notes || "").includes("[Laser Package Redemption]") ||
+      String(booking?.notes || "").includes("[Purchasing New Pulses Package]")
+    );
+    const pulseRate = Number(
+      booking?.laserPricePerPulse ||
+      (booking as any)?.laser_price_per_pulse ||
+      (() => {
+        const m = String(booking?.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+        return m ? Number(m[1]) : 1;
+      })()
+    ) || 1;
+
+    const finalPrice = (isPerPulseMode && isLaser)
+      ? (pulsesVal * pulseRate)
+      : (isPackageMode && isLaser)
+      ? 0
+      : srvPrice;
+
+    let devId: string | undefined = undefined;
+    let devName: string | undefined = undefined;
+    if (isLaser) {
+      try {
+        const devRes = await fetch(`/api/service-devices?serviceId=${srv.id}`, { headers: authenticatedJsonHeaders });
+        if (devRes.ok) {
+          const devData = await devRes.json();
+          const links = devData?.deviceLinks || [];
+          if (links.length > 0) {
+            devId = String(links[0].device_id || "");
+            const devObj = devicesList.find((d) => String(d.id) === String(links[0].device_id));
+            if (devObj) devName = devObj.name;
+          }
+        }
+      } catch (e) {
+        console.warn("Error fetching device for additional service:", e);
+      }
+    }
 
     const newItem: AdditionalServiceItem = {
       id: Date.now() + Math.random(),
       serviceId: srv.id,
       name: srvName,
-      price: srvPrice,
-      deviceId: devObj?.id ? String(devObj.id) : undefined,
-      deviceName: devObj?.name,
-      pulses: Math.max(0, Number(pulsesCountForService) || 0)
+      price: finalPrice,
+      pulses: pulsesVal,
+      isLaser,
+      deviceId: devId,
+      deviceName: devName,
     };
 
     setAdditionalServices((prev) => [...prev, newItem]);
     setSelectedServiceIdToAdd("");
-    setSelectedDeviceForService("");
-    setPulsesCountForService(0);
+    setAdditionalServicePulsesInput(0);
   };
 
   const handleRemoveServiceFromSession = (id: string | number) => {
@@ -1056,7 +1190,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       }
 
       // 5. Deduct Device Pulses from DB
-      const totalPulses = (Number(extraPulsesCount) || 0) + additionalServices.reduce((sum, s) => sum + Number(s.pulses || 0), 0);
+      const primarySvcObj = localServices.find((s) => String(s.id) === String(primaryServiceId || booking.serviceId));
+      const isPrimaryLaser = checkIsLaserService(primarySvcObj);
+      const primaryPulses = isPrimaryLaser ? (Number(extraPulsesCount) || 0) : 0;
+      const totalPulses = primaryPulses + additionalServices.reduce((sum, s) => sum + Number(s.pulses || 0), 0);
       const targetDevId = selectedDeviceId || additionalServices.find((s) => s.deviceId)?.deviceId;
       if (targetDevId && totalPulses > 0) {
         try {
@@ -1079,6 +1216,100 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         }
       }
 
+      // 5b. Deduct Used Pulses from Patient's Laser Pulses Package (when in Package Mode)
+      const isPackageModeEnding = Boolean(
+        booking?.laserPaymentMode === "PACKAGE" ||
+        (booking as any)?.laser_payment_mode === "PACKAGE" ||
+        String(booking?.notes || "").toLowerCase().includes("package session") ||
+        String(booking?.notes || "").toLowerCase().includes("package redemption") ||
+        String(booking?.notes || "").toLowerCase().includes("pulses package") ||
+        String(booking?.notes || "").includes("[Laser Package]") ||
+        String(booking?.notes || "").includes("[Laser Package Redemption]") ||
+        String(booking?.notes || "").includes("[Purchasing New Pulses Package]")
+      );
+
+      const totalLaserPulsesToDeduct = (isPrimaryLaser ? primaryPulses : 0) + additionalServices.reduce((sum, s) => {
+        const srvObj = localServices.find((ls) => String(ls.id) === String(s.serviceId));
+        return sum + ((s.isLaser || checkIsLaserService(srvObj)) ? Number(s.pulses || 0) : 0);
+      }, 0);
+
+      if (isPackageModeEnding && totalLaserPulsesToDeduct > 0) {
+        try {
+          let targetPkgId = (booking as any).packageId || (booking as any).package_id || null;
+          
+          // Check if patient booked by purchasing a new package that needs initialization
+          const purchasingPkgId = (booking as any).purchasingPackageId || (booking as any).purchasing_package_id;
+          if (purchasingPkgId && custId) {
+            try {
+              const checkRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(custId)}`, { headers: authenticatedJsonHeaders });
+              if (checkRes.ok) {
+                const checkData = await checkRes.json();
+                const existingList = checkData.customerPackages || checkData.packages || [];
+                const alreadySold = existingList.find((cp: any) => String(cp.packageId || cp.package_id) === String(purchasingPkgId));
+                if (alreadySold) {
+                  targetPkgId = alreadySold.id;
+                } else {
+                  const sellRes = await fetch("/api/packages/sell", {
+                    method: "POST",
+                    headers: authenticatedJsonHeaders,
+                    body: JSON.stringify({
+                      customerId: custId,
+                      packageId: purchasingPkgId,
+                      paymentMethod: "cash"
+                    })
+                  });
+                  if (sellRes.ok) {
+                    const sellData = await sellRes.json().catch(() => null);
+                    if (sellData?.customerPackage?.id) {
+                      targetPkgId = sellData.customerPackage.id;
+                    }
+                  }
+                }
+              }
+            } catch (sellErr) {
+              console.warn("Auto-create purchased package on end session fallback:", sellErr);
+            }
+          }
+
+          // If no package ID yet, find patient's active pulses package
+          if (!targetPkgId && custId) {
+            const pRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(custId)}`, {
+              headers: authenticatedJsonHeaders
+            });
+            if (pRes.ok) {
+              const pData = await pRes.json();
+              const pkgs = pData.customerPackages || pData.packages || [];
+              const activePulsePkg = pkgs.find((p: any) => {
+                const rem = Number(p.remainingPulses ?? p.pulsesRemaining ?? p.remaining_pulses ?? p.pulses_remaining ?? 0);
+                return (p.status || "active").toLowerCase() === "active" && rem > 0;
+              });
+              if (activePulsePkg) targetPkgId = activePulsePkg.id;
+            }
+          }
+
+          if (targetPkgId) {
+            await fetch("/api/customers/packages", {
+              method: "PATCH",
+              headers: authenticatedJsonHeaders,
+              body: JSON.stringify({
+                action: "consume_package_pulses",
+                customer_package_id: targetPkgId,
+                package_id: targetPkgId,
+                quantity_used: totalLaserPulsesToDeduct,
+                pulses: totalLaserPulsesToDeduct,
+                booking_id: booking.id,
+                reservationId: booking.id,
+                treatment_area: "Laser Treatment",
+                used_by: "Receptionist",
+                notes: `Global Ending Session pulse deduction (${totalLaserPulsesToDeduct} pulses deducted)`
+              })
+            });
+          }
+        } catch (pkgDeductErr) {
+          console.error("Error deducting package pulses during global session completion:", pkgDeductErr);
+        }
+      }
+
       // 6. Persist Line Items to reservation_products
       const lineItemWrites: Promise<any>[] = [];
       for (const p of usedProducts) {
@@ -1098,8 +1329,40 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           })
         );
       }
+      const isPerPulseMode = Boolean(
+        booking?.laserPaymentMode === "PER_PULSE" ||
+        (booking as any)?.laser_payment_mode === "PER_PULSE" ||
+        String(booking?.notes || "").toLowerCase().includes("pay per pulse") ||
+        String(booking?.notes || "").toLowerCase().includes("per_pulse")
+      );
+      const isPackageMode = Boolean(
+        booking?.laserPaymentMode === "PACKAGE" ||
+        (booking as any)?.laser_payment_mode === "PACKAGE" ||
+        String(booking?.notes || "").toLowerCase().includes("package session") ||
+        String(booking?.notes || "").toLowerCase().includes("package redemption") ||
+        String(booking?.notes || "").toLowerCase().includes("pulses package") ||
+        String(booking?.notes || "").includes("[Laser Package]") ||
+        String(booking?.notes || "").includes("[Laser Package Redemption]") ||
+        String(booking?.notes || "").includes("[Purchasing New Pulses Package]")
+      );
+      const pulseRate = Number(
+        booking?.laserPricePerPulse ||
+        (booking as any)?.laser_price_per_pulse ||
+        (() => {
+          const m = String(booking?.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+          return m ? Number(m[1]) : 1;
+        })()
+      ) || 1;
+
       for (const s of additionalServices) {
         const realServiceId = s.serviceId || (typeof s.id === "number" && s.id < 1000000 ? s.id : null);
+        const srvObj = localServices.find((ls) => String(ls.id) === String(realServiceId));
+        const isSvcLaser = s.isLaser || checkIsLaserService(srvObj);
+        const effectivePrice = (isPerPulseMode && isSvcLaser)
+          ? (Number(s.pulses) || 0) * pulseRate
+          : (isPackageMode && isSvcLaser)
+          ? 0
+          : s.price;
         lineItemWrites.push(
           fetch("/api/reservation-products", {
             method: "POST",
@@ -1108,9 +1371,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               reservationId: booking.id,
               lineType: "additional_service",
               serviceId: realServiceId ? Number(realServiceId) : null,
-              description: s.name,
+              description: (isPackageMode && isSvcLaser)
+                ? `${s.name} (Package Redemption · 0 EGP)`
+                : s.name + (Number(s.pulses) > 0 ? ` (${s.pulses} pulses)` : ""),
               qty: 1,
-              unitPrice: s.price,
+              unitPrice: effectivePrice,
               addedByRole: "receptionist_global_ending",
             }),
           })
@@ -1126,8 +1391,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               reservationId: booking.id,
               lineType: "device_pulses",
               description: `${devName} — ${totalPulses} pulses`,
+              productName: `${devName} — ${totalPulses} pulses`,
               qty: totalPulses,
-              unitPrice: pricePerPulse,
+              quantity: totalPulses,
+              unitPrice: 0,
               addedByRole: "receptionist_global_ending",
             }),
           })
@@ -1142,7 +1409,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       // Build structured notes summary
       let updatedNotes = String(booking.notes || "");
       if (additionalServices.length > 0) {
-        const addSvcString = `\n[Additional Services Used]: ${additionalServices.map((s) => `${s.name} (Qty: 1 x ${s.price} EGP = ${s.price} EGP)`).join(", ")}`;
+        const addSvcString = `\n[Additional Services Used]: ${additionalServices.map((s) => {
+          const srvObj = localServices.find((ls) => String(ls.id) === String(s.serviceId));
+          const isSvcLaser = s.isLaser || checkIsLaserService(srvObj);
+          const effectivePrice = (isPerPulseMode && isSvcLaser)
+            ? (Number(s.pulses) || 0) * pulseRate
+            : (isPackageMode && isSvcLaser)
+            ? 0
+            : s.price;
+          return `${s.name} (Qty: 1 x ${effectivePrice} EGP = ${effectivePrice} EGP${Number(s.pulses) > 0 ? `, Pulses: ${s.pulses}` : ""})`;
+        }).join(", ")}`;
         updatedNotes = updatedNotes.replace(/\[Additional Services(?: Used)?(?: During Session)?\]:[^\n\[]*/gi, "").trim() + addSvcString;
       }
       if (usedProducts.length > 0) {
@@ -1150,8 +1426,28 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         updatedNotes = updatedNotes.replace(/\[Products Used During Session\]:[^\n\[]*/gi, "").trim() + prodString;
       }
       if (totalPulses > 0) {
-        const pulseString = `\n[Extra Device Pulses]: ${totalPulses} pulses = ${(Number(extraPulsesCount) || 0) * (Number(pricePerPulse) || 0)} EGP`;
-        updatedNotes = updatedNotes.replace(/\[Extra Device Pulses\]:[^\n\[]*/gi, "").trim() + pulseString;
+        if (isPerPulseMode) {
+          const addPulses = additionalServices.reduce((sum, s) => sum + Number(s.pulses || 0), 0);
+          const pulseString = `\n[Laser Pulses Delivered]: Primary: ${primaryPulses} pulses (@ ${pulseRate} EGP/pulse = ${primaryPulses * pulseRate} EGP), Additional: ${addPulses} pulses (@ ${pulseRate} EGP/pulse = ${addPulses * pulseRate} EGP), Total: ${totalPulses} pulses`;
+          updatedNotes = updatedNotes.replace(/\[(?:Laser Pulses Delivered|Extra Device Pulses)\]:[^\n\[]*/gi, "").trim() + pulseString;
+        } else {
+          const pulseString = `\n[Extra Device Pulses]: ${totalPulses} pulses = ${primaryPulses * (Number(pricePerPulse) || 0)} EGP`;
+          updatedNotes = updatedNotes.replace(/\[Extra Device Pulses\]:[^\n\[]*/gi, "").trim() + pulseString;
+        }
+      }
+      if (isPerPulseMode) {
+        const totalLaserPulses = (isPrimaryLaser ? primaryPulses : 0) + additionalServices.reduce((sum, s) => {
+          const srvObj = localServices.find((ls) => String(ls.id) === String(s.serviceId));
+          return sum + ((s.isLaser || checkIsLaserService(srvObj)) ? Number(s.pulses || 0) : 0);
+        }, 0);
+        const totalLaserCost = totalLaserPulses * pulseRate;
+        const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are charged per pulse (${totalLaserPulses} pulses × ${pulseRate} EGP = ${totalLaserCost} EGP) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${totalLaserPulses} نبضة × ${pulseRate} ج.م = ${totalLaserCost} ج.م)`;
+        updatedNotes = updatedNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
+      } else if (isPackageMode) {
+        const pkgMatch = String(booking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
+        const pkgDetails = pkgMatch ? pkgMatch[1] : `Delivered ${primaryPulses} pulses covered by pulses package`;
+        const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are covered by Pulses Package (${pkgDetails}) / تم الاتفاق على أن تكون خدمات الليزر مغطاة بباقة النبضات`;
+        updatedNotes = updatedNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
       }
 
       const patchRes = await fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}`, {
@@ -1165,6 +1461,17 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           amountLeft: finalAmountLeft,
           total_price: finalInvoiceAmount,
           price: finalInvoiceAmount,
+          ...(isPerPulseMode ? {
+            laser_payment_mode: "PER_PULSE",
+            laserPaymentMode: "PER_PULSE",
+            laser_price_per_pulse: pulseRate,
+            laserPricePerPulse: pulseRate,
+            delivered_pulses: primaryPulses,
+          } : isPackageMode ? {
+            laser_payment_mode: "PACKAGE",
+            laserPaymentMode: "PACKAGE",
+            delivered_pulses: primaryPulses,
+          } : {}),
           ...(rxHasFollowUp && rxFollowUpDate ? { followUpDate: rxFollowUpDate } : {})
         })
       });
@@ -1181,7 +1488,18 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 notes: updatedNotes,
                 amountLeft: finalAmountLeft,
                 total_price: finalInvoiceAmount,
-                price: finalInvoiceAmount
+                price: finalInvoiceAmount,
+                ...(isPerPulseMode ? {
+                  laser_payment_mode: "PER_PULSE",
+                  laserPaymentMode: "PER_PULSE",
+                  laser_price_per_pulse: pulseRate,
+                  laserPricePerPulse: pulseRate,
+                  delivered_pulses: primaryPulses,
+                } : isPackageMode ? {
+                  laser_payment_mode: "PACKAGE",
+                  laserPaymentMode: "PACKAGE",
+                  delivered_pulses: primaryPulses,
+                } : {}),
               }
             : null
         );
@@ -1190,6 +1508,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         fetchRequests();
         fetchCustomers();
         fetchInventoryProducts();
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+          window.dispatchEvent(new CustomEvent("revera-booking-change"));
+        }
 
         alert(isRTL ? "تم إنهاء الجلسة بنجاح! تم حفظ السجلات الطبية وخصم المخزون والنبضات وتحديث الفاتورة." : "Session completed successfully! Clinical records saved, inventory deducted, and invoice updated.");
         setViewMode("details");
@@ -1219,12 +1542,66 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           31: 400, 32: 350, 33: 400, 34: 500
         };
 
+        const isLaserPerPulse = Boolean(
+          booking?.laserPaymentMode === "PER_PULSE" ||
+          (booking as any)?.laser_payment_mode === "PER_PULSE" ||
+          String(booking?.notes || "").toLowerCase().includes("pay per pulse") ||
+          String(booking?.notes || "").toLowerCase().includes("per_pulse") ||
+          String(booking?.notes || "").includes("[Laser Settlement]") && String(booking?.notes || "").includes("per pulse")
+        );
+
+        const isLaserPackage = Boolean(
+          booking?.laserPaymentMode === "PACKAGE" ||
+          (booking as any)?.laser_payment_mode === "PACKAGE" ||
+          String(booking?.notes || "").toLowerCase().includes("pay with package") ||
+          String(booking?.notes || "").toLowerCase().includes("package session") ||
+          String(booking?.notes || "").toLowerCase().includes("package redemption") ||
+          String(booking?.notes || "").toLowerCase().includes("pulses package") ||
+          String(booking?.notes || "").includes("[Laser Package]") ||
+          String(booking?.notes || "").includes("[Laser Package Redemption]") ||
+          String(booking?.notes || "").includes("[Purchasing New Pulses Package]")
+        );
+
+        const laserPulseRate = Number(
+          booking?.laserPricePerPulse ||
+          (booking as any)?.laser_price_per_pulse ||
+          (() => {
+            const m = String(booking?.notes || "").match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+            return m ? Number(m[1]) : 1;
+          })()
+        ) || 1;
+
+        const primaryDeliveredPulses = extractPrimaryPulses(String(booking?.notes || ""), booking);
+        const settlementMatch = String(booking?.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
+        const packageRedemptionMatch = String(booking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
+
         const bookingServices = selectedServiceIds.map(id => {
           const s = localServices.find(item => item.id === id);
+          const isLaser = checkIsLaserService(s);
+          let price = s ? getEffectiveServicePrice(s, booking.branchId, branches) : (prices[id] ?? 500);
+          let pulseDetails = "";
+
+          if (isLaserPerPulse && isLaser) {
+            if (primaryDeliveredPulses > 0) {
+              price = primaryDeliveredPulses * laserPulseRate;
+              pulseDetails = ` (${primaryDeliveredPulses} pulses × ${laserPulseRate} EGP)`;
+            } else {
+              price = 0;
+              pulseDetails = ` (Pay per Pulse @ ${laserPulseRate} EGP)`;
+            }
+          } else if (isLaserPackage && isLaser) {
+            price = 0;
+            pulseDetails = ` (Package Redemption · 0 EGP)`;
+          }
+
           return {
             id,
             name: s ? s.en : `Service #${id}`,
-            price: s ? getEffectiveServicePrice(s, booking.branchId, branches) : (prices[id] ?? 500)
+            nameAr: s ? s.ar : `خدمة #${id}`,
+            rawName: s ? s.en : `Service #${id}`,
+            price,
+            isLaser,
+            pulseDetails,
           };
         });
 
@@ -1248,7 +1625,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const total = Number(item.total) || (qty * unitPrice);
           const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
 
-          // Skip zero-cost device pulse counter tracking from billing products list
+          // Skip device pulse counters from billing products list in per-pulse mode or zero-cost tracking
+          if (isLaserPerPulse && lineType === 'device_pulses') {
+            continue;
+          }
           const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
           if (isPulse && (total === 0 || unitPrice === 0)) {
             continue;
@@ -1256,8 +1636,27 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
           if (!existingNames.has(name.toLowerCase())) {
             existingNames.add(name.toLowerCase());
+            const matchingSvc = localServices.find((ls) =>
+              (item.serviceId && String(ls.id) === String(item.serviceId)) ||
+              ls.en?.toLowerCase() === name.toLowerCase() ||
+              ls.ar === name
+            );
+            const isItemLaser = checkIsLaserService(matchingSvc) || name.toLowerCase().includes('laser') || name.includes('ليزر');
+            let effectiveUnitPrice = unitPrice;
+            let effectiveTotal = total;
+            if (isLaserPackage && isItemLaser) {
+              effectiveUnitPrice = 0;
+              effectiveTotal = 0;
+            }
+
             if (lineType === 'additional_service') {
-              additionalServicesList.push({ name, qty, unitPrice, total, lineType });
+              additionalServicesList.push({
+                name: (isLaserPackage && isItemLaser) ? `${name} (Package Redemption · 0 EGP)` : name,
+                qty,
+                unitPrice: effectiveUnitPrice,
+                total: effectiveTotal,
+                lineType
+              });
             } else {
               productsConsumablesList.push({
                 name,
@@ -1282,46 +1681,23 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             // Split by comma or newline outside parentheses
             const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
             for (const item of items) {
-              const trimmed = item.trim();
-              if (!trimmed || trimmed.startsWith("[")) continue;
-              // Format 1: Name (Qty: 1 x 200 EGP = 200 EGP)
-              const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-              if (m1) {
-                const name = m1[1].replace(/^[,\s-]+/, '').trim();
-                const qty = Number(m1[2]) || 1;
-                const unitPrice = Number(m1[3]) || 0;
-                const total = Number(m1[4]) || (qty * unitPrice);
-                if (!existingNames.has(name.toLowerCase())) {
-                  existingNames.add(name.toLowerCase());
-                  additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                }
-                continue;
-              }
-              // Format 2: Name (Qty: 1 x 200 EGP)
-              const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-              if (m2) {
-                const name = m2[1].replace(/^[,\s-]+/, '').trim();
-                const qty = Number(m2[2]) || 1;
-                const unitPrice = Number(m2[3]) || 0;
-                const total = qty * unitPrice;
-                if (!existingNames.has(name.toLowerCase())) {
-                  existingNames.add(name.toLowerCase());
-                  additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                }
-                continue;
-              }
-              // Format 3: Name - 200 EGP or Name (200 EGP) or Name: 200 EGP or Name @ 200 EGP
-              const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
-              if (m3) {
-                const name = m3[1].replace(/^[,\s-]+/, '').trim();
-                const qty = m3[2] ? Number(m3[2]) : 1;
-                const total = Number(m3[3]) || 0;
-                const unitPrice = qty > 0 ? total / qty : total;
-                if (!existingNames.has(name.toLowerCase())) {
-                  existingNames.add(name.toLowerCase());
-                  additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-                }
-                continue;
+              const parsed = parseAdditionalServiceLine(item.trim());
+              if (parsed && !existingNames.has(parsed.name.toLowerCase())) {
+                existingNames.add(parsed.name.toLowerCase());
+                const matchingSvc = localServices.find((ls) =>
+                  ls.en?.toLowerCase() === parsed.name.toLowerCase() ||
+                  ls.ar === parsed.name
+                );
+                const isItemLaser = checkIsLaserService(matchingSvc) || parsed.name.toLowerCase().includes('laser') || parsed.name.includes('ليزر');
+                const effectiveUnitPrice = (isLaserPackage && isItemLaser) ? 0 : parsed.unitPrice;
+                const effectiveTotal = (isLaserPackage && isItemLaser) ? 0 : parsed.total;
+                additionalServicesList.push({
+                  name: (isLaserPackage && isItemLaser) ? `${parsed.name} (Package Redemption · 0 EGP)` : parsed.name,
+                  qty: parsed.qty,
+                  unitPrice: effectiveUnitPrice,
+                  total: effectiveTotal,
+                  lineType: 'additional_service'
+                });
               }
             }
           }
@@ -1329,30 +1705,23 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           // b) Added Service format: [Added Service]: Name - 350 EGP or [Additional Service]: Name - 200 EGP
           const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service|Extra Service)\]:\s+(.*?)(?=\n|$)/gi);
           for (const match of addedServiceMatches) {
-            const rawLine = match[1].trim();
-            const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
-            if (m1) {
-              const name = m1[1].replace(/^[,\s-]+/, '').trim();
-              const qty = Number(m1[2]) || 1;
-              const unitPrice = Number(m1[3]) || 0;
-              const total = Number(m1[4]) || (qty * unitPrice);
-              if (!existingNames.has(name.toLowerCase())) {
-                existingNames.add(name.toLowerCase());
-                additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-              }
-              continue;
-            }
-            const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
-            if (m2) {
-              const name = m2[1].replace(/^[,\s-]+/, '').trim();
-              const qty = m2[2] ? Number(m2[2]) : 1;
-              const total = Number(m2[3]);
-              const unitPrice = qty > 0 ? total / qty : total;
-              if (!existingNames.has(name.toLowerCase())) {
-                existingNames.add(name.toLowerCase());
-                additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
-              }
-              continue;
+            const parsed = parseAdditionalServiceLine(match[1].trim());
+            if (parsed && !existingNames.has(parsed.name.toLowerCase())) {
+              existingNames.add(parsed.name.toLowerCase());
+              const matchingSvc = localServices.find((ls) =>
+                ls.en?.toLowerCase() === parsed.name.toLowerCase() ||
+                ls.ar === parsed.name
+              );
+              const isItemLaser = checkIsLaserService(matchingSvc) || parsed.name.toLowerCase().includes('laser') || parsed.name.includes('ليزر');
+              const effectiveUnitPrice = (isLaserPackage && isItemLaser) ? 0 : parsed.unitPrice;
+              const effectiveTotal = (isLaserPackage && isItemLaser) ? 0 : parsed.total;
+              additionalServicesList.push({
+                name: (isLaserPackage && isItemLaser) ? `${parsed.name} (Package Redemption · 0 EGP)` : parsed.name,
+                qty: parsed.qty,
+                unitPrice: effectiveUnitPrice,
+                total: effectiveTotal,
+                lineType: 'additional_service'
+              });
             }
           }
 
@@ -1392,14 +1761,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             }
           }
 
-          // e) Extra Device Pulses matches
-          const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
-          for (const match of pulseMatches) {
-            const name = "Extra Device Pulses";
-            const total = parseFloat(match[2]) || 0;
-            if (total > 0 && !existingNames.has(name.toLowerCase())) {
-              existingNames.add(name.toLowerCase());
-              productsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses', addedBy: 'Doctor Session' });
+          // e) Extra Device Pulses matches (only in non-per-pulse mode)
+          if (!isLaserPerPulse) {
+            const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
+            for (const match of pulseMatches) {
+              const name = "Extra Device Pulses";
+              const total = parseFloat(match[2]) || 0;
+              if (total > 0 && !existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                productsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses', addedBy: 'Doctor Session' });
+              }
             }
           }
 
@@ -1415,6 +1786,45 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product', addedBy: 'Doctor Session' });
             }
           }
+
+          // g) Package Purchase matches in notes:
+          // [Purchasing New Pulses Package]: Name (6000 EGP · 10,000 pulses) or [Laser Package Purchase & Redemption]: Name (6000 EGP)
+          const pkgPurchaseMatch = notesStr.match(/\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption|Laser Package Deficit Settlement)\]:\s*(?:Choice 3A\s*-\s*)?([^(]+?)\s*\((\d+(?:\.\d+)?)\s*EGP/i);
+          if (pkgPurchaseMatch) {
+            const rawPkgName = pkgPurchaseMatch[1].trim();
+            const pkgPrice = parseFloat(pkgPurchaseMatch[2]) || 0;
+            const displayName = `Purchased Package: ${rawPkgName}`;
+            if (pkgPrice > 0 && !existingNames.has(displayName.toLowerCase()) && !existingNames.has(rawPkgName.toLowerCase())) {
+              existingNames.add(displayName.toLowerCase());
+              existingNames.add(rawPkgName.toLowerCase());
+              productsConsumablesList.push({
+                name: displayName,
+                qty: 1,
+                unitPrice: pkgPrice,
+                total: pkgPrice,
+                lineType: 'product',
+                addedBy: 'Reception Booking'
+              });
+            }
+          }
+
+          // h) Package Deficit Choice 3B (per pulse deficit in notes)
+          const deficitPerPulseMatch = notesStr.match(/\[Laser Package Deficit Settlement\]:\s*Choice 3B\s*-\s*Pay Rest per Pulse\s*\(([^)]+?)=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+          if (deficitPerPulseMatch) {
+            const deficitDesc = `Excess Pulses Deficit (${deficitPerPulseMatch[1].trim()})`;
+            const deficitPrice = parseFloat(deficitPerPulseMatch[2]) || 0;
+            if (deficitPrice > 0 && !existingNames.has(deficitDesc.toLowerCase())) {
+              existingNames.add(deficitDesc.toLowerCase());
+              productsConsumablesList.push({
+                name: deficitDesc,
+                qty: 1,
+                unitPrice: deficitPrice,
+                total: deficitPrice,
+                lineType: 'device_pulses',
+                addedBy: 'Doctor Session'
+              });
+            }
+          }
         }
 
         // 3. Fallback reconciliation: If notes or booking balance recorded a higher invoice total than the sum of parsed lines,
@@ -1422,7 +1832,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const baseAndAttachedTotal = servicesCost + additionalServicesList.reduce((sum, s) => sum + s.total, 0) + productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
         let targetInvoiceTotal = baseAndAttachedTotal;
 
-        if (booking.notes) {
+        if (booking.notes && !isLaserPerPulse && !isLaserPackage) {
           const invMatch = String(booking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP|Invoice Value:\s*(\d+(?:\.\d+)?)\s*EGP/i);
           if (invMatch) {
             const notedTotal = Number(invMatch[1] || invMatch[2]);
@@ -1437,18 +1847,36 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const additionalServicesCost = additionalServicesList.reduce((sum, s) => sum + s.total, 0);
         const productsCost = productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
         const calculatedTotal = servicesCost + additionalServicesCost + productsCost;
-        const totalPrice = Math.max(
-          calculatedTotal,
-          targetInvoiceTotal,
-          rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
-        );
+
+        // For package mode: recover the booked package purchase price from notes so we don't collapse to 0
+        let bookedPackagePurchasePrice = 0;
+        if (isLaserPackage) {
+          const pkgPriceMatch = String(booking?.notes || "").match(
+            /\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption)\]:[^(]+\((\d+(?:\.\d+)?)\s*EGP/i
+          );
+          if (pkgPriceMatch) {
+            bookedPackagePurchasePrice = parseFloat(pkgPriceMatch[1]) || 0;
+          }
+        }
+
+        const totalPrice = (isLaserPerPulse || isLaserPackage)
+          ? Math.max(
+              calculatedTotal,
+              bookedPackagePurchasePrice,
+              rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
+            )
+          : Math.max(
+              calculatedTotal,
+              targetInvoiceTotal,
+              rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
+            );
 
         const sessionPaid = rawPaid;
         const sessionLeft = (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)))
           ? Number(rawLeft)
           : Math.max(0, totalPrice - sessionPaid);
 
-        const isInvoicePaid = (rawLeft !== null && rawLeft !== undefined && Number(rawLeft) <= 0 && sessionPaid > 0) || (sessionLeft <= 0 && sessionPaid > 0) || (sessionPaid >= totalPrice && totalPrice > 0);
+        const isInvoicePaid = (sessionPaid >= totalPrice && totalPrice > 0) || (sessionLeft <= 0 && sessionPaid > 0);
 
         // Primary effective service for end session
         const primaryServiceObj = localServices.find(
@@ -1456,16 +1884,41 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                  (s.en && s.en === ((booking as any).service || (booking as any).service_name)) ||
                  (s.ar && s.ar === ((booking as any).service || (booking as any).service_name))
         );
-        const baseBookingPrice = primaryServiceObj 
+        const isPrimaryLaser = checkIsLaserService(primaryServiceObj);
+        const primaryPulses = isPrimaryLaser ? (Number(extraPulsesCount) || 0) : 0;
+        const catalogPrice = primaryServiceObj 
           ? getEffectiveServicePrice(primaryServiceObj, booking.branchId, branches)
           : (servicesCost || Number((booking as any).total_price || (booking as any).price || 0) || 500);
 
-        const additionalServicesSubtotal = additionalServices.reduce((sum, item) => sum + Number(item.price || 0), 0);
+        const baseBookingPrice = (isLaserPerPulse && isPrimaryLaser)
+          ? (primaryPulses * laserPulseRate)
+          : (isLaserPackage && isPrimaryLaser)
+          ? 0
+          : catalogPrice;
+
+        const additionalServicesSubtotal = additionalServices.reduce((sum, item) => {
+          const srvObj = localServices.find((s) => String(s.id) === String(item.serviceId));
+          const isItemLaser = item.isLaser || checkIsLaserService(srvObj);
+          const itemPrice = (isLaserPerPulse && isItemLaser)
+            ? (Number(item.pulses) || 0) * laserPulseRate
+            : (isLaserPackage && isItemLaser)
+            ? 0
+            : Number(item.price || 0);
+          return sum + itemPrice;
+        }, 0);
+
         const productsSubtotal = usedProducts.reduce((sum, item) => sum + Number(item.total || 0), 0);
-        const extraPulsesSubtotal = (Number(extraPulsesCount) || 0) * (Number(pricePerPulse) || 0);
+        const extraPulsesSubtotal = isLaserPerPulse ? 0 : (primaryPulses * (Number(pricePerPulse) || 0));
         const additionalPulsesTotal = additionalServices.reduce((sum, item) => sum + Number(item.pulses || 0), 0);
-        const totalSessionPulses = (Number(extraPulsesCount) || 0) + additionalPulsesTotal;
-        const endSessionInvoiceTotal = baseBookingPrice + additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal;
+        const totalSessionPulses = primaryPulses + additionalPulsesTotal;
+        // For isLaserPackage: include the booked package purchase price so amountLeft is preserved
+        const endSessionInvoiceTotal = isLaserPackage
+          ? Math.max(
+              baseBookingPrice + additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal,
+              bookedPackagePurchasePrice,
+              rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
+            )
+          : baseBookingPrice + additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal;
         const endSessionAmountLeft = Math.max(0, endSessionInvoiceTotal - sessionPaid);
 
         // First visit check
@@ -1550,6 +2003,26 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       </div>
                     </div>
                   </div>
+
+                  {/* LASER PER-PULSE AGREEMENT NOTICE */}
+                  {isLaserPerPulse && (
+                    <div className="rounded-3xl border border-amber-300 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-emerald-500/10 p-5 shadow-xs space-y-1.5 animate-fadeIn">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 font-black text-[#1F251A] text-sm">
+                          <Zap size={18} className="text-amber-600 fill-amber-500 animate-pulse" />
+                          <span>{isRTL ? "اتفاقية محاسبة خدمات الليزر بنظام حساب النبضات" : "Laser Per-Pulse Settlement Agreement"}</span>
+                        </div>
+                        <span className="rounded-full bg-amber-200 text-amber-900 border border-amber-300 px-3 py-1 text-xs font-black">
+                          {laserPulseRate} EGP / {isRTL ? "نبضة" : "pulse"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#1F251A] font-semibold leading-relaxed">
+                        {isRTL
+                          ? `تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${totalSessionPulses} نبضة × ${laserPulseRate} ج.م = ${totalSessionPulses * laserPulseRate} ج.م)`
+                          : `Settled that laser services in this session are charged per pulse (${totalSessionPulses} pulses × ${laserPulseRate} EGP = ${totalSessionPulses * laserPulseRate} EGP)`}
+                      </p>
+                    </div>
+                  )}
 
                   {/* 2-COLUMN CLINICAL GRID */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -2046,152 +2519,276 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               }}
                               className="rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                             >
-                              <Send size={13} /> {isRTL ? "إرسال عبر واتساب" : "Send WhatsApp Rx"}
+                              <Send size={13} /> {isRTL ? "إرسال عبر واتساب" : "Send WhatsApp"}
                             </button>
                             <button
                               type="submit"
                               disabled={savingRxInline}
                               className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                             >
-                              <Printer size={14} /> {savingRxInline ? "..." : (isRTL ? "حفظ وطباعة الروشتة" : "Save & Print Rx")}
+                              <Printer size={14} /> {savingRxInline ? "..." : (isRTL ? "حفظ وطباعة الروشتة" : "Save & Print")}
                             </button>
                           </div>
                         </form>
                       </div>
 
                       {/* 2. SERVICES, DEVICES & PULSES MANAGER */}
-                      <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
-                          <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                            <Zap size={16} className="text-amber-600" />
-                            <span>{isRTL ? "الخدمات الإضافية ونبضات الأجهزة" : "Services, Devices & Pulses"}</span>
-                          </h3>
+                      {(() => {
+                        const currentPrimarySvc = localServices.find((s) => String(s.id) === String(primaryServiceId));
+                        const isPrimaryLaser = checkIsLaserService(currentPrimarySvc);
+                        const chosenAddSvc = localServices.find((s) => String(s.id) === String(selectedServiceIdToAdd));
+                        const isAddSvcLaser = checkIsLaserService(chosenAddSvc);
+                        const totalCalculatedPulses = (isPrimaryLaser ? Number(extraPulsesCount) || 0 : 0) + additionalServices.reduce((sum, s) => sum + Number(s.pulses || 0), 0);
 
-                          {(selectedDeviceId || additionalServices.some((s) => s.deviceId)) && (
-                            <div className="flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-3.5 py-1.5 text-xs font-black text-amber-900 shadow-xs">
-                              <Zap size={14} className="text-amber-600 fill-amber-500 animate-pulse" />
-                              <span>{isRTL ? "إجمالي النبضات:" : "Total Pulses:"}</span>
-                              <span className="text-sm text-amber-900 font-extrabold">{totalSessionPulses}</span>
-                            </div>
-                          )}
-                        </div>
+                        return (
+                          <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
+                              <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                                <Zap size={16} className="text-amber-600" />
+                                <span>{isRTL ? "الخدمات الإضافية ونبضات الليزر" : "Services & Laser Pulses"}</span>
+                              </h3>
 
-                        {/* Primary Service Display */}
-                        <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-2">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
-                              <Layers size={14} className="text-[#414E36]" />
-                              <span>{isRTL ? "الخدمة الأساسية المحجوزة" : "Primary Reserved Service"}</span>
-                            </span>
-                            <span className="font-extrabold text-[#414E36]">{baseBookingPrice} EGP</span>
-                          </div>
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
-                            <div className="flex-1 w-full">
-                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">
-                                {isRTL ? "تعديل الخدمة الأساسية للجلسة" : "Selected Patient Service (Changeable)"}
-                              </label>
-                              <select
-                                value={primaryServiceId}
-                                onChange={(e) => setPrimaryServiceId(e.target.value)}
-                                className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
-                              >
-                                {localServices.map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {isRTL ? (s.ar || s.en) : (s.en || s.ar)} ({getEffectiveServicePrice(s, booking?.branchId, branches)} EGP)
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Additional Services Manager */}
-                        <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
-                          <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
-                            <Plus size={14} className="text-[#414E36]" />
-                            <span>{isRTL ? "إضافة خدمة إضافية للجلسة" : "Add Additional Service"}</span>
-                          </h4>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <select
-                              value={selectedServiceIdToAdd}
-                              onChange={(e) => setSelectedServiceIdToAdd(e.target.value)}
-                              className="sm:col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
-                            >
-                              <option value="">{isRTL ? "-- اختر الخدمة --" : "-- Select Additional Service --"}</option>
-                              {localServices.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                  {isRTL ? (s.ar || s.en) : (s.en || s.ar)} ({getEffectiveServicePrice(s, booking?.branchId, branches)} EGP)
-                                </option>
-                              ))}
-                            </select>
-
-                            <select
-                              value={selectedDeviceForService}
-                              onChange={(e) => setSelectedDeviceForService(e.target.value)}
-                              className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
-                            >
-                              <option value="">{isRTL ? "-- ربط الجهاز (اختياري) --" : "-- Linked Device --"}</option>
-                              {devicesList.map((d) => (
-                                <option key={d.id} value={d.id}>{d.name}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">
-                                {isRTL ? "عدد نبضات الجهاز" : "Device Pulses"}
-                              </label>
-                              <input
-                                type="number"
-                                min={0}
-                                value={pulsesCountForService}
-                                onChange={(e) => setPulsesCountForService(Math.max(0, parseInt(e.target.value) || 0))}
-                                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
-                                placeholder="Pulses (e.g. 150)"
-                              />
+                              {(totalCalculatedPulses > 0 || isPrimaryLaser || additionalServices.some((s) => s.isLaser || Number(s.pulses) > 0)) && (
+                                <div className="flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-3.5 py-1.5 text-xs font-black text-amber-900 shadow-xs">
+                                  <Zap size={14} className="text-amber-600 fill-amber-500 animate-pulse" />
+                                  <span>{isRTL ? "إجمالي النبضات:" : "Total Pulses:"}</span>
+                                  <span className="text-sm text-amber-900 font-extrabold">{totalCalculatedPulses}</span>
+                                </div>
+                              )}
                             </div>
 
-                            <div className="flex items-end">
-                              <button
-                                type="button"
-                                onClick={handleAddServiceToSession}
-                                disabled={!selectedServiceIdToAdd}
-                                className="w-full rounded-xl bg-[#414E36] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer"
-                              >
-                                <Plus size={14} /> {isRTL ? "إضافة الخدمة" : "Add Service"}
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Added Additional Services List */}
-                          {additionalServices.length > 0 && (
-                            <div className="space-y-2 pt-2 border-t border-[#414E36]/10">
-                              {additionalServices.map((item) => (
-                                <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
-                                  <div className="min-w-0">
-                                    <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
-                                    <span className="text-[10px] text-[#5A6A51] block truncate">
-                                      {item.deviceName ? `${item.deviceName} • ` : ""}{item.pulses} Pulses
+                            {/* Primary Service Display & Laser Pulse Tracker */}
+                            <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-3">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
+                                  <Layers size={14} className="text-[#414E36]" />
+                                  <span>{isRTL ? "الخدمة الأساسية المحجوزة" : "Primary Reserved Service"}</span>
+                                  {isPrimaryLaser && (
+                                    <span className="rounded-md bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-extrabold">
+                                      {isRTL ? "خدمة ليزر" : "Laser Service"}
                                     </span>
+                                  )}
+                                </span>
+                                <span className="font-extrabold text-[#414E36]">
+                                  {baseBookingPrice} EGP {isLaserPerPulse && isPrimaryLaser && Number(primaryPulses) > 0 ? `(${primaryPulses} × ${laserPulseRate} EGP)` : ""}
+                                </span>
+                              </div>
+
+                              <div className="bg-white p-3 rounded-xl border border-[#414E36]/10 space-y-3">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">
+                                    {isRTL ? "تعديل الخدمة الأساسية للجلسة" : "Selected Patient Service (Changeable)"}
+                                  </label>
+                                  <select
+                                    value={primaryServiceId}
+                                    onChange={(e) => {
+                                      const newId = e.target.value;
+                                      setPrimaryServiceId(newId);
+                                      const newSvc = localServices.find((s) => String(s.id) === String(newId));
+                                      if (!checkIsLaserService(newSvc)) {
+                                        setExtraPulsesCount(0);
+                                      }
+                                    }}
+                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                  >
+                                    {localServices.map((s) => (
+                                      <option key={s.id} value={s.id}>
+                                        {isRTL ? (s.ar || s.en) : (s.en || s.ar)} ({getEffectiveServicePrice(s, booking?.branchId, branches)} EGP){checkIsLaserService(s) ? (isRTL ? " ⚡ (ليزر)" : " ⚡ (Laser)") : ""}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                {/* Only show Delivered Pulses intake if Primary Service is a Laser Service */}
+                                {isPrimaryLaser && (
+                                  <div className="pt-2 border-t border-[#414E36]/10">
+                                    <label className="block text-[10px] font-bold text-[#5A6A51] mb-1 flex items-center justify-between">
+                                      <span className="flex items-center gap-1">
+                                        <Zap size={12} className="text-amber-600" />
+                                        <span>{isRTL ? "عدد النبضات المستخدمة" : "Delivered Pulses"}</span>
+                                      </span>
+                                      {Number(extraPulsesCount) > 0 && (
+                                        <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                                          {extraPulsesCount} {isRTL ? "نبضة" : "pulses"}
+                                        </span>
+                                      )}
+                                    </label>
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={extraPulsesCount || ""}
+                                        onChange={(e) => setExtraPulsesCount(Math.max(0, parseInt(e.target.value) || 0))}
+                                        className="flex-1 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                        placeholder={isRTL ? "عدد النبضات (مثال: 500)" : "Pulses (e.g. 500)"}
+                                      />
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        {[250, 500, 1000, 2000].map((preset) => (
+                                          <button
+                                            key={preset}
+                                            type="button"
+                                            onClick={() => setExtraPulsesCount(preset)}
+                                            className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                                              extraPulsesCount === preset
+                                                ? "bg-[#414E36] text-white border-[#414E36]"
+                                                : "bg-white text-[#5A6A51] border-[#414E36]/15 hover:bg-[#EDF1EC]"
+                                            }`}
+                                          >
+                                            {preset}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-3 shrink-0">
-                                    <span className="font-extrabold text-[#414E36]">+{item.price} EGP</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Additional Services Manager */}
+                            <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                              <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
+                                <Plus size={14} className="text-[#414E36]" />
+                                <span>{isRTL ? "إضافة خدمة إضافية للجلسة" : "Add Additional Service"}</span>
+                              </h4>
+
+                              <div className="space-y-3">
+                                <div className="flex flex-col sm:flex-row items-center gap-2">
+                                  <select
+                                    value={selectedServiceIdToAdd}
+                                    onChange={(e) => {
+                                      const newId = e.target.value;
+                                      setSelectedServiceIdToAdd(newId);
+                                      const svcObj = localServices.find((s) => String(s.id) === String(newId));
+                                      if (!checkIsLaserService(svcObj)) {
+                                        setAdditionalServicePulsesInput(0);
+                                      }
+                                    }}
+                                    className="flex-1 w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                                  >
+                                    <option value="">{isRTL ? "-- اختر الخدمة الإضافية --" : "-- Select Additional Service --"}</option>
+                                    {localServices.map((s) => (
+                                      <option key={s.id} value={s.id}>
+                                        {isRTL ? (s.ar || s.en) : (s.en || s.ar)} ({getEffectiveServicePrice(s, booking?.branchId, branches)} EGP){checkIsLaserService(s) ? (isRTL ? " ⚡ (ليزر)" : " ⚡ (Laser)") : ""}
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                  {!isAddSvcLaser && (
                                     <button
                                       type="button"
-                                      onClick={() => handleRemoveServiceFromSession(item.id)}
-                                      className="text-rose-600 hover:text-rose-800 text-xs font-bold cursor-pointer p-1"
+                                      onClick={handleAddServiceToSession}
+                                      disabled={!selectedServiceIdToAdd}
+                                      className="w-full sm:w-auto px-5 py-2 rounded-xl bg-[#414E36] text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
                                     >
-                                      <Trash2 size={14} />
+                                      <Plus size={14} /> {isRTL ? "إضافة الخدمة" : "Add Service"}
                                     </button>
-                                  </div>
+                                  )}
                                 </div>
-                              ))}
+
+                                {/* If chosen additional service is a Laser service, prompt for Delivered Pulses intake before recording */}
+                                {selectedServiceIdToAdd && isAddSvcLaser && (
+                                  <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200/80 space-y-2">
+                                    <div className="flex items-center justify-between text-xs font-bold text-amber-900">
+                                      <span className="flex items-center gap-1.5">
+                                        <Zap size={13} className="text-amber-600 fill-amber-500" />
+                                        <span>{isRTL ? "النبضات المستخدمة للخدمة الإضافية:" : "Delivered Pulses for Additional Laser Service:"}</span>
+                                      </span>
+                                      {Number(additionalServicePulsesInput) > 0 && (
+                                        <span className="text-[11px] font-extrabold text-amber-800 bg-white px-2 py-0.5 rounded-md border border-amber-200">
+                                          {additionalServicePulsesInput} {isRTL ? "نبضة" : "pulses"}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div className="flex flex-col sm:flex-row items-center gap-2">
+                                      <div className="flex-1 w-full flex items-center gap-1.5">
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          value={additionalServicePulsesInput || ""}
+                                          onChange={(e) => setAdditionalServicePulsesInput(Math.max(0, parseInt(e.target.value) || 0))}
+                                          className="flex-1 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none focus:ring-2 focus:ring-amber-400"
+                                          placeholder={isRTL ? "عدد النبضات (مثال: 500)" : "Pulses (e.g. 500)"}
+                                        />
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          {[250, 500, 1000, 2000].map((preset) => (
+                                            <button
+                                              key={preset}
+                                              type="button"
+                                              onClick={() => setAdditionalServicePulsesInput(preset)}
+                                              className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                                                additionalServicePulsesInput === preset
+                                                  ? "bg-amber-700 text-white border-amber-700"
+                                                  : "bg-white text-amber-900 border-amber-300 hover:bg-amber-100"
+                                              }`}
+                                            >
+                                              {preset}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={handleAddServiceToSession}
+                                        disabled={!selectedServiceIdToAdd}
+                                        className="w-full sm:w-auto px-5 py-2 rounded-xl bg-[#414E36] text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                                      >
+                                        <Plus size={14} /> {isRTL ? "تسجيل الخدمة الإضافية" : "Record Additional Service"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Added Additional Services List */}
+                              {additionalServices.length > 0 && (
+                                <div className="space-y-2 pt-2 border-t border-[#414E36]/10">
+                                  {additionalServices.map((item) => {
+                                    const srvObj = localServices.find((ls) => String(ls.id) === String(item.serviceId));
+                                    const isItemLaser = item.isLaser || checkIsLaserService(srvObj);
+                                    const itemDisplayPrice = (isLaserPerPulse && isItemLaser)
+                                      ? (Number(item.pulses) || 0) * laserPulseRate
+                                      : (isLaserPackage && isItemLaser)
+                                      ? 0
+                                      : Number(item.price || 0);
+
+                                    return (
+                                      <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
+                                        <div className="min-w-0 flex items-center gap-2">
+                                          <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
+                                          {(item.isLaser || Number(item.pulses) > 0) && (
+                                            <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-extrabold text-amber-800 shrink-0">
+                                              <Zap size={10} className="text-amber-600 fill-amber-500" />
+                                              <span>{item.pulses || 0} {isRTL ? "نبضة" : "pulses"}</span>
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-3 shrink-0">
+                                          <span className="font-extrabold text-[#414E36]">
+                                            {isLaserPackage && isItemLaser ? (
+                                              <span className="text-purple-700 font-bold">0 EGP (Package Redemption)</span>
+                                            ) : (
+                                              `+${itemDisplayPrice} EGP ${isLaserPerPulse && isItemLaser && Number(item.pulses) > 0 ? `(${item.pulses} × ${laserPulseRate} EGP)` : ""}`
+                                            )}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveServiceFromSession(item.id)}
+                                            className="text-rose-600 hover:text-rose-800 text-xs font-bold cursor-pointer p-1"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* 3. PRODUCTS & CONSUMABLES USED */}
                       <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
@@ -2295,7 +2892,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         {isRTL ? "تأكيد الإنهاء النهائي للجلسة" : "Confirm Session Termination"}
                       </p>
                       <p>
-                        {isRTL ? "سيتم حفظ كافة البيانات وخصم المخزون والنبضات وإنهاء الجلسة فورياً لدى شاشة الطبيب دون إعادة تحميل" : "Persists intake, Rx, stock sales, pulses, and terminates doctor session in real-time."}
+                        {isRTL ? "سيتم حفظ كافة البيانات وخصم المخزون والنبضات وإنهاء الجلسة فورياً لدى شاشة الطبيب دون إعادة تحميل" : "Persists intake, prescriptions, stock sales, pulses, and terminates doctor session in real-time."}
                       </p>
                     </div>
 
@@ -2530,7 +3127,88 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </div>
                   </div>
 
-                  {/* 2. 3-METRICS ROW: SERVICE, DATE & TIME, SESSION TYPE */}
+                  {/* Laser Per-Pulse Settlement Agreement Banner */}
+                  {isLaserPerPulse && (
+                    <div className="rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 via-amber-50/90 to-amber-100/60 p-4 text-xs text-amber-950 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fadeIn">
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className="h-10 w-10 rounded-2xl bg-amber-500/20 text-amber-800 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                          <Zap size={20} className="text-amber-700 fill-amber-600" />
+                        </div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-black text-amber-950 text-sm">
+                              {isRTL ? "نظام المحاسبة: الدفع بالنبضة" : "Payment Mode: Pay per Pulse"}
+                            </span>
+                            <span className="rounded-full bg-amber-200/90 px-2.5 py-0.5 text-[10.5px] font-black text-amber-950 border border-amber-300 shadow-2xs">
+                              {laserPulseRate} EGP / {isRTL ? "نبضة" : "pulse"}
+                            </span>
+                          </div>
+                          <p className="text-[11.5px] text-amber-900 font-medium mt-0.5 leading-relaxed">
+                            {settlementMatch ? settlementMatch[1] : (
+                              isRTL
+                                ? `تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${laserPulseRate} ج.م لكل نبضة)`
+                                : `Agreed that laser services in this session are settled per pulse (@ ${laserPulseRate} EGP/pulse)`
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      {primaryDeliveredPulses > 0 && (
+                        <div className="text-left sm:text-right shrink-0 bg-white/80 sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:rounded-none w-full sm:w-auto border sm:border-0 border-amber-200">
+                          <span className="text-[10px] text-amber-800 font-bold block uppercase tracking-wider">
+                            {isRTL ? "إجمالي النبضات المنفذة" : "Total Pulses Delivered"}
+                          </span>
+                          <span className="font-black text-sm sm:text-base text-amber-950 flex items-center sm:justify-end gap-1 mt-0.5">
+                            <Zap size={14} className="text-amber-600 fill-amber-500" />
+                            <span>{primaryDeliveredPulses + additionalServicesList.reduce((sum, s) => {
+                              const m = s.name.match(/(\d+)\s*pulses/i);
+                              return sum + (m ? Number(m[1]) : 0);
+                            }, 0)} {isRTL ? "نبضة" : "pulses"}</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Laser Pulses Package Settlement Agreement Banner */}
+                  {isLaserPackage && (
+                    <div className="rounded-2xl border border-purple-300 bg-gradient-to-r from-purple-50 via-purple-50/90 to-purple-100/60 p-4 text-xs text-purple-950 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fadeIn">
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className="h-10 w-10 rounded-2xl bg-purple-500/20 text-purple-800 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                          <Sparkles size={20} className="text-purple-700 fill-purple-600" />
+                        </div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-black text-purple-950 text-sm">
+                              {isRTL ? "نظام المحاسبة: باقة نبضات الليزر" : "Payment Mode: Pulses Package"}
+                            </span>
+                            <span className="rounded-full bg-purple-200/90 px-2.5 py-0.5 text-[10.5px] font-black text-purple-950 border border-purple-300 shadow-2xs">
+                              {isRTL ? "تغطية باقة" : "Package Covered"}
+                            </span>
+                          </div>
+                          <p className="text-[11.5px] text-purple-900 font-medium mt-0.5 leading-relaxed">
+                            {packageRedemptionMatch ? packageRedemptionMatch[1] : (
+                              isRTL
+                                ? "تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مغطاة بنظام باقات النبضات"
+                                : "Agreed that laser services in this session are covered under patient Pulses Package"
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      {primaryDeliveredPulses > 0 && (
+                        <div className="text-left sm:text-right shrink-0 bg-white/80 sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:rounded-none w-full sm:w-auto border sm:border-0 border-purple-200">
+                          <span className="text-[10px] text-purple-800 font-bold block uppercase tracking-wider">
+                            {isRTL ? "النبضات المستهلكة من الباقة" : "Package Pulses Redeemed"}
+                          </span>
+                          <span className="font-black text-sm sm:text-base text-purple-950 flex items-center sm:justify-end gap-1 mt-0.5">
+                            <Sparkles size={14} className="text-purple-600 fill-purple-500" />
+                            <span>{primaryDeliveredPulses} {isRTL ? "نبضة" : "pulses"}</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 2. 3-METRICS ROW: SERVICE, DATE & TIME, SESSION TYPE & PAYMENT MODE */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* Card A: SERVICE */}
                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
@@ -2590,18 +3268,37 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       </p>
                     </div>
 
-                    {/* Card C: SESSION TYPE */}
+                    {/* Card C: SESSION TYPE & PAYMENT MODE */}
                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
-                      <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
-                        <User size={13} className="text-[#0F3826]" />
-                        <span>SESSION TYPE</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
+                          <User size={13} className="text-[#0F3826]" />
+                          <span>SESSION TYPE</span>
+                        </div>
+                        {isLaserPerPulse ? (
+                          <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[9px] font-black text-amber-800">
+                            <Zap size={9} className="text-amber-600 fill-amber-500" />
+                            <span>Per Pulse</span>
+                          </span>
+                        ) : isLaserPackage ? (
+                          <span className="inline-flex items-center gap-0.5 rounded-md bg-purple-50 border border-purple-200 px-1.5 py-0.5 text-[9px] font-black text-purple-800">
+                            <Sparkles size={9} className="text-purple-600 fill-purple-500" />
+                            <span>Package</span>
+                          </span>
+                        ) : null}
                       </div>
                       <p className="font-black text-xs text-[#1F251A] pt-0.5">
                         {booking.sessionType === 'online' ? "Online Consultation" : "In Person"}
                       </p>
                       <p className="text-xs text-[#5A6A51] font-medium flex items-center gap-1.5">
-                        <span className={`h-2 w-2 rounded-full ${booking.sessionType === 'online' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
-                        <span>{booking.sessionType === 'online' ? "Virtual Consultation" : "In Clinic Visit"}</span>
+                        <span className={`h-2 w-2 rounded-full ${booking.sessionType === 'online' ? 'bg-blue-500' : isLaserPerPulse ? 'bg-amber-500' : isLaserPackage ? 'bg-purple-500' : 'bg-emerald-500'}`} />
+                        <span>
+                          {isLaserPerPulse 
+                            ? `Pay per Pulse (@ ${laserPulseRate} EGP)` 
+                            : isLaserPackage
+                            ? "Pay with Pulses Package"
+                            : (booking.sessionType === 'online' ? "Virtual Consultation" : "In Clinic Visit")}
+                        </span>
                       </p>
                     </div>
                   </div>
@@ -2685,11 +3382,21 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     <div className="space-y-2 text-xs">
                       {bookingServices.map((bs, index) => (
                         <div key={`bs-${bs.id}-${index}`} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
-                          <span className="font-semibold text-[#1F251A]">
-                            {index + 1}. {bs.name}
-                          </span>
                           <div className="flex items-center gap-2">
-                            <span className="font-extrabold text-[#1F251A]">{bs.price} EGP</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {index + 1}. {bs.rawName || bs.name}
+                            </span>
+                            {bs.isLaser && isLaserPerPulse && (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 shrink-0">
+                                <Zap size={10} className="text-amber-600 fill-amber-500" />
+                                <span>{primaryDeliveredPulses > 0 ? `${primaryDeliveredPulses} pulses` : "Per Pulse"}</span>
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-[#1F251A]">
+                              {bs.price} EGP {bs.pulseDetails && <span className="text-[10px] text-[#5A6A51] font-normal">{bs.pulseDetails}</span>}
+                            </span>
                             {bookingServices.length > 1 && hasPermission("bookings.edit") && booking.status !== 'completed' && (
                               <button
                                 type="button"
@@ -2825,10 +3532,19 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           <FileText size={13} className="text-[#0F3826]" />
                           <span>PRESCRIPTION</span>
                         </div>
-                        {drawerPrescriptions.length > 0 && (
+                        {drawerPrescriptions.length > 0 ? (
                           <span className="text-[10px] font-bold text-[#5A6A51] bg-gray-100 px-2 py-0.5 rounded-full">
                             {drawerPrescriptions[0].date ? new Date(drawerPrescriptions[0].date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "Recorded"}
                           </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowDrawerPrescriptionModal(true)}
+                            className="rounded-xl border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                          >
+                            <Plus size={11} />
+                            <span>Add Prescription</span>
+                          </button>
                         )}
                       </div>
 
@@ -2946,7 +3662,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 className="flex-1 rounded-xl bg-[#0F3826] text-white py-1.5 px-2.5 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-[#0A271A] transition shadow-2xs cursor-pointer"
                               >
                                 <Printer size={12} />
-                                <span>Print Rx</span>
+                                <span>Print</span>
                               </button>
                             </div>
                           </div>
@@ -3226,6 +3942,25 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                     <div className="space-y-2.5 text-xs">
                       <div className="flex justify-between items-center text-[#1F251A]">
+                        <span className="font-semibold text-[#5A6A51]">{isRTL ? "طريقة المحاسبة" : "Payment Mode"}</span>
+                        <span className={`font-bold inline-flex items-center gap-1 ${isLaserPerPulse ? "text-amber-800" : isLaserPackage ? "text-purple-800" : "text-[#1F251A]"}`}>
+                          {isLaserPerPulse ? (
+                            <>
+                              <Zap size={12} className="text-amber-600 fill-amber-500" />
+                              <span>{isRTL ? `دفع بالنبضة (${laserPulseRate} ج.م/نبضة)` : `Pay per Pulse (@ ${laserPulseRate} EGP)`}</span>
+                            </>
+                          ) : isLaserPackage ? (
+                            <>
+                              <Zap size={12} className="text-purple-600 fill-purple-400" />
+                              <span>{isRTL ? "باقة نبضات" : "Pulses Package"}</span>
+                            </>
+                          ) : (
+                            <span>{isRTL ? "سعر الخدمة الثابت" : "Standard Service"}</span>
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-[#1F251A]">
                         <span className="font-semibold text-[#5A6A51]">Service Price</span>
                         <span className="font-bold">{totalPrice} EGP</span>
                       </div>
@@ -3499,7 +4234,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 my-8 border border-[#414E36]/10">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Digital Rx</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Digital Prescription</span>
                 <h3 className="text-base font-bold text-[#1F251A] mt-0.5">Add Prescription for {booking.name}</h3>
               </div>
               <button

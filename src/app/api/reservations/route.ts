@@ -343,12 +343,97 @@ async function writeCheckoutInvoice(params: {
 
   const { data: services, error: svcErr } = await supabaseServer
     .from('services')
-    .select('id, en, price, branch_pricing')
+    .select('id, en, ar, name, price, branch_pricing, islaser, is_laser, category')
     .in('id', serviceIds);
   if (svcErr) throw svcErr;
   if (!services || services.length === 0) return;
 
+  let resRow: any = null;
+  try {
+    const { data: resData, error: resErr } = await supabaseServer
+      .from('reservations')
+      .select('laser_payment_mode, laser_price_per_pulse, notes')
+      .eq('id', reservationId)
+      .maybeSingle();
+    if (!resErr && resData) {
+      resRow = resData;
+    } else {
+      const { data: notesData } = await supabaseServer
+        .from('reservations')
+        .select('notes')
+        .eq('id', reservationId)
+        .maybeSingle();
+      resRow = notesData;
+    }
+  } catch (e) {
+    console.warn('Could not query laser columns on reservation for invoice (non-fatal):', e);
+  }
+
+  const isPerPulseMode = Boolean(
+    resRow?.laser_payment_mode === 'PER_PULSE' ||
+    String(resRow?.notes || '').toLowerCase().includes('pay per pulse') ||
+    String(resRow?.notes || '').toLowerCase().includes('per_pulse') ||
+    String(resRow?.notes || '').includes('[Laser Settlement]')
+  );
+  const isPackageMode = Boolean(
+    resRow?.laser_payment_mode === 'PACKAGE' ||
+    String(resRow?.notes || '').toLowerCase().includes('pay with package') ||
+    String(resRow?.notes || '').toLowerCase().includes('package session') ||
+    String(resRow?.notes || '').toLowerCase().includes('package redemption') ||
+    String(resRow?.notes || '').toLowerCase().includes('pulses package') ||
+    String(resRow?.notes || '').includes('[Laser Package]')
+  );
+  const pulseRate = Number(
+    resRow?.laser_price_per_pulse ||
+    (() => {
+      const m = String(resRow?.notes || '').match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+      return m ? Number(m[1]) : 1;
+    })()
+  ) || 1;
+  const primaryPulsesMatch = String(resRow?.notes || '').match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
+    String(resRow?.notes || '').match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
+    String(resRow?.notes || '').match(/Primary:\s*(\d+)\s*pulses/i) ||
+    String(resRow?.notes || '').match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
+    String(resRow?.notes || '').match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
+    String(resRow?.notes || '').match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
+    String(resRow?.notes || '').match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
+  const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
+
   const lines = services.map((svc: any) => {
+    const isLaser = Boolean(
+      svc.islaser ||
+      svc.is_laser ||
+      (svc.en && svc.en.toLowerCase().includes('laser')) ||
+      (svc.name && svc.name.toLowerCase().includes('laser')) ||
+      (svc.ar && svc.ar.includes('ليزر')) ||
+      (svc.category && String(svc.category).toLowerCase().includes('laser'))
+    );
+
+    if (isPerPulseMode && isLaser) {
+      if (primaryDeliveredPulses > 0) {
+        const perPulseTotal = primaryDeliveredPulses * pulseRate;
+        return buildInvoiceLine({
+          lineType: 'service',
+          description: `${svc.en || svc.name || `Service #${svc.id}`} (${primaryDeliveredPulses} pulses × ${pulseRate} EGP)`,
+          qty: 1,
+          unitPrice: perPulseTotal,
+          discount: 0,
+          serviceId: svc.id,
+          providerId: providerId ?? undefined,
+        });
+      } else {
+        return buildInvoiceLine({
+          lineType: 'service',
+          description: `${svc.en || svc.name || `Service #${svc.id}`} (Pay per Pulse @ ${pulseRate} EGP)`,
+          qty: 1,
+          unitPrice: 0,
+          discount: 0,
+          serviceId: svc.id,
+          providerId: providerId ?? undefined,
+        });
+      }
+    }
+
     const priceDetails = getServicePriceDetails(
       { price: svc.price !== null ? Number(svc.price) : 0, branchPricing: svc.branch_pricing },
       targetBranchName
@@ -359,7 +444,7 @@ async function writeCheckoutInvoice(params: {
     // already covers this visit, so the line is written at its list price with a full discount
     // (line_total 0) rather than silently omitted, keeping the visit on the invoice for the audit
     // trail without billing it again or creating a phantom receivable.
-    const isRedeemed = redeemedSet.has(Number(svc.id));
+    const isRedeemed = redeemedSet.has(Number(svc.id)) || (isPackageMode && isLaser);
     return buildInvoiceLine({
       lineType: 'service',
       description: (svc.en || `Service #${svc.id}`) + (isRedeemed ? ' (package redemption)' : ''),
@@ -386,16 +471,24 @@ async function writeCheckoutInvoice(params: {
   if (rpErr) {
     console.error('Failed to fetch pending reservation_products for invoice (non-fatal, service lines still write):', rpErr.message, '| reservation:', reservationId);
   }
-  const addonLines = (pendingReservationProducts || []).map((p: any) =>
-    buildInvoiceLine({
-      lineType: 'product',
-      description: p.description,
-      qty: Number(p.qty) || 1,
-      unitPrice: Number(p.unit_price) || 0,
-      serviceId: p.line_type === 'additional_service' ? (p.service_id ?? undefined) : undefined,
-      providerId: providerId ?? undefined,
+  const addonLines = (pendingReservationProducts || [])
+    .filter((p: any) => {
+      // In per-pulse mode or package mode with 0 unit_price, device_pulses are purely equipment tracking and should not be billed as an extra customer product
+      if (isPerPulseMode && p.line_type === 'device_pulses') return false;
+      const isZeroCostPulse = (p.line_type === 'device_pulses' || String(p.description || '').toLowerCase().includes('pulse')) && Number(p.unit_price || 0) <= 0;
+      if (isZeroCostPulse) return false;
+      return true;
     })
-  );
+    .map((p: any) =>
+      buildInvoiceLine({
+        lineType: p.line_type === 'additional_service' ? 'service' : 'product',
+        description: p.description,
+        qty: Number(p.qty) || 1,
+        unitPrice: Number(p.unit_price) || 0,
+        serviceId: p.line_type === 'additional_service' ? (p.service_id ?? undefined) : undefined,
+        providerId: providerId ?? undefined,
+      })
+    );
 
   const allLines = [...lines, ...addonLines];
   const totals = buildInvoiceTotals(allLines);
@@ -1098,6 +1191,7 @@ export async function POST(req: Request) {
       is_manual: isManualBooking,
       rooms: compRoomIds,
       created_by_employee_id: createdByEmployeeId || null,
+      follow_up_date: body.followUpDate || body.follow_up_date || null,
     };
 
     // No fallback retries here — deliberately. This used to retry a failed insert after
@@ -1520,7 +1614,7 @@ export async function PATCH(req: Request) {
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
-    } else if (status || notes !== undefined || doctorNotes !== undefined || receptionNotes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined || newDate !== undefined) {
+    } else if (status || notes !== undefined || doctorNotes !== undefined || receptionNotes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined || newDate !== undefined || followUpDate !== undefined || body.follow_up_date !== undefined || body.laserPaymentMode !== undefined || body.laser_payment_mode !== undefined || body.laserPricePerPulse !== undefined || body.laser_price_per_pulse !== undefined || body.total_price !== undefined || body.totalPrice !== undefined || body.price !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (status === 'completed' && target.status !== 'completed') {
@@ -1563,6 +1657,17 @@ export async function PATCH(req: Request) {
       if (createdByEmployeeId !== undefined) updates.created_by_employee_id = createdByEmployeeId || null;
       if (newDate !== undefined) updates.date = newDate;
       if (newDate !== undefined && timeSlot) updates.time_slot = timeSlot;
+      if (followUpDate !== undefined) updates.follow_up_date = followUpDate || null;
+      else if (body.follow_up_date !== undefined) updates.follow_up_date = body.follow_up_date || null;
+      if (body.follow_up_notes !== undefined) updates.follow_up_notes = body.follow_up_notes || null;
+      else if (body.followUpNotes !== undefined) updates.follow_up_notes = body.followUpNotes || null;
+      if (body.laserPaymentMode !== undefined) updates.laser_payment_mode = body.laserPaymentMode;
+      if (body.laser_payment_mode !== undefined) updates.laser_payment_mode = body.laser_payment_mode;
+      if (body.laserPricePerPulse !== undefined) updates.laser_price_per_pulse = body.laserPricePerPulse;
+      if (body.laser_price_per_pulse !== undefined) updates.laser_price_per_pulse = body.laser_price_per_pulse;
+      if (body.total_price !== undefined) updates.total_price = Number(body.total_price);
+      else if (body.totalPrice !== undefined) updates.total_price = Number(body.totalPrice);
+      if (body.price !== undefined) updates.price = Number(body.price);
 
       // Determine total service cost to accurately resolve amount_left if null or missing
       const effectiveServiceIds: number[] =
@@ -1573,6 +1678,30 @@ export async function PATCH(req: Request) {
             : (serviceId !== undefined ? Number(serviceId) : target.service_id)
               ? [serviceId !== undefined ? Number(serviceId) : Number(target.service_id)]
               : [];
+
+      const isPerPulseMode = Boolean(
+        updates.laser_payment_mode === 'PER_PULSE' ||
+        target.laser_payment_mode === 'PER_PULSE' ||
+        String(updates.notes || target.notes || '').toLowerCase().includes('pay per pulse') ||
+        String(updates.notes || target.notes || '').toLowerCase().includes('per_pulse') ||
+        String(updates.notes || target.notes || '').includes('[Laser Settlement]')
+      );
+      const pulseRate = Number(
+        updates.laser_price_per_pulse ||
+        target.laser_price_per_pulse ||
+        (() => {
+          const m = String(updates.notes || target.notes || '').match(/@\s*(\d+(?:\.\d+)?)\s*EGP\/pulse/i);
+          return m ? Number(m[1]) : 1;
+        })()
+      ) || 1;
+      const primaryPulsesMatch = String(updates.notes || target.notes || '').match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
+        String(updates.notes || target.notes || '').match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
+        String(updates.notes || target.notes || '').match(/Primary:\s*(\d+)\s*pulses/i) ||
+        String(updates.notes || target.notes || '').match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
+        String(updates.notes || target.notes || '').match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
+        String(updates.notes || target.notes || '').match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
+        String(updates.notes || target.notes || '').match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
+      const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
 
       let derivedTotalCost = 0;
       if (effectiveServiceIds.length > 0) {
@@ -1593,10 +1722,21 @@ export async function PATCH(req: Request) {
 
         const { data: svcs } = await supabaseServer
           .from('services')
-          .select('id, price, branch_pricing')
+          .select('id, en, ar, name, price, branch_pricing, islaser, is_laser, category')
           .in('id', effectiveServiceIds);
         if (svcs && svcs.length > 0) {
           derivedTotalCost = svcs.reduce((sum: number, s: any) => {
+            const isLaser = Boolean(
+              s.islaser ||
+              s.is_laser ||
+              (s.en && s.en.toLowerCase().includes('laser')) ||
+              (s.name && s.name.toLowerCase().includes('laser')) ||
+              (s.ar && s.ar.includes('ليزر')) ||
+              (s.category && String(s.category).toLowerCase().includes('laser'))
+            );
+            if (isPerPulseMode && isLaser) {
+              return sum + (primaryDeliveredPulses > 0 ? (primaryDeliveredPulses * pulseRate) : 0);
+            }
             const mappedService = { price: s.price !== null ? Number(s.price) : 0, branchPricing: s.branch_pricing };
             return sum + getEffectiveServicePrice(mappedService, targetBranchName);
           }, 0);
@@ -1608,11 +1748,17 @@ export async function PATCH(req: Request) {
       try {
         const { data: resProducts } = await supabaseServer
           .from('reservation_products')
-          .select('total, unit_price, price, qty')
+          .select('line_type, description, total, unit_price, price, qty')
           .eq('reservation_id', id);
         if (resProducts && resProducts.length > 0) {
           attachedProductsCost = resProducts.reduce(
-            (sum: number, p: any) => sum + (Number(p.total) || (Number(p.qty || 1) * Number(p.unit_price || p.price || 0))),
+            (sum: number, p: any) => {
+              // In per-pulse mode, skip device_pulses lines so pulses are not double-counted
+              if (isPerPulseMode && p.line_type === 'device_pulses') return sum;
+              const isZeroCostPulse = (p.line_type === 'device_pulses' || String(p.description || '').toLowerCase().includes('pulse')) && Number(p.unit_price || 0) === 0;
+              if (isZeroCostPulse) return sum;
+              return sum + (Number(p.total) || (Number(p.qty || 1) * Number(p.unit_price || p.price || 0)));
+            },
             0
           );
         }
@@ -1649,7 +1795,60 @@ export async function PATCH(req: Request) {
         .update(updates)
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
+
+      // If missing column error (Postgres 42703) occurs, strip optional extended columns and retry
+      if (updateError && (updateError.code === '42703' || String(updateError.message || '').toLowerCase().includes('column'))) {
+        console.warn('Extended columns missing in reservations table, retrying with core columns only:', updateError.message);
+        const coreUpdates = { ...updates };
+        delete coreUpdates.laser_payment_mode;
+        delete coreUpdates.laser_price_per_pulse;
+        delete coreUpdates.delivered_pulses;
+        delete coreUpdates.actual_duration_minutes;
+        delete coreUpdates.doctor_notes;
+        delete coreUpdates.reception_notes;
+        delete coreUpdates.follow_up_notes;
+        delete coreUpdates.follow_up_date;
+        delete coreUpdates.total_price;
+        delete coreUpdates.price;
+
+        const retryRes = await supabaseServer
+          .from('reservations')
+          .update(coreUpdates)
+          .eq('id', id)
+          .select()
+          .maybeSingle();
+
+        if (!retryRes.error && retryRes.data) {
+          updated = retryRes.data;
+          updateError = null;
+        } else if (retryRes.error && (retryRes.error.code === '42703' || String(retryRes.error.message || '').toLowerCase().includes('column'))) {
+          // If still failing, keep only minimal safe core columns
+          const minimalUpdates: Record<string, any> = {};
+          if (coreUpdates.status !== undefined) minimalUpdates.status = coreUpdates.status;
+          if (coreUpdates.notes !== undefined) minimalUpdates.notes = coreUpdates.notes;
+          if (coreUpdates.amount_paid !== undefined) minimalUpdates.amount_paid = coreUpdates.amount_paid;
+          if (coreUpdates.amount_left !== undefined) minimalUpdates.amount_left = coreUpdates.amount_left;
+          if (coreUpdates.service_id !== undefined) minimalUpdates.service_id = coreUpdates.service_id;
+          if (coreUpdates.doctor_name !== undefined) minimalUpdates.doctor_name = coreUpdates.doctor_name;
+
+          const safeRes = await supabaseServer
+            .from('reservations')
+            .update(minimalUpdates)
+            .eq('id', id)
+            .select()
+            .maybeSingle();
+
+          if (!safeRes.error && safeRes.data) {
+            updated = safeRes.data;
+            updateError = null;
+          } else {
+            updateError = safeRes.error;
+          }
+        } else {
+          updateError = retryRes.error;
+        }
+      }
 
       // RISK-046: this used to fall back to writing 'confirmed' and then return
       // `{ ...fbUpdated, status: 'checked_in' }` — telling the caller the check-in succeeded while
@@ -1666,7 +1865,7 @@ export async function PATCH(req: Request) {
           .update(fallbackUpdates)
           .eq('id', id)
           .select()
-          .single();
+          .maybeSingle();
         if (!fbError && fbUpdated) {
           updated = fbUpdated;
           updateError = null;
@@ -1675,6 +1874,7 @@ export async function PATCH(req: Request) {
       }
 
       if (updateError) throw updateError;
+      if (!updated) updated = { ...target, ...updates };
 
       if (checkedInDowngraded) {
         return NextResponse.json({

@@ -2015,4 +2015,634 @@ The clinic reception dashboard required dynamic responsiveness to shift state (N
 3. **Customer Auth Modal Isolation:**
    - `AuthModal.tsx` blocks any staff email attempting customer authentication and notifies them to log in via `/login`.
 
+---
+
+## DEC-057: Zero-Reload Real-Time Follow-Up Reminders Engine & Event Bus Synchronization
+
+**Date:** 2026-09-17
+**Status:** Decided & Implemented
+
+**Context:**
+1. When doctors or receptionists save prescriptions or set follow-up dates (e.g. from the Customer Profile Drawer, Doctor Session View, or Booking Details Modal), the follow-up reminder banners and calendar dots in Reception Bookings previously required a full browser reload to appear.
+2. `PATCH /api/reservations` was rejecting standalone `followUpDate` sync requests with `400 Bad Request: Unknown action` when action was omitted.
+3. Supabase Realtime WebSocket connections can intermittently disconnect or delay updates.
+
+**Decisions & Implementation:**
+1. **Multi-Channel Real-Time Event Bus:**
+   - Dispatched `revera-prescription-change` and `revera-booking-change` custom DOM events across all modification surfaces:
+     - `src/components/admin/patients/useCustomerProfile.ts` (`handleSavePrescription`, `handleDeletePrescription`)
+     - `src/components/admin/DoctorAccountView.tsx` (`handleCompleteTreatment`, `handleSaveClinicalNote`)
+     - `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx` (`handleSavePrescriptionInline`)
+     - `src/components/admin/bookings/AdminNewBookingView.tsx` (`handleCreateBooking`)
+     - `src/components/admin/bookings/AdminAddPreviousBookingView.tsx` (`handleSubmit`)
+     - `src/components/admin/bookings/BookingDetailsModal.tsx` (`handleFinalizeTreatmentSession`, etc.)
+     - `src/app/admin/page.tsx` (postpone and reschedule handlers)
+2. **Resilient 3-Second Background Polling & Subscription:**
+   - Added silent background fetching in `AdminBookingsView.tsx` and `DoctorAccountView.tsx` to automatically re-sync reservations and prescriptions in real time without flickering UI spinners or reload prompts.
+   - Combined `postgres_changes` subscriptions on `reservations` and `prescriptions` with local event listeners for instant in-tab updates.
+3. **API Route Follow-Up Mutation Fix:**
+   - Updated `PATCH /api/reservations` to gracefully process direct `followUpDate`, `follow_up_date`, and `follow_up_notes` updates without failing validation.
+   - Added automatic synchronization of `follow_up_date` to `reservations` table on every prescription creation in `POST /api/prescriptions`.
+4. **Calendar Follow-Up Dot Isolation, Warning Light Blink & Status Color Differentiation:**
+   - Rendered calendar warning dots strictly on the actual `followUpDate` rather than lead reminder dates.
+   - Refined follow-up calendar dots to match the exact size of standard status indicator dots (`h-1.5 w-1.5 rounded-full`, 6px) without blurry shadows or halo rings, animated on the calendar day cells with a crisp warning light on/off blinking cycle (`.animate-warning-light` keyframe animation), while the legend circle remains solid and steady without turning on and off.
+   - Updated the `Postponed` appointment status color across calendar dots, tables, badges, and legend to distinct yellow (`#EAB308`, `bg-yellow-50 text-yellow-800`), completely eliminating color collisions with the indigo Follow-Up Reminder markers.
+5. **Interactive Follow-Up Management Action Suite:**
+   - Upgraded `+ Convert to Full Booking` on follow-up reminder cards to open an interactive modal (`FollowUpActionModal`) providing 3 explicit choices:
+     - (a) **Book on Target Date**: Converts and opens New Booking pre-populated on the doctor's recommended date.
+     - (b) **Change Date / Reschedule**: Provides a date picker and action buttons in a clean single-line layout (`[ Date ] [ Reschedule Reminder ] [ Book on New Date ]`) with `whitespace-nowrap` to either book immediately on the new chosen date or save the new follow-up date to the database so the calendar reminder adjusts without text wrapping.
+     - (c) **Cancel Follow-Up**: Cancels the follow-up reminder, clears `follow_up_date` in the database across reservations and prescriptions via atomic `PATCH /api/prescriptions` & `PATCH /api/reservations`, and dismisses the reminder with instant real-time event broadcasting.
+
+---
+
+## DEC-058: Modernized Patient Profile Financial Summary Header & Dynamic Staff Shift Schedule Engine
+
+**Date:** 2026-09-18
+**Status:** Decided & Implemented
+
+**Context:**
+1. In the Patient Profile Drawer (`CustomerProfileDrawer.tsx`), the top header only displayed a basic avatar and name, lacking quick financial visibility when inspecting a patient's file.
+2. In Employee Profiles (`UserProfileView.tsx` & `AdminEmployeesView.tsx`), the weekly schedule view previously rendered the fallback 09:00 AM - 05:00 PM schedule for every account because `loadExtraDetails()` encountered Postgres UUID parsing errors on non-UUID identifiers, and shift parser/display templates hardcoded 9-5 hours for non-night shifts.
+
+**Decisions & Implementation:**
+1. **Modernized 2-Column Patient Profile Header Card:**
+   - Redesigned `CustomerProfileDrawer.tsx` top hero banner into a responsive 2-column layout:
+     - **Left Column**: Large rounded avatar with initials/image, bottom-right camera upload overlay button, remove photo button, Patient Full Name, live Active/Inactive account status badge, clickable Phone with icon, and Email with icon.
+     - **Center Divider**: Vertical subtle divider (`border-[#414E36]/10`) on desktop viewports.
+     - **Right Column (Financial Summary)**: "Financial Summary" heading with 3 distinct soft color-coded metric cards:
+       - **Total Spend** (`bg-[#F0FDF4] border-emerald-100`): Wallet icon, label with Info icon, bold amount `{spent} EGP`, subtitle "All time".
+       - **Wallet** (`bg-[#F0F9FF] border-sky-100`): Wallet icon, label with Info icon, bold amount `{wallet} EGP` in primary blue, subtitle "Available balance".
+       - **Outstanding** (`bg-[#FFF7ED] border-amber-100`): Credit card icon, label with Info icon, bold amount `{outstanding} EGP` in rose/amber, subtitle "Unpaid amount".
+    - Added complete English & Arabic translations in `translations.ts`.
+2. **Dynamic Staff Shift Schedule & Safe DB Resolution:**
+   - Sanitized `loadExtraDetails()` in `UserProfileView.tsx` to guard against invalid UUID syntax errors (`22P02`) when checking `id` vs `employee_id`, `email`, `phone`, and `name`.
+   - Enhanced `parseShiftStringToTimes` and `weeklyScheduleData` in `UserProfileView.tsx` to parse custom time ranges (e.g. `02:00 PM to 10:00 PM`, `14:00 - 22:00`, `10:00 AM – 06:00 PM`), morning, evening, night, day shifts, and structured DB weekday schedule trees without falling back to hardcoded 9-5.
+   - Replaced hardcoded `t.doctorSection.dayHours` checks in `AdminEmployeesView.tsx` (work tab & print profile) with dynamic formatting helpers (`formatEmployeeDisplayHours`, `formatEmployeeShiftTypeDetails`, `formatEmployeeBreakTime`).
+   - Improved `Profile` view employee matching in `src/app/admin/page.tsx` across email, ID, and employee_id.
+3. **Automated Diagnostic Test Verification:**
+   - Added test case `TC-063` ("Patient Profile Financial Summary & Staff Shifts Resolution Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
+---
+
+## DEC-059: Receptionist Access to Digital Prescriptions, Medical Reports & Intake Records
+
+**Date:** 2026-09-19
+**Status:** Decided & Implemented
+
+**Context:**
+Receptionists frequently need to assist doctors and patients at clinic front desks by entering medical intake forms, issuing digital prescriptions based on doctor instructions, uploading lab/medical reports or documents, and viewing previous clinical notes and prescriptions. Previously, the "+ Write Prescription" action button and prescription edit/delete tools in `CustomerProfileDrawer.tsx` were strictly gated to `superadmin`, `admin`, or `doctor` roles only.
+
+**Decisions & Implementation:**
+1. **Permission Gating Upgrade in `CustomerProfileDrawer.tsx`:**
+   - Updated `+ Write Prescription` button gate on line 913 and empty-state button to allow `adminRole === "receptionist" || adminRole === "reception" || adminRole === "Receptionist"`, alongside permission checks `hasPermission("bookings.manage_prescriptions")` and `hasPermission("clinical.create_prescriptions")`.
+   - Updated `isDocUser` (line 1144) to include receptionist roles and permissions, enabling receptionists to edit/delete digital prescriptions and view clinical notes.
+2. **Permission Evaluation Engine in `src/app/admin/page.tsx`:**
+   - Updated `hasPermission()` `clinical.` permission namespace fallback to grant access for `adminRole === "receptionist" || adminRole === "reception" || adminRole === "Receptionist"`.
+3. **Booking Details Modal Fast Prescription Launcher:**
+   - Added `+ Add Prescription` button in Card B of `BookingDetailsModal.tsx` when no prescription is recorded yet, opening `setShowDrawerPrescriptionModal(true)` directly.
+4. **Automated Diagnostic Test Verification:**
+   - Added test case `TC-064` ("Receptionist Clinical Records & Prescription Access Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
+---
+
+## DEC-060: Customer Package Inspection & Session Redemption in New Booking View
+
+**Date:** 2026-09-19
+**Status:** Decided & Implemented
+
+**Context:**
+When staff create a new appointment in `AdminNewBookingView.tsx`, they need immediate visibility into whether the selected patient owns active prepaid session packages, which services and remaining sessions are covered, and the ability to pay for the booking using a package session (0 EGP to pay).
+
+**Decisions & Implementation:**
+1. **Interactive Package Inspection Card in Appointment Details (Section 2):**
+   - Embedded directly in Section 2 (`2 APPOINTMENT DETAILS`) of `AdminNewBookingView.tsx`:
+     - Displays patient package state in real time (`loadingPackages`, `noPackagesFound`, or active package cards).
+     - Renders package title, expiry date, and total sessions remaining badge.
+     - Lists all included services with `{qtyRemaining} / {qtyTotal}` session counts.
+     - Highlights the currently selected service and offers 1-click service switching for other covered services in the package.
+2. **Session Package Redemption Engine:**
+   - When the selected service matches an item with `qtyRemaining > 0` in the patient's active package:
+     - Displays a prominent "Pay with Package Session" toggle/checkbox.
+     - When activated: zeroes out financial totals (`bookingValue = 0`, `amountPaidNow = 0`, `remainingValue = 0`, marked as "Fully Settled").
+     - Records `[Package Redemption]: <Package Name> - <Service Name> (Item ID: <Item ID>)` into the reservation `notes`.
+     - In Booking Summary Confirmation Modal, clearly displays "0 EGP (Package Redemption)" with the package name.
+3. **Bilingual Parity:**
+   - Added all necessary keys in `adminTranslations` in `src/components/admin/translations.ts` for English and Arabic.
+4. **Automated Diagnostic Test Verification:**
+   - Added test case `TC-065` ("New Booking Customer Packages & Session Redemption Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
+---
+
+## DEC-061: Staff Weekly Shift Schedule & Working Days Persistence Engine
+
+**Date:** 2026-09-19
+**Status:** Decided & Implemented
+
+**Context:**
+1. In Admin Employees (`AdminEmployeesView.tsx`), when clinic administrators modified weekly working shifts (toggling working days open/closed, adjusting shift start/end times, adding multiple shifts per day, or assigning branch-specific schedules) and clicked "Save Changes", the changes were not persisted or reflected upon reopening the edit modal.
+2. The root cause had multiple components:
+   - In `src/app/api/employees/route.ts`, the `PATCH` handler omitted `workingDaysHours` / `working_days_hours` extraction, sending only the legacy `shift` string (`computedShift`) to `employee_accounts`.
+   - The `employee_accounts` database table in Supabase did not return `working_days_hours` in `GET /api/employees`.
+   - When reopening the edit modal, `loadEmployeeWorkingSchedule` found no structured `working_days_hours` on the employee object and fell back to `parseShiftString(emp.shift || "Day")`. If the shift string was `"Multi-Shift Schedule"` or `"Day"`, it reset all days back to standard defaults (09:00 - 17:00).
+
+**Decisions & Implementation:**
+1. **Resilient Schedule Persistence Store (`/api/employees`):**
+   - Added persistent helper functions `getEmployeeWorkingSchedulesMap()` and `saveEmployeeWorkingSchedule()` with dual storage: persisting structured employee schedules to both `data/employee_schedules.json` on disk and Supabase `page_settings` under the `employee_working_schedules` key, indexed across employee `id`, `email`, and `name` aliases.
+   - Updated `PATCH /api/employees` and `POST /api/employees` to:
+     - Extract `workingDaysHours` and attempt writing to `employee_accounts.working_days_hours` (with graceful fallback if the column is absent).
+     - Persist structured schedule data in both disk and `page_settings`.
+     - Synchronize with `providers.working_days_hours` when updating doctor accounts.
+   - Updated `GET /api/employees` to merge schedule data from `employee_accounts`, local JSON, and `page_settings` into each employee record, guaranteeing structured `working_days_hours` and `workingDaysHours` are returned.
+2. **Modal State Initialization & Schedule Loading (`AdminEmployeesView.tsx`):**
+   - Updated `loadEmployeeWorkingSchedule()` to recursively resolve structured working day schedules from `branch_schedules[branchId].in_person`, `in_person`, `emp.working_days_hours`, and `emp.workingDaysHours`.
+   - Initialized `newEmployeeSelectedScheduleBranchId` and `newEmployeeBranchSchedules` on both "+ Add Employee" button click and Edit pencil button click.
+   - Ensured `onSubmit` clears `editingEmployee` state and cleanly awaits `fetchRolesAndEmployees()` and `fetchProviders()`.
+3. **User Profile Schedule Visualization & Multi-Shift Rendering (`UserProfileView.tsx`):**
+   - Updated `loadExtraDetails()` in `UserProfileView.tsx` to query `/api/employees` so that the profile view always receives the full enriched schedule with multi-shift arrays.
+   - Resolved `rawSched` across `user.workingDaysHours`, `user.working_days_hours`, and fetched employee/doctor records, rendering multiple distinct shift badges and accurate daily/weekly work hours in the Weekly Schedule Matrix.
+4. **Automated Diagnostic Test Verification:**
+   - Added test case `TC-066` ("Staff Weekly Shift Schedule & Working Days Persistence Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
+---
+
+## DEC-062: Comprehensive Laser Pulse Counter & Unified History Engine (Types 1, 2, 3)
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+The clinic required a complete, multi-tiered laser pulse counting and accounting engine to support three distinct operational models across all 17 clinical and business scenarios:
+1. **Type 1 — Sell by Service**: Patient purchases a fixed-price laser service (e.g., Full Body or Beard Laser). Routine pulse consumption is recorded for clinical tracking without altering service price (0 EGP delta). Optional additional pulses can be billed with a mandatory clinical reason, automatically staging extra charges in the reservation invoice.
+2. **Type 2 — Sell by Pulse (FIFO Engine)**: Patient purchases a volume of retail pulses (e.g., 500, 1000, 2000 pulses). Purchases are combined into a patient-level General Active Pulse Balance banner while maintaining individual purchase records. When consumed in doctor sessions, a First-In, First-Out (FIFO) algorithm automatically consumes from the oldest active purchase first, spilling over into subsequent purchases, rejecting requests exceeding total balance, and auto-transitioning fully depleted records to Purchase History.
+3. **Type 3 — Pulse Included in Package**: Predefined packages (e.g., "Full Body Laser 6 Sessions + 12,000 Pulses") track package-specific pulse balances (`included_pulses`, `used_pulses`, `remaining_pulses`), strictly isolated from retail pulse products, with automated package expiration validation.
+4. **Unified Laser History**: A centralized audit feed and lifetime KPI aggregator logging all laser deliveries across all 3 types with treatment area tags, doctor/staff attribution, device tracking, surcharge breakdowns, and post-session remaining balance snapshots.
+
+**Decisions & Implementation:**
+1. **Database Schema & Migrations (`supabase/migrations/20260920000000_create_laser_pulse_engine.sql`):**
+   - Created `laser_pulse_logs` table with columns: `id`, `customer_id`, `reservation_id`, `pulse_type` (`SERVICE`, `PULSE_PURCHASE`, `PACKAGE`), `treatment_area`, `pulses_used`, `remaining_balance_after`, `additional_pulses`, `pulse_value`, `additional_charge`, `total_patient_charge`, `additional_reason`, `source_id`, `doctor_id`, `doctor_name`, `device_id`, `device_name`, `session_date`, and `created_at`.
+2. **Unified Laser Pulses API (`/api/laser-pulses`):**
+   - `GET /api/laser-pulses`: Fetches unified logs and aggregates lifetime statistics (`totalSessions`, `totalPulsesDelivered`, `totalAdditionalPulses`, `totalAdditionalCharge`).
+   - `POST /api/laser-pulses`: Validates non-negative inputs, enforces mandatory reason for additional billed pulses, persists logs to Supabase `laser_pulse_logs`, local disk `data/laser_pulses.json`, and `page_settings.laser_pulse_logs`.
+3. **FIFO Retail Pulse Engine (`/api/customers/products`):**
+   - Exported helper `consumePatientPulsesFIFO(customerId, pulsesToConsume, sessionContext)` which sorts active purchases by `created_at ASC`, deducts from the oldest batch, marks exhausted batches as `Depleted`, and halts with HTTP 400 if balance is insufficient.
+   - Added `PATCH` action `fifo_consume` and enhanced `GET` summary with `totalActivePulses`.
+4. **Package Pulse Balance Engine (`/api/customers/packages`):**
+   - Extended customer package data models to track `includedPulses`, `usedPulses`, and `remainingPulses`.
+   - Added `PATCH` action `consume_package_pulses` validating active status, expiration date, and remaining balance.
+5. **Doctor Portal Session Counter Card (`DoctorOngoingSessionTab.tsx` & `DoctorAccountView.tsx`):**
+   - Integrated dynamic Laser Pulse Counter card in Doctor Ongoing Session with Mode Switcher (Type 1 Service, Type 2 FIFO Pulse, Type 3 Package Pulses), treatment area selector, device picker, live extra pulse calculation (`Qty × Value`), mandatory reason validation, and real-time FIFO balance projection.
+   - Integrated execution into `handleCompleteTreatment`: records unified laser log, deducts FIFO pulses / package pulses, updates device pulse counters, and stages invoice line items.
+6. **Patient Laser History Drawers & Active Pulse Banner (`DoctorPatientHistoryDrawer.tsx` & `CustomerProfileDrawer.tsx`):**
+   - Added dedicated "Laser History" tabs in both Doctor Patient History Drawer and Admin Customer Profile Drawer with lifetime KPI summary cards and chronological treatment tables.
+   - Added General Active Pulse Balance banner in Customer Profile "Purchased Products & Cart" tab with "+ Sell Laser Pulses" modal dialog for selling retail pulses directly to patient balance.
+7. **Bilingual Parity (`translations.ts` & `doctor/translations.ts`):**
+   - Added complete English and Arabic dictionaries for all pulse modes, field labels, tooltips, validation errors, and KPI cards.
+8. **Automated Diagnostic Test Verification:**
+   - Added test case `TC-067` ("Laser Pulse Counter & Unified Laser History Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
+---
+
+## DEC-063: Default Laser Pulse Pricing in Admin Settings & Service Equipment Connection Simplification
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. **Configurable Default Laser Pulse Price:** Previously, the unit price per laser pulse (e.g., 5 EGP) was hardcoded or required manual entry when selling retail pulses to patients or billing additional pulses during doctor treatment sessions. Clinic owners required a centralized setting in Admin Settings (`/admin` -> Settings -> Booking Settings) to define the clinic-wide Default Price per Laser Pulse in EGP.
+2. **Simplified Service Device Equipment Linking:** In Admin Services (`/admin` -> Services -> Connected Devices modal), connecting an equipment device to a service previously required configuring an arbitrary "Pulses Per Session" number. Because laser pulse consumption varies by patient and treatment area (tracked dynamically in the Laser Pulse Counter engine), this fixed number was obsolete and caused user confusion.
+3. **Doctor Ongoing Session Simplification:**
+   - Primary booked service delivered pulses can now be entered and highlighted directly on the booked service card in Session Flow (Type 1 Service mode).
+   - In "Additional Clinical Services", device selection and pulse override inputs were removed, simplifying additional services to simple service item and price additions without equipment overhead.
+
+**Decisions & Implementation:**
+1. **Admin Booking Settings (`BookingSettingsView.tsx`, `page_settings.json`, `admin/page.tsx`):**
+   - Added `defaultPricePerPulse` setting with numeric validation and EGP adornment in Booking Settings.
+   - Added bilingual labels (`defaultPricePerPulse`, `defaultPricePerPulseHint`, info dialogs) in `translations.ts`.
+   - Seeded default value `5` in `data/page_settings.json`.
+   - Loaded and passed `defaultPricePerPulse` across Admin Settings and Customer Profile Drawer.
+2. **Customer Profile Sell Pulses Prefill (`CustomerProfileDrawer.tsx`):**
+   - "+ Sell Laser Pulses" modal dialog automatically prefills the Unit Price with `defaultPricePerPulse` (defaulting to 5 EGP if unset), calculating total price dynamically.
+3. **Doctor Ongoing Session Pulse Pricing & Service Cleanup (`DoctorOngoingSessionTab.tsx`):**
+   - Automatically loads `defaultPricePerPulse` from `/api/page-settings` to prefill `additionalPulseUnitPrice`.
+   - Removed device selection dropdown and pulse override inputs from "Additional Clinical Services".
+   - Highlighted `standardPulsesDelivered` input on the primary booked service card in Mode 1.
+4. **Connected Devices Simplification (`ServiceDeviceEditor.tsx` & `/api/service-devices`):**
+   - Removed `pulses_per_session` input and column from `ServiceDeviceEditor.tsx`.
+   - Updated `POST /api/service-devices` to treat `pulsesPerSession` as optional (defaulting to 0), permitting pure device-to-service equipment linking.
+5. **System Test Suite Diagnostic Verification:**
+   - Added test case `TC-068` ("Service Equipment Connector & Pulse Pricing Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
+---
+
+## DEC-064: Laser Services Multi-Payment Mode Architecture & Deficit Spillover Engine
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. **`islaser` Service Flag & Equipment Connection:** Clinic services are now explicitly categorized with an `islaser` (or `is_laser`) boolean in the database and catalog. Standard services (`islaser: false`) behave normally, while laser services (`islaser: true`) require connected equipment devices and enforce a 3-tier payment selection workflow.
+2. **3 Structured Payment Options for Laser Services:**
+   - **Option 1: Pay by Service (Fixed Price)** (`SERVICE`): Patient pays the catalog price regardless of pulses delivered. Any extra pulses beyond baseline can optionally carry an extra charge with a mandatory reason.
+   - **Option 2: Pay per Pulse (Post-Session Actuals)** (`PER_PULSE`): Reception/doctor agrees on a per-pulse rate (e.g., $1 or 5 EGP). Final session total equals `Delivered Pulses × Unit Rate`.
+   - **Option 3: Pay with Pulses Package (Package Redemption + Spillover Engine)** (`PACKAGE`):
+     - Active package pulses are redeemed during the session.
+     - If patient has no package, prompts package purchase.
+     - **Package Deficit Spillover Engine**: When delivered pulses exceed remaining package pulses (e.g. 6,000 delivered vs 4,000 balance -> 2,000 pulse deficit), two explicit resolution choices are presented:
+       - **Choice 3A (Buy New Package)**: Deducts the deficit from a newly purchased package and adds the package price to the session invoice.
+       - **Choice 3B (Pay Rest per Pulse)**: Billed excess pulses directly on the session invoice at the per-pulse rate.
+3. **Patient Profile Retail Pulse Decoupling:** Standalone retail pulse purchase buttons were removed from the patient profile drawer, consolidating all pulse accounting through structured reception bookings and doctor session flows while retaining the full lifetime Laser History audit tab.
+
+**Decisions & Implementation:**
+1. **Database Migration (`supabase/migrations/20260920010000_add_islaser_to_services.sql`):**
+   - Added `islaser` and `is_laser` boolean columns to `services` table with default `false` and indexed query performance.
+   - Auto-tagged existing laser services matching `laser|pulse|hair removal|ليزر|نبضة` keywords.
+2. **Catalog & API Support (`src/lib/services.ts` & `src/app/api/services/route.ts`):**
+   - Added `islaser?: boolean; is_laser?: boolean;` to `ServiceItem` interface.
+   - Updated `mapServiceRow` and `mapServiceToDb` in API routes to read and persist `islaser`.
+3. **Admin Services View (`AdminServicesView.tsx` & `admin/page.tsx`):**
+   - Added `Laser` badge in services table with `Sparkles` icon.
+   - Added "Laser Service" toggle switch card in Add/Edit Service modal with live status indicator.
+4. **Reception & New Booking Flow (`AdminNewBookingView.tsx`):**
+   - Dynamically detects `isLaserService`.
+   - Renders 3 interactive Laser Payment Mode selection cards (Fixed Service, Pay per Pulse, Pulses Package).
+   - In Mode 2, displays live per-pulse unit price input prefilled from Booking Settings.
+   - Persists selected mode and rate into booking notes and metadata.
+   - Shows selected mode in Booking Confirmation summary modal.
+5. **Doctor Ongoing Session & LIVE Math (`DoctorOngoingSessionTab.tsx` & `DoctorAccountView.tsx`):**
+   - Mode selector tabs: Option 1 (`SERVICE`), Option 2 (`PER_PULSE`), Option 3 (`PACKAGE`).
+   - Auto-detects payment mode from booking metadata.
+   - Mode 2 calculates live session total: `standardPulsesDelivered * additionalPulseUnitPrice`.
+   - Mode 3 integrates the **Package Deficit Spillover Interactive Card** with **Choice 3A** and **Choice 3B**.
+   - `handleCompleteTreatment` stages line items in `reservation-products`, consumes package pulses, triggers package purchases, records unified laser history in `/api/laser-pulses`, and updates equipment device counters.
+6. **Patient Profile Cleanup (`CustomerProfileDrawer.tsx`):**
+   - Removed loose `+ Sell Laser Pulses` button and modal dialog from the products tab while preserving the dedicated Laser History tab.
+7. **System Test Suite Diagnostic Verification:**
+   - Added test case `TC-069` ("Laser Services Multi-Payment Mode & Deficit Spillover Engine") to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+
+---
+
+## DEC-065: Laser-Only Delivered Pulses Intake & Automated Equipment Device Resolution
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. In Receptionist session finalization and ending session flow (`BookingDetailsModal.tsx`), manual equipment device dropdown selectors created unnecessary friction for non-technical receptionists.
+2. Laser services are mapped to physical devices in Admin Settings (`/api/service-devices`). Pulses intake should strictly appear only for laser services (`checkIsLaserService`), and device resolution should happen automatically in the background.
+
+**Decisions & Implementation:**
+1. **Laser-Only Pulses Intake:**
+   - Pulses input was gated behind `isLaser` / `checkIsLaserService` for both Primary Booked Service and Additional Services. Non-laser procedures do not display pulses intake.
+   - Additional laser services prompt for delivered pulses with quick presets (`250`, `500`, `1,000`, `2,000`) before saving into session.
+2. **Automated Equipment Device Resolution:**
+   - Completely removed device selection dropdowns from Receptionist view.
+   - Automatically queries `/api/service-devices?serviceId=...` on service selection and binds `deviceId`/`deviceName` in the background for pulse counter logging.
+
+---
+
+## DEC-066: Package Types & Laser Pulses Package Engine
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. Clinics require selling dedicated Laser Pulses Packages (e.g. 5,000 pulses, 10,000 pulses) in addition to traditional multi-service packages.
+2. Package creation must offer explicit package type selection (`services` vs `pulses`) and configure total pulse quotas with quick presets.
+
+**Decisions & Implementation:**
+1. **Database Schema & Migrations (`20260920020000_add_package_types_and_pulses.sql`):**
+   - Added `package_type` (`'services' | 'pulses'`) and `total_pulses` integer to `packages` and `customer_packages` tables.
+2. **Admin Package Management (`PackageAdminPanel.tsx`):**
+   - Added interactive Package Type selector (`Services Package` vs `Laser Pulses Package`).
+   - When Pulses Package is selected, renders pulse quota input with quick preset buttons (`1,000`, `2,500`, `5,000`, `10,000`, `20,000` pulses) without service requirement.
+3. **Automated Diagnostic Verification:**
+   - Added test case `TC-070` ("Package Types & Laser Pulses Package Engine") to `INITIAL_SYSTEM_TEST_SUITES`.
+
+---
+
+## DEC-067: Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. When Option 2 (Pay per Pulse / `PER_PULSE`) is selected in New Booking (e.g. rate = 1 EGP/pulse), all laser services delivered in that session (primary service + additional services) must be dynamically calculated: `delivered_pulses × agreed_price_per_pulse` (e.g. 250 pulses primary + 250 pulses additional @ 1 EGP = 500 EGP total invoice instead of catalog prices).
+2. The invoice (Ending session summary, Checkout settlement modal, Invoice preview, and printed PDF) must explicitly display the settlement agreement statement:
+   - English: `Settled that laser services in this session are charged per pulse (500 pulses × 1 EGP = 500 EGP)`
+   - Arabic: `تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (500 نبضة × 1 ج.م = 500 ج.م)`
+3. Regex parsing in `BookingDetailsModal.tsx` and `src/app/admin/page.tsx` was corrupted by `, Pulses: <num>` suffixes leaking into service names.
+
+**Decisions & Implementation:**
+1. **Centralized Note Parsing Helper (`parseAdditionalServiceLine` & `extractPrimaryPulses` in `BookingDetailsModal.tsx`):**
+   - `parseAdditionalServiceLine`: Robustly parses service line format `Name (Qty: 1 x 150 EGP = 150 EGP, Pulses: 250)` without name corruption or regex fallthrough.
+   - `extractPrimaryPulses`: Reliably extracts primary pulses from structured notes (`[Laser Pulses Delivered]: Primary: 250 pulses...` as well as direct digits and extra pulse formats).
+2. **Dynamic Per-Pulse Rate Calculation:**
+   - In `BookingDetailsModal.tsx`, `handleAddServiceToSession` sets `price = pulsesVal * pulseRate` for additional laser services in per-pulse sessions.
+   - `handleConfirmEndSession` writes line items to `reservation-products` with effective prices, appends `[Laser Settlement]` and `[Laser Pulses Delivered]` notes, and updates total invoice.
+   - `baseBookingPrice`, `additionalServicesSubtotal`, and `endSessionInvoiceTotal` compute `pulses × laserPulseRate`.
+   - `bookingServices` in standard Booking Details view dynamically evaluates `primaryDeliveredPulses * laserPulseRate` with per-pulse badge and calculation string.
+   - In `src/app/admin/page.tsx`, `checkoutBooking` and `invoiceBooking` calculate primary laser prices by `primaryDeliveredPulses * pulseRate`, parse additional services using `parseAdditionalServiceLine`, and display live pulse multipliers.
+   - In `src/app/api/reservations/route.ts`, `writeCheckoutInvoice` verifies per-pulse mode and writes accurate per-pulse invoice line totals into the ledger.
+3. **Laser Per-Pulse Settlement Agreement Banner & Detailed Payment Mode UI:**
+   - Rendered across Ending Session view, standard Booking Details view (top settlement agreement banner with delivered pulses counter), 3-metrics row ("Session Type & Payment Mode" card with `Pay per Pulse (@ ${rate} EGP)`), Service Details card (with pulses count badge), Payment Summary card (with explicit Payment Mode row), Payment Settlement checkout modal, Invoice preview popup modal, and printed PDF template (`printUtils.ts`).
+4. **Automated Diagnostic Verification:**
+   - Verified under test case `TC-071` ("Laser Per-Pulse Dynamic Calculation & Invoice Settlement Engine") in `INITIAL_SYSTEM_TEST_SUITES`.
+
+---
+
+## DEC-068: Laser Pulses Package Redemption & Resilient Session Completion Engine
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. Ending a session settled with a pulses package (Option 3: Pay with Pulses Package) previously threw a popup error: `"Database error"`.
+2. Root causes identified:
+   - `PATCH /api/reservations`: Updating `reservations` with extended columns (`laser_payment_mode`, `laser_price_per_pulse`, `delivered_pulses`, `actual_duration_minutes`, `doctor_notes`, etc.) failed with Postgres 42703 (missing columns) on unmigrated or older schemas.
+   - `PATCH /api/customers/packages`: Querying `customer_packages` with synthetic IDs (e.g. `pb-...`) failed with Postgres 22P02 (invalid UUID input syntax).
+   - `writeCheckoutInvoice` and `DoctorAccountView.tsx`: Base laser services in package sessions were not marked as 100% discounted redemptions, and hardware tracking pulses were written with unit price > 0, creating unwanted invoice charges.
+   - `/api/reservation-products`: Did not accept parameter aliases (`productName`, `quantity`) or the `receptionist_global_ending` role.
+
+**Decisions & Implementation:**
+1. **Multi-Stage Resilient Reservation Update (`src/app/api/reservations/route.ts`):**
+   - Wrapped `supabaseServer.from('reservations').update(updates)` in a schema-resilient catch block.
+   - On error code `42703` or column errors, automatically strips optional extended columns and retries with core columns (`status`, `notes`, `amount_paid`, `amount_left`, `service_id`), preventing any 500 error popups.
+2. **UUID-Guarded Package Querying (`src/app/api/customers/packages/route.ts`):**
+   - Validates UUID syntax with `/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i` before querying `customer_packages` table, while updating `pulseStore` in `page_settings` seamlessly for all package IDs.
+3. **0 EGP Base Package Redemption & Device Pulse Tracking (`writeCheckoutInvoice`, `DoctorAccountView.tsx`, `BookingDetailsModal.tsx`):**
+   - In package mode, primary laser service line items receive a full 100% package discount (`unitPrice: basePrice, discount: basePrice, line_total: 0`).
+   - Hardware counter pulse entries are recorded with `unitPrice: 0` so device tracking never creates phantom billable line items.
+4. **Normalized Reservation Products API (`src/app/api/reservation-products/route.ts`):**
+   - Fully supports payload aliases (`description` / `productName`, `qty` / `quantity`, `unitPrice` / `price`) and all staff roles.
+5. **Automated Diagnostic Verification:**
+   - Added test case `TC-072` ("Laser Pulses Package Redemption & Session Completion Engine") to `INITIAL_SYSTEM_TEST_SUITES`.
+
+---
+
+## DEC-069: Multi-Scenario Laser Pulses Package Settlement Architecture
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. In `laserPaymentMode === "PACKAGE"`, clinics encounter multiple real-world scenarios:
+   - **Scenario 1 (No existing package)**: A patient without an active pulses package books a laser session and selects Package mode. The patient must be able to select and purchase a new pulses package during the session checkout. The session invoice charges only the price of the purchased package (the laser session itself is 100% covered). Pulses delivered in this session are deducted from this new package, and the remaining pulses carry forward for future sessions without paying again.
+   - **Scenario 2 (Existing package + Deficit spillover)**: When delivered pulses exceed remaining pulses in the patient's existing package (e.g. 10,000 delivered vs 5,000 remaining = 5,000 pulse deficit), the system offers two explicit resolution choices:
+     - **Choice 3A (Buy New Package)**: The patient purchases a new package. The deficit pulses are deducted from the new package, the new package price is charged on the invoice, and remaining pulses carry forward.
+     - **Choice 3B (Pay per pulse)**: The patient pays for the deficit pulses at the agreed per-pulse rate (`deficit × pulseRate`).
+   - **Scenario 3 (Standard redemption)**: The patient has sufficient pulses. 0 EGP laser charge on invoice, pulses are deducted, remaining balance carries forward.
+   - **Mixed Sessions**: Non-laser services (e.g. consultations, peelings) attached to the session are always added at full catalog price on top of the package mode choice (e.g. 7,000 EGP package + 150 EGP non-laser service = 7,150 EGP total invoice).
+2. The package settlement agreement notice and badge must be surfaced prominently across the entire booking lifecycle: Doctor Ongoing Session live breakdown, Receptionist Booking Details modal, Payment Settlement checkout modal, Invoice Preview modal, and printed invoice PDFs with bilingual EN/AR statement.
+
+**Decisions & Implementation:**
+1. **Doctor Ongoing Session Engine (`DoctorOngoingSessionTab.tsx` & `DoctorAccountView.tsx`):**
+   - Added live detection for `isNoActivePackage` in Mode 3 (`PACKAGE`), rendering the **Scenario 1 Package Selection Card** with searchable package picker, pulse delivery input with quick presets, live remaining balance calculation (`packageTotalPulses - deliveredPulses`), and invoice breakdown preview.
+   - For Scenario 2, upgraded **Package Deficit Spillover Card** with side-by-side **Choice 3A** (Buy New Package) and **Choice 3B** (Pay per pulse) cards, live deficit calculations, and invoice impact breakdowns.
+   - In `DoctorAccountView.tsx`, integrated automated package purchase via `POST /api/packages/sell`, captures the resulting `customerPackage.id`, and automatically calls `PATCH /api/customers/packages` (`consume_package_pulses`) for both Scenario 1 and Scenario 2 Choice 3A, plus Choice 3B excess pulse lines and standard redemption.
+   - Formatted bilingual completion notes with `[Laser Package Redemption]` and `[Laser Settlement]` tags.
+2. **Booking Details Modal & Settlement Notice (`BookingDetailsModal.tsx`):**
+   - Automatically detects package redemption matches from notes or `laserPaymentMode === "PACKAGE"`.
+   - Zeros out the base laser service price (`0 EGP (Package Redemption)`), ensuring the patient is not double-charged for the procedure while preserving the service line for clinical audit trails.
+   - Renders a prominent purple/emerald **Laser Pulses Package Settlement Agreement Banner** at the top of the modal and an explicit `Package` badge in the 3-metrics row.
+   - Supports mixed sessions by combining package purchases/deficit lines with standard non-laser services.
+3. **Checkout, Invoice Modal & PDF Print Engine (`src/app/admin/page.tsx` & `src/lib/printUtils.ts`):**
+   - In Payment Settlement checkout modal and Invoice Preview modals, dynamically identifies package sessions and renders the bilingual **Laser Package Settlement Notice**.
+   - Zeroes out the base laser service line (`(Package Redemption · 0 EGP) / (استهلاك باقة · 0 ج.م)`).
+   - In `printUtils.ts`, renders the `📦 Laser Package Settlement` agreement banner in the printed PDF and formats the laser service row at 0 EGP with redemption notes.
+4. **Admin Settings System Test Suite Diagnostic Verification:**
+   - Added test case `TC-073` ("Multi-Scenario Laser Pulses Package Settlement Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
+
+## DEC-070: New Booking Laser Pulses Package Selection & In-Booking Catalog Purchase Engine
+**Date:** 2026-09-20
+**Context:**
+1. In the New Booking creation modal (`AdminNewBookingView.tsx`), when a receptionist booked a laser service for a patient holding an active laser pulses package ("pulses v2"), the package card erroneously displayed `0 sessions left` and displayed an amber warning `Selected service is not covered in this package: Switch to a covered service:` because the system treated all packages as session-based (`package_items`) without supporting pulses packages (`packageType === 'pulses'`).
+2. When the patient did NOT have an active pulses package and Option 3 (Pulses Package) was clicked, there was no way to select which pulses package to purchase or charge the booking for that package upfront.
+3. Laser pulses packages cover all laser services in the clinic, so any laser service selected should automatically be recognized as covered.
+
+**Decision & Implementation:**
+1. **Active Pulses Package Detection & Quota Display (`AdminNewBookingView.tsx`):**
+   - Added `checkIsPulsesPackage(pkg)` and `getPackagePulsesBalance(pkg)` helpers to extract `pulsesRemaining` and `totalPulses`.
+   - Distinguishes pulses packages (`packageType === 'pulses'`) from session packages (`packageType === 'services'`).
+   - For patients with an active pulses package:
+     - Renders `${remaining.toLocaleString()} pulses left` badge instead of `0 sessions left`.
+     - Displays `Laser Hair Removal Treatments (All Areas)` with `${remaining} / ${total} pulses` and `Selected` badge, removing the false warning.
+     - Automatically zeros out the booking value (`0 EGP`) and shows a green confirmation banner that session pulses will be deducted upon treatment completion.
+     - Notes record `[Laser Package Redemption]: <Package Name>`.
+2. **In-Booking Catalog Pulses Package Selection (`AdminNewBookingView.tsx`):**
+   - Loads catalog packages from `GET /api/packages` in `loadData`.
+   - Filters active catalog packages where `package_type === 'pulses'` or `total_pulses > 0`.
+   - When a patient with 0 active pulses packages selects Option 3, renders interactive catalog cards with package name, pulse quota (e.g. 10,000 pulses), and price (e.g. 6,000 EGP).
+   - Selecting a package sets the booking value and amount paid now to the package's price (e.g. 6,000 EGP).
+   - Staves `[Purchasing New Pulses Package]: <Name> (<Price> EGP · <Pulses> pulses)` in the reservation notes and passes `purchasingPackageId` in the reservation payload.
+3. **Downstream Session & Settlement Integration (`DoctorAccountView.tsx`, `BookingDetailsModal.tsx`, `src/app/admin/page.tsx`):**
+   - Updated `isBookingPackageMode`, `isCheckoutPackage`, and `isInvoicePackage` to recognize `[Purchasing New Pulses Package]` and `[Laser Package Redemption]`.
+   - Resolves active session booking properly, seamlessly activating Scenario 1 (new package purchase charged on invoice, 100% covered laser session, pulses deducted and remainder carried forward).
+4. **Admin Settings System Test Suite Diagnostic Verification:**
+   - Added test case `TC-074` ("New Booking Laser Pulses Package Selection & Catalog Purchase Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
+
+---
+
+## DEC-071: Laser Package UI Isolation to Option 3 with Multi-Package Selector & Mixed Non-Laser Total Pricing
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. In the New Booking modal (`AdminNewBookingView.tsx`), booking a laser service for a patient with pulses packages caused the pulses packages to appear in the general "Patient Packages & Subscriptions" bottom section. Because that section was built for fixed-session service packages (`package_items`), it displayed confusing warnings: `0 sessions left` and `Selected service is not covered in this package`.
+2. The user required that on laser services, packages must appear **ONLY** when Option 3 (Pulses Package) is selected.
+3. If the patient has multiple active pulses packages, the receptionist must be able to choose which one to use for the session.
+4. If the patient has no active packages, Option 3 shows available catalog pulses packages to purchase upfront.
+5. The session total price must strictly equal `pulses package price (if purchasing new) + any non-laser service price if used`, with all laser services 100% covered under the package quota (`0 EGP`).
+
+**Decisions & Implementation:**
+1. **Strict UI Isolation (`src/components/admin/bookings/AdminNewBookingView.tsx`):**
+   - The general "PATIENT PACKAGES & SUBSCRIPTIONS" section at the bottom of the booking modal is wrapped in `{!isLaserService && ( ... )}` and iterates strictly over `customerServicePackages` (`customerPackages.filter(pkg => !checkIsPulsesPackage(pkg))`).
+   - Laser packages never appear in this lower section, eliminating clutter and false `0 sessions left` alerts entirely.
+2. **Option 3 Active Multi-Package Selector (`src/components/admin/bookings/AdminNewBookingView.tsx`):**
+   - Computed `customerPulsePackages` array and state `selectedCustomerPulsePkgId`.
+   - When the patient has active pulses package(s), Option 3 displays an interactive grid of cards for each package showing its remaining pulses, total pulses, progress bar, and expiry date.
+   - The receptionist clicks between cards to choose which package to use (`selectedCustomerPulsePkgId`).
+   - The booking value is set to 0 EGP with a green confirmation banner stating pulses will be deducted upon session completion.
+3. **In-Booking Catalog Package Selection (0 Active Packages):**
+   - When the patient has 0 active pulses packages, Option 3 displays interactive cards for catalog packages from `/api/packages`.
+   - Selecting a package sets the booking value and amount paid to the package price (e.g. 6,000 EGP).
+4. **Total Price Calculation Across Workflows (`BookingDetailsModal.tsx`, `DoctorOngoingSessionTab.tsx`, `DoctorAccountView.tsx`):**
+   - Total session price is strictly: `package price + non-laser services price`.
+   - Base and additional laser services are zero-rated (`0 EGP (Package Redemption)`).
+   - In `BookingDetailsModal.tsx`, note parsing for `[Purchasing New Pulses Package]`, `[Laser Package Purchase & Redemption]`, and `[Laser Package Deficit Settlement]` creates product line items so invoice recalculation cleanly aggregates package costs with any non-laser services.
+5. **Admin Settings System Test Suite Diagnostic Verification:**
+   - Added test case `TC-075` ("Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
+
+---
+
+## DEC-072: Laser Package Used Pulses Deduction, Cross-Workflow Execution & Database Column Synchronization
+
+**Date:** 2026-09-20
+**Status:** Decided & Implemented
+
+**Context:**
+1. The user requested: "make sure the used pulses is being deducted from the pacakges".
+2. In-depth audit revealed several critical failure points:
+   - **PostgreSQL Column Mismatch**: Migration `20260920030000_add_package_type_and_total_pulses_to_packages.sql` created columns `pulses_used` and `pulses_remaining` on `customer_packages`. However, `PATCH /api/customers/packages` (`consume_package_pulses`) was writing to non-existent columns `used_pulses` and `remaining_pulses`, causing silent Postgres 42703 errors inside `try/catch` and leaving database records untouched.
+   - **Pulse Store Initialization Disconnect**: If a package was not yet registered in `page_settings` `customer_package_pulses`, the endpoint initialized `used_pulses: 0` and ignored the database's existing `pulses_used` / `pulses_remaining` balances.
+   - **Doctor Portal Property Casing**: `GET /api/customers/packages` returns camelCase (`remainingPulses`, `totalPulses`, `pulsesRemaining`). `DoctorOngoingSessionTab.tsx` was filtering with `p.remaining_pulses` and `p.included_pulses` (snake_case), evaluating `rem` to `NaN` and hiding the patient's active pulses packages from the doctor.
+   - **Doctor Target Package Fallback**: If `laserData.sourceId` was empty, `DoctorAccountView.tsx` failed to deduct pulses even if the booking had a linked package.
+   - **Receptionist Global End Session Gap**: `BookingDetailsModal.tsx` (`handleFinalizeSessionStandalone`) deducted device hardware pulses, but had zero code to deduct pulses from the customer's package.
+   - **Deficit Rejection**: Deductions exceeding balance threw HTTP 400 instead of consuming available balance and completing the package.
+
+**Decisions & Implementation:**
+1. **API Endpoint Column Synchronization & Robust Deduction (`src/app/api/customers/packages/route.ts`):**
+   - Fixed `PATCH /api/customers/packages` (`consume_package_pulses`): writes to both `pulses_used` / `pulses_remaining` (the true DB columns) with fallback to `used_pulses` / `remaining_pulses`.
+   - Initializes pulse balances from the database row (`pkgRow.pulses_used`, `pkgRow.pulses_remaining`).
+   - Capped deduction: `actualDeduct = Math.min(qtyToDeduct, pkgPulses.remaining_pulses)`. If balance reaches 0, updates package status to `'completed'`.
+   - Idempotency guard: verifies `booking_id` in `usage_history` so duplicate triggers from doctor, receptionist, or checkout never double-deduct pulses.
+2. **Doctor Ongoing Session Component (`DoctorOngoingSessionTab.tsx`):**
+   - Added robust property fallback chain (`p.remainingPulses ?? p.pulsesRemaining ?? p.remaining_pulses ?? p.pulses_remaining`).
+   - Auto-selects the session's booked package (`activeSessionBooking.packageId`).
+   - Aggregates delivered pulses across primary and all additional laser services in `laserPulseData.pulsesUsed`.
+3. **Doctor Session Finalization Pipeline (`DoctorAccountView.tsx`):**
+   - Resolves target package from `laserData.sourceId`, `targetBooking.packageId`, `targetBooking.package_id`, or queries the patient's active pulses package via `/api/customers/packages`.
+4. **Receptionist Session Ending Engine (`BookingDetailsModal.tsx`):**
+   - Added Step 5b in `handleFinalizeSessionStandalone`: resolves active or newly purchased package and calls `consume_package_pulses` for total laser pulses delivered.
+5. **Checkout Settlement Safeguard (`src/app/admin/page.tsx`):**
+   - Added automated deduction safeguard on payment settlement (`handleSavePayment`).
+6. **Automated Diagnostic Verification:**
+   - Added test case `TC-076` ("Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
+
+---
+
+## DEC-073: In-Booking Package Selling to Customer Profile & Patient Directory Search Dropdown Engine
+
+**Date:** 2026-09-21
+**Status:** Decided & Implemented
+
+**Context:**
+1. The user reported two related issues:
+   - "the painet list isnt showing": In New Booking (`AdminNewBookingView.tsx`), clicking "Browse Patients List" showed "Hide Patients List" but no dropdown appeared. This occurred because:
+     a) Dropdown container had `{showCustomerDropdown && customerList.length > 0 && ( ... )}`, which suppressed the dropdown completely if `customerList.length === 0` despite having an inner empty state.
+     b) `allCustomers` was querying `supabase.from("customers")` directly in the browser, failing silently under RLS.
+     c) `src/app/admin/page.tsx` was passing `dbCustomers` instead of the full derived `customers` prop.
+     d) Typing into phone prematurely hid the dropdown when no phone match occurred.
+   - "the pusrcahsed pacakge in the new booking page isnt showing in the painet profile": When creating a new laser booking with Option 3 (Pulses Package) and selecting a catalog package to purchase, the package was only noted as text in the reservation (`[Purchasing New Pulses Package]`). It was not inserted into `customer_packages` in the database, leaving the patient profile showing "No active packages".
+
+**Decisions & Implementation:**
+1. **In-Booking Direct Package Selling (`src/components/admin/bookings/AdminNewBookingView.tsx`):**
+   - In `handleSaveBooking`, if `isNewPackagePurchase && selectedCatalogPulsePkg`, the system resolves the customer (existing or auto-created via `POST /api/customers`) and immediately executes `POST /api/packages/sell`.
+   - The returned `customerPackage.id` is linked to `payload.packageId` and recorded in reservation notes as `[Customer Package ID]: <id>`.
+   - Dispatches `revera-laser-change`, `revera-booking-change`, and `revera-prescription-change`.
+   - Because the package is now immediately created in `customer_packages`, opening the patient's profile (`CustomerProfileDrawer.tsx`) displays the active pulses package with full quota, price paid, purchase date, and active status.
+2. **Reliable Patient Search & Dropdown Engine (`AdminNewBookingView.tsx` & `src/app/admin/page.tsx`):**
+   - In `src/app/admin/page.tsx`, updated both `AdminNewBookingView` instances and `AdminAddPreviousBookingView` to pass `customers={customers}` (the full synthesized list) instead of `dbCustomers`.
+   - In `AdminNewBookingView.tsx`, loads customers via `/api/customers` with session authorization headers and updates `allCustomers` whenever `customers` prop updates.
+   - Removed `&& customerList.length > 0` condition from the dropdown container so clicking "Browse Patients List" always renders the dropdown.
+   - Added an integrated search bar inside the dropdown to search patients by name, phone, or email.
+   - Ensured empty search states render cleanly with a "Show all patients" button.
+3. **Admin Settings System Test Suite Diagnostic Verification:**
+   - Added test case `TC-077` ("In-Booking Package Selling & Integrated Patient Search Engine") to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
+
+---
+
+## DEC-074: Synthetic Customer UUID Crash (22P02) Resolution & Multi-Workflow Patient Profile Package Synchronization
+
+**Date:** 2026-09-21
+**Status:** Decided & Implemented
+
+**Context:**
+1. The user reported two related errors:
+   - "the pusrcahsed pacakge in the new booking page isnt showing in the painet profile"
+   - "that is happend when i tryed to purchase a package from the painet profile" (Error modal: `invalid input syntax for type uuid: "res-cust-01016302772"`).
+2. Root Cause Analysis:
+   - **Synthetic Customer IDs**: In `src/app/admin/page.tsx:3526`, patients created from historical reservations who do not yet have a corresponding row in `customers` table are synthesized with ID `res-cust-<phone>`.
+   - **Postgres 22P02 Syntax Crash**: When opening such a patient profile and clicking "+ Sell Package", `useCustomerProfile.ts` sent `customerId: "res-cust-01016302772"` to `POST /api/packages/sell`. The endpoint executed `.eq('id', customerId)` and `.insert({ customer_id: customerId })` against tables with PostgreSQL `UUID` columns (`customers`, `invoices`, `customer_packages`), immediately crashing with `22P02: invalid input syntax for type uuid: "res-cust-01016302772"`.
+   - **Query Crashing on Package Fetch**: In `src/app/api/customers/packages/route.ts`, `GET` passed `customerId` directly into `.in('customer_id', [customerId])` without verifying UUID format. For synthetic IDs, this threw 22P02, returning 500 error or empty packages, causing newly purchased packages to fail to render in the patient profile.
+   - **Profile Package Refresh Event Gap**: `useCustomerProfile.ts` only listened to `revera-laser-change` for `fetchCustomerProductBalances`, but neglected to call `fetchCustomerProfilePackages`. When a package was purchased in New Booking, the profile never refreshed its package list.
+
+**Decisions & Implementation:**
+1. **Synthetic ID Resolution & Auto-Creation in `/api/packages/sell` (`src/app/api/packages/sell/route.ts`):**
+   - Added `UUID_REGEX` validation. If `customerId` is a synthetic ID (`res-cust-...`) or raw phone string:
+     - Extracts the phone digits.
+     - Searches `customers` table by phone number (`mobile` or `phone`).
+     - If no customer exists, auto-creates the real customer row using patient information from reservations.
+     - Uses `finalCustomerId` (valid UUID) for customer verification, `invoices` insert, `customer_packages` insert, `recordTransaction` ledger, customer `spent_amount` updates, and wallet movements.
+   - Added `GET` handler returning status 200 for diagnostic verification in System Test Suite (`TC-077`).
+2. **Hardening Patient Profile Client (`src/components/admin/patients/useCustomerProfile.ts`):**
+   - In `handleSellPackageToCustomer`: detects non-UUID `customerId`, resolves or creates the real customer record via `POST /api/customers`, and updates `viewingCustomerProfile.id`.
+   - On sale completion: updates `viewingCustomerProfile.id` with `data.customerPackage.customer_id` and immediately re-fetches customer packages.
+   - In `handleAddProductToPatient`: applies the same synthetic ID resolution to prevent 22P02 crashes when adding inventory products to reservation-synthesized patients.
+   - In `useEffect`: wired `revera-laser-change` to re-fetch `fetchCustomerProfilePackages` and `fetchCustomerPackageRedemptions` so cross-component purchases (New Booking, Doctor Session, Receptionist Session) immediately reflect in open patient profiles.
+3. **Safe UUID Filtering & Synthetic Lookup in `/api/customers/packages` (`src/app/api/customers/packages/route.ts`):**
+   - When `customerId` is synthetic (`res-cust-...`), extracts digits to `lookupMobile` and matches all associated UUIDs in `customers`.
+   - Filters `validCustomerIds = customerIds.filter(id => UUID_REGEX.test(id))` before running `.in('customer_id', validCustomerIds)` on `customer_packages` and `customer_product_balances`.
+   - Prevents all 22P02 UUID crashes while finding packages belonging to this phone number.
+4. **Resilience in Inventory POS Sales (`src/app/api/inventory/products/sales/route.ts`):**
+   - Added `UUID_REGEX` and synthetic ID auto-resolution/creation to prevent 22P02 crashes during product sales.
+
+---
+
+## DEC-075: In-Booking Package Partial Payment & Session Balance Preservation
+
+**Date:** 2026-09-21
+**Status:** Decided — active
+
+**Context:**
+When booking a new patient who didn't have an existing pulses package, the receptionist could select Option 3 (In-Booking Package Purchase), choose a 1000 EGP package, and enter 500 EGP as the amount paid now. After the session started and ended via the doctor portal, the system showed the invoice as "fully settled" even though 500 EGP remained outstanding. The outstanding balance was silently zeroed out.
+
+**Root Causes:**
+1. **`/api/packages/sell`**: The POST body never received `amountPaid` from `AdminNewBookingView.tsx`, so it always defaulted to full payment (grandTotal). Invoice status was always `'issued'` with full 1000 EGP payment recorded.
+2. **`DoctorAccountView.tsx` session completion**: In PACKAGE mode, `effectiveBasePrice = 0` and `effectiveLaserSessionCharge = 0` (standard redemption, no deficit), so `sessionComputedTotal = 0`, causing the PATCH to set `amountLeft = max(0, 0 - 500) = 0`, wiping the outstanding balance.
+3. **`BookingDetailsModal.tsx` end session total**: `baseBookingPrice` was forced to `0` for isLaserPackage mode, and the legacy `totalPrice` computation for laser modes used only `calculatedTotal` (derived from the services cost line items, not the package purchase price), so `endSessionInvoiceTotal = 0` and `endSessionAmountLeft = 0`.
+4. **`BookingDetailsModal.tsx` Payment Mode label**: The label only checked `isLaserPerPulse` — if false, it always rendered "Standard Service" even when `isLaserPackage` was true.
+
+**Decisions & Implementation:**
+1. **`AdminNewBookingView.tsx`**: Added `amountPaid: numAmountPaid` to the `/api/packages/sell` POST body so the actual partial payment flows through correctly.
+2. **`/api/packages/sell`**: Updated POST handler to extract `amountPaid`/`paidAmount` from request body. Computes `actualPaid = min(grandTotal, max(0, amountPaid))`, `remainingDue = grandTotal - actualPaid`, and sets correct `invoiceStatus` (`'paid'` | `'partially_paid'` | `'issued'`). Payment row, transaction ledger, and customer `outstanding` now reflect the actual partial payment.
+3. **`DoctorAccountView.tsx`**: For PACKAGE mode, computes `bookedPackagePrice` by parsing `[Purchasing New Pulses Package]: Name (PRICE EGP)` from booking notes. Also reads `originalBookingCommitment = amountPaid + amountLeft` from the booking record. `sessionComputedTotal = max(sessionComputedRaw, bookedPackagePrice, originalBookingCommitment)` — ensuring total is never collapsed to zero for package purchases.
+4. **`BookingDetailsModal.tsx` (session panel)**:
+   - Recovers `bookedPackagePurchasePrice` from booking notes for isLaserPackage bookings.
+   - `totalPrice` for laser modes now uses `max(calculatedTotal, bookedPackagePurchasePrice, rawPaid + rawLeft)` to preserve the original financial commitment.
+   - `isInvoicePaid` now correctly checks `sessionPaid >= totalPrice` (not the rawLeft-zero condition which could false-positive).
+   - `endSessionInvoiceTotal` for isLaserPackage uses `max(computed, bookedPackagePurchasePrice, rawPaid + rawLeft)`.
+   - Payment Mode label now shows "Pulses Package" / "باقة نبضات" (with purple Zap icon) when `isLaserPackage` is true, instead of always falling back to "Standard Service".
+
+**Rule:** When computing session totals for PACKAGE mode laser bookings, NEVER collapse the total to a value less than the original booking commitment (`amountPaid + amountLeft`). Always parse the booked package price from booking notes as a floor for the invoice total.
+
+---
+
+## DEC-076: Database Synchronization for Services and Categories Across Devices
+
+**Date:** 2026-09-22
+**Status:** Decided — active
+
+**Context:**
+Administrators modifying service categories, adding/editing services, or toggling service active/visibility states reported that changes were only visible on the browser where the edits were made, even though services rows in Supabase were updated. On other devices, services under new categories were completely missing, and toggles remained in their default or local state.
+
+**Root Causes:**
+1. **`localStorage` category storage:** `getDynamicCategories()` and `saveDynamicCategories()` used client `localStorage` (`_dynamic_categories`). Categories created or reordered on one device were never saved to or fetched from the `categories` table in Supabase.
+2. **Hidden services from category omissions:** In `AdminServicesView.tsx`, services were grouped and rendered strictly by iterating over `localCategories`. Any service belonging to a category that was not seeded in another user's local browser storage was completely omitted from the UI.
+3. **`_service_toggles` in `localStorage`:** Activating or deactivating a service only updated `localStorage` (`_service_toggles`) on that machine instead of persisting to `services.active` and `services.visible` in Supabase.
+4. **Public sections dependency:** `HomeServicesSection.tsx` and `ServicesSection.tsx` filtered active services using `isServiceActive(...)` against `localStorage`.
+
+**Decisions & Implementation:**
+1. **Dynamic & Public `/api/categories` (`src/app/api/categories/route.ts`):**
+   - Added `export const dynamic = 'force-dynamic'` and `cache: 'no-store'`.
+   - Made `GET /api/categories` public (no staff auth required), enabling public website sections and all client sessions to fetch categories directly from Supabase.
+   - Auto-seeds the `categories` table with default `CATEGORY_LABELS` on first read if empty.
+   - Preserves authenticated staff requirement for `POST` (upsert) and `DELETE`.
+2. **Dynamic `/api/services` (`src/app/api/services/route.ts`):**
+   - Added `export const dynamic = 'force-dynamic'`.
+   - Explicitly preserves and maps `visible` and `active` boolean fields across DB operations.
+3. **Admin Panel Synchronization (`src/app/admin/page.tsx` & `AdminServicesView.tsx`):**
+   - Added `loadCategoriesFromApi`, `syncCategoriesToApi`, and `deleteCategoryFromApi` to persist category creation, deletion, and drag-and-drop reordering to Supabase.
+   - `loadServicesFromApi` initializes `serviceToggles` strictly from database `s.active` and `s.visible` fields with auto-discovery of unmapped service category keys.
+   - `toggleService` updates `localServices` and immediately triggers `syncServicesToApi` to persist `active`/`visible` states to Supabase.
+   - `AdminServicesView.tsx` computes `completeCategories` ensuring that any category key referenced by a database service is rendered even if not explicitly created yet.
+4. **Client Website Sections (`HomeServicesSection.tsx`, `ServicesSection.tsx`, `BookingModal.tsx`):**
+   - Fetches `/api/categories` and `/api/services` with `{ cache: 'no-store' }`.
+   - Filters active services directly via database flags `s.active !== false && s.visible !== false`.
+   - Dynamically computes `renderedCategories` merging any categories referenced by active services.
+
+
+
+
+
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, AlertTriangle, Zap } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, Cpu } from "lucide-react";
 
 type Device = {
   id: string;
@@ -10,7 +10,7 @@ type Device = {
 
 type DeviceLink = {
   device_id: string;
-  pulses_per_session: number;
+  pulses_per_session?: number;
   inventory_devices?: { name: string } | null;
 };
 
@@ -28,7 +28,6 @@ export default function ServiceDeviceEditor({ serviceId, authHeaders }: Props) {
   const [dirty, setDirty] = useState(false);
 
   const [newDeviceId, setNewDeviceId] = useState("");
-  const [newPulses, setNewPulses] = useState("1");
 
   useEffect(() => {
     loadAll();
@@ -64,33 +63,22 @@ export default function ServiceDeviceEditor({ serviceId, authHeaders }: Props) {
 
   function addLink() {
     if (!newDeviceId) return;
-    const pulses = Number(newPulses);
-    if (!Number.isInteger(pulses) || pulses <= 0) {
-      setError("Pulses per session must be a positive whole number.");
-      return;
-    }
     const device = devices.find((d) => d.id === newDeviceId);
     setLinks((prev) => [
       ...prev,
       {
         device_id: newDeviceId,
-        pulses_per_session: pulses,
+        pulses_per_session: 0,
         inventory_devices: device ? { name: device.name } : null,
       },
     ]);
     setNewDeviceId("");
-    setNewPulses("1");
     setDirty(true);
     setError(null);
   }
 
   function removeLink(deviceId: string) {
     setLinks((prev) => prev.filter((l) => l.device_id !== deviceId));
-    setDirty(true);
-  }
-
-  function updatePulses(deviceId: string, pulses: number) {
-    setLinks((prev) => prev.map((l) => (l.device_id === deviceId ? { ...l, pulses_per_session: pulses } : l)));
     setDirty(true);
   }
 
@@ -103,7 +91,7 @@ export default function ServiceDeviceEditor({ serviceId, authHeaders }: Props) {
         headers: authHeaders,
         body: JSON.stringify({
           serviceId,
-          items: links.map((l) => ({ deviceId: l.device_id, pulsesPerSession: l.pulses_per_session })),
+          items: links.map((l) => ({ deviceId: l.device_id, pulsesPerSession: 0 })),
         }),
       });
       const json = await res.json();
@@ -120,12 +108,10 @@ export default function ServiceDeviceEditor({ serviceId, authHeaders }: Props) {
   return (
     <div className="rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 space-y-3">
       <div className="flex items-center gap-2 text-[#414E36] font-semibold text-xs uppercase tracking-wider">
-        <Zap size={14} /> Devices &amp; Pulses Per Session
+        <Cpu size={14} /> Connected Equipment &amp; Devices
       </div>
       <p className="text-[11px] text-[#8C9A84]">
-        Clinic devices used by one session of this service, and how many pulses each session
-        delivers. Drives the per-session device cost (lamp replacement cost ÷ rated pulses × pulses
-        used).
+        Clinic laser and medical machines connected to this clinical service.
       </p>
 
       {error && (
@@ -139,28 +125,22 @@ export default function ServiceDeviceEditor({ serviceId, authHeaders }: Props) {
       ) : (
         <>
           {links.length === 0 ? (
-            <p className="text-xs text-[#5A6A51] italic">No devices attached to this service yet.</p>
+            <p className="text-xs text-[#5A6A51] italic">No devices connected to this service yet.</p>
           ) : (
             <div className="space-y-2">
               {links.map((link) => (
-                <div key={link.device_id} className="flex items-center gap-2">
-                  <span className="flex-1 text-sm text-[#1F251A] font-medium truncate">
-                    {link.inventory_devices?.name || link.device_id}
-                  </span>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={link.pulses_per_session}
-                    onChange={(e) => updatePulses(link.device_id, Number(e.target.value) || 0)}
-                    className="w-24 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
-                  />
-                  <span className="text-xs text-[#5A6A51] w-16">pulses</span>
+                <div key={link.device_id} className="flex items-center justify-between gap-2 bg-white px-3 py-2 rounded-xl border border-[#414E36]/10 shadow-2xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="text-sm text-[#1F251A] font-semibold truncate">
+                      {link.inventory_devices?.name || link.device_id}
+                    </span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => removeLink(link.device_id)}
-                    className="rounded-lg border border-rose-100 p-1.5 text-rose-600 transition hover:bg-rose-50"
-                    title="Remove"
+                    className="rounded-lg border border-rose-100 p-1.5 text-rose-600 transition hover:bg-rose-50 cursor-pointer shrink-0"
+                    title="Remove device link"
                   >
                     <Trash2 size={13} />
                   </button>
@@ -173,31 +153,22 @@ export default function ServiceDeviceEditor({ serviceId, authHeaders }: Props) {
             <select
               value={newDeviceId}
               onChange={(e) => setNewDeviceId(e.target.value)}
-              className="flex-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+              className="flex-1 rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
             >
               <option value="">
-                {pickableDevices.length === 0 ? "No more devices available" : "Select device..."}
+                {pickableDevices.length === 0 ? "No more devices available" : "Select device to connect..."}
               </option>
               {pickableDevices.map((d) => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </select>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={newPulses}
-              onChange={(e) => setNewPulses(e.target.value)}
-              placeholder="Pulses"
-              className="w-24 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
-            />
             <button
               type="button"
               onClick={addLink}
               disabled={!newDeviceId}
-              className="inline-flex items-center gap-1 rounded-lg bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 cursor-pointer shrink-0 shadow-xs"
             >
-              <Plus size={13} /> Add
+              <Plus size={13} /> Connect
             </button>
           </div>
 
@@ -205,9 +176,9 @@ export default function ServiceDeviceEditor({ serviceId, authHeaders }: Props) {
             type="button"
             onClick={handleSave}
             disabled={saving || !dirty}
-            className="w-full rounded-lg bg-[#414E36] py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40"
+            className="w-full rounded-xl bg-[#414E36] py-2.5 text-xs font-bold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 cursor-pointer shadow-sm"
           >
-            {saving ? "Saving..." : "Save Device Links"}
+            {saving ? "Saving Changes..." : "Save Connected Devices"}
           </button>
         </>
       )}

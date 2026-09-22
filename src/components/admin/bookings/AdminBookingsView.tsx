@@ -29,7 +29,9 @@ import {
   DollarSign,
   History,
   CalendarPlus,
-  MessageSquare
+  MessageSquare,
+  Trash2,
+  CalendarClock
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getAuthHeaders } from "@/lib/authHeaders";
@@ -198,12 +200,147 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   const [loadingDb, setLoadingDb] = useState(false);
   const [convertedFollowUpIds, setConvertedFollowUpIds] = useState<Set<string>>(() => new Set());
 
+  // Follow-Up Management Modal State
+  const [managingFollowUp, setManagingFollowUp] = useState<any | null>(null);
+  const [newFollowUpDateInput, setNewFollowUpDateInput] = useState<string>("");
+  const [updatingFollowUp, setUpdatingFollowUp] = useState<boolean>(false);
+  const [cancellingFollowUp, setCancellingFollowUp] = useState<boolean>(false);
+
+  const handleOpenManageFollowUp = (fu: any) => {
+    setManagingFollowUp(fu);
+    setNewFollowUpDateInput(fu.followUpDate || "");
+  };
+
+  const handleBookOnTargetDate = (fu: any, targetDate?: string) => {
+    const finalDate = targetDate || fu.followUpDate;
+    setConvertedFollowUpIds(prev => {
+      const next = new Set(prev);
+      if (fu.id) next.add(String(fu.id));
+      if (fu.bookingId) next.add(String(fu.bookingId));
+      if (fu.customerId) next.add(String(fu.customerId));
+      if (fu.patientName) next.add(`name-${fu.patientName.toLowerCase().trim()}`);
+      return next;
+    });
+    if (onNewBooking) {
+      onNewBooking({
+        customerId: fu.customerId,
+        patientName: fu.patientName,
+        phone: fu.phone,
+        doctorName: fu.doctorName,
+        doctorId: fu.doctorId,
+        serviceName: fu.serviceName,
+        serviceId: fu.serviceId,
+        date: finalDate,
+        notes: fu.notes ? `Follow-up from ${fu.doctorName}: ${fu.notes}` : `Follow-up visit recommended by ${fu.doctorName}`,
+        raw: fu.raw
+      });
+    }
+    setManagingFollowUp(null);
+  };
+
+  const handleCancelFollowUp = async (fu: any) => {
+    if (!fu) return;
+    if (!confirm(tr.cancelFollowUpConfirm || "Are you sure you want to cancel and remove this follow-up reminder?")) return;
+    setCancellingFollowUp(true);
+    try {
+      const headers = await getAuthHeaders();
+      // 1. If has bookingId, clear followUpDate on reservations
+      if (fu.bookingId) {
+        await fetch(`/api/reservations?id=${encodeURIComponent(fu.bookingId)}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ followUpDate: null, follow_up_date: null })
+        }).catch(() => {});
+      }
+      // 2. If prescription record, clear follow_up_date on prescriptions
+      const rxId = fu.raw?.id || (String(fu.id).startsWith("fu-rx-") ? String(fu.id).replace("fu-rx-", "") : null);
+      if (rxId) {
+        await fetch(`/api/prescriptions?id=${encodeURIComponent(rxId)}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ follow_up_date: null })
+        }).catch(() => {});
+      }
+      // 3. Mark in local converted state
+      setConvertedFollowUpIds(prev => {
+        const next = new Set(prev);
+        if (fu.id) next.add(String(fu.id));
+        if (fu.bookingId) next.add(String(fu.bookingId));
+        if (fu.customerId) next.add(String(fu.customerId));
+        if (fu.patientName) next.add(`name-${fu.patientName.toLowerCase().trim()}`);
+        return next;
+      });
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+        window.dispatchEvent(new CustomEvent("revera-booking-change"));
+      }
+      setManagingFollowUp(null);
+    } catch (err) {
+      console.error("Error cancelling follow up:", err);
+      alert("Error cancelling follow up. Please try again.");
+    } finally {
+      setCancellingFollowUp(false);
+    }
+  };
+
+  const handleSaveNewFollowUpDate = async (fu: any, newDate: string, thenBook: boolean = false) => {
+    if (!fu || !newDate) return;
+    setUpdatingFollowUp(true);
+    try {
+      const headers = await getAuthHeaders();
+      if (fu.bookingId) {
+        await fetch(`/api/reservations?id=${encodeURIComponent(fu.bookingId)}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ followUpDate: newDate, follow_up_date: newDate })
+        }).catch(() => {});
+      }
+      const rxId = fu.raw?.id || (String(fu.id).startsWith("fu-rx-") ? String(fu.id).replace("fu-rx-", "") : null);
+      if (rxId) {
+        await fetch(`/api/prescriptions?id=${encodeURIComponent(rxId)}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ follow_up_date: newDate })
+        }).catch(() => {});
+      }
+
+      // If moving as a reminder to the new date, clear any converted status so it is active
+      if (!thenBook) {
+        setConvertedFollowUpIds(prev => {
+          const next = new Set(prev);
+          if (fu.id) next.delete(String(fu.id));
+          if (fu.bookingId) next.delete(String(fu.bookingId));
+          if (fu.customerId) next.delete(String(fu.customerId));
+          if (fu.patientName) next.delete(`name-${fu.patientName.toLowerCase().trim()}`);
+          return next;
+        });
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+        window.dispatchEvent(new CustomEvent("revera-booking-change"));
+      }
+
+      if (thenBook) {
+        handleBookOnTargetDate(fu, newDate);
+      } else {
+        setManagingFollowUp(null);
+      }
+    } catch (err) {
+      console.error("Error updating follow up date:", err);
+      alert("Error updating follow up date.");
+    } finally {
+      setUpdatingFollowUp(false);
+    }
+  };
+
   // Fetch real reservations, providers & prescriptions directly from database on mount & subscribe to realtime
   useEffect(() => {
     let isMounted = true;
 
-    async function fetchRealData() {
-      setLoadingDb(true);
+    async function fetchRealData(silent = false) {
+      if (!silent) setLoadingDb(true);
       try {
         const [resResponse, provResponse, rxResponse, authHeaders] = await Promise.all([
           supabase.from("reservations").select("*").order("date", { ascending: false }),
@@ -255,11 +392,18 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       } catch (err) {
         console.error("Error fetching database reservations/providers/prescriptions:", err);
       } finally {
-        if (isMounted) setLoadingDb(false);
+        if (isMounted && !silent) setLoadingDb(false);
       }
     }
 
-    fetchRealData();
+    fetchRealData(false);
+
+    // 3-second background polling ensures follow-up updates reflect instantly without reload
+    const pollInterval = setInterval(() => {
+      if (isMounted) {
+        fetchRealData(true);
+      }
+    }, 3000);
 
     // Real-time synchronization
     const channel = supabase
@@ -268,24 +412,25 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         "postgres_changes",
         { event: "*", schema: "public", table: "prescriptions" },
         () => {
-          fetchRealData();
+          fetchRealData(true);
         }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reservations" },
         () => {
-          fetchRealData();
+          fetchRealData(true);
         }
       )
       .subscribe();
 
-    const onSyncChange = () => fetchRealData();
+    const onSyncChange = () => fetchRealData(true);
     window.addEventListener("revera-prescription-change", onSyncChange);
     window.addEventListener("revera-booking-change", onSyncChange);
 
     return () => {
       isMounted = false;
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
       window.removeEventListener("revera-prescription-change", onSyncChange);
       window.removeEventListener("revera-booking-change", onSyncChange);
@@ -411,7 +556,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   // Aggregate all Follow-Up Reminders from bookings and prescriptions with lead time calculation
   const allFollowUpReminders = useMemo(() => {
     const list: any[] = [];
-    const seenKeys = new Set<string>();
+    const keyIndexMap = new Map<string, number>();
+
+    const makeKeys = (bookingId?: string | number, custId?: string, pName?: string, dateStr?: string): string[] => {
+      const keys: string[] = [];
+      const d = String(dateStr || "").slice(0, 10);
+      if (bookingId) keys.push(`bid-${bookingId}-${d}`);
+      if (custId) keys.push(`cid-${custId}-${d}`);
+      if (pName) keys.push(`name-${String(pName).trim().toLowerCase()}-${d}`);
+      return keys;
+    };
 
     // 1. From merged appointments
     mergedAppointments.forEach((apt) => {
@@ -419,24 +573,31 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       if (fDate) {
         const cleanFDate = String(fDate).slice(0, 10);
         const remDate = computeReminderDate(cleanFDate, followUpLeadDays ?? 2);
-        const key = `${apt.id || apt.customer_id || apt.customer_name}-${cleanFDate}`;
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key);
-          list.push({
-            id: `fu-apt-${apt.id}`,
-            bookingId: apt.id,
-            customerId: apt.customer_id || apt.customerId,
-            patientName: apt.customer_name,
-            phone: apt.customer_phone,
-            doctorName: apt.doctor_name,
-            doctorId: apt.provider_id || apt.providerId || apt.doctorId || apt.doctor_id,
-            serviceName: apt.service_name,
-            serviceId: apt.service_id || apt.serviceId,
-            followUpDate: cleanFDate,
-            reminderDate: remDate,
-            notes: apt.follow_up_notes || apt.notes || "",
-            raw: apt
-          });
+        const keys = makeKeys(apt.id, apt.customer_id || apt.customerId, apt.customer_name, cleanFDate);
+        const existingIdx = keys.map(k => keyIndexMap.get(k)).find(idx => idx !== undefined);
+
+        const item = {
+          id: `fu-apt-${apt.id}`,
+          bookingId: apt.id,
+          customerId: apt.customer_id || apt.customerId,
+          patientName: apt.customer_name,
+          phone: apt.customer_phone || apt.phone,
+          doctorName: apt.doctor_name,
+          doctorId: apt.provider_id || apt.providerId || apt.doctorId || apt.doctor_id,
+          serviceName: apt.service_name,
+          serviceId: apt.service_id || apt.serviceId,
+          followUpDate: cleanFDate,
+          reminderDate: remDate,
+          notes: apt.follow_up_notes || apt.notes || "",
+          raw: apt
+        };
+
+        if (existingIdx !== undefined) {
+          list[existingIdx] = { ...list[existingIdx], ...item };
+        } else {
+          const newIdx = list.length;
+          list.push(item);
+          keys.forEach(k => keyIndexMap.set(k, newIdx));
         }
       }
     });
@@ -446,33 +607,46 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       if (rx.follow_up_date) {
         const cleanFDate = String(rx.follow_up_date).slice(0, 10);
         const remDate = computeReminderDate(cleanFDate, followUpLeadDays ?? 2);
-        const key = `${rx.booking_id || rx.customer_id || rx.patient_name || rx.customer_name}-${cleanFDate}`;
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key);
-          // Look up matching appointment to get phone or doctor name if missing
-          const matchingApt = mergedAppointments.find((a) =>
-            (rx.booking_id && String(a.id) === String(rx.booking_id)) ||
-            (rx.customer_id && a.customer_id && String(a.customer_id) === String(rx.customer_id)) ||
-            (rx.patient_name && a.customer_name && a.customer_name.trim().toLowerCase() === String(rx.patient_name).trim().toLowerCase())
-          );
-          const rawPhone = rx.customer_phone || rx.phone || matchingApt?.customer_phone || matchingApt?.phone || "";
-          const docName = rx.doctor_name || matchingApt?.doctor_name || "Doctor";
+        const matchingApt = mergedAppointments.find((a) =>
+          (rx.booking_id && String(a.id) === String(rx.booking_id)) ||
+          (rx.customer_id && a.customer_id && String(a.customer_id) === String(rx.customer_id)) ||
+          (rx.patient_name && a.customer_name && a.customer_name.trim().toLowerCase() === String(rx.patient_name).trim().toLowerCase())
+        );
+        const rawPhone = rx.customer_phone || rx.phone || matchingApt?.customer_phone || matchingApt?.phone || "";
+        const docName = rx.doctor_name || matchingApt?.doctor_name || "Doctor";
+        const patName = rx.patient_name || rx.customer_name || matchingApt?.customer_name || "Patient";
 
-          list.push({
-            id: `fu-rx-${rx.id}`,
-            bookingId: rx.booking_id,
-            customerId: rx.customer_id || matchingApt?.customer_id,
-            patientName: rx.patient_name || rx.customer_name || matchingApt?.customer_name || "Patient",
-            phone: rawPhone,
-            doctorName: docName,
-            doctorId: rx.provider_id || rx.doctor_id || matchingApt?.provider_id,
-            serviceName: rx.service_name || matchingApt?.service_name || "Follow-Up Consultation",
-            serviceId: rx.service_id || matchingApt?.service_id,
-            followUpDate: cleanFDate,
-            reminderDate: remDate,
-            notes: rx.follow_up_notes || rx.instructions || rx.general_notes || "",
-            raw: rx
-          });
+        const keys = makeKeys(rx.booking_id, rx.customer_id || matchingApt?.customer_id, patName, cleanFDate);
+        const existingIdx = keys.map(k => keyIndexMap.get(k)).find(idx => idx !== undefined);
+        const rxNotes = rx.follow_up_notes || rx.instructions || rx.general_notes || rx.doctor_notes || "";
+
+        const item = {
+          id: `fu-rx-${rx.id}`,
+          bookingId: rx.booking_id || matchingApt?.id,
+          customerId: rx.customer_id || matchingApt?.customer_id,
+          patientName: patName,
+          phone: rawPhone,
+          doctorName: docName,
+          doctorId: rx.provider_id || rx.doctor_id || matchingApt?.provider_id,
+          serviceName: rx.service_name || matchingApt?.service_name || "Follow-Up Consultation",
+          serviceId: rx.service_id || matchingApt?.service_id,
+          followUpDate: cleanFDate,
+          reminderDate: remDate,
+          notes: rxNotes || matchingApt?.follow_up_notes || matchingApt?.notes || "",
+          raw: rx
+        };
+
+        if (existingIdx !== undefined) {
+          list[existingIdx] = {
+            ...list[existingIdx],
+            ...item,
+            phone: rawPhone || list[existingIdx].phone,
+            notes: rxNotes || list[existingIdx].notes
+          };
+        } else {
+          const newIdx = list.length;
+          list.push(item);
+          keys.forEach(k => keyIndexMap.set(k, newIdx));
         }
       }
     });
@@ -809,7 +983,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   // Real Database Appointment dots mapping per date
   const appointmentsByDate = useMemo(() => {
-    const map: Record<string, string[]> = {};
+    const map: Record<string, { color: string; isFollowUp?: boolean }[]> = {};
 
     mergedAppointments.forEach(app => {
       if (!app.date) return;
@@ -821,24 +995,24 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       else if (st === "checked_in") color = "#3B82F6"; // blue
       else if (st === "in_progress" || st === "started") color = "#A855F7"; // purple
       else if (st === "completed") color = "#0D9488"; // teal
-      else if (st === "postponed" || st === "rescheduled") color = "#6366F1"; // indigo
+      else if (st === "postponed" || st === "rescheduled") color = "#EAB308"; // yellow
       else if (st === "canceled" || st === "cancelled" || st === "rejected") color = "#EF4444"; // red
       else if (st === "no_show") color = "#6B7280"; // gray
 
-      if (!map[app.date].includes(color) && map[app.date].length < 3) {
-        map[app.date].push(color);
+      if (!map[app.date].some(d => d.color === color) && map[app.date].length < 3) {
+        map[app.date].push({ color });
       }
     });
 
     allFollowUpReminders.forEach(fu => {
-      const datesToDot = [fu.reminderDate, fu.followUpDate].filter(Boolean);
-      datesToDot.forEach(dStr => {
+      if (fu.followUpDate) {
+        const dStr = fu.followUpDate;
         if (!map[dStr]) map[dStr] = [];
         const fuColor = "#6366F1"; // Indigo/purple for follow-up reminders
-        if (!map[dStr].includes(fuColor) && map[dStr].length < 3) {
-          map[dStr].push(fuColor);
+        if (!map[dStr].some(d => d.isFollowUp) && map[dStr].length < 3) {
+          map[dStr].push({ color: fuColor, isFollowUp: true });
         }
-      });
+      }
     });
 
     return map;
@@ -870,7 +1044,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         return { label: tr.statusLabels.completed, bg: "bg-teal-50", text: "text-teal-700", dot: "bg-teal-500", border: "border-l-teal-500" };
       case "postponed":
       case "rescheduled":
-        return { label: tr.statusLabels.postponed, bg: "bg-indigo-50", text: "text-indigo-700", dot: "bg-indigo-500", border: "border-l-indigo-500" };
+        return { label: tr.statusLabels.postponed, bg: "bg-yellow-50", text: "text-yellow-800", dot: "bg-yellow-500", border: "border-l-yellow-500" };
       case "canceled":
       case "cancelled":
       case "rejected":
@@ -1355,30 +1529,12 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setConvertedFollowUpIds(prev => {
-                          const next = new Set(prev);
-                          if (fu.id) next.add(String(fu.id));
-                          if (fu.bookingId) next.add(String(fu.bookingId));
-                          if (fu.customerId) next.add(String(fu.customerId));
-                          if (fu.patientName) next.add(`name-${fu.patientName.toLowerCase().trim()}`);
-                          return next;
+                        handleOpenManageFollowUp({
+                          ...fu,
+                          doctorName: formattedDocName || fu.doctorName
                         });
-                        if (onNewBooking) {
-                          onNewBooking({
-                            customerId: fu.customerId,
-                            patientName: fu.patientName,
-                            phone: fu.phone,
-                            doctorName: formattedDocName,
-                            doctorId: fu.doctorId,
-                            serviceName: fu.serviceName,
-                            serviceId: fu.serviceId,
-                            date: fu.followUpDate,
-                            notes: fu.notes ? `Follow-up from ${formattedDocName}: ${fu.notes}` : `Follow-up visit recommended by ${formattedDocName}`,
-                            raw: fu.raw
-                          });
-                        }
                       }}
-                      className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 transition shadow-xs cursor-pointer"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 active:scale-95 transition shadow-xs cursor-pointer"
                       title={tr.convertToBookingBtn || "Convert to Full Booking"}
                     >
                       <Plus size={13} />
@@ -1885,13 +2041,21 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       >
                         {cell.day}
                       </div>
-                      <div className="mt-1 flex h-1.5 min-h-[6px] items-center justify-center gap-0.5">
-                        {dots.map((dotColor, dIdx) => (
-                          <span
-                            key={dIdx}
-                            className="h-1.5 w-1.5 rounded-full"
-                            style={{ backgroundColor: dotColor }}
-                          />
+                      <div className="mt-1 flex h-2 min-h-[8px] items-center justify-center gap-0.5">
+                        {dots.map((dot, dIdx) => (
+                          dot.isFollowUp ? (
+                            <span
+                              key={dIdx}
+                              className="h-1.5 w-1.5 rounded-full bg-[#6366F1] animate-warning-light shrink-0"
+                              title={tr.followUpBadge || "Follow-Up Reminder"}
+                            />
+                          ) : (
+                            <span
+                              key={dIdx}
+                              className="h-1.5 w-1.5 rounded-full shrink-0"
+                              style={{ backgroundColor: dot.color }}
+                            />
+                          )
                         ))}
                       </div>
                     </button>
@@ -1908,7 +2072,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     { color: "#3B82F6", label: tr.statusLabels.checkedIn },
                     { color: "#A855F7", label: tr.statusLabels.inProgress },
                     { color: "#0D9488", label: tr.statusLabels.completed },
-                    { color: "#6366F1", label: tr.statusLabels.postponed },
+                    { color: "#EAB308", label: tr.statusLabels.postponed },
                     { color: "#EF4444", label: tr.statusLabels.canceled },
                     { color: "#6B7280", label: tr.statusLabels.noShow },
                   ].map(({ color, label }) => (
@@ -1918,7 +2082,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     </div>
                   ))}
                   <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-[#6366F1]"></span>
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-[#6366F1]" />
                     <span>{tr.followUpBadge || "Follow-Up Reminder"}</span>
                   </div>
                 </div>
@@ -2212,6 +2376,163 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* ── FOLLOW-UP ACTION MODAL (Book on target date / Change date / Cancel) ── */}
+      {managingFollowUp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn">
+          <div
+            dir={lang === "ar" ? "rtl" : "ltr"}
+            className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl border border-gray-100 space-y-5 animate-scaleUp overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 shadow-2xs">
+                  <CalendarClock size={22} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[#111827]">
+                    {tr.manageFollowUpModalTitle || "Manage Follow-Up Appointment"}
+                  </h3>
+                  <p className="text-xs text-[#6B7280]">
+                    {tr.manageFollowUpModalSubtitle || "Choose an action for this recommended follow-up visit."}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManagingFollowUp(null)}
+                className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Patient & Doctor Context Card */}
+            <div className="rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 p-4 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <div className="font-bold text-sm text-[#111827]">
+                  {managingFollowUp.patientName}
+                </div>
+                <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-bold text-indigo-800">
+                  {tr.targetDateLabel || "Recommended:"} {managingFollowUp.followUpDate}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-600 flex-wrap">
+                <span className="font-semibold text-indigo-950">{managingFollowUp.doctorName}</span>
+                <span>·</span>
+                <span>{managingFollowUp.serviceName}</span>
+                {managingFollowUp.phone && (
+                  <>
+                    <span>·</span>
+                    <span className="font-mono dir-ltr">{managingFollowUp.phone}</span>
+                  </>
+                )}
+              </div>
+              {managingFollowUp.notes && (
+                <div className="mt-1 text-[11px] italic text-gray-500 bg-white/80 rounded-xl p-2 border border-gray-200/50">
+                  "{managingFollowUp.notes}"
+                </div>
+              )}
+            </div>
+
+            {/* Action Options Grid */}
+            <div className="space-y-3">
+              {/* OPTION 1: Book on Recommended Date */}
+              <button
+                type="button"
+                onClick={() => handleBookOnTargetDate(managingFollowUp)}
+                className="w-full text-left rtl:text-right group flex items-center justify-between p-3.5 rounded-2xl border-2 border-indigo-600/20 bg-indigo-50/50 hover:bg-indigo-600 hover:text-white transition shadow-2xs cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white group-hover:bg-white group-hover:text-indigo-600 transition shadow-2xs">
+                    <Plus size={18} />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-[#111827] group-hover:text-white transition">
+                      {tr.bookOnTargetDateBtn || "Book on Target Date"} ({managingFollowUp.followUpDate})
+                    </div>
+                    <div className="text-[11px] text-gray-500 group-hover:text-indigo-100 transition">
+                      {tr.bookOnTargetDateDesc || "Create appointment on the doctor's recommended date"}
+                    </div>
+                  </div>
+                </div>
+                <ArrowRight size={16} className={`text-indigo-600 group-hover:text-white transition ${lang === "ar" ? "rotate-180" : ""}`} />
+              </button>
+
+              {/* OPTION 2: Change to Another Day */}
+              <div className="rounded-2xl border border-gray-200 bg-white p-3.5 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+                      <CalendarIcon size={16} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#111827]">
+                        {tr.changeFollowUpDateTitle || "Reschedule Follow-Up Reminder to Another Date"}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {tr.changeFollowUpDateDesc || "Moves the reminder to the new date (notification only, not a full booking yet)."}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="date"
+                    value={newFollowUpDateInput}
+                    onChange={(e) => setNewFollowUpDateInput(e.target.value)}
+                    className="shrink-0 rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-xs font-semibold text-[#111827] focus:border-indigo-500 focus:bg-white focus:outline-hidden transition"
+                  />
+                  <button
+                    type="button"
+                    disabled={updatingFollowUp || !newFollowUpDateInput || newFollowUpDateInput === managingFollowUp.followUpDate}
+                    onClick={() => handleSaveNewFollowUpDate(managingFollowUp, newFollowUpDateInput, false)}
+                    className="flex-1 whitespace-nowrap rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700 transition disabled:opacity-40 cursor-pointer text-center shadow-xs flex items-center justify-center gap-1.5"
+                    title={tr.saveNewDateOnlyBtn || "Reschedule Reminder"}
+                  >
+                    {updatingFollowUp ? <Loader2 size={13} className="animate-spin inline" /> : null}
+                    <span>{tr.saveNewDateOnlyBtn || "Reschedule Reminder"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={updatingFollowUp || !newFollowUpDateInput || newFollowUpDateInput === managingFollowUp.followUpDate}
+                    onClick={() => handleSaveNewFollowUpDate(managingFollowUp, newFollowUpDateInput, true)}
+                    className="shrink-0 whitespace-nowrap rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-40 cursor-pointer text-center"
+                    title={tr.bookOnNewDateBtn || "Book on New Date"}
+                  >
+                    <span>{tr.bookOnNewDateBtn || "Book on New Date"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* OPTION 3: Cancel Follow-Up */}
+              <button
+                type="button"
+                disabled={cancellingFollowUp}
+                onClick={() => handleCancelFollowUp(managingFollowUp)}
+                className="w-full text-left rtl:text-right group flex items-center justify-between p-3.5 rounded-2xl border border-rose-200 bg-rose-50/40 hover:bg-rose-600 hover:text-white transition shadow-2xs cursor-pointer disabled:opacity-50"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-100 text-rose-700 group-hover:bg-white group-hover:text-rose-600 transition shadow-2xs">
+                    {cancellingFollowUp ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-rose-900 group-hover:text-white transition">
+                      {tr.cancelFollowUpBtn || "Cancel This Follow-Up"}
+                    </div>
+                    <div className="text-[11px] text-rose-600/80 group-hover:text-rose-100 transition">
+                      {tr.cancelFollowUpDesc || "Patient declined or cancelled follow-up visit"}
+                    </div>
+                  </div>
+                </div>
+                <X size={16} className="text-rose-500 group-hover:text-white transition" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

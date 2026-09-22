@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Category, ServiceItem, getServicePriceDetails } from "@/lib/services";
 import { 
   getServiceToggles, 
-  isServiceActive, 
   ServiceToggleState, 
   getDynamicCategories, 
   LocalCategory 
@@ -373,30 +372,57 @@ export function ServicesSection() {
   const { t, language, isRTL } = useLanguage();
   const router = useRouter();
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
-  const [serviceToggles, setServiceToggles] = useState<ServiceToggleState>({});
   const [dynamicServices, setDynamicServices] = useState<ServiceItem[]>([]);
   const [dynamicCategories, setDynamicCategories] = useState<LocalCategory[]>([]);
 
-  // Load services from the database; categories/toggles still sync via localStorage
+  // Load categories and services directly from the database API
   useEffect(() => {
-    setServiceToggles(getServiceToggles());
-    setDynamicCategories(getDynamicCategories());
+    fetch("/api/categories", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setDynamicCategories(data);
+        } else {
+          setDynamicCategories(getDynamicCategories());
+        }
+      })
+      .catch(() => setDynamicCategories(getDynamicCategories()));
 
-    fetch("/api/services")
+    fetch("/api/services", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setDynamicServices(Array.isArray(data) ? data : []))
       .catch(() => setDynamicServices([]));
 
     const handleStorage = () => {
-      setServiceToggles(getServiceToggles());
       setDynamicCategories(getDynamicCategories());
     };
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  // Only show services that are active & visible in admin
-  const activeServices = dynamicServices.filter(s => isServiceActive(s.id, serviceToggles));
+  // Only show services that are active & visible in database
+  const activeServices = useMemo(() => {
+    return dynamicServices.filter(s => s.active !== false && s.visible !== false);
+  }, [dynamicServices]);
+
+  // Merge any categories referenced by active services that may not yet be in dynamicCategories
+  const renderedCategories = useMemo(() => {
+    const knownKeys = new Set(dynamicCategories.map(c => c.key));
+    const extra: LocalCategory[] = [];
+    activeServices.forEach(s => {
+      if (s.cat && !knownKeys.has(s.cat)) {
+        knownKeys.add(s.cat);
+        extra.push({
+          key: s.cat,
+          en: s.cat.charAt(0).toUpperCase() + s.cat.slice(1).replace(/_/g, " "),
+          ar: s.cat.charAt(0).toUpperCase() + s.cat.slice(1).replace(/_/g, " "),
+          sortOrder: dynamicCategories.length + extra.length,
+        });
+      }
+    });
+    return [...dynamicCategories, ...extra];
+  }, [dynamicCategories, activeServices]);
+
   const filtered = activeCategory ? activeServices.filter(s => s.cat === activeCategory) : [];
 
   const descText = language === "ar"
@@ -495,12 +521,12 @@ export function ServicesSection() {
                 }}
                 className="services-cat-grid"
               >
-                {dynamicCategories.length === 0 ? (
+                {renderedCategories.length === 0 ? (
                   <div style={{ textAlign: "center", gridColumn: "1 / -1", padding: "40px 0", color: "var(--color-brand-secondary)" }}>
                     {language === "ar" ? "لا توجد أقسام متاحة حالياً" : "No categories available yet."}
                   </div>
                 ) : (
-                  dynamicCategories.map((cat) => (
+                  renderedCategories.map((cat) => (
                     <CategoryCard
                       key={cat.key}
                       label={language === "ar" && cat.ar ? cat.ar : cat.en}
@@ -524,7 +550,7 @@ export function ServicesSection() {
                   marginBottom: 40,
                   flexWrap: "wrap",
                 }}>
-                  {dynamicCategories.map((cat) => {
+                  {renderedCategories.map((cat) => {
                     const isActive = cat.key === activeCategory;
                     const label = language === "ar" && cat.ar ? cat.ar : cat.en;
                     return (

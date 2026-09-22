@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **59 resolved** · 79 tracked total.
+**7 open** · **13 partially resolved** · **64 resolved** · 84 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4095,6 +4095,168 @@ live reproduction described above.
 
 ---
 
+## RISK-089: "Database error" Popup Modal on Ending Laser Session Settled with Pulses Package (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Correctness / Error handling / Schema resilience
+**Found:** 2026-09-20, live-reported by user with screenshot ("that appeared when i tryed ending a session that is was setteled to be payed by a pulses package"). **Fixed same day.**
+
+**What it was:**
+1. When completing or ending a session settled with a laser pulses package in `DoctorAccountView.tsx` or `BookingDetailsModal.tsx`, `PATCH /api/reservations` attempted to update columns (`laser_payment_mode`, `laser_price_per_pulse`, `delivered_pulses`, `actual_duration_minutes`, `doctor_notes`, `reception_notes`, etc.) that may not exist on the database table in unmigrated environments, causing Postgres error `42703` (`column does not exist`). Line 1800 had `if (updateError) throw updateError;`, which got caught and returned HTTP 500 `{ error: 'Database error' }`, displaying `alert("Database error")`.
+2. In `PATCH /api/customers/packages`, consuming pulses executed `.eq('id', pkgId)` without checking if `pkgId` is a valid UUID, throwing Postgres error `22P02` (`invalid input syntax for type uuid`) on synthetic or custom package IDs.
+3. In `writeCheckoutInvoice`, laser services paid via pulses packages were not flagged as 100% discounted package redemptions, and hardware tracking pulse line items were assigned unit price > 0 in `persistSessionLineItems`, adding unintended phantom charges.
+4. In `src/app/api/reservation-products/route.ts`, required payload field names strictly expected `description` and `qty`, failing calls sending `productName` and `quantity`, and rejected `receptionist_global_ending` role.
+
+**Fix:**
+1. Added multi-stage resilient retry in `PATCH /api/reservations`: catches Postgres 42703 errors, strips extended columns, and retries with core columns (`status`, `notes`, `amount_paid`, `amount_left`, `service_id`).
+2. UUID-guarded database queries in `PATCH /api/customers/packages` before calling `.from('customer_packages')`.
+3. In `writeCheckoutInvoice`, recognized `isPackageMode` to treat base laser services as 100% discounted package redemptions (`line_total: 0`), and ensured pulse counter entries with `unit_price <= 0` are omitted from customer billable invoice lines.
+4. In `DoctorAccountView.tsx` and `BookingDetailsModal.tsx`, set `unitPrice: 0` for hardware tracking pulse records.
+5. In `/api/reservation-products`, supported payload aliases (`description` / `productName`, `qty` / `quantity`, `unitPrice` / `price`) and all staff roles.
+
+**Verify:**
+- Verified with `npm run build` with 0 compiler / TypeScript errors.
+- Verified under System Test Suite `TC-072` (`Laser Pulses Package Redemption & Session Completion Engine`).
+
+---
+
+## RISK-090: `GET /api/customers/packages` Had No Authentication, So Anyone Could Read Any Patient's Packages By Phone Number (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Security / patient data exposure
+**Found:** 2026-09-21, while fixing a test that expected this route to return 401 for an unauthenticated caller. **Fixed same day.**
+
+**What it was:** only the `PATCH` handler in `src/app/api/customers/packages/route.ts` called
+`requireStaffAccess`; `GET` had no auth check at all, and the auth sweep's registry already declared
+it `staff`. The handler accepts a `mobile`/`phone` param and looks up every customer whose phone
+contains the last 9 digits, so an anonymous caller — no login, no token — could enumerate any phone
+number and get back that patient's packages, `price_paid`, laser-pulse usage history (treatment area,
+who delivered it, remaining balance) and product balances. Patient OTP login is UI-only, so no
+patient-side session ever legitimately needed this endpoint; every real caller is staff.
+
+**How it surfaced:** the route arrived with the DEC-062…DEC-076 laser/package commits. The auth
+sweep already listed it as `staff`, so its `401`/`403` assertions for this route were red on
+`origin/dev` right after that batch landed (`expected 400 to be 401`) — the sweep did flag it, it
+just wasn't acted on. Note the sweep calls handlers with *no* query params, so even when green it
+could not prove the real leak (valid params, no token); `customers-packages.test.ts` does.
+
+**Fix:** `GET` now calls `requireStaffAccess` first — before param validation, so an unauthenticated
+caller gets `401`, never a `400` that reveals the route's shape. One caller sent no token at all
+(`AdminNewBookingView.tsx`'s `loadCustomerPackages`); it now sends the session bearer token the way
+the same file's `/api/customers` and `/api/packages/sell` calls already did. Every other caller
+already went through `getAuthHeaders()`/`authenticatedJsonHeaders`.
+
+**Verified:** live against the dev server + dev database — no token → `401` for `customer_id=`,
+`mobile=` and no-param requests; staff token → `200`; staff with no params → `400`.
+
+**Tests:** `tests/routes/customers-packages.test.ts` (new, 8 cases). The four auth cases were
+confirmed to fail with the guard removed. `auth-sweep.test.ts` `/api/customers/packages` rows pass
+(311/311).
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_090_091_MANUAL_TESTS.md`
+
+---
+
+## RISK-091: UI Callers Looked Up A Patient's Package With `?customerId=` But The Route Only Read `customer_id`, So Every Lookup Returned 400 And Was Silently Skipped (RESOLVED — end-to-end symptoms not yet re-verified)
+
+**Severity:** High (P1) · **Type:** Correctness / silent failure (money-adjacent)
+**Found:** 2026-09-21, during the RISK-090 caller audit. **Fixed same day** (the param mismatch itself).
+
+**What it was:** `GET /api/customers/packages` read `searchParams.get('customer_id')` only (plus
+`mobile`/`phone`). `BookingDetailsModal.tsx` (2 call sites), `DoctorAccountView.tsx`,
+`DoctorOngoingSessionTab.tsx` and `admin/page.tsx` (checkout) all called it with `?customerId=`. With
+neither param present the route returned `400`, and each of those callers only acts inside
+`if (res.ok) { … }` — so the lookup failed **silently**, with no error shown:
+- "is this package already sold to this patient?" (`BookingDetailsModal`, before selling a package
+  during booking/checkout) never found an existing package;
+- "which of this patient's packages do I deduct pulses from?" (`BookingDetailsModal`,
+  `DoctorAccountView`, `admin/page.tsx` checkout) never found a target package, so the follow-up
+  `PATCH … consume_package_pulses` was never sent;
+- the doctor session tab never populated the patient's active pulse packages.
+
+**Relationship to the reported "known issues" (verified live 2026-09-21, dev DB, test patients
+`ZZTEST*` — since deactivated):**
+- *(2) pulses used in a package-paid session are not deducted* — **this was the cause.** A patient who
+  already held a package (7,500 remaining) booked "Pay via Package" (note `[Laser Package
+  Redemption]`, no Customer Package ID), and a session used 2,500 pulses: the balance went
+  **7,500 → 5,000**, deducted once, history `2500→5000`. That path finds the package only through
+  `?customerId=`, which is exactly what used to 400.
+- *(1) a package bought during booking does not appear under Purchased Packages* — **this was NOT
+  this bug**; it had two separate causes, see RISK-092 and RISK-093. (The alias only mattered for the
+  read-back.)
+
+**Fix:** the route now accepts `customerId` as an alias for `customer_id` (`route.ts`, the same
+tolerance `customers/products` and `inventory/products/sales` already got in DEC-072/073).
+
+**Verified:** `tests/routes/customers-packages.test.ts` "accepts the camelCase `customerId` param" —
+confirmed to fail with `400` before the change; live against the dev server, `?customerId=<uuid>` now
+returns `200` (was `400`).
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_090_091_MANUAL_TESTS.md`
+
+---
+
+## RISK-092: `POST /api/packages/sell` Wrote Invoice Status `paid` / `partially_paid`, Which The Schema Forbids, So Every Package Sale With Money Attached Returned 500 (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Correctness / money
+**Found:** 2026-09-21, reproducing the reported "purchased package is not credited to the patient" issue
+live. **Fixed same day.**
+
+**What it was:** `invoices.status` is `CHECK (status IN ('draft','issued','void'))`
+(`20260726010000_create_invoices.sql`), and `customerBalances.ts` only counts `'issued'` invoices.
+`src/app/api/packages/sell/route.ts` computed
+`actualPaid >= grandTotal ? 'paid' : (actualPaid > 0 ? 'partially_paid' : 'issued')`, so the insert
+failed with Postgres `23514 invoices_status_check` whenever the sale had any payment attached — full
+or partial. Only a 0-EGP sale worked. The route rolled back and returned 500, so **no package was ever
+created**. Server log: `new row for relation "invoices" violates check constraint "invoices_status_check"`.
+
+**Fix:** the invoice is always written as `'issued'`; how much was paid lives in `payments` and
+`customers.outstanding`, which the route already maintained.
+
+**Verified:** live — a fully paid `pulses v2` (10,000 pulses, 1,000 EGP) sale from New Booking now
+returns 201 and the patient's package shows 10,000 total / 10,000 remaining / active / 1,000 paid.
+`tests/routes/packages-sell.test.ts` (new, 6 cases; `supabaseFake` does not enforce CHECK constraints,
+so the test asserts the written status against the allowed set) — the two payment cases were confirmed
+to fail with the old line.
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_090_091_MANUAL_TESTS.md`
+
+---
+
+## RISK-093: New Booking Silently Billed The Package Price When The Package Sale Failed, And Its "Create Patient" Call Sent No Auth Token (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Correctness / money · **Found:** 2026-09-21 (live repro).
+**Fixed same day.**
+
+**What it was:** `AdminNewBookingView.tsx`'s submit handler (a) called `POST /api/customers` with **no
+`Authorization` header**, so for a brand-new patient it got 401 and `resolvedCustomerId` stayed null;
+(b) then sold the package with `customerId: <phone>`, which `/api/packages/sell` could not resolve
+(404); and (c) **carried on regardless**, creating the reservation with the package price as
+`amountPaid`. The reservations route never reads `purchasingPackageId`, so nothing else would ever
+create the package. Reproduced exactly: reservation paid 1,000 EGP, note "Purchasing New Pulses
+Package: pulses v2", patient created, **zero packages**, no error shown.
+
+**Fix:** the submit handler reads the session once and sends the bearer token on both
+`/api/customers` and `/api/packages/sell`; and if a new-package purchase did not produce a customer
+package, it now alerts (`packageSaleFailedAlert`, EN + AR) and **stops before creating the booking**, so
+a patient can no longer be billed for a package they did not receive.
+
+**Verified:** live — brand-new patient, laser service, Option 3, buy `pulses v2`: `POST /api/customers`
+201, sale 201, booking created, note carries `[Customer Package ID]`, package listed. Before the
+RISK-092 fix the new guard was seen firing correctly (booking blocked, nothing charged).
+
+**Still open, not fixed here:** `BookingDetailsModal.tsx`'s end-session "package purchased at booking"
+fallback (~line 1241) depends on `booking.purchasingPackageId`, which is never persisted, so it never
+runs; if it did, it sells without `amountPaid` and would record the full price as a second payment. The
+booking payload also sends `explicitCustomerId` while the reservations route reads `customerId`, so the
+resolved patient id is ignored (it falls back to a phone lookup). Neither was needed for the fix above.
+The doctor session screen also offers "buy a new package" (Option 3 with no active package). It was not
+exercised live (it needs a doctor login), and selling packages is reception's job, so whether that
+option should exist is a product decision; it shares the `/api/packages/sell` route fixed in RISK-092.
+Reception's End Session has no purchase step at all: a package is only sold at booking time.
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_090_091_MANUAL_TESTS.md`
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:
@@ -4102,3 +4264,4 @@ See `PROPOSALS.md` for:
   making fork-per-client a one-file-edit operation.
 - **PROPOSAL-002** — the Finance & Management Accounting module. Its Phase 0 is the remediation
   plan for RISK-010 … RISK-015 and RISK-018.
+

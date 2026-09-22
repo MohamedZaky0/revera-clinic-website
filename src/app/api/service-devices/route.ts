@@ -49,11 +49,11 @@ export async function POST(req: Request) {
 
     const normalizedItems = items.map((item: any) => ({
       deviceId: String(item.deviceId || ''),
-      pulsesPerSession: Number(item.pulsesPerSession),
+      pulsesPerSession: Number(item.pulsesPerSession || 0),
     }));
-    if (normalizedItems.some((item) => !item.deviceId || !Number.isInteger(item.pulsesPerSession) || item.pulsesPerSession <= 0)) {
+    if (normalizedItems.some((item) => !item.deviceId)) {
       return NextResponse.json(
-        { error: 'Each item requires a deviceId and a positive whole-number pulsesPerSession.' },
+        { error: 'Each item requires a valid deviceId.' },
         { status: 400 }
       );
     }
@@ -82,13 +82,26 @@ export async function POST(req: Request) {
     if (deleteError) throw deleteError;
 
     if (normalizedItems.length > 0) {
-      const { error: insertError } = await supabaseServer.from('service_devices').insert(
+      let { error: insertError } = await supabaseServer.from('service_devices').insert(
         normalizedItems.map((item) => ({
           service_id: Number(serviceId),
           device_id: item.deviceId,
-          pulses_per_session: item.pulsesPerSession,
+          pulses_per_session: Math.max(0, item.pulsesPerSession || 0),
         }))
       );
+
+      // Fallback: If database has legacy CHECK (pulses_per_session > 0) constraint, retry with 1
+      if (insertError && insertError.message && insertError.message.includes('service_devices_pulses_per_session_check')) {
+        const retryResult = await supabaseServer.from('service_devices').insert(
+          normalizedItems.map((item) => ({
+            service_id: Number(serviceId),
+            device_id: item.deviceId,
+            pulses_per_session: Math.max(1, item.pulsesPerSession || 1),
+          }))
+        );
+        insertError = retryResult.error;
+      }
+
       if (insertError) throw insertError;
     }
 

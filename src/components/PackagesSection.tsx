@@ -181,8 +181,8 @@ export function PackagesSection() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/packages").then((res) => (res.ok ? res.json() : [])),
-      fetch("/api/services").then((res) => (res.ok ? res.json() : [])),
+      fetch("/api/packages", { cache: "no-store" }).then((res) => (res.ok ? res.json() : [])),
+      fetch("/api/services", { cache: "no-store" }).then((res) => (res.ok ? res.json() : [])),
     ])
       .then(([packagesData, servicesData]) => {
         setPackages(Array.isArray(packagesData) ? packagesData : []);

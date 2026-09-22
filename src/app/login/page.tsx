@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { getRoleSlug, getRoleDisplayName } from "@/lib/roleUtils";
-import { Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowLeft, Building2 } from "lucide-react";
+import { Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowLeft } from "lucide-react";
 
 export default function UnifiedStaffLoginPage() {
   const router = useRouter();
@@ -284,14 +284,6 @@ export default function UnifiedStaffLoginPage() {
               )}
             </button>
           </form>
-
-          {/* Quick Info */}
-          <div className="mt-6 pt-5 border-t border-[#E7E2D6] text-center">
-            <div className="flex items-center justify-center gap-1.5 text-xs text-[#7A8871]">
-              <Building2 size={14} />
-              <span>Auto-routes to /doctor, /reception, /admin, or /superadmin</span>
-            </div>
-          </div>
         </div>
       </div>
 

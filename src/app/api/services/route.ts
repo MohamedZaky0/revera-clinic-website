@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess, hasGranularPermission } from '@/lib/access';
@@ -14,6 +16,7 @@ function fmtCreatedAt(val: unknown): string {
 }
 
 function mapServiceRow(r: any) {
+  const isLaser = Boolean(r.islaser ?? r.is_laser ?? false);
   return {
     id: r.id,
     en: r.en,
@@ -28,10 +31,12 @@ function mapServiceRow(r: any) {
     descriptionEn: r.description_en,
     descriptionAr: r.description_ar,
     isShared: r.is_shared,
+    islaser: isLaser,
+    is_laser: isLaser,
     enableReminder: r.enable_reminder,
     branchPricing: r.branch_pricing,
-    visible: r.visible,
-    active: r.active,
+    visible: r.visible !== false,
+    active: r.active !== false,
     createdAt: fmtCreatedAt(r.created_at),
     rawCreatedAt: r.created_at,
     created_at: r.created_at,
@@ -39,6 +44,7 @@ function mapServiceRow(r: any) {
 }
 
 function mapServiceToDb(s: any) {
+  const isLaser = Boolean(s.islaser ?? s.is_laser ?? false);
   const row: Record<string, any> = {
     en: s.en,
     ar: s.ar,
@@ -52,6 +58,8 @@ function mapServiceToDb(s: any) {
     description_en: s.descriptionEn,
     description_ar: s.descriptionAr,
     is_shared: s.isShared,
+    islaser: isLaser,
+    is_laser: isLaser,
     enable_reminder: s.enableReminder,
     branch_pricing: s.branchPricing,
     visible: s.visible !== undefined ? s.visible : true,

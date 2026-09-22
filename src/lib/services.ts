@@ -204,7 +204,11 @@ export interface ServiceItem {
   descriptionEn?: string;
   descriptionAr?: string;
   isShared?: boolean;
+  islaser?: boolean;
+  is_laser?: boolean;
   enableReminder?: boolean;
+  visible?: boolean;
+  active?: boolean;
   branchPricing?: Array<{
     name: string;
     price: number;
@@ -222,18 +226,18 @@ export interface ServiceItem {
 }
 
 export const SERVICES: ServiceItem[] = [
-  { id: 1, en: "Skin Dermatology Clinics", ar: "عيادات الجلدية", img: "/images/services/dermatology-service/dermatology.jpeg", cat: "dermatology", unit: "in_clinic" },
-  { id: 2, en: "Skin Care Treatments", ar: "تجميل البشرة", img: "/images/services/dermatology-service/skincare-treatment.jpg", cat: "dermatology", unit: "in_clinic" },
-  { id: 3, en: "Skin Care Sessions", ar: "جلسات العناية بالبشرة", img: "/images/services/dermatology-service/skincare-session.webp", cat: "dermatology", unit: "in_clinic" },
-  { id: 4, en: "Hair & Scalp Treatment", ar: "علاج الشعر والتساقط", img: "/images/services/dermatology-service/hair-scalp-treatment.jpg", cat: "dermatology", unit: "in_clinic" },
-  { id: 5, en: "Laser Hair Removal", ar: "إزالة الشعر بالليزر (رجالي ونسائي)", img: "/images/services/dermatology-service/laser-hair-removal.jpg", cat: "dermatology", unit: "in_clinic" },
-  { id: 6, en: "Therapeutic Laser", ar: "الليزر العلاجي", img: "/images/services/dermatology-service/therapeutic-laser.jpg", cat: "dermatology", unit: "in_clinic" },
-  { id: 7, en: "Aesthetic Injections (Botox/Filler/Plasma)", ar: "حقن تجميلية (بوتوكس / فيلر / بلازما)", img: "/images/services/dermatology-service/aesthetic-injections.jpg", cat: "dermatology", unit: "in_clinic" },
-  { id: 11, en: "Gynecology Clinics", ar: "النساء والتوليد", img: "/images/services/gyna-service/gyna.jpg", cat: "gynecology", unit: "both" },
-  { id: 12, en: "Pregnancy Follow-Up", ar: "متابعة الحمل", img: "/images/services/gyna-service/pregnancy-followup.webp", cat: "gynecology", unit: "both" },
-  { id: 13, en: "Infertility & Fertility Treatment", ar: "علاج العقم وتأخر الإنجاب", img: "/images/services/gyna-service/infertility.avif", cat: "gynecology", unit: "both" },
-  { id: 14, en: "Women's Aesthetic Treatments", ar: "التجميل النسائي", img: "/images/services/gyna-service/women-aethetic-treatment.webp", cat: "gynecology", unit: "in_clinic" },
-  { id: 15, en: "Laser Vaginal Rejuvenation", ar: "ليزر تجديد المهبل", img: "/images/services/gyna-service/laser-vaginal-rejuvenation.jpg", cat: "gynecology", unit: "in_clinic" },
+  { id: 1, en: "Skin Dermatology Clinics", ar: "عيادات الجلدية", img: "/images/services/dermatology-service/dermatology.jpeg", cat: "dermatology", unit: "in_clinic", islaser: false },
+  { id: 2, en: "Skin Care Treatments", ar: "تجميل البشرة", img: "/images/services/dermatology-service/skincare-treatment.jpg", cat: "dermatology", unit: "in_clinic", islaser: false },
+  { id: 3, en: "Skin Care Sessions", ar: "جلسات العناية بالبشرة", img: "/images/services/dermatology-service/skincare-session.webp", cat: "dermatology", unit: "in_clinic", islaser: false },
+  { id: 4, en: "Hair & Scalp Treatment", ar: "علاج الشعر والتساقط", img: "/images/services/dermatology-service/hair-scalp-treatment.jpg", cat: "dermatology", unit: "in_clinic", islaser: false },
+  { id: 5, en: "Laser Hair Removal", ar: "إزالة الشعر بالليزر (رجالي ونسائي)", img: "/images/services/dermatology-service/laser-hair-removal.jpg", cat: "dermatology", unit: "in_clinic", islaser: true, is_laser: true },
+  { id: 6, en: "Therapeutic Laser", ar: "الليزر العلاجي", img: "/images/services/dermatology-service/therapeutic-laser.jpg", cat: "dermatology", unit: "in_clinic", islaser: true, is_laser: true },
+  { id: 7, en: "Aesthetic Injections (Botox/Filler/Plasma)", ar: "حقن تجميلية (بوتوكس / فيلر / بلازما)", img: "/images/services/dermatology-service/aesthetic-injections.jpg", cat: "dermatology", unit: "in_clinic", islaser: false },
+  { id: 11, en: "Gynecology Clinics", ar: "النساء والتوليد", img: "/images/services/gyna-service/gyna.jpg", cat: "gynecology", unit: "both", islaser: false },
+  { id: 12, en: "Pregnancy Follow-Up", ar: "متابعة الحمل", img: "/images/services/gyna-service/pregnancy-followup.webp", cat: "gynecology", unit: "both", islaser: false },
+  { id: 13, en: "Infertility & Fertility Treatment", ar: "علاج العقم وتأخر الإنجاب", img: "/images/services/gyna-service/infertility.avif", cat: "gynecology", unit: "both", islaser: false },
+  { id: 14, en: "Women's Aesthetic Treatments", ar: "التجميل النسائي", img: "/images/services/gyna-service/women-aethetic-treatment.webp", cat: "gynecology", unit: "in_clinic", islaser: false },
+  { id: 15, en: "Laser Vaginal Rejuvenation", ar: "ليزر تجديد المهبل", img: "/images/services/gyna-service/laser-vaginal-rejuvenation.jpg", cat: "gynecology", unit: "in_clinic", islaser: true, is_laser: true },
   { id: 16, en: "Vaginal Tightening", ar: "شد المهبل (Tightening)", img: "/images/services/gyna-service/vaginal-tightening.jpg", cat: "gynecology", unit: "in_clinic" },
   { id: 17, en: "Marital & Family Counseling", ar: "الاستشارات الزوجية والأسرية", img: "/images/services/gyna-service/consultation.jpg", cat: "gynecology", unit: "both" },
   { id: 21, en: "Physical Therapy", ar: "العلاج الطبيعي", img: "/images/services/physicaltherapy_service/physical-therapy.jpg", cat: "physiotherapy", unit: "in_clinic" },

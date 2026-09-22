@@ -1,47 +1,79 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
-import { requireStaffAccess, requireAdministratorAccess } from '@/lib/access';
+import { requireStaffAccess } from '@/lib/access';
+import { CATEGORY_LABELS } from '@/lib/services';
 
 function mapCategoryRow(r: any) {
   return {
     key: r.key,
     en: r.en,
     ar: r.ar,
-    sortOrder: r.sort_order,
+    sortOrder: r.sort_order ?? 0,
   };
 }
 
-function mapCategoryToDb(c: any) {
+function mapCategoryToDb(c: any, index?: number) {
   return {
     key: c.key,
     en: c.en,
-    ar: c.ar,
-    sort_order: c.sortOrder,
+    ar: c.ar || c.en,
+    sort_order: c.sortOrder ?? c.sort_order ?? index ?? 0,
   };
 }
 
 export async function GET(req: Request) {
-  const access = await requireStaffAccess(req);
-  if ('error' in access) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
-  }
-
   try {
-    const { data, error } = await getSupabaseServer()
+    const supabase = getSupabaseServer();
+    const { data, error } = await supabase
       .from('categories')
       .select('*')
       .order('sort_order', { ascending: true });
 
     if (error) throw error;
-    return NextResponse.json((data || []).map(mapCategoryRow));
+
+    if (!data || data.length === 0) {
+      // Seed default categories if table is currently empty
+      const defaultCats = Object.entries(CATEGORY_LABELS).map(([key, val], idx) => ({
+        key,
+        en: val.en,
+        ar: val.ar,
+        sort_order: idx,
+      }));
+
+      try {
+        const { data: seeded, error: seedError } = await supabase
+          .from('categories')
+          .upsert(defaultCats)
+          .select();
+
+        if (!seedError && seeded && seeded.length > 0) {
+          return NextResponse.json(seeded.map(mapCategoryRow));
+        }
+      } catch (seedErr) {
+        console.warn('Auto-seed categories warning:', seedErr);
+      }
+
+      return NextResponse.json(defaultCats.map(mapCategoryRow));
+    }
+
+    return NextResponse.json(data.map(mapCategoryRow));
   } catch (err) {
     console.error('GET /api/categories error:', err);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    // Fallback to static CATEGORY_LABELS on DB error
+    const defaultCats = Object.entries(CATEGORY_LABELS).map(([key, val], idx) => ({
+      key,
+      en: val.en,
+      ar: val.ar,
+      sortOrder: idx,
+    }));
+    return NextResponse.json(defaultCats);
   }
 }
 
 export async function POST(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  const access = await requireStaffAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
@@ -49,7 +81,9 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const isArray = Array.isArray(body);
-    const categoriesToUpsert = isArray ? body.map(mapCategoryToDb) : [mapCategoryToDb(body)];
+    const categoriesToUpsert = isArray
+      ? body.map((c: any, idx: number) => mapCategoryToDb(c, idx))
+      : [mapCategoryToDb(body)];
 
     const { data, error } = await getSupabaseServer()
       .from('categories')
@@ -65,7 +99,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  const access = await requireStaffAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }

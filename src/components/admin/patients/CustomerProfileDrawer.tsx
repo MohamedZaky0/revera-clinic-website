@@ -16,6 +16,12 @@ import {
   User,
   ReceiptText,
   History,
+  Phone,
+  Mail,
+  Wallet,
+  CreditCard,
+  Info,
+  Zap,
 } from "lucide-react";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
@@ -138,6 +144,7 @@ interface CustomerProfileDrawerProps {
   authenticatedJsonHeaders: { "Content-Type": string; Authorization: string };
   lang: "en" | "ar";
   adminTranslations: any;
+  defaultPricePerPulse?: number;
   MOCK_MEDICINES: any[];
 }
 
@@ -251,14 +258,64 @@ export default function CustomerProfileDrawer({
   authenticatedJsonHeaders,
   lang,
   adminTranslations,
+  defaultPricePerPulse = 5,
   MOCK_MEDICINES,
 }: CustomerProfileDrawerProps) {
   if (!viewingCustomerProfile) return null;
 
   const [showInlineManualTxnModal, setShowInlineManualTxnModal] = React.useState(false);
 
+  // Laser Pulse Counter Engine states
+  const [laserLogs, setLaserLogs] = React.useState<any[]>([]);
+  const [loadingLaserLogs, setLoadingLaserLogs] = React.useState(false);
+  const [laserStats, setLaserStats] = React.useState<any>(null);
+
+  // Fetch unified laser history logs for this customer
+  React.useEffect(() => {
+    if (!viewingCustomerProfile?.id) {
+      setLaserLogs([]);
+      setLaserStats(null);
+      return;
+    }
+
+    const fetchLaser = async () => {
+      setLoadingLaserLogs(true);
+      try {
+        const res = await fetch(`/api/laser-pulses?customerId=${encodeURIComponent(viewingCustomerProfile.id || "")}`, {
+          headers: authenticatedJsonHeaders
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setLaserLogs(Array.isArray(data.logs) ? data.logs : []);
+          setLaserStats(data.stats || null);
+        }
+      } catch (err) {
+        console.error("Error fetching patient laser history:", err);
+      } finally {
+        setLoadingLaserLogs(false);
+      }
+    };
+    fetchLaser();
+
+    const handleLaserChange = () => fetchLaser();
+    window.addEventListener("revera-laser-change", handleLaserChange);
+    return () => window.removeEventListener("revera-laser-change", handleLaserChange);
+  }, [viewingCustomerProfile?.id]);
+
   const t = adminTranslations[lang].patients.customerProfileDrawer;
   const mf = adminTranslations[lang].patients.medicalFormModal;
+
+  const totalActiveRetailPulses = useMemo(() => {
+    if (!Array.isArray(customerProductBalances)) return 0;
+    return customerProductBalances.reduce((sum: number, bal: any) => {
+      const isPulse = bal.category === "laser_pulses" || bal.is_pulse_product || (bal.product_name && bal.product_name.toLowerCase().includes("pulse"));
+      if (!isPulse) return sum;
+      const totalPurchased = bal.purchased_quantity ?? bal.total_purchased ?? bal.quantity ?? 0;
+      const totalUsed = bal.used_quantity ?? bal.total_used ?? bal.quantity_used ?? 0;
+      const remaining = bal.remaining_quantity ?? bal.remaining_balance ?? (totalPurchased - totalUsed);
+      return sum + Math.max(0, remaining);
+    }, 0);
+  }, [customerProductBalances]);
 
   const combinedPatientProductSales = useMemo(() => {
     if (!viewingCustomerProfile) return [];
@@ -442,57 +499,146 @@ export default function CustomerProfileDrawer({
       </div>
 
       {/* Profile Header Banner */}
-      <div className="bg-white rounded-3xl border border-[#414E36]/10 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="relative group shrink-0">
-            <div className="h-16 w-16 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl font-bold font-serif overflow-hidden shadow-xs">
-              {(viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url ? (
-                <img
-                  src={(viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url || ""}
-                  alt={viewingCustomerProfile.name || "Customer"}
-                  className="h-full w-full object-cover"
+      <div className="bg-white rounded-3xl border border-[#414E36]/10 p-6 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          {/* Left Column: Avatar & Patient Details */}
+          <div className="flex items-start sm:items-center gap-4.5 min-w-0">
+            <div className="relative group shrink-0">
+              <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl sm:text-3xl font-bold font-serif overflow-hidden shadow-xs">
+                {(viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url ? (
+                  <img
+                    src={(viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url || ""}
+                    alt={viewingCustomerProfile.name || "Customer"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span>{viewingCustomerProfile.name ? viewingCustomerProfile.name.charAt(0).toUpperCase() : "P"}</span>
+                )}
+              </div>
+              <label
+                className="absolute -bottom-1 -end-1 p-1.5 rounded-full bg-[#414E36] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
+                title={t.uploadPhotoTitle}
+              >
+                <Camera size={12} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && viewingCustomerProfile.id) {
+                      handleAvatarUpload(viewingCustomerProfile.id, file);
+                    }
+                  }}
                 />
-              ) : (
-                <span>{viewingCustomerProfile.name ? viewingCustomerProfile.name.charAt(0).toUpperCase() : "P"}</span>
+              </label>
+              {((viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url) && (
+                <button
+                  type="button"
+                  onClick={() => viewingCustomerProfile.id && handleAvatarRemove(viewingCustomerProfile.id)}
+                  className="absolute -top-1 -end-1 p-1 rounded-full bg-red-600 text-white shadow-xs hover:bg-red-700 transition"
+                  title={t.removePhotoTitle}
+                >
+                  <X size={10} />
+                </button>
               )}
             </div>
-            <label
-              className="absolute -bottom-1 -end-1 p-1.5 rounded-full bg-[#414E36] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
-              title={t.uploadPhotoTitle}
-            >
-              <Camera size={12} />
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file && viewingCustomerProfile.id) {
-                    handleAvatarUpload(viewingCustomerProfile.id, file);
-                  }
-                }}
-              />
-            </label>
-            {((viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url) && (
-              <button
-                type="button"
-                onClick={() => viewingCustomerProfile.id && handleAvatarRemove(viewingCustomerProfile.id)}
-                className="absolute -top-1 -end-1 p-1 rounded-full bg-red-600 text-white shadow-xs hover:bg-red-700 transition"
-                title={t.removePhotoTitle}
-              >
-                <X size={10} />
-              </button>
-            )}
+
+            <div className="min-w-0 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h3 className="text-xl sm:text-2xl font-bold text-[#1F251A] leading-tight truncate">
+                  {viewingCustomerProfile.name}
+                </h3>
+                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold shrink-0 ${
+                  viewingCustomerProfile.active !== false ? "bg-[#EDF1EC] text-[#414E36]" : "bg-red-50 text-red-600"
+                }`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-[#414E36]" : "bg-red-500"}`} />
+                  {viewingCustomerProfile.active !== false ? t.activePatientBadge : t.inactiveBadge}
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs font-medium text-[#5A6A51]">
+                <span className="inline-flex items-center gap-1.5">
+                  <Phone size={13} className="text-[#5A6A51] shrink-0" />
+                  <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
+                </span>
+                {viewingCustomerProfile.email && (
+                  <span className="inline-flex items-center gap-1.5 truncate">
+                    <Mail size={13} className="text-[#5A6A51] shrink-0" />
+                    <span className="text-[#5A6A51] truncate">{viewingCustomerProfile.email}</span>
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-          <div>
-            <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingCustomerProfile.name}</h3>
-            <div className="mt-2">
-              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                viewingCustomerProfile.active !== false ? "bg-[#EDF1EC] text-[#414E36]" : "bg-red-50 text-red-600"
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-[#414E36]" : "bg-red-500"}`} />
-                {viewingCustomerProfile.active !== false ? t.activePatientBadge : t.inactiveBadge}
-              </span>
+
+          {/* Center Divider */}
+          <div className="hidden lg:block h-20 w-px bg-[#414E36]/10 self-center" />
+
+          {/* Right Column: Financial Summary */}
+          <div className="lg:max-w-xl w-full">
+            <p className="text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2.5">
+              {t.financialSummary || "Financial Summary"}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Total Spend */}
+              <div className="rounded-2xl border border-emerald-100 bg-[#F0FDF4]/70 p-3.5 flex flex-col justify-between transition hover:shadow-xs">
+                <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
+                  <span className="flex items-center gap-1.5">
+                    <Wallet size={14} className="text-emerald-600 shrink-0" />
+                    <span>{t.totalSpend || "Total Spend"}</span>
+                  </span>
+                  <span title={t.totalSpend || "Total Spend"}>
+                    <Info size={12} className="text-emerald-500 opacity-60" />
+                  </span>
+                </div>
+                <div className="mt-2 text-lg sm:text-xl font-black text-[#1F251A] tracking-tight">
+                  {Number(viewingCustomerProfile.spent_amount !== undefined ? viewingCustomerProfile.spent_amount : viewingCustomerProfile.spent || 0).toLocaleString()} <span className="text-xs font-bold text-[#5A6A51]">{t.egp || "EGP"}</span>
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5 font-medium">
+                  {t.allTime || "All time"}
+                </div>
+              </div>
+
+              {/* Wallet */}
+              <div className="rounded-2xl border border-sky-100 bg-[#F0F9FF]/70 p-3.5 flex flex-col justify-between transition hover:shadow-xs">
+                <div className="flex items-center justify-between text-xs font-semibold text-sky-800">
+                  <span className="flex items-center gap-1.5">
+                    <Wallet size={14} className="text-sky-600 shrink-0" />
+                    <span>{t.wallet || "Wallet"}</span>
+                  </span>
+                  <span title={t.wallet || "Wallet"}>
+                    <Info size={12} className="text-sky-500 opacity-60" />
+                  </span>
+                </div>
+                <div className="mt-2 text-lg sm:text-xl font-black text-sky-700 tracking-tight">
+                  {Number(viewingCustomerProfile.wallet_balance !== undefined ? viewingCustomerProfile.wallet_balance : viewingCustomerProfile.wallet || 0).toLocaleString()} <span className="text-xs font-bold text-sky-600">{t.egp || "EGP"}</span>
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5 font-medium">
+                  {t.availableBalance || "Available balance"}
+                </div>
+              </div>
+
+              {/* Outstanding */}
+              <div className="rounded-2xl border border-amber-100 bg-[#FFF7ED]/70 p-3.5 flex flex-col justify-between transition hover:shadow-xs">
+                <div className="flex items-center justify-between text-xs font-semibold text-amber-800">
+                  <span className="flex items-center gap-1.5">
+                    <CreditCard size={14} className="text-amber-600 shrink-0" />
+                    <span>{t.outstanding || "Outstanding"}</span>
+                  </span>
+                  <span title={t.outstanding || "Outstanding"}>
+                    <Info size={12} className="text-amber-500 opacity-60" />
+                  </span>
+                </div>
+                <div className={`mt-2 text-lg sm:text-xl font-black tracking-tight ${
+                  Number(viewingCustomerProfile.outstanding || 0) > 0 ? "text-rose-600" : "text-[#1F251A]"
+                }`}>
+                  {Number(viewingCustomerProfile.outstanding || 0).toLocaleString()} <span className="text-xs font-bold text-rose-500">{t.egp || "EGP"}</span>
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5 font-medium">
+                  {t.unpaidAmount || "Unpaid amount"}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -568,6 +714,17 @@ export default function CustomerProfileDrawer({
         >
           <Package size={15} />
           {t.tabPackages}
+        </button>
+        <button
+          onClick={() => setCustomerProfileTab("laser")}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none min-w-max ${
+            customerProfileTab === "laser"
+              ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+              : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
+          }`}
+        >
+          <Zap size={15} className="text-amber-500" />
+          <span>Laser History {laserLogs.length > 0 ? `(${laserLogs.length})` : ""}</span>
         </button>
       </div>
 
@@ -816,7 +973,7 @@ export default function CustomerProfileDrawer({
                 </button>
               </div>
 
-              {customerRecordsSubTab === "prescriptions" && !prescriptionEditMode && (adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor") && (
+              {customerRecordsSubTab === "prescriptions" && !prescriptionEditMode && (adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor" || adminRole === "receptionist" || adminRole === "reception" || adminRole === "Receptionist" || !hasPermission || hasPermission("bookings.manage_prescriptions") || hasPermission("clinical.create_prescriptions")) && (
                 <button
                   type="button"
                   onClick={handleStartCreatePrescription}
@@ -1039,15 +1196,27 @@ export default function CustomerProfileDrawer({
                     {loadingPrescriptions ? (
                       <div className="text-center py-12 text-[#5A6A51] text-sm">{t.loadingRecords}</div>
                     ) : customerPrescriptions.length === 0 ? (
-                      <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-2">
-                        <p className="text-sm font-semibold text-[#1F251A]">{t.noPrescriptionsTitle}</p>
-                        <p className="text-xs text-[#5A6A51]">{t.noPrescriptionsSubtitle}</p>
+                      <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-3">
+                        <FileText size={36} className="mx-auto text-[#8A9A81]" />
+                        <div>
+                          <p className="text-sm font-semibold text-[#1F251A]">{t.noPrescriptionsTitle}</p>
+                          <p className="text-xs text-[#5A6A51]">{t.noPrescriptionsSubtitle}</p>
+                        </div>
+                        {(adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor" || adminRole === "receptionist" || adminRole === "reception" || adminRole === "Receptionist" || !hasPermission || hasPermission("bookings.manage_prescriptions") || hasPermission("clinical.create_prescriptions")) && (
+                          <button
+                            type="button"
+                            onClick={handleStartCreatePrescription}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
+                          >
+                            <Plus size={14} /> {t.writePrescriptionBtn}
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-4">
                         {customerPrescriptions.map((rx) => {
                           const rxDate = new Date(rx.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-                          const isDocUser = adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor";
+                          const isDocUser = adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor" || adminRole === "receptionist" || adminRole === "reception" || adminRole === "Receptionist" || !hasPermission || hasPermission("bookings.manage_prescriptions") || hasPermission("clinical.create_prescriptions");
                           return (
                             <div key={rx.id} className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 relative overflow-hidden">
                               <div className="flex items-start sm:items-center justify-between border-b border-[#414E36]/5 pb-3 flex-wrap gap-2">
@@ -1225,23 +1394,54 @@ export default function CustomerProfileDrawer({
               </div>
 
               {(adminRole === "superadmin" || adminRole === "admin" || adminRole === "receptionist" || adminRole === "doctor") && (
-                <button
-                  onClick={() => {
-                    setSelectedAddProductId("");
-                    setSelectedAddProductName("");
-                    setSelectedAddProductQty(1);
-                    setSelectedAddProductUnitPrice(0);
-                    setShowAddPatientProductModal(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm w-fit"
-                >
-                  <Plus size={14} /> {t.addProductBtn}
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => {
+                      setSelectedAddProductId("");
+                      setSelectedAddProductName("");
+                      setSelectedAddProductQty(1);
+                      setSelectedAddProductUnitPrice(0);
+                      setShowAddPatientProductModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm w-fit"
+                  >
+                    <Plus size={14} /> {t.addProductBtn}
+                  </button>
+                </div>
               )}
             </div>
 
             {customerProductsSubTab === "current" && (
-              <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm">
+              <div className="space-y-4">
+                {/* General Active Laser Pulse Balance Banner (FIFO) */}
+                {totalActiveRetailPulses > 0 && (
+                  <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent rounded-2xl border border-amber-300/60 p-4.5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+                        <Zap size={20} />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-sm font-bold text-[#1F251A]">{t.generalActivePulseBalance || "General Active Pulse Balance"}</h4>
+                          <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">FIFO Engine</span>
+                        </div>
+                        <p className="text-xs text-[#5A6A51] max-w-xl leading-relaxed">
+                          {t.fifoNotice || "Pulses are consumed automatically using FIFO (oldest active purchases consumed first)."}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                      <div className="text-end">
+                        <span className="block text-xl font-black text-amber-900 tracking-tight">
+                          {totalActiveRetailPulses.toLocaleString()}
+                        </span>
+                        <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">{t.totalAvailablePulses || "Pulses Available"}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm">
                 {loadingCustomerProducts ? (
                   <div className="p-8 text-center text-sm text-[#5A6A51]">{t.loadingProductBalances}</div>
                 ) : customerProductBalances.length === 0 ? (
@@ -1338,7 +1538,8 @@ export default function CustomerProfileDrawer({
                   </div>
                 )}
               </div>
-            )}
+            </div>
+          )}
 
             {customerProductsSubTab === "history" && (
               <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm p-6 space-y-4">
@@ -1469,10 +1670,22 @@ export default function CustomerProfileDrawer({
                   <div className="divide-y divide-[#414E36]/5">
                     {customerProfilePackages.filter((p: any) => p.status === "active").map((pkg: any) => {
                       const isExpired = pkg.expiresAt && new Date(pkg.expiresAt) < new Date();
+                      const isPulses = pkg.packageType === "pulses" || Number(pkg.totalPulses) > 0 || Number(pkg.includedPulses) > 0 || Number(pkg.remainingPulses) > 0 || Number(pkg.pulsesRemaining) > 0 || (pkg.items || []).length === 0;
+                      const remainingPulsesVal = pkg.pulsesRemaining ?? pkg.remainingPulses ?? pkg.totalPulses ?? pkg.includedPulses ?? 0;
+                      const totalPulsesVal = pkg.totalPulses ?? pkg.includedPulses ?? remainingPulsesVal;
+
                       return (
                         <div key={pkg.id} className="p-4 space-y-2">
                           <div className="flex items-center justify-between">
-                            <p className="font-bold text-[#1F251A] text-sm">{pkg.packageName}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-[#1F251A] text-sm">{pkg.packageName}</p>
+                              {isPulses && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300/50 px-2 py-0.5 text-[10px] font-bold">
+                                  <Zap size={11} className="text-amber-600" />
+                                  {lang === "ar" ? "باقة نبضات ليزر" : "Laser Pulses Package"}
+                                </span>
+                              )}
+                            </div>
                             <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                               isExpired ? "bg-amber-100 text-amber-800" : "bg-emerald-100/80 text-emerald-800"
                             }`}>
@@ -1485,16 +1698,40 @@ export default function CustomerProfileDrawer({
                             {pkg.expiresAt && ` · ${t.expiresPrefix} ${new Date(pkg.expiresAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`}
                             {` · EGP ${Number(pkg.pricePaid).toLocaleString()} ${t.paidSuffix}`}
                           </p>
-                          <div className="flex flex-wrap gap-2">
-                            {(pkg.items || []).map((it: any) => (
-                              <span key={it.id} className="inline-flex items-center gap-1.5 rounded-full bg-[#F9F9F7] border border-[#414E36]/10 px-2.5 py-1 text-[11px] font-semibold text-[#414E36]">
-                                {it.serviceName || `Service #${it.serviceId}`}
-                                <span className={`font-bold ${it.qtyRemaining > 0 ? "text-emerald-700" : "text-gray-400"}`}>
-                                  {it.qtyUsed}/{it.qtyTotal} {t.usedSuffix}
+                          {isPulses ? (
+                            <div className="flex items-center gap-3 bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 max-w-md">
+                              <div className="p-1.5 bg-amber-500 text-white rounded-lg shrink-0">
+                                <Zap size={14} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="font-semibold text-amber-900">{lang === "ar" ? "رصيد النبضات المتبقي" : "Remaining Pulses"}</span>
+                                  <span className="font-black text-amber-900">
+                                    {Number(remainingPulsesVal).toLocaleString()} / {Number(totalPulsesVal).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-amber-200/60 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                                  <div
+                                    className="bg-amber-500 h-full rounded-full transition-all"
+                                    style={{
+                                      width: `${totalPulsesVal > 0 ? Math.min(100, Math.max(0, (remainingPulsesVal / totalPulsesVal) * 100)) : 100}%`
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {(pkg.items || []).map((it: any) => (
+                                <span key={it.id} className="inline-flex items-center gap-1.5 rounded-full bg-[#F9F9F7] border border-[#414E36]/10 px-2.5 py-1 text-[11px] font-semibold text-[#414E36]">
+                                  {it.serviceName || `Service #${it.serviceId}`}
+                                  <span className={`font-bold ${it.qtyRemaining > 0 ? "text-emerald-700" : "text-gray-400"}`}>
+                                    {it.qtyUsed}/{it.qtyTotal} {t.usedSuffix}
+                                  </span>
                                 </span>
-                              </span>
-                            ))}
-                          </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1527,6 +1764,183 @@ export default function CustomerProfileDrawer({
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Tab 7: Laser History */}
+        {customerProfileTab === "laser" && (
+          <div className="space-y-6">
+            {/* Lifetime KPI Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="rounded-2xl border border-amber-200/70 bg-amber-50/50 p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-xs font-semibold text-amber-800">
+                  <span>{t.totalLaserSessions || "Total Laser Sessions"}</span>
+                  <Zap size={14} className="text-amber-600" />
+                </div>
+                <div className="mt-2 text-xl font-black text-[#1F251A]">
+                  {laserStats?.totalSessions ?? laserLogs.length}
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5">Lifetime sessions</div>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/50 p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
+                  <span>{t.totalPulsesDelivered || "Total Pulses Delivered"}</span>
+                  <Zap size={14} className="text-emerald-600" />
+                </div>
+                <div className="mt-2 text-xl font-black text-emerald-900">
+                  {(laserStats?.totalPulsesDelivered ?? laserLogs.reduce((acc, l) => acc + (Number(l.pulses_used) || 0), 0)).toLocaleString()}
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5">All service & pulse logs</div>
+              </div>
+
+              <div className="rounded-2xl border border-sky-200/70 bg-sky-50/50 p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-xs font-semibold text-sky-800">
+                  <span>{t.totalAdditionalPulses || "Total Additional Pulses"}</span>
+                  <Plus size={14} className="text-sky-600" />
+                </div>
+                <div className="mt-2 text-xl font-black text-sky-900">
+                  {(laserStats?.totalAdditionalPulses ?? laserLogs.reduce((acc, l) => acc + (Number(l.additional_pulses) || 0), 0)).toLocaleString()}
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5">Extra billed pulses</div>
+              </div>
+
+              <div className="rounded-2xl border border-purple-200/70 bg-purple-50/50 p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-xs font-semibold text-purple-800">
+                  <span>Total Extra Billed</span>
+                  <Wallet size={14} className="text-purple-600" />
+                </div>
+                <div className="mt-2 text-xl font-black text-purple-900">
+                  EGP {(laserStats?.totalAdditionalCharge ?? laserLogs.reduce((acc, l) => acc + (Number(l.additional_charge) || 0), 0)).toLocaleString()}
+                </div>
+                <div className="text-[11px] text-[#5A6A51] mt-0.5">Surcharge revenue</div>
+              </div>
+            </div>
+
+            {/* Laser Logs Feed / Table */}
+            <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm">
+              <div className="p-4 border-b border-[#414E36]/10 bg-[#FBFBF9] flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-[#1F251A]">{t.tabLaserHistory || "Laser History"}</h4>
+                  <p className="text-xs text-[#5A6A51]">Comprehensive audit log of all laser treatments and pulse consumptions</p>
+                </div>
+                {laserLogs.length > 0 && (
+                  <span className="text-xs font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-1 rounded-lg">
+                    {laserLogs.length} {laserLogs.length === 1 ? "Session" : "Sessions"}
+                  </span>
+                )}
+              </div>
+
+              {loadingLaserLogs ? (
+                <div className="p-8 text-center text-sm text-[#5A6A51]">Loading laser history...</div>
+              ) : laserLogs.length === 0 ? (
+                <div className="p-12 text-center space-y-3">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                    <Zap size={24} />
+                  </div>
+                  <p className="text-sm font-semibold text-[#1F251A]">{t.noLaserHistoryTitle || "No Laser Sessions Recorded Yet"}</p>
+                  <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
+                    {t.noLaserHistorySubtitle || "Recorded laser pulse sessions and history logs for this patient will appear here."}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-start text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-[#414E36]/10 bg-[#FBFBF9] text-[#5A6A51] font-bold uppercase tracking-wider">
+                        <th className="py-3 px-4">{t.colDate || "Date / Time"}</th>
+                        <th className="py-3 px-4">{t.colTreatmentArea || "Treatment Area"}</th>
+                        <th className="py-3 px-4 text-center">{t.colSource || "Sale Type"}</th>
+                        <th className="py-3 px-4 text-center">{t.colPulsesUsed || "Pulses Used"}</th>
+                        <th className="py-3 px-4 text-center">{t.colAdditionalPulses || "Additional Pulses"}</th>
+                        <th className="py-3 px-4 text-center">Remaining Balance</th>
+                        <th className="py-3 px-4 text-end">{t.colDoctorStaff || "Doctor / Staff"}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#414E36]/5">
+                      {laserLogs.map((log: any) => {
+                        const dateStr = log.created_at || log.session_date
+                          ? new Date(log.created_at || log.session_date).toLocaleString(lang === "ar" ? "ar-EG" : "en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })
+                          : "—";
+
+                        return (
+                          <tr key={log.id} className="hover:bg-[#FBFBF9]/60 transition">
+                            <td className="py-3.5 px-4 font-medium text-[#1F251A] whitespace-nowrap">
+                              {dateStr}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="inline-flex items-center font-bold text-[#1F251A] bg-gray-100 px-2.5 py-1 rounded-md">
+                                {log.treatment_area || "Standard Area"}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {log.pulse_type === "SERVICE" ? (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  {t.sourceService || "Laser Service"}
+                                </span>
+                              ) : log.pulse_type === "PACKAGE" ? (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  {t.sourcePackage || "Package Pulses"}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  {t.sourcePulsePurchase || "Pulse Purchase (FIFO)"}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center font-bold text-[#1F251A]">
+                              <span className="text-sm">{Number(log.pulses_used || 0).toLocaleString()}</span> <span className="text-[10px] text-[#5A6A51]">pulses</span>
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {Number(log.additional_pulses || 0) > 0 ? (
+                                <div className="inline-flex flex-col items-center">
+                                  <span className="font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md text-xs">
+                                    +{Number(log.additional_pulses).toLocaleString()} pulses
+                                  </span>
+                                  {Number(log.additional_charge || 0) > 0 && (
+                                    <span className="text-[10px] text-rose-700 font-semibold mt-0.5">
+                                      +EGP {Number(log.additional_charge).toLocaleString()}
+                                    </span>
+                                  )}
+                                  {log.additional_reason && (
+                                    <span className="text-[9px] text-[#5A6A51] italic max-w-[120px] truncate" title={log.additional_reason}>
+                                      {log.additional_reason}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-[#8A9A81]">—</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center font-semibold">
+                              {log.remaining_balance_after !== null && log.remaining_balance_after !== undefined ? (
+                                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
+                                  {Number(log.remaining_balance_after).toLocaleString()} left
+                                </span>
+                              ) : (
+                                <span className="text-[#8A9A81] text-[11px]">N/A (Fixed Service)</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-end">
+                              <div className="font-semibold text-[#1F251A]">{log.doctor_name || "Doctor"}</div>
+                              {log.device_name && (
+                                <div className="text-[10px] text-[#5A6A51]">{log.device_name}</div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -1740,11 +2154,14 @@ export default function CustomerProfileDrawer({
                   className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                 >
                   <option value="">{t.choosePackageOption}</option>
-                  {availablePackageOffers.map((pkg: any) => (
-                    <option key={pkg.id} value={pkg.id}>
-                      {pkg.name} - EGP {Number(pkg.price).toLocaleString()} ({pkg.items?.length || 0} {t.servicesCountSuffix})
-                    </option>
-                  ))}
+                  {availablePackageOffers.map((pkg: any) => {
+                    const isPulses = pkg.packageType === "pulses" || Number(pkg.totalPulses) > 0 || (pkg.items?.length || 0) === 0;
+                    return (
+                      <option key={pkg.id} value={pkg.id}>
+                        {pkg.name} - EGP {Number(pkg.price).toLocaleString()} ({isPulses ? `⚡ ${(pkg.totalPulses || 0).toLocaleString()} ${lang === "ar" ? "نبضة" : "Pulses"}` : `${pkg.items?.length || 0} ${t.servicesCountSuffix}`})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -1766,6 +2183,7 @@ export default function CustomerProfileDrawer({
               {selectedSellPackageId && (() => {
                 const pkg = availablePackageOffers.find((p: any) => p.id === selectedSellPackageId);
                 if (!pkg) return null;
+                const isPulses = pkg.packageType === "pulses" || Number(pkg.totalPulses) > 0 || (pkg.items?.length || 0) === 0;
                 return (
                   <div className="bg-[#EDF1EC]/60 p-3.5 rounded-xl space-y-2 text-xs text-[#1F251A]">
                     <div className="flex items-center justify-between font-semibold">
@@ -1776,13 +2194,25 @@ export default function CustomerProfileDrawer({
                       <span>{t.validityLabel}</span>
                       <span className="font-semibold">{pkg.validityDays} {t.daysSuffix}</span>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {(pkg.items || []).map((it: any) => (
-                        <span key={it.id} className="inline-flex rounded-full bg-white border border-[#414E36]/10 px-2 py-0.5 font-semibold">
-                          {it.serviceName || `Service #${it.serviceId}`} ×{it.qty}
+                    {isPulses ? (
+                      <div className="pt-1 flex items-center justify-between bg-amber-500/10 border border-amber-300/60 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                          <Zap size={14} className="text-amber-600" />
+                          <span>{lang === "ar" ? "رصيد النبضات المتضمن" : "Included Pulses Quota"}</span>
+                        </div>
+                        <span className="text-sm font-black text-amber-900">
+                          {(pkg.totalPulses || 0).toLocaleString()} {lang === "ar" ? "نبضة" : "Pulses"}
                         </span>
-                      ))}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {(pkg.items || []).map((it: any) => (
+                          <span key={it.id} className="inline-flex rounded-full bg-white border border-[#414E36]/10 px-2 py-0.5 font-semibold">
+                            {it.serviceName || `Service #${it.serviceId}`} ×{it.qty}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
@@ -1987,6 +2417,8 @@ export default function CustomerProfileDrawer({
           </div>
         </div>
       )}
+
+      {/* ── Modal: Sell Laser Pulses to Patient (FIFO Active Balance) ── */}
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
 import { DoctorTab, MedicationItem } from "../types";
 import { getAuthHeaders } from "../utils";
 import { MedicalRecordTemplate, IntakeField } from "@/app/api/medical-records/templates/route";
+import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
 
 export interface AdditionalServiceItem {
   id: string | number;
@@ -35,12 +36,13 @@ export interface AdditionalServiceItem {
   price: number;
   deviceId?: string;
   deviceName?: string;
-  pulses: number;
+  pulses?: number;
+  isLaser?: boolean;
 }
 
 interface DoctorOngoingSessionTabProps {
   activeSessionBooking: any;
-  handleCompleteTreatment: (booking: any, totalPulses?: number) => void;
+  handleCompleteTreatment: (booking: any, totalPulses?: number, laserData?: any) => void;
   medicalRecord: any;
   medicalRecordLoading: boolean;
   showMedicalForm: boolean;
@@ -141,14 +143,58 @@ export default function DoctorOngoingSessionTab({
   onAdditionalServicesChange,
   t
 }: DoctorOngoingSessionTabProps) {
+  // Laser Pulse Counter Engine State
+  const [laserMode, setLaserMode] = useState<"SERVICE" | "PER_PULSE" | "PACKAGE">("SERVICE");
+  const [treatmentArea, setTreatmentArea] = useState<string>("Face");
+  const [customTreatmentArea, setCustomTreatmentArea] = useState<string>("");
+  const [standardPulsesDelivered, setStandardPulsesDelivered] = useState<number>(100);
+  const [hasAdditionalPulses, setHasAdditionalPulses] = useState<boolean>(false);
+  const [additionalPulsesQty, setAdditionalPulsesQty] = useState<number>(0);
+  const [additionalPulseUnitPrice, setAdditionalPulseUnitPrice] = useState<number>(5);
+  const [additionalPulsesReason, setAdditionalPulsesReason] = useState<string>("");
+  const [patientActivePackages, setPatientActivePackages] = useState<any[]>([]);
+  const [selectedLaserPackageId, setSelectedLaserPackageId] = useState<string>("");
+  const [loadingLaserData, setLoadingLaserData] = useState<boolean>(false);
+
+  // Deficit Spillover Choice: Choice 3A (Buy New Package) or Choice 3B (Pay Rest per Pulse)
+  const [packageSpilloverChoice, setPackageSpilloverChoice] = useState<"BUY_NEW_PACKAGE" | "PAY_PER_PULSE">("PAY_PER_PULSE");
+  const [allCatalogPackages, setAllCatalogPackages] = useState<any[]>([]);
+  const [selectedNewPackageToBuy, setSelectedNewPackageToBuy] = useState<any>(null);
+
+  // Auto-detect laser mode and pulse price from active session booking notes / metadata
+  useEffect(() => {
+    if (!activeSessionBooking) return;
+    const notesStr = String(activeSessionBooking.notes || "").toLowerCase();
+    const rawMode = activeSessionBooking.laserPaymentMode || activeSessionBooking.laser_payment_mode;
+    if (rawMode === "PER_PULSE" || notesStr.includes("pay per pulse") || notesStr.includes("per_pulse")) {
+      setLaserMode("PER_PULSE");
+    } else if (rawMode === "PACKAGE" || notesStr.includes("pulse package") || notesStr.includes("package redemption")) {
+      setLaserMode("PACKAGE");
+    } else {
+      setLaserMode("SERVICE");
+    }
+    if (activeSessionBooking.laserPricePerPulse || activeSessionBooking.laser_price_per_pulse) {
+      setAdditionalPulseUnitPrice(Number(activeSessionBooking.laserPricePerPulse || activeSessionBooking.laser_price_per_pulse));
+    }
+  }, [activeSessionBooking]);
+
+  // Load catalog packages for Choice 3A (Buy New Package)
+  useEffect(() => {
+    fetch("/api/packages")
+      .then((r) => r.json())
+      .then((data) => {
+        const pkgs = Array.isArray(data) ? data : data.packages || [];
+        setAllCatalogPackages(pkgs);
+        if (pkgs.length > 0 && !selectedNewPackageToBuy) {
+          setSelectedNewPackageToBuy(pkgs[0]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Additional Services added during ongoing treatment session
   const [additionalServices, setAdditionalServices] = useState<AdditionalServiceItem[]>([]);
   const [selectedServiceIdToAdd, setSelectedServiceIdToAdd] = useState<string>("");
-  const [selectedDeviceForService, setSelectedDeviceForService] = useState<string>("");
-  // Defaults to 0, not 100: a service with no linked device has no pulses, and pre-filling a
-  // plausible-looking count meant non-laser services silently carried a fabricated charge.
-  const [pulsesCountForService, setPulsesCountForService] = useState<number>(0);
-  const [loadingDeviceLinks, setLoadingDeviceLinks] = useState(false);
 
   // Intake Template state for the active booking's selected service
   const [activeTemplate, setActiveTemplate] = useState<MedicalRecordTemplate | null>(null);
@@ -167,6 +213,61 @@ export default function DoctorOngoingSessionTab({
   const [rxFollowUpDate, setRxFollowUpDate] = useState("");
   const [rxFollowUpNotes, setRxFollowUpNotes] = useState("");
   const [savingRxInline, setSavingRxInline] = useState(false);
+
+  // Fetch patient active packages for laser engine
+  useEffect(() => {
+    if (!activeSessionBooking) return;
+    const custId = activeSessionBooking.customerId || activeSessionBooking.customer_id;
+    if (!custId) return;
+
+    setLoadingLaserData(true);
+    getAuthHeaders().then(async (headers) => {
+      try {
+        // Fetch active packages
+        const pkgRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(custId)}`, { headers });
+        if (pkgRes.ok) {
+          const pkgData = await pkgRes.json();
+          const pkgs = pkgData.customerPackages || pkgData.packages || [];
+          const activePulsePkgs = pkgs.filter((p: any) => {
+            const rem = Number(
+              p.remainingPulses ??
+              p.pulsesRemaining ??
+              p.remaining_pulses ??
+              p.pulses_remaining ??
+              (Number(p.totalPulses ?? p.includedPulses ?? p.total_pulses ?? p.included_pulses ?? 0) - Number(p.usedPulses ?? p.used_pulses ?? 0))
+            );
+            const exp = p.expiresAt || p.expires_at;
+            const isNotExpired = !exp || new Date(exp) >= new Date();
+            const isPulseType = p.packageType === "pulses" || p.package_type === "pulses" || Number(p.totalPulses || p.total_pulses || 0) > 0 || (p.items || []).length === 0;
+            return (p.status || "active").toLowerCase() === "active" && rem > 0 && isNotExpired && isPulseType;
+          });
+          setPatientActivePackages(activePulsePkgs);
+          const bookingLinkedPkgId = activeSessionBooking.packageId || activeSessionBooking.package_id;
+          if (bookingLinkedPkgId && activePulsePkgs.some((p: any) => String(p.id) === String(bookingLinkedPkgId))) {
+            setSelectedLaserPackageId(String(bookingLinkedPkgId));
+          } else if (activePulsePkgs.length > 0 && (!selectedLaserPackageId || !activePulsePkgs.some((p: any) => String(p.id) === String(selectedLaserPackageId)))) {
+            setSelectedLaserPackageId(String(activePulsePkgs[0].id));
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching patient laser pulse data:", err);
+      } finally {
+        setLoadingLaserData(false);
+      }
+    });
+  }, [activeSessionBooking?.customerId, activeSessionBooking?.customer_id, activeSessionBooking?.packageId, activeSessionBooking?.package_id]);
+
+  // Load clinic default price per pulse from booking settings
+  useEffect(() => {
+    fetch("/api/page-settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.booking?.defaultPricePerPulse !== undefined) {
+          setAdditionalPulseUnitPrice(Number(data.booking.defaultPricePerPulse));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const setFollowUpPresetDays = (days: number) => {
     const target = new Date();
@@ -312,32 +413,7 @@ export default function DoctorOngoingSessionTab({
     setDynamicResponses(initial);
   }, [medicalRecord, activeTemplate]);
 
-  // When a service is selected from dropdown, fetch its linked devices & default pulses from /api/service-devices
-  useEffect(() => {
-    if (!selectedServiceIdToAdd) return;
-    const fetchServiceDevices = async () => {
-      setLoadingDeviceLinks(true);
-      try {
-        const headers = await getAuthHeaders();
-        const res = await fetch(`/api/service-devices?serviceId=${selectedServiceIdToAdd}`, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          const links = data.deviceLinks || [];
-          if (links.length > 0) {
-            setSelectedDeviceForService(links[0].device_id || "");
-            setPulsesCountForService(Number(links[0].pulses_per_session) || 100);
-          } else {
-            setPulsesCountForService(100);
-          }
-        }
-      } catch (err) {
-        console.error("Error loading service devices:", err);
-      } finally {
-        setLoadingDeviceLinks(false);
-      }
-    };
-    fetchServiceDevices();
-  }, [selectedServiceIdToAdd]);
+
 
   // Preload any existing additional services from session booking notes
   useEffect(() => {
@@ -351,15 +427,16 @@ export default function DoctorOngoingSessionTab({
       for (const item of items) {
         const trimmed = item.trim();
         if (!trimmed) continue;
-        const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+        const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP(?:\s*,\s*Pulses:\s*(\d+))?[^)]*\)/i);
         if (m1) {
           const srvName = m1[1].trim();
-          const srvPrice = Number(m1[3]) || 0;
+          const srvPrice = Number(m1[4]) || Number(m1[3]) || 0;
+          const pulsesCount = m1[5] ? Number(m1[5]) : 0;
           parsed.push({
             id: Date.now() + Math.random(),
             name: srvName,
             price: srvPrice,
-            pulses: 0
+            pulses: pulsesCount
           });
         }
       }
@@ -376,15 +453,26 @@ export default function DoctorOngoingSessionTab({
     if (!bookingId) return;
 
     const addSvcString = updated.length > 0
-      ? `\n[Additional Services Used]: ${updated.map(s => `${s.name} (Qty: 1 x ${s.price} EGP = ${s.price} EGP)`).join(", ")}`
+      ? `\n[Additional Services Used]: ${updated.map(s => {
+          const srv = servicesList.find((x) => String(x.id) === String(s.serviceId));
+          const isLaser = s.isLaser || checkIsLaserService(srv);
+          const effectivePrice = (laserMode === "PACKAGE" && isLaser) ? 0 : s.price;
+          return `${s.name} (Qty: 1 x ${effectivePrice} EGP = ${effectivePrice} EGP${Number(s.pulses) > 0 ? `, Pulses: ${s.pulses}` : ""})`;
+        }).join(", ")}`
       : "";
     
     let currentNotes = String(activeSessionBooking?.notes || "");
     currentNotes = currentNotes.replace(/\[Additional Services(?: Used)?(?: During Session)?\]:[^\n\[]*/gi, "").trim();
     const newNotes = currentNotes ? `${currentNotes}${addSvcString}` : addSvcString.trim();
 
-    const addSubtotal = updated.reduce((sum, s) => sum + s.price, 0);
-    const newAmountLeft = Math.max(0, (baseBookingPrice + addSubtotal + productsSubtotal + extraPulsesSubtotal) - Number(activeSessionBooking?.amountPaid || 0));
+    const addSubtotal = updated.reduce((sum, s) => {
+      const srv = servicesList.find((x) => String(x.id) === String(s.serviceId));
+      const isLaser = s.isLaser || checkIsLaserService(srv);
+      if (laserMode === "PACKAGE" && isLaser) return sum;
+      return sum + s.price;
+    }, 0);
+    const effectiveBase = laserMode === "PACKAGE" ? 0 : (laserMode === "PER_PULSE" ? (standardPulsesDelivered * additionalPulseUnitPrice) : baseBookingPrice);
+    const newAmountLeft = Math.max(0, (effectiveBase + addSubtotal + productsSubtotal + extraPulsesSubtotal + laserAdditionalCharge) - Number(activeSessionBooking?.amountPaid || 0));
 
     getAuthHeaders().then(headers => {
       fetch(`/api/reservations?id=${encodeURIComponent(bookingId)}`, {
@@ -405,18 +493,15 @@ export default function DoctorOngoingSessionTab({
     if (!srv) return;
 
     const srvName = srv.en || srv.name || srv.title || "Clinical Service";
-    const srvPrice = Number(srv.price || 0);
-
-    const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceForService));
+    const isLaser = checkIsLaserService(srv);
+    const srvPrice = (laserMode === "PACKAGE" && isLaser) ? 0 : Number(srv.price || 0);
 
     const newItem: AdditionalServiceItem = {
       id: Date.now(),
       serviceId: srv.id,
       name: srvName,
       price: srvPrice,
-      deviceId: devObj?.id,
-      deviceName: devObj?.name,
-      pulses: Math.max(0, pulsesCountForService || 0)
+      isLaser: isLaser
     };
 
     const updated = [...additionalServices, newItem];
@@ -424,8 +509,6 @@ export default function DoctorOngoingSessionTab({
     onAdditionalServicesChange?.(updated);
     autoSyncServicesToBooking(updated);
     setSelectedServiceIdToAdd("");
-    setSelectedDeviceForService("");
-    setPulsesCountForService(0);
   };
 
   const handleRemoveServiceFromSession = (id: string | number) => {
@@ -509,16 +592,90 @@ export default function DoctorOngoingSessionTab({
     }
   };
 
-  // Calculate Subtotals
-  const additionalServicesSubtotal = additionalServices.reduce((sum, item) => sum + item.price, 0);
-  const totalServicesPrice = baseBookingPrice + additionalServicesSubtotal;
-  
-  // Total Pulses Calculated = (Primary Service Default Pulses) + (Additional Services Pulses)
-  const additionalPulsesTotal = additionalServices.reduce((sum, item) => sum + item.pulses, 0);
-  const totalSessionPulses = (extraPulsesCount || 0) + additionalPulsesTotal;
+  const TREATMENT_AREAS = [
+    "Face",
+    "Full Body",
+    "Underarms",
+    "Bikini",
+    "Full Arms",
+    "Half Arms",
+    "Full Legs",
+    "Half Legs",
+    "Back",
+    "Chest & Abdomen",
+    "Full Beard",
+    "Custom"
+  ];
 
-  // Final Session Invoice Total
-  const finalSessionTotal = totalServicesPrice + productsSubtotal + extraPulsesSubtotal;
+  // Active Package & Deficit Calculation
+  const selectedPkg = patientActivePackages.find((p) => String(p.id) === String(selectedLaserPackageId)) || patientActivePackages[0];
+  const availablePkgPulses = selectedPkg ? Number(
+    selectedPkg.remainingPulses ??
+    selectedPkg.pulsesRemaining ??
+    selectedPkg.remaining_pulses ??
+    selectedPkg.pulses_remaining ??
+    (Number(selectedPkg.totalPulses ?? selectedPkg.includedPulses ?? selectedPkg.total_pulses ?? selectedPkg.included_pulses ?? 0) - Number(selectedPkg.usedPulses ?? selectedPkg.used_pulses ?? 0))
+  ) : 0;
+  const isNoActivePackage = patientActivePackages.length === 0;
+
+  // Additional laser pulses delivered in this session
+  const additionalLaserPulses = additionalServices.reduce((sum, item) => {
+    const srv = servicesList.find((x) => String(x.id) === String(item.serviceId));
+    const isLaser = item.isLaser || checkIsLaserService(srv);
+    return sum + (isLaser ? Number(item.pulses || 0) : 0);
+  }, 0);
+  const totalLaserDeliveredPulses = standardPulsesDelivered + additionalLaserPulses;
+  const packageDeficit = isNoActivePackage ? 0 : Math.max(0, totalLaserDeliveredPulses - availablePkgPulses);
+
+  // Helper to extract total pulses in catalog package for purchase
+  const newPackageTotalPulses = Number(
+    selectedNewPackageToBuy?.total_pulses ||
+    selectedNewPackageToBuy?.totalPulses ||
+    selectedNewPackageToBuy?.included_pulses ||
+    selectedNewPackageToBuy?.includedPulses ||
+    (() => {
+      const match = String(selectedNewPackageToBuy?.name || selectedNewPackageToBuy?.title || '').match(/(\d+)\s*k\b/i);
+      if (match) return Number(match[1]) * 1000;
+      const numMatch = String(selectedNewPackageToBuy?.name || selectedNewPackageToBuy?.title || '').match(/(\d+(?:,\d+)?)/);
+      return numMatch ? Number(numMatch[1].replace(/,/g, '')) : 10000;
+    })()
+  );
+
+  // Calculate Subtotals
+  const additionalServicesSubtotal = additionalServices.reduce((sum, item) => {
+    const srv = servicesList.find((x) => String(x.id) === String(item.serviceId));
+    const isLaser = item.isLaser || checkIsLaserService(srv);
+    if (laserMode === "PACKAGE" && isLaser) return sum;
+    return sum + (Number(item.price) || 0);
+  }, 0);
+  
+  // Base Service Price:
+  // Option 1 (SERVICE): Fixed base booking price
+  // Option 2 (PER_PULSE): Dynamic price = standardPulsesDelivered * additionalPulseUnitPrice
+  // Option 3 (PACKAGE): 0 EGP base (redeemed from package)
+  const effectiveBaseServicePrice = laserMode === "SERVICE" ? baseBookingPrice : (laserMode === "PER_PULSE" ? (standardPulsesDelivered * additionalPulseUnitPrice) : 0);
+  const totalServicesPrice = effectiveBaseServicePrice + additionalServicesSubtotal;
+  
+  // Laser Additional / Deficit Charges:
+  // Scenario 1 (No Package): Patient pays only new package price (e.g. 7000 EGP)
+  // Scenario 2 (Deficit): Choice 3A (Buy new package = new package price) or Choice 3B (Pay per pulse = deficit * rate)
+  // Scenario 3 (Normal package redemption): 0 EGP
+  const laserAdditionalCharge = laserMode === "SERVICE" && hasAdditionalPulses
+    ? (additionalPulsesQty * additionalPulseUnitPrice)
+    : laserMode === "PACKAGE"
+    ? (isNoActivePackage
+        ? Number(selectedNewPackageToBuy?.price || 0)
+        : packageDeficit > 0
+        ? (packageSpilloverChoice === "PAY_PER_PULSE" ? (packageDeficit * additionalPulseUnitPrice) : Number(selectedNewPackageToBuy?.price || 0))
+        : 0)
+    : 0;
+
+  // Total Pulses Calculated = (Delivered Laser Pulses) + (Additional Services Pulses) + (Additional Pulses)
+  const additionalPulsesTotal = additionalServices.reduce((sum, item) => sum + (item.pulses || 0), 0);
+  const totalSessionPulses = standardPulsesDelivered + (hasAdditionalPulses && laserMode === "SERVICE" ? additionalPulsesQty : 0) + additionalPulsesTotal;
+
+  // Final Session Invoice Total (mixed session: base/pulse + non-laser additional services + products + package/deficit charges)
+  const finalSessionTotal = totalServicesPrice + productsSubtotal + laserAdditionalCharge;
 
   // Resolved active service name with catalog fallback
   const resolvedActiveServiceName = useMemo(() => {
@@ -617,7 +774,64 @@ export default function DoctorOngoingSessionTab({
                     setShowMedicalForm(true);
                     return;
                   }
-                  handleCompleteTreatment(activeSessionBooking, totalSessionPulses);
+
+                  // Option 1 extra charge validation: mandatory reason
+                  if (laserMode === "SERVICE" && hasAdditionalPulses && additionalPulsesQty > 0 && additionalPulseUnitPrice > 0 && !additionalPulsesReason.trim()) {
+                    alert("Mandatory field missing: Please provide a reason for the additional pulse charge before completing the session.");
+                    return;
+                  }
+
+                  // Option 2 validation: must have delivered pulses > 0
+                  if (laserMode === "PER_PULSE" && standardPulsesDelivered <= 0) {
+                    alert("Please enter the number of laser pulses delivered in this session.");
+                    return;
+                  }
+
+                  // Option 3 package validation
+                  if (laserMode === "PACKAGE") {
+                    if (isNoActivePackage && !selectedNewPackageToBuy) {
+                      alert("Please select a pulse package to purchase for this patient, or switch to Option 1/2.");
+                      return;
+                    }
+                    if (standardPulsesDelivered <= 0) {
+                      alert("Please enter the number of laser pulses delivered in this session.");
+                      return;
+                    }
+                  }
+
+                  const isInitialPurchase = laserMode === "PACKAGE" && isNoActivePackage;
+                  const effectiveChoice = isInitialPurchase ? "BUY_NEW_PACKAGE" : packageSpilloverChoice;
+                  const effectiveNewPackage = (isInitialPurchase || (laserMode === "PACKAGE" && packageDeficit > 0 && effectiveChoice === "BUY_NEW_PACKAGE")) ? selectedNewPackageToBuy : null;
+
+                  const laserPulseData = {
+                    pulseType: laserMode,
+                    treatmentArea: treatmentArea === "Custom" ? customTreatmentArea || "Custom Area" : treatmentArea,
+                    pulsesUsed: laserMode === "PACKAGE" ? totalLaserDeliveredPulses : standardPulsesDelivered,
+                    additionalPulses: hasAdditionalPulses && laserMode === "SERVICE" ? additionalPulsesQty : (laserMode === "PACKAGE" && packageDeficit > 0 && effectiveChoice === "PAY_PER_PULSE" ? packageDeficit : 0),
+                    pulseValue: additionalPulseUnitPrice,
+                    additionalCharge: laserAdditionalCharge,
+                    additionalReason: laserMode === "SERVICE"
+                      ? additionalPulsesReason
+                      : laserMode === "PACKAGE"
+                      ? (isInitialPurchase
+                          ? `Initial package purchase (${selectedNewPackageToBuy?.name || selectedNewPackageToBuy?.title || "Laser Pulses Package"}): ${standardPulsesDelivered} pulses redeemed from ${newPackageTotalPulses} total pulses`
+                          : packageDeficit > 0
+                          ? `Package deficit resolution (${packageDeficit} pulses via ${effectiveChoice})`
+                          : `Package redemption from ${selectedPkg?.package_name || selectedPkg?.name || "Laser Package"}`)
+                      : "Standard laser pulse delivery",
+                    sourceId: laserMode === "PACKAGE" ? (selectedPkg?.id || null) : null,
+                    sourceName: laserMode === "PACKAGE" ? (selectedPkg?.package_name || selectedPkg?.name || null) : null,
+                    selectedPackage: selectedPkg,
+                    deviceId: selectedDeviceId,
+                    deviceName: devicesList.find(d => String(d.id) === String(selectedDeviceId))?.name,
+                    deficitPulses: laserMode === "PACKAGE" ? packageDeficit : 0,
+                    spilloverChoice: laserMode === "PACKAGE" ? effectiveChoice : null,
+                    newPackageToBuy: effectiveNewPackage,
+                    isInitialPackagePurchase: isInitialPurchase,
+                    newPackageTotalPulses: newPackageTotalPulses
+                  };
+
+                  handleCompleteTreatment(activeSessionBooking, totalSessionPulses, laserPulseData);
                 }}
                 className={`w-full sm:w-auto justify-center flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition cursor-pointer shadow-md ${
                   isFirstVisit && !medicalRecord
@@ -1126,79 +1340,554 @@ export default function DoctorOngoingSessionTab({
                 </form>
               </div>
 
-              {/* 2. SERVICES, DEVICES & PULSES MANAGER SECTION */}
+              {/* 2. LASER PULSE COUNTER & ACCOUNTING ENGINE */}
               <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
                   <div>
                     <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                      <Zap size={16} className="text-amber-600" /> {t.additionalServicesTitle}
+                      <Zap size={16} className="text-amber-600" /> {t.laserTreatmentTitle || "Laser Treatment & Pulse Counter Engine"}
                     </h3>
+                    <p className="text-[11px] text-[#5A6A51] mt-0.5">
+                      {laserMode === "SERVICE"
+                        ? (t.laserModeServiceDesc || "Option 1: Fixed catalog price with hardware pulse tracking.")
+                        : laserMode === "PER_PULSE"
+                        ? (t.laserModePerPulseDesc || "Option 2: Pay per pulse deal agreed at reception (Pulses × Unit Price).")
+                        : (t.laserModePackageDesc || "Option 3: Deduct from active package with automatic deficit spillover handling.")}
+                    </p>
                   </div>
-                  
-                  {/* Live Total Pulse Counter Badge — only when device-linked services exist */}
-                  {(selectedDeviceId || additionalServices.some((s) => s.deviceId)) && (
-                  <div className="flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-3.5 sm:px-4 py-1.5 text-xs font-black text-amber-900 shadow-sm">
-                    <Zap size={14} className="text-amber-600 fill-amber-500 animate-pulse" />
-                    <span>{t.totalPulsesCalculated}</span>
-                    <span className="text-sm text-amber-900 font-extrabold">{totalSessionPulses} {t.pulsesLabel}</span>
+
+                  {/* Mode Selector Tabs */}
+                  <div className="flex bg-[#F2EFE9] p-1 rounded-xl gap-1 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setLaserMode("SERVICE")}
+                      className={`px-3 py-1.5 rounded-lg transition ${
+                        laserMode === "SERVICE" ? "bg-[#414E36] text-white shadow-xs" : "text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      {t.type1Service || "Option 1: Service"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLaserMode("PER_PULSE")}
+                      className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                        laserMode === "PER_PULSE" ? "bg-[#414E36] text-white shadow-xs" : "text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      <span>{t.type2Pulse || "Option 2: Pay per Pulse"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLaserMode("PACKAGE")}
+                      className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                        laserMode === "PACKAGE" ? "bg-[#414E36] text-white shadow-xs" : "text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      <span>{t.type3Package || "Option 3: Package"}</span>
+                      {patientActivePackages.length > 0 && (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${laserMode === "PACKAGE" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-800"}`}>
+                          {patientActivePackages.length}
+                        </span>
+                      )}
+                    </button>
                   </div>
-                  )}
                 </div>
 
-                {/* Primary Reserved Service Display */}
-                <div className="rounded-2xl bg-[#FBFBF9] p-3.5 sm:p-4 border border-[#414E36]/10 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
-                      <Layers size={14} className="text-[#414E36]" /> {t.primaryBookingService}
-                    </span>
-                    <span className="font-extrabold text-[#414E36]">{baseBookingPrice || activeSessionBooking.price || activeSessionBooking.total_price || 0} EGP</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
-                    <div className="flex-1 w-full">
-                      <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Selected Patient Service (Changeable)</label>
-                      <select
-                        value={
-                          activeSessionBooking.serviceId ||
-                          activeSessionBooking.service_id ||
-                          servicesList.find((s) => {
-                            const sName = (s.en || s.name || s.title || s.name_en || s.ar || "").toLowerCase().trim();
-                            const bName = (activeSessionBooking.service || activeSessionBooking.service_name || activeSessionBooking.service_title || "").toLowerCase().trim();
-                            return sName && bName && (sName === bName || sName.includes(bName) || bName.includes(sName));
-                          })?.id || ""
-                        }
-                        onChange={(e) => handleChangePrimaryService && handleChangePrimaryService(activeSessionBooking, e.target.value)}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
-                      >
-                        {!(activeSessionBooking.service || activeSessionBooking.service_name) && (
-                          <option value="">Select Service</option>
-                        )}
-                        {servicesList.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.en || s.name || s.title || s.name_en || s.ar} ({s.price || 0} EGP)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {selectedDeviceId && (
-                    <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-lg shrink-0">
-                      {extraPulsesCount} {t.pulsesLabel}
-                    </span>
+                {/* Common Laser Settings: Treatment Area & Device */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.treatmentAreaLabel || "Treatment Area"}</label>
+                    <select
+                      value={treatmentArea}
+                      onChange={(e) => setTreatmentArea(e.target.value)}
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                    >
+                      {TREATMENT_AREAS.map((area) => (
+                        <option key={area} value={area}>{area}</option>
+                      ))}
+                    </select>
+                    {treatmentArea === "Custom" && (
+                      <input
+                        type="text"
+                        placeholder="Specify custom area..."
+                        value={customTreatmentArea}
+                        onChange={(e) => setCustomTreatmentArea(e.target.value)}
+                        className="mt-2 w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                      />
                     )}
                   </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                      {t.deviceUsedLabel || "Laser Device (Hardware Counter)"}
+                    </label>
+                    <select
+                      value={selectedDeviceId}
+                      onChange={(e) => setSelectedDeviceId(e.target.value)}
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                    >
+                      <option value="">Select Laser Device...</option>
+                      {devicesList.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} {d.current_pulse_count ? `(${d.current_pulse_count} total pulses)` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                {/* Additional Services Selection & Counter */}
+                {/* OPTION 1: PAY BY SERVICE (FIXED PRICE) */}
+                {laserMode === "SERVICE" && (
+                  <div className="space-y-4 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-[#414E36] text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                            {t.primaryBookingService || "Primary Booked Service"}
+                          </span>
+                          <span className="font-extrabold text-xs sm:text-sm text-[#1F251A]">
+                            {resolvedActiveServiceName}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#5A6A51] mt-1">
+                          Fixed Service Price: <strong className="text-[#414E36]">{baseBookingPrice} EGP</strong> (Standard pulses recorded for clinical tracking; 0 EGP price change).
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <label className="text-xs font-bold text-[#5A6A51]">{t.standardPulsesLabel || "Standard Pulses:"}</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={standardPulsesDelivered}
+                          onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-28 rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
+                          placeholder="Pulses"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Additional Pulses Toggle */}
+                    <div className="space-y-3 pt-1">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[#1F251A]">
+                        <input
+                          type="checkbox"
+                          checked={hasAdditionalPulses}
+                          onChange={(e) => setHasAdditionalPulses(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-[#414E36] accent-[#414E36]"
+                        />
+                        <Plus size={14} className="text-amber-700" />
+                        <span>Add Additional Charged Pulses (Special Case)</span>
+                      </label>
+
+                      {hasAdditionalPulses && (
+                        <div className="space-y-3 bg-white p-3.5 rounded-xl border border-amber-200">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Additional Pulses Qty</label>
+                              <input
+                                type="number"
+                                min={1}
+                                value={additionalPulsesQty}
+                                onChange={(e) => setAdditionalPulsesQty(Math.max(0, parseInt(e.target.value) || 0))}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                placeholder="e.g. 100"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Price Per Pulse (EGP)</label>
+                              <input
+                                type="number"
+                                min={0}
+                                step={0.5}
+                                value={additionalPulseUnitPrice}
+                                onChange={(e) => setAdditionalPulseUnitPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                placeholder="5"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Additional Charge</label>
+                              <div className="w-full rounded-xl bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-black text-amber-900">
+                                +{additionalPulsesQty * additionalPulseUnitPrice} EGP
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">
+                              Reason for Additional Pulses <span className="text-rose-600 font-bold">* (Mandatory)</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={additionalPulsesReason}
+                              onChange={(e) => setAdditionalPulsesReason(e.target.value)}
+                              placeholder="e.g. Extended session for high hair density..."
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* OPTION 2: PAY PER PULSE (POST-SESSION ACTUALS) */}
+                {laserMode === "PER_PULSE" && (
+                  <div className="space-y-4 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 animate-fadeIn">
+                    <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider block">
+                          Option 2: Pay per Pulse (Post-Session Actuals)
+                        </span>
+                        <span className="text-2xl font-black text-emerald-950">
+                          {standardPulsesDelivered * additionalPulseUnitPrice} <span className="text-xs font-bold text-emerald-700">EGP Total Charge</span>
+                        </span>
+                        <p className="text-[11px] text-emerald-800 mt-1 font-medium">
+                          Deal agreed at reception: <strong>{additionalPulseUnitPrice} EGP</strong> per delivered pulse.
+                        </p>
+                      </div>
+
+                      <div className="bg-white px-3.5 py-2 rounded-xl border border-emerald-300 text-xs text-end font-bold text-emerald-950 shadow-xs">
+                        <span className="block text-[10px] text-emerald-700 uppercase">Live Math</span>
+                        {standardPulsesDelivered} Pulses × {additionalPulseUnitPrice} EGP
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-[#414E36]/10">
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                          Actual Pulses Delivered in This Session <span className="text-emerald-700 font-black">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={standardPulsesDelivered}
+                          onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-full rounded-xl border border-[#414E36]/20 bg-[#FBFBF9] px-3.5 py-2 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
+                          placeholder="e.g. 1000"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                          Agreed Rate per Pulse (EGP)
+                        </label>
+                        <input
+                          type="number"
+                          min={0.1}
+                          step={0.5}
+                          value={additionalPulseUnitPrice}
+                          onChange={(e) => setAdditionalPulseUnitPrice(Math.max(0.1, parseFloat(e.target.value) || 1))}
+                          className="w-full rounded-xl border border-[#414E36]/20 bg-[#FBFBF9] px-3.5 py-2 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
+                          placeholder="5"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* OPTION 3: PAY WITH PULSE PACKAGE (REDEMPTION + DEFICIT SPILLOVER) */}
+                {laserMode === "PACKAGE" && (
+                  <div className="space-y-4 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 animate-fadeIn">
+                    {patientActivePackages.length === 0 ? (
+                      <div className="p-5 bg-white rounded-2xl border-2 border-purple-300 space-y-4 shadow-sm animate-fadeIn">
+                        <div className="flex items-start gap-3">
+                          <div className="h-10 w-10 rounded-2xl bg-purple-100 text-purple-800 flex items-center justify-center shrink-0">
+                            <Sparkles size={20} className="text-purple-700" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 block">
+                              Scenario 1: New Pulses Package Purchase
+                            </span>
+                            <h4 className="font-black text-sm text-[#1F251A]">
+                              Patient has no active pulses package — Buy Package & Deduct Pulses
+                            </h4>
+                            <p className="text-[11px] text-[#5A6A51] mt-0.5 leading-relaxed">
+                              Choose a pulses package. The session invoice will charge <strong>only the package price</strong>. Pulses used today are deducted immediately, and remaining pulses carry forward to upcoming sessions.
+                            </p>
+                          </div>
+                        </div>
+
+                        {allCatalogPackages.length > 0 ? (
+                          <div className="space-y-3 pt-1">
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                Select Pulses Package to Purchase <span className="text-purple-700 font-black">*</span>
+                              </label>
+                              <select
+                                value={selectedNewPackageToBuy?.id || ""}
+                                onChange={(e) => {
+                                  const found = allCatalogPackages.find((p) => String(p.id) === String(e.target.value));
+                                  if (found) setSelectedNewPackageToBuy(found);
+                                }}
+                                className="w-full rounded-xl border border-purple-200 bg-[#FBFBF9] px-3.5 py-2.5 text-xs font-black text-[#1F251A] outline-none focus:border-purple-600 shadow-2xs"
+                              >
+                                {allCatalogPackages.map((p) => {
+                                  const pPulses = Number(p.total_pulses || p.totalPulses || p.included_pulses || p.includedPulses || (() => {
+                                    const m = String(p.name || '').match(/(\d+)\s*k\b/i);
+                                    if (m) return Number(m[1]) * 1000;
+                                    const nm = String(p.name || '').match(/(\d+(?:,\d+)?)/);
+                                    return nm ? Number(nm[1].replace(/,/g, '')) : 10000;
+                                  })());
+                                  return (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name || p.title} ({pPulses.toLocaleString()} pulses · {Number(p.price || 0).toLocaleString()} EGP)
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+
+                            {/* Pulses Used in This Session */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                              <div>
+                                <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                  Pulses Used in This Session <span className="text-purple-700 font-black">*</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={standardPulsesDelivered || ""}
+                                  onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
+                                  className="w-full rounded-xl border border-purple-200 bg-[#FBFBF9] px-3.5 py-2 text-xs font-black text-[#1F251A] outline-none focus:border-purple-600"
+                                  placeholder="e.g. 5000"
+                                />
+                                <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                                  {[500, 1000, 2000, 5000].map((preset) => (
+                                    <button
+                                      key={preset}
+                                      type="button"
+                                      onClick={() => setStandardPulsesDelivered(preset)}
+                                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                                        standardPulsesDelivered === preset
+                                          ? "bg-purple-700 text-white border-purple-700"
+                                          : "bg-white text-[#5A6A51] border-gray-200 hover:bg-purple-50"
+                                      }`}
+                                    >
+                                      {preset.toLocaleString()}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                  Package Balance After This Session
+                                </label>
+                                <div className="w-full rounded-xl px-3.5 py-2 text-xs font-black bg-purple-50 border border-purple-200 text-purple-950 flex flex-col justify-center min-h-[40px]">
+                                  <span>
+                                    {Math.max(0, newPackageTotalPulses - standardPulsesDelivered).toLocaleString()} Pulses Remaining
+                                  </span>
+                                  <span className="text-[10px] font-semibold text-purple-700">
+                                    ({standardPulsesDelivered.toLocaleString()} deducted from {newPackageTotalPulses.toLocaleString()} total)
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Live Math Impact Card */}
+                            <div className="bg-purple-50/70 p-3 rounded-xl border border-purple-200 text-xs space-y-1.5">
+                              <div className="flex items-center justify-between font-black text-purple-950">
+                                <span>Charged for Laser on Session Invoice:</span>
+                                <span className="text-sm text-purple-900">{Number(selectedNewPackageToBuy?.price || 0).toLocaleString()} EGP (Package Price Only)</span>
+                              </div>
+                              <p className="text-[11px] text-purple-800 leading-relaxed">
+                                Base laser treatment is 100% covered. The remaining <strong>{Math.max(0, newPackageTotalPulses - standardPulsesDelivered).toLocaleString()} pulses</strong> will be available for the patient in future sessions at 0 EGP.
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-amber-50 rounded-xl text-xs text-amber-800">
+                            No catalog packages available in database. Please add packages under Admin Settings → Packages.
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Select Active Pulse Package</label>
+                          <select
+                            value={selectedLaserPackageId}
+                            onChange={(e) => setSelectedLaserPackageId(e.target.value)}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
+                          >
+                            {patientActivePackages.map((pkg) => {
+                              const rem = Number(
+                                pkg.remainingPulses ??
+                                pkg.pulsesRemaining ??
+                                pkg.remaining_pulses ??
+                                pkg.pulses_remaining ??
+                                (Number(pkg.totalPulses ?? pkg.includedPulses ?? 0) - Number(pkg.usedPulses ?? pkg.used_pulses ?? 0))
+                              );
+                              const exp = pkg.expiresAt || pkg.expires_at;
+                              return (
+                                <option key={pkg.id} value={pkg.id}>
+                                  {(pkg.packageNameAr || pkg.packageName || pkg.package_name || pkg.name)} ({rem.toLocaleString()} pulses remaining{exp ? ` · Exp: ${new Date(exp).toLocaleDateString()}` : ""})
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+
+                        {/* Selected Package Details */}
+                        {selectedPkg && (
+                          <div className="space-y-3 bg-white p-3.5 rounded-xl border border-[#414E36]/10">
+                            <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                              <div className="bg-[#FBFBF9] p-2 rounded-lg border border-[#414E36]/10">
+                                <span className="text-[10px] text-[#5A6A51] block">Included</span>
+                                <span className="font-black text-[#1F251A]">{Number(selectedPkg.totalPulses ?? selectedPkg.includedPulses ?? selectedPkg.total_pulses ?? selectedPkg.included_pulses ?? 0).toLocaleString()}</span>
+                              </div>
+                              <div className="bg-[#FBFBF9] p-2 rounded-lg border border-[#414E36]/10">
+                                <span className="text-[10px] text-[#5A6A51] block">Used</span>
+                                <span className="font-black text-[#5A6A51]">{Number(selectedPkg.usedPulses ?? selectedPkg.used_pulses ?? 0).toLocaleString()}</span>
+                              </div>
+                              <div className="bg-purple-50 p-2 rounded-lg border border-purple-200">
+                                <span className="text-[10px] text-purple-800 block">Remaining</span>
+                                <span className="font-black text-purple-950">{availablePkgPulses.toLocaleString()}</span>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                              <div>
+                                <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                  Pulses Used in This Session
+                                </label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={standardPulsesDelivered}
+                                  onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
+                                  className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                                  placeholder="Pulses"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                  Package Balance After Session
+                                </label>
+                                <div className={`w-full rounded-xl px-3 py-2 text-xs font-black border ${
+                                  packageDeficit > 0
+                                    ? "bg-amber-50 text-amber-900 border-amber-300"
+                                    : "bg-purple-50 text-purple-900 border-purple-200"
+                                }`}>
+                                  {packageDeficit > 0
+                                    ? `0 Pulses Left (${packageDeficit} Deficit)`
+                                    : `${availablePkgPulses - standardPulsesDelivered} Pulses Remaining`}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* ── PACKAGE DEFICIT SPILLOVER INTERACTIVE CARD ── */}
+                            {packageDeficit > 0 && (
+                              <div className="mt-3 p-4 rounded-2xl bg-amber-50/80 border-2 border-amber-300 space-y-3 animate-fadeIn">
+                                <div className="flex items-start gap-2.5">
+                                  <AlertTriangle size={18} className="text-amber-700 shrink-0 mt-0.5" />
+                                  <div>
+                                    <h5 className="font-black text-xs text-amber-950">
+                                      {t.deficitDetectedTitle || "Package Pulse Deficit Detected!"}
+                                    </h5>
+                                    <p className="text-[11px] text-amber-900 mt-0.5">
+                                      {t.deficitExceeded || "Delivered pulses exceed package balance by"} <strong className="text-amber-950 font-black">{packageDeficit} pulses</strong>. Choose how to settle the excess:
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                  {/* Choice 3A: Buy a New Package */}
+                                  <div
+                                    onClick={() => setPackageSpilloverChoice("BUY_NEW_PACKAGE")}
+                                    className={`p-3 rounded-xl border-2 cursor-pointer transition flex flex-col justify-between ${
+                                      packageSpilloverChoice === "BUY_NEW_PACKAGE"
+                                        ? "border-amber-700 bg-white ring-2 ring-amber-700/20 shadow-xs"
+                                        : "border-amber-200 bg-white/70 hover:bg-white"
+                                    }`}
+                                  >
+                                    <div className="space-y-1">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-extrabold text-xs text-amber-950">
+                                          {t.deficitChoiceA || "Choice 3A: Buy New Package"}
+                                        </span>
+                                        {packageSpilloverChoice === "BUY_NEW_PACKAGE" && (
+                                          <Check size={14} className="text-amber-700 font-bold" />
+                                        )}
+                                      </div>
+                                      <p className="text-[10px] text-amber-800/90 leading-relaxed">
+                                        {t.deficitChoiceADesc || "Deduct the 2,000 pulse deficit from a new package and charge package price."}
+                                      </p>
+                                    </div>
+
+                                    {packageSpilloverChoice === "BUY_NEW_PACKAGE" && allCatalogPackages.length > 0 && (
+                                      <div className="pt-2 mt-2 border-t border-amber-100" onClick={(e) => e.stopPropagation()}>
+                                        <select
+                                          value={selectedNewPackageToBuy?.id || ""}
+                                          onChange={(e) => {
+                                            const found = allCatalogPackages.find((p) => String(p.id) === String(e.target.value));
+                                            if (found) setSelectedNewPackageToBuy(found);
+                                          }}
+                                          className="w-full rounded-lg border border-amber-300 bg-amber-50/50 px-2 py-1 text-xs font-bold text-amber-950 outline-none"
+                                        >
+                                          {allCatalogPackages.map((p) => (
+                                            <option key={p.id} value={p.id}>
+                                              {p.name || p.title} (+{p.price} EGP)
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Choice 3B: Pay Rest per Pulse */}
+                                  <div
+                                    onClick={() => setPackageSpilloverChoice("PAY_PER_PULSE")}
+                                    className={`p-3 rounded-xl border-2 cursor-pointer transition flex flex-col justify-between ${
+                                      packageSpilloverChoice === "PAY_PER_PULSE"
+                                        ? "border-amber-700 bg-white ring-2 ring-amber-700/20 shadow-xs"
+                                        : "border-amber-200 bg-white/70 hover:bg-white"
+                                    }`}
+                                  >
+                                    <div className="space-y-1">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-extrabold text-xs text-amber-950">
+                                          {t.deficitChoiceB || "Choice 3B: Pay Rest per Pulse"}
+                                        </span>
+                                        {packageSpilloverChoice === "PAY_PER_PULSE" && (
+                                          <Check size={14} className="text-amber-700 font-bold" />
+                                        )}
+                                      </div>
+                                      <p className="text-[10px] text-amber-800/90 leading-relaxed">
+                                        {t.deficitChoiceBDesc || "Bill the excess pulses directly on session invoice at per-pulse rate."}
+                                      </p>
+                                    </div>
+
+                                    <div className="pt-2 mt-2 border-t border-amber-100 flex items-center justify-between font-black text-xs text-amber-950">
+                                      <span className="text-[10px] text-amber-800">Excess Charge:</span>
+                                      <span>+{packageDeficit * additionalPulseUnitPrice} EGP</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Additional Clinical Services Section */}
                 <div className="space-y-3 bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
                   <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
                     <Plus size={14} className="text-[#414E36]" /> {t.addAdditionalServiceBtn}
                   </h4>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {/* Service Selector Dropdown */}
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
                     <select
                       value={selectedServiceIdToAdd}
                       onChange={(e) => setSelectedServiceIdToAdd(e.target.value)}
-                      className="sm:col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                      className="w-full sm:flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
                     >
                       <option value="">{t.selectServicePlaceholder}</option>
                       {servicesList.map((s) => (
@@ -1208,44 +1897,14 @@ export default function DoctorOngoingSessionTab({
                       ))}
                     </select>
 
-                    {/* Device Selector */}
-                    <select
-                      value={selectedDeviceForService}
-                      onChange={(e) => setSelectedDeviceForService(e.target.value)}
-                      className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                    <button
+                      type="button"
+                      onClick={handleAddServiceToSession}
+                      disabled={!selectedServiceIdToAdd}
+                      className="w-full sm:w-auto rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer shrink-0 shadow-xs"
                     >
-                      <option value="">{t.selectDevicePlaceholder}</option>
-                      {devicesList.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.overridePulsesLabel}</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={pulsesCountForService}
-                        onChange={(e) => setPulsesCountForService(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
-                        placeholder="Pulses (e.g. 150)"
-                      />
-                    </div>
-
-                    <div className="flex items-end">
-                      <button
-                        type="button"
-                        onClick={handleAddServiceToSession}
-                        disabled={!selectedServiceIdToAdd}
-                        className="w-full rounded-xl bg-[#414E36] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <Plus size={14} /> {t.addAdditionalServiceBtn}
-                      </button>
-                    </div>
+                      <Plus size={14} /> {t.addAdditionalServiceBtn}
+                    </button>
                   </div>
 
                   {/* Added Additional Services List */}
@@ -1255,16 +1914,21 @@ export default function DoctorOngoingSessionTab({
                         <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
                           <div className="min-w-0">
                             <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
-                            <span className="text-[10px] text-[#5A6A51] block truncate">
-                              {item.deviceName ? `${t.deviceUsedLabel} ${item.deviceName} • ` : ""}{item.pulses} {t.pulsesLabel}
-                            </span>
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-extrabold text-[#414E36]">+{item.price} EGP</span>
+                            {(() => {
+                              const srv = servicesList.find((s) => String(s.id) === String(item.serviceId));
+                              const isLaser = item.isLaser || checkIsLaserService(srv);
+                              if (laserMode === "PACKAGE" && isLaser) {
+                                return <span className="font-extrabold text-purple-700">0 EGP (Package Redemption)</span>;
+                              }
+                              return <span className="font-extrabold text-[#414E36]">+{item.price} EGP</span>;
+                            })()}
                             <button
                               type="button"
                               onClick={() => handleRemoveServiceFromSession(item.id)}
                               className="text-rose-600 hover:text-rose-800 text-xs font-bold cursor-pointer p-1"
+                              title="Remove service"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -1347,7 +2011,23 @@ export default function DoctorOngoingSessionTab({
                 {/* Final Session Invoice Breakdown Summary */}
                 <div className="bg-[#414E36]/05 p-3.5 sm:p-4 rounded-2xl space-y-2 text-xs">
                   <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 text-[#5A6A51]">
-                    <span>{t.baseServiceLabel} <strong className="text-[#1F251A]">{baseBookingPrice} EGP</strong></span>
+                    <span>
+                      {t.baseServiceLabel}{" "}
+                      <strong className="text-[#1F251A]">
+                        {laserMode === "SERVICE" ? `${baseBookingPrice} EGP` : "0 EGP (Prepaid / Package Pulses)"}
+                      </strong>
+                    </span>
+                    {laserAdditionalCharge > 0 && (
+                      <span className="text-amber-800 font-bold">
+                        {laserMode === "PACKAGE" && (isNoActivePackage || packageSpilloverChoice === "BUY_NEW_PACKAGE") ? (
+                          <span>New Package: <strong className="text-purple-900">+{laserAdditionalCharge} EGP</strong></span>
+                        ) : laserMode === "PACKAGE" && packageDeficit > 0 && packageSpilloverChoice === "PAY_PER_PULSE" ? (
+                          <span>Deficit Pulses: <strong className="text-amber-900">+{laserAdditionalCharge} EGP</strong></span>
+                        ) : (
+                          <span>Extra Pulses: <strong className="text-amber-900">+{laserAdditionalCharge} EGP</strong></span>
+                        )}
+                      </span>
+                    )}
                     {additionalServicesSubtotal > 0 && (
                       <span>{t.additionalServicesSubtotal} <strong className="text-[#1F251A]">+{additionalServicesSubtotal} EGP</strong></span>
                     )}
