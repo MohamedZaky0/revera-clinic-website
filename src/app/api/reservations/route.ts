@@ -385,7 +385,12 @@ async function writeCheckoutInvoice(params: {
     resRow?.laser_payment_mode === 'PER_PULSE' ||
     String(resRow?.notes || '').toLowerCase().includes('pay per pulse') ||
     String(resRow?.notes || '').toLowerCase().includes('per_pulse') ||
-    String(resRow?.notes || '').includes('[Laser Settlement]')
+    // `[Laser Settlement]` is written by DoctorAccountView.tsx for EVERY laser completion branch
+    // (PER_PULSE, package-initial-purchase, 3A buy-new-package, 3B pay-per-pulse deficit, and plain
+    // package redemption), so its mere presence proves nothing about whether a rate was used. Only
+    // the branches that actually multiply pulses by a rate write "charged per pulse" — 3A's tag says
+    // "Purchased new package" instead. Match that phrase, not the universal tag.
+    String(resRow?.notes || '').toLowerCase().includes('charged per pulse')
   );
   const isPackageMode = Boolean(
     resRow?.laser_payment_mode === 'PACKAGE' ||
@@ -1698,7 +1703,13 @@ export async function PATCH(req: Request) {
         target.laser_payment_mode === 'PER_PULSE' ||
         String(updates.notes || target.notes || '').toLowerCase().includes('pay per pulse') ||
         String(updates.notes || target.notes || '').toLowerCase().includes('per_pulse') ||
-        String(updates.notes || target.notes || '').includes('[Laser Settlement]')
+        // See the matching comment in writeCheckoutInvoice's isPerPulseMode above: `[Laser
+        // Settlement]` is written for every laser branch including 3A (buy a new package, billed at
+        // a flat price), so it cannot signal "needs a resolved per-pulse rate" by itself — doing so
+        // made every 3A completion fail with "Per-pulse rate not configured" whenever no clinic
+        // default was set. Only the rate-using branches (plain PER_PULSE, and 3B's deficit payout)
+        // write "charged per pulse".
+        String(updates.notes || target.notes || '').toLowerCase().includes('charged per pulse')
       );
       const pulseRate = resolveLaserPulseRate({
         reservationRate: updates.laser_price_per_pulse ?? target.laser_price_per_pulse,

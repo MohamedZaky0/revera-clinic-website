@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **64 resolved** · 84 tracked total.
+**7 open** · **13 partially resolved** · **65 resolved** · 85 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4282,6 +4282,55 @@ Reception's End Session has no purchase step at all: a package is only sold at b
 - The master per-pulse price location remains undecided; the implemented chain does not presume device vs service vs clinic ownership.
 
 **Manual test checklist:** `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_34_MANUAL_TESTS.md`
+
+---
+
+## RISK-095: RISK-094's Own Rate-Resolution Fix Blocked Every Choice-3A Completion, Because `[Laser Settlement]` Is Written By Every Laser Branch (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Regression / correctness · **Found:** 2026-09-22, live-verifying
+RISK-094's fixes against the dev server and dev database (doctor login, real reservation, real
+`consume_package_pulses` calls — not the test suite). **Fixed same day.**
+
+**What it was:** RISK-094's item 5 made `PATCH /api/reservations` refuse to complete a laser session
+when a per-pulse rate is required but unresolved (`resolveLaserPulseRate()` → `null`). It decides
+"required" with `isPerPulseMode`, which included
+`String(notes).includes('[Laser Settlement]')` — but `DoctorAccountView.tsx` writes a
+`[Laser Settlement]:` tag in **every** laser completion branch: plain per-pulse, an initial package
+purchase, Choice 3A (deficit resolved by buying a new package — billed at that package's flat price,
+no rate involved), Choice 3B (deficit resolved by charging the excess per pulse), and a plain
+no-deficit redemption. Only two of those five actually multiply pulses by a rate. The presence of the
+tag proves nothing about which branch ran, so the guard fired for all five — meaning any environment
+with no clinic-wide default price-per-pulse configured (this dev database, at the time) could not
+complete **any** laser package session, deficit or not.
+
+**Reproduced live:** doctor completes a Choice-3A session (patient's package already fully drained,
+new package correctly sold, deficit correctly deducted from it) → the settlement steps all succeed →
+the final `PATCH /api/reservations` (`status: 'completed'`) → **400 "Per-pulse rate not configured —
+set it in Booking Settings."** The reservation stayed `started`; nothing about this failure was
+predicted by RISK-094's own fail-closed design (that covers steps *inside* the settlement chain, not
+this outer completion call, which never needed a rate for 3A in the first place).
+
+**Fix:** in both `isPerPulseMode` definitions in `src/app/api/reservations/route.ts`
+(`writeCheckoutInvoice` and the `PATCH` handler), replaced the `[Laser Settlement]` substring check
+with `charged per pulse` — the one phrase that appears only in the two branches that actually resolve
+a rate (plain Option 2, and Choice 3B's deficit line), never in 3A's "Purchased new package" tag, the
+initial-purchase tag, or the plain-redemption tag. Verified against the real dev database:
+Choice-3A-shaped notes now complete (200) with no rate configured anywhere; a genuine per-pulse
+session with no rate still correctly refuses (400, unchanged).
+
+**Tests:** `tests/routes/reservations-patch.test.ts`, new describe block "laser per-pulse rate guard
+(RISK-095)" — 6 cases covering all five note shapes plus a resolved-rate positive case. Confirmed to
+fail (3 of 6) with the fix reverted, matching exactly the branches that should never have required a
+rate.
+
+**Note on how this got past RISK-094's own verification:** RISK-094's report listed the file/rate
+call sites checked, but the "browser click-path" verification step in Brief 34 was written as a
+checklist, not actually run before this session picked the work back up — the gap between
+"`npm run check` is green" and "a human clicked through it" is exactly the distinction
+`ai_docs/TESTING.md` and this project's working agreement call out. This bug only existed in the
+one path static checks and unit tests (written against the code as it stood) could not see: the
+interaction between two already-tested pieces (the notes-tag writer and the rate guard) once wired
+together and clicked through for real.
 
 ---
 

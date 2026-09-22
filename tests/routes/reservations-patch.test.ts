@@ -480,6 +480,91 @@ describe('status: completed — duration and amount_left', () => {
   });
 });
 
+// ── Laser per-pulse rate guard (RISK-095) ────────────────────────────────────
+//
+// `[Laser Settlement]` is written into `notes` by DoctorAccountView.tsx for EVERY laser completion
+// branch — plain per-pulse, an initial package purchase, a 3A deficit resolved by buying a new
+// package (flat price, no rate involved), a 3B deficit resolved by charging the excess per pulse,
+// and a plain no-deficit package redemption. Only the branches that actually multiply pulses by a
+// rate write the more specific phrase "charged per pulse". Before this fix, the route required a
+// resolved per-pulse rate whenever `[Laser Settlement]` appeared at all, so completing a 3A session
+// failed with a false "Per-pulse rate not configured" the moment no clinic-wide default was set —
+// reproduced live against the dev server (see RISKS.md RISK-095).
+
+describe('laser per-pulse rate guard (RISK-095)', () => {
+  beforeEach(() => {
+    seedStaffAuth();
+    fake.seed('services', [{ id: SERVICE_ID, price: 150, branch_pricing: null, en: 'Laser Hair Removal' }]);
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, spent_amount: 0, outstanding: 0 }]);
+    // No `page_settings` row for `home` — getClinicDefaultPricePerPulse() resolves nothing, matching
+    // the live dev environment where this was reproduced.
+  });
+
+  it('does not require a per-pulse rate to complete a 3A (buy new package) deficit settlement', async () => {
+    fake.seed('reservations', [baseReservation({
+      status: 'started', amount_paid: 0, amount_left: 0, laser_payment_mode: 'PACKAGE',
+      notes: '[Laser Package Redemption]: Existing package exhausted. Purchased new package pulses v2 (300 deficit pulses deducted)\n' +
+        '[Laser Settlement]: Settled that laser services deficit is covered via New Pulses Package (pulses v2)',
+    })]);
+    const res = await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 0, amountLeft: 0 } }));
+    expect(res.status).toBe(200);
+  });
+
+  it('does not require a per-pulse rate for an initial package purchase (no deficit yet)', async () => {
+    fake.seed('reservations', [baseReservation({
+      status: 'started', amount_paid: 0, amount_left: 0, laser_payment_mode: 'PACKAGE',
+      notes: '[Laser Package Redemption]: Initial package purchase: pulses v2 (10000 pulses @ 1000 EGP). Deducted 500 pulses, remaining: 9500 pulses\n' +
+        '[Laser Settlement]: Settled that laser services are covered via Pulses Package purchase (pulses v2, 500 pulses used, 9500 pulses left)',
+    })]);
+    const res = await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 0, amountLeft: 0 } }));
+    expect(res.status).toBe(200);
+  });
+
+  it('does not require a per-pulse rate for a plain no-deficit package redemption', async () => {
+    fake.seed('reservations', [baseReservation({
+      status: 'started', amount_paid: 0, amount_left: 0, laser_payment_mode: 'PACKAGE',
+      notes: '[Laser Package Redemption]: Deducted 500 pulses from pulses v2\n' +
+        '[Laser Settlement]: Settled that laser services in this session are covered by Pulses Package (pulses v2)',
+    })]);
+    const res = await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 0, amountLeft: 0 } }));
+    expect(res.status).toBe(200);
+  });
+
+  it('still refuses to complete a plain per-pulse (Option 2) session when no rate is configured', async () => {
+    fake.seed('reservations', [baseReservation({
+      status: 'started', amount_paid: 0, amount_left: 0, laser_payment_mode: 'PER_PULSE',
+      notes: '[Laser Pulses Delivered]: Primary: 500 pulses (@ 0 EGP/pulse = 0 EGP), Total: 500 pulses\n' +
+        '[Laser Settlement]: Settled that laser services in this session are charged per pulse (500 pulses × 0 EGP = 0 EGP)',
+    })]);
+    const res = await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 0, amountLeft: 0 } }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/per-pulse rate not configured/i);
+  });
+
+  it('still refuses to complete a 3B (pay deficit per pulse) session when no rate is configured', async () => {
+    fake.seed('reservations', [baseReservation({
+      status: 'started', amount_paid: 0, amount_left: 0, laser_payment_mode: 'PACKAGE',
+      notes: '[Laser Package Redemption]: Existing package exhausted. Excess 300 pulses charged per pulse @ 0 EGP = 0 EGP\n' +
+        '[Laser Settlement]: Settled that excess laser pulses are charged per pulse (300 pulses × 0 EGP = 0 EGP)',
+    })]);
+    const res = await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 0, amountLeft: 0 } }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/per-pulse rate not configured/i);
+  });
+
+  it('a resolved reservation-snapshot rate lets the per-pulse session complete', async () => {
+    fake.seed('reservations', [baseReservation({
+      status: 'started', amount_paid: 0, amount_left: 0, laser_payment_mode: 'PER_PULSE',
+      laser_price_per_pulse: 5,
+      notes: '[Laser Settlement]: Settled that laser services in this session are charged per pulse (500 pulses × 5 EGP = 2500 EGP)',
+    })]);
+    const res = await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 2500, amountLeft: 0 } }));
+    expect(res.status).toBe(200);
+  });
+});
+
 // ── Settlement: customer balances on completion ──────────────────────────────
 
 describe('settlement — customer balances on completion', () => {
