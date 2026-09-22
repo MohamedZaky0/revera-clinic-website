@@ -38,11 +38,13 @@ export async function requireStaffAccess(req: Request): Promise<AccessResult> {
     const { data: authData, error: authError } = await supabaseServer.auth.getUser(token);
     if (authError || !authData.user) return { error: "Invalid or expired session.", status: 401 };
 
-    let { data: employee, error: employeeError } = await supabaseServer
+    const employeeLookup = await supabaseServer
       .from("employee_accounts")
       .select("id, employee_id, email, role_name, auth_user_id")
       .eq("auth_user_id", authData.user.id)
       .maybeSingle();
+    let employee = employeeLookup.data;
+    const employeeError = employeeLookup.error;
 
     if (employeeError) throw employeeError;
 
