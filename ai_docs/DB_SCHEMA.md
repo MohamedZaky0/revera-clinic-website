@@ -974,6 +974,8 @@ this table — see RISK-012 / RISK-016.
 | `created_at` | timestamptz | |
 | `name_ar` | text | nullable. **Added 2026-07-28** by `20260728010000_packages_public_display_fields.sql` — `name` has no Arabic counterpart otherwise, unlike `services.en`/`services.ar`. |
 | `show_on_website` | boolean | Default false. **Added 2026-07-28**, same migration — whether this package is advertised on the public site. Deliberately separate from `active` (which also gates whether the package can still be sold/consumed at POS): a package can stay `active` for existing customers while no longer being publicly advertised. |
+| `package_type` | text | NOT NULL DEFAULT `'services'`, CHECK IN (`'services'`, `'pulses'`). **Added 2026-09-20** by `20260920030000_add_package_type_and_total_pulses_to_packages.sql` |
+| `total_pulses` | integer | NOT NULL DEFAULT 0 — the pulse quota for `'pulses'` packages. **Added 2026-09-20**, same migration. This is the only quota source — code must never parse it out of `name` |
 
 ---
 
@@ -1006,9 +1008,27 @@ Composite primary key `(package_id, service_id)`. The package's content list —
 | `extended_by_employee_id` | UUID | FK → employee_accounts.id ON DELETE SET NULL, nullable — DEC-025's manual extend audit trail |
 | `extended_at` | timestamptz | nullable |
 | `created_at` | timestamptz | |
+| `package_type` | text | NOT NULL DEFAULT `'services'`, CHECK IN (`'services'`, `'pulses'`). **Added 2026-09-20** by `20260920030000_add_package_type_and_total_pulses_to_packages.sql` |
+| `total_pulses` | integer | NOT NULL DEFAULT 0 — included pulses for `'pulses'` packages. **Added 2026-09-20**, same migration |
+| `pulses_used` | integer | NOT NULL DEFAULT 0. **Added 2026-09-20**, same migration. The live pulse balance lives here since Brief 34B — see `package_pulse_usage` |
+| `pulses_remaining` | integer | NOT NULL DEFAULT 0. **Added 2026-09-20**, same migration |
 
 One row per package a patient bought. `price_paid` is the deferred-revenue basis — see
 `customer_package_items` below for the per-service breakdown that basis is allocated across.
+
+**Pulse balances:** for `package_type='pulses'` rows, `pulses_used` / `pulses_remaining` are the
+source of truth, mutated only by the `consume_package_pulses()` Postgres function
+(`20260922000000_package_pulse_balance_to_columns.sql`), which also writes one
+`package_pulse_usage` audit row per consume. Before Brief 34B the balance lived in the
+`page_settings` JSON blob `key='customer_package_pulses'`; that row is retained as a rollback
+artifact but is no longer read or written by code. There is no `updated_at` column on this table.
+
+**Removed wrong documentation (Brief 34B):** this file previously had a second
+`customer_packages` block (added 2026-09-20) listing `package_name`, `purchase_date`,
+`expiry_date`, `services jsonb`, and `status CHECK ('active','expired','completed')` — none of
+which exist in any migration. The real `status` CHECK is `('active','expired','fully_used')`;
+writing `'completed'` is rejected, which is how depleted packages silently stayed `active`
+before Brief 34B.
 
 ---
 
@@ -1386,75 +1406,150 @@ Unified clinical and accounting audit logs for all laser pulse treatments across
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID | Primary key DEFAULT gen_random_uuid() |
-| `customer_id` | UUID | FK → customers.id ON DELETE CASCADE |
+| `customer_id` | UUID | NOT NULL, FK → customers.id ON DELETE CASCADE |
 | `reservation_id` | UUID | FK → reservations.id ON DELETE SET NULL, nullable |
-| `pulse_type` | text | NOT NULL (`'SERVICE'`, `'PULSE_PURCHASE'`, `'PACKAGE'`) |
-| `treatment_area` | text | NOT NULL DEFAULT `'Standard Area'` (e.g. `'Full Body'`, `'Face'`, `'Beard'`, `'Underarms'`) |
+| `pulse_type` | text | NOT NULL DEFAULT `'SERVICE'`, CHECK IN (`'SERVICE'`, `'PULSE_PURCHASE'`, `'PACKAGE'`) |
+| `service_id` | bigint | FK → services.id ON DELETE SET NULL, nullable |
+| `service_name` | text | NOT NULL DEFAULT `'Laser Session'` |
+| `treatment_area` | text | nullable (e.g. `'Full Body'`, `'Face'`, `'Beard'`) |
+| `service_price` | numeric | NOT NULL DEFAULT 0 |
 | `pulses_used` | integer | NOT NULL DEFAULT 0 (standard session pulses delivered) |
 | `remaining_balance_after` | integer | nullable (remaining balance snapshot after session) |
 | `additional_pulses` | integer | NOT NULL DEFAULT 0 (extra pulses delivered beyond standard) |
-| `pulse_value` | numeric(10,2) | NOT NULL DEFAULT 0.00 (unit price per additional pulse) |
-| `additional_charge` | numeric(10,2) | NOT NULL DEFAULT 0.00 (`additional_pulses * pulse_value`) |
-| `total_patient_charge` | numeric(10,2) | NOT NULL DEFAULT 0.00 (total billed for this session) |
-| `additional_reason` | text | nullable (mandatory when `additional_pulses > 0`) |
+| `additional_pulses_reason` | text | nullable (mandatory when `additional_pulses > 0`) |
+| `pulse_value` | numeric | NOT NULL DEFAULT 0 (unit price per additional pulse) |
+| `additional_charge` | numeric | NOT NULL DEFAULT 0 (`additional_pulses * pulse_value`) |
+| `total_patient_charge` | numeric | NOT NULL DEFAULT 0 (total billed for this session) |
 | `source_id` | text | nullable (linked package ID or product balance ID) |
-| `doctor_id` | text | nullable (doctor UUID or identifier) |
-| `doctor_name` | text | nullable (doctor display name) |
 | `device_id` | text | nullable (laser equipment device ID) |
 | `device_name` | text | nullable (laser equipment device name) |
-| `added_by` | text | NOT NULL DEFAULT `'Staff'` |
+| `doctor_id` | UUID | FK → providers.id ON DELETE SET NULL, nullable |
+| `doctor_name` | text | nullable (doctor display name) |
+| `added_by` | text | nullable |
 | `notes` | text | nullable |
-| `session_date` | timestamptz | NOT NULL DEFAULT now() |
 | `created_at` | timestamptz | NOT NULL DEFAULT now() |
+| `updated_at` | timestamptz | NOT NULL DEFAULT now() |
+
+Indexes on `customer_id`, `reservation_id`, `pulse_type`. RLS enabled, no policies.
+
+**Corrected 2026-09-22 (Brief 34B):** this block previously listed `additional_reason`,
+`session_date`, and `doctor_id text` — the migration's real columns are
+`additional_pulses_reason`, `created_at`/`updated_at` (no `session_date`), and
+`doctor_id uuid → providers.id`. Also note: `/api/laser-pulses` generates ids like
+`lpl-<ts>-<rand>` for this UUID column, so its native-table upsert fails 22P02 every time —
+the table is effectively never written (see RISK-096's findings note).
 
 ---
 
-### `packages`
+### `package_pulse_usage`
 
-**Updated 2026-09-20** by `20260920030000_add_package_type_and_total_pulses_to_packages.sql`.
-Package offers catalogue configured in Admin (`/admin` -> Packages).
+**Added 2026-09-22** by `20260922000000_package_pulse_balance_to_columns.sql` (Brief 34B /
+RISK-096). One row per package-pulse consume — the audit trail behind the
+`customer_packages.pulses_used` / `pulses_remaining` balance columns.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID | Primary key DEFAULT gen_random_uuid() |
-| `name` | text | NOT NULL (package name) |
-| `name_ar` | text | nullable (Arabic name) |
-| `description` | text | nullable |
-| `description_ar` | text | nullable |
-| `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable |
-| `price` | numeric(10,2) | NOT NULL DEFAULT 0.00 |
-| `tax` | numeric(10,2) | DEFAULT 0.00 |
-| `validity_days` | integer | DEFAULT 365 |
-| `package_type` | text | NOT NULL DEFAULT `'services'` (`'services'` or `'pulses'`) |
-| `total_pulses` | integer | NOT NULL DEFAULT 0 (included pulses for `'pulses'` package type) |
-| `on_expiry` | text | DEFAULT `'expire'` (`'expire'` or `'extend'`) |
-| `extension_days` | integer | DEFAULT 0 |
-| `is_active` | boolean | DEFAULT true |
-| `services` | jsonb | Array of included service items for services packages |
+| `customer_package_id` | UUID | NOT NULL, FK → customer_packages.id ON DELETE CASCADE |
+| `reservation_id` | UUID | FK → reservations.id ON DELETE SET NULL, nullable |
+| `quantity_used` | integer | NOT NULL — pulses actually deducted (after the remaining-balance clamp) |
+| `remaining_after` | integer | NOT NULL — package balance snapshot after this consume |
+| `used_by` | text | nullable — staff name/email recorded by the caller |
+| `treatment_area` | text | nullable |
+| `notes` | text | nullable |
 | `created_at` | timestamptz | NOT NULL DEFAULT now() |
+
+Index on `customer_package_id`. **Partial unique index**
+`(customer_package_id, reservation_id) WHERE reservation_id IS NOT NULL` — a retried consume
+for the same booking is idempotent at the database level. RLS enabled, no policies.
+
+### `consume_package_pulses(p_customer_package_id, p_qty, p_reservation_id, p_used_by, p_treatment_area, p_notes)` → jsonb
+
+Atomic consume, same migration. Locks the `customer_packages` row `FOR UPDATE`, replays a
+prior consume for the same `(package, reservation)` with `already_deducted: true`, otherwise
+clamps to `pulses_remaining`, updates the columns (marking `status='fully_used'` on depletion
+— the only terminal value the CHECK allows), and inserts the usage row, all in one
+transaction. Raises on: package not found, `p_qty <= 0`, expired, `total_pulses <= 0`,
+`pulses_remaining <= 0`. `REVOKE`d from `PUBLIC`/`anon`/`authenticated`, `GRANT EXECUTE` to
+`service_role` only — PostgREST would otherwise expose it to the browser's anon key. Returns
+`{consumed, requested, remaining, already_deducted, used_total, total_pulses}`.
 
 ---
 
-### `customer_packages`
+## Reception Bot Automation (n8n)
 
-**Updated 2026-09-20** by `20260920030000_add_package_type_and_total_pulses_to_packages.sql`.
-Purchased packages assigned to customers.
+**Added 2026-09-17** by `20260917000000_add_reception_bot_knowledge_base.sql`.
+
+These three tables support the Reception bot workflow in n8n. They hold no patient data. All three
+have **RLS enabled with no policies** — service-role / direct-connection only, deliberately not
+reachable with the anon key, because the knowledge base is the internal staff manual and the memory
+table holds staff-typed text. No grants are issued to `anon` or `authenticated`.
+
+### `kb_reception_documents`
+
+Embedded chunks of the knowledge base (staff manual + clinic policy documents), written by the n8n
+indexing workflow and read by the bot's retrieval tool.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | UUID | Primary key DEFAULT gen_random_uuid() |
-| `customer_id` | UUID | FK → customers.id ON DELETE CASCADE |
-| `package_id` | UUID | FK → packages.id ON DELETE SET NULL, nullable |
-| `package_name` | text | NOT NULL |
-| `price_paid` | numeric(10,2) | NOT NULL DEFAULT 0.00 |
-| `purchase_date` | date | NOT NULL DEFAULT CURRENT_DATE |
-| `expiry_date` | date | NOT NULL |
-| `status` | text | NOT NULL DEFAULT `'active'` (`'active'`, `'expired'`, `'completed'`) |
-| `services` | jsonb | Array of customer service items with total & used counts |
-| `package_type` | text | NOT NULL DEFAULT `'services'` (`'services'` or `'pulses'`) |
-| `total_pulses` | integer | NOT NULL DEFAULT 0 |
-| `pulses_remaining` | integer | NOT NULL DEFAULT 0 |
-| `created_at` | timestamptz | NOT NULL DEFAULT now() |
+| `id` | bigserial | Primary key |
+| `content` | text | Chunk text. The indexing workflow prepends `Section: <heading> \| Source: <file>` so the bot can cite a real section and the output validator can verify the citation |
+| `metadata` | JSONB | Default `{}`. At least `{file_id, file_name, section, indexed_at}`. `file_id` is what the indexing workflow deletes on before re-inserting, so an edited document does not leave its old version behind |
+| `embedding` | extensions.vector(1536) | 1536 = OpenAI `text-embedding-3-small` / `ada-002`. A different embedding model with different dimensions needs a new table, not an ALTER |
+| `created_at` | timestamptz | Default `now()` |
+
+Indexes: HNSW (cosine) on `embedding`, with an IVFFlat fallback for pgvector < 0.5; GIN on
+`metadata`; btree on `(metadata->>'file_id')`.
+
+### `match_kb_reception_documents(query_embedding, match_count, filter, match_threshold)`
+
+Similarity search function used by the n8n Supabase Vector Store node (set **Query Name** to this
+name — the node's default is `match_documents`). Returns `id, content, metadata, similarity`.
+Unlike the stock `match_documents`, it drops matches below `match_threshold` (default `0.7`) so the
+bot answers "not found" instead of stretching an unrelated passage. The node calls it with
+`query_embedding`, `match_count` and `filter` only, so the threshold is tuned in the function.
+
+### `reception_chat_histories`
+
+Conversation memory, one row per message, written by the n8n Postgres Chat Memory node.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | serial | Primary key |
+| `session_id` | text | Normalized staff phone number (or widget user id) |
+| `message` | JSONB | The stored message, shape owned by the n8n/LangChain node |
+| `created_at` | timestamptz | Default `now()` — added here for retention pruning; the node does not write it |
+
+The n8n node creates this table itself when missing, but would create it **without** RLS, which is
+why it is created here instead. If the node ever fails to insert, the connection role is being
+blocked by RLS — use a role that bypasses RLS for that credential or add a policy for it; do not
+disable RLS.
+
+### `bot_guardrail_log`
+
+One row per bot message: what was blocked and why, and what was answered.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigserial | Primary key |
+| `created_at` | timestamptz | Default `now()` |
+| `bot` | text | Default `'reception'` |
+| `channel` | text | e.g. `whatsapp`, `internal_widget`, nullable |
+| `user_ref` | text | Normalized phone or employee id of the sender |
+| `role_name` | text | nullable |
+| `stage` | text | `input_gate` / `input_regex` / `input_guardrails` / `output_validation` / `answered` |
+| `blocked` | boolean | Default false |
+| `reason` | text | e.g. `injection_pattern`, `topical`, `not_configured`, `label_not_in_evidence`, `number_not_in_evidence` |
+| `status` | text | `answered` / `not_found` / `out_of_scope` / `clarify` / `validation_failed` |
+| `message_text` | text | The message **after** PII sanitization — never the raw text |
+| `sources` | JSONB | Default `[]` — cited sections or tools |
+| `details` | JSONB | Default `{}` — pattern hit, fabricated labels/numbers, missing sources |
+
+Retention: both `reception_chat_histories` and `bot_guardrail_log` grow forever unless pruned. The
+migration ends with the two `delete` statements to run manually or schedule once `pg_cron` is
+enabled (30 days for memory, 180 days for the log).
+
+---
 
 ## Notes on Schema Gaps
 
