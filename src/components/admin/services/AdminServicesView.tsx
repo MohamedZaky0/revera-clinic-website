@@ -1247,7 +1247,14 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
               <button
                 type="button"
                 onClick={async () => {
-                  if (!serviceNameEn.trim()) return;
+                  if (!serviceNameEn.trim()) {
+                    alert(lang === "ar" ? "يرجى إدخال اسم الخدمة" : "Please enter a service name.");
+                    return;
+                  }
+                  if (!serviceCategory) {
+                    alert(lang === "ar" ? "يرجى اختيار القسم" : "Please select a category.");
+                    return;
+                  }
                   if (serviceDurationMinutes <= 0 || serviceDurationMinutes > 1440) {
                     alert(t.durationAlert);
                     return;
@@ -1263,7 +1270,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                         return {
                           ...s,
                           en: serviceNameEn.trim(),
-                          ar: serviceNameAr.trim(),
+                          ar: serviceNameAr.trim() || serviceNameEn.trim(),
                           cat: serviceCategory,
                           unit: serviceUnitType.toLowerCase(),
                           price: servicePrice,
@@ -1290,11 +1297,11 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     const newService: ServiceItem = {
                       id: 0, // placeholder, removed by the API mapper
                       en: serviceNameEn.trim(),
-                      ar: serviceNameAr.trim(),
+                      ar: serviceNameAr.trim() || serviceNameEn.trim(),
                       cat: serviceCategory,
                       unit: serviceUnitType.toLowerCase(),
                       price: servicePrice,
-                      duration: serviceDuration,
+                      duration: serviceDuration || getDurationLabel(serviceDurationMinutes),
                       duration_minutes: serviceDurationMinutes,
                       descriptionEn: serviceDescEn.trim(),
                       descriptionAr: serviceDescAr.trim(),
@@ -1315,26 +1322,16 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
                   const synced = await syncServicesToApi(updatedServices);
                   if (synced) {
-                    setLocalServices(synced);
-
-                    const savedService = editingService
-                      ? synced.find(s => s.id === editingService.id)
-                      : synced.find(s => !previousIds.has(s.id));
-
-                    const defaultBranch = serviceBranchPricing.find(b => b.isDefault);
-                    if (savedService && defaultBranch) {
-                      setServiceToggle(savedService.id, "active", defaultBranch.status);
-                      setServiceToggle(savedService.id, "visible", defaultBranch.visible);
-                      setServiceToggles(prev => ({
-                        ...prev,
-                        [savedService.id]: { visible: defaultBranch.visible, active: defaultBranch.status }
-                      }));
+                    await loadServicesFromApi();
+                    if (loadCategoriesFromApi) {
+                      await loadCategoriesFromApi();
                     }
+                    setShowAddServiceModal(false);
+                  } else {
+                    alert(lang === "ar" ? "فشل حفظ الخدمة. يرجى التأكد من صلاحيات الحساب والمحاولة مرة أخرى." : "Failed to save service. Please check your permissions and try again.");
                   }
-
-                  setShowAddServiceModal(false);
                 }}
-                className="rounded-lg bg-[#414E36] px-6 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                className="rounded-lg bg-[#414E36] px-6 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] cursor-pointer"
               >
                 {t.saveBtn}
               </button>

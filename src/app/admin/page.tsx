@@ -578,6 +578,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const { isRTL } = useLanguage();
   // Auth state
   const [session, setSession] = useState<any>(null);
+
+  const getAccessToken = useCallback(async () => {
+    if (session?.access_token) return session.access_token;
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.access_token) {
+        setSession(data.session);
+        return data.session.access_token;
+      }
+    } catch {}
+    return null;
+  }, [session?.access_token]);
+
   const authenticatedJsonHeaders = {
     "Content-Type": "application/json",
     "Authorization": `Bearer ${session?.access_token || ""}`
@@ -614,11 +627,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
   const syncCategoriesToApi = useCallback(async (categories: LocalCategory[]) => {
     saveDynamicCategories(categories);
-    if (!session?.access_token) return categories;
+    const token = await getAccessToken();
+    if (!token) return categories;
     try {
       const res = await fetch("/api/categories", {
         method: "POST",
-        headers: authenticatedJsonHeaders,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(categories),
       });
       if (res.ok) {
@@ -632,28 +649,30 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       console.error("Error saving categories to API:", err);
     }
     return categories;
-  }, [session?.access_token, authenticatedJsonHeaders]);
+  }, [getAccessToken]);
 
   const deleteCategoryFromApi = useCallback(async (key: string) => {
-    if (!session?.access_token) return false;
+    const token = await getAccessToken();
+    if (!token) return false;
     try {
       const res = await fetch(`/api/categories?key=${encodeURIComponent(key)}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       return res.ok;
     } catch (err) {
       console.error("Error deleting category from API:", err);
       return false;
     }
-  }, [session?.access_token]);
+  }, [getAccessToken]);
 
   // Service CRUD helpers — services are now database-primary, not localStorage (RISK-025)
   const loadServicesFromApi = useCallback(async () => {
     try {
+      const token = await getAccessToken();
       const headers: Record<string, string> = {};
-      if (session?.access_token) {
-        headers["Authorization"] = `Bearer ${session.access_token}`;
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
       }
       const res = await fetch("/api/services", {
         headers,
@@ -706,14 +725,18 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     } catch (err) {
       console.error("Error loading services from API:", err);
     }
-  }, [session?.access_token]);
+  }, [getAccessToken]);
 
   const syncServicesToApi = useCallback(async (services: ServiceItem[]) => {
-    if (!session?.access_token) return null;
+    const token = await getAccessToken();
+    if (!token) return null;
     try {
       const res = await fetch("/api/services", {
         method: "POST",
-        headers: authenticatedJsonHeaders,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(services),
       });
       if (!res.ok) {
@@ -726,21 +749,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       console.error("Error saving services to API:", err);
       return null;
     }
-  }, [session?.access_token, authenticatedJsonHeaders]);
+  }, [getAccessToken]);
 
   const deleteServiceFromApi = useCallback(async (id: number) => {
-    if (!session?.access_token) return false;
+    const token = await getAccessToken();
+    if (!token) return false;
     try {
       const res = await fetch(`/api/services?id=${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       return res.ok;
     } catch (err) {
       console.error("Error deleting service from API:", err);
       return false;
     }
-  }, [session?.access_token]);
+  }, [getAccessToken]);
 
   // Inactivity Settings State
   const [inactivityThreshold, setInactivityThreshold] = useState<number>(30);
