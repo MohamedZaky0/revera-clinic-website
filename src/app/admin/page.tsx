@@ -583,12 +583,80 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     "Authorization": `Bearer ${session?.access_token || ""}`
   };
 
+  // Category CRUD helpers — backed by /api/categories and Supabase
+  const loadCategoriesFromApi = useCallback(async () => {
+    try {
+      const res = await fetch("/api/categories", {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLocalCategories(data);
+          saveDynamicCategories(data);
+          setExpandedCategories(prev => {
+            const exp = { ...prev };
+            data.forEach((c: LocalCategory) => {
+              if (exp[c.key] === undefined) exp[c.key] = true;
+            });
+            return exp;
+          });
+          return data;
+        }
+      }
+    } catch (err) {
+      console.error("Error loading categories from API:", err);
+    }
+    const fallback = getDynamicCategories();
+    setLocalCategories(fallback);
+    return fallback;
+  }, []);
+
+  const syncCategoriesToApi = useCallback(async (categories: LocalCategory[]) => {
+    saveDynamicCategories(categories);
+    if (!session?.access_token) return categories;
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify(categories),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const saved = Array.isArray(data) ? data : [data];
+        setLocalCategories(saved);
+        saveDynamicCategories(saved);
+        return saved;
+      }
+    } catch (err) {
+      console.error("Error saving categories to API:", err);
+    }
+    return categories;
+  }, [session?.access_token, authenticatedJsonHeaders]);
+
+  const deleteCategoryFromApi = useCallback(async (key: string) => {
+    if (!session?.access_token) return false;
+    try {
+      const res = await fetch(`/api/categories?key=${encodeURIComponent(key)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      return res.ok;
+    } catch (err) {
+      console.error("Error deleting category from API:", err);
+      return false;
+    }
+  }, [session?.access_token]);
+
   // Service CRUD helpers — services are now database-primary, not localStorage (RISK-025)
   const loadServicesFromApi = useCallback(async () => {
-    if (!session?.access_token) return;
     try {
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
       const res = await fetch("/api/services", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers,
         cache: "no-store",
       });
       if (!res.ok) {
@@ -596,10 +664,45 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         return;
       }
       const data = await res.json();
-      setLocalServices(Array.isArray(data) ? data : []);
-      const storedToggles = getServiceToggles();
-      const defaults = Object.fromEntries((Array.isArray(data) ? data : []).map((s: ServiceItem) => [s.id, { visible: true, active: true }]));
-      setServiceToggles({ ...defaults, ...storedToggles });
+      const servicesList: ServiceItem[] = Array.isArray(data) ? data : [];
+      setLocalServices(servicesList);
+
+      // Build database-driven toggles directly from database active & visible columns
+      const dbToggles = Object.fromEntries(
+        servicesList.map((s: ServiceItem) => [
+          s.id,
+          { visible: s.visible !== false, active: s.active !== false }
+        ])
+      );
+      setServiceToggles(dbToggles);
+
+      // Auto-discover any missing categories from database services so no service is ever hidden
+      setLocalCategories(prevCats => {
+        const knownKeys = new Set(prevCats.map(c => c.key));
+        const missingKeys = new Set<string>();
+        servicesList.forEach(s => {
+          if (s.cat && !knownKeys.has(s.cat)) {
+            missingKeys.add(s.cat);
+          }
+        });
+        if (missingKeys.size > 0) {
+          const autoCats: LocalCategory[] = Array.from(missingKeys).map((catKey, idx) => ({
+            key: catKey,
+            en: catKey.charAt(0).toUpperCase() + catKey.slice(1).replace(/_/g, " "),
+            ar: catKey.charAt(0).toUpperCase() + catKey.slice(1).replace(/_/g, " "),
+            sortOrder: prevCats.length + idx,
+          }));
+          const merged = [...prevCats, ...autoCats];
+          saveDynamicCategories(merged);
+          setExpandedCategories(prevExp => {
+            const exp = { ...prevExp };
+            autoCats.forEach(c => { exp[c.key] = true; });
+            return exp;
+          });
+          return merged;
+        }
+        return prevCats;
+      });
     } catch (err) {
       console.error("Error loading services from API:", err);
     }
@@ -1289,7 +1392,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [dragOverCatKey, setDragOverCatKey] = useState<string | null>(null);
   const [catDraggable, setCatDraggable] = useState<Record<string, boolean>>({});
 
-  const handleReorderCategories = (draggedKey: string, targetKey: string) => {
+  const handleReorderCategories = async (draggedKey: string, targetKey: string) => {
     const draggedIndex = localCategories.findIndex(c => c.key === draggedKey);
     const targetIndex = localCategories.findIndex(c => c.key === targetKey);
     if (draggedIndex === -1 || targetIndex === -1) return;
@@ -1304,6 +1407,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
     setLocalCategories(updatedCategories);
     saveDynamicCategories(updatedCategories);
+    await syncCategoriesToApi(updatedCategories);
   };
 
   function toggleCategoryExpand(cat: string) {
@@ -1315,6 +1419,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     const updatedCats = localCategories.filter(c => c.key !== catKey);
     setLocalCategories(updatedCats);
     saveDynamicCategories(updatedCats);
+    await deleteCategoryFromApi(catKey);
 
     const updatedSvcs = localServices.filter(s => s.cat !== catKey);
     setLocalServices(updatedSvcs);
@@ -2239,17 +2344,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }, []);
 
   useEffect(() => {
-    const cats = getDynamicCategories();
-    setLocalCategories(cats);
-
-    // Set all categories expanded by default
-    const exp: Record<string, boolean> = {};
-    cats.forEach(c => { exp[c.key] = true; });
-    setExpandedCategories(exp);
-  }, []);
+    loadCategoriesFromApi();
+  }, [loadCategoriesFromApi]);
 
   useEffect(() => {
-    if (session?.access_token) loadServicesFromApi();
+    loadServicesFromApi();
   }, [session?.access_token, loadServicesFromApi]);
   // BRANCHES is now derived from the real branches state loaded from Supabase
 
@@ -2285,14 +2384,37 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }, [filteredServices, localCategories]);
 
   function toggleService(id: number, field: "visible" | "active") {
+    let serviceToSync: ServiceItem | undefined;
+
     setServiceToggles((prev) => {
       const current = prev[id] ?? { visible: true, active: true };
       const newValue = !current[field];
       const updated = { ...prev, [id]: { ...current, [field]: newValue } };
-      // Persist to localStorage so user-facing pages reflect the change
       setServiceToggle(id, field, newValue);
       return updated;
     });
+
+    setLocalServices((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id === id) {
+          const toggled = {
+            ...s,
+            [field]: !(s[field] ?? true),
+          };
+          serviceToSync = toggled;
+          return toggled;
+        }
+        return s;
+      });
+      return updated;
+    });
+
+    // Persist active/visible change to database
+    if (serviceToSync) {
+      syncServicesToApi([serviceToSync]).catch((err) => {
+        console.error("Failed to sync service toggle to database:", err);
+      });
+    }
   }
 
   const [eCommerceExpanded, setECommerceExpanded] = useState(false);
@@ -6195,6 +6317,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               syncServicesToApi={syncServicesToApi}
               loadServicesFromApi={loadServicesFromApi}
               deleteServiceFromApi={deleteServiceFromApi}
+              syncCategoriesToApi={syncCategoriesToApi}
+              loadCategoriesFromApi={loadCategoriesFromApi}
+              deleteCategoryFromApi={deleteCategoryFromApi}
               authenticatedJsonHeaders={authenticatedJsonHeaders}
               hasPermission={hasPermission}
               lang={lang}

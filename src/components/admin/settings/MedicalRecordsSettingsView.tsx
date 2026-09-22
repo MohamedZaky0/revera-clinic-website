@@ -60,11 +60,12 @@ export default function MedicalRecordsSettingsView({
     const loadServices = async () => {
       try {
         const headers = await getAuthHeaders();
-        const res = await fetch("/api/services", { headers });
+        const res = await fetch("/api/services", { headers, cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data.services) && data.services.length > 0) {
-            setAllServices(data.services);
+          const servicesList = Array.isArray(data) ? data : (data.services || []);
+          if (servicesList.length > 0) {
+            setAllServices(servicesList);
           }
         }
       } catch (err) {

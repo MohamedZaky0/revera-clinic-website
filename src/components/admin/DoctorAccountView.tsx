@@ -361,7 +361,7 @@ export default function DoctorAccountView({
         const [prodRes, devRes, srvRes] = await Promise.all([
           fetch("/api/inventory/products", { headers }),
           fetch("/api/inventory/devices", { headers }),
-          fetch("/api/services", { headers })
+          fetch("/api/services", { headers, cache: "no-store" })
         ]);
         if (prodRes.ok) {
           const pData = await prodRes.json();

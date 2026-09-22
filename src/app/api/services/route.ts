@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess, hasGranularPermission } from '@/lib/access';
@@ -33,8 +35,8 @@ function mapServiceRow(r: any) {
     is_laser: isLaser,
     enableReminder: r.enable_reminder,
     branchPricing: r.branch_pricing,
-    visible: r.visible,
-    active: r.active,
+    visible: r.visible !== false,
+    active: r.active !== false,
     createdAt: fmtCreatedAt(r.created_at),
     rawCreatedAt: r.created_at,
     created_at: r.created_at,

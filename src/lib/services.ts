@@ -207,6 +207,8 @@ export interface ServiceItem {
   islaser?: boolean;
   is_laser?: boolean;
   enableReminder?: boolean;
+  visible?: boolean;
+  active?: boolean;
   branchPricing?: Array<{
     name: string;
     price: number;

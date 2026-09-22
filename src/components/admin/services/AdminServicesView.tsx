@@ -124,6 +124,9 @@ interface AdminServicesViewProps {
   syncServicesToApi: (services: ServiceItem[]) => Promise<ServiceItem[] | null>;
   loadServicesFromApi: () => Promise<void>;
   deleteServiceFromApi: (id: number) => Promise<boolean>;
+  syncCategoriesToApi?: (categories: LocalCategory[]) => Promise<LocalCategory[] | null>;
+  loadCategoriesFromApi?: () => Promise<LocalCategory[] | null>;
+  deleteCategoryFromApi?: (key: string) => Promise<boolean>;
   authenticatedJsonHeaders: { "Content-Type": string; Authorization: string };
   hasPermission: (perm: string) => boolean;
   lang: "en" | "ar";
@@ -177,6 +180,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
     handleEditService, handleReorderServices, handleReorderCategories,
     toggleCategoryExpand, removeCategory, toggleService,
     syncServicesToApi, loadServicesFromApi, deleteServiceFromApi,
+    syncCategoriesToApi, loadCategoriesFromApi, deleteCategoryFromApi,
     authenticatedJsonHeaders, hasPermission,
     lang, t,
   } = props;
@@ -321,7 +325,18 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
             return Number(s.id) || 0;
           };
 
-          const sortedCategories = [...localCategories].sort((catA, catB) => {
+          const allCategoryKeys = new Set(localCategories.map(c => c.key));
+          const extraCategories: LocalCategory[] = Object.keys(groupedServices)
+            .filter(catKey => !allCategoryKeys.has(catKey))
+            .map((catKey, idx) => ({
+              key: catKey,
+              en: catKey.charAt(0).toUpperCase() + catKey.slice(1).replace(/_/g, " "),
+              ar: catKey.charAt(0).toUpperCase() + catKey.slice(1).replace(/_/g, " "),
+              sortOrder: localCategories.length + idx,
+            }));
+          const completeCategories = [...localCategories, ...extraCategories];
+
+          const sortedCategories = completeCategories.sort((catA, catB) => {
             if (serviceSortBy === "custom") return 0;
             const servicesA = (groupedServices[catA.key] ?? []).map(getServicePrice);
             const servicesB = (groupedServices[catB.key] ?? []).map(getServicePrice);
@@ -863,13 +878,17 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 {t.cancelBtn}
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (!newCategoryNameEn.trim()) return;
                   const key = newCategoryNameEn.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
                   const arName = newCategoryNameAr.trim() || newCategoryNameEn.trim();
-                  const updated = [...localCategories, { key, en: newCategoryNameEn.trim(), ar: arName }];
+                  const newCat = { key, en: newCategoryNameEn.trim(), ar: arName, sortOrder: localCategories.length };
+                  const updated = [...localCategories, newCat];
                   setLocalCategories(updated);
                   saveDynamicCategories(updated);
+                  if (syncCategoriesToApi) {
+                    await syncCategoriesToApi(updated);
+                  }
                   setExpandedCategories(prev => ({ ...prev, [key]: true }));
                   setNewCategoryNameEn("");
                   setNewCategoryNameAr("");
@@ -1234,12 +1253,15 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                           enableReminder: serviceEnableReminder,
                           img: serviceImageUrl,
                           branchPricing: serviceBranchPricing.map(bp => ({ ...bp, price: servicePrice })),
+                          visible: editingService.visible !== undefined ? editingService.visible : (serviceToggles[editingService.id]?.visible ?? true),
+                          active: editingService.active !== undefined ? editingService.active : (serviceToggles[editingService.id]?.active ?? true),
                         };
                       }
                       return s;
                     });
                   } else {
                     // Add mode — let the database assign the id
+                    const defaultBranch = serviceBranchPricing.find(b => b.isDefault);
                     const newService: ServiceItem = {
                       id: 0, // placeholder, removed by the API mapper
                       en: serviceNameEn.trim(),
@@ -1258,6 +1280,8 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       enableReminder: serviceEnableReminder,
                       img: serviceImageUrl,
                       branchPricing: serviceBranchPricing.map(bp => ({ ...bp, price: servicePrice })),
+                      visible: defaultBranch ? defaultBranch.visible : true,
+                      active: defaultBranch ? defaultBranch.status : true,
                       createdAt: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + " " + new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true }),
                     };
                     updatedServices = [...localServices, newService];

@@ -2606,6 +2606,42 @@ When booking a new patient who didn't have an existing pulses package, the recep
 
 **Rule:** When computing session totals for PACKAGE mode laser bookings, NEVER collapse the total to a value less than the original booking commitment (`amountPaid + amountLeft`). Always parse the booked package price from booking notes as a floor for the invoice total.
 
+---
+
+## DEC-076: Database Synchronization for Services and Categories Across Devices
+
+**Date:** 2026-09-22
+**Status:** Decided — active
+
+**Context:**
+Administrators modifying service categories, adding/editing services, or toggling service active/visibility states reported that changes were only visible on the browser where the edits were made, even though services rows in Supabase were updated. On other devices, services under new categories were completely missing, and toggles remained in their default or local state.
+
+**Root Causes:**
+1. **`localStorage` category storage:** `getDynamicCategories()` and `saveDynamicCategories()` used client `localStorage` (`_dynamic_categories`). Categories created or reordered on one device were never saved to or fetched from the `categories` table in Supabase.
+2. **Hidden services from category omissions:** In `AdminServicesView.tsx`, services were grouped and rendered strictly by iterating over `localCategories`. Any service belonging to a category that was not seeded in another user's local browser storage was completely omitted from the UI.
+3. **`_service_toggles` in `localStorage`:** Activating or deactivating a service only updated `localStorage` (`_service_toggles`) on that machine instead of persisting to `services.active` and `services.visible` in Supabase.
+4. **Public sections dependency:** `HomeServicesSection.tsx` and `ServicesSection.tsx` filtered active services using `isServiceActive(...)` against `localStorage`.
+
+**Decisions & Implementation:**
+1. **Dynamic & Public `/api/categories` (`src/app/api/categories/route.ts`):**
+   - Added `export const dynamic = 'force-dynamic'` and `cache: 'no-store'`.
+   - Made `GET /api/categories` public (no staff auth required), enabling public website sections and all client sessions to fetch categories directly from Supabase.
+   - Auto-seeds the `categories` table with default `CATEGORY_LABELS` on first read if empty.
+   - Preserves authenticated staff requirement for `POST` (upsert) and `DELETE`.
+2. **Dynamic `/api/services` (`src/app/api/services/route.ts`):**
+   - Added `export const dynamic = 'force-dynamic'`.
+   - Explicitly preserves and maps `visible` and `active` boolean fields across DB operations.
+3. **Admin Panel Synchronization (`src/app/admin/page.tsx` & `AdminServicesView.tsx`):**
+   - Added `loadCategoriesFromApi`, `syncCategoriesToApi`, and `deleteCategoryFromApi` to persist category creation, deletion, and drag-and-drop reordering to Supabase.
+   - `loadServicesFromApi` initializes `serviceToggles` strictly from database `s.active` and `s.visible` fields with auto-discovery of unmapped service category keys.
+   - `toggleService` updates `localServices` and immediately triggers `syncServicesToApi` to persist `active`/`visible` states to Supabase.
+   - `AdminServicesView.tsx` computes `completeCategories` ensuring that any category key referenced by a database service is rendered even if not explicitly created yet.
+4. **Client Website Sections (`HomeServicesSection.tsx`, `ServicesSection.tsx`, `BookingModal.tsx`):**
+   - Fetches `/api/categories` and `/api/services` with `{ cache: 'no-store' }`.
+   - Filters active services directly via database flags `s.active !== false && s.visible !== false`.
+   - Dynamically computes `renderedCategories` merging any categories referenced by active services.
+
+
 
 
 
