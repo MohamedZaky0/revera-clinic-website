@@ -2670,6 +2670,36 @@ Users reported that deleted categories kept resurrecting and default categories/
 5. **System Test Suite Diagnostics:**
    - Added `TC-079` to verify database-driven categories CRUD, zero fake defaults, and clean category deletion.
 
+---
+
+## DEC-078: Resilient Service Persistence, Database Column Alignment, and Case-Insensitive Multi-Role Staff Access
+
+**Date:** 2026-09-22
+**Status:** Decided — active
+
+**Context:**
+When superadmin or admin users attempted to create or edit a service in the admin panel, the operation failed with an error notification *"Failed to save service. Please check your permissions and try again."*
+
+**Root Causes:**
+1. **Schema Column Cache Mismatch in `POST /api/services` (`mapServiceToDb`):**
+   `mapServiceToDb` was passing `islaser: isLaser` and `is_laser: isLaser` directly into Supabase/PostgREST `.insert()` and `.upsert()` payloads. The `services` table in PostgreSQL does not have an `is_laser` or `islaser` column, causing PostgREST to immediately fail with:
+   `"Could not find the 'is_laser' column of 'services' in the schema cache"` (HTTP 500).
+2. **Strict `employee_accounts` Auth-ID Linkage in `requireStaffAccess`:**
+   `requireStaffAccess` queried `employee_accounts` exclusively by `.eq("auth_user_id", authData.user.id)`. If an admin/superadmin account was registered or seeded in `employee_accounts` with matching `email` but `auth_user_id` was `NULL` or not linked yet, `requireStaffAccess` returned `403` (*"Staff access is required"*).
+3. **Role Case-Sensitivity and Granular Permission Checking (`hasGranularPermission`):**
+   Role checking in `hasGranularPermission` had a strict bypass `if (access.role === "superadmin") return true;`. Normalized role names and `admin` roles, or roles with wildcard `*` permissions, needed consistent normalization across all granular checks.
+
+**Decisions & Implementation:**
+1. **Aligned Service DB Mapping with Schema:**
+   - Removed nonexistent `islaser` and `is_laser` columns from `mapServiceToDb` in `src/app/api/services/route.ts`.
+   - Enhanced error responses across `GET`, `POST`, and `DELETE` in `src/app/api/services/route.ts` to surface exact underlying database error messages (`err?.message`).
+2. **Resilient Staff Access & Auto-Linking (`src/lib/access.ts`):**
+   - Added email fallback (`.ilike("email", authData.user.email)`) in `requireStaffAccess` when `auth_user_id` is unlinked, with automatic linking of `auth_user_id`.
+   - Normalized role casing and formatting across `requireStaffAccess`, `hasStaffPermission`, `hasFinancePermission`, and `hasGranularPermission` (supporting `"superadmin"`, `"Super Admin"`, `"admin"`, etc.).
+3. **Granular Permission Wildcards and Role Equivalence:**
+   - Extended `hasGranularPermission` to recognize `"superadmin"`, `"admin"`, and wildcard `*` permissions across all actions including `services.create`, `services.edit`, `services.delete`.
+
+
 
 
 

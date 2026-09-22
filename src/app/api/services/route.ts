@@ -44,7 +44,6 @@ function mapServiceRow(r: any) {
 }
 
 function mapServiceToDb(s: any) {
-  const isLaser = Boolean(s.islaser ?? s.is_laser ?? false);
   const durationMinutes = s.duration_minutes ?? (s.duration ? getDurationInMinutes(s.duration) : 30);
   const row: Record<string, any> = {
     en: String(s.en || '').trim(),
@@ -59,8 +58,6 @@ function mapServiceToDb(s: any) {
     description_en: s.descriptionEn ?? s.description_en ?? '',
     description_ar: s.descriptionAr ?? s.description_ar ?? '',
     is_shared: Boolean(s.isShared ?? s.is_shared ?? false),
-    islaser: isLaser,
-    is_laser: isLaser,
     enable_reminder: s.enableReminder !== undefined ? Boolean(s.enableReminder) : (s.enable_reminder !== undefined ? Boolean(s.enable_reminder) : true),
     branch_pricing: Array.isArray(s.branchPricing) ? s.branchPricing : (Array.isArray(s.branch_pricing) ? s.branch_pricing : []),
     visible: s.visible !== undefined ? Boolean(s.visible) : true,
@@ -79,9 +76,9 @@ export async function GET(req: Request) {
 
     if (error) throw error;
     return NextResponse.json((data || []).map(mapServiceRow));
-  } catch (err) {
+  } catch (err: any) {
     console.error('GET /api/services error:', err);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    return NextResponse.json({ error: err?.message || 'Database error' }, { status: 500 });
   }
 }
 
@@ -132,9 +129,9 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(isArray ? results.map(mapServiceRow) : mapServiceRow(results[0]), { status: 201 });
-  } catch (err) {
+  } catch (err: any) {
     console.error('POST /api/services error:', err);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    return NextResponse.json({ error: err?.message || 'Database error' }, { status: 500 });
   }
 }
 
@@ -178,8 +175,8 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
     return NextResponse.json({ success: true, message: 'Service permanently deleted' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('DELETE /api/services error:', err);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    return NextResponse.json({ error: err?.message || 'Database error' }, { status: 500 });
   }
 }
