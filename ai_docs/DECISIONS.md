@@ -2699,8 +2699,74 @@ When superadmin or admin users attempted to create or edit a service in the admi
 3. **Granular Permission Wildcards and Role Equivalence:**
    - Extended `hasGranularPermission` to recognize `"superadmin"`, `"admin"`, and wildcard `*` permissions across all actions including `services.create`, `services.edit`, `services.delete`.
 
+---
 
+## DEC-079: Doctor Screen Records Delivered Pulses Only — Package Sales And Payment Choices Move Entirely To Reception
 
+**Date:** 2026-09-22
+**Status:** Decided — active
+
+**Context:**
+Brief 34 (landed 2026-09-20/21, hardened 2026-09-22) shipped a "Choice 3A / 3B" UI directly inside
+the doctor's active-session screen (`DoctorAccountView.tsx` / `DoctorOngoingSessionTab.tsx`): when a
+laser session's delivered pulses exceed the patient's remaining pulses-package balance, the **doctor**
+is shown the package balance, the resolved per-pulse price, and is asked to choose between selling the
+patient a new package or billing the deficit per-pulse — and the doctor's choice writes the invoice
+line. While live-verifying Brief 34's fix for RISK-095, Mohamed noticed the doctor screen surfaces
+pulse balances and money at all, and asked directly: a patient does not buy anything from the doctor —
+packages, prices, and how a deficit gets paid are reception's job, not the doctor's. The doctor's only
+real job at the point of care is to record how many pulses were actually delivered.
+
+**Alternatives Considered:**
+1. Keep the doctor's 3A/3B UI as-is; add a reception-side backstop only (the original Brief 35 scope
+   as drafted in `WINDSURF_BRIEFS.md` before this decision — reception re-prompts only if the doctor
+   left a deficit unresolved).
+2. Remove the doctor's 3A/3B UI entirely; the doctor screen becomes record-only (delivered pulse
+   count, nothing else); every package sale, payment-method choice, and deficit resolution happens
+   exclusively at reception checkout, through one server operation.
+3. Hybrid — keep 3A/3B as an optional doctor shortcut but hide the money figures from the doctor's
+   view.
+
+**Chosen Option:** #2.
+The doctor's active-session screen is record-only for laser pulses: no package selection, no price or
+balance display, no "sell new package" / "pay per pulse" choice, and no invoice-line writes from that
+screen. Reception's checkout (Brief 35, rewritten under this decision) becomes the **sole** place a
+pulse deficit is resolved, a package is sold, or money changes hands.
+
+**Reason:**
+- Matches the real clinic workflow: patients pay reception, not the doctor, and the doctor has no
+  reason to see package pricing or make a sales decision mid-session.
+- Directly removes the defect class RISK-095 exposed — a doctor-side money/package decision, built and
+  tested in isolation, silently broke once wired into the per-pulse rate guard. Taking that decision
+  out of the doctor's screen removes an entire class of future doctor-side money bugs, not just this
+  one.
+- Collapses what would otherwise be two parallel deficit-resolution paths (doctor 3A/3B and reception
+  checkout) into one from the start, instead of shipping both and unifying them later — Brief 35's
+  queued "Brief D — unify the doctor and checkout deficit paths" becomes largely moot under this
+  decision; see Impact below.
+
+**Trade-offs:**
+- Brief 34's Choice 3A/3B UI in `DoctorAccountView.tsx` / `DoctorOngoingSessionTab.tsx` becomes
+  removal scope, not a feature to build on — real, already-partially-tested work is discarded rather
+  than extended.
+- Brief 35 as drafted before this decision assumed the doctor's 3A/3B choice stays and reception only
+  backstops an *unresolved* deficit (reading an "already resolved by doctor" marker). That draft is
+  superseded and must be rewritten, not patched, under this decision.
+- The doctor screen still needs *some* signal when delivered pulses exceed the visible balance (so the
+  doctor knows to tell the patient "reception will sort out the difference"), but that signal must stop
+  short of pricing, package selection, or any write — the exact boundary is Brief 35's to define.
+
+**Impact on Codebase:**
+- `ai_docs/WINDSURF_BRIEFS.md` Brief 35 rewritten under this decision (see this file's history for the
+  prior draft) to remove the doctor's 3A/3B choice UI and make reception checkout the only deficit-
+  resolution surface, built on Brief 34's `laserDeficit.ts` and Brief 34B's `consume_package_pulses`
+  RPC exactly as before.
+- Brief D's original framing ("migrate the doctor flow onto the new server operation") is no longer
+  needed as a follow-up migration, since there is only one path from the start; Brief D is narrowed to
+  FEFO-across-packages only (still applies to reception's single checkout path).
+- No schema change required by this decision itself — `laser_payment_mode` / `laser_price_per_pulse` /
+  `delivered_pulses` (Brief 34) and Brief 35's own marker columns are unaffected; only which UI is
+  permitted to write them changes.
 
 
 

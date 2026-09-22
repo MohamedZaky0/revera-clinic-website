@@ -351,7 +351,8 @@ you could not resolve from code. The `grep -rn "customer_package_pulses" src/` o
 Every `status === 'active'` site you checked for item (7). Plus the standing convention: Dev Notes
 block, `ai_docs/manual_tests/LASER_PULSE_BALANCE_BRIEF_34B_MANUAL_TESTS.md` (follow
 `RISK_029_MANUAL_TESTS.md`: Evidence log table + `- [ ]` checks), and a new `RISKS.md` entry — next
-free id is **RISK-095** (RISK-094 is reserved by Brief 34; verify against `RISKS.md` before writing) —
+free id is **RISK-096** (RISK-094 is reserved by Brief 34; RISK-095 was already used by the
+2026-09-22 per-pulse rate-guard fix — verify against `RISKS.md` before writing regardless) —
 covering the cross-patient read-modify-write race, the invisible save failure, and the
 `status: 'completed'` CHECK violation, referencing that file.
 
@@ -359,25 +360,43 @@ covering the cross-patient read-modify-write race, the invisible save failure, a
 
 > **Do not start Brief 35 until Briefs 34 and 34B have landed and been reviewed.** It depends on Brief 34's migration, `src/lib/laserDeficit.ts` and the per-pulse rate chain, and on Brief 34B's `package_pulse_usage` table and `consume_package_pulses` function — the new server operation must call that RPC, never write pulse balances itself.
 
-## Brief 35 — Receptionist checkout: resolve the pulse deficit before taking money
+## Brief 35 — Receptionist checkout owns the pulse deficit; the doctor screen only records pulses
 
-**Read first:** Briefs 34 and 34B (this depends on Brief 34's migration, `src/lib/laserDeficit.ts` and the rate chain, and on Brief 34B's `package_pulse_usage` table and `consume_package_pulses` function — the new server operation must call that RPC and never write pulse balances itself; do not start until both have landed). Then DEC-069, DEC-072 item 5, DEC-075, and
-`src/app/api/packages/sell/route.ts` end to end.
+**Rewritten 2026-09-22 under DEC-079 — read that decision first.** Mohamed decided the doctor has no
+business selling packages or making payment choices: patients pay reception, not the doctor. The prior
+draft of this brief (reception as a backstop for a doctor-made 3A/3B choice) is superseded. This
+version makes reception checkout the **only** place a laser-pulse deficit is resolved, and **removes**
+the doctor-side 3A/3B choice UI that Brief 34 shipped — it does not defer that removal to a future
+brief.
 
-**What this delivers.** At checkout, when a session's delivered laser pulses exceed the patient's
-remaining pulses-package balance and nobody has resolved the difference yet, the receptionist is
-prompted to either (a) sell a new package — the deficit comes out of it and its price goes on the
-invoice — or (b) bill the deficit out of pocket at the resolved per-pulse rate. Today the receptionist
-is never asked; the deficit is silently absorbed.
+**Read first:** `ai_docs/DECISIONS.md` DEC-079 (this brief's mandate), then Briefs 34 and 34B in this
+file (this depends on Brief 34's migration, `src/lib/laserDeficit.ts` and the rate chain, and on
+Brief 34B's `package_pulse_usage` table and `consume_package_pulses` function — the new server
+operation must call that RPC and never write pulse balances itself; do not start until both have
+landed). Then DEC-069, DEC-072 item 5, DEC-075, and `src/app/api/packages/sell/route.ts` end to end.
+
+**What this delivers.** The doctor's active-session screen records **only** how many pulses were
+delivered — no package name, no balance, no price, no "buy new package" / "pay per pulse" choice, and
+no write to `invoices`/`invoice_lines`/`customer_packages` from that screen. At checkout (both the
+main Checkout modal and the "end session" flow in `BookingDetailsModal.tsx`), when delivered pulses
+exceed the patient's remaining pulses-package balance and the deficit has not yet been resolved, the
+receptionist is prompted to either (a) sell a new package — the deficit comes out of it and its price
+goes on the invoice — or (b) bill the deficit out of pocket at the resolved per-pulse rate. Today
+neither the doctor's choice nor reception's is authoritative and reliable: the doctor's 3A/3B writes
+were the subject of RISK-095, and reception silently absorbs the deficit (see findings below). After
+this brief there is exactly one deficit-resolution path, and it lives at reception.
 
 ### Investigation findings — verify before designing
 
 1. **Checkout already consumes pulses, and already loses the deficit.**
    `src/app/admin/page.tsx:9547-9599` (inside `handleConfirmCheckout`, defined `:9509`, modal at
    `:9203`) resolves the patient's first active pulses package and PATCHes `consume_package_pulses`
-   for the full delivered count. The server clamps to the remaining balance (Brief 34, finding 1), the response is discarded, and the excess is never billed. As of Brief 34B the clamp happens inside the Postgres function `public.consume_package_pulses`, not in the route; the response contract is unchanged. `BookingDetailsModal.tsx:1219-1311` does the
-   same thing in the receptionist "end session" flow. **So "checkout only displays laser settlement"
-   is wrong — it writes.** Both are silent-clamp sites; both must stop being silent.
+   for the full delivered count. The server clamps to the remaining balance (Brief 34, finding 1), the
+   response is discarded, and the excess is never billed. As of Brief 34B the clamp happens inside the
+   Postgres function `public.consume_package_pulses`, not in the route; the response contract is
+   unchanged. `BookingDetailsModal.tsx:1219-1311` does the same thing in the receptionist "end session"
+   flow. **Both are silent-clamp sites and both are reception surfaces** — neither may stop at "surface
+   the clamp"; both must route through the new server operation and prompt.
 2. **The consume happens *after* the money PATCH.** `:9512-9524` writes
    `status/amountPaid/amountLeft/wallet…` first; the pulse consume is at `:9547`. A deficit discovered
    at `:9547` therefore cannot reach the invoice. **The prompt must be resolved before the money is
@@ -388,14 +407,33 @@ is never asked; the deficit is silently absorbed.
    re-resolves the package price server-side from the `packages` row (`:141`), writes
    `invoices` + `invoice_lines` + `customer_packages` (with `total_pulses`/`pulses_remaining`) +
    `payments` with the **real** `method` (`:387-392`) + customer balances, supports partial
-   `amountPaid`, and has rollback helpers at `:30-42`. Brief 34B removed that `|| 1000` pulse fallback: `/api/packages/sell` now refuses a pulses package whose `packages.total_pulses` is 0. The 3A path must surface that refusal to the receptionist, not retry. Also note every current caller hardcodes `paymentMethod: "cash"`
-   (`DoctorAccountView.tsx:1287`, `:1405`, `BookingDetailsModal.tsx:1258`); the new path must pass what
-   the receptionist actually collected.
-5. **Deficit is computed against ONE package.** `DoctorOngoingSessionTab.tsx:611` picks the
-   doctor-selected package, defaulting to the first active pulses package returned by
-   `GET /api/customers/packages`; `page.tsx:9572` and `BookingDetailsModal.tsx:1282` both pick the first active one with `remaining > 0`. (Re-grep these line numbers after Brief 34B item (7) touches those filters; a depleted package is now `fully_used`, so "first active" and "first active with remaining > 0" finally agree.) There is no FIFO across several packages. **Follow the
-   existing behaviour** (single package, explicitly chosen at checkout when there is more than one) and
-   log the "should it drain all active packages first?" question as a decision for Mohamed.
+   `amountPaid`, and has rollback helpers at `:30-42`. Brief 34B removed that `|| 1000` pulse fallback:
+   `/api/packages/sell` now refuses a pulses package whose `packages.total_pulses` is 0. The
+   buy-new-package choice must surface that refusal to the receptionist, not retry. Also note every
+   current caller hardcodes `paymentMethod: "cash"` (`DoctorAccountView.tsx:1287`, `:1405`,
+   `BookingDetailsModal.tsx:1258`); the new path must pass what the receptionist actually collected.
+5. **Deficit is computed against ONE package.** `DoctorOngoingSessionTab.tsx:611` currently picks a
+   doctor-selected package for display purposes only (that selection UI is removed by this brief —
+   see scope item below); `page.tsx:9572` and `BookingDetailsModal.tsx:1282` both pick the first active
+   one with `remaining > 0`. (Re-grep these line numbers after Brief 34B item (7) touches those
+   filters; a depleted package is now `fully_used`, so "first active" and "first active with
+   `remaining > 0`" finally agree.) There is no FIFO across several packages. **Follow the existing
+   behaviour** (single package, explicitly chosen at checkout when there is more than one) and log the
+   "should it drain all active packages first?" question as a decision for Mohamed — it is Brief D,
+   below.
+6. **The doctor-side 3A/3B choice is exactly what DEC-079 removes.**
+   `DoctorAccountView.tsx:1392-1479` (`handleCompleteTreatment`'s deficit branch, hardened by Brief 34
+   item 4) currently: consumes the old package, calls `POST /api/packages/sell`, deducts the deficit
+   from the new package, and posts a `New Package: …` invoice line — all from the doctor's screen, all
+   before reception ever sees the booking. `DoctorOngoingSessionTab.tsx:610-675` computes and displays
+   the deficit, the package balance, and the resolved per-pulse price to the doctor so they can choose.
+   Per DEC-079 this entire choice — the UI, the price/balance display, and the `/api/packages/sell`
+   call and invoice-line write it triggers — is out of place on the doctor's screen and must be
+   removed, not preserved as a parallel path. What the doctor screen keeps: the delivered-pulses input,
+   and the existing clamped consume against the source package (Brief 34B's RPC, unchanged) so the
+   package's `pulses_used`/`pulses_remaining` stay accurate in real time. What it loses: any number
+   that implies a price, any package-selection or "buy new package" control, and any code path that can
+   write an invoice line.
 
 ### Design requirements
 
@@ -403,87 +441,139 @@ is never asked; the deficit is silently absorbed.
 existing route — justify whichever you pick). `requireStaffAccess`. Body carries **only the choice**:
 `{ reservationId, choice: 'BUY_NEW_PACKAGE' | 'PAY_PER_PULSE', packageId?, sourceCustomerPackageId?,
 paymentMethod?, amountPaid? }`. The server does all of: re-read delivered pulses and the package
-balance, compute the deficit with `src/lib/laserDeficit.ts`, consume the source package down to 0,
-then either call the same logic as `/api/packages/sell` (re-resolving the package price from the
-`packages` row — never a client-supplied price, `.windsurf/rules/30-react-and-money.md` rule 6) and
-deduct the deficit from the new package, or write a single `reservation_products` deficit line at the
-rate from Brief 34's chain. Client sends no amounts. If the rate is unresolvable, refuse with a real
-error — no 1 EGP.
+balance, compute the deficit with `src/lib/laserDeficit.ts`, consume the source package down to 0 (this
+consume already happened once from the doctor screen at the clamped amount — this call must be safe to
+run when that consume has already occurred, i.e. it resolves the *remaining, unconsumed* deficit, not
+the full delivered count again), then either call the same logic as `/api/packages/sell`
+(re-resolving the package price from the `packages` row — never a client-supplied price,
+`.windsurf/rules/30-react-and-money.md` rule 6) and deduct the deficit from the new package, or write a
+single `reservation_products` deficit line at the rate from Brief 34's chain. Client sends no amounts.
+If the rate is unresolvable, refuse with a real error — no 1 EGP.
 
-**Idempotency, keyed by reservation.** The consume is protected by `UNIQUE(customer_package_id, reservation_id)` on `package_pulse_usage` (Brief 34B): a repeat call returns the first result and deducts nothing. That guard still does **not** protect the invoice line or the package sale, so the reservation-level marker below is still required. Add a persisted, queryable marker: prefer a real column
-(`reservations.laser_deficit_resolution text` + `laser_deficit_pulses integer`, nullable, no default,
-idempotent migration + `DB_SCHEMA.md` in the same commit) over regex on `notes`. The existing
-`[Laser Settlement]` / `[Laser Package Redemption]` tags written by
-`DoctorAccountView.tsx:1575-1590` keep being written unchanged — treat them as a **legacy read-only
-fallback** for bookings created before this column exists, and say in the PR how you decide between
-the two. A second call for the same reservation returns the first result, changes nothing, and the UI
-says "already resolved".
+**Idempotency, keyed by reservation.** The consume is protected by
+`UNIQUE(customer_package_id, reservation_id)` on `package_pulse_usage` (Brief 34B): a repeat call
+returns the first result and deducts nothing. That guard still does **not** protect the invoice line or
+the package sale, so the reservation-level marker below is still required. Add a persisted, queryable
+marker: a real column (`reservations.laser_deficit_resolution text` + `laser_deficit_pulses integer`,
+nullable, no default, idempotent migration + `DB_SCHEMA.md` in the same commit). The legacy
+`[Laser Settlement]` / `[Laser Package Redemption]` notes tags written by
+`DoctorAccountView.tsx:1575-1590` **stop being written by the deficit branch** under this brief (that
+branch no longer exists — see scope item below); treat any tag already present on older bookings as a
+**legacy read-only fallback** for the marker on bookings created before this column exists, and say in
+the PR how you decide between the two. A second call for the same reservation returns the first
+result, changes nothing, and the UI says "already resolved". Because the doctor screen no longer
+resolves anything, there is no "already resolved by the doctor" case to design for — resolution only
+ever happens once, at reception, through this one operation.
 
-**Cases the design must state an answer for:** a package with an unknown total (`total_pulses = 0`) — refuse with Brief 34B's error, never compute a deficit against a guessed total; no active package at all (no deficit — this is the
-"initial purchase" path, out of scope, must not prompt); exactly-equal balance (no deficit, no
-prompt); multiple active packages (receptionist picks; default = the one the doctor used, read from
-the marker); expired package (`route.ts:416-421` refuses — surface it, do not silently skip);
-mixed sessions with non-laser services on the same invoice (DEC-069 — the deficit line is additive,
-other lines untouched); partial payment (DEC-075 — never collapse the booking total below
-`amountPaid + amountLeft`); wallet / outstanding via the existing helpers only.
-`payments.method` must be the real method.
+**Cases the design must state an answer for:** a package with an unknown total (`total_pulses = 0`) —
+refuse with Brief 34B's error, never compute a deficit against a guessed total; no active package at
+all (no deficit — this is the "initial purchase" path, out of scope, must not prompt); exactly-equal
+balance (no deficit, no prompt); multiple active packages (receptionist picks; no doctor-made default
+exists anymore, so default to the same "first active" resolution `page.tsx`/`BookingDetailsModal.tsx`
+already use); expired package (`route.ts:416-421` refuses — surface it, do not silently skip); mixed
+sessions with non-laser services on the same invoice (DEC-069 — the deficit line is additive, other
+lines untouched); partial payment (DEC-075 — never collapse the booking total below
+`amountPaid + amountLeft`); wallet / outstanding via the existing helpers only. `payments.method` must
+be the real method.
 
-**UI — smallest possible change in the big files.** New
+**UI — reception gets the prompt, the doctor screen gets a plain number.** New
 `src/components/admin/bookings/LaserDeficitPrompt.tsx`: shows delivered pulses, remaining balance,
 deficit, the two choices, the resolved rate and the resulting invoice delta. It is rendered inside the
-checkout modal **before** the totals block (`page.tsx` ~`:9470`), and confirming checkout is blocked
+Checkout modal **before** the totals block (`page.tsx` ~`:9470`), and confirming checkout is blocked
 while an unresolved deficit exists. The diff in `src/app/admin/page.tsx` should be an import, a small
 amount of state, one conditional render and one guard in `handleConfirmCheckout` — nothing else.
-`BookingDetailsModal.tsx:1219-1311` gets **one** change in this brief: surface the clamp (compare
-`consumed` vs `requested` from the response and tell the receptionist a deficit is pending at
-checkout). Do not restructure either file.
+`BookingDetailsModal.tsx:1219-1311`'s "end session" flow gets the **same** `LaserDeficitPrompt`, gated
+the same way, before that flow's own status/payment write — this is a change of substance, not the
+"surface the clamp only" treatment the prior draft specified, per finding 1.
+On the doctor screen, `DoctorOngoingSessionTab.tsx`'s pulses input keeps recording delivered pulses and
+triggers the existing clamped consume; when the clamp reports `consumed < requested`, show one neutral,
+non-monetary line — e.g. "Recorded pulses exceed the package balance. Reception will resolve this at
+checkout." — with no balance number, no package name, and no button. Do not restructure either big
+file beyond these additions.
+
+### Scope — doctor-side removal, spelled out
+
+**DELIBERATE FIX, and it is in scope for this brief, not deferred.**
+- `DoctorAccountView.tsx:1392-1479` (`handleCompleteTreatment`'s deficit branch): delete the
+  `POST /api/packages/sell` call, the deficit-deduction-from-new-package call, and the
+  `New Package: …` invoice-line write. Completion keeps doing the delivered-pulses consume against the
+  source package (clamped, unchanged) and completes the session; it does not sell anything and does not
+  write invoice lines.
+- `DoctorOngoingSessionTab.tsx:610-675`: delete the 3A/3B choice UI, the package-selection control, and
+  the balance/price display. Keep `resolveDeliveredPulses`/whatever of `src/lib/laserDeficit.ts`'s
+  helpers are still needed to detect "delivered exceeds remaining" for the neutral notice above — that
+  detection stays, the monetary UI built on top of it goes.
+- `DoctorAccountView.tsx:1575-1590`'s `[Laser Settlement]` / `[Laser Package Redemption]` tag-writing
+  is deleted along with the branch that wrote it, per the point above — say explicitly in the PR that
+  this is a deletion, not a behavior-preserving refactor, since Brief 34/34B both treated those tags as
+  a thing to keep writing.
+- State plainly in the PR: this discards real, working code Brief 34 shipped two days prior. That is
+  the intended outcome of DEC-079, not a regression to explain away.
 
 ### Deliberately not in scope
-Migrating the doctor flow (`DoctorAccountView.tsx:1392-1479`) onto the new server operation —
-**recommended as the next brief**, but not here; after Brief 35 the doctor path stays as Brief 34 left
-it, and the marker keeps the two from double-billing. FEFO (earliest-expiry-first) across packages — Brief D. The master-rate decision
-(future Brief C). `src/lib/billing.ts`, `ledger.ts`, `wallet.ts`, `customerBalances.ts`,
-`computeSettledBalances()`.
+FEFO (earliest-expiry-first) across packages — Brief D, now scoped to reception's single path only
+(see Queued below, updated under DEC-079). The master-rate decision (future Brief C).
+`src/lib/billing.ts`, `ledger.ts`, `wallet.ts`, `customerBalances.ts`, `computeSettledBalances()`.
+
+### Method
+Order matters because this brief both adds a resolution path and removes the only one that exists
+today. Land in this order so there is never a window where a deficit can occur with nothing able to
+resolve it: (1) the migration + server operation + `LaserDeficitPrompt` + wiring into
+`page.tsx`'s Checkout modal and `BookingDetailsModal.tsx`'s end-session flow, verified working end to
+end; **then, only after that is green and manually verified,** (2) the doctor-side removal described
+above. Do not land (2) before (1) is confirmed working.
 
 ### Verification
 `npm run check` green. New `tests/routes/reservations-laser-deficit.test.ts` (fake-Supabase style,
 per `tests/routes/reservations-patch.test.ts`): deficit computed server-side and not trusted from the
-body; 3A sells, deducts and invoices once; 3B writes one line at the resolved rate; second call is a
-no-op returning the first result; already-resolved-by-doctor never prompts and never re-bills;
-no-package and equal-balance produce no deficit; unresolvable rate → error, no writes; expired source
-package → error; unauthenticated → 401. A jsdom test for `LaserDeficitPrompt.tsx` only (do not add
-one for `page.tsx`).
+body; buy-new-package choice sells, deducts and invoices once; pay-per-pulse choice writes one line at
+the resolved rate; second call is a no-op returning the first result; no-package and equal-balance
+produce no deficit; unresolvable rate → error, no writes; expired source package → error;
+unauthenticated → 401; the same suite covers `BookingDetailsModal.tsx`'s end-session call path, not
+just the Checkout modal's. A jsdom test for `LaserDeficitPrompt.tsx` only (do not add one for
+`page.tsx`). A test asserting `DoctorAccountView.tsx`'s completion path no longer calls
+`/api/packages/sell` and writes no invoice line, to lock in the removal.
 Browser click-path: book a laser service in Package mode for a patient with 5,000 pulses left →
-doctor records 10,000 delivered **without** choosing a spillover option → reception opens Checkout →
-the deficit prompt appears showing 5,000 → pick 3B → the invoice gains one 5,000 × rate line and the
-package reads 0 → reopen Checkout → "already resolved", no second line, balance still 0. Repeat with 3A.
+doctor records 10,000 delivered — the doctor screen shows only the neutral notice, no numbers, no
+choice → reception opens Checkout → the deficit prompt appears showing 5,000 → pick pay-per-pulse → the
+invoice gains one 5,000 × rate line and the package reads 0 → reopen Checkout → "already resolved", no
+second line, balance still 0. Repeat with buy-new-package. Repeat both through
+`BookingDetailsModal.tsx`'s end-session flow instead of the Checkout modal.
 
 ### Report back
 Which route shape you chose and why. The exact marker column(s) and how they interact with the legacy
 `notes` tags. The answer you implemented for each bullet under "Cases the design must state an answer
-for". Every file you touched in `page.tsx` / `BookingDetailsModal.tsx`, line-counted. The migration is
-unapplied — say so. Plus the standing convention: Dev Notes block,
-`ai_docs/manual_tests/LASER_DEFICIT_BRIEF_35_MANUAL_TESTS.md`, a `DECISIONS.md` entry for the
-server-operation + marker design, and a `RISKS.md` entry for anything you found and did not fix.
+for". Every file you touched in `page.tsx` / `BookingDetailsModal.tsx` / `DoctorAccountView.tsx` /
+`DoctorOngoingSessionTab.tsx`, line-counted, with the doctor-side deletions itemized separately from
+the reception-side additions. The migration is unapplied — say so. Plus the standing convention: Dev
+Notes block, `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_35_MANUAL_TESTS.md`, a `DECISIONS.md` entry for
+the server-operation + marker design (referencing DEC-079), and a `RISKS.md` entry for anything you
+found and did not fix.
 
 ### Queued, not yet written
 
 - **Brief C — master per-pulse price location** (device vs service vs clinic default). Product decision pending. Briefs 34/34B/35 resolve the rate only through the fallback chain (reservation snapshot → clinic default → error) so they stay valid whichever is chosen.
-- **Brief D — unify the doctor and checkout deficit paths, and add FEFO.** Migrate `DoctorAccountView.tsx`'s 3A/3B onto Brief 35's server operation, **and** extend that operation to drain **all** of a patient's active pulses packages, earliest expiry first, calling Brief 34B's `consume_package_pulses` once per package in a loop. Doctor and checkout must get FEFO in the same brief — shipping it to one path only re-creates the divergence Brief D exists to remove.
+- **Brief D — FEFO across active packages.** Under DEC-079 there is only one deficit-resolution path (reception's), so Brief D no longer needs to "unify" anything — it only extends Brief 35's server operation to drain **all** of a patient's active pulses packages, earliest expiry first, calling Brief 34B's `consume_package_pulses` once per package in a loop.
 - Translation of the Pages Settings tabs extracted in Brief 27 is also an obvious next brief, not yet written.
 
 ### Decisions log for Mohamed
 
 **Decided:**
-- FEFO across active packages, earliest expiry first → **Brief D**, applied to the doctor and checkout paths together. Briefs 34B/35 stay single-package.
+- The doctor's screen never sells packages, never shows package pricing, and never chooses how a
+  deficit is paid — reception's checkout is the only place that happens → **DEC-079**, this brief.
+- FEFO across active packages, earliest expiry first → **Brief D**, applied to reception's single path
+  (no longer "doctor and checkout paths together" — there is only one path after this brief).
 - Move the pulse balance off the `page_settings` blob → **Brief 34B**.
 - Package total pulses come from the real `total_pulses` column only; unknown is an error the user resolves in Admin → Packages, never a guess → **Brief 34B** items (4)/(5).
-- Keep writing the legacy `[Laser Settlement]` / `[Laser Package Redemption]` notes tags, but stop depending on them for reads once Brief 35's marker column exists.
 
 **Still open (do NOT decide these in code):**
 1. Where the master per-pulse price lives (Brief C).
 2. `packages.total_pulses` is `NOT NULL DEFAULT 0`, so "unset" and "zero" are indistinguishable. Brief 34B assumes 0 = unset and refuses. Confirm no legitimate zero-quota pulses package exists.
 3. The live DB cannot be inspected from code: `DB_SCHEMA.md` had a duplicate, wrong `customer_packages` block (columns no migration creates). Brief 34B assumes the migrations are right and the doc was wrong; if the live DB was hand-edited the backfill changes.
+4. Whether the doctor screen needs the neutral "reception will resolve this" notice at all, or whether
+   silence is preferable — implemented here as a notice per DEC-079's spirit ("the doctor should still
+   know to tell the patient"), but Mohamed should confirm this is the right amount of doctor-facing
+   signal, not too little or too much.
 ---
 ---
 
