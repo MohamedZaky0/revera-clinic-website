@@ -1313,8 +1313,9 @@ export default function AdminNewBookingView({
         return;
       }
 
+      const catalogPulseQuota = Number(selectedCatalogPulsePkg?.total_pulses ?? selectedCatalogPulsePkg?.totalPulses ?? 0);
       const packageNote = isNewPackagePurchase && selectedCatalogPulsePkg
-        ? `\n[Purchasing New Pulses Package]: ${(lang === "ar" && selectedCatalogPulsePkg.name_ar) ? selectedCatalogPulsePkg.name_ar : selectedCatalogPulsePkg.name} (${Number(selectedCatalogPulsePkg.price || 0)} EGP · ${Number(selectedCatalogPulsePkg.total_pulses || selectedCatalogPulsePkg.totalPulses || 10000).toLocaleString()} pulses)${createdCustomerPackageId ? `\n[Customer Package ID]: ${createdCustomerPackageId}` : ""}`
+        ? `\n[Purchasing New Pulses Package]: ${(lang === "ar" && selectedCatalogPulsePkg.name_ar) ? selectedCatalogPulsePkg.name_ar : selectedCatalogPulsePkg.name} (${Number(selectedCatalogPulsePkg.price || 0)} EGP${catalogPulseQuota > 0 ? ` · ${catalogPulseQuota.toLocaleString()} pulses` : ""})${createdCustomerPackageId ? `\n[Customer Package ID]: ${createdCustomerPackageId}` : ""}`
         : (usePackagePayment && matchingPackage && matchingPackageItem)
         ? matchingPackageItem.isPulses
           ? `\n[Laser Package Redemption]: ${(lang === "ar" && matchingPackage.packageNameAr) ? matchingPackage.packageNameAr : matchingPackage.packageName} (${Number(matchingPackageItem.qtyRemaining).toLocaleString()} pulses remaining)`
@@ -2222,7 +2223,7 @@ export default function AdminNewBookingView({
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                               {catalogPackages.map((catPkg) => {
                                 const isSelected = selectedCatalogPulsePkg?.id === catPkg.id;
-                                const totalPulses = catPkg.total_pulses || catPkg.totalPulses || 10000;
+                                const totalPulses = Number(catPkg.total_pulses ?? catPkg.totalPulses ?? 0);
                                 return (
                                   <div
                                     key={catPkg.id}
@@ -2246,7 +2247,9 @@ export default function AdminNewBookingView({
                                         {isSelected && <Check size={14} className="text-amber-700 shrink-0 font-bold" />}
                                       </div>
                                       <span className="text-[11px] text-amber-800 font-semibold block">
-                                        {Number(totalPulses).toLocaleString()} {lang === "ar" ? "نبضة" : "pulses"}
+                                        {totalPulses > 0
+                                          ? `${totalPulses.toLocaleString()} ${lang === "ar" ? "نبضة" : "pulses"}`
+                                          : (lang === "ar" ? "بدون حصة نبضات محددة" : "No pulse quota configured")}
                                       </span>
                                     </div>
                                     <div className="pt-2 mt-2 border-t border-amber-100 flex items-center justify-between">

@@ -188,20 +188,11 @@ export async function GET(req: Request) {
       }
     }
 
-    // Secondary pass: if items are empty and totalPulses is unset or packageType is ambiguous, infer pulse quota
+    // Secondary pass: item-less packages are pulse packages. totalPulses stays whatever the real
+    // column says (0 when unset) — never inferred from the package name; the UI decides what to show.
     for (const pkg of mappedPackages) {
       if (pkg.items.length === 0) {
         pkg.packageType = 'pulses';
-        if (!pkg.totalPulses || pkg.totalPulses <= 0) {
-          const nameStr = String(pkg.name || '');
-          const kMatch = nameStr.match(/(\d+)\s*k\b/i);
-          if (kMatch) {
-            pkg.totalPulses = Number(kMatch[1]) * 1000;
-          } else {
-            const numMatch = nameStr.match(/(\d+(?:,\d+)?)/);
-            if (numMatch) pkg.totalPulses = Number(numMatch[1].replace(/,/g, ''));
-          }
-        }
       }
     }
 
