@@ -138,9 +138,11 @@ export async function POST(req: Request) {
 
       const allDepleted = (siblingItems || []).every((it: any) => (it.qty_remaining || 0) <= 0);
       if (allDepleted) {
+        // 'fully_used', never 'completed': the customer_packages CHECK is
+        // ('active','expired','fully_used') — 'completed' is rejected and leaves the row stale.
         await supabaseServer
           .from('customer_packages')
-          .update({ status: 'completed' })
+          .update({ status: 'fully_used' })
           .eq('id', currentItem.customer_package_id);
       }
 
@@ -148,7 +150,7 @@ export async function POST(req: Request) {
         customer_package_id: currentItem.customer_package_id,
         qty_used: (currentItem.qty_used || 0) + 1,
         qty_remaining: Math.max(0, (currentItem.qty_remaining || 1) - 1),
-        package_status: allDepleted ? 'completed' : 'active'
+        package_status: allDepleted ? 'fully_used' : 'active'
       };
     } else {
       consumptionData = Array.isArray(data) ? data[0] : data;
