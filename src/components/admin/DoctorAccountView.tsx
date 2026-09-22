@@ -507,7 +507,7 @@ export default function DoctorAccountView({
   const fetchDoctorReservations = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      let queryUrl = "/api/reservations?limit=250";
+      const queryUrl = "/api/reservations?limit=250";
       const headers = await getAuthHeaders();
       const res = await fetch(queryUrl, { headers });
       if (res.ok) {

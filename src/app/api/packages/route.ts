@@ -241,11 +241,13 @@ export async function POST(req: Request) {
       show_on_website: payload.showOnWebsite,
     };
 
-    let { data: pkg, error: pkgError } = await supabaseServer
+    const pkgInsertResult = await supabaseServer
       .from('packages')
       .insert(insertPayload)
       .select('*')
       .single();
+    let pkg = pkgInsertResult.data;
+    const pkgError = pkgInsertResult.error;
 
     if (pkgError && (pkgError.message?.includes('column') || pkgError.code === '42703')) {
       const fallbackPayload = { ...insertPayload };
@@ -347,12 +349,14 @@ export async function PATCH(req: Request) {
       show_on_website: payload.showOnWebsite,
     };
 
-    let { data: pkg, error: pkgError } = await supabaseServer
+    const pkgUpdateResult = await supabaseServer
       .from('packages')
       .update(updatePayload)
       .eq('id', id)
       .select('*')
       .single();
+    let pkg = pkgUpdateResult.data;
+    const pkgError = pkgUpdateResult.error;
 
     if (pkgError && (pkgError.message?.includes('column') || pkgError.code === '42703')) {
       const fallbackPayload = { ...updatePayload };

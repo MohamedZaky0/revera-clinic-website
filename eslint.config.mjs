@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "scratch/**",
     "*.js",
+    // Other sessions' git worktrees live here (excluded from git via .git/info/exclude). They are
+    // full copies of the repo, so linting them multiplies every finding and fails the gate on
+    // code that is not part of this checkout.
+    ".claude/worktrees/**",
   ]),
   {
     rules: {
