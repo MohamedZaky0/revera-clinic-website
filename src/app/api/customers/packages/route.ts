@@ -15,22 +15,27 @@ export interface PackagePulseUsageLog {
   remaining_after?: number;
 }
 
-// Helper to get fallback package pulse data store in page_settings
-async function getPackagePulsesStore(): Promise<Record<string, { included_pulses: number; used_pulses: number; remaining_pulses: number; usage_history: PackagePulseUsageLog[] }>> {
-  try {
-    const { data } = await supabaseServer
-      .from('page_settings')
-      .select('value')
-      .eq('key', 'customer_package_pulses')
-      .maybeSingle();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    if (data?.value && typeof data.value === 'object') {
-      return data.value;
-    }
-  } catch (err) {
-    console.warn('Error reading customer_package_pulses:', err);
+// One batched read of package_pulse_usage for a set of customer package ids, grouped by
+// customer_package_id. Keeps the old blob's usage_history field names via mapPulseUsageRow.
+async function getPackagePulseUsageMap(customerPackageIds: string[]): Promise<Record<string, PackagePulseUsageLog[]>> {
+  const ids = customerPackageIds.filter((id) => UUID_RE.test(String(id)));
+  if (ids.length === 0) return {};
+  const { data, error } = await supabaseServer
+    .from('package_pulse_usage')
+    .select('*')
+    .in('customer_package_id', ids)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.warn('Error reading package_pulse_usage:', error);
+    return {};
   }
-  return {};
+  const map: Record<string, PackagePulseUsageLog[]> = {};
+  for (const row of data || []) {
+    (map[row.customer_package_id] ||= []).push(mapPulseUsageRow(row));
+  }
+  return map;
 }
 
 // Maps one package_pulse_usage row into the PackagePulseUsageLog shape callers already consume
@@ -134,7 +139,6 @@ export async function GET(req: Request) {
     }
 
     const validCustomerIds = customerIds.filter((id) => UUID_REGEX.test(id));
-    const pulseStore = await getPackagePulsesStore();
     let packages: any[] = [];
 
     // 1. Fetch from native customer_packages table (only with valid UUIDs to avoid 22P02 error)
@@ -144,7 +148,8 @@ export async function GET(req: Request) {
           .from('customer_packages')
           .select(`
             id, customer_id, package_id, status, purchased_at, expires_at, price_paid,
-            packages ( id, name, name_ar ),
+            package_type, total_pulses, pulses_used, pulses_remaining,
+            packages ( id, name, name_ar, package_type ),
             customer_package_items ( id, service_id, qty_total, qty_used, qty_remaining, services ( id, en, ar, name, price ) )
           `)
           .in('customer_id', validCustomerIds)
@@ -152,20 +157,16 @@ export async function GET(req: Request) {
 
         if (!error && data && data.length > 0) {
           packages = data.map((row: any) => {
-            const pulseInfo = pulseStore[row.id] || null;
-            const incPulses = pulseInfo
-              ? Number(pulseInfo.included_pulses || 0)
-              : Number((row as any).total_pulses || (row as any).included_pulses || 0);
-            const remPulses = pulseInfo
-              ? Number(pulseInfo.remaining_pulses || 0)
-              : Number((row as any).pulses_remaining || (row as any).remaining_pulses || incPulses);
-            const usedPulses = pulseInfo
-              ? Number(pulseInfo.used_pulses || 0)
-              : Number((row as any).pulses_used || (row as any).used_pulses || 0);
+            // Nullish-aware: a real pulses_remaining of 0 must stay 0 — falling back to the
+            // included total would resurrect a depleted package.
+            const incPulses = Number(row.total_pulses ?? row.included_pulses ?? 0);
+            const remPulses = row.pulses_remaining != null
+              ? Number(row.pulses_remaining)
+              : row.remaining_pulses != null ? Number(row.remaining_pulses) : incPulses;
+            const usedPulses = Number(row.pulses_used ?? row.used_pulses ?? 0);
             const isPulses = Boolean(
-              (row as any).package_type === 'pulses' ||
-              (row.packages as any)?.package_type === 'pulses' ||
-              pulseInfo !== null ||
+              row.package_type === 'pulses' ||
+              row.packages?.package_type === 'pulses' ||
               incPulses > 0 ||
               remPulses > 0 ||
               (row.customer_package_items || []).length === 0
@@ -186,7 +187,7 @@ export async function GET(req: Request) {
               usedPulses: usedPulses,
               pulsesRemaining: remPulses,
               remainingPulses: remPulses,
-              pulseUsageHistory: pulseInfo?.usage_history || [],
+              pulseUsageHistory: [] as PackagePulseUsageLog[],
               items: (row.customer_package_items || []).map((it: any) => ({
                 id: it.id,
                 serviceId: Number(it.service_id),
@@ -223,20 +224,14 @@ export async function GET(req: Request) {
             packages = rawCustPkgs.map((row: any) => {
               const master = allMasterPkgs.find((m: any) => String(m.id) === String(row.package_id));
               const rowItems = allItems.filter((it: any) => String(it.customer_package_id) === String(row.id));
-              const pulseInfo = pulseStore[row.id] || null;
-              const incPulses = pulseInfo
-                ? Number(pulseInfo.included_pulses || 0)
-                : Number(row.total_pulses || (row as any).included_pulses || 0);
-              const remPulses = pulseInfo
-                ? Number(pulseInfo.remaining_pulses || 0)
-                : Number(row.pulses_remaining || (row as any).remaining_pulses || incPulses);
-              const usedPulses = pulseInfo
-                ? Number(pulseInfo.used_pulses || 0)
-                : Number(row.pulses_used || (row as any).used_pulses || 0);
+              const incPulses = Number(row.total_pulses ?? row.included_pulses ?? 0);
+              const remPulses = row.pulses_remaining != null
+                ? Number(row.pulses_remaining)
+                : row.remaining_pulses != null ? Number(row.remaining_pulses) : incPulses;
+              const usedPulses = Number(row.pulses_used ?? row.used_pulses ?? 0);
               const isPulses = Boolean(
                 row.package_type === 'pulses' ||
                 (master as any)?.package_type === 'pulses' ||
-                pulseInfo !== null ||
                 incPulses > 0 ||
                 remPulses > 0 ||
                 rowItems.length === 0
@@ -257,7 +252,7 @@ export async function GET(req: Request) {
                 usedPulses: usedPulses,
                 pulsesRemaining: remPulses,
                 remainingPulses: remPulses,
-                pulseUsageHistory: pulseInfo?.usage_history || [],
+                pulseUsageHistory: [] as PackagePulseUsageLog[],
                 items: rowItems.map((it: any) => {
                   const svc = allServices.find((s: any) => Number(s.id) === Number(it.service_id));
                   return {
@@ -277,6 +272,13 @@ export async function GET(req: Request) {
       } catch (cpErr) {
         console.warn('Error reading customer_packages table:', cpErr);
       }
+    }
+
+    // Pulse usage history comes from package_pulse_usage in one batched query, covering both the
+    // joined and the fallback branches above.
+    if (packages.length > 0) {
+      const usageMap = await getPackagePulseUsageMap(packages.map((p) => p.id));
+      packages = packages.map((p) => ({ ...p, pulseUsageHistory: usageMap[p.id] || [] }));
     }
 
     // 2. Also check customer_product_balances in case sessions were purchased as product balances
