@@ -578,6 +578,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const { isRTL } = useLanguage();
   // Auth state
   const [session, setSession] = useState<any>(null);
+
+  const getAccessToken = useCallback(async () => {
+    if (session?.access_token) return session.access_token;
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.access_token) {
+        setSession(data.session);
+        return data.session.access_token;
+      }
+    } catch {}
+    return null;
+  }, [session?.access_token]);
+
   const authenticatedJsonHeaders = {
     "Content-Type": "application/json",
     "Authorization": `Bearer ${session?.access_token || ""}`
@@ -591,7 +604,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setLocalCategories(data);
           saveDynamicCategories(data);
           setExpandedCategories(prev => {
@@ -614,11 +627,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
   const syncCategoriesToApi = useCallback(async (categories: LocalCategory[]) => {
     saveDynamicCategories(categories);
-    if (!session?.access_token) return categories;
+    const token = await getAccessToken();
+    if (!token) return categories;
     try {
       const res = await fetch("/api/categories", {
         method: "POST",
-        headers: authenticatedJsonHeaders,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(categories),
       });
       if (res.ok) {
@@ -632,28 +649,30 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       console.error("Error saving categories to API:", err);
     }
     return categories;
-  }, [session?.access_token, authenticatedJsonHeaders]);
+  }, [getAccessToken]);
 
   const deleteCategoryFromApi = useCallback(async (key: string) => {
-    if (!session?.access_token) return false;
+    const token = await getAccessToken();
+    if (!token) return false;
     try {
       const res = await fetch(`/api/categories?key=${encodeURIComponent(key)}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       return res.ok;
     } catch (err) {
       console.error("Error deleting category from API:", err);
       return false;
     }
-  }, [session?.access_token]);
+  }, [getAccessToken]);
 
   // Service CRUD helpers — services are now database-primary, not localStorage (RISK-025)
   const loadServicesFromApi = useCallback(async () => {
     try {
+      const token = await getAccessToken();
       const headers: Record<string, string> = {};
-      if (session?.access_token) {
-        headers["Authorization"] = `Bearer ${session.access_token}`;
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
       }
       const res = await fetch("/api/services", {
         headers,
@@ -706,14 +725,18 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     } catch (err) {
       console.error("Error loading services from API:", err);
     }
-  }, [session?.access_token]);
+  }, [getAccessToken]);
 
   const syncServicesToApi = useCallback(async (services: ServiceItem[]) => {
-    if (!session?.access_token) return null;
+    const token = await getAccessToken();
+    if (!token) return null;
     try {
       const res = await fetch("/api/services", {
         method: "POST",
-        headers: authenticatedJsonHeaders,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(services),
       });
       if (!res.ok) {
@@ -726,21 +749,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       console.error("Error saving services to API:", err);
       return null;
     }
-  }, [session?.access_token, authenticatedJsonHeaders]);
+  }, [getAccessToken]);
 
   const deleteServiceFromApi = useCallback(async (id: number) => {
-    if (!session?.access_token) return false;
+    const token = await getAccessToken();
+    if (!token) return false;
     try {
       const res = await fetch(`/api/services?id=${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       return res.ok;
     } catch (err) {
       console.error("Error deleting service from API:", err);
       return false;
     }
-  }, [session?.access_token]);
+  }, [getAccessToken]);
 
   // Inactivity Settings State
   const [inactivityThreshold, setInactivityThreshold] = useState<number>(30);
@@ -1426,6 +1450,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
     await Promise.all(removedServiceIds.map(id => deleteServiceFromApi(id)));
     await loadServicesFromApi();
+    await loadCategoriesFromApi();
 
     setExpandedCategories(prev => {
       const copy = { ...prev };
@@ -2514,7 +2539,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-075', name: 'Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies laser packages isolation to Option 3, patient multi-package selection, catalog package purchase, and package price + non-laser service total calculation.', status: 'idle' },
     { id: 'TC-076', name: 'Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies accurate deduction of delivered laser pulses from customer pulses packages across doctor portal session finalization, reception session completion, and checkout settlement workflows with DB synchronization and idempotency.', status: 'idle' },
     { id: 'TC-077', name: 'In-Booking Package Selling & Integrated Patient Search Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies selling catalog packages directly during new booking creation with customer_packages persistence and instant patient profile appearance, as well as integrated patient search dropdown rendering.', status: 'idle' },
-    { id: 'TC-078', name: 'In-Booking Package Partial Payment & Session Balance Preservation Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies that when a patient purchases a new pulses package during booking with a partial payment (e.g. 500 EGP of 1000 EGP), the remaining 500 EGP outstanding balance is preserved correctly through doctor portal session completion and receptionist session finalization — preventing amountLeft from being zeroed out. Also verifies Payment Mode displays Pulses Package and Pay & Settle Invoice button remains visible.', status: 'idle' }
+    { id: 'TC-078', name: 'In-Booking Package Partial Payment & Session Balance Preservation Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies that when a patient purchases a new pulses package during booking with a partial payment (e.g. 500 EGP of 1000 EGP), the remaining 500 EGP outstanding balance is preserved correctly through doctor portal session completion and receptionist session finalization — preventing amountLeft from being zeroed out. Also verifies Payment Mode displays Pulses Package and Pay & Settle Invoice button remains visible.', status: 'idle' },
+    { id: 'TC-079', name: 'Database-Driven Service Categories & Zero Mock Defaults Engine', category: 'Services & Bookings', endpoint: '/api/categories', description: 'Verifies dynamic database-driven categories CRUD, zero hardcoded/mock defaults, instant category deletion without re-seeding resurrection, and associated service cascade cleanup.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);

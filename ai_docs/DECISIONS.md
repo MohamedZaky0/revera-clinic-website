@@ -2638,8 +2638,38 @@ Administrators modifying service categories, adding/editing services, or togglin
    - `AdminServicesView.tsx` computes `completeCategories` ensuring that any category key referenced by a database service is rendered even if not explicitly created yet.
 4. **Client Website Sections (`HomeServicesSection.tsx`, `ServicesSection.tsx`, `BookingModal.tsx`):**
    - Fetches `/api/categories` and `/api/services` with `{ cache: 'no-store' }`.
-   - Filters active services directly via database flags `s.active !== false && s.visible !== false`.
-   - Dynamically computes `renderedCategories` merging any categories referenced by active services.
+
+---
+
+## DEC-077: Elimination of Hardcoded Mock Data, Auto-Seeding, and Ensuring Pure Database-Driven Services & Categories
+
+**Date:** 2026-09-22
+**Status:** Decided — active
+
+**Context:**
+Users reported that deleted categories kept resurrecting and default categories/mock services could not be permanently removed. When inspecting the database, deleted records were being automatically recreated by backend and frontend auto-seeding routines whenever a table was empty or storage was unpopulated.
+
+**Root Causes:**
+1. **API Auto-Seeding (`src/app/api/categories/route.ts`):** `GET /api/categories` had fallback logic that automatically upserted hardcoded mock categories (`dermatology`, `gynecology`, `physiotherapy`, `osteopathy`) directly into Supabase whenever `categories` table had 0 rows.
+2. **Client `localStorage` Auto-Seeding (`src/lib/serviceStore.ts`):** `getDynamicCategories()` and `getDynamicServices()` inserted mock categories and 20 sample services into `localStorage` if local storage keys were empty.
+3. **Hardcoded Mock Constants (`src/lib/services.ts`):** `SERVICES` contained 20 hardcoded mock service objects and `CATEGORY_LABELS` contained 4 hardcoded categories.
+4. **Length-conditioned API fallbacks:** In consumer components (`HomeServicesSection`, `ServicesSection`, `BookingModal`, and `admin/page.tsx`), empty arrays (`[]`) returned by the API were treated as missing data due to `data.length > 0` checks, triggering fallbacks to mock data.
+
+**Decisions & Implementation:**
+1. **Purged All Mock Data from Codebase:**
+   - `SERVICES` in `src/lib/services.ts` is now an empty array `[]`.
+   - `CATEGORY_LABELS` is now an empty map `{}`.
+2. **Removed Auto-Seeding from API Routes:**
+   - `GET /api/categories` returns `[]` when the table is empty and never upserts default categories into Supabase.
+   - `DELETE /api/categories?key=...` deletes the category record from `categories` and cascades to remove any associated services in that category.
+3. **Removed Auto-Seeding from `serviceStore.ts`:**
+   - `getDynamicCategories()` and `getDynamicServices()` return `[]` when storage is empty, with zero mock insertion.
+4. **Direct Array Assignment in Consumer Views:**
+   - Frontend components now check `Array.isArray(data)` rather than `data.length > 0`, ensuring that 0 categories or 0 services are correctly recognized as intentional empty states.
+   - Added friendly empty states in `AdminServicesView.tsx` when no categories are created yet.
+5. **System Test Suite Diagnostics:**
+   - Added `TC-079` to verify database-driven categories CRUD, zero fake defaults, and clean category deletion.
+
 
 
 

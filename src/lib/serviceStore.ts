@@ -1,5 +1,5 @@
 import { CLIENT } from "@/config/client";
-import { SERVICES, CATEGORY_LABELS, ServiceItem } from "./services";
+import { ServiceItem } from "./services";
 
 const TOGGLES_KEY = `${CLIENT.storagePrefix}_service_toggles`;
 const SERVICES_KEY = `${CLIENT.storagePrefix}_dynamic_services`;
@@ -14,7 +14,7 @@ export interface LocalCategory {
 
 export type ServiceToggleState = Record<number, { visible: boolean; active: boolean }>;
 
-/** Helper to get dynamic categories, seeding with defaults if empty */
+/** Helper to get dynamic categories from localStorage */
 export function getDynamicCategories(): LocalCategory[] {
   if (typeof window === "undefined") return [];
   try {
@@ -25,16 +25,7 @@ export function getDynamicCategories(): LocalCategory[] {
         return parsed.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
       }
     }
-    
-    // Seed default categories
-    const defaults: LocalCategory[] = Object.entries(CATEGORY_LABELS).map(([key, val], index) => ({
-      key,
-      en: val.en,
-      ar: val.ar,
-      sortOrder: index,
-    }));
-    localStorage.setItem(CATEGORIES_KEY, JSON.stringify(defaults));
-    return defaults.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    return [];
   } catch {
     return [];
   }
@@ -47,7 +38,7 @@ export function saveDynamicCategories(categories: LocalCategory[]): void {
   window.dispatchEvent(new StorageEvent("storage", { key: CATEGORIES_KEY }));
 }
 
-/** Helper to get dynamic services, seeding with defaults if empty */
+/** Helper to get dynamic services from localStorage */
 export function getDynamicServices(): ServiceItem[] {
   if (typeof window === "undefined") return [];
   try {
@@ -55,31 +46,10 @@ export function getDynamicServices(): ServiceItem[] {
     if (raw) {
       const parsed = JSON.parse(raw) as ServiceItem[];
       if (Array.isArray(parsed)) {
-        let changed = false;
-        const migrated = parsed.map(item => {
-          const defaultSvc = SERVICES.find(s => s.id === item.id);
-          if (defaultSvc && item.img !== defaultSvc.img) {
-            changed = true;
-            return { ...item, img: defaultSvc.img };
-          }
-          return item;
-        });
-        if (changed) {
-          localStorage.setItem(SERVICES_KEY, JSON.stringify(migrated));
-        }
-        return migrated.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+        return parsed.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
       }
     }
-
-    // Seed default services
-    const defaults = SERVICES.map(s => ({
-      ...s,
-      price: s.price ?? 0,
-      createdAt: s.createdAt ?? "30 Apr 2:01 pm",
-      sortOrder: s.sortOrder ?? 0,
-    }));
-    localStorage.setItem(SERVICES_KEY, JSON.stringify(defaults));
-    return defaults.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    return [];
   } catch {
     return [];
   }

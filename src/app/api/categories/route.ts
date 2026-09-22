@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess } from '@/lib/access';
-import { CATEGORY_LABELS } from '@/lib/services';
 
 function mapCategoryRow(r: any) {
   return {
@@ -32,43 +31,10 @@ export async function GET(req: Request) {
       .order('sort_order', { ascending: true });
 
     if (error) throw error;
-
-    if (!data || data.length === 0) {
-      // Seed default categories if table is currently empty
-      const defaultCats = Object.entries(CATEGORY_LABELS).map(([key, val], idx) => ({
-        key,
-        en: val.en,
-        ar: val.ar,
-        sort_order: idx,
-      }));
-
-      try {
-        const { data: seeded, error: seedError } = await supabase
-          .from('categories')
-          .upsert(defaultCats)
-          .select();
-
-        if (!seedError && seeded && seeded.length > 0) {
-          return NextResponse.json(seeded.map(mapCategoryRow));
-        }
-      } catch (seedErr) {
-        console.warn('Auto-seed categories warning:', seedErr);
-      }
-
-      return NextResponse.json(defaultCats.map(mapCategoryRow));
-    }
-
-    return NextResponse.json(data.map(mapCategoryRow));
+    return NextResponse.json((data || []).map(mapCategoryRow));
   } catch (err) {
     console.error('GET /api/categories error:', err);
-    // Fallback to static CATEGORY_LABELS on DB error
-    const defaultCats = Object.entries(CATEGORY_LABELS).map(([key, val], idx) => ({
-      key,
-      en: val.en,
-      ar: val.ar,
-      sortOrder: idx,
-    }));
-    return NextResponse.json(defaultCats);
+    return NextResponse.json([]);
   }
 }
 
@@ -109,17 +75,26 @@ export async function DELETE(req: Request) {
   if (!key) return NextResponse.json({ error: 'Missing key' }, { status: 400 });
 
   try {
-    const { data, error } = await getSupabaseServer()
+    const supabase = getSupabaseServer();
+    const { data, error } = await supabase
       .from('categories')
       .delete()
       .eq('key', key)
       .select();
 
     if (error) throw error;
-    if (!data || data.length === 0) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    // Also delete or unassign any services under this category in the database
+    try {
+      await supabase
+        .from('services')
+        .delete()
+        .eq('cat', key);
+    } catch (svcErr) {
+      console.warn('Warning deleting services under category:', svcErr);
     }
-    return NextResponse.json({ success: true, message: 'Category deleted' });
+
+    return NextResponse.json({ success: true, message: 'Category deleted', deleted: data });
   } catch (err) {
     console.error('DELETE /api/categories error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });

@@ -380,7 +380,7 @@ export function ServicesSection() {
     fetch("/api/categories", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setDynamicCategories(data);
         } else {
           setDynamicCategories(getDynamicCategories());

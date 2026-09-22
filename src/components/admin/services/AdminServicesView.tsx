@@ -371,6 +371,31 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
             return 0;
           });
 
+          if (sortedCategories.length === 0) {
+            return (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#414E36]/20 bg-[#F9F9F7] py-16 px-4 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36] mb-3">
+                  <Layers size={22} />
+                </div>
+                <h4 className="text-base font-bold text-[#1F251A] mb-1">
+                  {lang === "ar" ? "لا توجد أقسام مسجلة" : "No Categories Created Yet"}
+                </h4>
+                <p className="text-xs text-[#5A6A51] max-w-sm mb-4">
+                  {lang === "ar"
+                    ? "ابدأ بإضافة قسم جديد للخدمات لتنظيم خدمات العيادة والأسعار."
+                    : "Get started by adding a service category to organize your clinic's services and pricing."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCategoryModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer"
+                >
+                  <Plus size={14} /> {t.addCategoryBtn}
+                </button>
+              </div>
+            );
+          }
+
           return sortedCategories.map((cat) => {
             const catServicesRaw = (groupedServices[cat.key] ?? []).filter((svc) => {
               const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
@@ -1222,7 +1247,14 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
               <button
                 type="button"
                 onClick={async () => {
-                  if (!serviceNameEn.trim()) return;
+                  if (!serviceNameEn.trim()) {
+                    alert(lang === "ar" ? "يرجى إدخال اسم الخدمة" : "Please enter a service name.");
+                    return;
+                  }
+                  if (!serviceCategory) {
+                    alert(lang === "ar" ? "يرجى اختيار القسم" : "Please select a category.");
+                    return;
+                  }
                   if (serviceDurationMinutes <= 0 || serviceDurationMinutes > 1440) {
                     alert(t.durationAlert);
                     return;
@@ -1238,7 +1270,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                         return {
                           ...s,
                           en: serviceNameEn.trim(),
-                          ar: serviceNameAr.trim(),
+                          ar: serviceNameAr.trim() || serviceNameEn.trim(),
                           cat: serviceCategory,
                           unit: serviceUnitType.toLowerCase(),
                           price: servicePrice,
@@ -1265,11 +1297,11 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     const newService: ServiceItem = {
                       id: 0, // placeholder, removed by the API mapper
                       en: serviceNameEn.trim(),
-                      ar: serviceNameAr.trim(),
+                      ar: serviceNameAr.trim() || serviceNameEn.trim(),
                       cat: serviceCategory,
                       unit: serviceUnitType.toLowerCase(),
                       price: servicePrice,
-                      duration: serviceDuration,
+                      duration: serviceDuration || getDurationLabel(serviceDurationMinutes),
                       duration_minutes: serviceDurationMinutes,
                       descriptionEn: serviceDescEn.trim(),
                       descriptionAr: serviceDescAr.trim(),
@@ -1290,26 +1322,16 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
                   const synced = await syncServicesToApi(updatedServices);
                   if (synced) {
-                    setLocalServices(synced);
-
-                    const savedService = editingService
-                      ? synced.find(s => s.id === editingService.id)
-                      : synced.find(s => !previousIds.has(s.id));
-
-                    const defaultBranch = serviceBranchPricing.find(b => b.isDefault);
-                    if (savedService && defaultBranch) {
-                      setServiceToggle(savedService.id, "active", defaultBranch.status);
-                      setServiceToggle(savedService.id, "visible", defaultBranch.visible);
-                      setServiceToggles(prev => ({
-                        ...prev,
-                        [savedService.id]: { visible: defaultBranch.visible, active: defaultBranch.status }
-                      }));
+                    await loadServicesFromApi();
+                    if (loadCategoriesFromApi) {
+                      await loadCategoriesFromApi();
                     }
+                    setShowAddServiceModal(false);
+                  } else {
+                    alert(lang === "ar" ? "فشل حفظ الخدمة. يرجى التأكد من صلاحيات الحساب والمحاولة مرة أخرى." : "Failed to save service. Please check your permissions and try again.");
                   }
-
-                  setShowAddServiceModal(false);
                 }}
-                className="rounded-lg bg-[#414E36] px-6 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                className="rounded-lg bg-[#414E36] px-6 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] cursor-pointer"
               >
                 {t.saveBtn}
               </button>
