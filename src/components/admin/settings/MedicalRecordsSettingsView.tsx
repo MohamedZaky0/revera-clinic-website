@@ -22,7 +22,6 @@ import {
   Tag
 } from "lucide-react";
 import { MedicalRecordTemplate, IntakeField } from "@/app/api/medical-records/templates/route";
-import { SERVICES } from "@/lib/services";
 import { supabase } from "@/lib/supabaseClient";
 
 interface MedicalRecordsSettingsViewProps {
@@ -36,9 +35,7 @@ export default function MedicalRecordsSettingsView({
   lang = "en",
   authenticatedJsonHeaders
 }: MedicalRecordsSettingsViewProps) {
-  const [allServices, setAllServices] = useState<any[]>(
-    initialServices.length > 0 ? initialServices : SERVICES
-  );
+  const [allServices, setAllServices] = useState<any[]>(initialServices);
   const [templates, setTemplates] = useState<MedicalRecordTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -60,11 +57,12 @@ export default function MedicalRecordsSettingsView({
     const loadServices = async () => {
       try {
         const headers = await getAuthHeaders();
-        const res = await fetch("/api/services", { headers });
+        const res = await fetch("/api/services", { headers, cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data.services) && data.services.length > 0) {
-            setAllServices(data.services);
+          const servicesList = Array.isArray(data) ? data : (data.services || []);
+          if (servicesList.length > 0) {
+            setAllServices(servicesList);
           }
         }
       } catch (err) {

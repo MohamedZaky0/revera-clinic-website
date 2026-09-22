@@ -4248,8 +4248,10 @@ fallback (~line 1241) depends on `booking.purchasingPackageId`, which is never p
 runs; if it did, it sells without `amountPaid` and would record the full price as a second payment. The
 booking payload also sends `explicitCustomerId` while the reservations route reads `customerId`, so the
 resolved patient id is ignored (it falls back to a phone lookup). Neither was needed for the fix above.
-The **doctor-portal** "buy a package at end of session" path was not exercised live (it needs a doctor
-login); it shares the `/api/packages/sell` route fixed in RISK-092.
+The doctor session screen also offers "buy a new package" (Option 3 with no active package). It was not
+exercised live (it needs a doctor login), and selling packages is reception's job, so whether that
+option should exist is a product decision; it shares the `/api/packages/sell` route fixed in RISK-092.
+Reception's End Session has no purchase step at all: a package is only sold at booking time.
 
 **Manual test checklist:** `ai_docs/manual_tests/RISK_090_091_MANUAL_TESTS.md`
 

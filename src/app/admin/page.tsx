@@ -579,17 +579,104 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const { isRTL } = useLanguage();
   // Auth state
   const [session, setSession] = useState<any>(null);
+
+  const getAccessToken = useCallback(async () => {
+    if (session?.access_token) return session.access_token;
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.access_token) {
+        setSession(data.session);
+        return data.session.access_token;
+      }
+    } catch {}
+    return null;
+  }, [session?.access_token]);
+
   const authenticatedJsonHeaders = {
     "Content-Type": "application/json",
     "Authorization": `Bearer ${session?.access_token || ""}`
   };
 
+  // Category CRUD helpers — backed by /api/categories and Supabase
+  const loadCategoriesFromApi = useCallback(async () => {
+    try {
+      const res = await fetch("/api/categories", {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocalCategories(data);
+          saveDynamicCategories(data);
+          setExpandedCategories(prev => {
+            const exp = { ...prev };
+            data.forEach((c: LocalCategory) => {
+              if (exp[c.key] === undefined) exp[c.key] = true;
+            });
+            return exp;
+          });
+          return data;
+        }
+      }
+    } catch (err) {
+      console.error("Error loading categories from API:", err);
+    }
+    const fallback = getDynamicCategories();
+    setLocalCategories(fallback);
+    return fallback;
+  }, []);
+
+  const syncCategoriesToApi = useCallback(async (categories: LocalCategory[]) => {
+    saveDynamicCategories(categories);
+    const token = await getAccessToken();
+    if (!token) return categories;
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(categories),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const saved = Array.isArray(data) ? data : [data];
+        setLocalCategories(saved);
+        saveDynamicCategories(saved);
+        return saved;
+      }
+    } catch (err) {
+      console.error("Error saving categories to API:", err);
+    }
+    return categories;
+  }, [getAccessToken]);
+
+  const deleteCategoryFromApi = useCallback(async (key: string) => {
+    const token = await getAccessToken();
+    if (!token) return false;
+    try {
+      const res = await fetch(`/api/categories?key=${encodeURIComponent(key)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return res.ok;
+    } catch (err) {
+      console.error("Error deleting category from API:", err);
+      return false;
+    }
+  }, [getAccessToken]);
+
   // Service CRUD helpers — services are now database-primary, not localStorage (RISK-025)
   const loadServicesFromApi = useCallback(async () => {
-    if (!session?.access_token) return;
     try {
+      const token = await getAccessToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
       const res = await fetch("/api/services", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers,
         cache: "no-store",
       });
       if (!res.ok) {
@@ -597,21 +684,60 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         return;
       }
       const data = await res.json();
-      setLocalServices(Array.isArray(data) ? data : []);
-      const storedToggles = getServiceToggles();
-      const defaults = Object.fromEntries((Array.isArray(data) ? data : []).map((s: ServiceItem) => [s.id, { visible: true, active: true }]));
-      setServiceToggles({ ...defaults, ...storedToggles });
+      const servicesList: ServiceItem[] = Array.isArray(data) ? data : [];
+      setLocalServices(servicesList);
+
+      // Build database-driven toggles directly from database active & visible columns
+      const dbToggles = Object.fromEntries(
+        servicesList.map((s: ServiceItem) => [
+          s.id,
+          { visible: s.visible !== false, active: s.active !== false }
+        ])
+      );
+      setServiceToggles(dbToggles);
+
+      // Auto-discover any missing categories from database services so no service is ever hidden
+      setLocalCategories(prevCats => {
+        const knownKeys = new Set(prevCats.map(c => c.key));
+        const missingKeys = new Set<string>();
+        servicesList.forEach(s => {
+          if (s.cat && !knownKeys.has(s.cat)) {
+            missingKeys.add(s.cat);
+          }
+        });
+        if (missingKeys.size > 0) {
+          const autoCats: LocalCategory[] = Array.from(missingKeys).map((catKey, idx) => ({
+            key: catKey,
+            en: catKey.charAt(0).toUpperCase() + catKey.slice(1).replace(/_/g, " "),
+            ar: catKey.charAt(0).toUpperCase() + catKey.slice(1).replace(/_/g, " "),
+            sortOrder: prevCats.length + idx,
+          }));
+          const merged = [...prevCats, ...autoCats];
+          saveDynamicCategories(merged);
+          setExpandedCategories(prevExp => {
+            const exp = { ...prevExp };
+            autoCats.forEach(c => { exp[c.key] = true; });
+            return exp;
+          });
+          return merged;
+        }
+        return prevCats;
+      });
     } catch (err) {
       console.error("Error loading services from API:", err);
     }
-  }, [session?.access_token]);
+  }, [getAccessToken]);
 
   const syncServicesToApi = useCallback(async (services: ServiceItem[]) => {
-    if (!session?.access_token) return null;
+    const token = await getAccessToken();
+    if (!token) return null;
     try {
       const res = await fetch("/api/services", {
         method: "POST",
-        headers: authenticatedJsonHeaders,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(services),
       });
       if (!res.ok) {
@@ -624,21 +750,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       console.error("Error saving services to API:", err);
       return null;
     }
-  }, [session?.access_token, authenticatedJsonHeaders]);
+  }, [getAccessToken]);
 
   const deleteServiceFromApi = useCallback(async (id: number) => {
-    if (!session?.access_token) return false;
+    const token = await getAccessToken();
+    if (!token) return false;
     try {
       const res = await fetch(`/api/services?id=${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       return res.ok;
     } catch (err) {
       console.error("Error deleting service from API:", err);
       return false;
     }
-  }, [session?.access_token]);
+  }, [getAccessToken]);
 
   // Inactivity Settings State
   const [inactivityThreshold, setInactivityThreshold] = useState<number>(30);
@@ -1290,7 +1417,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [dragOverCatKey, setDragOverCatKey] = useState<string | null>(null);
   const [catDraggable, setCatDraggable] = useState<Record<string, boolean>>({});
 
-  const handleReorderCategories = (draggedKey: string, targetKey: string) => {
+  const handleReorderCategories = async (draggedKey: string, targetKey: string) => {
     const draggedIndex = localCategories.findIndex(c => c.key === draggedKey);
     const targetIndex = localCategories.findIndex(c => c.key === targetKey);
     if (draggedIndex === -1 || targetIndex === -1) return;
@@ -1305,6 +1432,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
     setLocalCategories(updatedCategories);
     saveDynamicCategories(updatedCategories);
+    await syncCategoriesToApi(updatedCategories);
   };
 
   function toggleCategoryExpand(cat: string) {
@@ -1316,12 +1444,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     const updatedCats = localCategories.filter(c => c.key !== catKey);
     setLocalCategories(updatedCats);
     saveDynamicCategories(updatedCats);
+    await deleteCategoryFromApi(catKey);
 
     const updatedSvcs = localServices.filter(s => s.cat !== catKey);
     setLocalServices(updatedSvcs);
 
     await Promise.all(removedServiceIds.map(id => deleteServiceFromApi(id)));
     await loadServicesFromApi();
+    await loadCategoriesFromApi();
 
     setExpandedCategories(prev => {
       const copy = { ...prev };
@@ -2240,17 +2370,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }, []);
 
   useEffect(() => {
-    const cats = getDynamicCategories();
-    setLocalCategories(cats);
-
-    // Set all categories expanded by default
-    const exp: Record<string, boolean> = {};
-    cats.forEach(c => { exp[c.key] = true; });
-    setExpandedCategories(exp);
-  }, []);
+    loadCategoriesFromApi();
+  }, [loadCategoriesFromApi]);
 
   useEffect(() => {
-    if (session?.access_token) loadServicesFromApi();
+    loadServicesFromApi();
   }, [session?.access_token, loadServicesFromApi]);
   // BRANCHES is now derived from the real branches state loaded from Supabase
 
@@ -2286,14 +2410,37 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }, [filteredServices, localCategories]);
 
   function toggleService(id: number, field: "visible" | "active") {
+    let serviceToSync: ServiceItem | undefined;
+
     setServiceToggles((prev) => {
       const current = prev[id] ?? { visible: true, active: true };
       const newValue = !current[field];
       const updated = { ...prev, [id]: { ...current, [field]: newValue } };
-      // Persist to localStorage so user-facing pages reflect the change
       setServiceToggle(id, field, newValue);
       return updated;
     });
+
+    setLocalServices((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id === id) {
+          const toggled = {
+            ...s,
+            [field]: !(s[field] ?? true),
+          };
+          serviceToSync = toggled;
+          return toggled;
+        }
+        return s;
+      });
+      return updated;
+    });
+
+    // Persist active/visible change to database
+    if (serviceToSync) {
+      syncServicesToApi([serviceToSync]).catch((err) => {
+        console.error("Failed to sync service toggle to database:", err);
+      });
+    }
   }
 
   const [eCommerceExpanded, setECommerceExpanded] = useState(false);
@@ -2393,7 +2540,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-075', name: 'Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies laser packages isolation to Option 3, patient multi-package selection, catalog package purchase, and package price + non-laser service total calculation.', status: 'idle' },
     { id: 'TC-076', name: 'Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies accurate deduction of delivered laser pulses from customer pulses packages across doctor portal session finalization, reception session completion, and checkout settlement workflows with DB synchronization and idempotency.', status: 'idle' },
     { id: 'TC-077', name: 'In-Booking Package Selling & Integrated Patient Search Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies selling catalog packages directly during new booking creation with customer_packages persistence and instant patient profile appearance, as well as integrated patient search dropdown rendering.', status: 'idle' },
-    { id: 'TC-078', name: 'In-Booking Package Partial Payment & Session Balance Preservation Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies that when a patient purchases a new pulses package during booking with a partial payment (e.g. 500 EGP of 1000 EGP), the remaining 500 EGP outstanding balance is preserved correctly through doctor portal session completion and receptionist session finalization — preventing amountLeft from being zeroed out. Also verifies Payment Mode displays Pulses Package and Pay & Settle Invoice button remains visible.', status: 'idle' }
+    { id: 'TC-078', name: 'In-Booking Package Partial Payment & Session Balance Preservation Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies that when a patient purchases a new pulses package during booking with a partial payment (e.g. 500 EGP of 1000 EGP), the remaining 500 EGP outstanding balance is preserved correctly through doctor portal session completion and receptionist session finalization — preventing amountLeft from being zeroed out. Also verifies Payment Mode displays Pulses Package and Pay & Settle Invoice button remains visible.', status: 'idle' },
+    { id: 'TC-079', name: 'Database-Driven Service Categories & Zero Mock Defaults Engine', category: 'Services & Bookings', endpoint: '/api/categories', description: 'Verifies dynamic database-driven categories CRUD, zero hardcoded/mock defaults, instant category deletion without re-seeding resurrection, and associated service cascade cleanup.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -6196,6 +6344,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               syncServicesToApi={syncServicesToApi}
               loadServicesFromApi={loadServicesFromApi}
               deleteServiceFromApi={deleteServiceFromApi}
+              syncCategoriesToApi={syncCategoriesToApi}
+              loadCategoriesFromApi={loadCategoriesFromApi}
+              deleteCategoryFromApi={deleteCategoryFromApi}
               authenticatedJsonHeaders={authenticatedJsonHeaders}
               hasPermission={hasPermission}
               lang={lang}

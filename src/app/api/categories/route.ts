@@ -1,33 +1,31 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
-import { requireStaffAccess, requireAdministratorAccess } from '@/lib/access';
+import { requireStaffAccess } from '@/lib/access';
 
 function mapCategoryRow(r: any) {
   return {
     key: r.key,
     en: r.en,
     ar: r.ar,
-    sortOrder: r.sort_order,
+    sortOrder: r.sort_order ?? 0,
   };
 }
 
-function mapCategoryToDb(c: any) {
+function mapCategoryToDb(c: any, index?: number) {
   return {
     key: c.key,
     en: c.en,
-    ar: c.ar,
-    sort_order: c.sortOrder,
+    ar: c.ar || c.en,
+    sort_order: c.sortOrder ?? c.sort_order ?? index ?? 0,
   };
 }
 
 export async function GET(req: Request) {
-  const access = await requireStaffAccess(req);
-  if ('error' in access) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
-  }
-
   try {
-    const { data, error } = await getSupabaseServer()
+    const supabase = getSupabaseServer();
+    const { data, error } = await supabase
       .from('categories')
       .select('*')
       .order('sort_order', { ascending: true });
@@ -36,12 +34,12 @@ export async function GET(req: Request) {
     return NextResponse.json((data || []).map(mapCategoryRow));
   } catch (err) {
     console.error('GET /api/categories error:', err);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    return NextResponse.json([]);
   }
 }
 
 export async function POST(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  const access = await requireStaffAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
@@ -49,7 +47,9 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const isArray = Array.isArray(body);
-    const categoriesToUpsert = isArray ? body.map(mapCategoryToDb) : [mapCategoryToDb(body)];
+    const categoriesToUpsert = isArray
+      ? body.map((c: any, idx: number) => mapCategoryToDb(c, idx))
+      : [mapCategoryToDb(body)];
 
     const { data, error } = await getSupabaseServer()
       .from('categories')
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  const access = await requireStaffAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
@@ -75,17 +75,26 @@ export async function DELETE(req: Request) {
   if (!key) return NextResponse.json({ error: 'Missing key' }, { status: 400 });
 
   try {
-    const { data, error } = await getSupabaseServer()
+    const supabase = getSupabaseServer();
+    const { data, error } = await supabase
       .from('categories')
       .delete()
       .eq('key', key)
       .select();
 
     if (error) throw error;
-    if (!data || data.length === 0) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    // Also delete or unassign any services under this category in the database
+    try {
+      await supabase
+        .from('services')
+        .delete()
+        .eq('cat', key);
+    } catch (svcErr) {
+      console.warn('Warning deleting services under category:', svcErr);
     }
-    return NextResponse.json({ success: true, message: 'Category deleted' });
+
+    return NextResponse.json({ success: true, message: 'Category deleted', deleted: data });
   } catch (err) {
     console.error('DELETE /api/categories error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });

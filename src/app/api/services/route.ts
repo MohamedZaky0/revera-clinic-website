@@ -1,7 +1,9 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess, hasGranularPermission } from '@/lib/access';
-import { getDurationInMinutes } from '@/lib/services';
+import { getDurationInMinutes, getDurationLabel } from '@/lib/services';
 
 function fmtCreatedAt(val: unknown): string {
   if (!val) return "";
@@ -33,8 +35,8 @@ function mapServiceRow(r: any) {
     is_laser: isLaser,
     enableReminder: r.enable_reminder,
     branchPricing: r.branch_pricing,
-    visible: r.visible,
-    active: r.active,
+    visible: r.visible !== false,
+    active: r.active !== false,
     createdAt: fmtCreatedAt(r.created_at),
     rawCreatedAt: r.created_at,
     created_at: r.created_at,
@@ -42,28 +44,26 @@ function mapServiceRow(r: any) {
 }
 
 function mapServiceToDb(s: any) {
-  const isLaser = Boolean(s.islaser ?? s.is_laser ?? false);
+  const durationMinutes = s.duration_minutes ?? (s.duration ? getDurationInMinutes(s.duration) : 30);
   const row: Record<string, any> = {
-    en: s.en,
-    ar: s.ar,
-    img: s.img,
-    cat: s.cat,
-    unit: s.unit,
-    price: s.price,
-    sort_order: s.sortOrder,
-    duration: s.duration,
-    duration_minutes: s.duration_minutes ?? getDurationInMinutes(s.duration),
-    description_en: s.descriptionEn,
-    description_ar: s.descriptionAr,
-    is_shared: s.isShared,
-    islaser: isLaser,
-    is_laser: isLaser,
-    enable_reminder: s.enableReminder,
-    branch_pricing: s.branchPricing,
-    visible: s.visible !== undefined ? s.visible : true,
-    active: s.active !== undefined ? s.active : true,
+    en: String(s.en || '').trim(),
+    ar: String(s.ar || s.en || '').trim(),
+    img: s.img || '',
+    cat: s.cat || 'general',
+    unit: s.unit || 'in_clinic',
+    price: s.price !== undefined && !isNaN(Number(s.price)) ? Number(s.price) : 0,
+    sort_order: s.sortOrder ?? s.sort_order ?? 0,
+    duration: s.duration || getDurationLabel(durationMinutes),
+    duration_minutes: durationMinutes,
+    description_en: s.descriptionEn ?? s.description_en ?? '',
+    description_ar: s.descriptionAr ?? s.description_ar ?? '',
+    is_shared: Boolean(s.isShared ?? s.is_shared ?? false),
+    enable_reminder: s.enableReminder !== undefined ? Boolean(s.enableReminder) : (s.enable_reminder !== undefined ? Boolean(s.enable_reminder) : true),
+    branch_pricing: Array.isArray(s.branchPricing) ? s.branchPricing : (Array.isArray(s.branch_pricing) ? s.branch_pricing : []),
+    visible: s.visible !== undefined ? Boolean(s.visible) : true,
+    active: s.active !== undefined ? Boolean(s.active) : true,
   };
-  if (s.id) row.id = s.id;
+  if (s.id && Number(s.id) > 0) row.id = Number(s.id);
   return row;
 }
 
@@ -76,9 +76,9 @@ export async function GET(req: Request) {
 
     if (error) throw error;
     return NextResponse.json((data || []).map(mapServiceRow));
-  } catch (err) {
+  } catch (err: any) {
     console.error('GET /api/services error:', err);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    return NextResponse.json({ error: err?.message || 'Database error' }, { status: 500 });
   }
 }
 
@@ -129,9 +129,9 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(isArray ? results.map(mapServiceRow) : mapServiceRow(results[0]), { status: 201 });
-  } catch (err) {
+  } catch (err: any) {
     console.error('POST /api/services error:', err);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    return NextResponse.json({ error: err?.message || 'Database error' }, { status: 500 });
   }
 }
 
@@ -175,8 +175,8 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
     return NextResponse.json({ success: true, message: 'Service permanently deleted' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('DELETE /api/services error:', err);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    return NextResponse.json({ error: err?.message || 'Database error' }, { status: 500 });
   }
 }

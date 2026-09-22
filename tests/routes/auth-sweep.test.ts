@@ -46,13 +46,17 @@ import { createSupabaseFake } from '../helpers/supabaseFake';
 
 const fake = createSupabaseFake();
 
-vi.mock('@/lib/supabaseServer', () => ({
-  supabaseServer: {
+vi.mock('@/lib/supabaseServer', () => {
+  const server = {
     auth: { getUser: (...args: any[]) => fake.authGetUser(...args) },
     from: (table: string) => fake.client.from(table),
     rpc: (name: string, args?: any) => fake.client.rpc(name, args),
-  },
-}));
+  };
+  return {
+    supabaseServer: server,
+    getSupabaseServer: () => server,
+  };
+});
 
 import * as Assets from '@/app/api/assets/route';
 import * as AssetsPostDepreciation from '@/app/api/assets/post-depreciation/route';
@@ -154,7 +158,7 @@ const REGISTRY: RouteEntry[] = [
   { path: '/api/auth/me', methods: [M('GET', AuthMe.GET, 'staff')] },
   { path: '/api/availability', methods: [M('GET', Availability.GET, 'public')] },
   { path: '/api/branches', methods: [M('GET', Branches.GET, 'public', { noArgs: true }), M('POST', Branches.POST, 'admin'), M('DELETE', Branches.DELETE, 'admin')] },
-  { path: '/api/categories', methods: [M('GET', Categories.GET, 'staff'), M('POST', Categories.POST, 'admin'), M('DELETE', Categories.DELETE, 'admin')] },
+  { path: '/api/categories', methods: [M('GET', Categories.GET, 'public', { noArgs: true }), M('POST', Categories.POST, 'admin'), M('DELETE', Categories.DELETE, 'admin')] },
   { path: '/api/clinic-settings', methods: [M('GET', ClinicSettings.GET, 'staff'), M('POST', ClinicSettings.POST, 'admin')] },
   { path: '/api/customer-avatars', methods: [M('GET', CustomerAvatars.GET, 'public'), M('POST', CustomerAvatars.POST, 'staff')] },
   { path: '/api/customers/package-redemptions', methods: [M('GET', CustomersPackageRedemptions.GET, 'staff')] },

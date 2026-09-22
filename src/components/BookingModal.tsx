@@ -322,16 +322,30 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
   }, [sessionType, serviceId, dynamicServices]);
 
   useEffect(() => {
-    setServiceToggles(getServiceToggles());
-    setDynamicCategories(getDynamicCategories());
-
-    fetch("/api/services")
+    fetch("/api/categories", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : []))
-      .then((data) => setDynamicServices(Array.isArray(data) ? data : []))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setDynamicCategories(data);
+        } else {
+          setDynamicCategories(getDynamicCategories());
+        }
+      })
+      .catch(() => setDynamicCategories(getDynamicCategories()));
+
+    fetch("/api/services", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setDynamicServices(list);
+        const dbToggles = Object.fromEntries(
+          list.map((s: any) => [s.id, { visible: s.visible !== false, active: s.active !== false }])
+        );
+        setServiceToggles(dbToggles);
+      })
       .catch(() => setDynamicServices([]));
 
     const handleStorage = () => {
-      setServiceToggles(getServiceToggles());
       setDynamicCategories(getDynamicCategories());
     };
     window.addEventListener("storage", handleStorage);

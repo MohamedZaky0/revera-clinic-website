@@ -2606,6 +2606,102 @@ When booking a new patient who didn't have an existing pulses package, the recep
 
 **Rule:** When computing session totals for PACKAGE mode laser bookings, NEVER collapse the total to a value less than the original booking commitment (`amountPaid + amountLeft`). Always parse the booked package price from booking notes as a floor for the invoice total.
 
+---
+
+## DEC-076: Database Synchronization for Services and Categories Across Devices
+
+**Date:** 2026-09-22
+**Status:** Decided — active
+
+**Context:**
+Administrators modifying service categories, adding/editing services, or toggling service active/visibility states reported that changes were only visible on the browser where the edits were made, even though services rows in Supabase were updated. On other devices, services under new categories were completely missing, and toggles remained in their default or local state.
+
+**Root Causes:**
+1. **`localStorage` category storage:** `getDynamicCategories()` and `saveDynamicCategories()` used client `localStorage` (`_dynamic_categories`). Categories created or reordered on one device were never saved to or fetched from the `categories` table in Supabase.
+2. **Hidden services from category omissions:** In `AdminServicesView.tsx`, services were grouped and rendered strictly by iterating over `localCategories`. Any service belonging to a category that was not seeded in another user's local browser storage was completely omitted from the UI.
+3. **`_service_toggles` in `localStorage`:** Activating or deactivating a service only updated `localStorage` (`_service_toggles`) on that machine instead of persisting to `services.active` and `services.visible` in Supabase.
+4. **Public sections dependency:** `HomeServicesSection.tsx` and `ServicesSection.tsx` filtered active services using `isServiceActive(...)` against `localStorage`.
+
+**Decisions & Implementation:**
+1. **Dynamic & Public `/api/categories` (`src/app/api/categories/route.ts`):**
+   - Added `export const dynamic = 'force-dynamic'` and `cache: 'no-store'`.
+   - Made `GET /api/categories` public (no staff auth required), enabling public website sections and all client sessions to fetch categories directly from Supabase.
+   - Auto-seeds the `categories` table with default `CATEGORY_LABELS` on first read if empty.
+   - Preserves authenticated staff requirement for `POST` (upsert) and `DELETE`.
+2. **Dynamic `/api/services` (`src/app/api/services/route.ts`):**
+   - Added `export const dynamic = 'force-dynamic'`.
+   - Explicitly preserves and maps `visible` and `active` boolean fields across DB operations.
+3. **Admin Panel Synchronization (`src/app/admin/page.tsx` & `AdminServicesView.tsx`):**
+   - Added `loadCategoriesFromApi`, `syncCategoriesToApi`, and `deleteCategoryFromApi` to persist category creation, deletion, and drag-and-drop reordering to Supabase.
+   - `loadServicesFromApi` initializes `serviceToggles` strictly from database `s.active` and `s.visible` fields with auto-discovery of unmapped service category keys.
+   - `toggleService` updates `localServices` and immediately triggers `syncServicesToApi` to persist `active`/`visible` states to Supabase.
+   - `AdminServicesView.tsx` computes `completeCategories` ensuring that any category key referenced by a database service is rendered even if not explicitly created yet.
+4. **Client Website Sections (`HomeServicesSection.tsx`, `ServicesSection.tsx`, `BookingModal.tsx`):**
+   - Fetches `/api/categories` and `/api/services` with `{ cache: 'no-store' }`.
+
+---
+
+## DEC-077: Elimination of Hardcoded Mock Data, Auto-Seeding, and Ensuring Pure Database-Driven Services & Categories
+
+**Date:** 2026-09-22
+**Status:** Decided — active
+
+**Context:**
+Users reported that deleted categories kept resurrecting and default categories/mock services could not be permanently removed. When inspecting the database, deleted records were being automatically recreated by backend and frontend auto-seeding routines whenever a table was empty or storage was unpopulated.
+
+**Root Causes:**
+1. **API Auto-Seeding (`src/app/api/categories/route.ts`):** `GET /api/categories` had fallback logic that automatically upserted hardcoded mock categories (`dermatology`, `gynecology`, `physiotherapy`, `osteopathy`) directly into Supabase whenever `categories` table had 0 rows.
+2. **Client `localStorage` Auto-Seeding (`src/lib/serviceStore.ts`):** `getDynamicCategories()` and `getDynamicServices()` inserted mock categories and 20 sample services into `localStorage` if local storage keys were empty.
+3. **Hardcoded Mock Constants (`src/lib/services.ts`):** `SERVICES` contained 20 hardcoded mock service objects and `CATEGORY_LABELS` contained 4 hardcoded categories.
+4. **Length-conditioned API fallbacks:** In consumer components (`HomeServicesSection`, `ServicesSection`, `BookingModal`, and `admin/page.tsx`), empty arrays (`[]`) returned by the API were treated as missing data due to `data.length > 0` checks, triggering fallbacks to mock data.
+
+**Decisions & Implementation:**
+1. **Purged All Mock Data from Codebase:**
+   - `SERVICES` in `src/lib/services.ts` is now an empty array `[]`.
+   - `CATEGORY_LABELS` is now an empty map `{}`.
+2. **Removed Auto-Seeding from API Routes:**
+   - `GET /api/categories` returns `[]` when the table is empty and never upserts default categories into Supabase.
+   - `DELETE /api/categories?key=...` deletes the category record from `categories` and cascades to remove any associated services in that category.
+3. **Removed Auto-Seeding from `serviceStore.ts`:**
+   - `getDynamicCategories()` and `getDynamicServices()` return `[]` when storage is empty, with zero mock insertion.
+4. **Direct Array Assignment in Consumer Views:**
+   - Frontend components now check `Array.isArray(data)` rather than `data.length > 0`, ensuring that 0 categories or 0 services are correctly recognized as intentional empty states.
+   - Added friendly empty states in `AdminServicesView.tsx` when no categories are created yet.
+5. **System Test Suite Diagnostics:**
+   - Added `TC-079` to verify database-driven categories CRUD, zero fake defaults, and clean category deletion.
+
+---
+
+## DEC-078: Resilient Service Persistence, Database Column Alignment, and Case-Insensitive Multi-Role Staff Access
+
+**Date:** 2026-09-22
+**Status:** Decided — active
+
+**Context:**
+When superadmin or admin users attempted to create or edit a service in the admin panel, the operation failed with an error notification *"Failed to save service. Please check your permissions and try again."*
+
+**Root Causes:**
+1. **Schema Column Cache Mismatch in `POST /api/services` (`mapServiceToDb`):**
+   `mapServiceToDb` was passing `islaser: isLaser` and `is_laser: isLaser` directly into Supabase/PostgREST `.insert()` and `.upsert()` payloads. The `services` table in PostgreSQL does not have an `is_laser` or `islaser` column, causing PostgREST to immediately fail with:
+   `"Could not find the 'is_laser' column of 'services' in the schema cache"` (HTTP 500).
+2. **Strict `employee_accounts` Auth-ID Linkage in `requireStaffAccess`:**
+   `requireStaffAccess` queried `employee_accounts` exclusively by `.eq("auth_user_id", authData.user.id)`. If an admin/superadmin account was registered or seeded in `employee_accounts` with matching `email` but `auth_user_id` was `NULL` or not linked yet, `requireStaffAccess` returned `403` (*"Staff access is required"*).
+3. **Role Case-Sensitivity and Granular Permission Checking (`hasGranularPermission`):**
+   Role checking in `hasGranularPermission` had a strict bypass `if (access.role === "superadmin") return true;`. Normalized role names and `admin` roles, or roles with wildcard `*` permissions, needed consistent normalization across all granular checks.
+
+**Decisions & Implementation:**
+1. **Aligned Service DB Mapping with Schema:**
+   - Removed nonexistent `islaser` and `is_laser` columns from `mapServiceToDb` in `src/app/api/services/route.ts`.
+   - Enhanced error responses across `GET`, `POST`, and `DELETE` in `src/app/api/services/route.ts` to surface exact underlying database error messages (`err?.message`).
+2. **Resilient Staff Access & Auto-Linking (`src/lib/access.ts`):**
+   - Added email fallback (`.ilike("email", authData.user.email)`) in `requireStaffAccess` when `auth_user_id` is unlinked, with automatic linking of `auth_user_id`.
+   - Normalized role casing and formatting across `requireStaffAccess`, `hasStaffPermission`, `hasFinancePermission`, and `hasGranularPermission` (supporting `"superadmin"`, `"Super Admin"`, `"admin"`, etc.).
+3. **Granular Permission Wildcards and Role Equivalence:**
+   - Extended `hasGranularPermission` to recognize `"superadmin"`, `"admin"`, and wildcard `*` permissions across all actions including `services.create`, `services.edit`, `services.delete`.
+
+
+
+
 
 
 
