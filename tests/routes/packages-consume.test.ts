@@ -197,7 +197,9 @@ describe('consuming a session', () => {
     const res = await POST(req({ customerPackageItemId: ITEM, reservationId: RESERVATION }));
     expect(res.status).toBe(200);
 
-    expect(mockDb.customer_packages.find((p: any) => p.id === PKG)!.status).toBe('completed');
+    // 'fully_used', not 'completed': the customer_packages CHECK is ('active','expired','fully_used')
+    // — 'completed' is rejected outright (RISK-096 / Brief 34B item 7).
+    expect(mockDb.customer_packages.find((p: any) => p.id === PKG)!.status).toBe('fully_used');
   });
 
   it('leaves the package active while any item still has sessions left', async () => {
