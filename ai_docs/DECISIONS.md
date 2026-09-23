@@ -2895,3 +2895,25 @@ When a patient purchased a package during New Booking with a partial payment / d
 3. **Automatic Package Debt Allocation:**
    - On checkout confirmation (`handleConfirmCheckout`), if the patient had an outstanding package balance and made a payment at checkout, `/api/customers/settle-debt` allocates the payment to the package invoice and decrements `customers.outstanding`.
    - In `src/app/api/customers/settle-debt/route.ts`, debt settlement is extended to allocate against unpaid issued invoices (including package sale invoices).
+
+---
+
+## DEC-084: Zero-Cost Package Redemption Session Payment Status Resolution
+
+**Date:** 2026-09-23
+**Status:** Decided — active
+**Note:** cherry-picked from commit `90436e5` (`saifuldeennaser`, working in parallel on `origin/dev`).
+`isInvoicePaid`'s new `isLaserPackage` branch is a display-only flag in this modal; it does not
+bypass Brief 35's separate pre-write deficit gate (DEC-080), which still blocks the actual
+confirm/checkout action while a deficit is unresolved regardless of what this badge shows.
+
+**Context:**
+When a patient had an existing package and attended a booking paid via package redemption (0 EGP due, 0 EGP paid, 0 EGP left), confirming checkout completed the reservation. However, `BookingDetailsModal`, `AdminBookingsView`, and `ReceptionDashboardView` displayed "Unpaid" and showed the "Pay & Settle Invoice" button.
+
+**Root Causes:**
+1. In `BookingDetailsModal.tsx`, `isInvoicePaid` required `sessionPaid > 0` (`sessionLeft <= 0 && sessionPaid > 0`). When a session is 100% covered by a package, `sessionPaid` is 0 EGP, which caused `isInvoicePaid` to evaluate to `false`.
+2. In `AdminBookingsView.tsx` and `ReceptionDashboardView.tsx`, payment status checks checked `amountPaid > 0 ? "Paid" : "Unpaid"`, rendering package covered bookings as "Unpaid".
+
+**Decisions & Implementation:**
+1. In `BookingDetailsModal.tsx`, `isInvoicePaid` now recognizes 0-cost package sessions and completed sessions with 0 balance due (`sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || booking.status === 'completed')`).
+2. In `AdminBookingsView.tsx` and `ReceptionDashboardView.tsx` / reception API route, package-covered and completed 0-balance bookings evaluate to "Paid".

@@ -509,13 +509,23 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       const rawLeft = r.amountLeft ?? r.amount_left;
       const amtPaid = Number(rawPaid);
       const amtLeft = Number(rawLeft);
+      const isPkgCovered = Boolean(
+        r.laserPaymentMode === "PACKAGE" ||
+        r.laser_payment_mode === "PACKAGE" ||
+        r.customerPackageId ||
+        r.customer_package_id ||
+        r.packageId ||
+        r.package_id ||
+        String(r.notes || "").toLowerCase().includes("package redemption") ||
+        String(r.notes || "").includes("[Laser Package]")
+      );
       let paySt: string;
       if (rawPaid === null || rawPaid === undefined || Number.isNaN(amtPaid)) {
-        paySt = "—";
-      } else if (amtPaid <= 0) {
+        paySt = isPkgCovered && (st === "completed" || amtLeft === 0) ? "Paid" : "—";
+      } else if (amtPaid <= 0 && amtLeft !== 0 && !isPkgCovered && st !== "completed") {
         paySt = "Unpaid";
       } else if (rawLeft === null || rawLeft === undefined || Number.isNaN(amtLeft)) {
-        paySt = "—";
+        paySt = isPkgCovered ? "Paid" : "—";
       } else if (amtLeft > 0) {
         paySt = "Partially Paid";
       } else {
