@@ -243,9 +243,19 @@ export default function DoctorOngoingSessionTab({
             return (p.status || "active").toLowerCase() === "active" && rem > 0 && isNotExpired && isPulseType;
           });
           setPatientActivePackages(activePulsePkgs);
-          const bookingLinkedPkgId = activeSessionBooking.packageId || activeSessionBooking.package_id;
-          if (bookingLinkedPkgId && activePulsePkgs.some((p: any) => String(p.id) === String(bookingLinkedPkgId))) {
-            setSelectedLaserPackageId(String(bookingLinkedPkgId));
+          const notesStr = String(activeSessionBooking.notes || "");
+          const notePkgMatch = notesStr.match(/\[Customer Package ID\]:\s*([0-9a-f-]+)/i) ||
+            notesStr.match(/\[Customer Package ID\]:\s*([^\n\]]+)/i) ||
+            notesStr.match(/Package ID:\s*([0-9a-f-]+)/i);
+          const bookingLinkedPkgId = activeSessionBooking.customerPackageId ||
+            activeSessionBooking.customer_package_id ||
+            activeSessionBooking.packageId ||
+            activeSessionBooking.package_id ||
+            (notePkgMatch ? notePkgMatch[1]?.trim() : null);
+
+          if (bookingLinkedPkgId && activePulsePkgs.some((p: any) => String(p.id) === String(bookingLinkedPkgId) || String(p.packageId) === String(bookingLinkedPkgId))) {
+            const matched = activePulsePkgs.find((p: any) => String(p.id) === String(bookingLinkedPkgId) || String(p.packageId) === String(bookingLinkedPkgId));
+            if (matched) setSelectedLaserPackageId(String(matched.id));
           } else if (activePulsePkgs.length > 0 && (!selectedLaserPackageId || !activePulsePkgs.some((p: any) => String(p.id) === String(selectedLaserPackageId)))) {
             setSelectedLaserPackageId(String(activePulsePkgs[0].id));
           }

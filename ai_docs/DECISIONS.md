@@ -2815,4 +2815,27 @@ When attempting to purchase a package for a customer during new booking creation
 3. **Regression Tests Added:**
    - In `tests/routes/packages-sell.test.ts`, added unit tests validating service packages with "laser" in their names, meta pulse resolution, and quota validation.
 
+---
+
+## DEC-082: End-to-End Pulse Package Linkage, Checkout Pulse Deduction Breakdown, and Profile Bar Synchronization
+
+**Date:** 2026-09-23
+**Status:** Decided — active
+
+**Context:**
+When a laser pulse package is selected or purchased in Option 3 of New Booking, the session needed to use that specific package. Upon completing the treatment and opening reception checkout, the popup must display exactly how many pulses are deducted from the package (e.g. 2,000 pulses deducted from 5,000 pulses package, leaving 3,000 pulses remaining). In the patient profile, the progress bar must accurately reflect the real-time remaining and used pulse balances.
+
+**Decisions & Implementation:**
+1. **Reservation Package Linkage:**
+   - In `AdminNewBookingView.tsx`, when Option 3 is selected with a package purchase, `[Customer Package ID]: <id>`, `[Laser Package]: <name> (Package ID: <id>)`, `customerPackageId`, and `laserPaymentMode: "PACKAGE"` are persisted on the reservation and notes.
+   - In `src/app/api/reservations/route.ts`, `mapRow` and `POST` persist and return `laser_payment_mode`, `laser_price_per_pulse`, `delivered_pulses`, `packageId`, and `customerPackageId`.
+2. **Doctor Ongoing Session Auto-Selection:**
+   - In `DoctorOngoingSessionTab.tsx`, linked package IDs from reservation metadata or structured note tags are automatically matched to the patient's active pulse packages.
+3. **Checkout Modal Pulse Deduction Breakdown:**
+   - In `src/app/admin/page.tsx`, when checking out a laser package reservation, the modal matches the linked pulse package, displays current package balance, session usage, remaining pulses after checkout, and a progress bar preview with a clear natural-language summary.
+   - On checkout settlement, `consume_package_pulses` RPC executes pulse deduction and emits `revera-laser-change` for instantaneous cross-component refresh.
+4. **Patient Profile Progress Bar:**
+   - In `CustomerProfileDrawer.tsx`, the progress bar calculates `(remainingPulsesVal / effectiveTotal) * 100` and displays both remaining pulses and used pulses counters clearly.
+
+
 

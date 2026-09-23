@@ -9396,6 +9396,39 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               : "Agreed that laser services in this session are covered under patient Pulses Package"
           );
 
+          const notesStr = String(checkoutBooking?.notes || "");
+          const notePkgIdMatch = notesStr.match(/\[Customer Package ID\]:\s*([0-9a-f-]+)/i) ||
+            notesStr.match(/\[Customer Package ID\]:\s*([^\n\]]+)/i) ||
+            notesStr.match(/Package ID:\s*([0-9a-f-]+)/i);
+          const linkedPkgId = checkoutBooking?.customerPackageId ||
+            (checkoutBooking as any)?.customer_package_id ||
+            checkoutBooking?.packageId ||
+            (checkoutBooking as any)?.package_id ||
+            (notePkgIdMatch ? notePkgIdMatch[1]?.trim() : null);
+
+          const matchedPulsePkg = (checkoutCustomerPackages || []).find((p: any) =>
+            (linkedPkgId && String(p.id) === String(linkedPkgId)) ||
+            (linkedPkgId && String(p.packageId) === String(linkedPkgId))
+          ) || (checkoutCustomerPackages || []).find((p: any) =>
+            (p.packageType === "pulses" || Number(p.totalPulses || p.includedPulses || 0) > 0) &&
+            (p.status || "active").toLowerCase() === "active"
+          );
+
+          const totalPkgPulses = Number(matchedPulsePkg?.totalPulses ?? matchedPulsePkg?.includedPulses ?? 0);
+          const currentRemainingPulses = matchedPulsePkg
+            ? Number(matchedPulsePkg.pulsesRemaining ?? matchedPulsePkg.remainingPulses ?? totalPkgPulses)
+            : 0;
+
+          const deliveredPulsesVal = Number(
+            checkoutBooking?.deliveredPulses ||
+            (checkoutBooking as any)?.delivered_pulses ||
+            primaryDeliveredPulses ||
+            0
+          );
+
+          const remainingPulsesAfterCheckout = Math.max(0, currentRemainingPulses - deliveredPulsesVal);
+          const deficitPulsesVal = Math.max(0, deliveredPulsesVal - currentRemainingPulses);
+
           // 1. Calculate service cost
           const svcIds = Array.isArray(checkoutBooking.serviceIds) ? checkoutBooking.serviceIds : [checkoutBooking.serviceId];
           // A deposit collected at reservation time (BookingModal's "declare deposit paid" step)
@@ -9715,7 +9748,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       })()
                     );
                     const targetCustId = customerRecord?.id || (checkoutBooking as any).customerId || (checkoutBooking as any).customer_id;
-                    let targetPkgId = checkoutBooking.packageId || (checkoutBooking as any).package_id;
+                    const notesStr = String(checkoutBooking.notes || "");
+                    const notePkgIdMatch = notesStr.match(/\[Customer Package ID\]:\s*([0-9a-f-]+)/i) ||
+                      notesStr.match(/\[Customer Package ID\]:\s*([^\n\]]+)/i) ||
+                      notesStr.match(/Package ID:\s*([0-9a-f-]+)/i);
+                    let targetPkgId = checkoutBooking.customerPackageId ||
+                      (checkoutBooking as any).customer_package_id ||
+                      checkoutBooking.packageId ||
+                      (checkoutBooking as any).package_id ||
+                      (notePkgIdMatch ? notePkgIdMatch[1]?.trim() : null);
+
                     if (!targetPkgId && targetCustId) {
                       const pRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(targetCustId)}`, { headers: authenticatedJsonHeaders });
                       if (pRes.ok) {
@@ -9744,6 +9786,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           notes: `Checkout pulse deduction (${deliveredPulsesVal} pulses deducted)`
                         })
                       });
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("revera-laser-change"));
+                      }
                     }
                   } catch (pulseErr) {
                     console.error("Error consuming laser package pulses at checkout:", pulseErr);
@@ -9829,16 +9874,92 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     </div>
                   )}
 
-                  {/* Laser Package Settlement Agreement Notice */}
+                  {/* Laser Package Settlement Agreement & Pulse Deduction Breakdown */}
                   {isCheckoutPackage && (
-                    <div className="rounded-2xl border border-purple-300 bg-purple-50/90 p-3.5 text-xs text-purple-900 space-y-1 animate-fadeIn">
-                      <div className="flex items-center gap-1.5 font-bold text-purple-950">
-                        <Package size={15} className="text-purple-700 shrink-0" />
-                        <span>Laser Package Settlement / اتفاقية باقة نبضات الليزر</span>
+                    <div className="rounded-2xl border border-purple-200/90 bg-gradient-to-br from-purple-50/95 via-white to-purple-50/60 p-4 text-xs text-purple-900 space-y-3 shadow-xs animate-fadeIn">
+                      <div className="flex items-center justify-between border-b border-purple-200/60 pb-2">
+                        <div className="flex items-center gap-2 font-bold text-purple-950 text-sm">
+                          <div className="p-1.5 bg-purple-600 text-white rounded-lg shrink-0 shadow-xs">
+                            <Zap size={15} />
+                          </div>
+                          <div>
+                            <p className="leading-tight">{isRTL ? "خصم نبضات باقة الليزر" : "Laser Package Pulse Deduction"}</p>
+                            <p className="text-[11px] font-medium text-purple-700 mt-0.5">
+                              {matchedPulsePkg ? (isRTL && matchedPulsePkg.packageNameAr ? matchedPulsePkg.packageNameAr : matchedPulsePkg.packageName) : (isRTL ? "باقة نبضات الليزر" : "Laser Pulses Package")}
+                            </p>
+                          </div>
+                        </div>
+                        {totalPkgPulses > 0 && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 text-purple-800 border border-purple-300/60 px-2.5 py-0.5 text-[11px] font-bold">
+                            {totalPkgPulses.toLocaleString()} {isRTL ? "نبضة" : "pulses total"}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-[11.5px] leading-relaxed text-purple-800">
-                        {checkoutPackageSettlementText}
-                      </p>
+
+                      {/* Deduction calculation box */}
+                      <div className="bg-white/90 rounded-xl border border-purple-200/70 p-3 space-y-2.5">
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div className="bg-purple-50/70 rounded-lg p-2 border border-purple-100">
+                            <p className="text-[10px] uppercase font-semibold text-purple-600">{isRTL ? "رصيد الباقة الحالي" : "Current Balance"}</p>
+                            <p className="font-extrabold text-[#1F251A] text-xs sm:text-sm mt-0.5">
+                              {currentRemainingPulses.toLocaleString()} <span className="text-[10px] font-normal text-[#5A6A51]">{isRTL ? "نبضة" : "pulses"}</span>
+                            </p>
+                          </div>
+                          <div className="bg-amber-50/80 rounded-lg p-2 border border-amber-200/80">
+                            <p className="text-[10px] uppercase font-semibold text-amber-800">{isRTL ? "المستخدم بالجلسة" : "Session Usage"}</p>
+                            <p className="font-extrabold text-amber-900 text-xs sm:text-sm mt-0.5">
+                              -{deliveredPulsesVal.toLocaleString()} <span className="text-[10px] font-normal text-amber-700">{isRTL ? "نبضة" : "pulses"}</span>
+                            </p>
+                          </div>
+                          <div className="bg-emerald-50/80 rounded-lg p-2 border border-emerald-200/80">
+                            <p className="text-[10px] uppercase font-semibold text-emerald-800">{isRTL ? "المتبقي بالباقة" : "Remaining After"}</p>
+                            <p className="font-extrabold text-emerald-900 text-xs sm:text-sm mt-0.5">
+                              {remainingPulsesAfterCheckout.toLocaleString()} <span className="text-[10px] font-normal text-emerald-700">{isRTL ? "نبضة" : "pulses"}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Progress Bar Visualization */}
+                        {totalPkgPulses > 0 && (
+                          <div className="space-y-1 pt-1">
+                            <div className="flex justify-between text-[11px] font-medium text-purple-900">
+                              <span>{isRTL ? "رصيد النبضات المتبقي" : "Package Pulses Remaining"}</span>
+                              <span className="font-bold">
+                                {remainingPulsesAfterCheckout.toLocaleString()} / {totalPkgPulses.toLocaleString()} {isRTL ? "نبضة" : "pulses"}
+                              </span>
+                            </div>
+                            <div className="w-full bg-purple-100 rounded-full h-2 overflow-hidden flex">
+                              <div
+                                className="bg-purple-600 h-full transition-all duration-500 rounded-full"
+                                style={{
+                                  width: `${Math.min(100, Math.max(0, (remainingPulsesAfterCheckout / totalPkgPulses) * 100))}%`
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Summary sentence matching user prompt */}
+                        <div className="text-[11.5px] leading-relaxed text-purple-900 bg-purple-50/50 rounded-lg p-2 border border-purple-100 font-medium">
+                          {isRTL ? (
+                            <span>
+                              سيتم خصم <strong>{deliveredPulsesVal.toLocaleString()}</strong> نبضة من باقة <strong>{totalPkgPulses > 0 ? `${totalPkgPulses.toLocaleString()} نبضة` : (matchedPulsePkg?.packageName || "النبضات")}</strong>، والرصيد المتبقي <strong>{remainingPulsesAfterCheckout.toLocaleString()}</strong> نبضة.
+                            </span>
+                          ) : (
+                            <span>
+                              <strong>{deliveredPulsesVal.toLocaleString()} pulses</strong> will be deducted from the <strong>{totalPkgPulses > 0 ? `${totalPkgPulses.toLocaleString()} pulses` : (matchedPulsePkg?.packageName || "pulses")}</strong> package, and <strong>{remainingPulsesAfterCheckout.toLocaleString()} pulses</strong> remaining.
+                            </span>
+                          )}
+                        </div>
+
+                        {deficitPulsesVal > 0 && (
+                          <p className="text-[11px] font-semibold text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                            ⚠️ {isRTL
+                              ? `تنبيه: عدد النبضات المستهلكة يتجاوز رصيد الباقة بمقدار ${deficitPulsesVal.toLocaleString()} نبضة.`
+                              : `Note: Session pulses exceed package balance by ${deficitPulsesVal.toLocaleString()} pulses.`}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
 
