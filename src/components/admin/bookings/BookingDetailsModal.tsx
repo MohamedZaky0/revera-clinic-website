@@ -1896,7 +1896,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           ? Number(rawLeft)
           : Math.max(0, totalPrice - sessionPaid);
 
-        const isInvoicePaid = (sessionPaid >= totalPrice && totalPrice > 0) || (sessionLeft <= 0 && sessionPaid > 0);
+        const isInvoicePaid = (sessionPaid >= totalPrice && totalPrice > 0) || (sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || booking.status === 'completed'));
 
         // Primary effective service for end session
         const primaryServiceObj = localServices.find(
