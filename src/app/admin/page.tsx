@@ -9637,7 +9637,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               }
             }
 
-            // f) Generic format: - Name (x2) @ 700 EGP
+            // g) Generic format: - Name (x2) @ 700 EGP
             const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/gi);
             for (const match of doctorMatches) {
               const name = match[1].trim();
@@ -9647,6 +9647,43 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               if (!existingCheckoutNames.has(name.toLowerCase())) {
                 existingCheckoutNames.add(name.toLowerCase());
                 checkoutProductsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+              }
+            }
+
+            // h) Package Purchase matches in notes:
+            // [Purchasing New Pulses Package]: Name (2500 EGP · 5,000 pulses) or [Laser Package Purchase & Redemption]: Name (2500 EGP)
+            const pkgPurchaseMatch = notesStr.match(/\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption|Laser Package Deficit Settlement)\]:\s*(?:Choice 3A\s*-\s*)?([^(]+?)\s*\((\d+(?:,\d+)?(?:\.\d+)?)\s*EGP/i);
+            if (pkgPurchaseMatch) {
+              const rawPkgName = pkgPurchaseMatch[1].trim();
+              const pkgPrice = parseFloat(pkgPurchaseMatch[2].replace(/,/g, '')) || 0;
+              const displayName = isRTL ? `شراء باقة: ${rawPkgName}` : `Purchased Package: ${rawPkgName}`;
+              if (pkgPrice > 0 && !existingCheckoutNames.has(displayName.toLowerCase()) && !existingCheckoutNames.has(rawPkgName.toLowerCase())) {
+                existingCheckoutNames.add(displayName.toLowerCase());
+                existingCheckoutNames.add(rawPkgName.toLowerCase());
+                checkoutProductsConsumablesList.push({
+                  name: displayName,
+                  qty: 1,
+                  unitPrice: pkgPrice,
+                  total: pkgPrice,
+                  lineType: 'product'
+                });
+              }
+            }
+
+            // i) Package Deficit Choice 3B (per pulse deficit in notes)
+            const deficitPerPulseMatch = notesStr.match(/\[Laser Package Deficit Settlement\]:\s*Choice 3B\s*-\s*Pay Rest per Pulse\s*\(([^)]+?)=\s*(\d+(?:,\d+)?(?:\.\d+)?)\s*EGP\)/i);
+            if (deficitPerPulseMatch) {
+              const deficitDesc = `Excess Pulses Deficit (${deficitPerPulseMatch[1].trim()})`;
+              const deficitPrice = parseFloat(deficitPerPulseMatch[2].replace(/,/g, '')) || 0;
+              if (deficitPrice > 0 && !existingCheckoutNames.has(deficitDesc.toLowerCase())) {
+                existingCheckoutNames.add(deficitDesc.toLowerCase());
+                checkoutProductsConsumablesList.push({
+                  name: deficitDesc,
+                  qty: 1,
+                  unitPrice: deficitPrice,
+                  total: deficitPrice,
+                  lineType: 'device_pulses'
+                });
               }
             }
           }
@@ -9667,7 +9704,26 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
           const checkoutAdditionalServicesCost = checkoutAdditionalServicesList.reduce((sum, s) => sum + s.total, 0);
           const checkoutProductsCost = checkoutProductsConsumablesList.reduce((sum, p) => sum + p.total, 0);
-          const totalCost = baseServicesTotal + checkoutAdditionalServicesCost + checkoutProductsCost;
+          const calculatedTotal = baseServicesTotal + checkoutAdditionalServicesCost + checkoutProductsCost;
+
+          let bookedPackagePurchasePrice = 0;
+          if (isCheckoutPackage) {
+            const pkgPriceMatch = String(checkoutBooking?.notes || "").match(
+              /\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption)\]:[^(]+\((\d+(?:,\d+)?(?:\.\d+)?)\s*EGP/i
+            );
+            if (pkgPriceMatch) {
+              bookedPackagePurchasePrice = parseFloat(pkgPriceMatch[1].replace(/,/g, '')) || 0;
+            }
+          }
+
+          const rawPaid = Number(checkoutBooking.amountPaid || (checkoutBooking as any).amount_paid || 0);
+          const rawLeft = (checkoutBooking as any).amountLeft ?? (checkoutBooking as any).amount_left;
+          const totalCost = isCheckoutPackage
+            ? Math.max(calculatedTotal, bookedPackagePurchasePrice, rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0))
+            : isCheckoutPerPulse
+            ? calculatedTotal
+            : Math.max(calculatedTotal, targetCheckoutTotal, rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0));
+
           const balanceDue = Math.max(0, totalCost - depositAlreadyPaid);
 
           // 2. Fetch customer details
@@ -9817,6 +9873,25 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     }
                   } catch (pulseErr) {
                     console.error("Error consuming laser package pulses at checkout:", pulseErr);
+                  }
+                }
+
+                // If customer had an outstanding balance (e.g. from in-booking package purchase) and paid now at checkout, settle debt
+                if (customerRecord && Number(customerRecord.outstanding || 0) > 0 && amountPaidNum > 0) {
+                  try {
+                    const settleAmount = Math.min(Number(customerRecord.outstanding || 0), amountPaidNum);
+                    await fetch("/api/customers/settle-debt", {
+                      method: "POST",
+                      headers: authenticatedJsonHeaders,
+                      body: JSON.stringify({
+                        customerId: customerRecord.id,
+                        amount: settleAmount,
+                        paymentMethod: "cash",
+                        note: `Checkout settlement for booking #${checkoutBooking.id}`
+                      })
+                    });
+                  } catch (debtErr) {
+                    console.warn("Non-fatal debt settlement error at checkout:", debtErr);
                   }
                 }
 
@@ -10147,16 +10222,27 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-[#5A6A51] mb-1">
-                        Amount Paid / المبلغ المدفوع
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-[#5A6A51]">
+                          Amount Paid / المبلغ المدفوع
+                        </label>
+                        {netDue > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setCheckoutAmountPaid(String(netDue))}
+                            className="text-[11px] font-bold text-[#414E36] hover:underline cursor-pointer"
+                          >
+                            {isRTL ? "دفع كامل المبلغ" : "Pay Full"} ({netDue} EGP)
+                          </button>
+                        )}
+                      </div>
                       <div className="relative">
                         <input
                           type="number"
                           min="0"
                           value={checkoutAmountPaid}
                           onChange={(e) => setCheckoutAmountPaid(e.target.value)}
-                          placeholder="0.00"
+                          placeholder={String(netDue)}
                           className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-10 py-2.5 text-sm font-bold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5A6A51]">EGP</span>
