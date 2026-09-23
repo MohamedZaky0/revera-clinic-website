@@ -120,4 +120,25 @@ describe('GET /api/customers/packages — staff access still works', () => {
     const res = await GET(req('', 'staff-token'));
     expect(res.status).toBe(400);
   });
+
+  it('does not include retail product balances as packages', async () => {
+    seedStaffAuth();
+    fake.seed('customer_product_balances', [
+      {
+        id: 'cpb-1',
+        customer_id: CUSTOMER_ID,
+        product_name: 'Retinol Anti-Aging Serum',
+        purchased_quantity: 1,
+        remaining_quantity: 1,
+        status: 'Active',
+      },
+    ]);
+    const res = await GET(req(`customer_id=${CUSTOMER_ID}`, 'staff-token'));
+    expect(res.status).toBe(200);
+    const { packages } = await res.json();
+    expect(packages).toHaveLength(1);
+    expect(packages[0].id).toBe('cp-1');
+    expect(packages.some((p: any) => p.packageName === 'Retinol Anti-Aging Serum')).toBe(false);
+  });
 });
+

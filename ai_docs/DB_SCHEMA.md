@@ -200,6 +200,8 @@ no application code reads or writes it; do not use it until its purpose is decid
 | `laser_payment_mode` | text | nullable, CHECK IN (`'SERVICE'`, `'PER_PULSE'`, `'PACKAGE'`). **Added 2026-09-21** by `20260921000000_add_laser_settlement_columns_to_reservations.sql`. Snapshot of the settlement mode agreed for this reservation; no default so historical bookings remain unknown. |
 | `laser_price_per_pulse` | numeric | nullable. Same migration. Agreed per-pulse rate snapshot for this reservation; no default. |
 | `delivered_pulses` | integer | nullable. Same migration. Actual laser pulses delivered for this reservation; no default. |
+| `laser_deficit_resolution` | text | nullable. **Added 2026-09-23** by `20260923000000_add_laser_deficit_resolution_to_reservations.sql` (Brief 35 / DEC-079). `'BUY_NEW_PACKAGE'` or `'PAY_PER_PULSE'` — how the delivered-pulses deficit was resolved at reception checkout. NULL = no deficit resolved; doubles as the reservation-level idempotency marker for `POST /api/reservations/laser-deficit`. |
+| `laser_deficit_pulses` | integer | nullable. Same migration. Deficit pulse count covered by `laser_deficit_resolution`. |
 | `is_historical` | boolean | Default false. **Added 2026-08-29** by `20260829000000_add_is_historical_to_reservations.sql`. Set to `true` when created via "Add Previous Booking" for historical bookings prior to system setup. |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
