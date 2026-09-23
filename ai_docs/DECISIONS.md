@@ -2789,3 +2789,30 @@ In `src/app/api/customers/packages/route.ts`, the `GET` handler contained a lega
 2. **Added Regression Test:**
    - Added test in `tests/routes/customers-packages.test.ts` asserting that records in `customer_product_balances` are never returned as packages.
 
+---
+
+## DEC-081: Accurate Package Classification and Pulse Quota Resolution in Package Sales
+
+**Date:** 2026-09-23
+**Status:** Decided — active
+
+**Context:**
+When attempting to purchase a package for a customer during new booking creation or from the package catalog, the system threw an error: *"The package could not be added to the patient's profile, so the booking was not created and nothing was charged."*
+
+**Root Causes:**
+1. In `src/app/api/packages/sell/route.ts`, `isPulsesPkg` checked generic keywords like `pkg.name.toLowerCase().includes('laser')` without checking if the package was an explicit service package with service items (`package_items`). Consequently, any service package containing the word "laser" in its title was incorrectly classified as a pulses package and rejected with a 400 error (`This package has no pulse quota configured`) because `total_pulses` was 0.
+2. `configuredTotalPulses` resolution was not unified across DB `total_pulses`, `packages_meta`, and package names, leading to false negatives on pulses packages that had quota metadata.
+3. In `AdminNewBookingView.tsx`, the catalog filter for Option 3 ("Pay with Pulses Package") included service packages with "laser" in their name, and error messages from the sell API were not surfaced to receptionists.
+
+**Decisions & Implementation:**
+1. **Package Sell Classification Refined:**
+   - In `src/app/api/packages/sell/route.ts`, explicit service packages (`packageItems.length > 0 && pkg.package_type !== 'pulses' && pkgMeta?.packageType !== 'pulses'`) are identified and exempted from pulse quota requirements.
+   - `configuredTotalPulses` resolves the quota across `pkg.total_pulses`, `pkgMeta.totalPulses`, and pulse name patterns.
+   - `customer_packages` record receives the resolved `configuredTotalPulses`.
+2. **Booking View Filter & Error Propagation:**
+   - In `AdminNewBookingView.tsx`, catalog pulses filtering strictly excludes service packages without pulse quotas.
+   - Any server-returned error message from `/api/packages/sell` is surfaced in the alert so the user is clearly informed.
+3. **Regression Tests Added:**
+   - In `tests/routes/packages-sell.test.ts`, added unit tests validating service packages with "laser" in their names, meta pulse resolution, and quota validation.
+
+
