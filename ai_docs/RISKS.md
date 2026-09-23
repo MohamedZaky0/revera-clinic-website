@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **65 resolved** · 85 tracked total.
+**7 open** · **13 partially resolved** · **66 resolved** · 86 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4331,6 +4331,94 @@ checklist, not actually run before this session picked the work back up — the 
 one path static checks and unit tests (written against the code as it stood) could not see: the
 interaction between two already-tested pieces (the notes-tag writer and the rate guard) once wired
 together and clicked through for real.
+
+---
+
+## RISK-096: Every Patient's Package Pulse Balance Lived In One Shared `page_settings` JSON Row — Concurrent Consumes Lost Deductions, And Depletion Never Persisted (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Data integrity / concurrency · **Found:** 2026-09-20 audit
+(Brief 34 investigation), deliberately deferred there · **Fixed:** 2026-09-22, Brief 34B.
+**Both migrations applied to dev 2026-09-23 and live-verified — see checklist.**
+
+**What it was — three compounding defects in `src/app/api/customers/packages/route.ts`:**
+
+1. **Cross-patient lost-update race.** The pulse balance for every `customer_packages` row in the
+   clinic lived in a single `page_settings` row (`key='customer_package_pulses'`, a
+   `{id: {included,used,remaining,usage_history[]}}` map). Every consume read the whole map,
+   mutated one key, and upserted the whole row back. Two concurrent consumes — even for
+   *different* patients — read the same snapshot and the later write silently erased the earlier
+   deduction. The clinic gave away paid laser pulses with no record anywhere.
+2. **The save could not fail at all — even quietly.** `savePackagePulsesStore` wrapped the upsert
+   in `try/catch`, but supabase-js **returns** `{error}` rather than throwing, and the code never
+   destructured it. A rejected write returned `success: true` with a balance that was never
+   stored.
+3. **Depletion was physically impossible to persist.** The best-effort column sync wrote
+   `status: 'completed'`, but the real CHECK is `('active','expired','fully_used')`
+   (`20260726010500_create_customer_packages.sql`). The whole UPDATE was rejected on depletion,
+   leaving stale pulses *and* `status='active'` — exactly when the package was exhausted. The
+   same illegal `'completed'` was written by `POST /api/packages/consume`'s fallback path.
+   Root cause included wrong documentation: `DB_SCHEMA.md` had a second `customer_packages`
+   block (and a second `packages` block, and a wrong `laser_pulse_logs` block) describing
+   columns and constraints no migration creates — now deduplicated.
+
+**Fix (Brief 34B, 7 commits):** new `package_pulse_usage` audit table with a partial unique
+index on `(customer_package_id, reservation_id)`; `consume_package_pulses()` plpgsql function
+that locks the row `FOR UPDATE`, replays idempotent consumes, clamps with `least()`, and marks
+`'fully_used'` on depletion — `REVOKE`d from `PUBLIC`/`anon`/`authenticated`, granted only to
+`service_role` (PostgREST would otherwise expose it to the browser's anon key). The PATCH route
+calls the RPC and checks `{error}`; GET reads the real columns and batches usage history;
+`packages/sell` writes columns only and refuses a pulses package with `total_pulses <= 0`; all
+`10000`/`1000`/name-parsing quota fabrications removed (`AdminNewBookingView`,
+`DoctorOngoingSessionTab`, `DoctorAccountView`, `GET /api/packages`); a blob→columns backfill
+migration repairs stale rows and lists unresolvable ones via `RAISE NOTICE` instead of
+guessing. `grep -rn "customer_package_pulses" src/` is empty.
+
+**Migration bug found during the live apply, fixed before landing (2026-09-23):** the backfill
+migration inserted every blob `usage_history[]` entry's `booking_id` straight into
+`package_pulse_usage.reservation_id`, which has `REFERENCES reservations(id)`. On the real dev
+database this failed with `23503` — every historical `booking_id` in the blob referenced a
+reservation that had since been deleted (this session's own test-data cleanup, across many
+earlier live-testing passes). Fixed by requiring the UUID to actually resolve in `reservations`
+before using it, otherwise inserting the usage row with `reservation_id = NULL` (same treatment
+as a malformed/non-UUID id) — preserves the audit quantity/remaining-after history without
+violating the FK. Re-applied clean; all 10 backfilled usage rows ended up `reservation_id = NULL`
+(expected — none of the historical test bookings still exist).
+
+**Deploy ordering — applied 2026-09-23 on dev, in order:** migration 1 (table + RPC) → migration
+2 (backfill, fixed as above) → `db push` on migration 2 failed once (the bug above), fixed, and
+`db push` succeeded clean on retry. `SELECT ... WHERE package_type='pulses' AND total_pulses<=0
+AND NOT EXISTS(package_pulse_usage row)` returned **zero rows** — nothing left unresolvable, no
+NOTICE-listed packages to fix in Admin → Packages. Post-backfill: 9 `active` pulses packages
+(93,800 pulses total), 2 rows repaired from stale `active` to `fully_used` (the exact defect
+finding 3 describes). Rollback: revert the deploy; the blob row is deliberately kept.
+
+**Adjacent finding, reported not fixed (per brief):** `/api/laser-pulses` builds ids like
+`lpl-<ts>-<rand>` for `laser_pulse_logs.id uuid`, so its native-table upsert fails 22P02 every
+time and is swallowed — assume `laser_pulse_logs` is empty; the real audit lives in
+`page_settings.laser_pulse_logs` + `data/laser_pulses.json`.
+
+**Tests:** `tests/routes/packages-consume-pulses-columns.test.ts` (17 cases: contract, clamp,
+idempotency, `fully_used`, no `page_settings` access, RPC failure → real error);
+`packages-consume-pulses.test.ts` updated to the new contract; `packages-sell.test.ts` asserts
+columns not blob + new refusal case.
+
+**Live-verified against the real dev database (2026-09-23), not just the fake:** ACL confirmed
+directly (`has_function_privilege`) — `anon`/`authenticated` cannot execute
+`consume_package_pulses`, only `service_role` can, `prosecdef = false` (no `SECURITY DEFINER`);
+partial unique index and RLS confirmed present. Functional test against a disposable
+customer/reservation/package: clamp (requested 900 against 600 remaining → consumed 600,
+remaining 0), depletion correctly flips `status` to `fully_used`, a further consume on a depleted
+package raises `package has 0 remaining pulses` (mapped by the route to a clean 400), a repeat
+call for the same reservation returns `already_deducted: true` with zero additional rows.
+**Concurrency (the whole point of the brief):** fired overlapping `consume_package_pulses` calls
+for the *same* `(customer_package_id, reservation_id)` — exactly one committed the deduction,
+every other call returned `already_deducted: true`, and the final balance reflected exactly one
+600-pulse consume, never two. Fired concurrent calls for *two different* patients' packages —
+both succeeded independently with no cross-contamination. All disposable test rows deleted
+afterward; confirmed zero residue.
+
+**Manual test checklist:** `ai_docs/manual_tests/LASER_PULSE_BALANCE_BRIEF_34B_MANUAL_TESTS.md`
+— Evidence log and checklist filled in with the above.
 
 ---
 

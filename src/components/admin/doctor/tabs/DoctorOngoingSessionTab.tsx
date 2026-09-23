@@ -632,19 +632,18 @@ export default function DoctorOngoingSessionTab({
     hasActivePackage: !isNoActivePackage,
   });
 
-  // Helper to extract total pulses in catalog package for purchase
-  const newPackageTotalPulses = Number(
-    selectedNewPackageToBuy?.total_pulses ||
-    selectedNewPackageToBuy?.totalPulses ||
-    selectedNewPackageToBuy?.included_pulses ||
-    selectedNewPackageToBuy?.includedPulses ||
-    (() => {
-      const match = String(selectedNewPackageToBuy?.name || selectedNewPackageToBuy?.title || '').match(/(\d+)\s*k\b/i);
-      if (match) return Number(match[1]) * 1000;
-      const numMatch = String(selectedNewPackageToBuy?.name || selectedNewPackageToBuy?.title || '').match(/(\d+(?:,\d+)?)/);
-      return numMatch ? Number(numMatch[1].replace(/,/g, '')) : 10000;
-    })()
-  );
+  // Total pulses for the catalog package being purchased — the real total_pulses field only.
+  // null means "no pulse quota configured" and must block the buy-new-package choice, never a guess.
+  const newPackageTotalPulses: number | null = (() => {
+    const raw = Number(
+      selectedNewPackageToBuy?.total_pulses ??
+      selectedNewPackageToBuy?.totalPulses ??
+      selectedNewPackageToBuy?.included_pulses ??
+      selectedNewPackageToBuy?.includedPulses ??
+      0
+    );
+    return raw > 0 ? raw : null;
+  })();
 
   // Calculate Subtotals
   const additionalServicesSubtotal = additionalServices.reduce((sum, item) => {
@@ -805,6 +804,11 @@ export default function DoctorOngoingSessionTab({
                     }
                     if (standardPulsesDelivered <= 0) {
                       alert("Please enter the number of laser pulses delivered in this session.");
+                      return;
+                    }
+                    const needsNewPackage = isNoActivePackage || (packageDeficit > 0 && packageSpilloverChoice === "BUY_NEW_PACKAGE");
+                    if (needsNewPackage && selectedNewPackageToBuy && newPackageTotalPulses === null) {
+                      alert("This package has no pulse quota configured — set Total Pulses in Admin → Packages.");
                       return;
                     }
                   }
@@ -1635,15 +1639,10 @@ export default function DoctorOngoingSessionTab({
                                 className="w-full rounded-xl border border-purple-200 bg-[#FBFBF9] px-3.5 py-2.5 text-xs font-black text-[#1F251A] outline-none focus:border-purple-600 shadow-2xs"
                               >
                                 {allCatalogPackages.map((p) => {
-                                  const pPulses = Number(p.total_pulses || p.totalPulses || p.included_pulses || p.includedPulses || (() => {
-                                    const m = String(p.name || '').match(/(\d+)\s*k\b/i);
-                                    if (m) return Number(m[1]) * 1000;
-                                    const nm = String(p.name || '').match(/(\d+(?:,\d+)?)/);
-                                    return nm ? Number(nm[1].replace(/,/g, '')) : 10000;
-                                  })());
+                                  const pPulses = Number(p.total_pulses ?? p.totalPulses ?? p.included_pulses ?? p.includedPulses ?? 0);
                                   return (
                                     <option key={p.id} value={p.id}>
-                                      {p.name || p.title} ({pPulses.toLocaleString()} pulses · {Number(p.price || 0).toLocaleString()} EGP)
+                                      {p.name || p.title} ({pPulses > 0 ? `${pPulses.toLocaleString()} pulses` : "no pulse quota configured"} · {Number(p.price || 0).toLocaleString()} EGP)
                                     </option>
                                   );
                                 })}
@@ -1687,12 +1686,18 @@ export default function DoctorOngoingSessionTab({
                                   Package Balance After This Session
                                 </label>
                                 <div className="w-full rounded-xl px-3.5 py-2 text-xs font-black bg-purple-50 border border-purple-200 text-purple-950 flex flex-col justify-center min-h-[40px]">
-                                  <span>
-                                    {Math.max(0, newPackageTotalPulses - standardPulsesDelivered).toLocaleString()} Pulses Remaining
-                                  </span>
-                                  <span className="text-[10px] font-semibold text-purple-700">
-                                    ({standardPulsesDelivered.toLocaleString()} deducted from {newPackageTotalPulses.toLocaleString()} total)
-                                  </span>
+                                  {newPackageTotalPulses === null ? (
+                                    <span>— (no pulse quota configured — set Total Pulses in Admin → Packages)</span>
+                                  ) : (
+                                    <>
+                                      <span>
+                                        {Math.max(0, newPackageTotalPulses - standardPulsesDelivered).toLocaleString()} Pulses Remaining
+                                      </span>
+                                      <span className="text-[10px] font-semibold text-purple-700">
+                                        ({standardPulsesDelivered.toLocaleString()} deducted from {newPackageTotalPulses.toLocaleString()} total)
+                                      </span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1704,7 +1709,9 @@ export default function DoctorOngoingSessionTab({
                                 <span className="text-sm text-purple-900">{Number(selectedNewPackageToBuy?.price || 0).toLocaleString()} EGP (Package Price Only)</span>
                               </div>
                               <p className="text-[11px] text-purple-800 leading-relaxed">
-                                Base laser treatment is 100% covered. The remaining <strong>{Math.max(0, newPackageTotalPulses - standardPulsesDelivered).toLocaleString()} pulses</strong> will be available for the patient in future sessions at 0 EGP.
+                                Base laser treatment is 100% covered. {newPackageTotalPulses === null
+                                  ? "This package has no pulse quota configured — set Total Pulses in Admin → Packages."
+                                  : <>The remaining <strong>{Math.max(0, newPackageTotalPulses - standardPulsesDelivered).toLocaleString()} pulses</strong> will be available for the patient in future sessions at 0 EGP.</>}
                               </p>
                             </div>
                           </div>

@@ -221,6 +221,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Package must contain at least one service with a positive quantity.' }, { status: 400 });
     }
 
+    // Pulse quota comes from the real packages.total_pulses column only — never the package name
+    // and never a fabricated default. A pulses-type package with no configured quota is refused
+    // before any invoice/package is written, so the owner sets Total Pulses in Admin → Packages
+    // instead of the patient getting a guessed one.
+    if (isPulsesPkg && Number(pkg.total_pulses || 0) <= 0) {
+      return NextResponse.json(
+        { error: 'This package has no pulse quota configured — set Total Pulses in Admin → Packages.' },
+        { status: 400 }
+      );
+    }
+
     if (branchId && pkg.branch_id && branchId !== pkg.branch_id) {
       return NextResponse.json({ error: 'Package is not available at the requested branch.' }, { status: 400 });
     }
@@ -298,9 +309,7 @@ export async function POST(req: Request) {
       throw invoiceLineError;
     }
 
-    const totalPulsesVal = isPulsesPkg
-      ? (Number(pkg.total_pulses || 0) || Number(pkgMeta?.totalPulses || 0) || extractedPulsesFromName || 1000)
-      : 0;
+    const totalPulsesVal = isPulsesPkg ? Number(pkg.total_pulses || 0) : 0;
     const cpInsertPayload: any = {
       customer_id: finalCustomerId,
       package_id: pkg.id,
@@ -340,31 +349,6 @@ export async function POST(req: Request) {
     } else if (customerPackageError) {
       await removeIncompleteSale(invoice.id);
       throw customerPackageError;
-    }
-
-    // Persist pulses to page_settings pulse store for full ecosystem compatibility
-    if (isPulsesPkg && totalPulsesVal > 0 && customerPackage?.id) {
-      try {
-        const { data: psData } = await supabaseServer
-          .from('page_settings')
-          .select('value')
-          .eq('key', 'customer_package_pulses')
-          .maybeSingle();
-        const store = psData?.value && typeof psData.value === 'object' ? psData.value : {};
-        store[customerPackage.id] = {
-          included_pulses: totalPulsesVal,
-          used_pulses: 0,
-          remaining_pulses: totalPulsesVal,
-          usage_history: []
-        };
-        await supabaseServer.from('page_settings').upsert({
-          key: 'customer_package_pulses',
-          value: store,
-          updated_at: new Date().toISOString()
-        });
-      } catch (pulseErr) {
-        console.warn('Error saving customer package pulses in store:', pulseErr);
-      }
     }
 
     if (packageItems.length > 0) {

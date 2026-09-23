@@ -1620,7 +1620,7 @@ export default function DoctorAccountView({
     } else if (isDoctorPackage) {
       if (laserData?.isInitialPackagePurchase && laserData?.newPackageToBuy) {
         const pkgName = laserData.newPackageToBuy.name || laserData.newPackageToBuy.title || "Laser Pulses Package";
-        const pkgTotal = Number(laserData.newPackageTotalPulses || 10000);
+        const pkgTotal = Number(laserData.newPackageTotalPulses || 0);
         const remPulses = Math.max(0, pkgTotal - doctorDeliveredPulses);
         const pkgPrice = Number(laserData.newPackageToBuy.price || 0);
         const purchaseString = `\n[Laser Package Redemption]: Initial package purchase: ${pkgName} (${pkgTotal} pulses @ ${pkgPrice} EGP). Deducted ${doctorDeliveredPulses} pulses, remaining: ${remPulses} pulses / تم شراء باقة نبضات (${pkgName}) واستهلاك ${doctorDeliveredPulses} نبضة والمتبقي ${remPulses} نبضة`;

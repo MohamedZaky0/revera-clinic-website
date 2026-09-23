@@ -15,36 +15,55 @@ export interface PackagePulseUsageLog {
   remaining_after?: number;
 }
 
-// Helper to get fallback package pulse data store in page_settings
-async function getPackagePulsesStore(): Promise<Record<string, { included_pulses: number; used_pulses: number; remaining_pulses: number; usage_history: PackagePulseUsageLog[] }>> {
-  try {
-    const { data } = await supabaseServer
-      .from('page_settings')
-      .select('value')
-      .eq('key', 'customer_package_pulses')
-      .maybeSingle();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    if (data?.value && typeof data.value === 'object') {
-      return data.value;
-    }
-  } catch (err) {
-    console.warn('Error reading customer_package_pulses:', err);
+// One batched read of package_pulse_usage for a set of customer package ids, grouped by
+// customer_package_id. Keeps the old blob's usage_history field names via mapPulseUsageRow.
+async function getPackagePulseUsageMap(customerPackageIds: string[]): Promise<Record<string, PackagePulseUsageLog[]>> {
+  const ids = customerPackageIds.filter((id) => UUID_RE.test(String(id)));
+  if (ids.length === 0) return {};
+  const { data, error } = await supabaseServer
+    .from('package_pulse_usage')
+    .select('*')
+    .in('customer_package_id', ids)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.warn('Error reading package_pulse_usage:', error);
+    return {};
   }
-  return {};
+  const map: Record<string, PackagePulseUsageLog[]> = {};
+  for (const row of data || []) {
+    (map[row.customer_package_id] ||= []).push(mapPulseUsageRow(row));
+  }
+  return map;
 }
 
-async function savePackagePulsesStore(store: Record<string, any>) {
-  try {
-    await supabaseServer
-      .from('page_settings')
-      .upsert({
-        key: 'customer_package_pulses',
-        value: store,
-        updated_at: new Date().toISOString()
-      });
-  } catch (err) {
-    console.warn('Error saving customer_package_pulses:', err);
+// Maps one package_pulse_usage row into the PackagePulseUsageLog shape callers already consume
+// (field names unchanged from the old page_settings blob: booking_id, used_at, remaining_after).
+function mapPulseUsageRow(row: any): PackagePulseUsageLog {
+  return {
+    id: String(row.id),
+    quantity_used: Number(row.quantity_used || 0),
+    used_at: row.created_at,
+    used_by: row.used_by || undefined,
+    notes: row.notes || undefined,
+    booking_id: row.reservation_id || undefined,
+    treatment_area: row.treatment_area || undefined,
+    remaining_after: row.remaining_after !== null && row.remaining_after !== undefined ? Number(row.remaining_after) : undefined,
+  };
+}
+
+async function getPackagePulseUsageHistory(customerPackageId: string): Promise<PackagePulseUsageLog[]> {
+  const { data, error } = await supabaseServer
+    .from('package_pulse_usage')
+    .select('*')
+    .eq('customer_package_id', customerPackageId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.warn('Error reading package_pulse_usage history:', error);
+    return [];
   }
+  return (data || []).map(mapPulseUsageRow);
 }
 
 // Lists everything a customer has bought under the packages feature (customer_packages +
@@ -120,7 +139,6 @@ export async function GET(req: Request) {
     }
 
     const validCustomerIds = customerIds.filter((id) => UUID_REGEX.test(id));
-    const pulseStore = await getPackagePulsesStore();
     let packages: any[] = [];
 
     // 1. Fetch from native customer_packages table (only with valid UUIDs to avoid 22P02 error)
@@ -130,7 +148,8 @@ export async function GET(req: Request) {
           .from('customer_packages')
           .select(`
             id, customer_id, package_id, status, purchased_at, expires_at, price_paid,
-            packages ( id, name, name_ar ),
+            package_type, total_pulses, pulses_used, pulses_remaining,
+            packages ( id, name, name_ar, package_type ),
             customer_package_items ( id, service_id, qty_total, qty_used, qty_remaining, services ( id, en, ar, name, price ) )
           `)
           .in('customer_id', validCustomerIds)
@@ -138,20 +157,16 @@ export async function GET(req: Request) {
 
         if (!error && data && data.length > 0) {
           packages = data.map((row: any) => {
-            const pulseInfo = pulseStore[row.id] || null;
-            const incPulses = pulseInfo
-              ? Number(pulseInfo.included_pulses || 0)
-              : Number((row as any).total_pulses || (row as any).included_pulses || 0);
-            const remPulses = pulseInfo
-              ? Number(pulseInfo.remaining_pulses || 0)
-              : Number((row as any).pulses_remaining || (row as any).remaining_pulses || incPulses);
-            const usedPulses = pulseInfo
-              ? Number(pulseInfo.used_pulses || 0)
-              : Number((row as any).pulses_used || (row as any).used_pulses || 0);
+            // Nullish-aware: a real pulses_remaining of 0 must stay 0 — falling back to the
+            // included total would resurrect a depleted package.
+            const incPulses = Number(row.total_pulses ?? row.included_pulses ?? 0);
+            const remPulses = row.pulses_remaining != null
+              ? Number(row.pulses_remaining)
+              : row.remaining_pulses != null ? Number(row.remaining_pulses) : incPulses;
+            const usedPulses = Number(row.pulses_used ?? row.used_pulses ?? 0);
             const isPulses = Boolean(
-              (row as any).package_type === 'pulses' ||
-              (row.packages as any)?.package_type === 'pulses' ||
-              pulseInfo !== null ||
+              row.package_type === 'pulses' ||
+              row.packages?.package_type === 'pulses' ||
               incPulses > 0 ||
               remPulses > 0 ||
               (row.customer_package_items || []).length === 0
@@ -172,7 +187,7 @@ export async function GET(req: Request) {
               usedPulses: usedPulses,
               pulsesRemaining: remPulses,
               remainingPulses: remPulses,
-              pulseUsageHistory: pulseInfo?.usage_history || [],
+              pulseUsageHistory: [] as PackagePulseUsageLog[],
               items: (row.customer_package_items || []).map((it: any) => ({
                 id: it.id,
                 serviceId: Number(it.service_id),
@@ -209,20 +224,14 @@ export async function GET(req: Request) {
             packages = rawCustPkgs.map((row: any) => {
               const master = allMasterPkgs.find((m: any) => String(m.id) === String(row.package_id));
               const rowItems = allItems.filter((it: any) => String(it.customer_package_id) === String(row.id));
-              const pulseInfo = pulseStore[row.id] || null;
-              const incPulses = pulseInfo
-                ? Number(pulseInfo.included_pulses || 0)
-                : Number(row.total_pulses || (row as any).included_pulses || 0);
-              const remPulses = pulseInfo
-                ? Number(pulseInfo.remaining_pulses || 0)
-                : Number(row.pulses_remaining || (row as any).remaining_pulses || incPulses);
-              const usedPulses = pulseInfo
-                ? Number(pulseInfo.used_pulses || 0)
-                : Number(row.pulses_used || (row as any).used_pulses || 0);
+              const incPulses = Number(row.total_pulses ?? row.included_pulses ?? 0);
+              const remPulses = row.pulses_remaining != null
+                ? Number(row.pulses_remaining)
+                : row.remaining_pulses != null ? Number(row.remaining_pulses) : incPulses;
+              const usedPulses = Number(row.pulses_used ?? row.used_pulses ?? 0);
               const isPulses = Boolean(
                 row.package_type === 'pulses' ||
                 (master as any)?.package_type === 'pulses' ||
-                pulseInfo !== null ||
                 incPulses > 0 ||
                 remPulses > 0 ||
                 rowItems.length === 0
@@ -243,7 +252,7 @@ export async function GET(req: Request) {
                 usedPulses: usedPulses,
                 pulsesRemaining: remPulses,
                 remainingPulses: remPulses,
-                pulseUsageHistory: pulseInfo?.usage_history || [],
+                pulseUsageHistory: [] as PackagePulseUsageLog[],
                 items: rowItems.map((it: any) => {
                   const svc = allServices.find((s: any) => Number(s.id) === Number(it.service_id));
                   return {
@@ -263,6 +272,13 @@ export async function GET(req: Request) {
       } catch (cpErr) {
         console.warn('Error reading customer_packages table:', cpErr);
       }
+    }
+
+    // Pulse usage history comes from package_pulse_usage in one batched query, covering both the
+    // joined and the fallback branches above.
+    if (packages.length > 0) {
+      const usageMap = await getPackagePulseUsageMap(packages.map((p) => p.id));
+      packages = packages.map((p) => ({ ...p, pulseUsageHistory: usageMap[p.id] || [] }));
     }
 
     // 2. Also check customer_product_balances in case sessions were purchased as product balances
@@ -368,6 +384,8 @@ export async function PATCH(req: Request) {
       used_by,
       notes,
       booking_id,
+      reservation_id,
+      reservationId,
       treatment_area,
       included_pulses
     } = body;
@@ -377,157 +395,118 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ success: false, error: 'Customer Package ID is required.' }, { status: 400 });
     }
 
-    const pulseStore = await getPackagePulsesStore();
+    const PKG_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    // Set / Initialize Included Pulses on package
+    // Set / Initialize Included Pulses on package — writes the real customer_packages columns
     if (action === 'set_included_pulses' || included_pulses !== undefined) {
+      if (!PKG_UUID_RE.test(String(pkgId))) {
+        return NextResponse.json({ success: false, error: 'Customer package not found.' }, { status: 400 });
+      }
       const incPulses = Math.max(0, parseInt(String(included_pulses || 0), 10));
-      const existing = pulseStore[pkgId] || { included_pulses: incPulses, used_pulses: 0, remaining_pulses: incPulses, usage_history: [] };
-      existing.included_pulses = incPulses;
-      existing.remaining_pulses = Math.max(0, incPulses - (existing.used_pulses || 0));
-      pulseStore[pkgId] = existing;
-      await savePackagePulsesStore(pulseStore);
-      return NextResponse.json({ success: true, packagePulses: existing });
+      const { data: curRow, error: curErr } = await supabaseServer
+        .from('customer_packages')
+        .select('id, pulses_used')
+        .eq('id', pkgId)
+        .maybeSingle();
+      if (curErr) {
+        console.error('set_included_pulses read failed:', curErr);
+        return NextResponse.json({ success: false, error: curErr.message }, { status: 500 });
+      }
+      if (!curRow) {
+        return NextResponse.json({ success: false, error: 'Customer package not found.' }, { status: 400 });
+      }
+      const usedPulses = Number((curRow as any).pulses_used || 0);
+      const remainingPulses = Math.max(0, incPulses - usedPulses);
+      const { error: updErr } = await supabaseServer
+        .from('customer_packages')
+        .update({ total_pulses: incPulses, pulses_remaining: remainingPulses })
+        .eq('id', pkgId);
+      if (updErr) {
+        console.error('set_included_pulses update failed:', updErr);
+        return NextResponse.json({ success: false, error: updErr.message }, { status: 500 });
+      }
+      return NextResponse.json({
+        success: true,
+        packagePulses: {
+          included_pulses: incPulses,
+          used_pulses: usedPulses,
+          remaining_pulses: remainingPulses,
+          usage_history: []
+        }
+      });
     }
 
-    // Deduct Package Pulses (Scenario 14, 15)
+    // Deduct Package Pulses (Scenario 14, 15) — atomic RPC, see
+    // supabase/migrations/20260922000000_package_pulse_balance_to_columns.sql
     if (action === 'consume_package_pulses' || action === 'deduct_pulses') {
       const qtyToDeduct = Math.max(0, parseInt(String(quantity_used || 0), 10));
       if (qtyToDeduct <= 0) {
         return NextResponse.json({ success: false, error: 'Quantity of pulses to consume must be greater than 0.' }, { status: 400 });
       }
 
-      // 1. Verify package existence & expiry in database (safely guard UUID to avoid 22P02 syntax error on synthetic IDs)
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(pkgId));
-      let pkgRow: any = null;
-      if (isUuid) {
-        try {
-          const { data, error: pErr } = await supabaseServer
-            .from('customer_packages')
-            .select('*')
-            .eq('id', pkgId)
-            .maybeSingle();
-          if (!pErr) pkgRow = data;
-        } catch (e) {
-          console.warn('Customer package DB lookup error (non-fatal):', e);
-        }
-      }
-
-      if (pkgRow?.expires_at) {
-        const expiryDate = new Date(pkgRow.expires_at);
-        if (expiryDate.getTime() < Date.now()) {
-          return NextResponse.json({ success: false, error: 'Cannot consume pulses: This package has expired.' }, { status: 400 });
-        }
-      }
-
-      const storedPulses = pulseStore[pkgId];
-      if (!storedPulses && !pkgRow) {
+      // Synthetic/non-UUID ids cannot be customer_packages rows — reject cleanly, never let a
+      // 22P02 uuid cast error leak out of the RPC.
+      if (!PKG_UUID_RE.test(String(pkgId))) {
         return NextResponse.json({ success: false, error: 'Customer package not found.' }, { status: 400 });
       }
-      const initialTotalPulses = Number(
-        storedPulses?.included_pulses ??
-        (pkgRow as any)?.total_pulses ??
-        (pkgRow as any)?.included_pulses ??
-        (pkgRow as any)?.pulses
-      );
-      if (!Number.isFinite(initialTotalPulses) || initialTotalPulses <= 0) {
-        return NextResponse.json({ success: false, error: 'Package pulse quota is not configured.' }, { status: 400 });
+      const rawReservationId = booking_id || reservation_id || reservationId;
+      if (rawReservationId !== undefined && rawReservationId !== null && rawReservationId !== ''
+          && !PKG_UUID_RE.test(String(rawReservationId))) {
+        return NextResponse.json({ success: false, error: 'booking_id must be a reservation UUID.' }, { status: 400 });
       }
-      const initialUsed = Number(
-        (pkgRow as any)?.pulses_used ??
-        (pkgRow as any)?.used_pulses ??
-        0
-      );
-      const initialRemaining = Number(
-        (pkgRow as any)?.pulses_remaining ??
-        (pkgRow as any)?.remaining_pulses ??
-        Math.max(0, initialTotalPulses - initialUsed)
-      );
+      const reservationUuid = rawReservationId ? String(rawReservationId) : null;
 
-      const pkgPulses = pulseStore[pkgId] || {
-        included_pulses: initialTotalPulses,
-        used_pulses: initialUsed,
-        remaining_pulses: initialRemaining,
-        usage_history: []
+      const { data: rpcData, error: rpcError } = await supabaseServer.rpc('consume_package_pulses', {
+        p_customer_package_id: pkgId,
+        p_qty: qtyToDeduct,
+        p_reservation_id: reservationUuid,
+        p_used_by: used_by || (access.access.user as any)?.name || access.access.user?.email || 'Staff',
+        p_treatment_area: treatment_area || null,
+        p_notes: notes || null,
+      });
+
+      if (rpcError) {
+        const msg = String(rpcError.message || '');
+        const clientError =
+          msg.includes('customer package not found') ? 'Customer package not found.' :
+          msg.includes('has expired') ? 'Cannot consume pulses: This package has expired.' :
+          msg.includes('quota is not configured') ? 'Package pulse quota is not configured.' :
+          msg.includes('0 remaining pulses') ? 'Package has 0 remaining pulses.' :
+          msg.includes('greater than 0') ? 'Quantity of pulses to consume must be greater than 0.' :
+          null;
+        if (clientError) {
+          return NextResponse.json({ success: false, error: clientError }, { status: 400 });
+        }
+        console.error('consume_package_pulses RPC failed:', rpcError);
+        return NextResponse.json({ success: false, error: msg || 'Pulse consumption failed.' }, { status: 500 });
+      }
+
+      const result: any = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData;
+      const remaining = Number(result?.remaining ?? 0);
+      const packagePulses = {
+        included_pulses: Number(result?.total_pulses ?? 0),
+        used_pulses: Number(result?.used_total ?? 0),
+        remaining_pulses: remaining,
+        usage_history: await getPackagePulseUsageHistory(pkgId)
       };
 
-      // Idempotency check: if this exact booking has already deducted pulses, do not double-deduct
-      if (booking_id && Array.isArray(pkgPulses.usage_history)) {
-        const alreadyConsumed = pkgPulses.usage_history.find((log: any) => String(log.booking_id) === String(booking_id));
-        if (alreadyConsumed) {
-          return NextResponse.json({
-            success: true,
-            alreadyDeducted: true,
-            consumed: alreadyConsumed.quantity_used,
-            remainingPulses: pkgPulses.remaining_pulses,
-            packagePulses: pkgPulses
-          });
-        }
-      }
-
-      // Deduct up to available pulses without throwing 400 rejection (ensures pulses are always deducted)
-      const actualDeduct = Math.min(qtyToDeduct, Math.max(0, pkgPulses.remaining_pulses));
-      if (actualDeduct <= 0 && pkgPulses.remaining_pulses <= 0) {
+      if (result?.already_deducted) {
         return NextResponse.json({
-          success: false,
-          error: `Package has 0 remaining pulses.`
-        }, { status: 400 });
-      }
-
-      pkgPulses.used_pulses = (pkgPulses.used_pulses || 0) + actualDeduct;
-      pkgPulses.remaining_pulses = Math.max(0, pkgPulses.included_pulses - pkgPulses.used_pulses);
-
-      const usageLog: PackagePulseUsageLog = {
-        id: `ppul-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        quantity_used: actualDeduct,
-        used_at: new Date().toISOString(),
-        used_by: used_by || (access.access.user as any)?.name || access.access.user?.email || 'Staff',
-        notes: notes || '',
-        booking_id: booking_id || undefined,
-        treatment_area: treatment_area || undefined,
-        remaining_after: pkgPulses.remaining_pulses
-      };
-
-      pkgPulses.usage_history = [usageLog, ...(pkgPulses.usage_history || [])];
-      pulseStore[pkgId] = pkgPulses;
-      await savePackagePulsesStore(pulseStore);
-
-      // Sync to native customer_packages table if UUID (supports both pulses_used/pulses_remaining and used_pulses/remaining_pulses)
-      if (isUuid && pkgRow) {
-        const isDepleted = pkgPulses.remaining_pulses <= 0;
-        try {
-          await supabaseServer
-            .from('customer_packages')
-            .update({
-              pulses_used: pkgPulses.used_pulses,
-              pulses_remaining: pkgPulses.remaining_pulses,
-              ...(isDepleted ? { status: 'completed' } : {}),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', pkgId);
-        } catch (dbErr1) {
-          try {
-            await supabaseServer
-              .from('customer_packages')
-              .update({
-                used_pulses: pkgPulses.used_pulses,
-                remaining_pulses: pkgPulses.remaining_pulses,
-                ...(isDepleted ? { status: 'completed' } : {}),
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', pkgId);
-          } catch (dbErr2) {
-            console.warn('Syncing pulses to customer_packages table failed silently (non-fatal):', dbErr2);
-          }
-        }
+          success: true,
+          alreadyDeducted: true,
+          consumed: Number(result.consumed ?? 0),
+          requested: Number(result.requested ?? qtyToDeduct),
+          remainingPulses: remaining,
+          packagePulses
+        });
       }
 
       return NextResponse.json({
         success: true,
-        consumed: actualDeduct,
-        requested: qtyToDeduct,
-        remainingPulses: pkgPulses.remaining_pulses,
-        packagePulses: pkgPulses
+        consumed: Number(result?.consumed ?? 0),
+        requested: Number(result?.requested ?? qtyToDeduct),
+        remainingPulses: remaining,
+        packagePulses
       });
     }
 
