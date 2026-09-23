@@ -89,8 +89,16 @@ BEGIN
 
     IF jsonb_typeof(v_entry->'usage_history') = 'array' THEN
       FOR v_hist IN SELECT * FROM jsonb_array_elements(v_entry->'usage_history') LOOP
+        -- A well-formed UUID booking_id that no longer matches a live reservation (deleted test
+        -- data, or any historical booking that was removed) must NOT be inserted, or the
+        -- package_pulse_usage.reservation_id FK rejects the whole backfill (confirmed live,
+        -- 2026-09-23: dev push failed 23503 on exactly this). Treat it the same as a malformed
+        -- id: keep the usage row for audit history, but with reservation_id NULL.
         v_reservation := CASE
           WHEN COALESCE(v_hist->>'booking_id', '') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+               AND EXISTS (
+                 SELECT 1 FROM public.reservations r WHERE r.id = (v_hist->>'booking_id')::uuid
+               )
             THEN (v_hist->>'booking_id')::uuid
           ELSE NULL END;
         v_qty := CASE
