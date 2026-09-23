@@ -367,6 +367,13 @@ export async function GET(req: Request) {
 
       // Payment Status Badge
       let paymentStatus = "Unpaid";
+      const isPkgBooking = Boolean(
+        r.laser_payment_mode === "PACKAGE" ||
+        r.package_id ||
+        r.customer_package_id ||
+        String(r.notes || "").toLowerCase().includes("package redemption") ||
+        String(r.notes || "").includes("[Laser Package]")
+      );
       if (amountPaid > 0) {
         if (amountLeft === 0 || (amountLeft === null && amountPaid >= basePrice && basePrice > 0)) {
           paymentStatus = "Paid";
@@ -375,6 +382,8 @@ export async function GET(req: Request) {
         } else {
           paymentStatus = "Paid";
         }
+      } else if (amountLeft === 0 || isPkgBooking) {
+        paymentStatus = "Paid";
       } else {
         paymentStatus = "Unpaid";
       }
