@@ -1595,6 +1595,17 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const settlementMatch = String(booking?.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
         const packageRedemptionMatch = String(booking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
 
+        const notePulsesRemMatch = String(booking?.notes || "").match(/(\d+(?:,\d+)?)\s*pulses remaining/i);
+        const notePkgRem = notePulsesRemMatch ? Number(notePulsesRemMatch[1].replace(/,/g, '')) : 0;
+        const hasSettledDeficit = Boolean(
+          String(booking?.notes || "").includes("[Laser Package Deficit Settlement]") ||
+          String(booking?.notes || "").includes("Choice 3A") ||
+          String(booking?.notes || "").includes("Choice 3B")
+        );
+        const pulseDeficit = (!hasSettledDeficit && notePkgRem > 0 && primaryDeliveredPulses > notePkgRem)
+          ? primaryDeliveredPulses - notePkgRem
+          : 0;
+
         const bookingServices = selectedServiceIds.map(id => {
           const s = localServices.find(item => item.id === id);
           const isLaser = checkIsLaserService(s);
@@ -1896,7 +1907,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           ? Number(rawLeft)
           : Math.max(0, totalPrice - sessionPaid);
 
-        const isInvoicePaid = (sessionPaid >= totalPrice && totalPrice > 0) || (sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || booking.status === 'completed'));
+        const isInvoicePaid = (!pulseDeficit || hasSettledDeficit) && (
+          (sessionPaid >= totalPrice && totalPrice > 0) ||
+          (sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || booking.status === 'completed'))
+        );
 
         // Primary effective service for end session
         const primaryServiceObj = localServices.find(
@@ -3191,22 +3205,44 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                   {/* Laser Pulses Package Settlement Agreement Banner */}
                   {isLaserPackage && (
-                    <div className="rounded-2xl border border-purple-300 bg-gradient-to-r from-purple-50 via-purple-50/90 to-purple-100/60 p-4 text-xs text-purple-950 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fadeIn">
+                    <div className={`rounded-2xl border p-4 text-xs shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fadeIn ${
+                      pulseDeficit > 0 && !hasSettledDeficit
+                        ? "border-amber-400 bg-gradient-to-r from-amber-50 via-amber-50/90 to-amber-100/70 text-amber-950"
+                        : "border-purple-300 bg-gradient-to-r from-purple-50 via-purple-50/90 to-purple-100/60 text-purple-950"
+                    }`}>
                       <div className="flex items-start sm:items-center gap-3">
-                        <div className="h-10 w-10 rounded-2xl bg-purple-500/20 text-purple-800 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                          <Sparkles size={20} className="text-purple-700 fill-purple-600" />
+                        <div className={`h-10 w-10 rounded-2xl flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 ${
+                          pulseDeficit > 0 && !hasSettledDeficit ? "bg-amber-500/20 text-amber-800" : "bg-purple-500/20 text-purple-800"
+                        }`}>
+                          {pulseDeficit > 0 && !hasSettledDeficit ? (
+                            <AlertTriangle size={20} className="text-amber-700" />
+                          ) : (
+                            <Sparkles size={20} className="text-purple-700 fill-purple-600" />
+                          )}
                         </div>
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-black text-purple-950 text-sm">
+                            <span className="font-black text-sm">
                               {isRTL ? "نظام المحاسبة: باقة نبضات الليزر" : "Payment Mode: Pulses Package"}
                             </span>
-                            <span className="rounded-full bg-purple-200/90 px-2.5 py-0.5 text-[10.5px] font-black text-purple-950 border border-purple-300 shadow-2xs">
-                              {isRTL ? "تغطية باقة" : "Package Covered"}
-                            </span>
+                            {pulseDeficit > 0 && !hasSettledDeficit ? (
+                              <span className="rounded-full bg-amber-200/90 px-2.5 py-0.5 text-[10.5px] font-black text-amber-950 border border-amber-300 shadow-2xs">
+                                {isRTL ? `تجاوز رصيد الباقة (+${pulseDeficit.toLocaleString()} نبضة)` : `Exceeded Package (+${pulseDeficit.toLocaleString()} Pulses)`}
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-purple-200/90 px-2.5 py-0.5 text-[10.5px] font-black text-purple-950 border border-purple-300 shadow-2xs">
+                                {isRTL ? "تغطية باقة" : "Package Covered"}
+                              </span>
+                            )}
                           </div>
-                          <p className="text-[11.5px] text-purple-900 font-medium mt-0.5 leading-relaxed">
-                            {packageRedemptionMatch ? packageRedemptionMatch[1] : (
+                          <p className={`text-[11.5px] font-medium mt-0.5 leading-relaxed ${
+                            pulseDeficit > 0 && !hasSettledDeficit ? "text-amber-900" : "text-purple-900"
+                          }`}>
+                            {pulseDeficit > 0 && !hasSettledDeficit ? (
+                              isRTL
+                                ? `تم استهلاك ${primaryDeliveredPulses.toLocaleString()} نبضة بينما رصيد الباقة كان ${notePkgRem.toLocaleString()} نبضة (عجز بمقدار ${pulseDeficit.toLocaleString()} نبضة يلزم تسويته عند الدفع).`
+                                : `Delivered ${primaryDeliveredPulses.toLocaleString()} pulses while package had ${notePkgRem.toLocaleString()} pulses remaining (${pulseDeficit.toLocaleString()} excess pulses require checkout settlement).`
+                            ) : packageRedemptionMatch ? packageRedemptionMatch[1] : (
                               isRTL
                                 ? "تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مغطاة بنظام باقات النبضات"
                                 : "Agreed that laser services in this session are covered under patient Pulses Package"
@@ -3215,13 +3251,17 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         </div>
                       </div>
                       {primaryDeliveredPulses > 0 && (
-                        <div className="text-left sm:text-right shrink-0 bg-white/80 sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:rounded-none w-full sm:w-auto border sm:border-0 border-purple-200">
-                          <span className="text-[10px] text-purple-800 font-bold block uppercase tracking-wider">
+                        <div className={`text-left sm:text-right shrink-0 bg-white/80 sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:rounded-none w-full sm:w-auto border sm:border-0 ${
+                          pulseDeficit > 0 && !hasSettledDeficit ? "border-amber-300" : "border-purple-200"
+                        }`}>
+                          <span className={`text-[10px] font-bold block uppercase tracking-wider ${
+                            pulseDeficit > 0 && !hasSettledDeficit ? "text-amber-800" : "text-purple-800"
+                          }`}>
                             {isRTL ? "النبضات المستهلكة من الباقة" : "Package Pulses Redeemed"}
                           </span>
-                          <span className="font-black text-sm sm:text-base text-purple-950 flex items-center sm:justify-end gap-1 mt-0.5">
-                            <Sparkles size={14} className="text-purple-600 fill-purple-500" />
-                            <span>{primaryDeliveredPulses} {isRTL ? "نبضة" : "pulses"}</span>
+                          <span className="font-black text-sm sm:text-base flex items-center sm:justify-end gap-1 mt-0.5">
+                            <Sparkles size={14} className={pulseDeficit > 0 && !hasSettledDeficit ? "text-amber-600 fill-amber-500" : "text-purple-600 fill-purple-500"} />
+                            <span>{primaryDeliveredPulses.toLocaleString()} {isRTL ? "نبضة" : "pulses"}</span>
                           </span>
                         </div>
                       )}
@@ -4002,9 +4042,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <span className={`rounded-full px-3 py-0.5 text-xs font-extrabold ${
                           isInvoicePaid 
                             ? 'bg-[#EBF7EE] text-[#1E7E34]' 
+                            : (pulseDeficit > 0 && !hasSettledDeficit) || sessionPaid > 0
+                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
                             : 'bg-amber-50 text-amber-800'
                         }`}>
-                          {isInvoicePaid ? "Paid" : "Unpaid"}
+                          {isInvoicePaid ? "Paid" : (pulseDeficit > 0 && !hasSettledDeficit) || sessionPaid > 0 ? "Partially Paid" : "Unpaid"}
                         </span>
                       </div>
                     </div>

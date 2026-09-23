@@ -86,6 +86,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
   FlaskConical,
   CheckCircle2,
   XCircle,
@@ -1170,6 +1171,33 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [useWalletBalance, setUseWalletBalance] = useState<boolean>(false);
   const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(false);
   const [savingCheckout, setSavingCheckout] = useState<boolean>(false);
+  const [checkoutDeficitChoice, setCheckoutDeficitChoice] = useState<"BUY_NEW_PACKAGE" | "PAY_PER_PULSE">("BUY_NEW_PACKAGE");
+  const [checkoutDeficitPackageId, setCheckoutDeficitPackageId] = useState<string>("");
+  const [checkoutDeficitPulseRate, setCheckoutDeficitPulseRate] = useState<number>(1.5);
+  const [allCatalogPackages, setAllCatalogPackages] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (checkoutBooking) {
+      fetch("/api/packages", { cache: "no-store" })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          const pkgs = Array.isArray(data) ? data : [];
+          setAllCatalogPackages(pkgs);
+          const pulsePkgs = pkgs.filter(
+            (p: any) =>
+              p.active !== false &&
+              (p.package_type === "pulses" ||
+                p.packageType === "pulses" ||
+                Number(p.total_pulses || p.totalPulses || 0) > 0)
+          );
+          if (pulsePkgs.length > 0) {
+            setCheckoutDeficitPackageId(String(pulsePkgs[0].id));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [checkoutBooking]);
+
   const [invoiceBooking, setInvoiceBooking] = useState<any>(null);
   const [ledgerInvoice, setLedgerInvoice] = useState<{ invoice: any; lines: any[] } | null>(null);
 
@@ -2540,8 +2568,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-075', name: 'Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies laser packages isolation to Option 3, patient multi-package selection, catalog package purchase, and package price + non-laser service total calculation.', status: 'idle' },
     { id: 'TC-076', name: 'Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies accurate deduction of delivered laser pulses from customer pulses packages across doctor portal session finalization, reception session completion, and checkout settlement workflows with DB synchronization and idempotency.', status: 'idle' },
     { id: 'TC-077', name: 'In-Booking Package Selling & Integrated Patient Search Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies selling catalog packages directly during new booking creation with customer_packages persistence and instant patient profile appearance, as well as integrated patient search dropdown rendering.', status: 'idle' },
-    { id: 'TC-078', name: 'In-Booking Package Partial Payment & Session Balance Preservation Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies that when a patient purchases a new pulses package during booking with a partial payment (e.g. 500 EGP of 1000 EGP), the remaining 500 EGP outstanding balance is preserved correctly through doctor portal session completion and receptionist session finalization — preventing amountLeft from being zeroed out. Also verifies Payment Mode displays Pulses Package and Pay & Settle Invoice button remains visible.', status: 'idle' },
-    { id: 'TC-079', name: 'Database-Driven Service Categories & Zero Mock Defaults Engine', category: 'Services & Bookings', endpoint: '/api/categories', description: 'Verifies dynamic database-driven categories CRUD, zero hardcoded/mock defaults, instant category deletion without re-seeding resurrection, and associated service cascade cleanup.', status: 'idle' }
+    { id: 'TC-079', name: 'Database-Driven Service Categories & Zero Mock Defaults Engine', category: 'Services & Bookings', endpoint: '/api/categories', description: 'Verifies dynamic database-driven categories CRUD, zero hardcoded/mock defaults, instant category deletion without re-seeding resurrection, and associated service cascade cleanup.', status: 'idle' },
+    { id: 'TC-080', name: 'Laser Pulses Package Excess Deficit & Dual Interactive Settlement Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies package deficit detection when delivered pulses exceed remaining balance, automatic payment status transition to Partially Paid, and dual interactive settlement choices (Option 1: Buy New Package with deficit deduction vs Option 2: Pay per Pulse with customizable rate) at checkout.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -9406,6 +9434,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             (checkoutBooking as any)?.package_id ||
             (notePkgIdMatch ? notePkgIdMatch[1]?.trim() : null);
 
+          const notePulsesRemMatch = notesStr.match(/(\d+(?:,\d+)?)\s*pulses remaining/i);
+          const notePkgRemPulses = notePulsesRemMatch ? Number(notePulsesRemMatch[1].replace(/,/g, '')) : null;
+
           const matchedPulsePkg = (checkoutCustomerPackages || []).find((p: any) =>
             (linkedPkgId && String(p.id) === String(linkedPkgId)) ||
             (linkedPkgId && String(p.packageId) === String(linkedPkgId))
@@ -9415,9 +9446,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           );
 
           const totalPkgPulses = Number(matchedPulsePkg?.totalPulses ?? matchedPulsePkg?.includedPulses ?? 0);
-          const currentRemainingPulses = matchedPulsePkg
-            ? Number(matchedPulsePkg.pulsesRemaining ?? matchedPulsePkg.remainingPulses ?? totalPkgPulses)
-            : 0;
+          const currentRemainingPulses = notePkgRemPulses !== null
+            ? notePkgRemPulses
+            : (matchedPulsePkg
+                ? Number(matchedPulsePkg.pulsesRemaining ?? matchedPulsePkg.remainingPulses ?? totalPkgPulses)
+                : 0);
 
           const deliveredPulsesVal = Number(
             checkoutBooking?.deliveredPulses ||
@@ -9426,8 +9459,54 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             0
           );
 
+          const hasSettledDeficit = Boolean(
+            notesStr.includes("[Laser Package Deficit Settlement]") ||
+            notesStr.includes("Choice 3A") ||
+            notesStr.includes("Choice 3B")
+          );
+
+          const deficitPulsesVal = (!hasSettledDeficit && currentRemainingPulses > 0 && deliveredPulsesVal > currentRemainingPulses)
+            ? (deliveredPulsesVal - currentRemainingPulses)
+            : 0;
+
           const remainingPulsesAfterCheckout = Math.max(0, currentRemainingPulses - deliveredPulsesVal);
-          const deficitPulsesVal = Math.max(0, deliveredPulsesVal - currentRemainingPulses);
+
+          const selectedDeficitPackage = (allCatalogPackages || []).find(
+            (p: any) => String(p.id) === String(checkoutDeficitPackageId)
+          ) || (allCatalogPackages || []).find(
+            (p: any) =>
+              p.active !== false &&
+              (p.package_type === "pulses" ||
+                p.packageType === "pulses" ||
+                Number(p.total_pulses || p.totalPulses || 0) > 0)
+          );
+
+          const selectedDeficitPkgPrice = Number(
+            selectedDeficitPackage?.price ||
+            selectedDeficitPackage?.selling_price ||
+            0
+          );
+          const selectedDeficitPkgTotalPulses = Number(
+            selectedDeficitPackage?.total_pulses ||
+            selectedDeficitPackage?.totalPulses ||
+            selectedDeficitPackage?.included_pulses ||
+            0
+          );
+          const selectedDeficitPkgRemainingAfterDeduction = Math.max(
+            0,
+            selectedDeficitPkgTotalPulses - deficitPulsesVal
+          );
+
+          const perPulseDeficitTotal = deficitPulsesVal * checkoutDeficitPulseRate;
+
+          let activeDeficitCharge = 0;
+          if (deficitPulsesVal > 0 && !hasSettledDeficit) {
+            if (checkoutDeficitChoice === "BUY_NEW_PACKAGE") {
+              activeDeficitCharge = selectedDeficitPkgPrice;
+            } else {
+              activeDeficitCharge = perPulseDeficitTotal;
+            }
+          }
 
           // 1. Calculate service cost
           const svcIds = Array.isArray(checkoutBooking.serviceIds) ? checkoutBooking.serviceIds : [checkoutBooking.serviceId];
@@ -9718,10 +9797,18 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const rawPaid = Number(checkoutBooking.amountPaid || (checkoutBooking as any).amount_paid || 0);
           const rawLeft = (checkoutBooking as any).amountLeft ?? (checkoutBooking as any).amount_left;
           const totalCost = isCheckoutPackage
-            ? Math.max(calculatedTotal, bookedPackagePurchasePrice, rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0))
+            ? Math.max(
+                calculatedTotal + activeDeficitCharge,
+                bookedPackagePurchasePrice + activeDeficitCharge,
+                rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0) + activeDeficitCharge
+              )
             : isCheckoutPerPulse
-            ? calculatedTotal
-            : Math.max(calculatedTotal, targetCheckoutTotal, rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0));
+            ? (calculatedTotal + activeDeficitCharge)
+            : Math.max(
+                calculatedTotal + activeDeficitCharge,
+                targetCheckoutTotal + activeDeficitCharge,
+                rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
+              );
 
           const balanceDue = Math.max(0, totalCost - depositAlreadyPaid);
 
@@ -9785,69 +9872,182 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   }
                 }
 
-                // Consume Laser Package Pulses if applicable and not yet deducted
-                const isLaserPkgCheckout = Boolean(
-                  checkoutBooking.laserPaymentMode === "PACKAGE" ||
-                  (checkoutBooking as any).laser_payment_mode === "PACKAGE" ||
-                  String(checkoutBooking.notes || "").toLowerCase().includes("package redemption") ||
-                  String(checkoutBooking.notes || "").includes("[Laser Package]") ||
-                  String(checkoutBooking.notes || "").includes("[Laser Package Redemption]")
-                );
-                if (isLaserPkgCheckout) {
-                  try {
-                    const deliveredPulsesVal = Number(
-                      checkoutBooking.deliveredPulses ||
-                      (checkoutBooking as any).delivered_pulses ||
-                      (() => {
-                        const m = String(checkoutBooking.notes || "").match(/(\d+(?:,\d+)?)\s*pulses/i);
-                        return m ? Number(m[1].replace(/,/g, '')) : 0;
-                      })()
-                    );
-                    const targetCustId = customerRecord?.id || (checkoutBooking as any).customerId || (checkoutBooking as any).customer_id;
-                    const notesStr = String(checkoutBooking.notes || "");
-                    const notePkgIdMatch = notesStr.match(/\[Customer Package ID\]:\s*([0-9a-f-]+)/i) ||
-                      notesStr.match(/\[Customer Package ID\]:\s*([^\n\]]+)/i) ||
-                      notesStr.match(/Package ID:\s*([0-9a-f-]+)/i);
-                    let targetPkgId = checkoutBooking.customerPackageId ||
-                      (checkoutBooking as any).customer_package_id ||
-                      checkoutBooking.packageId ||
-                      (checkoutBooking as any).package_id ||
-                      (notePkgIdMatch ? notePkgIdMatch[1]?.trim() : null);
-
-                    if (!targetPkgId && targetCustId) {
-                      const pRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(targetCustId)}`, { headers: authenticatedJsonHeaders });
-                      if (pRes.ok) {
-                        const pData = await pRes.json();
-                        const pList = pData.customerPackages || pData.packages || [];
-                        const actPkg = pList.find((p: any) => {
-                          const rem = Number(p.remainingPulses ?? p.pulsesRemaining ?? p.remaining_pulses ?? p.pulses_remaining ?? 0);
-                          return (p.status || "active").toLowerCase() === "active" && rem > 0;
-                        });
-                        if (actPkg) targetPkgId = actPkg.id;
-                      }
-                    }
-                    if (targetPkgId && deliveredPulsesVal > 0) {
-                      await fetch("/api/customers/packages", {
-                        method: "PATCH",
+                // Deficit Settlement Logic (Choice 3A vs Choice 3B)
+                if (deficitPulsesVal > 0 && !hasSettledDeficit) {
+                  const targetCustId = customerRecord?.id || (checkoutBooking as any).customerId || (checkoutBooking as any).customer_id;
+                  if (checkoutDeficitChoice === "BUY_NEW_PACKAGE" && selectedDeficitPackage) {
+                    try {
+                      // 1. Sell new package to customer
+                      const sellRes = await fetch("/api/packages/sell", {
+                        method: "POST",
                         headers: authenticatedJsonHeaders,
                         body: JSON.stringify({
-                          action: "consume_package_pulses",
-                          customer_package_id: targetPkgId,
-                          package_id: targetPkgId,
-                          quantity_used: deliveredPulsesVal,
-                          pulses: deliveredPulsesVal,
-                          booking_id: checkoutBooking.id,
-                          reservationId: checkoutBooking.id,
-                          used_by: "Checkout Settlement",
-                          notes: `Checkout pulse deduction (${deliveredPulsesVal} pulses deducted)`
+                          customerId: targetCustId,
+                          packageId: selectedDeficitPackage.id,
+                          branchId: checkoutBooking.branchId,
+                          paymentMethod: "cash",
+                          amountPaid: totalPaidIncludingDeposit,
+                          paidAmount: totalPaidIncludingDeposit,
                         })
                       });
-                      if (typeof window !== "undefined") {
-                        window.dispatchEvent(new CustomEvent("revera-laser-change"));
+                      if (sellRes.ok) {
+                        const sellData = await sellRes.json();
+                        const newCustPkgId = sellData.customerPackage?.id || sellData.package?.id || sellData.id;
+                        // 2. Deduct deficit pulses from the new package
+                        if (newCustPkgId && deficitPulsesVal > 0) {
+                          await fetch("/api/customers/packages", {
+                            method: "PATCH",
+                            headers: authenticatedJsonHeaders,
+                            body: JSON.stringify({
+                              action: "consume_package_pulses",
+                              customer_package_id: newCustPkgId,
+                              package_id: newCustPkgId,
+                              quantity_used: deficitPulsesVal,
+                              pulses: deficitPulsesVal,
+                              booking_id: checkoutBooking.id,
+                              reservationId: checkoutBooking.id,
+                              used_by: "Deficit Settlement (Choice 3A)",
+                              notes: `Deducted ${deficitPulsesVal} excess pulses from newly purchased package`
+                            })
+                          });
+                        }
+                      }
+                    } catch (sellErr) {
+                      console.error("Error selling deficit package:", sellErr);
+                    }
+
+                    // 3. Exhaust original package
+                    if (matchedPulsePkg?.id && currentRemainingPulses > 0) {
+                      try {
+                        await fetch("/api/customers/packages", {
+                          method: "PATCH",
+                          headers: authenticatedJsonHeaders,
+                          body: JSON.stringify({
+                            action: "consume_package_pulses",
+                            customer_package_id: matchedPulsePkg.id,
+                            package_id: matchedPulsePkg.id,
+                            quantity_used: currentRemainingPulses,
+                            pulses: currentRemainingPulses,
+                            booking_id: checkoutBooking.id,
+                            reservationId: checkoutBooking.id,
+                            used_by: "Checkout Settlement",
+                            notes: `Exhausted package balance (${currentRemainingPulses} pulses)`
+                          })
+                        });
+                      } catch (oldPkgErr) {
+                        console.error("Error exhausting old package:", oldPkgErr);
                       }
                     }
-                  } catch (pulseErr) {
-                    console.error("Error consuming laser package pulses at checkout:", pulseErr);
+
+                    // 4. Record settlement note on reservation
+                    const deficitNote = `\n[Laser Package Deficit Settlement]: Choice 3A - Purchased New Package: ${selectedDeficitPackage.name} (${selectedDeficitPkgPrice} EGP), deducted ${deficitPulsesVal} excess pulses (${selectedDeficitPkgRemainingAfterDeduction} pulses remaining in new package).`;
+                    await fetch(`/api/reservations?id=${checkoutBooking.id}`, {
+                      method: "PATCH",
+                      headers: authenticatedJsonHeaders,
+                      body: JSON.stringify({
+                        notes: (checkoutBooking.notes || "") + deficitNote
+                      })
+                    }).catch(() => {});
+                  } else if (checkoutDeficitChoice === "PAY_PER_PULSE") {
+                    // Option 2: Pay per Pulse
+                    // 1. Exhaust original package
+                    if (matchedPulsePkg?.id && currentRemainingPulses > 0) {
+                      try {
+                        await fetch("/api/customers/packages", {
+                          method: "PATCH",
+                          headers: authenticatedJsonHeaders,
+                          body: JSON.stringify({
+                            action: "consume_package_pulses",
+                            customer_package_id: matchedPulsePkg.id,
+                            package_id: matchedPulsePkg.id,
+                            quantity_used: currentRemainingPulses,
+                            pulses: currentRemainingPulses,
+                            booking_id: checkoutBooking.id,
+                            reservationId: checkoutBooking.id,
+                            used_by: "Checkout Settlement",
+                            notes: `Exhausted package balance (${currentRemainingPulses} pulses)`
+                          })
+                        });
+                      } catch (oldPkgErr) {
+                        console.error("Error exhausting old package:", oldPkgErr);
+                      }
+                    }
+
+                    // 2. Record settlement note on reservation
+                    const deficitNote = `\n[Laser Package Deficit Settlement]: Choice 3B - Pay Rest per Pulse (${deficitPulsesVal} pulses @ ${checkoutDeficitPulseRate} EGP/pulse = ${perPulseDeficitTotal} EGP).`;
+                    await fetch(`/api/reservations?id=${checkoutBooking.id}`, {
+                      method: "PATCH",
+                      headers: authenticatedJsonHeaders,
+                      body: JSON.stringify({
+                        notes: (checkoutBooking.notes || "") + deficitNote
+                      })
+                    }).catch(() => {});
+                  }
+                } else {
+                  // Standard Laser Package Pulses deduction (no deficit or already settled)
+                  const isLaserPkgCheckout = Boolean(
+                    checkoutBooking.laserPaymentMode === "PACKAGE" ||
+                    (checkoutBooking as any).laser_payment_mode === "PACKAGE" ||
+                    String(checkoutBooking.notes || "").toLowerCase().includes("package redemption") ||
+                    String(checkoutBooking.notes || "").includes("[Laser Package]") ||
+                    String(checkoutBooking.notes || "").includes("[Laser Package Redemption]")
+                  );
+                  if (isLaserPkgCheckout) {
+                    try {
+                      const deliveredPulsesVal = Number(
+                        checkoutBooking.deliveredPulses ||
+                        (checkoutBooking as any).delivered_pulses ||
+                        (() => {
+                          const m = String(checkoutBooking.notes || "").match(/(\d+(?:,\d+)?)\s*pulses/i);
+                          return m ? Number(m[1].replace(/,/g, '')) : 0;
+                        })()
+                      );
+                      const targetCustId = customerRecord?.id || (checkoutBooking as any).customerId || (checkoutBooking as any).customer_id;
+                      const notesStr = String(checkoutBooking.notes || "");
+                      const notePkgIdMatch = notesStr.match(/\[Customer Package ID\]:\s*([0-9a-f-]+)/i) ||
+                        notesStr.match(/\[Customer Package ID\]:\s*([^\n\]]+)/i) ||
+                        notesStr.match(/Package ID:\s*([0-9a-f-]+)/i);
+                      let targetPkgId = checkoutBooking.customerPackageId ||
+                        (checkoutBooking as any).customer_package_id ||
+                        checkoutBooking.packageId ||
+                        (checkoutBooking as any).package_id ||
+                        (notePkgIdMatch ? notePkgIdMatch[1]?.trim() : null);
+
+                      if (!targetPkgId && targetCustId) {
+                        const pRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(targetCustId)}`, { headers: authenticatedJsonHeaders });
+                        if (pRes.ok) {
+                          const pData = await pRes.json();
+                          const pList = pData.customerPackages || pData.packages || [];
+                          const actPkg = pList.find((p: any) => {
+                            const rem = Number(p.remainingPulses ?? p.pulsesRemaining ?? p.remaining_pulses ?? p.pulses_remaining ?? 0);
+                            return (p.status || "active").toLowerCase() === "active" && rem > 0;
+                          });
+                          if (actPkg) targetPkgId = actPkg.id;
+                        }
+                      }
+                      if (targetPkgId && deliveredPulsesVal > 0) {
+                        await fetch("/api/customers/packages", {
+                          method: "PATCH",
+                          headers: authenticatedJsonHeaders,
+                          body: JSON.stringify({
+                            action: "consume_package_pulses",
+                            customer_package_id: targetPkgId,
+                            package_id: targetPkgId,
+                            quantity_used: deliveredPulsesVal,
+                            pulses: deliveredPulsesVal,
+                            booking_id: checkoutBooking.id,
+                            reservationId: checkoutBooking.id,
+                            used_by: "Checkout Settlement",
+                            notes: `Checkout pulse deduction (${deliveredPulsesVal} pulses deducted)`
+                          })
+                        });
+                        if (typeof window !== "undefined") {
+                          window.dispatchEvent(new CustomEvent("revera-laser-change"));
+                        }
+                      }
+                    } catch (pulseErr) {
+                      console.error("Error consuming laser package pulses at checkout:", pulseErr);
+                    }
                   }
                 }
 
@@ -10027,12 +10227,147 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           )}
                         </div>
 
-                        {deficitPulsesVal > 0 && (
-                          <p className="text-[11px] font-semibold text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                            ⚠️ {isRTL
-                              ? `تنبيه: عدد النبضات المستهلكة يتجاوز رصيد الباقة بمقدار ${deficitPulsesVal.toLocaleString()} نبضة.`
-                              : `Note: Session pulses exceed package balance by ${deficitPulsesVal.toLocaleString()} pulses.`}
-                          </p>
+                        {deficitPulsesVal > 0 && !hasSettledDeficit && (
+                          <div className="mt-3 rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 via-white to-amber-50/70 p-4 space-y-3.5 shadow-xs">
+                            <div className="flex items-start gap-2.5">
+                              <div className="p-1.5 bg-amber-500 text-white rounded-xl shrink-0 mt-0.5 shadow-xs">
+                                <AlertTriangle size={16} />
+                              </div>
+                              <div>
+                                <p className="font-black text-amber-950 text-xs sm:text-sm">
+                                  {isRTL ? `تجاوز رصيد الباقة بمقدار ${deficitPulsesVal.toLocaleString()} نبضة` : `Package Quota Exceeded by ${deficitPulsesVal.toLocaleString()} Pulses`}
+                                </p>
+                                <p className="text-[11.5px] text-amber-900 mt-0.5 leading-relaxed">
+                                  {isRTL
+                                    ? `المستهلك في الجلسة (${deliveredPulsesVal.toLocaleString()} نبضة) أكبر من رصيد الباقة الحالي (${currentRemainingPulses.toLocaleString()} نبضة). يرجى اختيار طريقة تسوية الـ ${deficitPulsesVal.toLocaleString()} نبضة الإضافية:`
+                                    : `Delivered pulses (${deliveredPulsesVal.toLocaleString()}) exceeded available package balance (${currentRemainingPulses.toLocaleString()}). Please select how to settle the ${deficitPulsesVal.toLocaleString()} excess pulses:`}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* 2 Options Cards Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                              {/* Option 1: Buy New Package */}
+                              <label className={`relative rounded-2xl border-2 p-3.5 flex flex-col justify-between gap-3 cursor-pointer transition-all shadow-2xs ${
+                                checkoutDeficitChoice === "BUY_NEW_PACKAGE"
+                                  ? "border-purple-600 bg-purple-50/60 ring-2 ring-purple-600/20"
+                                  : "border-gray-200 bg-white hover:border-gray-300"
+                              }`}>
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-black text-purple-950">
+                                      <Sparkles size={14} className="text-purple-600" />
+                                      <span>{isRTL ? "الخيار 1: شراء باقة جديدة" : "Option 1: Buy New Package"}</span>
+                                    </span>
+                                    <input
+                                      type="radio"
+                                      name="deficitOption"
+                                      value="BUY_NEW_PACKAGE"
+                                      checked={checkoutDeficitChoice === "BUY_NEW_PACKAGE"}
+                                      onChange={() => setCheckoutDeficitChoice("BUY_NEW_PACKAGE")}
+                                      className="h-4 w-4 text-purple-600 accent-purple-600"
+                                    />
+                                  </div>
+                                  <p className="text-[11px] text-purple-900 leading-snug">
+                                    {isRTL
+                                      ? `شراء باقة نبضات جديدة، وخصم الـ ${deficitPulsesVal.toLocaleString()} نبضة الزائدة منها.`
+                                      : `Purchase a new pulses package and deduct the ${deficitPulsesVal.toLocaleString()} excess pulses from it.`}
+                                  </p>
+
+                                  {/* Catalog Package Select Dropdown */}
+                                  <div className="pt-1">
+                                    <select
+                                      value={checkoutDeficitPackageId}
+                                      disabled={checkoutDeficitChoice !== "BUY_NEW_PACKAGE"}
+                                      onChange={(e) => setCheckoutDeficitPackageId(e.target.value)}
+                                      className="w-full rounded-xl border border-purple-300 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none shadow-2xs"
+                                    >
+                                      {(allCatalogPackages || [])
+                                        .filter((p: any) => p.active !== false && (p.package_type === "pulses" || p.packageType === "pulses" || Number(p.total_pulses || p.totalPulses || 0) > 0))
+                                        .map((p: any) => {
+                                          const pPulses = Number(p.total_pulses || p.totalPulses || p.included_pulses || 0);
+                                          const pPrice = Number(p.price || p.selling_price || 0);
+                                          return (
+                                            <option key={p.id} value={p.id}>
+                                              {p.name} ({pPrice} EGP · {pPulses.toLocaleString()} pulses)
+                                            </option>
+                                          );
+                                        })}
+                                    </select>
+                                  </div>
+                                </div>
+
+                                {selectedDeficitPackage && (
+                                  <div className="rounded-xl bg-white/90 p-2 border border-purple-200 text-[11px] space-y-1">
+                                    <div className="flex justify-between font-bold text-purple-950">
+                                      <span>{isRTL ? "سعر الباقة الجديدة:" : "New Package Price:"}</span>
+                                      <span>+{selectedDeficitPkgPrice} EGP</span>
+                                    </div>
+                                    <div className="flex justify-between text-purple-800 text-[10.5px]">
+                                      <span>{isRTL ? "المتبقي بالباقة بعد الخصم:" : "Balance After Deduction:"}</span>
+                                      <span className="font-extrabold">{selectedDeficitPkgRemainingAfterDeduction.toLocaleString()} {isRTL ? "نبضة" : "pulses"}</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </label>
+
+                              {/* Option 2: Pay per Pulse */}
+                              <label className={`relative rounded-2xl border-2 p-3.5 flex flex-col justify-between gap-3 cursor-pointer transition-all shadow-2xs ${
+                                checkoutDeficitChoice === "PAY_PER_PULSE"
+                                  ? "border-amber-600 bg-amber-50/60 ring-2 ring-amber-600/20"
+                                  : "border-gray-200 bg-white hover:border-gray-300"
+                              }`}>
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-black text-amber-950">
+                                      <Zap size={14} className="text-amber-600" />
+                                      <span>{isRTL ? "الخيار 2: الدفع بسعر النبضة" : "Option 2: Pay per Pulse"}</span>
+                                    </span>
+                                    <input
+                                      type="radio"
+                                      name="deficitOption"
+                                      value="PAY_PER_PULSE"
+                                      checked={checkoutDeficitChoice === "PAY_PER_PULSE"}
+                                      onChange={() => setCheckoutDeficitChoice("PAY_PER_PULSE")}
+                                      className="h-4 w-4 text-amber-600 accent-amber-600"
+                                    />
+                                  </div>
+                                  <p className="text-[11px] text-amber-900 leading-snug">
+                                    {isRTL
+                                      ? `محاسبة الـ ${deficitPulsesVal.toLocaleString()} نبضة الزائدة بسعر النبضة الفردية.`
+                                      : `Pay for the remaining ${deficitPulsesVal.toLocaleString()} excess pulses at custom per-pulse rate.`}
+                                  </p>
+
+                                  {/* Pulse Rate Input */}
+                                  <div className="flex items-center gap-2 pt-1">
+                                    <span className="text-[11px] font-bold text-amber-900 shrink-0">
+                                      {isRTL ? "سعر النبضة (ج.م):" : "Price / Pulse:"}
+                                    </span>
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      min="0"
+                                      value={checkoutDeficitPulseRate}
+                                      disabled={checkoutDeficitChoice !== "PAY_PER_PULSE"}
+                                      onChange={(e) => setCheckoutDeficitPulseRate(Math.max(0, parseFloat(e.target.value) || 0))}
+                                      className="w-24 rounded-xl border border-amber-300 bg-white px-2.5 py-1 text-xs font-bold text-amber-950 outline-none shadow-2xs text-center"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="rounded-xl bg-white/90 p-2 border border-amber-200 text-[11px] space-y-1">
+                                  <div className="flex justify-between font-bold text-amber-950">
+                                    <span>{isRTL ? "إجمالي النبضات الزائدة:" : "Excess Pulses Total:"}</span>
+                                    <span>+{perPulseDeficitTotal.toLocaleString()} EGP</span>
+                                  </div>
+                                  <div className="flex justify-between text-amber-800 text-[10.5px]">
+                                    <span>{isRTL ? "الحسبة:" : "Calculation:"}</span>
+                                    <span>{deficitPulsesVal.toLocaleString()} × {checkoutDeficitPulseRate} EGP</span>
+                                  </div>
+                                </div>
+                              </label>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -10041,6 +10376,25 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   {/* Services Invoice details */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
                     <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Services List / الخدمات</p>
+                    {deficitPulsesVal > 0 && !hasSettledDeficit && activeDeficitCharge > 0 && (
+                      <div className="flex justify-between items-center text-sm font-semibold border-b border-[#414E36]/10 pb-2 text-amber-900 bg-amber-50/50 p-2 rounded-lg">
+                        <div>
+                          <span>
+                            {checkoutDeficitChoice === "BUY_NEW_PACKAGE"
+                              ? (isRTL ? `شراء باقة جديدة: ${selectedDeficitPackage?.name || "باقة نبضات"}` : `Purchased Package: ${selectedDeficitPackage?.name || "Pulses Package"}`)
+                              : (isRTL ? `محاسبة نبضات زائدة (${deficitPulsesVal.toLocaleString()} نبضة)` : `Excess Pulses Deficit (${deficitPulsesVal.toLocaleString()} pulses × ${checkoutDeficitPulseRate} EGP)`)}
+                          </span>
+                          <span className="text-[11px] font-normal text-amber-700 block">
+                            {checkoutDeficitChoice === "BUY_NEW_PACKAGE"
+                              ? (isRTL ? `خصم ${deficitPulsesVal.toLocaleString()} نبضة، المتبقي ${selectedDeficitPkgRemainingAfterDeduction.toLocaleString()} نبضة` : `Deducted ${deficitPulsesVal.toLocaleString()} pulses deficit, ${selectedDeficitPkgRemainingAfterDeduction.toLocaleString()} pulses remaining`)
+                              : (isRTL ? `تسوية العجز بسعر ${checkoutDeficitPulseRate} ج.م/نبضة` : `Settled deficit at ${checkoutDeficitPulseRate} EGP/pulse`)}
+                          </span>
+                        </div>
+                        <span className="text-right font-extrabold text-amber-900">
+                          +{activeDeficitCharge} EGP
+                        </span>
+                      </div>
+                    )}
                     {bookingServicesList.map((svc: any) => {
                       const isRedeemed = !!redeemedPackageItems[svc.serviceId];
                       return (
