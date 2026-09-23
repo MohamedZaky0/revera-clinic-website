@@ -1671,8 +1671,14 @@ export default function CustomerProfileDrawer({
                     {customerProfilePackages.filter((p: any) => p.status === "active").map((pkg: any) => {
                       const isExpired = pkg.expiresAt && new Date(pkg.expiresAt) < new Date();
                       const isPulses = pkg.packageType === "pulses" || Number(pkg.totalPulses) > 0 || Number(pkg.includedPulses) > 0 || Number(pkg.remainingPulses) > 0 || Number(pkg.pulsesRemaining) > 0 || (pkg.items || []).length === 0;
-                      const remainingPulsesVal = pkg.pulsesRemaining ?? pkg.remainingPulses ?? pkg.totalPulses ?? pkg.includedPulses ?? 0;
-                      const totalPulsesVal = pkg.totalPulses ?? pkg.includedPulses ?? remainingPulsesVal;
+                      const totalPulsesVal = Number(pkg.totalPulses ?? pkg.includedPulses ?? 0);
+                      const remainingPulsesVal = pkg.pulsesRemaining !== undefined && pkg.pulsesRemaining !== null
+                        ? Number(pkg.pulsesRemaining)
+                        : pkg.remainingPulses !== undefined && pkg.remainingPulses !== null
+                        ? Number(pkg.remainingPulses)
+                        : totalPulsesVal;
+                      const usedPulsesVal = Number(pkg.usedPulses ?? pkg.pulsesUsed ?? Math.max(0, totalPulsesVal - remainingPulsesVal));
+                      const effectiveTotal = totalPulsesVal > 0 ? totalPulsesVal : remainingPulsesVal;
 
                       return (
                         <div key={pkg.id} className="p-4 space-y-2">
@@ -1700,21 +1706,28 @@ export default function CustomerProfileDrawer({
                           </p>
                           {isPulses ? (
                             <div className="flex items-center gap-3 bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 max-w-md">
-                              <div className="p-1.5 bg-amber-500 text-white rounded-lg shrink-0">
+                              <div className="p-1.5 bg-amber-500 text-white rounded-lg shrink-0 shadow-xs">
                                 <Zap size={14} />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between text-xs">
-                                  <span className="font-semibold text-amber-900">{lang === "ar" ? "رصيد النبضات المتبقي" : "Remaining Pulses"}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold text-amber-900">{lang === "ar" ? "رصيد النبضات المتبقي" : "Remaining Pulses"}</span>
+                                    {usedPulsesVal > 0 && (
+                                      <span className="text-[10px] text-amber-700 font-medium">
+                                        ({usedPulsesVal.toLocaleString()} {lang === "ar" ? "مستخدمة" : "used"})
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="font-black text-amber-900">
-                                    {Number(remainingPulsesVal).toLocaleString()} / {Number(totalPulsesVal).toLocaleString()}
+                                    {Number(remainingPulsesVal).toLocaleString()} / {Number(effectiveTotal).toLocaleString()}
                                   </span>
                                 </div>
                                 <div className="w-full bg-amber-200/60 rounded-full h-1.5 mt-1.5 overflow-hidden">
                                   <div
-                                    className="bg-amber-500 h-full rounded-full transition-all"
+                                    className="bg-amber-500 h-full rounded-full transition-all duration-500"
                                     style={{
-                                      width: `${totalPulsesVal > 0 ? Math.min(100, Math.max(0, (remainingPulsesVal / totalPulsesVal) * 100)) : 100}%`
+                                      width: `${effectiveTotal > 0 ? Math.min(100, Math.max(0, (remainingPulsesVal / effectiveTotal) * 100)) : (remainingPulsesVal > 0 ? 100 : 0)}%`
                                     }}
                                   />
                                 </div>
