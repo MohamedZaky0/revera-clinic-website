@@ -2837,5 +2837,27 @@ When a laser pulse package is selected or purchased in Option 3 of New Booking, 
 4. **Patient Profile Progress Bar:**
    - In `CustomerProfileDrawer.tsx`, the progress bar calculates `(remainingPulsesVal / effectiveTotal) * 100` and displays both remaining pulses and used pulses counters clearly.
 
+---
+
+## DEC-083: In-Booking Package Unpaid Balance Resolution and Checkout Debt Settlement
+
+**Date:** 2026-09-23
+**Status:** Decided — active
+
+**Context:**
+When a patient purchased a package during New Booking with a partial payment / deposit (e.g. Package price 2,500 EGP, paid 2,000 EGP at booking, leaving 500 EGP outstanding balance), opening the Payment Settlement Checkout popup after the session displayed 0 EGP due. This occurred because laser package session services evaluate to 0 EGP (package redemption), while the 2,000 EGP deposit was subtracted from total cost (= 0 EGP), causing `balanceDue` and `netDue` to evaluate to 0 EGP rather than 500 EGP.
+
+**Decisions & Implementation:**
+1. **Package Purchase Line Item in Checkout Modal:**
+   - In `src/app/admin/page.tsx`, the checkout calculation parses package purchases from reservation notes (e.g. `[Purchasing New Pulses Package]: Name (2500 EGP)`) and booking metadata.
+   - A dedicated line item for the purchased package (2,500 EGP) is included in the invoice items and added to `totalCost`.
+   - `totalCost` (2,500 EGP) minus `depositAlreadyPaid` (2,000 EGP) correctly evaluates to `balanceDue = 500 EGP` and `netDue = 500 EGP`.
+2. **Interactive Payment Settlement Input:**
+   - In the Checkout Modal UI, `Amount Paid` defaults its placeholder to `netDue` (500 EGP) and includes a 1-click "Pay Full" button.
+3. **Automatic Package Debt Allocation:**
+   - On checkout confirmation (`handleConfirmCheckout`), if the patient had an outstanding package balance and made a payment at checkout, `/api/customers/settle-debt` allocates the payment to the package invoice and decrements `customers.outstanding`.
+   - In `src/app/api/customers/settle-debt/route.ts`, debt settlement is extended to allocate against unpaid issued invoices (including package sale invoices).
+
+
 
 

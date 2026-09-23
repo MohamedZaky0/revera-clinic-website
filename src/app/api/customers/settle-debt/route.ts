@@ -125,6 +125,42 @@ export async function POST(req: Request) {
       remaining -= portion;
     }
 
+    if (remaining > 0) {
+      // Check for package invoices or other issued invoices with unpaid balance
+      const { data: issuedInvoices } = await supabaseServer
+        .from('invoices')
+        .select('id, invoice_no, grand_total, created_at')
+        .eq('customer_id', customerId)
+        .eq('status', 'issued')
+        .order('created_at', { ascending: true });
+
+      for (const inv of issuedInvoices || []) {
+        if (remaining <= 0) break;
+        const { data: payRows } = await supabaseServer
+          .from('payments')
+          .select('amount')
+          .eq('invoice_id', inv.id);
+        const totalPaid = (payRows || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+        const invOwed = Math.max(0, Number(inv.grand_total || 0) - totalPaid);
+        if (invOwed <= 0) continue;
+
+        const portion = Math.min(invOwed, remaining);
+        try {
+          await supabaseServer.from('payments').insert({
+            invoice_id: inv.id,
+            amount: portion,
+            method: paymentMethod,
+            received_by_employee_id: access.access.employee?.id || null,
+          });
+        } catch (payErr) {
+          console.error(`settle-debt failed to append payment for invoice ${inv.id}:`, payErr);
+        }
+
+        applied.push({ reservationId: inv.id, amount: portion, date: inv.created_at ?? null });
+        remaining -= portion;
+      }
+    }
+
     const settled = parsedAmount - remaining;
     if (settled <= 0) {
       return NextResponse.json({
