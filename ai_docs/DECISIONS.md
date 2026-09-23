@@ -2823,7 +2823,24 @@ or the rate, and three separate writes (source-package consume, package sale or 
 **Impact:** the doctor's screen is record-only (DEC-079); the sole authoritative settlement path is
 this route, called from both reception surfaces.
 
+## DEC-081: Strict Isolation of Customer Packages from Retail Product Balances
 
+**Date:** 2026-09-23
+**Status:** Decided — active
+**Note:** originally numbered DEC-080 by its author (`saifuldeennaser`), working in parallel on
+`origin/dev` without this session's DEC-080 — renumbered on merge to avoid a collision. Cherry-picked
+from commit `71c33e0`.
 
+**Context:**
+When retail products (e.g., "Retinol Anti-Aging Serum", "Skin Protector") were sold to a patient via POS / patient profile, they correctly appeared under the "Purchased Products & Cart" tab. However, they also unexpectedly appeared as active items in the "Purchased Packages" section of the patient profile.
 
+**Root Causes:**
+In `src/app/api/customers/packages/route.ts`, the `GET` handler contained a legacy fallback step (section 2) that queried `customer_product_balances` and transformed every non-pulse product balance into a `syntheticPkg` object, appending it to the `packages` response array. As a result, every sold retail product was displayed as a package in the patient profile and wherever package lists were rendered.
+
+**Decisions & Implementation:**
+1. **Removed Synthetic Package Generation from `/api/customers/packages`:**
+   - `GET /api/customers/packages` now strictly queries the `customer_packages` table (for both service packages and laser pulse packages).
+   - Retail products stored in `customer_product_balances` remain strictly owned by `/api/customers/products` and the "Purchased Products & Cart" tab.
+2. **Added Regression Test:**
+   - Added test in `tests/routes/customers-packages.test.ts` asserting that records in `customer_product_balances` are never returned as packages.
 

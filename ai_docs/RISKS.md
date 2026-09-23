@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **66 resolved** · 86 tracked total.
+**7 open** · **13 partially resolved** · **67 resolved** · 87 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4510,7 +4510,24 @@ the `package_pulse_usage` audit rows.
 
 ---
 
+## RISK-098: Retail Product Balances Were Converted to Synthetic Packages in `GET /api/customers/packages` (RESOLVED)
+
+**Severity:** Medium · **Type:** UI & Domain Isolation
+**Found:** 2026-09-23 · **Fixed same day.**
+**Note:** originally numbered RISK-097 by its author (`saifuldeennaser`), working in parallel on
+`origin/dev` without this session's RISK-097 — renumbered on merge to avoid a collision.
+Cherry-picked from commit `71c33e0`. See DEC-081.
+
+**What it was:** In `src/app/api/customers/packages/route.ts`, the `GET` endpoint included a fallback querying `customer_product_balances` and synthesising a `syntheticPkg` for every non-pulse product balance. Consequently, whenever a patient purchased a skincare product (e.g., "Retinol Anti-Aging Serum", "Skin Protector"), it appeared under "Purchased Packages" in addition to "Purchased Products & Cart".
+
+**Fix:** Removed the `customer_product_balances` conversion from `GET /api/customers/packages`. Packages are now sourced exclusively from `customer_packages`.
+
+**Verified:** Automated tests in `tests/routes/customers-packages.test.ts` (including new test verifying product balances are excluded from packages response) pass, and this session independently re-ran the full suite after the merge — see the merge commit for the current count.
+
+---
+
 ## PROPOSALS.md Reference
+
 
 See `PROPOSALS.md` for:
 - **PROPOSAL-001** — extract all Revera-specific values into a single `client.config.ts`,
