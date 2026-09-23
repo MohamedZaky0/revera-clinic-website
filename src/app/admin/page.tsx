@@ -148,6 +148,7 @@ import ReceptionDashboardView from "@/components/admin/reception/ReceptionDashbo
 import { AdminBookingsView } from "@/components/admin/bookings/AdminBookingsView";
 import AdminNewBookingView from "@/components/admin/bookings/AdminNewBookingView";
 import AdminAddPreviousBookingView from "@/components/admin/bookings/AdminAddPreviousBookingView";
+import LaserDeficitPrompt from "@/components/admin/bookings/LaserDeficitPrompt";
 import { DoctorProfileDetailsView } from "@/components/admin/doctor/DoctorProfileDetailsView";
 import DoctorAuditLogsModal from "@/components/admin/doctor/DoctorAuditLogsModal";
 import { useProviderForm } from "@/components/admin/doctor/useProviderForm";
@@ -9659,6 +9660,30 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const totalPaidIncludingDeposit = depositAlreadyPaid + amountPaidNum + walletDeduction;
 
           const handleConfirmCheckout = async () => {
+            // Brief 35 / DEC-079: a package-mode laser pulse deficit must be resolved at this
+            // modal before the money PATCH below runs — never silently clamped after the fact.
+            if (isCheckoutPackage) {
+              const deliveredPulsesVal = Number(
+                checkoutBooking.deliveredPulses || (checkoutBooking as any).delivered_pulses || 0
+              );
+              if (deliveredPulsesVal > 0) {
+                try {
+                  const defRes = await fetch(
+                    `/api/reservations/laser-deficit?reservationId=${encodeURIComponent(checkoutBooking.id)}`,
+                    { headers: authenticatedJsonHeaders }
+                  );
+                  const defData = defRes.ok ? await defRes.json().catch(() => null) : null;
+                  if (defData && !defData.resolved && Number(defData.deficitPulses) > 0) {
+                    alert(
+                      `This booking has an unresolved laser pulse deficit of ${Number(defData.deficitPulses).toLocaleString()} pulses. Resolve it above before completing checkout.`
+                    );
+                    return;
+                  }
+                } catch {
+                  // the render-time prompt shows its own error state; don't double-alert
+                }
+              }
+            }
             setSavingCheckout(true);
             try {
               const res = await fetch(`/api/reservations?id=${checkoutBooking.id}`, {
@@ -9840,6 +9865,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                         {checkoutPackageSettlementText}
                       </p>
                     </div>
+                  )}
+
+                  {/* Brief 35 / DEC-079: deficit resolution prompt — reception decides, before
+                      the totals below are confirmed. Blocks handleConfirmCheckout when unresolved. */}
+                  {isCheckoutPackage && (
+                    <LaserDeficitPrompt
+                      reservationId={checkoutBooking.id}
+                      headers={authenticatedJsonHeaders}
+                      isRTL={isRTL}
+                    />
                   )}
 
                   {/* Services Invoice details */}

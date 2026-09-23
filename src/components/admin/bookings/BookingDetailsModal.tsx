@@ -50,6 +50,7 @@ import { Branch } from "@/types";
 import { adminTranslations } from "../translations";
 import type { Req } from "@/app/admin/page";
 import { resolveLaserPulseRate } from "@/lib/laserRate";
+import LaserDeficitPrompt from "./LaserDeficitPrompt";
 
 export interface AdditionalServiceItem {
   id: string | number;
@@ -1421,6 +1422,28 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         );
       }
       await Promise.allSettled(lineItemWrites);
+
+      // Brief 35 / DEC-079: an unresolved package-mode laser pulse deficit must be resolved
+      // here — before this flow's own status/payment write — never silently absorbed.
+      if (isPackageMode && totalLaserPulsesToDeduct > 0) {
+        try {
+          const defRes = await fetch(
+            `/api/reservations/laser-deficit?reservationId=${encodeURIComponent(booking.id)}`,
+            { headers: authenticatedJsonHeaders }
+          );
+          const defData = defRes.ok ? await defRes.json().catch(() => null) : null;
+          if (defData && !defData.resolved && Number(defData.deficitPulses) > 0) {
+            alert(
+              isRTL
+                ? `هذا الحجز به عجز غير محسوم في نبضات الليزر قدره ${Number(defData.deficitPulses).toLocaleString()} نبضة. قم بتسويته من نافذة العجز قبل إنهاء الجلسة.`
+                : `This booking has an unresolved laser pulse deficit of ${Number(defData.deficitPulses).toLocaleString()} pulses. Resolve it in the deficit panel before ending the session.`
+            );
+            return;
+          }
+        } catch {
+          // the rendered prompt shows its own error state; don't double-alert
+        }
+      }
 
       // 7. Update Reservation Status to 'completed' with clinical notes and updated invoice
       const finalInvoiceAmount = calculatedInvoiceTotal;
@@ -2879,6 +2902,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             </div>
                           )}
                         </div>
+
+                        {/* Brief 35 / DEC-079: reception resolves the pulse deficit here,
+                            before Confirm & End Session is allowed to write status/money. */}
+                        {isLaserPackage && (
+                          <LaserDeficitPrompt
+                            reservationId={booking.id}
+                            headers={authenticatedJsonHeaders}
+                            isRTL={isRTL}
+                          />
+                        )}
 
                         {/* FINAL SESSION INVOICE SUMMARY */}
                         <div className="bg-[#414E36]/05 p-4 rounded-2xl space-y-2 text-xs border border-[#414E36]/10">
