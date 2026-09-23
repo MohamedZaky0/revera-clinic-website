@@ -2768,6 +2768,61 @@ pulse deficit is resolved, a package is sold, or money changes hands.
   `delivered_pulses` (Brief 34) and Brief 35's own marker columns are unaffected; only which UI is
   permitted to write them changes.
 
+---
+
+## DEC-080: Laser Deficit Resolution Server Operation And Marker Design (Brief 35 implementation of DEC-079)
+
+**Date:** 2026-09-23
+**Status:** Decided — implemented
+
+**Context:**
+DEC-079 made reception checkout the only place a laser-pulse deficit is resolved. Brief 35 then needed
+a concrete shape for that operation: a client could never be trusted to state the deficit, the price,
+or the rate, and three separate writes (source-package consume, package sale or invoice line, and a
+"don't ask again" marker) had to stay consistent.
+
+**Decided:**
+
+1. **Route shape:** `POST /api/reservations/laser-deficit` resolves; `GET` on the same route previews
+   (delivered/consumed/remaining/deficit/resolved-rate/marker state). A dedicated route rather than
+   extending `PATCH /api/reservations` — that route is already the busiest write path, and deficit
+   resolution has its own failure surface that must return its own status rather than being folded
+   into a status-transition PATCH.
+
+2. **The client sends no amounts.** POST takes `reservationId`, `choice` (`BUY_NEW_PACKAGE` |
+   `PAY_PER_PULSE`), `packageId` (buy only), `sourceCustomerPackageId` (optional), and the
+   receptionist's real `paymentMethod`/`amountPaid`. The server re-reads `delivered_pulses`,
+   the package balance, the catalog price, and the per-pulse rate (via `resolveLaserPulseRate`,
+   the existing chain: reservation snapshot → `page_settings.home.booking.defaultPricePerPulse` →
+   legacy `@ X EGP/pulse` notes → `null` = refuse).
+
+3. **Consume order:** the source package is drained first via `consume_package_pulses` (the Brief 34B
+   RPC — no direct column writes), then the deficit remainder is settled by the choice. The RPC's
+   `UNIQUE(customer_package_id, reservation_id)` makes the consume replayable.
+
+4. **Marker:** `reservations.laser_deficit_resolution` (`'BUY_NEW_PACKAGE'`/`'PAY_PER_PULSE'`) +
+   `laser_deficit_pulses`, written only after the resolution writes succeed. `NULL` = unresolved /
+   no deficit. It is the reservation-level idempotency key: a repeat POST returns
+   `{ alreadyResolved: true }` without writing anything. Needed because the usage-ledger unique index
+   only protects the pulse consume, not the invoice line or the package sale.
+   **Legacy interaction:** bookings resolved before the marker columns wrote
+   `[Laser Settlement]`/`[Laser Package Redemption]` notes tags instead; a tag mentioning
+   `deficit`/`excess`/`exhausted`/`عجز` counts as resolved (returned as `resolution: 'LEGACY'`).
+   Tag reading remains a fallback only — nothing new writes tags; new state lives in columns.
+   (See RISK-097 for the marker-write-failure edge and the lack of cross-table atomicity.)
+
+5. **Internal reuse, not re-implementation:** BUY_NEW_PACKAGE calls `POST /api/packages/sell`'s
+   handler with the caller's auth token (price re-resolved from the `packages` row); PAY_PER_PULSE
+   calls `POST /api/reservation-products` with `lineType: 'device_pulses'` (the route's own
+   late-invoice append for already-invoiced reservations is preserved).
+
+6. **Blocking:** `LaserDeficitPrompt` renders inside the Checkout modal and `BookingDetailsModal`'s
+   end-session panel; both flows also GET-check the deficit inside their confirm handlers and return
+   before the money/status write while `deficit > 0 && !resolved`.
+
+**Impact:** the doctor's screen is record-only (DEC-079); the sole authoritative settlement path is
+this route, called from both reception surfaces.
+
 
 
 

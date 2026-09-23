@@ -3958,12 +3958,39 @@ provider row, and a non-doctor hire must not touch `providers`).
 
 ---
 
-## RISK-086: `medical-records/templates` Writes To A Local File That Is Read-Only On Vercel
+## RISK-086: `medical-records/templates` Writes To A Local File That Is Read-Only On Vercel (RESOLVED)
 
 **Severity:** High (P1) · **Type:** Data integrity / platform mismatch
 **Found:** 2026-09-15, reviewing new routes added in the previous 4 weeks while auditing test
-coverage. **Not yet confirmed against a live Vercel deployment — this is a reasoned architectural
-finding, flagged so it gets verified deliberately rather than discovered by a clinic user.**
+coverage. **Fixed 2026-09-17 — see below.**
+
+**Fix:** `src/app/api/medical-records/templates/route.ts` no longer touches the filesystem at all —
+`fs`/`path` imports, `TEMPLATES_LOCAL_PATH`, `readLocalTemplates()`, and `writeLocalTemplates()` are
+gone. Supabase's `medical_record_templates` table is now the single store for GET/POST/PUT/DELETE,
+matching every other route in the codebase. First-run seeding (an empty table gets the 3 built-in
+default templates) now happens as a real Supabase insert instead of a local-file write, so it only
+ever needs to happen once per clinic, not once per cold serverless instance. A genuine Supabase
+error now surfaces as a 500 (matching the rest of the codebase) instead of silently falling back to
+stale local data.
+
+**No longer applicable:** the original finding's "not yet confirmed against a live Vercel
+deployment" caveat is moot — there is no local-file code path left to reproduce the bug against.
+`data/medical_record_templates.json` is now dead data (nothing reads or writes it); left in place
+rather than deleted as part of this fix — worth a deliberate decision on removing it, not a side
+effect of an unrelated change.
+
+**Tests:** `tests/routes/medical-records-templates.test.ts` rewritten — the `fs` mock is gone
+entirely (no longer needed, since the route no longer touches the filesystem), replaced with direct
+Supabase-fake seeding. Added a test that reproduces the exact original bug shape (create → edit →
+delete the same template in one flow) to guard against ever reintroducing a split store. Also added
+a case for a genuine Supabase error surfacing as a 500.
+
+**Manual verification still recommended:** `ai_docs/manual_tests/NEW_ROUTES_SEPT_2026_MANUAL_TESTS.md`
+check 6 was about surviving a server restart — now trivially true (Supabase persists regardless of
+serverless cold starts), but still worth a real click-through once against a live deployment before
+calling this fully closed operationally, not just architecturally.
+
+**Original finding (2026-09-15), kept for context:**
 
 **What it is:** `src/app/api/medical-records/templates/route.ts` treats a local JSON file
 (`data/medical_record_templates.json`, read/written via `fs.readFileSync`/`fs.writeFileSync`) as
@@ -3992,23 +4019,34 @@ swallows that error (logs a warning, keeps going), so the write appears to succe
 unable to edit or delete it — the exact kind of silent breakage that erodes trust in the system
 once discovered live, rather than in a demo.
 
-**Fix required:** make Supabase the single source of truth for this table (matching every other
-route in the codebase); either drop the local-file path entirely, or gate it strictly behind a
-local-dev-only check (e.g. `process.env.VERCEL` unset) so it can never run against a read-only
-filesystem in production.
-
-**Verification still needed:** confirm this reproduces against an actual Vercel preview/production
-deployment (not just local `next dev`, which has a writable filesystem and would not show the bug).
-No automated test can prove this either way — `tests/routes/medical-records-templates.test.ts`
-mocks `fs` entirely and is deliberately silent on this question (see that file's own header
-comment). Manual checklist: `ai_docs/manual_tests/NEW_ROUTES_SEPT_2026_MANUAL_TESTS.md`, check 6.
+**Fix required:** done — see the top of this entry.
 
 ---
 
-## RISK-087: Two Independent Implementations Decide How An Underpayment/Overpayment Settles
+## RISK-087: Two Independent Implementations Decide How An Underpayment/Overpayment Settles (PARTIALLY RESOLVED)
 
 **Severity:** Medium · **Type:** Maintainability / consistency risk
-**Found:** 2026-09-15, same review as RISK-086.
+**Found:** 2026-09-15, same review as RISK-086. **Extraction fixed 2026-09-17 — see below; the
+deeper cross-flow question this section originally raised is still open.**
+
+**Fix:** `src/app/api/reservations/previous/route.ts`'s inline wallet-vs-debt allocation
+(the block described below) is now `settlePaymentMismatch()` in `src/lib/billing.ts` — a small,
+named, directly-tested pure function, called by the route instead of the logic living inline in a
+route handler. This removes the "hand-written business logic buried in a route file, invisible to
+anyone not reading that file" problem, and gives the rule its own unit tests
+(`tests/lib/billing.test.ts`, 12 cases) independent of the route's own integration tests
+(`tests/routes/reservations-previous.test.ts`, unchanged and still green — confirming the
+extraction changed no behavior).
+
+**Not resolved by this — deliberately out of scope:** the regular checkout flow
+(`PATCH /api/reservations` + `admin/page.tsx`'s checkout modal) still decides wallet usage in the
+frontend rather than calling `settlePaymentMismatch()`; unifying that is a separate, larger change
+(it would mean the checkout modal's "use wallet balance" checkbox either goes away or the route
+gains an "auto-allocate" mode) and was not attempted here. The original finding below stays for that
+reason — two conceptually-equivalent rules still exist, just one of them is no longer the badly-
+factored one.
+
+**Original finding (2026-09-15), kept for context:**
 
 **What it is:** deciding *how much of an underpayment draws from an existing wallet credit before
 adding debt to `outstanding`, and how much of an overpayment pays down existing debt before
@@ -4035,16 +4073,15 @@ apply to the other unless someone remembers both exist. If the two rules are eve
 allowed to diverge further, staff could see different settlement behavior for what looks to them
 like the same kind of transaction, depending only on which screen recorded it.
 
-**Fix required (not urgent, but worth scheduling):** extract the wallet-vs-debt allocation decision
-in `reservations/previous` into a small, named, tested pure function (parallel to how
-`computeSettledBalances` was extracted from the checkout route) — either reusing/extending
-`billing.ts`, or as a clearly-named sibling — so there is one function both call sites can point at,
-not two hand-written copies of the same rule.
+**Fix required, done for implementation 1 (see the top of this entry):** extracted into
+`settlePaymentMismatch()` in `billing.ts`. Implementation 2 (the checkout flow) still splits the
+decision between the frontend and `computeSettledBalances()` and was deliberately left alone.
 
-**Tests:** `tests/routes/reservations-previous.test.ts`'s "settlement math" describe block (9 cases)
-documents implementation 1's exact current behavior; `tests/lib/billing.test.ts` documents
-implementation 2's. Neither test file currently asserts the two are equivalent — that assertion
-doesn't exist yet because the two functions don't share a common interface to compare.
+**Tests:** `tests/lib/billing.test.ts` now covers `settlePaymentMismatch()` directly (12 cases);
+`tests/routes/reservations-previous.test.ts`'s "settlement math" describe block (9 cases) covers it
+through the route. `tests/lib/billing.test.ts` separately covers `computeSettledBalances()`
+(implementation 2). No test asserts the two functions are equivalent — they still don't share a
+common interface, and per the note above, making them equivalent was not the goal of this fix.
 
 ---
 
@@ -4430,6 +4467,46 @@ afterward; confirmed zero residue.
 
 **Manual test checklist:** `ai_docs/manual_tests/LASER_PULSE_BALANCE_BRIEF_34B_MANUAL_TESTS.md`
 — Evidence log and checklist filled in with the above.
+
+---
+
+## RISK-097: Brief 35 Deficit Resolution Is Ordered, Not Transactional — A Failure Between Steps Leaves A Partially-Applied Settlement (OPEN — documented, mitigated)
+
+**Found:** 2026-09-23 during Brief 35 implementation.
+**Status:** OPEN — surfaced honestly by the route; not fixable without a cross-table Postgres transaction.
+
+`POST /api/reservations/laser-deficit` performs up to three writes in sequence: (1) source-package
+consume via `consume_package_pulses` RPC, (2) the resolution write — `POST /api/packages/sell`
+(invoices + invoice_lines + customer_packages + payments) or the `reservation_products` deficit line,
+and (3) the `reservations.laser_deficit_resolution` marker. There is no single transaction spanning
+them (the sell path is a route handler, not an RPC), so a failure between steps is a real partial
+state:
+
+- **Marker write fails after the resolution succeeded** (including when migration
+  `20260923000000_add_laser_deficit_resolution_to_reservations.sql` has not been applied yet — the
+  columns won't exist): the route returns 500 with "do not retry; reconcile manually," but the
+  invoice line/package sale already happened. A retry that ignores the warning would double-charge
+  the invoice line; the PAY_PER_PULSE line-write has a `description ILIKE 'Excess Laser Pulses
+  Deficit%'` guard so the *line* is not duplicated, but the package-sale path has no equivalent
+  protection.
+- **BUY_NEW_PACKAGE sells the package, then the deficit consume fails or returns
+  `consumed < deficit`:** the patient owns a package and its invoice exists, but the deficit pulses
+  were not deducted. The route returns 500 with the exact partial state in the message.
+- **Marker columns absent entirely (migration unapplied):** resolution still works, but
+  `laser_deficit_resolution` stays NULL forever, so idempotency falls back to the notes-tag /
+  deficit-line heuristics — weaker than the column.
+
+**Mitigations already in place:** consume is idempotent per `(customer_package_id, reservation_id)`
+(Brief 34B unique index); the PAY_PER_PULSE line is guarded against double-write; every failure
+message states exactly what did and did not happen, and never reports success.
+
+**Not fixed:** a single Postgres function wrapping consume + sale + marker in one transaction. That
+would require reimplementing `/api/packages/sell` inside SQL (invoices, invoice_lines, payments,
+wallet movements, transaction ledger — too much to duplicate); deferred as deliberate scope. The
+correct path if this ever bites in production is manual reconciliation from the error message plus
+the `package_pulse_usage` audit rows.
+
+**Manual checklist:** `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_35_MANUAL_TESTS.md`.
 
 ---
 
