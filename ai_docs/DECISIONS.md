@@ -2876,6 +2876,37 @@ When a patient had an existing package and attended a booking paid via package r
 1. In `BookingDetailsModal.tsx`, `isInvoicePaid` now recognizes 0-cost package sessions and completed sessions with 0 balance due (`sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || booking.status === 'completed')`).
 2. In `AdminBookingsView.tsx` and `ReceptionDashboardView.tsx` / reception API route, package-covered and completed 0-balance bookings evaluate to "Paid".
 
+---
+
+## DEC-085: Laser Pulse Package Deficit Detection, Unsettled Session Status, and Dual Interactive Checkout Options
+
+**Date:** 2026-09-23
+**Status:** Decided — active
+
+**Context:**
+When a patient redeems an active laser pulse package during a session and the delivered pulses exceed the remaining package balance (e.g. Package had 2,000 pulses remaining, session delivered 3,000 pulses → 1,000 excess/deficit pulses):
+1. The session payment status must automatically shift to "Partially Paid" / "Deficit" and the "Pay & Settle Invoice" button must remain accessible.
+2. In the Checkout Popup, staff must see that the delivered pulses exceeded the package quota and have two clear, interactive options to settle the excess deficit:
+   - **Option 1 (Buy New Package / Choice 3A):** Patient purchases a new catalog package (e.g. 5,000 pulses for 2,500 EGP) and the 1,000 pulse deficit is deducted from this new package (leaving 4,000 pulses remaining in the new package).
+   - **Option 2 (Pay per Pulse / Choice 3B):** Patient pays for the 1,000 remaining excess pulses at a customizable per-pulse rate (e.g. 1.5 EGP/pulse × 1,000 = 1,500 EGP).
+
+**Decisions & Implementation:**
+1. **Pulse Deficit Detection & Status Synchronization:**
+   - In `BookingDetailsModal.tsx` and `AdminBookingsView.tsx`, pulse deficit is calculated from delivered pulses vs package balance: `deficitPulses = (!hasSettledDeficit && notePkgRem > 0 && deliveredPulses > notePkgRem) ? deliveredPulses - notePkgRem : 0`.
+   - When an unsettled deficit exists, `isInvoicePaid` is set to `false`, the banner badge switches to an amber `Exceeded Package (+1,000 Pulses)` alert, and payment status displays `Partially Paid`.
+2. **Interactive Deficit Settlement UI in Checkout Modal:**
+   - In `src/app/admin/page.tsx`, when `deficitPulsesVal > 0` and `!hasSettledDeficit`, a dedicated 2-card interactive choice selector is rendered:
+     - **Option 1 Card:** Dropdown selection of active catalog pulses packages, pricing breakdown (+2,500 EGP), and calculated balance remaining after deficit deduction (4,000 pulses remaining).
+     - **Option 2 Card:** Number input for customizable per-pulse rate (e.g. 1.5 EGP), and live total calculation (1,000 pulses × 1.5 EGP = 1,500 EGP).
+   - The selected deficit charge is dynamically added to `totalCost`, `balanceDue`, and invoice line items.
+3. **Execution on Checkout Confirmation:**
+   - In `handleConfirmCheckout`:
+     - If Option 1: Calls `POST /api/packages/sell` to create the new package, calls `consume_package_pulses` to deduct the 1,000 deficit pulses from the new package, exhausts the old package (0 pulses), and appends audit note `[Laser Package Deficit Settlement]: Choice 3A...`.
+     - If Option 2: Exhausts the old package (0 pulses) and appends audit note `[Laser Package Deficit Settlement]: Choice 3B...`.
+4. **Automated Diagnostic Test Suite:**
+   - Added `TC-080: Laser Pulses Package Excess Deficit & Dual Interactive Settlement Engine` to Admin Settings System Test Suite.
+
+
 
 
 

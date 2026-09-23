@@ -37,6 +37,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getAuthHeaders } from "@/lib/authHeaders";
 import { getSessionStaleness } from "@/lib/services";
 import { adminTranslations } from "@/components/admin/translations";
+import { extractPrimaryPulses } from "./BookingDetailsModal";
 
 interface ReservationItem {
   id: string | number;
@@ -519,8 +520,21 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         String(r.notes || "").toLowerCase().includes("package redemption") ||
         String(r.notes || "").includes("[Laser Package]")
       );
+      const notesStr = String(r.notes || "");
+      const notePulsesRemMatch = notesStr.match(/(\d+(?:,\d+)?)\s*pulses remaining/i);
+      const notePkgRem = notePulsesRemMatch ? Number(notePulsesRemMatch[1].replace(/,/g, '')) : null;
+      const deliveredPulsesVal = Number(r.deliveredPulses || r.delivered_pulses || extractPrimaryPulses(notesStr, r) || 0);
+      const hasSettledDeficit = Boolean(
+        notesStr.includes("[Laser Package Deficit Settlement]") ||
+        notesStr.includes("Choice 3A") ||
+        notesStr.includes("Choice 3B")
+      );
+      const isDeficit = !hasSettledDeficit && isPkgCovered && notePkgRem !== null && notePkgRem > 0 && deliveredPulsesVal > notePkgRem;
+
       let paySt: string;
-      if (rawPaid === null || rawPaid === undefined || Number.isNaN(amtPaid)) {
+      if (isDeficit) {
+        paySt = "Partially Paid";
+      } else if (rawPaid === null || rawPaid === undefined || Number.isNaN(amtPaid)) {
         paySt = isPkgCovered && (st === "completed" || amtLeft === 0) ? "Paid" : "—";
       } else if (amtPaid <= 0 && amtLeft !== 0 && !isPkgCovered && st !== "completed") {
         paySt = "Unpaid";
