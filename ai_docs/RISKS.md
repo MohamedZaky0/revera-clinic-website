@@ -4257,6 +4257,7 @@ Reception's End Session has no purchase step at all: a package is only sold at b
 
 ---
 
+<<<<<<< HEAD
 ## RISK-094: Laser Package Deficit Settlement Had No Safety Net and Could Bill an Unsold Package (PARTIALLY RESOLVED)
 
 **Severity:** Critical (P0) · **Type:** Money / data integrity / concurrency
@@ -4433,7 +4434,21 @@ afterward; confirmed zero residue.
 
 ---
 
+## RISK-097: Retail Product Balances Were Converted to Synthetic Packages in `GET /api/customers/packages` (RESOLVED)
+
+**Severity:** Medium · **Type:** UI & Domain Isolation
+**Found:** 2026-09-23 · **Fixed same day.**
+
+**What it was:** In `src/app/api/customers/packages/route.ts`, the `GET` endpoint included a fallback querying `customer_product_balances` and synthesising a `syntheticPkg` for every non-pulse product balance. Consequently, whenever a patient purchased a skincare product (e.g., "Retinol Anti-Aging Serum", "Skin Protector"), it appeared under "Purchased Packages" in addition to "Purchased Products & Cart".
+
+**Fix:** Removed the `customer_product_balances` conversion from `GET /api/customers/packages`. Packages are now sourced exclusively from `customer_packages`.
+
+**Verified:** Automated tests in `tests/routes/customers-packages.test.ts` (including new test verifying product balances are excluded from packages response) pass (806 passing tests total), and `npm run build` succeeds with zero errors.
+
+---
+
 ## PROPOSALS.md Reference
+
 
 See `PROPOSALS.md` for:
 - **PROPOSAL-001** — extract all Revera-specific values into a single `client.config.ts`,
