@@ -4338,7 +4338,7 @@ together and clicked through for real.
 
 **Severity:** High (P1) · **Type:** Data integrity / concurrency · **Found:** 2026-09-20 audit
 (Brief 34 investigation), deliberately deferred there · **Fixed:** 2026-09-22, Brief 34B.
-**Both migrations applied to dev 2026-09-23 and live-verified — see checklist.**
+**Both migrations applied to dev AND main (production) 2026-09-23, live-verified — see checklist.**
 
 **What it was — three compounding defects in `src/app/api/customers/packages/route.ts`:**
 
@@ -4383,6 +4383,17 @@ before using it, otherwise inserting the usage row with `reservation_id = NULL` 
 as a malformed/non-UUID id) — preserves the audit quantity/remaining-after history without
 violating the FK. Re-applied clean; all 10 backfilled usage rows ended up `reservation_id = NULL`
 (expected — none of the historical test bookings still exist).
+
+**Also applied to production (2026-09-23), after `dev` was merged into `main`.** Main was behind
+`dev` by all 9 migrations from 2026-09-15 onward (this feature and several others had only ever
+been applied to dev), not just Brief 34B's 2 — reviewed all 9 for destructive statements (none
+found) and idempotency guards before bulk-applying via `db push --project-ref
+whmukkypceuizscpjcdo`. The backfill migration (with the FK fix from the dev run already baked in)
+applied clean on the first attempt. Production currently has **zero `pulses`-type
+`customer_packages` rows** (2 `services`-type packages only, 1,200 units remaining) — the laser
+pulses feature has no live production usage yet, so the backfill found nothing to repair there;
+the unresolvable-package check and the RPC ACL (`anon`/`service_role`) were independently
+re-verified against production directly, both clean.
 
 **Deploy ordering — applied 2026-09-23 on dev, in order:** migration 1 (table + RPC) → migration
 2 (backfill, fixed as above) → `db push` on migration 2 failed once (the bug above), fixed, and

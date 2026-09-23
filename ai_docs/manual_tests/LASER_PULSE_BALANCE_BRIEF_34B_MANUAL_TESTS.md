@@ -41,6 +41,10 @@
 | 2026-09-23 | Concurrency (a): two different patients | dev, disposable packages #3/#4 | Concurrent consumes on two unrelated patients' packages both succeeded independently (300/300), no cross-contamination | Pass |
 | 2026-09-23 | Test-data cleanup | dev | All disposable customers/reservations/customer_packages/usage rows deleted; `count(*)` on the 3 test mobile numbers = 0 | Pass |
 | 2026-09-23 | `grep -rn "customer_package_pulses" src/` | local repo | Empty | Pass |
+| 2026-09-23 | Apply all 9 pending migrations (Brief 34B's 2 + 7 others that had only ever landed on dev) | **main / production** (`whmukkypceuizscpjcdo`) | `db push --project-ref whmukkypceuizscpjcdo` — all 9 applied clean on first attempt (the FK fix from the dev run applied cleanly here too, no 23503) | Pass |
+| 2026-09-23 | Unresolvable-package check | production | `SELECT count(*) WHERE package_type='pulses' AND total_pulses<=0 AND NOT EXISTS(package_pulse_usage)` → 0 | Pass |
+| 2026-09-23 | Production package inventory | production | `customer_packages` GROUP BY status,package_type → 2 `services`/`active` rows only (1,200 units); **zero `pulses`-type rows** — the laser pulses feature has no live production usage yet | Pass (nothing to repair) |
+| 2026-09-23 | Function ACL on production | production | `has_function_privilege`: `anon`=false, `service_role`=true | Pass |
 
 **Not done in this pass (needs a live browser session, not just DB-level verification):** the UI
 click-path items below (sell via Admin, doctor active-session consume, reception checkout,
