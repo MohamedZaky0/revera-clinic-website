@@ -2844,3 +2844,32 @@ In `src/app/api/customers/packages/route.ts`, the `GET` handler contained a lega
 2. **Added Regression Test:**
    - Added test in `tests/routes/customers-packages.test.ts` asserting that records in `customer_product_balances` are never returned as packages.
 
+---
+
+## DEC-082: End-to-End Pulse Package Linkage, Checkout Pulse Deduction Breakdown, and Profile Bar Synchronization
+
+**Date:** 2026-09-23
+**Status:** Decided — active
+**Note:** cherry-picked from commit `fdebc6b` (`saifuldeennaser`, working in parallel on `origin/dev`).
+Its number happens to already match this session's sequence — no renumbering needed. The
+predecessor commit on `origin/dev` (`53e8fcf`, "Accurate Package Classification and Pulse Quota
+Resolution", their DEC-081) was deliberately **not** merged: it reintroduces resolving
+`customer_packages.total_pulses` from `pkgMeta.totalPulses` / a package-name regex, which is
+exactly the fabricated-quota pattern Brief 34B (RISK-096) removed. The one genuinely useful part of
+that commit — not misclassifying an explicit services package with "laser" in its name as a pulses
+package — still needs doing; tracked separately rather than taken as-is.
+
+**Context:**
+When a laser pulse package is selected or purchased in Option 3 of New Booking, the session needed to use that specific package. Upon completing the treatment and opening reception checkout, the popup must display exactly how many pulses are deducted from the package (e.g. 2,000 pulses deducted from 5,000 pulses package, leaving 3,000 pulses remaining). In the patient profile, the progress bar must accurately reflect the real-time remaining and used pulse balances.
+
+**Decisions & Implementation:**
+1. **Reservation Package Linkage:**
+   - In `AdminNewBookingView.tsx`, when Option 3 is selected with a package purchase, `[Customer Package ID]: <id>`, `[Laser Package]: <name> (Package ID: <id>)`, `customerPackageId`, and `laserPaymentMode: "PACKAGE"` are persisted on the reservation and notes.
+   - In `src/app/api/reservations/route.ts`, `mapRow` and `POST` persist and return `laser_payment_mode`, `laser_price_per_pulse`, `delivered_pulses`, `packageId`, and `customerPackageId`.
+2. **Doctor Ongoing Session Auto-Selection:**
+   - In `DoctorOngoingSessionTab.tsx`, linked package IDs from reservation metadata or structured note tags are automatically matched to the patient's active pulse packages. (This selection only feeds the doctor's clamped consume against the correct source package, per DEC-079 — it is not a reintroduction of a doctor-side choice UI.)
+3. **Checkout Modal Pulse Deduction Breakdown:**
+   - In `src/app/admin/page.tsx`, when checking out a laser package reservation, the modal matches the linked pulse package, displays current package balance, session usage, remaining pulses after checkout, and a progress bar preview with a clear natural-language summary. This is informational display only; it sits alongside, and does not replace, Brief 35's `LaserDeficitPrompt` gate for the deficit case (DEC-080).
+   - On checkout settlement, `consume_package_pulses` RPC executes pulse deduction and emits `revera-laser-change` for instantaneous cross-component refresh.
+4. **Patient Profile Progress Bar:**
+   - In `CustomerProfileDrawer.tsx`, the progress bar calculates `(remainingPulsesVal / effectiveTotal) * 100` and displays both remaining pulses and used pulses counters clearly.

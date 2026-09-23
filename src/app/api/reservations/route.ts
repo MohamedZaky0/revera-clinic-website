@@ -89,6 +89,13 @@ function mapRow(r: Record<string, any>, attachedProducts?: Array<Record<string, 
     followUpDate: r.follow_up_date ?? null,
     startedAt: r.started_at ?? null,
     actualDurationMinutes: r.actual_duration_minutes ?? null,
+    laserPaymentMode: r.laser_payment_mode ?? null,
+    laserPricePerPulse: r.laser_price_per_pulse !== null && r.laser_price_per_pulse !== undefined ? Number(r.laser_price_per_pulse) : null,
+    deliveredPulses: r.delivered_pulses !== null && r.delivered_pulses !== undefined ? Number(r.delivered_pulses) : null,
+    laserDeficitResolution: r.laser_deficit_resolution ?? null,
+    laserDeficitPulses: r.laser_deficit_pulses !== null && r.laser_deficit_pulses !== undefined ? Number(r.laser_deficit_pulses) : null,
+    packageId: r.package_id ?? null,
+    customerPackageId: r.customer_package_id ?? null,
     attachedProducts: attachedProducts ? attachedProducts.map(mapReservationProduct) : undefined,
   };
 }
@@ -1211,6 +1218,9 @@ export async function POST(req: Request) {
       rooms: compRoomIds,
       created_by_employee_id: createdByEmployeeId || null,
       follow_up_date: body.followUpDate || body.follow_up_date || null,
+      laser_payment_mode: body.laserPaymentMode || body.laser_payment_mode || null,
+      laser_price_per_pulse: body.laserPricePerPulse !== undefined && body.laserPricePerPulse !== null ? Number(body.laserPricePerPulse) : (body.laser_price_per_pulse !== undefined && body.laser_price_per_pulse !== null ? Number(body.laser_price_per_pulse) : null),
+      delivered_pulses: body.deliveredPulses !== undefined && body.deliveredPulses !== null ? Number(body.deliveredPulses) : (body.delivered_pulses !== undefined && body.delivered_pulses !== null ? Number(body.delivered_pulses) : null),
     };
 
     // No fallback retries here — deliberately. This used to retry a failed insert after

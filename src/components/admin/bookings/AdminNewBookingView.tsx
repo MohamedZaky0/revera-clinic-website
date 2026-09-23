@@ -1314,12 +1314,16 @@ export default function AdminNewBookingView({
       }
 
       const catalogPulseQuota = Number(selectedCatalogPulsePkg?.total_pulses ?? selectedCatalogPulsePkg?.totalPulses ?? 0);
+      const activePulsePkgName = isNewPackagePurchase && selectedCatalogPulsePkg
+        ? ((lang === "ar" && selectedCatalogPulsePkg.name_ar) ? selectedCatalogPulsePkg.name_ar : selectedCatalogPulsePkg.name)
+        : (matchingPackage ? ((lang === "ar" && matchingPackage.packageNameAr) ? matchingPackage.packageNameAr : matchingPackage.packageName) : "");
+
       const packageNote = isNewPackagePurchase && selectedCatalogPulsePkg
-        ? `\n[Purchasing New Pulses Package]: ${(lang === "ar" && selectedCatalogPulsePkg.name_ar) ? selectedCatalogPulsePkg.name_ar : selectedCatalogPulsePkg.name} (${Number(selectedCatalogPulsePkg.price || 0)} EGP${catalogPulseQuota > 0 ? ` · ${catalogPulseQuota.toLocaleString()} pulses` : ""})${createdCustomerPackageId ? `\n[Customer Package ID]: ${createdCustomerPackageId}` : ""}`
+        ? `\n[Purchasing New Pulses Package]: ${activePulsePkgName} (${Number(selectedCatalogPulsePkg.price || 0)} EGP${catalogPulseQuota > 0 ? ` · ${catalogPulseQuota.toLocaleString()} pulses` : ""})${createdCustomerPackageId ? `\n[Customer Package ID]: ${createdCustomerPackageId}\n[Laser Package]: ${activePulsePkgName} (Package ID: ${createdCustomerPackageId})` : ""}`
         : (usePackagePayment && matchingPackage && matchingPackageItem)
         ? matchingPackageItem.isPulses
-          ? `\n[Laser Package Redemption]: ${(lang === "ar" && matchingPackage.packageNameAr) ? matchingPackage.packageNameAr : matchingPackage.packageName} (${Number(matchingPackageItem.qtyRemaining).toLocaleString()} pulses remaining)`
-          : `\n[Package Redemption]: ${(lang === "ar" && matchingPackage.packageNameAr) ? matchingPackage.packageNameAr : matchingPackage.packageName} - ${selectedServiceName} (Item ID: ${matchingPackageItem.id})`
+          ? `\n[Laser Package Redemption]: ${activePulsePkgName} (${Number(matchingPackageItem.qtyRemaining).toLocaleString()} pulses remaining)\n[Customer Package ID]: ${matchingPackage.id}\n[Laser Package]: ${activePulsePkgName} (Package ID: ${matchingPackage.id})`
+          : `\n[Package Redemption]: ${activePulsePkgName} - ${selectedServiceName} (Item ID: ${matchingPackageItem.id})`
         : "";
 
       const laserNote = isLaserService
