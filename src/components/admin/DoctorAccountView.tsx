@@ -1618,6 +1618,10 @@ export default function DoctorAccountView({
       const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are charged per pulse (${doctorDeliveredPulses} pulses × ${doctorPulseRate} EGP = ${totalLaserCost} EGP) / تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${doctorDeliveredPulses} نبضة × ${doctorPulseRate} ج.م = ${totalLaserCost} ج.م)`;
       completionNotes = completionNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
     } else if (isDoctorPackage) {
+      if (doctorDeliveredPulses > 0) {
+        const pulseCountString = `\n[Laser Pulses Delivered]: Primary: ${doctorDeliveredPulses} pulses, Total: ${doctorDeliveredPulses} pulses`;
+        completionNotes = completionNotes.replace(/\[(?:Laser Pulses Delivered|Extra Device Pulses)\]:[^\n\[]*/gi, "").trim() + pulseCountString;
+      }
       if (laserData?.isInitialPackagePurchase && laserData?.newPackageToBuy) {
         const pkgName = laserData.newPackageToBuy.name || laserData.newPackageToBuy.title || "Laser Pulses Package";
         const pkgTotal = Number(laserData.newPackageTotalPulses || 0);

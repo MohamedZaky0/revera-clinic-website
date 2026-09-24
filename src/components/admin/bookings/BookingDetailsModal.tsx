@@ -50,6 +50,7 @@ import { Branch } from "@/types";
 import { adminTranslations } from "../translations";
 import type { Req } from "@/app/admin/page";
 import { resolveLaserPulseRate } from "@/lib/laserRate";
+import { extractPulsePackageQuota } from "@/lib/laserDeficit";
 
 export interface AdditionalServiceItem {
   id: string | number;
@@ -1445,10 +1446,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const prodString = `\n[Products Used During Session]: ${usedProducts.map((p) => `${p.name} (Qty: ${p.qty} x ${p.unitPrice} EGP = ${p.total} EGP)`).join(", ")}`;
         updatedNotes = updatedNotes.replace(/\[Products Used During Session\]:[^\n\[]*/gi, "").trim() + prodString;
       }
-      if (totalPulses > 0) {
+      const finalDeliveredPulses = totalPulses > 0 ? totalPulses : primaryPulses;
+      if (finalDeliveredPulses > 0) {
         if (isPerPulseMode) {
           const addPulses = additionalServices.reduce((sum, s) => sum + Number(s.pulses || 0), 0);
           const pulseString = `\n[Laser Pulses Delivered]: Primary: ${primaryPulses} pulses (@ ${resolvedPulseRate} EGP/pulse = ${primaryPulses * resolvedPulseRate} EGP), Additional: ${addPulses} pulses (@ ${resolvedPulseRate} EGP/pulse = ${addPulses * resolvedPulseRate} EGP), Total: ${totalPulses} pulses`;
+          updatedNotes = updatedNotes.replace(/\[(?:Laser Pulses Delivered|Extra Device Pulses)\]:[^\n\[]*/gi, "").trim() + pulseString;
+        } else if (isPackageMode) {
+          const pulseString = `\n[Laser Pulses Delivered]: Primary: ${primaryPulses || finalDeliveredPulses} pulses, Total: ${finalDeliveredPulses} pulses`;
           updatedNotes = updatedNotes.replace(/\[(?:Laser Pulses Delivered|Extra Device Pulses)\]:[^\n\[]*/gi, "").trim() + pulseString;
         } else {
           const pulseString = `\n[Extra Device Pulses]: ${totalPulses} pulses = ${primaryPulses * (Number(pricePerPulse) || 0)} EGP`;
@@ -1465,7 +1470,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         updatedNotes = updatedNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
       } else if (isPackageMode) {
         const pkgMatch = String(booking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
-        const pkgDetails = pkgMatch ? pkgMatch[1] : `Delivered ${primaryPulses} pulses covered by pulses package`;
+        const pkgDetails = pkgMatch ? pkgMatch[1] : `Delivered ${finalDeliveredPulses} pulses covered by pulses package`;
         const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are covered by Pulses Package (${pkgDetails}) / تم الاتفاق على أن تكون خدمات الليزر مغطاة بباقة النبضات`;
         updatedNotes = updatedNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
       }
@@ -1490,7 +1495,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           } : isPackageMode ? {
             laser_payment_mode: "PACKAGE",
             laserPaymentMode: "PACKAGE",
-            delivered_pulses: primaryPulses,
+            delivered_pulses: finalDeliveredPulses,
           } : {}),
           ...(rxHasFollowUp && rxFollowUpDate ? { followUpDate: rxFollowUpDate } : {})
         })
@@ -1518,7 +1523,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 } : isPackageMode ? {
                   laser_payment_mode: "PACKAGE",
                   laserPaymentMode: "PACKAGE",
-                  delivered_pulses: primaryPulses,
+                  delivered_pulses: finalDeliveredPulses,
                 } : {}),
               }
             : null
@@ -1595,8 +1600,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const settlementMatch = String(booking?.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
         const packageRedemptionMatch = String(booking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
 
-        const notePulsesRemMatch = String(booking?.notes || "").match(/(\d+(?:,\d+)?)\s*pulses remaining/i);
-        const notePkgRem = notePulsesRemMatch ? Number(notePulsesRemMatch[1].replace(/,/g, '')) : 0;
+        const notePkgRem = extractPulsePackageQuota(String(booking?.notes || "")) ?? 0;
         const hasSettledDeficit = Boolean(
           String(booking?.notes || "").includes("[Laser Package Deficit Settlement]") ||
           String(booking?.notes || "").includes("Choice 3A") ||

@@ -2906,6 +2906,34 @@ When a patient redeems an active laser pulse package during a session and the de
 4. **Automated Diagnostic Test Suite:**
    - Added `TC-080: Laser Pulses Package Excess Deficit & Dual Interactive Settlement Engine` to Admin Settings System Test Suite.
 
+---
+
+## DEC-086: Multi-Format Pulse Quota Extraction, Dynamic Package Fetching, and Real-Time Deficit Settlement in Patient Profiles
+
+**Date:** 2026-09-24
+**Status:** Decided — active
+
+**Context:**
+When a patient without packages books Option 3 (purchasing a new 2,500 pulses package during booking) and delivers 5,000 pulses during session (exceeding package balance by 2,500 pulses):
+1. The checkout modal failed to show the 2 interactive deficit options because `checkoutCustomerPackages` was never fetched when the modal opened and the regex expected the keyword "remaining" rather than in-booking purchase format (`· 2,500 pulses`).
+2. In the patient profile, the package showed 0 pulses used because pulse consumption was bypassed when deficit was unsettled.
+
+**Decisions & Implementation:**
+1. **Multi-Format Pulse Quota Extractor (`extractPulsePackageQuota` in `src/lib/laserDeficit.ts`):**
+   - Authoritative parser matching:
+     - `(\d+(?:,\d+)?)\s*pulses remaining` (from `[Laser Package Redemption]: ...`)
+     - `\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption)\]:[^(]*\([^)]*?[·•]\s*(\d+(?:,\d+)?)\s*pulses` (from in-booking new package purchases)
+     - `\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption)\]:[^(]*\((\d+(?:,\d+)?)\s*pulses`
+     - Any bracketed package line with pulse counts (`[Laser Package]: ... 2,500 pulses`).
+   - Unified across `src/app/admin/page.tsx`, `BookingDetailsModal.tsx`, `AdminBookingsView.tsx`, and tested via `tests/lib/laserDeficit.test.ts`.
+2. **Customer Packages Population on Checkout Modal Open:**
+   - In `src/app/admin/page.tsx`, the `useEffect` on `checkoutBooking` now fetches `/api/customers/packages?customerId=${custId}` to ensure `checkoutCustomerPackages` is populated for package lookup.
+3. **Robust Old Package Resolution & Consumption on Deficit Settlement:**
+   - On checkout deficit settlement (Choice 3A & Choice 3B), `oldPkgIdToExhaust` resolves across `matchedPulsePkg?.id`, `linkedPkgId`, notes match, and customer active package fallback, ensuring the original package balance is deducted / consumed and reflected accurately in the patient's profile.
+4. **Delivered Pulses Tagging & Reception Session End:**
+   - In `BookingDetailsModal.tsx` and `DoctorAccountView.tsx`, `delivered_pulses` and `[Laser Pulses Delivered]: Primary: X pulses, Total: Y pulses` are guaranteed on session completion.
+
+
 
 
 

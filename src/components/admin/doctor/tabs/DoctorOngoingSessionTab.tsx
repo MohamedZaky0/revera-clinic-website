@@ -169,7 +169,15 @@ export default function DoctorOngoingSessionTab({
     const rawMode = activeSessionBooking.laserPaymentMode || activeSessionBooking.laser_payment_mode;
     if (rawMode === "PER_PULSE" || notesStr.includes("pay per pulse") || notesStr.includes("per_pulse")) {
       setLaserMode("PER_PULSE");
-    } else if (rawMode === "PACKAGE" || notesStr.includes("pulse package") || notesStr.includes("package redemption")) {
+    } else if (
+      rawMode === "PACKAGE" ||
+      notesStr.includes("pulse package") ||
+      notesStr.includes("pulses package") ||
+      notesStr.includes("package redemption") ||
+      notesStr.includes("purchasing new pulses package") ||
+      notesStr.includes("[laser package") ||
+      notesStr.includes("option 3")
+    ) {
       setLaserMode("PACKAGE");
     } else {
       setLaserMode("SERVICE");

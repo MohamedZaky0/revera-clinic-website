@@ -41,6 +41,7 @@ import PatientsDirectoryView from "@/components/admin/patients/PatientsDirectory
 import { useCustomerProfile } from "@/components/admin/patients/useCustomerProfile";
 import CustomerProfileDrawer from "@/components/admin/patients/CustomerProfileDrawer";
 import BookingDetailsModal, { checkIsLaserService, parseAdditionalServiceLine } from "@/components/admin/bookings/BookingDetailsModal";
+import { extractPulsePackageQuota } from "@/lib/laserDeficit";
 import {
   AlarmClock,
   ArrowLeft,
@@ -1195,6 +1196,23 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           }
         })
         .catch(() => {});
+
+      const custId = checkoutBooking.customerId || (checkoutBooking as any).customer_id;
+      const phone = checkoutBooking.phone || (checkoutBooking as any).customer_phone;
+      const param = custId ? `customerId=${encodeURIComponent(custId)}` : phone ? `phone=${encodeURIComponent(phone)}` : null;
+      if (param) {
+        fetch(`/api/customers/packages?${param}`, { headers: authenticatedJsonHeaders, cache: "no-store" })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            const list = data?.customerPackages || data?.packages || [];
+            setCheckoutCustomerPackages(list);
+          })
+          .catch(() => setCheckoutCustomerPackages([]));
+      } else {
+        setCheckoutCustomerPackages([]);
+      }
+    } else {
+      setCheckoutCustomerPackages([]);
     }
   }, [checkoutBooking]);
 
@@ -9434,8 +9452,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             (checkoutBooking as any)?.package_id ||
             (notePkgIdMatch ? notePkgIdMatch[1]?.trim() : null);
 
-          const notePulsesRemMatch = notesStr.match(/(\d+(?:,\d+)?)\s*pulses remaining/i);
-          const notePkgRemPulses = notePulsesRemMatch ? Number(notePulsesRemMatch[1].replace(/,/g, '')) : null;
+          const notePkgRemPulses = extractPulsePackageQuota(notesStr);
 
           const matchedPulsePkg = (checkoutCustomerPackages || []).find((p: any) =>
             (linkedPkgId && String(p.id) === String(linkedPkgId)) ||
@@ -9917,15 +9934,32 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     }
 
                     // 3. Exhaust original package
-                    if (matchedPulsePkg?.id && currentRemainingPulses > 0) {
+                    let oldPkgIdToExhaust = matchedPulsePkg?.id || linkedPkgId || (notePkgIdMatch ? notePkgIdMatch[1]?.trim() : null);
+                    if (!oldPkgIdToExhaust && targetCustId) {
+                      try {
+                        const pRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(targetCustId)}`, { headers: authenticatedJsonHeaders });
+                        if (pRes.ok) {
+                          const pData = await pRes.json();
+                          const pList = pData.customerPackages || pData.packages || [];
+                          const actPkg = pList.find((p: any) => {
+                            const rem = Number(p.remainingPulses ?? p.pulsesRemaining ?? p.remaining_pulses ?? p.pulses_remaining ?? 0);
+                            return (p.status || "active").toLowerCase() === "active" && rem > 0;
+                          });
+                          if (actPkg) oldPkgIdToExhaust = actPkg.id;
+                        }
+                      } catch (lookupErr) {
+                        console.warn("Could not lookup old package to exhaust:", lookupErr);
+                      }
+                    }
+                    if (oldPkgIdToExhaust && currentRemainingPulses > 0) {
                       try {
                         await fetch("/api/customers/packages", {
                           method: "PATCH",
                           headers: authenticatedJsonHeaders,
                           body: JSON.stringify({
                             action: "consume_package_pulses",
-                            customer_package_id: matchedPulsePkg.id,
-                            package_id: matchedPulsePkg.id,
+                            customer_package_id: oldPkgIdToExhaust,
+                            package_id: oldPkgIdToExhaust,
                             quantity_used: currentRemainingPulses,
                             pulses: currentRemainingPulses,
                             booking_id: checkoutBooking.id,
@@ -9951,15 +9985,32 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   } else if (checkoutDeficitChoice === "PAY_PER_PULSE") {
                     // Option 2: Pay per Pulse
                     // 1. Exhaust original package
-                    if (matchedPulsePkg?.id && currentRemainingPulses > 0) {
+                    let oldPkgIdToExhaust = matchedPulsePkg?.id || linkedPkgId || (notePkgIdMatch ? notePkgIdMatch[1]?.trim() : null);
+                    if (!oldPkgIdToExhaust && targetCustId) {
+                      try {
+                        const pRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(targetCustId)}`, { headers: authenticatedJsonHeaders });
+                        if (pRes.ok) {
+                          const pData = await pRes.json();
+                          const pList = pData.customerPackages || pData.packages || [];
+                          const actPkg = pList.find((p: any) => {
+                            const rem = Number(p.remainingPulses ?? p.pulsesRemaining ?? p.remaining_pulses ?? p.pulses_remaining ?? 0);
+                            return (p.status || "active").toLowerCase() === "active" && rem > 0;
+                          });
+                          if (actPkg) oldPkgIdToExhaust = actPkg.id;
+                        }
+                      } catch (lookupErr) {
+                        console.warn("Could not lookup old package to exhaust:", lookupErr);
+                      }
+                    }
+                    if (oldPkgIdToExhaust && currentRemainingPulses > 0) {
                       try {
                         await fetch("/api/customers/packages", {
                           method: "PATCH",
                           headers: authenticatedJsonHeaders,
                           body: JSON.stringify({
                             action: "consume_package_pulses",
-                            customer_package_id: matchedPulsePkg.id,
-                            package_id: matchedPulsePkg.id,
+                            customer_package_id: oldPkgIdToExhaust,
+                            package_id: oldPkgIdToExhaust,
                             quantity_used: currentRemainingPulses,
                             pulses: currentRemainingPulses,
                             booking_id: checkoutBooking.id,

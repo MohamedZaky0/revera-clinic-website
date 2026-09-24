@@ -38,6 +38,7 @@ import { getAuthHeaders } from "@/lib/authHeaders";
 import { getSessionStaleness } from "@/lib/services";
 import { adminTranslations } from "@/components/admin/translations";
 import { extractPrimaryPulses } from "./BookingDetailsModal";
+import { extractPulsePackageQuota } from "@/lib/laserDeficit";
 
 interface ReservationItem {
   id: string | number;
@@ -521,8 +522,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         String(r.notes || "").includes("[Laser Package]")
       );
       const notesStr = String(r.notes || "");
-      const notePulsesRemMatch = notesStr.match(/(\d+(?:,\d+)?)\s*pulses remaining/i);
-      const notePkgRem = notePulsesRemMatch ? Number(notePulsesRemMatch[1].replace(/,/g, '')) : null;
+      const notePkgRem = extractPulsePackageQuota(notesStr);
       const deliveredPulsesVal = Number(r.deliveredPulses || r.delivered_pulses || extractPrimaryPulses(notesStr, r) || 0);
       const hasSettledDeficit = Boolean(
         notesStr.includes("[Laser Package Deficit Settlement]") ||
