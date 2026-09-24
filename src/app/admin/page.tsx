@@ -1406,7 +1406,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     setServiceDescAr(svc.descriptionAr || "");
     setServiceSortOrder(svc.sortOrder ?? 0);
     setServiceIsShared(svc.isShared ?? false);
-    setServiceIsLaser(Boolean(svc.islaser ?? svc.is_laser ?? false));
+    setServiceIsLaser(checkIsLaserService(svc));
     setServiceEnableReminder(svc.enableReminder ?? true);
     setServiceImageUrl(svc.img || "");
     setServicePrice(svc.price ?? 0);

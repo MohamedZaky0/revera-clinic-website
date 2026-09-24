@@ -2933,6 +2933,27 @@ When a patient without packages books Option 3 (purchasing a new 2,500 pulses pa
 4. **Delivered Pulses Tagging & Reception Session End:**
    - In `BookingDetailsModal.tsx` and `DoctorAccountView.tsx`, `delivered_pulses` and `[Laser Pulses Delivered]: Primary: X pulses, Total: Y pulses` are guaranteed on session completion.
 
+---
+
+## DEC-087: Laser Service Toggle State Initialization & Multi-Field API Persistence Fix
+
+**Date:** 2026-09-24
+**Status:** Decided — active
+
+**Context:**
+In Admin Services Settings (`AdminServicesView.tsx`), services under laser categories or with laser naming operated seamlessly as laser services across clinical & reception flows (via `checkIsLaserService`), but when opening the "Edit Service" modal, the "Laser Service" toggle appeared in an OFF state. Additionally, saving a service never persisted `islaser` or `is_laser` columns to Supabase due to missing fields in `mapServiceToDb`.
+
+**Decisions & Implementation:**
+1. **Authoritative Edit Modal Initialization (`src/app/admin/page.tsx`):**
+   - Updated `handleEditService(svc)` to initialize `setServiceIsLaser(checkIsLaserService(svc))` instead of relying solely on `svc.islaser ?? svc.is_laser`.
+2. **API Persistence and Mapping (`src/app/api/services/route.ts`):**
+   - Added `islaser` and `is_laser` to `mapServiceToDb(s)` to ensure toggle changes and laser statuses are persisted directly to the Supabase database.
+   - Updated `mapServiceRow(r)` to include category & title keyword fallbacks alongside `r.islaser`, `r.is_laser`, and `r.isLaser`.
+3. **Category Auto-Detection in UI (`AdminServicesView.tsx`):**
+   - When clicking "Add Service" inside any Laser category or changing category dropdown in Add mode, `serviceIsLaser` defaults to `true` while allowing manual toggle adjustments.
+   - Updated table laser badge rendering to use `checkIsLaserService(svc)`.
+
+
 
 
 

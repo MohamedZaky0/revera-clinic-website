@@ -16,7 +16,15 @@ function fmtCreatedAt(val: unknown): string {
 }
 
 function mapServiceRow(r: any) {
-  const isLaser = Boolean(r.islaser ?? r.is_laser ?? false);
+  const isLaser = Boolean(
+    r.islaser ||
+    r.is_laser ||
+    r.isLaser ||
+    (r.cat && String(r.cat).toLowerCase().includes("laser")) ||
+    (r.en && String(r.en).toLowerCase().includes("laser")) ||
+    (r.ar && String(r.ar).includes("ليزر")) ||
+    false
+  );
   return {
     id: r.id,
     en: r.en,
@@ -45,6 +53,18 @@ function mapServiceRow(r: any) {
 
 function mapServiceToDb(s: any) {
   const durationMinutes = s.duration_minutes ?? (s.duration ? getDurationInMinutes(s.duration) : 30);
+  const isLaserVal = s.islaser !== undefined
+    ? Boolean(s.islaser)
+    : s.is_laser !== undefined
+    ? Boolean(s.is_laser)
+    : s.isLaser !== undefined
+    ? Boolean(s.isLaser)
+    : Boolean(
+        (s.cat && String(s.cat).toLowerCase().includes("laser")) ||
+        (s.en && String(s.en).toLowerCase().includes("laser")) ||
+        (s.ar && String(s.ar).includes("ليزر"))
+      );
+
   const row: Record<string, any> = {
     en: String(s.en || '').trim(),
     ar: String(s.ar || s.en || '').trim(),
@@ -58,6 +78,8 @@ function mapServiceToDb(s: any) {
     description_en: s.descriptionEn ?? s.description_en ?? '',
     description_ar: s.descriptionAr ?? s.description_ar ?? '',
     is_shared: Boolean(s.isShared ?? s.is_shared ?? false),
+    islaser: isLaserVal,
+    is_laser: isLaserVal,
     enable_reminder: s.enableReminder !== undefined ? Boolean(s.enableReminder) : (s.enable_reminder !== undefined ? Boolean(s.enable_reminder) : true),
     branch_pricing: Array.isArray(s.branchPricing) ? s.branchPricing : (Array.isArray(s.branch_pricing) ? s.branch_pricing : []),
     visible: s.visible !== undefined ? Boolean(s.visible) : true,
