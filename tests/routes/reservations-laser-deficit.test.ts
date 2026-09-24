@@ -351,3 +351,86 @@ describe('POST /api/reservations/laser-deficit', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('PAY_PER_PULSE writes the deficit into the invoice ledger (RISK-100)', () => {
+  // Live finding: the cash was on reservations/customers but no invoices/payments/transactions row
+  // existed, because a fully package-covered doctor completion writes no invoice and the checkout's
+  // append-a-payment path silently no-ops without one.
+  let invSeq = 1;
+  let txnSeq = 1;
+  beforeEach(() => {
+    invSeq = 1;
+    txnSeq = 1;
+    fake.setRpc('next_invoice_no', () => ({ data: invSeq++, error: null }));
+    fake.setRpc('next_transaction_seq', () => ({ data: txnSeq++, error: null }));
+    fake.seed('invoices', []);
+    fake.seed('invoice_lines', []);
+    fake.seed('transactions', []);
+    seedPackage({ pulses_remaining: 0, pulses_used: 5000 });
+    fake.seed('package_pulse_usage', [{
+      id: 'u1', customer_package_id: PKG_ID, reservation_id: RES_ID, quantity_used: 5000,
+    }]);
+  });
+
+  it('creates the invoice, its line and a service_charge transaction when a completed booking has none', async () => {
+    seedReservation({ status: 'completed', laser_price_per_pulse: 2, branch_id: 'branch-1' });
+
+    const res = await POST(staffReq({ reservationId: RES_ID, choice: 'PAY_PER_PULSE' }));
+    expect(res.status).toBe(200);
+
+    const invoices = fake.rows('invoices');
+    expect(invoices).toHaveLength(1);
+    expect(invoices[0]).toMatchObject({
+      reservation_id: RES_ID, customer_id: CUSTOMER_ID, status: 'issued', grand_total: 10000, invoice_no: 'INV-000001',
+    });
+    const lines = fake.rows('invoice_lines');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ invoice_id: invoices[0].id, qty: 5000, unit_price: 2, line_total: 10000 });
+    const txns = fake.rows('transactions');
+    expect(txns).toHaveLength(1);
+    expect(txns[0]).toMatchObject({ type: 'service_charge', amount: 10000, invoice_id: invoices[0].id });
+    // the deficit reservation_products row is marked invoiced so a later completion cannot re-bill it
+    expect(fake.rows('reservation_products')[0].invoiced_at).toBeTruthy();
+  });
+
+  it('is idempotent - a repeat resolve creates no second invoice, line or transaction', async () => {
+    seedReservation({ status: 'completed', laser_price_per_pulse: 2 });
+    await POST(staffReq({ reservationId: RES_ID, choice: 'PAY_PER_PULSE' }));
+    // simulate a retry that got past the marker (e.g. the marker write had failed)
+    fake.rows('reservations')[0].laser_deficit_resolution = null;
+    const again = await POST(staffReq({ reservationId: RES_ID, choice: 'PAY_PER_PULSE' }));
+    expect(again.status).toBe(200);
+    expect(fake.rows('invoices')).toHaveLength(1);
+    expect(fake.rows('invoice_lines')).toHaveLength(1);
+    expect(fake.rows('transactions')).toHaveLength(1);
+    expect(Number(fake.rows('reservations')[0].amount_left)).toBe(10000);
+  });
+
+  it('adds the line to an existing invoice and recomputes its totals from its lines', async () => {
+    seedReservation({ status: 'completed', laser_price_per_pulse: 2 });
+    fake.seed('invoices', [{
+      id: 'inv-1', invoice_no: 'INV-000900', reservation_id: RES_ID, customer_id: CUSTOMER_ID,
+      status: 'issued', subtotal: 150, discount_total: 150, grand_total: 0,
+    }]);
+    fake.seed('invoice_lines', [{
+      id: 'l0', invoice_id: 'inv-1', description: 'Laser Hair Removal (package redemption)',
+      qty: 1, unit_price: 150, discount: 150, line_total: 0,
+    }]);
+
+    const res = await POST(staffReq({ reservationId: RES_ID, choice: 'PAY_PER_PULSE' }));
+    expect(res.status).toBe(200);
+
+    expect(fake.rows('invoices')).toHaveLength(1);
+    expect(fake.rows('invoice_lines')).toHaveLength(2);
+    expect(fake.rows('invoices')[0]).toMatchObject({ subtotal: 10150, discount_total: 150, grand_total: 10000 });
+  });
+
+  it('writes nothing to the ledger while the booking is not completed yet (completion writes the invoice)', async () => {
+    seedReservation({ status: 'in_progress', laser_price_per_pulse: 2 });
+    const res = await POST(staffReq({ reservationId: RES_ID, choice: 'PAY_PER_PULSE' }));
+    expect(res.status).toBe(200);
+    expect(fake.rows('invoices')).toHaveLength(0);
+    expect(fake.rows('invoice_lines')).toHaveLength(0);
+    expect(fake.rows('transactions')).toHaveLength(0);
+  });
+});

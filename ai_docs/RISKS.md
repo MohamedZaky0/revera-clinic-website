@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**8 open** · **13 partially resolved** · **68 resolved** · 89 tracked total.
+**7 open** · **13 partially resolved** · **69 resolved** · 89 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4610,7 +4610,7 @@ alert → Pay Per Pulse → Resolve → totals become 10,000 EGP with "Pay Full"
 
 ---
 
-## RISK-100: PAY_PER_PULSE Deficit Cash Is Recorded On The Booking And Customer But Not In The Invoices/Payments Ledger (OPEN)
+## RISK-100: PAY_PER_PULSE Deficit Cash Is Recorded On The Booking And Customer But Not In The Invoices/Payments Ledger (RESOLVED)
 
 **Severity:** High (P1) · **Type:** Financial ledger integrity · **Found:** 2026-09-24, same browser pass.
 
@@ -4620,11 +4620,28 @@ exists for it**. Cause: the doctor's completion is the booking's first completio
 package-covered session `writeCheckoutInvoice` writes no invoice; the reception checkout then takes
 the `wasAlreadyCompleted` branch, whose `appendPaymentToExistingInvoice` returns silently when there
 is no invoice, and `reservation-products`' late-append likewise only appends to an existing invoice.
-Finance reports built on the ledger will miss this cash. **Not fixed** — it needs a decision on where
-the deficit invoice is created (the deficit route creating one when none exists, versus teaching the
-checkout path to create it) and must reuse the invoice-numbering/ledger helpers rather than duplicate
-them; that is a ledger change (RISK-010 territory), not a one-line patch. BUY_NEW_PACKAGE is
-unaffected (the package sale writes its own invoice and payment).
+Finance reports built on the ledger would miss this cash. BUY_NEW_PACKAGE is unaffected (the
+package sale writes its own invoice and payment).
+
+**Fixed 2026-09-24 (option A — the deficit route owns it):** `POST /api/reservations/laser-deficit`
+now runs `syncDeficitIntoInvoiceLedger` after the PAY_PER_PULSE line is written, on every resolve
+(so a retry repairs it). For a **completed** booking: with no invoice it creates one
+(`next_invoice_no`, `buildInvoiceLine`/`buildInvoiceTotals`) carrying the deficit line; with an
+invoice it ensures the line is present and recomputes the invoice totals from its lines
+(`reservation-products`' late append adds a line but never updated the totals); it marks the
+`reservation_products` row invoiced so a later completion cannot re-bill it; and records one
+`service_charge` transaction (skipped if already present). For a booking not yet completed it does
+nothing — the completion writes the invoice from the pending line. Failure returns a 500 that says
+the line and amount owed were saved and that retrying is safe. The customer's payment at checkout
+then attaches through the existing `appendPaymentToExistingInvoice` path.
+
+**Verified live on dev:** a completed package booking with a 2,000-pulse deficit and no invoice →
+resolve created `INV-000117` (subtotal/grand_total 10,000, one `product` line 2,000 × 5) and a
+10,000 `service_charge`; the checkout PATCH (`amountPaid 10000`) then added a 10,000 cash
+`payments` row on that invoice and an `outstanding_payment` transaction; booking paid, customer
+`spent 10000 / outstanding 0`, exactly one invoice. Four new route tests (create, idempotent
+repeat, existing invoice + totals recompute, not-completed writes nothing) — the first three
+confirmed to fail without the fix.
 
 **Also noted, not fixed:** (a) the informational "Laser Package Pulse Deduction" card in the Checkout
 modal (merged from origin/dev `fdebc6b`) computes its own numbers and contradicts the prompt after the

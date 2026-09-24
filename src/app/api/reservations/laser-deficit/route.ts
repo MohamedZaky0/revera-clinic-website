@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { resolveLaserPulseRate } from '@/lib/laserRate';
+import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/ledger';
+import { recordTransaction } from '@/lib/transactionLedger';
 import { POST as sellPackage } from '@/app/api/packages/sell/route';
 import { POST as addReservationProduct } from '@/app/api/reservation-products/route';
 
@@ -126,6 +128,133 @@ async function clinicDefaultPulseRate(): Promise<number | null> {
 function isExpired(pkg: any): boolean {
   if (!pkg?.expires_at) return false;
   return new Date(pkg.expires_at).getTime() < Date.now();
+}
+
+// Makes the invoices/invoice_lines/transactions ledger match the PAY_PER_PULSE deficit charge.
+//
+// Why this exists: the deficit line lives in reservation_products, and reservations.amount_left
+// carries what is owed - but the invoice is only written once, at a booking's first completion.
+// For a fully package-covered session the doctor's completion produced no invoice, so the cash
+// reception later collected for the deficit had no invoice to attach to and never reached the
+// ledger (RISK-100, found in the browser pass). Idempotent by construction - safe to run on every
+// resolve/retry:
+//  - booking not completed yet: nothing to do, the completion writes the invoice from the pending
+//    reservation_products row (it has a non-zero unit_price, so it is included);
+//  - completed with no invoice: create the invoice carrying the deficit line;
+//  - completed with an invoice: make sure the line is on it, then recompute the invoice totals from
+//    its lines (reservation-products' late append adds a line but never updates the totals).
+// The customer's later payment then attaches through the checkout's existing
+// appendPaymentToExistingInvoice path.
+async function syncDeficitIntoInvoiceLedger(p: {
+  reservationId: string;
+  customerId: string | null;
+  deficit: number;
+  rate: number;
+  employeeId?: string | null;
+}) {
+  const { data: res, error: resErr } = await supabaseServer
+    .from('reservations')
+    .select('status, branch_id, provider_id')
+    .eq('id', p.reservationId)
+    .maybeSingle();
+  if (resErr) throw resErr;
+  if (!res || (res as any).status !== 'completed') return;
+
+  const description = `Excess Laser Pulses Deficit (${p.deficit} pulses @ ${p.rate} EGP)`;
+  const line = buildInvoiceLine({
+    lineType: 'product',
+    description,
+    qty: p.deficit,
+    unitPrice: p.rate,
+    providerId: (res as any).provider_id ?? undefined,
+  });
+
+  const { data: existingInvoice, error: invErr } = await supabaseServer
+    .from('invoices')
+    .select('id, invoice_no')
+    .eq('reservation_id', p.reservationId)
+    .eq('status', 'issued')
+    .maybeSingle();
+  if (invErr) throw invErr;
+
+  let invoiceId: string;
+  let invoiceNo: string;
+
+  if (!existingInvoice) {
+    const { data: seqValue, error: seqErr } = await supabaseServer.rpc('next_invoice_no');
+    if (seqErr) throw seqErr;
+    invoiceNo = formatInvoiceNo(Number(seqValue));
+    const totals = buildInvoiceTotals([line]);
+    const { data: created, error: createErr } = await supabaseServer
+      .from('invoices')
+      .insert({
+        invoice_no: invoiceNo,
+        reservation_id: p.reservationId,
+        customer_id: p.customerId,
+        branch_id: (res as any).branch_id ?? null,
+        subtotal: totals.subtotal,
+        discount_total: totals.discountTotal,
+        grand_total: totals.grandTotal,
+        status: 'issued',
+      })
+      .select('id')
+      .single();
+    if (createErr) throw createErr;
+    invoiceId = (created as any).id;
+    const { error: lineErr } = await supabaseServer.from('invoice_lines').insert({ ...line, invoice_id: invoiceId });
+    if (lineErr) throw lineErr;
+  } else {
+    invoiceId = (existingInvoice as any).id;
+    invoiceNo = (existingInvoice as any).invoice_no || '';
+    const { data: existingLine } = await supabaseServer
+      .from('invoice_lines')
+      .select('id')
+      .eq('invoice_id', invoiceId)
+      .ilike('description', 'Excess Laser Pulses Deficit%');
+    if (!existingLine || existingLine.length === 0) {
+      const { error: lineErr } = await supabaseServer.from('invoice_lines').insert({ ...line, invoice_id: invoiceId });
+      if (lineErr) throw lineErr;
+    }
+    const { data: allLines, error: linesErr } = await supabaseServer
+      .from('invoice_lines')
+      .select('qty, unit_price, discount')
+      .eq('invoice_id', invoiceId);
+    if (linesErr) throw linesErr;
+    const totals = buildInvoiceTotals((allLines || []) as any);
+    const { error: totalsErr } = await supabaseServer
+      .from('invoices')
+      .update({ subtotal: totals.subtotal, discount_total: totals.discountTotal, grand_total: totals.grandTotal })
+      .eq('id', invoiceId);
+    if (totalsErr) throw totalsErr;
+  }
+
+  // The deficit reservation_products row is now on an invoice - a later completion must not
+  // pick it up a second time.
+  await supabaseServer
+    .from('reservation_products')
+    .update({ invoiced_at: new Date().toISOString() })
+    .eq('reservation_id', p.reservationId)
+    .ilike('description', 'Excess Laser Pulses Deficit%')
+    .is('invoiced_at', null);
+
+  const { data: existingTxn } = await supabaseServer
+    .from('transactions')
+    .select('id')
+    .eq('invoice_id', invoiceId)
+    .ilike('description', '%laser pulse deficit%');
+  if (!existingTxn || existingTxn.length === 0) {
+    await recordTransaction({
+      type: 'service_charge',
+      amount: line.line_total,
+      description: `Invoice ${invoiceNo} - laser pulse deficit (${p.deficit} pulses)`,
+      customerId: p.customerId,
+      branchId: (res as any).branch_id ?? null,
+      invoiceId,
+      reservationId: p.reservationId,
+      paymentMethod: 'none',
+      createdByEmployeeId: p.employeeId || null,
+    });
+  }
 }
 
 // Shared by GET (preview) and POST (resolve). Never guesses a total.
@@ -349,6 +478,27 @@ export async function POST(req: Request) {
           { status: 500 }
         );
       }
+    }
+
+    // Runs on every resolve (not only the first line write) so a retry after a failure here
+    // repairs the ledger instead of leaving it permanently short.
+    try {
+      await syncDeficitIntoInvoiceLedger({
+        reservationId,
+        customerId: customerId || null,
+        deficit,
+        rate,
+        employeeId: (access as any)?.access?.employee?.id ?? null,
+      });
+    } catch (ledgerErr: any) {
+      return NextResponse.json(
+        {
+          error:
+            'The deficit line and amount owed were saved, but writing it to the invoice ledger failed: ' +
+            `${ledgerErr?.message || 'unknown error'}. Retrying is safe.`,
+        },
+        { status: 500 }
+      );
     }
   } else {
     // BUY_NEW_PACKAGE — reuse /api/packages/sell verbatim (re-resolves the price from the

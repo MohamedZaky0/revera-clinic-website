@@ -44,7 +44,9 @@
 | 2026-09-24 | Pay Per Pulse → Resolve Deficit (UI) | dev, real UI | Marker `PAY_PER_PULSE / 2000`, one `receptionist` line 2,000 × 5 = 10,000 — but modal Total Cost 0, drawer "Paid" again, `amount_left 0` | **Failed — RISK-099 #3** |
 | 2026-09-24 | After adding the charge to `amount_left` + `onResolved` refresh | dev, real UI | Modal: Total Cost 10000 EGP, "Pay Full (10000 EGP)", Outstanding 10000 EGP | Pass |
 | 2026-09-24 | Pay Full → Confirm & Complete | dev, real UI (server responses 20+ s, waited) | `amount_paid 10000, amount_left 0`, status completed, customer `spent_amount 10000, outstanding 0` | Pass |
-| 2026-09-24 | Ledger check after the above | dev | **No `invoices`/`invoice_lines`/`payments`/`transactions` rows** for the deficit cash | **Open — RISK-100** |
+| 2026-09-24 | Ledger check after the above | dev | **No `invoices`/`invoice_lines`/`payments`/`transactions` rows** for the deficit cash | **Failed — RISK-100** |
+| 2026-09-24 | Ledger sync (option A) — resolve | dev, completed package booking, deficit 2,000, no invoice | Created `INV-000117` (grand_total 10,000), one line 2,000 × 5, one 10,000 `service_charge` transaction; `amount_left 10000` | Pass |
+| 2026-09-24 | Ledger sync — checkout payment | dev, PATCH `amountPaid 10000` | 10,000 cash `payments` row on `INV-000117`, `outstanding_payment` transaction, booking paid, customer `spent 10000 / outstanding 0`, exactly 1 invoice | Pass |
 | 2026-09-24 | Cleanup | dev + local | Test rows deleted, test account department restored, dev default rate restored to unset, the intake entry my test wrote to the local `data/medical_records.json` fallback removed | Pass |
 
 **Browser pass done 2026-09-24 (rows above).** Still not done: the `BookingDetailsModal`
@@ -67,7 +69,7 @@ check) was confirmed by source review, not by clicking. Left as an explicit foll
 - [x] With delivered = 10,000 and package balance = 5,000, open reception checkout. Confirm the deficit panel shows Delivered 10,000 / Balance 5,000 / **Deficit 5,000** above the totals. *(Equivalent server-side math verified directly against the route: delivered 5,000/balance 3,000 → deficit 2,000, and delivered 4,000/balance 1,000 → deficit 3,000. UI rendering of the panel itself not click-tested.)*
 - [x] Try **Confirm checkout** without resolving — confirm it is blocked with an alert naming the unresolved deficit and the booking does not complete. *(Done in the real UI 2026-09-24.)*
 - [x] Choose **Pay Per Pulse** and resolve. Confirm: exactly one `reservation_products` row (`line_type=device_pulses`, qty = deficit, unit_price = resolved rate); source package `pulses_remaining` = 0; `reservations.laser_deficit_resolution = 'PAY_PER_PULSE'`, `laser_deficit_pulses` matches. (Done via direct API call, not the UI button — see Evidence log.)
-- [~] Confirm checkout now succeeds and the invoice total includes `deficit × rate`. *(Checkout succeeds and the modal total/amount owed now include `deficit × rate` after RISK-099 #3's fix; but no ledger invoice/payment row is written for it — RISK-100, open.)*
+- [x] Confirm checkout now succeeds and the invoice total includes `deficit × rate`. *(Checkout succeeds and the modal total/amount owed now include `deficit × rate` after RISK-099 #3's fix; and the ledger invoice/payment/transactions are now written — RISK-100 resolved, verified live.)*
 - [x] Reopen the booking — confirm the panel shows "already resolved" and no second charge can be created. *(Verified via a direct repeat POST — `alreadyResolved:true`, no duplicate row — not via re-opening the UI panel.)*
 
 ### Reception checkout — buy new package
