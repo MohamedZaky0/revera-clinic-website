@@ -518,8 +518,15 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         r.customer_package_id ||
         r.packageId ||
         r.package_id ||
+        (r as any).purchasingPackageId ||
+        (r as any).purchasing_package_id ||
+        String(r.notes || "").toLowerCase().includes("package session") ||
         String(r.notes || "").toLowerCase().includes("package redemption") ||
-        String(r.notes || "").includes("[Laser Package]")
+        String(r.notes || "").toLowerCase().includes("pulses package") ||
+        String(r.notes || "").includes("[Laser Package]") ||
+        String(r.notes || "").includes("[Laser Package Redemption]") ||
+        String(r.notes || "").includes("[Purchasing New Pulses Package]") ||
+        String(r.notes || "").includes("Option 3: Pay with Pulses Package")
       );
       const notesStr = String(r.notes || "");
       const notePkgRem = extractPulsePackageQuota(notesStr);
@@ -529,7 +536,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         notesStr.includes("Choice 3A") ||
         notesStr.includes("Choice 3B")
       );
-      const isDeficit = !hasSettledDeficit && isPkgCovered && notePkgRem !== null && notePkgRem > 0 && deliveredPulsesVal > notePkgRem;
+      const resolvedPkgQuota = notePkgRem !== null ? notePkgRem : 0;
+      const isDeficit = !hasSettledDeficit && isPkgCovered && deliveredPulsesVal > resolvedPkgQuota;
 
       let paySt: string;
       if (isDeficit) {

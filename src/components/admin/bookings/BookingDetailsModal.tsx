@@ -136,15 +136,22 @@ export function extractPrimaryPulses(notes: string, booking?: any): number {
     if (typeof booking.deliveredPulses === "number" && booking.deliveredPulses > 0) return booking.deliveredPulses;
     if (typeof booking.primaryPulses === "number" && booking.primaryPulses > 0) return booking.primaryPulses;
   }
-  if (!notes) return 0;
-  const m = notes.match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
-            notes.match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
-            notes.match(/Primary:\s*(\d+)\s*pulses/i) ||
-            notes.match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
-            notes.match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
-            notes.match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
-            notes.match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
-  return m ? Number(m[1]) : 0;
+  if (!notes || typeof notes !== "string") return 0;
+  const m =
+    notes.match(/\[Laser Pulses Delivered\]:[^\n]*?Primary:\s*(\d+(?:,\d+)?)/i) ||
+    notes.match(/\[Laser Pulses Delivered\]:[^\n]*?Total:\s*(\d+(?:,\d+)?)/i) ||
+    notes.match(/\[Laser Pulses Delivered\]:\s*(\d+(?:,\d+)?)/i) ||
+    notes.match(/Primary:\s*(\d+(?:,\d+)?)\s*pulses/i) ||
+    notes.match(/Total:\s*(\d+(?:,\d+)?)\s*pulses/i) ||
+    notes.match(/\[Laser Settlement\]:[^\n]*?\((\d+(?:,\d+)?)\s*pulses/i) ||
+    notes.match(/\[Laser Settlement\]:[^\n]*?\((\d+(?:,\d+)?)\s*نبضة/i) ||
+    notes.match(/\[Laser Package Redemption\]:[^\n]*?Deducted\s*(\d+(?:,\d+)?)\s*pulses/i) ||
+    notes.match(/\[Laser Package Redemption\]:[^\n]*?تم استهلاك\s*(\d+(?:,\d+)?)\s*نبضة/i) ||
+    notes.match(/Deducted\s*(\d+(?:,\d+)?)\s*pulses/i) ||
+    notes.match(/تم استهلاك\s*(\d+(?:,\d+)?)\s*نبضة/i) ||
+    notes.match(/\[Extra Device Pulses\]:\s*(\d+(?:,\d+)?)/i) ||
+    notes.match(/Laser Pulses Delivered\s*\(\s*(\d+(?:,\d+)?)\s*pulses/i);
+  return m ? Number(m[1].replace(/,/g, "")) : 0;
 }
 
 interface BookingDetailsModalProps {
@@ -1600,14 +1607,25 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const settlementMatch = String(booking?.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
         const packageRedemptionMatch = String(booking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
 
-        const notePkgRem = extractPulsePackageQuota(String(booking?.notes || "")) ?? 0;
+        const notePkgRem = extractPulsePackageQuota(String(booking?.notes || ""));
+        const bAny = booking as any;
+        const customerPulsePkg = (dbCustomers || []).flatMap((c: any) => c.packages || []).find((p: any) =>
+          (bAny?.customerPackageId && String(p.id) === String(bAny.customerPackageId)) ||
+          (bAny?.customer_package_id && String(p.id) === String(bAny.customer_package_id)) ||
+          (bAny?.packageId && String(p.id) === String(bAny.packageId)) ||
+          (bAny?.package_id && String(p.id) === String(bAny.package_id))
+        );
+        const resolvedPkgQuota = notePkgRem !== null
+          ? notePkgRem
+          : (customerPulsePkg ? Number(customerPulsePkg.pulsesRemaining ?? customerPulsePkg.remainingPulses ?? customerPulsePkg.totalPulses ?? 0) : 0);
+
         const hasSettledDeficit = Boolean(
           String(booking?.notes || "").includes("[Laser Package Deficit Settlement]") ||
           String(booking?.notes || "").includes("Choice 3A") ||
           String(booking?.notes || "").includes("Choice 3B")
         );
-        const pulseDeficit = (!hasSettledDeficit && notePkgRem > 0 && primaryDeliveredPulses > notePkgRem)
-          ? primaryDeliveredPulses - notePkgRem
+        const pulseDeficit = (!hasSettledDeficit && isLaserPackage && primaryDeliveredPulses > resolvedPkgQuota)
+          ? primaryDeliveredPulses - resolvedPkgQuota
           : 0;
 
         const bookingServices = selectedServiceIds.map(id => {
@@ -3244,8 +3262,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           }`}>
                             {pulseDeficit > 0 && !hasSettledDeficit ? (
                               isRTL
-                                ? `تم استهلاك ${primaryDeliveredPulses.toLocaleString()} نبضة بينما رصيد الباقة كان ${notePkgRem.toLocaleString()} نبضة (عجز بمقدار ${pulseDeficit.toLocaleString()} نبضة يلزم تسويته عند الدفع).`
-                                : `Delivered ${primaryDeliveredPulses.toLocaleString()} pulses while package had ${notePkgRem.toLocaleString()} pulses remaining (${pulseDeficit.toLocaleString()} excess pulses require checkout settlement).`
+                                ? `تم استهلاك ${primaryDeliveredPulses.toLocaleString()} نبضة بينما رصيد الباقة كان ${resolvedPkgQuota.toLocaleString()} نبضة (عجز بمقدار ${pulseDeficit.toLocaleString()} نبضة يلزم تسويته عند الدفع).`
+                                : `Delivered ${primaryDeliveredPulses.toLocaleString()} pulses while package had ${resolvedPkgQuota.toLocaleString()} pulses remaining (${pulseDeficit.toLocaleString()} excess pulses require checkout settlement).`
                             ) : packageRedemptionMatch ? packageRedemptionMatch[1] : (
                               isRTL
                                 ? "تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مغطاة بنظام باقات النبضات"

@@ -28,7 +28,7 @@ import { DoctorTab, MedicationItem } from "../types";
 import { getAuthHeaders } from "../utils";
 import { MedicalRecordTemplate, IntakeField } from "@/app/api/medical-records/templates/route";
 import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
-import { computeDeficitInvoiceImpact, computePackageDeficit, resolveDeliveredPulses } from "@/lib/laserDeficit";
+import { computeDeficitInvoiceImpact, computePackageDeficit, resolveDeliveredPulses, extractPulsePackageQuota } from "@/lib/laserDeficit";
 
 export interface AdditionalServiceItem {
   id: string | number;
@@ -635,7 +635,13 @@ export default function DoctorOngoingSessionTab({
     selectedPkg.pulses_remaining ??
     (Number(selectedPkg.totalPulses ?? selectedPkg.includedPulses ?? selectedPkg.total_pulses ?? selectedPkg.included_pulses ?? 0) - Number(selectedPkg.usedPulses ?? selectedPkg.used_pulses ?? 0))
   ) : 0;
-  const isNoActivePackage = patientActivePackages.length === 0;
+  const bookingNotesStr = String(activeSessionBooking?.notes || "");
+  const notePkgQuota = extractPulsePackageQuota(bookingNotesStr);
+  const effectiveAvailablePulses = availablePkgPulses > 0
+    ? availablePkgPulses
+    : (notePkgQuota ?? 0);
+  const isNoActivePackage = patientActivePackages.length === 0 && (notePkgQuota === null || notePkgQuota <= 0);
+  const effectiveHasPackage = !isNoActivePackage || (notePkgQuota !== null && notePkgQuota > 0);
 
   // Additional laser pulses delivered in this session
   const additionalLaserPulses = additionalServices.reduce((sum, item) => {
@@ -646,8 +652,8 @@ export default function DoctorOngoingSessionTab({
   const totalLaserDeliveredPulses = resolveDeliveredPulses(standardPulsesDelivered, additionalLaserPulses);
   const packageDeficit = computePackageDeficit({
     deliveredPulses: totalLaserDeliveredPulses,
-    remainingPulses: availablePkgPulses,
-    hasActivePackage: !isNoActivePackage,
+    remainingPulses: effectiveAvailablePulses,
+    hasActivePackage: effectiveHasPackage,
   });
 
   // Total pulses for the catalog package being purchased — the real total_pulses field only.

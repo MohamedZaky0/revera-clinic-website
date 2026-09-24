@@ -100,5 +100,18 @@ describe('extractPulsePackageQuota', () => {
     expect(extractPulsePackageQuota('')).toBeNull();
     expect(extractPulsePackageQuota('Just standard clinical note')).toBeNull();
   });
+
+  it('extracts quota from Arabic package notes', () => {
+    const arabicNotes1 = 'تم حجز باقة نبضات: باقة 2500 نبضة (1500 ج.م · 2,500 نبضة)';
+    expect(extractPulsePackageQuota(arabicNotes1)).toBe(2500);
+
+    const arabicNotes2 = '[Laser Package Redemption]: 5000 نبضة متبقية';
+    expect(extractPulsePackageQuota(arabicNotes2)).toBe(5000);
+  });
+
+  it('extracts quota when laser payment mode note is present', () => {
+    const notes = '[Laser Service Payment Mode]: Option 3: Pay with Pulses Package\n[Purchasing New Pulses Package]: 2.5k Pulses (1500 EGP · 2,500 pulses)';
+    expect(extractPulsePackageQuota(notes)).toBe(2500);
+  });
 });
 

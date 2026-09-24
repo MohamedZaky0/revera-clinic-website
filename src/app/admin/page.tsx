@@ -38,9 +38,9 @@ import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import CustomerFormModal from "@/components/admin/patients/CustomerFormModal";
 import PatientsDirectoryView from "@/components/admin/patients/PatientsDirectoryView";
-import { useCustomerProfile } from "@/components/admin/patients/useCustomerProfile";
 import CustomerProfileDrawer from "@/components/admin/patients/CustomerProfileDrawer";
-import BookingDetailsModal, { checkIsLaserService, parseAdditionalServiceLine } from "@/components/admin/bookings/BookingDetailsModal";
+import { useCustomerProfile } from "@/components/admin/patients/useCustomerProfile";
+import BookingDetailsModal, { checkIsLaserService, parseAdditionalServiceLine, extractPrimaryPulses } from "@/components/admin/bookings/BookingDetailsModal";
 import { extractPulsePackageQuota } from "@/lib/laserDeficit";
 import {
   AlarmClock,
@@ -9427,14 +9427,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               return m ? Number(m[1]) : 1;
             })()
           ) || 1;
-          const primaryPulsesMatch = String(checkoutBooking?.notes || "").match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
-            String(checkoutBooking?.notes || "").match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
-            String(checkoutBooking?.notes || "").match(/Primary:\s*(\d+)\s*pulses/i) ||
-            String(checkoutBooking?.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
-            String(checkoutBooking?.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
-            String(checkoutBooking?.notes || "").match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
-            String(checkoutBooking?.notes || "").match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
-          const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
+          const notesStr = String(checkoutBooking?.notes || "");
+          const primaryDeliveredPulses = extractPrimaryPulses(notesStr, checkoutBooking);
           const checkoutPackageMatch = String(checkoutBooking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
           const checkoutPackageSettlementText = checkoutPackageMatch ? checkoutPackageMatch[1] : (
             isRTL
@@ -9442,7 +9436,6 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               : "Agreed that laser services in this session are covered under patient Pulses Package"
           );
 
-          const notesStr = String(checkoutBooking?.notes || "");
           const notePkgIdMatch = notesStr.match(/\[Customer Package ID\]:\s*([0-9a-f-]+)/i) ||
             notesStr.match(/\[Customer Package ID\]:\s*([^\n\]]+)/i) ||
             notesStr.match(/Package ID:\s*([0-9a-f-]+)/i);
@@ -9462,12 +9455,27 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             (p.status || "active").toLowerCase() === "active"
           );
 
+          const catalogPkgMatch = (allCatalogPackages || []).find(
+            (p: any) =>
+              (checkoutBooking.purchasingPackageId && String(p.id) === String(checkoutBooking.purchasingPackageId)) ||
+              (p.name && notesStr.toLowerCase().includes(p.name.toLowerCase())) ||
+              (p.title && notesStr.toLowerCase().includes(p.title.toLowerCase())) ||
+              (p.name_ar && notesStr.includes(p.name_ar))
+          );
+          const catalogTotalPulses = Number(
+            catalogPkgMatch?.total_pulses ??
+            catalogPkgMatch?.totalPulses ??
+            catalogPkgMatch?.included_pulses ??
+            catalogPkgMatch?.includedPulses ??
+            0
+          );
+
           const totalPkgPulses = Number(matchedPulsePkg?.totalPulses ?? matchedPulsePkg?.includedPulses ?? 0);
           const currentRemainingPulses = notePkgRemPulses !== null
             ? notePkgRemPulses
             : (matchedPulsePkg
                 ? Number(matchedPulsePkg.pulsesRemaining ?? matchedPulsePkg.remainingPulses ?? totalPkgPulses)
-                : 0);
+                : (catalogTotalPulses > 0 ? catalogTotalPulses : 0));
 
           const deliveredPulsesVal = Number(
             checkoutBooking?.deliveredPulses ||
@@ -9482,7 +9490,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             notesStr.includes("Choice 3B")
           );
 
-          const deficitPulsesVal = (!hasSettledDeficit && currentRemainingPulses > 0 && deliveredPulsesVal > currentRemainingPulses)
+          const isOption3Mode = isCheckoutPackage ||
+            notesStr.includes("[Purchasing New Pulses Package]") ||
+            notesStr.includes("Option 3: Pay with Pulses Package");
+
+          const deficitPulsesVal = (!hasSettledDeficit && isOption3Mode && deliveredPulsesVal > currentRemainingPulses)
             ? (deliveredPulsesVal - currentRemainingPulses)
             : 0;
 
@@ -10946,14 +10958,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               return m ? Number(m[1]) : 1;
             })()
           ) || 1;
-          const primaryPulsesMatch = String(invoiceBooking.notes || "").match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
-            String(invoiceBooking.notes || "").match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
-            String(invoiceBooking.notes || "").match(/Primary:\s*(\d+)\s*pulses/i) ||
-            String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
-            String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
-            String(invoiceBooking.notes || "").match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
-            String(invoiceBooking.notes || "").match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
-          const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
+          const primaryDeliveredPulses = extractPrimaryPulses(String(invoiceBooking.notes || ""), invoiceBooking);
           const settlementMatch = String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
           const invoiceSettlementText = invoiceBooking.laserSettlementNote || (settlementMatch ? settlementMatch[1] : (
             isInvoicePerPulse

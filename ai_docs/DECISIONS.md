@@ -2953,6 +2953,31 @@ In Admin Services Settings (`AdminServicesView.tsx`), services under laser categ
    - When clicking "Add Service" inside any Laser category or changing category dropdown in Add mode, `serviceIsLaser` defaults to `true` while allowing manual toggle adjustments.
    - Updated table laser badge rendering to use `checkIsLaserService(svc)`.
 
+---
+
+## DEC-088: Universal Laser Package Deficit Detection, In-Booking Purchase Conversion & Status Synchronization
+
+**Date:** 2026-09-24  
+**Status:** Decided — active  
+
+**Context:**  
+When scheduling a booking with Option 3 ("Pay with Pulses Package"), whether redeeming an existing active pulses package or purchasing a brand new package during the reservation (e.g. purchasing a 2,500 pulse package) and pulses delivered during the session exceed the package quota (e.g. 5,000 pulses delivered):
+1. In-booking new package purchases may not yet be initialized in `customer_packages` or `patientActivePackages` prior to session finalization.
+2. The payment and booking status failed to convert to "Partially Paid" across tables and modals because the deficit condition required `remainingPulses > 0` or missed in-booking note formats.
+3. The Dual-Option Deficit Settlement popup failed to trigger during checkout.
+
+**Decisions & Implementation:**
+1. **Multi-Language and Multi-Pattern Quota Parser (`src/lib/laserDeficit.ts`):**
+   - Enhanced `extractPulsePackageQuota` to detect pulse quotas across Arabic phrases (`نبضة`, `نبضات`, `نبضة متبقية`), in-booking catalog purchases (`[Purchasing New Pulses Package]`), bullet dots (`·`, `•`), and redemption notes.
+2. **Deficit Determination Across All Option 3 Scenarios:**
+   - In `src/app/admin/page.tsx`, `BookingDetailsModal.tsx`, `AdminBookingsView.tsx`, and `DoctorOngoingSessionTab.tsx`:
+   - Resolved quota fallback through `extractPulsePackageQuota` when patient packages are uninitialized.
+   - Simplified deficit trigger to `!hasSettledDeficit && isOption3Mode && deliveredPulses > packageQuota`, removing the obsolete `quota > 0` prerequisite that suppressed deficit when balance was 0.
+3. **Table Badging & Payment Status Synchronization:**
+   - When delivered pulses exceed package quota, booking status reflects `Partially Paid`, an amber badge `Exceeded Package (+X Pulses)` is displayed, and `isInvoicePaid` is set to `false` to keep "Pay & Settle Invoice" accessible.
+4. **Checkout Modal Interactive Settle Drawer:**
+   - In `src/app/admin/page.tsx`, when an unsettled deficit is detected on an Option 3 booking, the checkout modal automatically renders the 2 interactive settlement cards (Choice 3A: Buy New Package and deduct excess, Choice 3B: Pay excess pulses per pulse).
+
 
 
 
