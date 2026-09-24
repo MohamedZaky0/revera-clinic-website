@@ -181,6 +181,24 @@ describe('POST /api/reservations/laser-deficit', () => {
     expect(fake.rows('reservations')[0].laser_deficit_pulses).toBe(5000);
   });
 
+  it('PAY_PER_PULSE adds the charge to amount_left exactly once, so checkout actually collects it', async () => {
+    // Live finding: the deficit line was written but amount_left stayed 0, so the checkout modal
+    // showed 0 due and the drawer showed "Paid" — the 10,000 EGP was never collected.
+    seedReservation({ laser_price_per_pulse: 2, amount_left: 300 });
+    seedPackage({ pulses_remaining: 0, pulses_used: 5000 });
+    fake.seed('package_pulse_usage', [{
+      id: 'u1', customer_package_id: PKG_ID, reservation_id: RES_ID, quantity_used: 5000,
+    }]);
+
+    const first = await POST(staffReq({ reservationId: RES_ID, choice: 'PAY_PER_PULSE' }));
+    expect(first.status).toBe(200);
+    expect(Number(fake.rows('reservations')[0].amount_left)).toBe(300 + 5000 * 2);
+
+    const repeat = await POST(staffReq({ reservationId: RES_ID, choice: 'PAY_PER_PULSE' }));
+    expect((await repeat.json()).alreadyResolved).toBe(true);
+    expect(Number(fake.rows('reservations')[0].amount_left)).toBe(300 + 5000 * 2);
+  });
+
   it('recomputes and resolves the deficit on retry after the source package already flipped to fully_used', async () => {
     // Reproduces the live 2026-09-24 finding: an earlier attempt's consume step succeeded (draining
     // the package to fully_used) but a later step failed before the marker was written. A retry

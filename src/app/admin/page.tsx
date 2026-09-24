@@ -10070,6 +10070,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       reservationId={checkoutBooking.id}
                       headers={authenticatedJsonHeaders}
                       isRTL={isRTL}
+                      onResolved={(result: any) => {
+                        // PAY_PER_PULSE adds the deficit charge to reservations.amount_left on the
+                        // server; mirror it here so the open modal's totals include it instead of
+                        // showing 0 due until the page is reloaded.
+                        const delta = result?.resolution === "PAY_PER_PULSE" && !result?.alreadyResolved
+                          ? Number(result?.invoiceDelta) || 0
+                          : 0;
+                        if (delta <= 0) return;
+                        const bump = (r: any) => {
+                          const left = Number(r?.amountLeft ?? r?.amount_left ?? 0) + delta;
+                          return { ...r, amountLeft: left, amount_left: left };
+                        };
+                        const resId = String(checkoutBooking.id);
+                        setCheckoutBooking((prev: any) => (prev ? bump(prev) : prev));
+                        setAllReservations((prev: any[]) => prev.map((r) => (String(r.id) === resId ? bump(r) : r)));
+                      }}
                     />
                   )}
 

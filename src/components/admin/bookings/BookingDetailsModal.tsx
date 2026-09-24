@@ -234,6 +234,31 @@ export default function BookingDetailsModal({
   const [drawerRxFollowUpDate, setDrawerRxFollowUpDate] = useState("");
   const [clinicDefaultPricePerPulse, setClinicDefaultPricePerPulse] = useState<number | null>(null);
 
+  // A completed booking with an unresolved laser pulse deficit is NOT settled: the "Pay & Settle
+  // Invoice" button is the only door to the reception deficit prompt (DEC-079/080), and DEC-084's
+  // 0-balance-means-paid rule alone hid it for every package booking — reception could never reach
+  // the prompt (found in the live browser pass, 2026-09-24).
+  const [pendingLaserDeficit, setPendingLaserDeficit] = useState(false);
+  useEffect(() => {
+    if (!booking?.id || booking.status !== "completed") {
+      setPendingLaserDeficit(false);
+      return;
+    }
+    let active = true;
+    fetch(`/api/reservations/laser-deficit?reservationId=${encodeURIComponent(booking.id)}`, { headers: authenticatedJsonHeaders })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (active) setPendingLaserDeficit(Boolean(data && !data.resolved && Number(data.deficitPulses) > 0));
+      })
+      .catch(() => {
+        if (active) setPendingLaserDeficit(false);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booking?.id, booking?.status, booking?.amountPaid, booking?.amountLeft]);
+
   useEffect(() => {
     let active = true;
     fetch("/api/page-settings")
@@ -1919,7 +1944,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           ? Number(rawLeft)
           : Math.max(0, totalPrice - sessionPaid);
 
-        const isInvoicePaid = (sessionPaid >= totalPrice && totalPrice > 0) || (sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || booking.status === 'completed'));
+        const isInvoicePaid = !pendingLaserDeficit && ((sessionPaid >= totalPrice && totalPrice > 0) || (sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || booking.status === 'completed')));
 
         // Primary effective service for end session
         const primaryServiceObj = localServices.find(

@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **67 resolved** · 87 tracked total.
+**8 open** · **13 partially resolved** · **68 resolved** · 89 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4569,6 +4569,69 @@ Cherry-picked from commit `71c33e0`. See DEC-081.
 **Fix:** Removed the `customer_product_balances` conversion from `GET /api/customers/packages`. Packages are now sourced exclusively from `customer_packages`.
 
 **Verified:** Automated tests in `tests/routes/customers-packages.test.ts` (including new test verifying product balances are excluded from packages response) pass, and this session independently re-ran the full suite after the merge — see the merge commit for the current count.
+
+---
+
+## RISK-099: The Real Doctor → Reception Flow Never Reached The Deficit Prompt — Three Separate Breaks Found Only By Driving The Actual UI (RESOLVED)
+
+**Severity:** Critical (P0) · **Type:** Money / feature never actually worked end to end
+**Found & fixed:** 2026-09-24, Brief 35 browser verification (doctor session → reception Checkout, real
+UI, real dev database). Every route-level test and API-level live check had passed; none of them
+exercised the doctor's real completion, which is why all three survived.
+
+1. **`delivered_pulses` was never persisted by the doctor's completion.** The doctor completes a
+   session with `PATCH /api/reservations`, which maps `laser_payment_mode` / `laser_price_per_pulse`
+   but had **no mapping for `delivered_pulses`** (only `POST` did). The column stayed NULL on every
+   doctor-completed booking, so reception's `GET /api/reservations/laser-deficit` read
+   `deliveredPulses: 0, deficitPulses: 0` — a real 2,000-pulse deficit was invisible. **Fix:** PATCH
+   now persists `deliveredPulses` / `delivered_pulses` (finite, non-negative, floored). Tests in
+   `tests/routes/reservations-patch.test.ts`, confirmed to fail without the fix.
+2. **The merged DEC-084 rule hid the only door to the prompt.** `BookingDetailsModal`'s `isInvoicePaid`
+   (from origin/dev `90436e5`, cherry-picked) treats every completed 0-balance package booking as
+   paid, which removed "Pay & Settle Invoice" — the button that opens the Checkout modal and its
+   `LaserDeficitPrompt`. I had judged that change display-only; the browser showed it made the
+   deficit **unreachable** ("✓ Invoice Settled & Paid", no button) for exactly the bookings that
+   needed it. **Fix:** the drawer now GETs the deficit for completed bookings and never reports paid
+   while one is unresolved (`pendingLaserDeficit`).
+3. **Resolving a PAY_PER_PULSE deficit never made anyone owe the money.** The route wrote the
+   `reservation_products` line but not `reservations.amount_left`, so after resolving, the Checkout
+   modal showed Total 0 / Net Due 0 and the drawer showed "Paid" — the 10,000 EGP (2,000 × 5) was
+   never collectable. **Fix:** the route adds the charge to `amount_left` on the first line write only
+   (idempotent on retry); the Checkout modal mirrors it via `onResolved` so its totals update without
+   a reload. Test added (once-only, checked on a repeat call).
+
+**Verified live end to end after the fixes:** doctor UI (Option 3 shows only the pulses input +
+presets; the neutral amber notice appears above the balance; no package/price/choice anywhere) →
+Complete Treatment (clamped consume 3,000 of 5,000; no invoice, no sale, only a 0 EGP "Device — 5000
+pulses" line as `doctor_session`) → reception drawer shows Unpaid + "Pay & Settle Invoice" → Checkout
+shows Delivered 5,000 / Balance 0 / Deficit 2,000 → Confirm blocked with the unresolved-deficit
+alert → Pay Per Pulse → Resolve → totals become 10,000 EGP with "Pay Full" → Confirm & Complete →
+`amount_paid 10000, amount_left 0`, customer `spent_amount 10000`.
+
+---
+
+## RISK-100: PAY_PER_PULSE Deficit Cash Is Recorded On The Booking And Customer But Not In The Invoices/Payments Ledger (OPEN)
+
+**Severity:** High (P1) · **Type:** Financial ledger integrity · **Found:** 2026-09-24, same browser pass.
+
+After the flow above completes, the 10,000 EGP is in `reservations.amount_paid` and
+`customers.spent_amount`, but **no `invoices`, `invoice_lines`, `payments` or `transactions` row
+exists for it**. Cause: the doctor's completion is the booking's first completion, and for a fully
+package-covered session `writeCheckoutInvoice` writes no invoice; the reception checkout then takes
+the `wasAlreadyCompleted` branch, whose `appendPaymentToExistingInvoice` returns silently when there
+is no invoice, and `reservation-products`' late-append likewise only appends to an existing invoice.
+Finance reports built on the ledger will miss this cash. **Not fixed** — it needs a decision on where
+the deficit invoice is created (the deficit route creating one when none exists, versus teaching the
+checkout path to create it) and must reuse the invoice-numbering/ledger helpers rather than duplicate
+them; that is a ledger change (RISK-010 territory), not a one-line patch. BUY_NEW_PACKAGE is
+unaffected (the package sale writes its own invoice and payment).
+
+**Also noted, not fixed:** (a) the informational "Laser Package Pulse Deduction" card in the Checkout
+modal (merged from origin/dev `fdebc6b`) computes its own numbers and contradicts the prompt after the
+doctor's consume has already run — it showed "5,000 pulses exceed the balance" beside the prompt's
+"Deficit 2,000"; it was written for the old flow where the consume happens at checkout. (b) The
+`BookingDetailsModal` **end-session** surface of the deficit prompt was not click-tested. (c) For a
+moment after opening a completed booking's drawer it shows "Paid" until the deficit GET returns.
 
 ---
 

@@ -324,6 +324,31 @@ export async function POST(req: Request) {
           { status: 500 }
         );
       }
+
+      // The line item alone is not money owed: the checkout modal, the booking drawer's paid
+      // status and the customer's balance all read reservations.amount_left. Without this the
+      // 10,000 EGP deficit charge existed only as a row nobody collects — after resolving, the
+      // drawer showed "Paid" and checkout showed 0 due (found in the live browser pass,
+      // 2026-09-24). Only on the first write of the line, so a retry cannot double-charge.
+      const { data: amountRow } = await supabaseServer
+        .from('reservations')
+        .select('amount_left')
+        .eq('id', reservationId)
+        .maybeSingle();
+      const { error: amountErr } = await supabaseServer
+        .from('reservations')
+        .update({ amount_left: Number((amountRow as any)?.amount_left || 0) + invoiceDelta })
+        .eq('id', reservationId);
+      if (amountErr) {
+        return NextResponse.json(
+          {
+            error:
+              `The deficit line (${invoiceDelta} EGP) was written but the amount owed could not be updated: ` +
+              `${amountErr.message}. Do not retry — add ${invoiceDelta} EGP to this booking's balance manually.`,
+          },
+          { status: 500 }
+        );
+      }
     }
   } else {
     // BUY_NEW_PACKAGE — reuse /api/packages/sell verbatim (re-resolves the price from the
