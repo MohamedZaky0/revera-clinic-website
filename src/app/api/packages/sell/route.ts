@@ -202,21 +202,36 @@ export async function POST(req: Request) {
       return 0;
     })();
 
+    // An explicit services package (package_type/meta say 'services' and it actually has service
+    // items) must never be reclassified as pulses-type just because "laser" appears in its name —
+    // e.g. a real "Laser Full Body 3x" services package. Checked first so the name-based signals
+    // below can't override an explicit, correctly-configured services package.
     const isExplicitServicesPkg = packageItems.length > 0 && pkg.package_type !== 'pulses' && pkgMeta?.packageType !== 'pulses';
-    const configuredTotalPulses = Number(pkg.total_pulses || pkgMeta?.totalPulses || extractedPulsesFromName || 0);
 
     const isPulsesPkg = !isExplicitServicesPkg && Boolean(
       pkg.package_type === 'pulses' ||
       pkgMeta?.packageType === 'pulses' ||
-      configuredTotalPulses > 0 ||
-      packageItems.length === 0
+      Number(pkg.total_pulses || 0) > 0 ||
+      Number(pkgMeta?.totalPulses || 0) > 0 ||
+      packageItems.length === 0 ||
+      extractedPulsesFromName > 0 ||
+      pkg.name?.toLowerCase().includes('pulse') ||
+      pkg.name?.toLowerCase().includes('laser') ||
+      pkg.name?.toLowerCase().includes('shot') ||
+      pkg.name?.includes('نبضة') ||
+      pkg.name?.includes('نبضات') ||
+      pkg.name?.includes('ليزر')
     );
 
     if (!isPulsesPkg && (packageItems.length === 0 || packageItems.some((item) => !Number.isInteger(item.qty) || item.qty <= 0))) {
       return NextResponse.json({ error: 'Package must contain at least one service with a positive quantity.' }, { status: 400 });
     }
 
-    if (isPulsesPkg && configuredTotalPulses <= 0) {
+    // Pulse quota comes from the real packages.total_pulses column only — never the package name
+    // and never a fabricated default. A pulses-type package with no configured quota is refused
+    // before any invoice/package is written, so the owner sets Total Pulses in Admin → Packages
+    // instead of the patient getting a guessed one.
+    if (isPulsesPkg && Number(pkg.total_pulses || 0) <= 0) {
       return NextResponse.json(
         { error: 'This package has no pulse quota configured — set Total Pulses in Admin → Packages.' },
         { status: 400 }
@@ -300,7 +315,7 @@ export async function POST(req: Request) {
       throw invoiceLineError;
     }
 
-    const totalPulsesVal = isPulsesPkg ? configuredTotalPulses : 0;
+    const totalPulsesVal = isPulsesPkg ? Number(pkg.total_pulses || 0) : 0;
     const cpInsertPayload: any = {
       customer_id: finalCustomerId,
       package_id: pkg.id,

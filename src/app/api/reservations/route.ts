@@ -1643,7 +1643,7 @@ export async function PATCH(req: Request) {
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
-    } else if (status || notes !== undefined || doctorNotes !== undefined || receptionNotes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined || newDate !== undefined || followUpDate !== undefined || body.follow_up_date !== undefined || body.laserPaymentMode !== undefined || body.laser_payment_mode !== undefined || body.laserPricePerPulse !== undefined || body.laser_price_per_pulse !== undefined || body.total_price !== undefined || body.totalPrice !== undefined || body.price !== undefined) {
+    } else if (status || notes !== undefined || doctorNotes !== undefined || receptionNotes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined || newDate !== undefined || followUpDate !== undefined || body.follow_up_date !== undefined || body.laserPaymentMode !== undefined || body.laser_payment_mode !== undefined || body.laserPricePerPulse !== undefined || body.laser_price_per_pulse !== undefined || body.deliveredPulses !== undefined || body.delivered_pulses !== undefined || body.total_price !== undefined || body.totalPrice !== undefined || body.price !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (status === 'completed' && target.status !== 'completed') {
@@ -1694,6 +1694,15 @@ export async function PATCH(req: Request) {
       if (body.laser_payment_mode !== undefined) updates.laser_payment_mode = body.laser_payment_mode;
       if (body.laserPricePerPulse !== undefined) updates.laser_price_per_pulse = body.laserPricePerPulse;
       if (body.laser_price_per_pulse !== undefined) updates.laser_price_per_pulse = body.laser_price_per_pulse;
+      // The doctor's session completion is a PATCH, and it is the only thing that records how many
+      // pulses were delivered. Without this mapping delivered_pulses stayed NULL on every
+      // doctor-completed booking, so reception's deficit route (which reads it) saw delivered = 0
+      // and never surfaced a deficit (found in the live browser pass, 2026-09-24).
+      const patchDelivered = body.deliveredPulses !== undefined ? body.deliveredPulses : body.delivered_pulses;
+      if (patchDelivered !== undefined && patchDelivered !== null) {
+        const deliveredNum = Number(patchDelivered);
+        if (Number.isFinite(deliveredNum) && deliveredNum >= 0) updates.delivered_pulses = Math.floor(deliveredNum);
+      }
       if (body.total_price !== undefined) updates.total_price = Number(body.total_price);
       else if (body.totalPrice !== undefined) updates.total_price = Number(body.totalPrice);
       if (body.price !== undefined) updates.price = Number(body.price);

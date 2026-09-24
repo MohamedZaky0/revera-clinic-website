@@ -2701,7 +2701,6 @@ When superadmin or admin users attempted to create or edit a service in the admi
 
 ---
 
-<<<<<<< HEAD
 ## DEC-079: Doctor Screen Records Delivered Pulses Only — Package Sales And Payment Choices Move Entirely To Reception
 
 **Date:** 2026-09-22
@@ -2771,10 +2770,66 @@ pulse deficit is resolved, a package is sold, or money changes hands.
 
 ---
 
-## DEC-080: Strict Isolation of Customer Packages from Retail Product Balances
+## DEC-080: Laser Deficit Resolution Server Operation And Marker Design (Brief 35 implementation of DEC-079)
+
+**Date:** 2026-09-23
+**Status:** Decided — implemented
+
+**Context:**
+DEC-079 made reception checkout the only place a laser-pulse deficit is resolved. Brief 35 then needed
+a concrete shape for that operation: a client could never be trusted to state the deficit, the price,
+or the rate, and three separate writes (source-package consume, package sale or invoice line, and a
+"don't ask again" marker) had to stay consistent.
+
+**Decided:**
+
+1. **Route shape:** `POST /api/reservations/laser-deficit` resolves; `GET` on the same route previews
+   (delivered/consumed/remaining/deficit/resolved-rate/marker state). A dedicated route rather than
+   extending `PATCH /api/reservations` — that route is already the busiest write path, and deficit
+   resolution has its own failure surface that must return its own status rather than being folded
+   into a status-transition PATCH.
+
+2. **The client sends no amounts.** POST takes `reservationId`, `choice` (`BUY_NEW_PACKAGE` |
+   `PAY_PER_PULSE`), `packageId` (buy only), `sourceCustomerPackageId` (optional), and the
+   receptionist's real `paymentMethod`/`amountPaid`. The server re-reads `delivered_pulses`,
+   the package balance, the catalog price, and the per-pulse rate (via `resolveLaserPulseRate`,
+   the existing chain: reservation snapshot → `page_settings.home.booking.defaultPricePerPulse` →
+   legacy `@ X EGP/pulse` notes → `null` = refuse).
+
+3. **Consume order:** the source package is drained first via `consume_package_pulses` (the Brief 34B
+   RPC — no direct column writes), then the deficit remainder is settled by the choice. The RPC's
+   `UNIQUE(customer_package_id, reservation_id)` makes the consume replayable.
+
+4. **Marker:** `reservations.laser_deficit_resolution` (`'BUY_NEW_PACKAGE'`/`'PAY_PER_PULSE'`) +
+   `laser_deficit_pulses`, written only after the resolution writes succeed. `NULL` = unresolved /
+   no deficit. It is the reservation-level idempotency key: a repeat POST returns
+   `{ alreadyResolved: true }` without writing anything. Needed because the usage-ledger unique index
+   only protects the pulse consume, not the invoice line or the package sale.
+   **Legacy interaction:** bookings resolved before the marker columns wrote
+   `[Laser Settlement]`/`[Laser Package Redemption]` notes tags instead; a tag mentioning
+   `deficit`/`excess`/`exhausted`/`عجز` counts as resolved (returned as `resolution: 'LEGACY'`).
+   Tag reading remains a fallback only — nothing new writes tags; new state lives in columns.
+   (See RISK-097 for the marker-write-failure edge and the lack of cross-table atomicity.)
+
+5. **Internal reuse, not re-implementation:** BUY_NEW_PACKAGE calls `POST /api/packages/sell`'s
+   handler with the caller's auth token (price re-resolved from the `packages` row); PAY_PER_PULSE
+   calls `POST /api/reservation-products` with `lineType: 'device_pulses'` (the route's own
+   late-invoice append for already-invoiced reservations is preserved).
+
+6. **Blocking:** `LaserDeficitPrompt` renders inside the Checkout modal and `BookingDetailsModal`'s
+   end-session panel; both flows also GET-check the deficit inside their confirm handlers and return
+   before the money/status write while `deficit > 0 && !resolved`.
+
+**Impact:** the doctor's screen is record-only (DEC-079); the sole authoritative settlement path is
+this route, called from both reception surfaces.
+
+## DEC-081: Strict Isolation of Customer Packages from Retail Product Balances
 
 **Date:** 2026-09-23
 **Status:** Decided — active
+**Note:** originally numbered DEC-080 by its author (`saifuldeennaser`), working in parallel on
+`origin/dev` without this session's DEC-080 — renumbered on merge to avoid a collision. Cherry-picked
+from commit `71c33e0`.
 
 **Context:**
 When retail products (e.g., "Retinol Anti-Aging Serum", "Skin Protector") were sold to a patient via POS / patient profile, they correctly appeared under the "Purchased Products & Cart" tab. However, they also unexpectedly appeared as active items in the "Purchased Packages" section of the patient profile.
@@ -2791,36 +2846,18 @@ In `src/app/api/customers/packages/route.ts`, the `GET` handler contained a lega
 
 ---
 
-## DEC-081: Accurate Package Classification and Pulse Quota Resolution in Package Sales
-
-**Date:** 2026-09-23
-**Status:** Decided — active
-
-**Context:**
-When attempting to purchase a package for a customer during new booking creation or from the package catalog, the system threw an error: *"The package could not be added to the patient's profile, so the booking was not created and nothing was charged."*
-
-**Root Causes:**
-1. In `src/app/api/packages/sell/route.ts`, `isPulsesPkg` checked generic keywords like `pkg.name.toLowerCase().includes('laser')` without checking if the package was an explicit service package with service items (`package_items`). Consequently, any service package containing the word "laser" in its title was incorrectly classified as a pulses package and rejected with a 400 error (`This package has no pulse quota configured`) because `total_pulses` was 0.
-2. `configuredTotalPulses` resolution was not unified across DB `total_pulses`, `packages_meta`, and package names, leading to false negatives on pulses packages that had quota metadata.
-3. In `AdminNewBookingView.tsx`, the catalog filter for Option 3 ("Pay with Pulses Package") included service packages with "laser" in their name, and error messages from the sell API were not surfaced to receptionists.
-
-**Decisions & Implementation:**
-1. **Package Sell Classification Refined:**
-   - In `src/app/api/packages/sell/route.ts`, explicit service packages (`packageItems.length > 0 && pkg.package_type !== 'pulses' && pkgMeta?.packageType !== 'pulses'`) are identified and exempted from pulse quota requirements.
-   - `configuredTotalPulses` resolves the quota across `pkg.total_pulses`, `pkgMeta.totalPulses`, and pulse name patterns.
-   - `customer_packages` record receives the resolved `configuredTotalPulses`.
-2. **Booking View Filter & Error Propagation:**
-   - In `AdminNewBookingView.tsx`, catalog pulses filtering strictly excludes service packages without pulse quotas.
-   - Any server-returned error message from `/api/packages/sell` is surfaced in the alert so the user is clearly informed.
-3. **Regression Tests Added:**
-   - In `tests/routes/packages-sell.test.ts`, added unit tests validating service packages with "laser" in their names, meta pulse resolution, and quota validation.
-
----
-
 ## DEC-082: End-to-End Pulse Package Linkage, Checkout Pulse Deduction Breakdown, and Profile Bar Synchronization
 
 **Date:** 2026-09-23
 **Status:** Decided — active
+**Note:** cherry-picked from commit `fdebc6b` (`saifuldeennaser`, working in parallel on `origin/dev`).
+Its number happens to already match this session's sequence — no renumbering needed. The
+predecessor commit on `origin/dev` (`53e8fcf`, "Accurate Package Classification and Pulse Quota
+Resolution", their DEC-081) was deliberately **not** merged: it reintroduces resolving
+`customer_packages.total_pulses` from `pkgMeta.totalPulses` / a package-name regex, which is
+exactly the fabricated-quota pattern Brief 34B (RISK-096) removed. The one genuinely useful part of
+that commit — not misclassifying an explicit services package with "laser" in its name as a pulses
+package — still needs doing; tracked separately rather than taken as-is.
 
 **Context:**
 When a laser pulse package is selected or purchased in Option 3 of New Booking, the session needed to use that specific package. Upon completing the treatment and opening reception checkout, the popup must display exactly how many pulses are deducted from the package (e.g. 2,000 pulses deducted from 5,000 pulses package, leaving 3,000 pulses remaining). In the patient profile, the progress bar must accurately reflect the real-time remaining and used pulse balances.
@@ -2830,9 +2867,9 @@ When a laser pulse package is selected or purchased in Option 3 of New Booking, 
    - In `AdminNewBookingView.tsx`, when Option 3 is selected with a package purchase, `[Customer Package ID]: <id>`, `[Laser Package]: <name> (Package ID: <id>)`, `customerPackageId`, and `laserPaymentMode: "PACKAGE"` are persisted on the reservation and notes.
    - In `src/app/api/reservations/route.ts`, `mapRow` and `POST` persist and return `laser_payment_mode`, `laser_price_per_pulse`, `delivered_pulses`, `packageId`, and `customerPackageId`.
 2. **Doctor Ongoing Session Auto-Selection:**
-   - In `DoctorOngoingSessionTab.tsx`, linked package IDs from reservation metadata or structured note tags are automatically matched to the patient's active pulse packages.
+   - In `DoctorOngoingSessionTab.tsx`, linked package IDs from reservation metadata or structured note tags are automatically matched to the patient's active pulse packages. (This selection only feeds the doctor's clamped consume against the correct source package, per DEC-079 — it is not a reintroduction of a doctor-side choice UI.)
 3. **Checkout Modal Pulse Deduction Breakdown:**
-   - In `src/app/admin/page.tsx`, when checking out a laser package reservation, the modal matches the linked pulse package, displays current package balance, session usage, remaining pulses after checkout, and a progress bar preview with a clear natural-language summary.
+   - In `src/app/admin/page.tsx`, when checking out a laser package reservation, the modal matches the linked pulse package, displays current package balance, session usage, remaining pulses after checkout, and a progress bar preview with a clear natural-language summary. This is informational display only; it sits alongside, and does not replace, Brief 35's `LaserDeficitPrompt` gate for the deficit case (DEC-080).
    - On checkout settlement, `consume_package_pulses` RPC executes pulse deduction and emits `revera-laser-change` for instantaneous cross-component refresh.
 4. **Patient Profile Progress Bar:**
    - In `CustomerProfileDrawer.tsx`, the progress bar calculates `(remainingPulsesVal / effectiveTotal) * 100` and displays both remaining pulses and used pulses counters clearly.
@@ -2843,6 +2880,7 @@ When a laser pulse package is selected or purchased in Option 3 of New Booking, 
 
 **Date:** 2026-09-23
 **Status:** Decided — active
+**Note:** cherry-picked from commit `367bf38` (`saifuldeennaser`, working in parallel on `origin/dev`).
 
 **Context:**
 When a patient purchased a package during New Booking with a partial payment / deposit (e.g. Package price 2,500 EGP, paid 2,000 EGP at booking, leaving 500 EGP outstanding balance), opening the Payment Settlement Checkout popup after the session displayed 0 EGP due. This occurred because laser package session services evaluate to 0 EGP (package redemption), while the 2,000 EGP deposit was subtracted from total cost (= 0 EGP), causing `balanceDue` and `netDue` to evaluate to 0 EGP rather than 500 EGP.
@@ -2864,6 +2902,10 @@ When a patient purchased a package during New Booking with a partial payment / d
 
 **Date:** 2026-09-23
 **Status:** Decided — active
+**Note:** cherry-picked from commit `90436e5` (`saifuldeennaser`, working in parallel on `origin/dev`).
+`isInvoicePaid`'s new `isLaserPackage` branch is a display-only flag in this modal; it does not
+bypass Brief 35's separate pre-write deficit gate (DEC-080), which still blocks the actual
+confirm/checkout action while a deficit is unresolved regardless of what this badge shows.
 
 **Context:**
 When a patient had an existing package and attended a booking paid via package redemption (0 EGP due, 0 EGP paid, 0 EGP left), confirming checkout completed the reservation. However, `BookingDetailsModal`, `AdminBookingsView`, and `ReceptionDashboardView` displayed "Unpaid" and showed the "Pay & Settle Invoice" button.
@@ -2878,36 +2920,33 @@ When a patient had an existing package and attended a booking paid via package r
 
 ---
 
-## DEC-085: Laser Pulse Package Deficit Detection, Unsettled Session Status, and Dual Interactive Checkout Options
+## DEC-085: Explicit Services Packages Are Never Reclassified As Pulses-Type By Name
 
-**Date:** 2026-09-23
+**Date:** 2026-09-24
 **Status:** Decided — active
+**Note:** manually re-implemented from the classification-guard portion of commit `53e8fcf`
+(`saifuldeennaser`, working in parallel on `origin/dev`) — see DEC-082's note. That commit's other
+change (resolving `customer_packages.total_pulses` from `pkgMeta.totalPulses` / a package-name
+regex when the real column is 0) was deliberately **not** taken: it reintroduces exactly the
+fabricated-quota pattern Brief 34B (RISK-096) removed, and the commit's own new test asserted a
+package named "5000 Laser Pulses" gets `total_pulses: 5000` written from the name alone. The quota
+still comes from `packages.total_pulses` only, everywhere; an unconfigured pulses package is still
+refused, not guessed.
 
 **Context:**
-When a patient redeems an active laser pulse package during a session and the delivered pulses exceed the remaining package balance (e.g. Package had 2,000 pulses remaining, session delivered 3,000 pulses → 1,000 excess/deficit pulses):
-1. The session payment status must automatically shift to "Partially Paid" / "Deficit" and the "Pay & Settle Invoice" button must remain accessible.
-2. In the Checkout Popup, staff must see that the delivered pulses exceeded the package quota and have two clear, interactive options to settle the excess deficit:
-   - **Option 1 (Buy New Package / Choice 3A):** Patient purchases a new catalog package (e.g. 5,000 pulses for 2,500 EGP) and the 1,000 pulse deficit is deducted from this new package (leaving 4,000 pulses remaining in the new package).
-   - **Option 2 (Pay per Pulse / Choice 3B):** Patient pays for the 1,000 remaining excess pulses at a customizable per-pulse rate (e.g. 1.5 EGP/pulse × 1,000 = 1,500 EGP).
+A real services package (`package_type: 'services'`, has real `package_items`) whose name happens
+to contain "laser" — e.g. "Laser Full Body 3x" — was misclassified as a pulses-type package by
+`isPulsesPkg`'s name-matching fallback and rejected with "no pulse quota configured", since a
+services package legitimately has `total_pulses = 0`.
 
 **Decisions & Implementation:**
-1. **Pulse Deficit Detection & Status Synchronization:**
-   - In `BookingDetailsModal.tsx` and `AdminBookingsView.tsx`, pulse deficit is calculated from delivered pulses vs package balance: `deficitPulses = (!hasSettledDeficit && notePkgRem > 0 && deliveredPulses > notePkgRem) ? deliveredPulses - notePkgRem : 0`.
-   - When an unsettled deficit exists, `isInvoicePaid` is set to `false`, the banner badge switches to an amber `Exceeded Package (+1,000 Pulses)` alert, and payment status displays `Partially Paid`.
-2. **Interactive Deficit Settlement UI in Checkout Modal:**
-   - In `src/app/admin/page.tsx`, when `deficitPulsesVal > 0` and `!hasSettledDeficit`, a dedicated 2-card interactive choice selector is rendered:
-     - **Option 1 Card:** Dropdown selection of active catalog pulses packages, pricing breakdown (+2,500 EGP), and calculated balance remaining after deficit deduction (4,000 pulses remaining).
-     - **Option 2 Card:** Number input for customizable per-pulse rate (e.g. 1.5 EGP), and live total calculation (1,000 pulses × 1.5 EGP = 1,500 EGP).
-   - The selected deficit charge is dynamically added to `totalCost`, `balanceDue`, and invoice line items.
-3. **Execution on Checkout Confirmation:**
-   - In `handleConfirmCheckout`:
-     - If Option 1: Calls `POST /api/packages/sell` to create the new package, calls `consume_package_pulses` to deduct the 1,000 deficit pulses from the new package, exhausts the old package (0 pulses), and appends audit note `[Laser Package Deficit Settlement]: Choice 3A...`.
-     - If Option 2: Exhausts the old package (0 pulses) and appends audit note `[Laser Package Deficit Settlement]: Choice 3B...`.
-4. **Automated Diagnostic Test Suite:**
-   - Added `TC-080: Laser Pulses Package Excess Deficit & Dual Interactive Settlement Engine` to Admin Settings System Test Suite.
-
-
-
-
-
-
+1. `src/app/api/packages/sell/route.ts`: added `isExplicitServicesPkg` (`packageItems.length > 0 &&
+   package_type !== 'pulses' && pkgMeta?.packageType !== 'pulses'`), checked before the name-based
+   pulses signals so an explicit, correctly-configured services package can never be overridden by
+   them. `tests/routes/packages-sell.test.ts` covers it.
+2. `src/components/admin/bookings/AdminNewBookingView.tsx`: the New Booking Option 3 catalog filter
+   gets the same guard (an explicit `services`-type catalog package is included only if it actually
+   has `total_pulses > 0`), and the generic `laser`/`ليزر` name keywords are dropped from the
+   pulses-catalog heuristic (too broad — caused the same false positive client-side). Also surfaces
+   the real server error message when a package sale fails during booking, instead of a generic
+   alert.
