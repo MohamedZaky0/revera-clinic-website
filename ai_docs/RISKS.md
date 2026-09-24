@@ -4470,10 +4470,14 @@ afterward; confirmed zero residue.
 
 ---
 
-## RISK-097: Brief 35 Deficit Resolution Is Ordered, Not Transactional — A Failure Between Steps Leaves A Partially-Applied Settlement (OPEN — documented, mitigated)
+## RISK-097: Brief 35 Deficit Resolution Is Ordered, Not Transactional — A Failure Between Steps Leaves A Partially-Applied Settlement (PARTIALLY RESOLVED — retry path fixed, cross-table atomicity still open)
 
-**Found:** 2026-09-23 during Brief 35 implementation.
-**Status:** OPEN — surfaced honestly by the route; not fixable without a cross-table Postgres transaction.
+**Found:** 2026-09-23 during Brief 35 implementation. **Retry-recovery bug found and fixed 2026-09-24
+during live verification** (migration applied, full scenario matrix run against the real dev
+database — see the Evidence log).
+**Status:** the specific failure mode below — a retry after a partial failure silently reporting
+"nothing to resolve" instead of recovering — is fixed. The underlying lack of a single cross-table
+transaction remains open by design (see "Not fixed").
 
 `POST /api/reservations/laser-deficit` performs up to three writes in sequence: (1) source-package
 consume via `consume_package_pulses` RPC, (2) the resolution write — `POST /api/packages/sell`
@@ -4500,13 +4504,55 @@ state:
 (Brief 34B unique index); the PAY_PER_PULSE line is guarded against double-write; every failure
 message states exactly what did and did not happen, and never reports success.
 
+**Bug found live, 2026-09-24, and fixed — the retry path was actually unsafe, not just loud.**
+Reproduced directly: forced the invoice-line write to fail after the consume step had already
+succeeded (see the `addedByRole` bug below), leaving the source package drained (`fully_used`, 0
+remaining) with no marker and no invoice line — exactly the documented partial state. But the
+*retry*, called after fixing the immediate cause, did not recover: `computeDeficitState`'s package
+lookup (`activePulsePackages`) filters `.eq('status', 'active')`, and Brief 34B flips a drained
+package to `'fully_used'`. The retry therefore found **no source package at all**, concluded
+`noActivePackage: true`, and returned `{ success: true, deficitPulses: 0 }` — a **silent no-op that
+looked like success**, worse than the loud 500 this risk originally described. A real ~2,000-pulse,
+10,000 EGP deficit would have gone permanently unbilled had the receptionist trusted that response.
+**Fix:** added `packageAlreadyTouchedForReservation()` — looks up `package_pulse_usage` rows for the
+specific reservation and treats that package as the authoritative source regardless of its current
+status, ahead of the active-package fallbacks. Re-verified live: the same reservation, retried after
+the fix, correctly recomputed the 2,000-pulse deficit and resolved it. Also verified this covers the
+rate-unconfigured retry case (consume succeeds, PAY_PER_PULSE's rate check fails after it, `NULL`
+rate then configured, retried — resolves correctly).
+
+**Separate bug found and fixed in the same pass:** the PAY_PER_PULSE line write hardcoded
+`addedByRole: 'receptionist_checkout'`, but `reservation_products.added_by_role`'s CHECK constraint
+only allows `'doctor_session'` or `'receptionist'` — every PAY_PER_PULSE resolution failed with a
+500 on the real database (never caught by the fake, which doesn't enforce CHECK constraints).
+Changed to `'receptionist'`.
+
 **Not fixed:** a single Postgres function wrapping consume + sale + marker in one transaction. That
 would require reimplementing `/api/packages/sell` inside SQL (invoices, invoice_lines, payments,
-wallet movements, transaction ledger — too much to duplicate); deferred as deliberate scope. The
-correct path if this ever bites in production is manual reconciliation from the error message plus
-the `package_pulse_usage` audit rows.
+wallet movements, transaction ledger — too much to duplicate); deferred as deliberate scope. A
+failure that happens *after* the source package is already fully drained now recovers correctly on
+retry (fixed above); a failure at the marker-write step specifically, after the resolution itself
+(sale or invoice line) already fully succeeded, still needs the manual reconciliation this risk
+originally described — that residual case was not exercised live (it requires injecting a failure
+at that exact point) and is left as-is.
 
-**Manual checklist:** `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_35_MANUAL_TESTS.md`.
+**Live-verified against the real dev database, 2026-09-24 (migration
+`20260923000000_add_laser_deficit_resolution_to_reservations.sql` applied):** GET preview and POST
+resolve for both `PAY_PER_PULSE` and `BUY_NEW_PACKAGE` on disposable test data — correct deficit
+math, correct invoice/payment amounts, correct marker writes; idempotent repeat calls for both
+choices (`alreadyResolved: true`, zero additional writes); no-deficit (sufficient balance) consumes
+normally and writes no marker; no-active-package refuses cleanly with no fabricated deficit;
+expired-package refuses before any write; unresolvable-rate refuses with a real 400 before any
+invoice write (and, per the fix above, recovers correctly once the rate is configured and the call
+is retried); unauthenticated → 401; invalid/missing reservationId → 400; non-existent reservation →
+404. All disposable test rows deleted afterward, confirmed zero residue. Doctor-side screen
+confirmed directly from source (`DoctorOngoingSessionTab.tsx`'s Option 3 block): delivered-pulses
+input plus presets, and — only when `packageDeficit > 0` — one neutral amber notice ("Recorded
+pulses exceed the package balance. Reception will resolve this at checkout."); no package name,
+balance, price, or choice control anywhere in that block, matching DEC-079 exactly.
+
+**Manual checklist:** `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_35_MANUAL_TESTS.md` — Evidence log
+filled in with the above.
 
 ---
 

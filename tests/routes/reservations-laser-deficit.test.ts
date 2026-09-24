@@ -173,9 +173,38 @@ describe('POST /api/reservations/laser-deficit', () => {
 
     const lines = fake.rows('reservation_products');
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatchObject({ qty: 5000, unit_price: 2, line_type: 'device_pulses' });
+    // added_by_role must be one of the real CHECK constraint's values ('doctor_session' |
+    // 'receptionist') — 'receptionist_checkout' passed the fake silently but violated the real
+    // constraint on every PAY_PER_PULSE resolution (confirmed live, 2026-09-24).
+    expect(lines[0]).toMatchObject({ qty: 5000, unit_price: 2, line_type: 'device_pulses', added_by_role: 'receptionist' });
     expect(fake.rows('reservations')[0].laser_deficit_resolution).toBe('PAY_PER_PULSE');
     expect(fake.rows('reservations')[0].laser_deficit_pulses).toBe(5000);
+  });
+
+  it('recomputes and resolves the deficit on retry after the source package already flipped to fully_used', async () => {
+    // Reproduces the live 2026-09-24 finding: an earlier attempt's consume step succeeded (draining
+    // the package to fully_used) but a later step failed before the marker was written. A retry
+    // must still find the deficit via package_pulse_usage, not report noActivePackage/deficit 0
+    // just because the package is no longer 'active'.
+    seedReservation({ laser_price_per_pulse: 2 });
+    seedPackage({ pulses_remaining: 0, pulses_used: 5000, status: 'fully_used' });
+    fake.seed('package_pulse_usage', [{
+      id: 'u1', customer_package_id: PKG_ID, reservation_id: RES_ID, quantity_used: 3000,
+    }]);
+
+    const getRes = await GET(staffGet());
+    const getData = await getRes.json();
+    expect(getData.deficitPulses).toBe(7000); // 10000 delivered - 3000 already consumed - 0 remaining
+    expect(getData.noActivePackage).toBe(false);
+    expect(getData.sourceCustomerPackageId).toBe(PKG_ID);
+
+    const res = await POST(staffReq({ reservationId: RES_ID, choice: 'PAY_PER_PULSE' }));
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.deficitPulses).toBe(7000);
+    expect(data.consumedFromSourcePackage).toBe(0); // already drained — must not attempt to consume again
+    expect(fake.rows('reservations')[0].laser_deficit_resolution).toBe('PAY_PER_PULSE');
+    expect(fake.rows('reservation_products')).toHaveLength(1);
   });
 
   it('PAY_PER_PULSE consumes the remaining balance first when the doctor consume never ran', async () => {

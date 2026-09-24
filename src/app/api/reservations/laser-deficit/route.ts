@@ -90,6 +90,28 @@ async function consumedForReservation(customerPackageId: string, reservationId: 
   return (data || []).reduce((sum: number, r: any) => sum + Number(r.quantity_used || 0), 0);
 }
 
+// The package that already has a package_pulse_usage row for this reservation — regardless of
+// its current status. Needed because draining a package to 0 flips it to 'fully_used'
+// (Brief 34B), which drops it out of activePulsePackages()'s 'active' filter. Without this, a
+// retry after a failure downstream of the consume (RISK-097) sees no source package at all and
+// silently reports "no active package, nothing to resolve" — confirmed live, 2026-09-24: a real
+// 2,000-pulse deficit went unbilled on retry because the consume had already succeeded and the
+// only package holding the answer had already flipped to fully_used.
+async function packageAlreadyTouchedForReservation(customerId: string, reservationId: string) {
+  const { data: usageRows, error: usageErr } = await supabaseServer
+    .from('package_pulse_usage')
+    .select('customer_package_id')
+    .eq('reservation_id', reservationId);
+  if (usageErr || !usageRows || usageRows.length === 0) return null;
+  const packageIds = Array.from(new Set(usageRows.map((r: any) => r.customer_package_id)));
+  const { data: pkgRows, error: pkgErr } = await supabaseServer
+    .from('customer_packages')
+    .select('id, package_id, package_type, total_pulses, pulses_used, pulses_remaining, expires_at, status, customer_id')
+    .in('id', packageIds);
+  if (pkgErr || !pkgRows) return null;
+  return pkgRows.find((p: any) => String(p.customer_id) === String(customerId)) || null;
+}
+
 async function clinicDefaultPulseRate(): Promise<number | null> {
   const { data, error } = await supabaseServer
     .from('page_settings')
@@ -109,9 +131,16 @@ function isExpired(pkg: any): boolean {
 // Shared by GET (preview) and POST (resolve). Never guesses a total.
 async function computeDeficitState(reservation: any, sourceCustomerPackageId?: string) {
   const delivered = deliveredPulsesOf(reservation);
-  const packages = reservation?.customer_id ? await activePulsePackages(String(reservation.customer_id)) : [];
+  const customerId = reservation?.customer_id ? String(reservation.customer_id) : null;
+  const packages = customerId ? await activePulsePackages(customerId) : [];
+  // A package already drained for this reservation is the authoritative source even if it has
+  // since flipped to fully_used — it must never be silently dropped just because it is no
+  // longer 'active'. Takes priority over the picked-by-balance fallbacks below.
+  const touchedPkg = customerId ? await packageAlreadyTouchedForReservation(customerId, reservation.id) : null;
   const source =
+    (touchedPkg && (!sourceCustomerPackageId || String(touchedPkg.id) === String(sourceCustomerPackageId)) ? touchedPkg : null) ||
     packages.find((p: any) => String(p.id) === String(sourceCustomerPackageId)) ||
+    touchedPkg ||
     packages.find((p: any) => Number(p.pulses_remaining || 0) > 0) ||
     packages[0] ||
     null;
@@ -282,7 +311,10 @@ export async function POST(req: Request) {
           description: `Excess Laser Pulses Deficit (${deficit} pulses @ ${rate} EGP)`,
           qty: deficit,
           unitPrice: rate,
-          addedByRole: 'receptionist_checkout',
+          // reservation_products.added_by_role CHECK only allows 'doctor_session' | 'receptionist'
+          // (confirmed live, 2026-09-24: 'receptionist_checkout' violated the constraint and
+          // aborted every PAY_PER_PULSE resolution with a 500).
+          addedByRole: 'receptionist',
         }),
       }));
       if (!lineRes.ok) {
