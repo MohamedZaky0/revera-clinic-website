@@ -2917,3 +2917,36 @@ When a patient had an existing package and attended a booking paid via package r
 **Decisions & Implementation:**
 1. In `BookingDetailsModal.tsx`, `isInvoicePaid` now recognizes 0-cost package sessions and completed sessions with 0 balance due (`sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || booking.status === 'completed')`).
 2. In `AdminBookingsView.tsx` and `ReceptionDashboardView.tsx` / reception API route, package-covered and completed 0-balance bookings evaluate to "Paid".
+
+---
+
+## DEC-085: Explicit Services Packages Are Never Reclassified As Pulses-Type By Name
+
+**Date:** 2026-09-24
+**Status:** Decided — active
+**Note:** manually re-implemented from the classification-guard portion of commit `53e8fcf`
+(`saifuldeennaser`, working in parallel on `origin/dev`) — see DEC-082's note. That commit's other
+change (resolving `customer_packages.total_pulses` from `pkgMeta.totalPulses` / a package-name
+regex when the real column is 0) was deliberately **not** taken: it reintroduces exactly the
+fabricated-quota pattern Brief 34B (RISK-096) removed, and the commit's own new test asserted a
+package named "5000 Laser Pulses" gets `total_pulses: 5000` written from the name alone. The quota
+still comes from `packages.total_pulses` only, everywhere; an unconfigured pulses package is still
+refused, not guessed.
+
+**Context:**
+A real services package (`package_type: 'services'`, has real `package_items`) whose name happens
+to contain "laser" — e.g. "Laser Full Body 3x" — was misclassified as a pulses-type package by
+`isPulsesPkg`'s name-matching fallback and rejected with "no pulse quota configured", since a
+services package legitimately has `total_pulses = 0`.
+
+**Decisions & Implementation:**
+1. `src/app/api/packages/sell/route.ts`: added `isExplicitServicesPkg` (`packageItems.length > 0 &&
+   package_type !== 'pulses' && pkgMeta?.packageType !== 'pulses'`), checked before the name-based
+   pulses signals so an explicit, correctly-configured services package can never be overridden by
+   them. `tests/routes/packages-sell.test.ts` covers it.
+2. `src/components/admin/bookings/AdminNewBookingView.tsx`: the New Booking Option 3 catalog filter
+   gets the same guard (an explicit `services`-type catalog package is included only if it actually
+   has `total_pulses > 0`), and the generic `laser`/`ليزر` name keywords are dropped from the
+   pulses-catalog heuristic (too broad — caused the same false positive client-side). Also surfaces
+   the real server error message when a package sale fails during booking, instead of a generic
+   alert.

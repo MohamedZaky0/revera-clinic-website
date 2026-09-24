@@ -391,15 +391,17 @@ export default function AdminNewBookingView({
           if (pRes.ok) {
             const pData = await pRes.json();
             const pkgs = Array.isArray(pData) ? pData : pData.packages || [];
-            const pulseOnly = pkgs.filter((p: any) =>
-              p.package_type === "pulses" ||
-              p.packageType === "pulses" ||
-              Number(p.total_pulses || p.totalPulses || 0) > 0 ||
-              p.name?.toLowerCase().includes("pulse") ||
-              p.name?.toLowerCase().includes("laser") ||
-              p.name?.includes("نبض") ||
-              p.name?.includes("ليزر")
-            );
+            // An explicit services package must not be pulled into the pulses catalog just
+            // because "laser" is in its name (e.g. a real "Laser Full Body 3x" services package).
+            const pulseOnly = pkgs.filter((p: any) => {
+              const totalPulses = Number(p.totalPulses ?? p.total_pulses ?? 0);
+              const isPulsesType = p.packageType === "pulses" || p.package_type === "pulses";
+              if (p.packageType === "services" || p.package_type === "services") {
+                return totalPulses > 0;
+              }
+              const hasPulseKeywords = p.name?.toLowerCase().includes("pulse") || p.name?.includes("نبض") || p.name?.includes("طلقة");
+              return isPulsesType || totalPulses > 0 || hasPulseKeywords;
+            });
             setCatalogPackages(pulseOnly);
             if (pulseOnly.length > 0) {
               setSelectedCatalogPulsePkg(pulseOnly[0]);
@@ -1274,6 +1276,7 @@ export default function AdminNewBookingView({
 
       // If purchasing a new pulses package in Option 3, sell package now so it immediately exists in customer_packages
       let createdCustomerPackageId: string | null = null;
+      let packageSaleErrorMessage = "";
       if (isNewPackagePurchase && selectedCatalogPulsePkg && (resolvedCustomerId || phone)) {
         try {
           const sellRes = await fetch("/api/packages/sell", {
@@ -1298,9 +1301,12 @@ export default function AdminNewBookingView({
               window.dispatchEvent(new CustomEvent("revera-laser-change"));
             }
           } else {
-            console.error("Package sale failed during booking:", await sellRes.text());
+            const errJson = await sellRes.json().catch(() => null);
+            packageSaleErrorMessage = errJson?.error || `HTTP ${sellRes.status}`;
+            console.error("Package sale failed during booking:", packageSaleErrorMessage);
           }
-        } catch (sellErr) {
+        } catch (sellErr: any) {
+          packageSaleErrorMessage = sellErr?.message || "Network error";
           console.error("Error selling package during booking:", sellErr);
         }
       }
@@ -1309,7 +1315,7 @@ export default function AdminNewBookingView({
       // so if the sale did not happen the booking would bill the package price and the patient would
       // receive nothing. Stop here instead of creating that booking.
       if (isNewPackagePurchase && selectedCatalogPulsePkg && !createdCustomerPackageId) {
-        alert(tr.packageSaleFailedAlert);
+        alert(packageSaleErrorMessage ? `${tr.packageSaleFailedAlert}\n\n(${packageSaleErrorMessage})` : tr.packageSaleFailedAlert);
         return;
       }
 

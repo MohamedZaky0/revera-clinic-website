@@ -124,6 +124,24 @@ describe('POST /api/packages/sell — pulse quota must be real (Brief 34B)', () 
     expect(fake.rows('customer_packages')).toHaveLength(0);
     expect(fake.rows('invoices')).toHaveLength(0);
   });
+
+  // Cherry-picked fix from commit 53e8fcf (saifuldeennaser, origin/dev) — the classification
+  // guard only, not that commit's configuredTotalPulses fallback (which reintroduced resolving
+  // the quota from pkgMeta/the package name, exactly what this describe block's first test
+  // guards against). See DEC-082's note and RISK-096.
+  it('sells an explicit services package even when its name contains "laser"', async () => {
+    fake.seed('packages', [{
+      id: PACKAGE_ID, name: 'Laser Full Body 3x', branch_id: null, price: 1500, tax_rate: 0,
+      validity_days: 180, active: true, package_type: 'services', total_pulses: 0,
+    }]);
+    fake.seed('package_items', [{ package_id: PACKAGE_ID, service_id: 101, qty: 3 }]);
+
+    const res = await POST(sellReq({ customerId: CUSTOMER_ID, packageId: PACKAGE_ID, amountPaid: 1500 }));
+    expect(res.status).toBe(201);
+    const cps = fake.rows('customer_packages');
+    expect(cps).toHaveLength(1);
+    expect(cps[0]).toMatchObject({ package_type: 'services', total_pulses: 0, pulses_remaining: 0 });
+  });
 });
 
 describe('POST /api/packages/sell — customer resolution', () => {

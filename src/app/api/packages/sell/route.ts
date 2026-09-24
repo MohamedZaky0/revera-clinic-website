@@ -202,7 +202,13 @@ export async function POST(req: Request) {
       return 0;
     })();
 
-    const isPulsesPkg = Boolean(
+    // An explicit services package (package_type/meta say 'services' and it actually has service
+    // items) must never be reclassified as pulses-type just because "laser" appears in its name —
+    // e.g. a real "Laser Full Body 3x" services package. Checked first so the name-based signals
+    // below can't override an explicit, correctly-configured services package.
+    const isExplicitServicesPkg = packageItems.length > 0 && pkg.package_type !== 'pulses' && pkgMeta?.packageType !== 'pulses';
+
+    const isPulsesPkg = !isExplicitServicesPkg && Boolean(
       pkg.package_type === 'pulses' ||
       pkgMeta?.packageType === 'pulses' ||
       Number(pkg.total_pulses || 0) > 0 ||
