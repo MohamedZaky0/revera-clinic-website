@@ -150,7 +150,7 @@ export async function GET(req: Request) {
             id, customer_id, package_id, status, purchased_at, expires_at, price_paid,
             package_type, total_pulses, pulses_used, pulses_remaining,
             packages ( id, name, name_ar, package_type ),
-            customer_package_items ( id, service_id, qty_total, qty_used, qty_remaining, services ( id, en, ar, name, price ) )
+            customer_package_items ( id, service_id, qty_total, qty_used, qty_remaining, services ( id, en, ar, price ) )
           `)
           .in('customer_id', validCustomerIds)
           .order('purchased_at', { ascending: false });
@@ -214,7 +214,7 @@ export async function GET(req: Request) {
             const [itemsRes, masterPkgsRes, servicesRes] = await Promise.all([
               supabaseServer.from('customer_package_items').select('*').in('customer_package_id', pkgIds),
               supabaseServer.from('packages').select('id, name, name_ar').in('id', masterPkgIds),
-              supabaseServer.from('services').select('id, en, ar, name'),
+              supabaseServer.from('services').select('id, en, ar'),
             ]);
 
             const allItems = itemsRes.data || [];

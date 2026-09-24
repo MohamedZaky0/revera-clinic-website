@@ -49,6 +49,14 @@
 | 2026-09-24 | Ledger sync — checkout payment | dev, PATCH `amountPaid 10000` | 10,000 cash `payments` row on `INV-000117`, `outstanding_payment` transaction, booking paid, customer `spent 10000 / outstanding 0`, exactly 1 invoice | Pass |
 | 2026-09-24 | Cleanup | dev + local | Test rows deleted, test account department restored, dev default rate restored to unset, the intake entry my test wrote to the local `data/medical_records.json` fallback removed | Pass |
 
+| 2026-09-25 | **BookingDetailsModal end-session** — enter 5,000 pulses vs 3,000 balance, Confirm & End Session (before the fix) | dev, real UI, started package booking | Session ended with a success alert. 3,000 consumed; `delivered_pulses` NULL, no marker, `amount_left 0`; **no prompt, no gate** — the 2,000-pulse deficit silently absorbed | **Failed — RISK-099 #4** |
+| 2026-09-25 | Same flow after persisting `delivered_pulses` first + prompt remount | dev, real UI | Alert "unresolved laser pulse deficit of 2,000 pulses… Resolve it in the deficit panel"; prompt shows Delivered 5,000 / Balance 0 / Deficit 2,000; session not ended | Pass |
+| 2026-09-25 | Pay Per Pulse → Resolve Deficit in the panel | dev, real UI | "already resolved"; Final Session Invoice 10,000 EGP, Paid 0, Outstanding 10,000 | Pass |
+| 2026-09-25 | Confirm & End Session after resolving | dev, real UI | Completed; `delivered_pulses 5000`, marker `PAY_PER_PULSE/2000`, `amount_left 10000`, customer `outstanding 10000`, one deficit line, consumed 3,000 once | Pass |
+| 2026-09-25 | Invoice written at that completion? | dev, server log + DB | **No invoice** — log: `Failed to write Phase 1 invoice … column services.name does not exist` (42703) | **Failed — RISK-101** (affects every completion, not just this flow) |
+| 2026-09-25 | `services.name` removed from 6 selects + drift-guard test | local | guard fails without the fix, passes with it; `tsc` 0 errors; vitest green except the other session's 7 unrelated failures | Pass |
+| 2026-09-25 | **Live confirmation that a completion now writes its invoice** | dev | **Pending** — the dev login expired (redirect to /login) and I do not enter credentials; needs a signed-in browser session. Plan: complete the rewound booking and expect an invoice carrying the 10,000 deficit line | **Outstanding** |
+
 **Browser pass done 2026-09-24 (rows above).** Still not done: the `BookingDetailsModal`
 **end-session** surface of the prompt, the BUY_NEW_PACKAGE choice through the UI, and the earlier
 API-only items noted below. The original note follows for the API-level pass: The route itself — every branch, every failure mode, and the two
@@ -80,8 +88,8 @@ check) was confirmed by source review, not by clicking. Left as an explicit foll
 
 ### BookingDetailsModal end-session flow (same behavior, second surface)
 
-- [ ] Book and start a PACKAGE-mode laser session; in the booking drawer's end-session view, confirm the same deficit panel renders above the Final Session Invoice summary. *(Not done — needs a live click-through of this specific surface.)*
-- [ ] Confirm **Confirm & End Session** is blocked while the deficit is unresolved, then resolves identically via the panel (repeat once with each choice). *(Not done.)*
+- [x] Book and start a PACKAGE-mode laser session; in the booking drawer's end-session view, confirm the same deficit panel renders above the Final Session Invoice summary. *(Done 2026-09-25 in the real UI, after the RISK-099 #4 fix — before it the panel never appeared because the deficit was invisible to the server.)*
+- [~] Confirm **Confirm & End Session** is blocked while the deficit is unresolved, then resolves identically via the panel (repeat once with each choice). *(Blocked-then-resolved verified for Pay Per Pulse; Buy New Package through this surface not click-tested.)*
 
 ### Failure and refusal cases
 

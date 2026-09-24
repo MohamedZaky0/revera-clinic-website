@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **69 resolved** · 89 tracked total.
+**7 open** · **13 partially resolved** · **70 resolved** · 90 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4600,6 +4600,20 @@ exercised the doctor's real completion, which is why all three survived.
    (idempotent on retry); the Checkout modal mirrors it via `onResolved` so its totals update without
    a reload. Test added (once-only, checked on a repeat call).
 
+4. **The `BookingDetailsModal` end-session surface had the same first break, plus a money overwrite
+   (found 2026-09-25, browser pass).** Reception's "Confirm & End Session" consumed the pulses and
+   ran the deficit gate *before* `delivered_pulses` was ever saved (the modal only kept the count in
+   state until its final PATCH), so the gate saw 0: with 5,000 entered against a 3,000 balance, 3,000
+   were consumed, the 2,000-pulse deficit was silently absorbed and the session completed with a
+   success alert (`delivered_pulses` NULL, no marker, `amount_left` 0). **Fix:** persist
+   `delivered_pulses` first, remount the prompt so it re-reads, and mirror a resolved PAY_PER_PULSE
+   charge into the modal's booking copy — its final save recomputes `amountLeft` from that copy and
+   would otherwise overwrite the charge back to 0. The final PATCH also now sends the same count that
+   was consumed. **Verified live:** the gate now blocks with the 2,000-pulse alert and shows the
+   prompt (Delivered 5,000 / Balance 0 / Deficit 2,000); Pay Per Pulse → the panel's Final Session
+   Invoice reads 10,000 EGP / Outstanding 10,000; ending the session leaves `delivered_pulses 5000`,
+   marker `PAY_PER_PULSE / 2000`, `amount_left 10000`, customer `outstanding 10000`, one deficit line.
+
 **Verified live end to end after the fixes:** doctor UI (Option 3 shows only the pulses input +
 presets; the neutral amber notice appears above the balance; no package/price/choice anywhere) →
 Complete Treatment (clamped consume 3,000 of 5,000; no invoice, no sale, only a 0 EGP "Device — 5000
@@ -4649,6 +4663,41 @@ doctor's consume has already run — it showed "5,000 pulses exceed the balance"
 "Deficit 2,000"; it was written for the old flow where the consume happens at checkout. (b) The
 `BookingDetailsModal` **end-session** surface of the deficit prompt was not click-tested. (c) For a
 moment after opening a completed booking's drawer it shows "Paid" until the deficit GET returns.
+
+---
+
+## RISK-101: Selecting A Nonexistent `services.name` Column Broke Invoice Writing For Every Completed Booking, On Dev And Production (RESOLVED)
+
+**Severity:** Critical (P0) · **Type:** Financial ledger / schema drift · **Found:** 2026-09-25 (dev server log during
+the BookingDetailsModal browser pass) · **Introduced:** `eadac73` (2026-09-20, "laser per-pulse invoice
+calculation…"), present on `main`.
+
+`public.services` has `en` / `ar` but **no `name` column** (confirmed on dev and on production). Two
+selects in `src/app/api/reservations/route.ts` (`writeCheckoutInvoice` and the PATCH costing path) asked
+for `name` (and `is_laser` etc. alongside it). PostgREST answered `42703 column services.name does not
+exist`; `writeCheckoutInvoice` threw and its caller logs it as `Failed to write Phase 1 invoice
+(dual-write, non-fatal)` and carries on. Result: **no `invoices`, `invoice_lines`, `payments` or
+transaction rows are written when any booking is completed** — the booking and customer counters update
+but the ledger does not. This is the real cause behind the "no invoice exists" symptom RISK-100 chased
+on a package-covered booking: it was not specific to package bookings. Because the error is swallowed,
+nothing failed visibly. Production impact at discovery: one booking completed since 2026-09-20, with no
+invoice (no other completions in that window) — a latent P0 that would have hit every checkout.
+
+Same drift, silently degraded, in three more places: `availability/route.ts` (the cached service list came
+back empty), `customers/packages/route.ts` (the joined package query failed and fell back, losing service
+names) and `reception/dashboard/route.ts` (selected `name` and `title`, so the dashboard showed
+"Service #5" instead of names).
+
+**Fix:** removed the nonexistent columns from all six selects (every use already falls back through
+`en || name`). `tests/lib/servicesColumnDrift.test.ts` scans `src/` for any select or PostgREST embed
+that requests `name` from `services` — the in-memory Supabase fake cannot validate columns, so no route
+test could ever catch this; the guard fails on the unfixed code and passes on the fixed code.
+
+**Follow-ups:** (1) the one production booking completed without an invoice needs a manual look; (2) the
+same class of bug — an error swallowed as "non-fatal" on a column the fake does not check — is worth a
+sweep for other tables, not just `services`; (3) the live confirmation that a completion now writes its
+invoice was pending a fresh browser session (the dev login had expired) when this was committed — see
+the manual checklist.
 
 ---
 

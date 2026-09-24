@@ -239,6 +239,7 @@ export default function BookingDetailsModal({
   // 0-balance-means-paid rule alone hid it for every package booking — reception could never reach
   // the prompt (found in the live browser pass, 2026-09-24).
   const [pendingLaserDeficit, setPendingLaserDeficit] = useState(false);
+  const [deficitPromptKey, setDeficitPromptKey] = useState(0);
   useEffect(() => {
     if (!booking?.id || booking.status !== "completed") {
       setPendingLaserDeficit(false);
@@ -1277,6 +1278,24 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         return sum + ((s.isLaser || checkIsLaserService(srvObj)) ? Number(s.pulses || 0) : 0);
       }, 0);
 
+      // The deficit gate below (and the LaserDeficitPrompt) read reservations.delivered_pulses from
+      // the server. This flow only held the count in modal state until the final save, so the gate
+      // saw 0 and a real deficit was silently absorbed while the session still completed
+      // (found in the live browser pass, 2026-09-24). Persist it first, then remount the prompt so
+      // it re-reads.
+      if (isPackageModeEnding && totalLaserPulsesToDeduct > 0) {
+        try {
+          const persistRes = await fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}`, {
+            method: "PATCH",
+            headers: authenticatedJsonHeaders,
+            body: JSON.stringify({ id: booking.id, delivered_pulses: totalLaserPulsesToDeduct }),
+          });
+          if (persistRes.ok) setDeficitPromptKey((k) => k + 1);
+        } catch (persistErr) {
+          console.warn("Could not persist delivered pulses before ending the session:", persistErr);
+        }
+      }
+
       if (isPackageModeEnding && totalLaserPulsesToDeduct > 0) {
         try {
           let targetPkgId = (booking as any).packageId || (booking as any).package_id || null;
@@ -1538,7 +1557,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           } : isPackageMode ? {
             laser_payment_mode: "PACKAGE",
             laserPaymentMode: "PACKAGE",
-            delivered_pulses: primaryPulses,
+            delivered_pulses: totalLaserPulsesToDeduct > 0 ? totalLaserPulsesToDeduct : primaryPulses,
           } : {}),
           ...(rxHasFollowUp && rxFollowUpDate ? { followUpDate: rxFollowUpDate } : {})
         })
@@ -2932,9 +2951,25 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             before Confirm & End Session is allowed to write status/money. */}
                         {isLaserPackage && (
                           <LaserDeficitPrompt
+                            key={deficitPromptKey}
                             reservationId={booking.id}
                             headers={authenticatedJsonHeaders}
                             isRTL={isRTL}
+                            onResolved={(result: any) => {
+                              // PAY_PER_PULSE adds the charge to reservations.amount_left on the
+                              // server. This flow's final save recomputes amountLeft from the
+                              // modal's own booking copy, so without mirroring it here that save
+                              // overwrites the charge back to 0.
+                              const delta = result?.resolution === "PAY_PER_PULSE" && !result?.alreadyResolved
+                                ? Number(result?.invoiceDelta) || 0
+                                : 0;
+                              if (delta <= 0) return;
+                              setBooking((prev: any) => {
+                                if (!prev) return prev;
+                                const left = Number(prev.amountLeft ?? prev.amount_left ?? 0) + delta;
+                                return { ...prev, amountLeft: left, amount_left: left };
+                              });
+                            }}
                           />
                         )}
 
