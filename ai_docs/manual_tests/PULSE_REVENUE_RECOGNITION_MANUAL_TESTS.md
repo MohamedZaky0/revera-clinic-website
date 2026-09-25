@@ -98,7 +98,7 @@ update public.customer_packages set package_type = 'services', total_pulses = 0,
 
 ## "Enter invoice value" (DEC-088 item 6) — built 2026-09-25, dev only
 
-Migration `20260925010000_confirm_historical_package_price.sql` is applied to **dev**; **not applied to production and the UI/API code is not on `main`**.
+Migration `20260925010000_confirm_historical_package_price.sql` is applied to **dev and production** (2026-09-26). The UI/API code is on `main` (`9a17d09`); the Vercel production deployment had not been confirmed at the time of writing.
 
 | Date | Check | Environment | Evidence | Result |
 |---|---|---|---|---|
@@ -116,3 +116,5 @@ Migration `20260925010000_confirm_historical_package_price.sql` is applied to **
 - [ ] `select * from package_pulse_usage where customer_package_id = <id>`: one "Pre-launch usage" row, no reservation.
 - [ ] Finance → P&L revenue does not move for the pre-launch pulses; a later real laser session recognises `price / total` per pulse.
 - [ ] As a doctor: no "Enter value" button, and the API refuses with 403.
+
+**Production apply (2026-09-26):** `migration list`: 65 = 65, none mismatched, last `20260925010000`; the function exists, exposed to anon/authenticated = 0, service_role = 1; the 5 pending packages, 1 usage row and 0 recognitions were unchanged by the apply. Rollback-only DB tests on production: `PASS: 21 assertions` (confirm) and `PASS: 36 assertions` (recognition); afterwards 0 test customers, 5 pending, 1 usage row, 0 recognitions. Code merged to `main` from a clean worktree: tsc clean, 944 tests passed, 0 failed on main's own tree.
