@@ -64,3 +64,33 @@ The in-memory `supabaseFake` cannot run PL/pgSQL, so this feature is verified ag
 ## Finding on production data (2026-09-25)
 
 5 of the 6 `customer_packages` on production are typed `package_type = 'services'` with `total_pulses = 0`, although their catalog packages are pulses packages ("2,500 Pulses" x2, "10,000 Pulses" x3), and their `price_paid` is the catalog price (2,000 / 8,000). They came from `POST /api/reservations/previous`, which does not set `package_type`/`total_pulses` and stores the catalog price. Consequences: their remaining pulses cannot be tracked or consumed, and no revenue can be recognised for them. **Fixed in code 2026-09-25** (dev): `POST /api/reservations/previous` now reads the catalog `package_type`/`total_pulses` and sets the price to the entered invoice value only for a package-only booking, otherwise `price_pending = true` with `price_paid = 0` (never the catalog price); it returns `package: { created, pricePending, packageType, totalPulses, error? }`. Tests: `tests/routes/reservations-previous-package.test.ts` (9, 7 fail without the change). **Existing production rows are repaired by `scripts/repair_historical_pulses_packages.sql`** (dry run first: `..._dry_run.sql`) — dry run on production 2026-09-25 lists exactly the 5 packages (Randa 2 x 2,500 Pulses, Khaled 2 x 10,000, Zeinab 1 x 10,000); script tested on dev with fixtures (repairs only the mis-typed one, idempotent, leaves real pulses and services packages alone). **Not yet applied to production; route change not yet on main.** Still to build: the badge and the "Enter invoice value" action.
+
+## Production repair applied (2026-09-25)
+
+`scripts/repair_historical_pulses_packages.sql` was run on production after a fresh dry run (5 x WOULD REPAIR) and the
+route fix was merged to `main` (`bd740e6`; full suite green on main's own tree, 918 passed).
+
+| Package | Catalog | Before (type / quota / remaining / price_paid / pending) | After |
+|---|---|---|---|
+| b579b41e… | 2,500 Pulses | services / 0 / 0 / 2,000 / false | pulses / 2,500 / 2,500 / 0 / **pending** |
+| a6fd7137… | 2,500 Pulses | services / 0 / 0 / 2,000 / false | pulses / 2,500 / 2,500 / 0 / **pending** |
+| 3146b0ca… | 10,000 Pulses | services / 0 / 0 / 8,000 / false | pulses / 10,000 / 10,000 / 0 / **pending** |
+| f36b5f4d… | 10,000 Pulses | services / 0 / 0 / 8,000 / false | pulses / 10,000 / 10,000 / 0 / **pending** |
+| 4cda7c8d… | 10,000 Pulses | services / 0 / 0 / 8,000 / false | pulses / 10,000 / 10,000 / 0 / **pending** |
+
+The sixth package (`de947a26…`, 2,500 pulses, fully used, price 2,000) was correctly left alone. A second run changed nothing.
+The remaining balance is the full catalog quota — pulses used before the clinic went live are unknown and must be adjusted by staff.
+Their price stays pending (no revenue is recognised for them) until staff enter the real invoice value.
+
+**Rollback (restores the exact pre-repair values):**
+```sql
+update public.customer_packages set package_type = 'services', total_pulses = 0, pulses_used = 0, pulses_remaining = 0,
+       price_pending = false,
+       price_paid = case id when 'b579b41e-c52a-4fb1-8495-42196043dcaf' then 2000 when 'a6fd7137-6a9a-4fd3-a116-694f851d20d1' then 2000 else 8000 end
+ where id in ('b579b41e-c52a-4fb1-8495-42196043dcaf','a6fd7137-6a9a-4fd3-a116-694f851d20d1','3146b0ca-0400-4792-beb7-b0652ac90ddf',
+              'f36b5f4d-02c5-41d1-aa31-3108e37d6aa4','4cda7c8d-8c9f-4220-be52-a15a4656d819');
+```
+
+- [x] Repair script applied on production; second run a no-op; the fully-used package untouched.
+- [ ] Customer profile (Randa, Khaled, Zeinab): their packages now show pulse balances (2,500 / 10,000) instead of a services package with no sessions.
+- [ ] Staff review each package's remaining pulses and enter the real invoice value (needs the "Enter invoice value" action — not built yet).
