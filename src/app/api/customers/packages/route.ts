@@ -147,7 +147,7 @@ export async function GET(req: Request) {
         const { data, error } = await supabaseServer
           .from('customer_packages')
           .select(`
-            id, customer_id, package_id, status, purchased_at, expires_at, price_paid,
+            id, customer_id, package_id, status, purchased_at, expires_at, price_paid, price_pending,
             package_type, total_pulses, pulses_used, pulses_remaining,
             packages ( id, name, name_ar, package_type ),
             customer_package_items ( id, service_id, qty_total, qty_used, qty_remaining, services ( id, en, ar, price ) )
@@ -182,6 +182,7 @@ export async function GET(req: Request) {
               purchasedAt: row.purchased_at,
               expiresAt: row.expires_at,
               pricePaid: row.price_paid !== null ? Number(row.price_paid) : 0,
+pricePending: Boolean(row.price_pending),
               totalPulses: incPulses,
               includedPulses: incPulses,
               usedPulses: usedPulses,
@@ -247,6 +248,7 @@ export async function GET(req: Request) {
                 purchasedAt: row.purchased_at,
                 expiresAt: row.expires_at,
                 pricePaid: row.price_paid !== null ? Number(row.price_paid) : 0,
+pricePending: Boolean(row.price_pending),
                 totalPulses: incPulses,
                 includedPulses: incPulses,
                 usedPulses: usedPulses,
@@ -317,6 +319,53 @@ export async function PATCH(req: Request) {
     }
 
     const PKG_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    // DEC-088 item 6: "Enter invoice value" for a historical package whose price was left pending. Sets the real
+    // price and the pulses already used before launch, atomically (confirm_historical_package_price RPC).
+    if (action === 'confirm_package_price') {
+      const role = String(access.access.role || '').toLowerCase().replace(/[\s_-]+/g, '');
+      if (!(role.includes('super') || role.includes('admin') || role.includes('reception'))) {
+        return NextResponse.json({ success: false, error: 'Only reception or admin can enter a package invoice value.' }, { status: 403 });
+      }
+      if (!PKG_UUID_RE.test(String(pkgId))) {
+        return NextResponse.json({ success: false, error: 'Customer package not found.' }, { status: 400 });
+      }
+      const priceRaw = body.price_paid ?? body.pricePaid;
+      const price = typeof priceRaw === 'number' ? priceRaw : (String(priceRaw ?? '').trim() === '' ? NaN : Number(priceRaw));
+      const pulsesUsed = Number(body.pulses_used_before ?? body.pulsesUsedBefore ?? 0);
+      if (!Number.isFinite(price) || price < 0) {
+        return NextResponse.json({ success: false, error: 'Enter the invoice value paid for this package (zero or more).' }, { status: 400 });
+      }
+      if (!Number.isInteger(pulsesUsed) || pulsesUsed < 0) {
+        return NextResponse.json({ success: false, error: 'Pulses already used must be a whole number, zero or more.' }, { status: 400 });
+      }
+
+      const { data: rpcData, error: rpcError } = await supabaseServer.rpc('confirm_historical_package_price', {
+        p_customer_package_id: pkgId,
+        p_price: price,
+        p_pulses_used: pulsesUsed,
+        p_employee_id: access.access.employee?.id ?? null,
+      });
+      if (rpcError) {
+        const msg = String(rpcError.message || '');
+        if (msg.includes('not found')) return NextResponse.json({ success: false, error: 'Customer package not found.' }, { status: 404 });
+        if (msg.includes('already confirmed')) return NextResponse.json({ success: false, error: 'This package price was already confirmed.' }, { status: 409 });
+        if (msg.includes('exceeds the remaining')) return NextResponse.json({ success: false, error: 'Pulses already used cannot be more than the package balance.' }, { status: 400 });
+        if (msg.includes('services package')) return NextResponse.json({ success: false, error: 'Pulses do not apply to a services package.' }, { status: 400 });
+        if (msg.includes('zero or more')) return NextResponse.json({ success: false, error: msg }, { status: 400 });
+        console.error('confirm_historical_package_price RPC failed:', rpcError);
+        return NextResponse.json({ success: false, error: msg || 'Could not save the package price.' }, { status: 500 });
+      }
+      const result: any = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData;
+      return NextResponse.json({
+        success: true,
+        alreadyConfirmed: Boolean(result?.already_confirmed),
+        pricePaid: Number(result?.price_paid ?? price),
+        pulsesUsed: Number(result?.pulses_used ?? 0),
+        pulsesRemaining: Number(result?.pulses_remaining ?? 0),
+        recognitionRows: Number(result?.recognition_rows ?? 0),
+      });
+    }
 
     // Set / Initialize Included Pulses on package — writes the real customer_packages columns
     if (action === 'set_included_pulses' || included_pulses !== undefined) {

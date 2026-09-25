@@ -3127,7 +3127,17 @@ code writes it.
    consumed (item 8's logic, per package). The action is idempotent and refuses to run twice with a different
    value unless the user explicitly edits. The cash for these packages predates the ledger and is excluded from
    Cash Flow by `is_opening`, so their recognised revenue has no matching cash inside the ledger period —
-   accepted; that is what opening deferred revenue means. Scope: **packages only** — a non-package historical
+   accepted; that is what opening deferred revenue means. **Delivered 2026-09-25 (dev; not yet on main/production):** the
+   "Enter invoice value" dialog (`ConfirmPackagePriceModal`, on the patient profile → Packages, reception/admin only) calls
+   `PATCH /api/customers/packages { action: 'confirm_package_price' }` → the `confirm_historical_package_price()` function
+   (`20260925010000_confirm_historical_package_price.sql`): in one transaction it sets `price_paid`, clears `price_pending`,
+   records the **pulses already used before launch** as a `package_pulse_usage` row with no booking (dated at the purchase
+   date, so it sorts first) and back-fills revenue for anything consumed while the price was pending (pulses via the catch-up
+   function; a services package by re-deriving its zero-amount recognitions). **Pre-launch pulses recognise no revenue** —
+   that consumption predates the ledger; only pulses used from now on earn `price_paid / total_pulses` each, so a package
+   with 3,000 of 10,000 pulses used before launch recognises at most 70% of its price. **Not done (deliberately):** updating
+   the booking's own ledger invoice and the customer's debt/wallet difference — there is no reliable link from a package to
+   its booking, and guessing one would edit money records; the historical booking's invoice stays as entered. Scope: **packages only** — a non-package historical
    booking with no entered value keeps the DEC-086 fallback (invoice = amount paid), which cannot misstate
    revenue because it equals the cash received.
 7. **Reversals:** no code path un-consumes pulses today. Any future restore/correction must delete or negate

@@ -95,3 +95,24 @@ update public.customer_packages set package_type = 'services', total_pulses = 0,
 - [x] Repair script applied on production; second run a no-op; the fully-used package untouched.
 - [ ] Customer profile (Randa, Khaled, Zeinab): their packages now show pulse balances (2,500 / 10,000) instead of a services package with no sessions.
 - [ ] Staff review each package's remaining pulses and enter the real invoice value (needs the "Enter invoice value" action — not built yet).
+
+## "Enter invoice value" (DEC-088 item 6) — built 2026-09-25, dev only
+
+Migration `20260925010000_confirm_historical_package_price.sql` is applied to **dev**; **not applied to production and the UI/API code is not on `main`**.
+
+| Date | Check | Environment | Evidence | Result |
+|---|---|---|---|---|
+| 2026-09-25 | Apply migration | dev | `db push --linked`; only that migration pending | Pass |
+| 2026-09-25 | Repeatable DB test `scripts/db_tests/confirm_historical_package_price.test.sql` | dev, rollback-only | `PASS: 21 assertions` — price + pre-launch pulses (3,000 of 10,000 → balance 7,000, usage row with no booking dated at purchase, **no revenue for pre-launch pulses**); a later 1,000-pulse consume recognises exactly 500.00 (T(4000)−T(3000)); same-price replay is a no-op, a different price is refused; validation (pulses > balance, negative, unknown package) changes nothing; consumed-while-pending is caught up (500.00); all pulses used → `fully_used`; services package re-derives 0 → 200.00 and totals 600.00 at depletion; pulses refused on a services package; ACL service_role only | Pass |
+| 2026-09-25 | Pulse-recognition DB test (regression) | dev | still `PASS: 36 assertions` | Pass |
+| 2026-09-25 | Route tests `tests/routes/customers-packages-confirm-price.test.ts` | local | 17: role gate (doctor 403), input validation (7 cases → 400, RPC never called), RPC args, camelCase, price 0 allowed, error mapping 404/409/400, 500 | Pass |
+| 2026-09-25 | Component tests `tests/components/ConfirmPackagePriceModal.test.tsx` | local, jsdom | 9: price starts empty, catalog price is only a suggestion ("Use catalog price" fills it, nothing is sent), request body, balance preview, bounds + visible error, price 0, server error keeps dialog open, services package has no pulses field, Arabic/RTL | Pass |
+| 2026-09-25 | `tsc` clean; eslint clean on new files, `CustomerProfileDrawer.tsx` 0 errors before and after; full vitest 1072 passed, the same 7 unrelated failures | local | | Pass |
+| — | **Click-test in the real UI** (patient profile → Packages → "Invoice value missing" → "Enter value") | dev, browser, signed-in | — | **Not run** — needs a signed-in session; only jsdom-tested so far |
+
+- [ ] Open a patient with a pending package (on production: Randa, Khaled, Zeinab after the migration + code are deployed): the card shows "Invoice value missing" and an "Enter value" button (reception/admin only; not shown to a doctor).
+- [ ] The dialog starts with an empty price and shows the catalog price as a suggestion; "Use catalog price" fills it; nothing is saved until Save.
+- [ ] Save 5,000 with 3,000 pulses used on a 10,000-pulse package: the card refreshes to `EGP 5,000 paid`, balance 7,000 / 10,000, badge gone; running it again is refused (already confirmed).
+- [ ] `select * from package_pulse_usage where customer_package_id = <id>`: one "Pre-launch usage" row, no reservation.
+- [ ] Finance → P&L revenue does not move for the pre-launch pulses; a later real laser session recognises `price / total` per pulse.
+- [ ] As a doctor: no "Enter value" button, and the API refuses with 403.
