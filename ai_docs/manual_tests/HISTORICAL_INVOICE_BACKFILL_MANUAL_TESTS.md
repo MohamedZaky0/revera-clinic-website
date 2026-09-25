@@ -46,3 +46,15 @@
 - [x] Finance revenue/cash reports exclude `is_opening` invoices (route tests + source guard).
 - [ ] After a production apply, open Finance → P&L / Cash Flow / Service Mix for April–August and confirm revenue and cash stay at 0 for those months.
 - [ ] `GET /api/customers/reconcile` reports no drift for the backfilled customers.
+
+## Add Previous Booking now writes its own invoice (RISK-102 fix)
+
+Automated: `tests/routes/reservations-previous-invoice.test.ts` (15 tests: paid in full, part-paid package, zero value
+skipped, value-less fallback to paid, overpaid product, unpaid balance, failure reported without failing the booking,
+payment-method mapping); the route tests fail without the change. Live UI click-test not done (needs a signed-in session).
+
+- [ ] Admin → Add Previous Booking: service booking, value 1,200, paid 1,200, method Visa. Booking saves and customer spent rises by 1,200. `select * from invoices where reservation_id = <id>` → 1 invoice, `is_opening = true`, 1,200, dated the booking date; 1 payment 1,200 `card`.
+- [ ] Value 3,000, paid 1,000 (package): invoice 3,000, payment 1,000, customer `outstanding` +2,000 and ledger outstanding also 2,000.
+- [ ] Value 0 and paid 0: booking saves, no invoice.
+- [ ] `GET /api/customers/reconcile` shows no drift for a customer whose history was all entered through this screen.
+- [ ] Finance → P&L / Cash Flow for the booking's month do not move.
