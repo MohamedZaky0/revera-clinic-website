@@ -2859,6 +2859,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     fetchCustomerProductBalances,
     fetchAvailablePackageOffers,
     handleSellPackageToCustomer,
+    fetchCustomerProfilePackages,
     handleSaveUsageLog,
     handleAddProductToPatient,
     handleStartCreatePrescription,
@@ -6599,6 +6600,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   selectedHistoryRx={selectedHistoryRx}
                   fetchAvailablePackageOffers={fetchAvailablePackageOffers}
                   handleSellPackageToCustomer={handleSellPackageToCustomer}
+                  fetchCustomerProfilePackages={fetchCustomerProfilePackages}
                   handleSaveUsageLog={handleSaveUsageLog}
                   handleAddProductToPatient={handleAddProductToPatient}
                   handleStartCreatePrescription={handleStartCreatePrescription}
