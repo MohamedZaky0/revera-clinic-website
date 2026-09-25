@@ -119,3 +119,12 @@ export function formatInvoiceNo(seqValue: number): string {
 function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
+
+/**
+ * PostgREST `.or()` filter that keeps a query to invoices that are NOT `is_opening` (DEC-086).
+ * Backfilled historical invoices are flagged `is_opening = true` so they feed customer value and
+ * reconciliation but never the revenue / margin / cash-flow reports — they have no COGS or
+ * commission and predate the ledger. `is_opening` is nullable in principle, so this matches NULL
+ * as well as false (`.neq('is_opening', true)` would silently drop NULL rows in PostgREST).
+ */
+export const EXCLUDE_OPENING_INVOICES = 'is_opening.is.null,is_opening.eq.false';

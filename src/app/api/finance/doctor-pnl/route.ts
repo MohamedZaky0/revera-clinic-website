@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireStaffAccess, hasFinancePermission } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { EXCLUDE_OPENING_INVOICES } from '@/lib/ledger';
 import { resolveDateRange } from '@/lib/financeReportRange';
 
 export const dynamic = 'force-dynamic';
@@ -75,6 +76,7 @@ export async function GET(req: Request) {
       .from('invoices')
       .select('id')
       .eq('status', 'issued')
+      .or(EXCLUDE_OPENING_INVOICES)
       .gte('issued_at', range.fromIso)
       .lt('issued_at', range.toIsoExclusive);
     if (branchId) invoiceQuery = invoiceQuery.eq('branch_id', branchId);

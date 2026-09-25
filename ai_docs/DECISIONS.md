@@ -2978,8 +2978,13 @@ the ledger under-reads every customer with pre-launch history. Production had 13
 2. **Total** = `[Invoice Total]: N EGP` from `reception_notes` if present, else `amount_paid + amount_left`.
    Bookings whose total is 0 are skipped — there is nothing to value. The line description comes from the
    route's own `Service:` / `Package:` / `Product:` note tags and is suffixed `[historical backfill]`.
-3. **Every backfilled invoice and payment is `is_opening = true`** (the DEC-024 import flag), so any report
-   can exclude backfilled history from live revenue.
+3. **Every backfilled invoice and payment is `is_opening = true`** (the DEC-024 import flag), and the revenue
+   reports now honour it: `finance/pnl`, `trend`, `branch-pnl`, `service-mix`, `service-margin`, `doctor-pnl`,
+   `cashflow` and the revenue part of `new-vs-returning` filter with `EXCLUDE_OPENING_INVOICES`
+   (`src/lib/ledger.ts`; matches `is_opening` NULL or false — PostgREST `neq true` would drop NULL rows).
+   Backfilled history therefore feeds customer value, `reconcile`, `receivables-aging`, `settle-debt` and the
+   new-vs-returning first-invoice lookup, but never revenue, margin or cash-flow (no COGS/commission, predates
+   the ledger). Audited 2026-09-25: no invoice reader honoured the flag before this.
 4. **No `transactions` rows are written** — the previous-bookings route already recorded the cash side there;
    writing again would double-count cash.
 5. `payments.method` is mapped into the CHECK set (card/instapay/wallet/transfer, else cash); the raw
@@ -2996,8 +3001,8 @@ Checklist: `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`. *
 - Totals are only as good as what reception typed: with no `[Invoice Total]` the total falls back to what was
   paid, so an unpaid-but-owed old booking recorded without a total would not appear as a receivable.
 - Backfilled invoices carry one summary line, not the original service/package/product breakdown.
-- Reports that sum `invoices` without honouring `is_opening` would now count this history; whether each
-  finance screen does was not audited (it is why the flag is set).
+- A new report that sums `invoices` must apply `EXCLUDE_OPENING_INVOICES` or it will count this history;
+  `tests/routes/finance-opening-invoices.test.ts` guards the eight existing ones.
 
 
 

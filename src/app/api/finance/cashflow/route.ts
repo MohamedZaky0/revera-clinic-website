@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireStaffAccess, hasFinancePermission } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { EXCLUDE_OPENING_INVOICES } from '@/lib/ledger';
 import { resolveDateRange } from '@/lib/financeReportRange';
 
 export const dynamic = 'force-dynamic';
@@ -38,7 +39,8 @@ export async function GET(req: Request) {
     let invoiceQuery = supabaseServer
       .from('invoices')
       .select('id')
-      .eq('status', 'issued');
+      .eq('status', 'issued')
+      .or(EXCLUDE_OPENING_INVOICES);
     if (branchId) invoiceQuery = invoiceQuery.eq('branch_id', branchId);
     const { data: invoices, error: invoicesError } = await invoiceQuery;
     if (invoicesError) throw invoicesError;
