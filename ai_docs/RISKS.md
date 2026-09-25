@@ -4723,8 +4723,10 @@ note the finance revenue/cash reports now exclude `is_opening` invoices (audited
 The pages are live in code but these items came from Manus and were never checked against the clinic:
 - **Google rating "4.9 ★ · 31 reviews"** and the three review quotes (`CLIENT.googleRating`,
   `LANDING_REVIEWS`) — must match the Maps listing at the moment ads go live.
-- **"اسم الجهاز والموديل بوضوح"** is promised in three places, but no device name appears anywhere on the
-  page. Either name the device or drop the promise.
+- ~~Device name promised but never shown~~ — **resolved 2026-09-25:** owner supplied **Candela GentleMax Pro**
+  (`CLIENT.laserDevice`); headlines, trust bar, device section and FAQ now name it and state it suits all skin
+  types. Still needs the owner's device photo to replace the placeholder panel in the device section, and the
+  "suits all skin types" wording should be kept tied to the device (not to outcomes) for Google Ads policy.
 - **"تبريد قبل كل نبضة"** (cooling) and **"8–10 جلسات"** — clinical claims; confirm with the doctor.
 - **Doctor photo** (`doctor-portrait.webp`, from `doctor/portrait-about.jpg`) is not confirmed to be the
   laser practitioner. Note `doctor/portrait-main.jpg` is byte-identical to `clinic/treatment.jpg` (a

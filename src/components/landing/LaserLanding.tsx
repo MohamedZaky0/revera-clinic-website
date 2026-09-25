@@ -146,7 +146,7 @@ export function LaserLanding({ variant }: { variant: LandingVariant }) {
           <div className="lp-wrap lp-trust-grid">
             <div><strong>{score} ★</strong><span>على Google · {count} تقييم</span></div>
             <div><ShieldCheck size={20} aria-hidden="true" /><span>تقييم قبل الجلسة</span></div>
-            <div><ThermometerSnowflake size={20} aria-hidden="true" /><span>تبريد وإعدادات محسوبة</span></div>
+            <div><ThermometerSnowflake size={20} aria-hidden="true" /><span dir="ltr">{CLIENT.laserDevice}</span></div>
             <div><Stethoscope size={20} aria-hidden="true" /><span>إشراف طبي متخصص</span></div>
           </div>
         </section>
@@ -177,9 +177,9 @@ export function LaserLanding({ variant }: { variant: LandingVariant }) {
             <div className="lp-split-copy">
               <span className="lp-kicker">{isMen ? "اسأل" : "اسألي"} قبل ما {isMen ? "تحجز" : "تحجزي"}</span>
               <h2>الجهاز مهم.<br /><em>والخطة أهم.</em></h2>
-              <p>مش كل جهاز ولا كل إعداد مناسب لكل بشرة. علشان كده بنشرح لك المناسب لحالتك، ونعمل تقييم قبل الجلسة بدل إجابة عامة.</p>
+              <p>بنستخدم جهاز {CLIENT.laserDevice}، المناسب لجميع أنواع البشرة. ومع ذلك مش كل إعداد مناسب لكل حالة، فبنعمل تقييم قبل الجلسة بدل إجابة عامة.</p>
               <ul>
-                <li><Check size={16} aria-hidden="true" /> اسم الجهاز والموديل بوضوح</li>
+                <li><Check size={16} aria-hidden="true" /> جهاز <bdi dir="ltr">{CLIENT.laserDevice}</bdi> لجميع أنواع البشرة</li>
                 <li><Check size={16} aria-hidden="true" /> إعدادات حسب بشرتك وشعرك</li>
                 <li><Check size={16} aria-hidden="true" /> توقعات واقعية ومتابعة</li>
               </ul>
@@ -187,7 +187,7 @@ export function LaserLanding({ variant }: { variant: LandingVariant }) {
             </div>
             <div className="lp-device-art" aria-hidden="true">
               <div className="lp-wave"><Waves size={46} /></div>
-              <span>Technology<br /><b>×</b> Care</span>
+              <span>{CLIENT.laserDevice.split(" ")[0]}<br /><b>{CLIENT.laserDevice.split(" ").slice(1).join(" ")}</b></span>
             </div>
           </div>
         </section>
