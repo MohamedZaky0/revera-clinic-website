@@ -362,7 +362,7 @@ async function writeCheckoutInvoice(params: {
 
   const { data: services, error: svcErr } = await supabaseServer
     .from('services')
-    .select('id, en, ar, name, price, branch_pricing, islaser, is_laser, category')
+    .select('id, en, ar, price, branch_pricing, islaser, is_laser, category')
     .in('id', serviceIds);
   if (svcErr) throw svcErr;
   if (!services || services.length === 0) return;
@@ -1767,7 +1767,7 @@ export async function PATCH(req: Request) {
 
         const { data: svcs } = await supabaseServer
           .from('services')
-          .select('id, en, ar, name, price, branch_pricing, islaser, is_laser, category')
+          .select('id, en, ar, price, branch_pricing, islaser, is_laser, category')
           .in('id', effectiveServiceIds);
         if (svcs && svcs.length > 0) {
           derivedTotalCost = svcs.reduce((sum: number, s: any) => {

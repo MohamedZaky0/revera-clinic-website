@@ -57,7 +57,7 @@ async function fetchCachedServices() {
   if (cachedServices && now < cachedServicesExpiry) {
     return cachedServices;
   }
-  const { data } = await supabaseServer.from('services').select('id, en, name, duration, duration_minutes');
+  const { data } = await supabaseServer.from('services').select('id, en, duration, duration_minutes');
   cachedServices = data || [];
   cachedServicesExpiry = now + CACHE_TTL;
   return cachedServices;
@@ -211,7 +211,7 @@ export async function GET(req: Request) {
         try {
           const { data: fullSvc } = await supabaseServer
             .from('services')
-            .select('en, name, duration, duration_minutes')
+            .select('en, duration, duration_minutes')
             .eq('id', missingId)
             .maybeSingle();
           if (fullSvc) {
