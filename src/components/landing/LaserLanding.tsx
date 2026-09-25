@@ -128,8 +128,8 @@ export function LaserLanding({ variant }: { variant: LandingVariant }) {
             </div>
             <div className="lp-hero-media">
               <Image
-                src="/images/landing/clinic.webp"
-                alt={c.heroImageAlt}
+                src={c.heroImage.src}
+                alt={c.heroImage.alt}
                 fill
                 priority
                 sizes="(max-width: 900px) 100vw, 520px"
@@ -218,7 +218,7 @@ export function LaserLanding({ variant }: { variant: LandingVariant }) {
         <section className="lp-section lp-character">
           <div className="lp-wrap lp-split">
             <div className="lp-character-media">
-              <Image src="/images/landing/doctor-portrait.webp" alt={`الفريق الطبي في ${CLIENT.name}`} fill sizes="(max-width: 900px) 100vw, 520px" />
+              <Image src={c.conversation.image.src} alt={c.conversation.image.alt} fill sizes="(max-width: 900px) 100vw, 520px" />
             </div>
             <div className="lp-split-copy">
               <span className="lp-kicker">المحادثة الصح</span>

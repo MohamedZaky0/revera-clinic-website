@@ -16,7 +16,7 @@ export function landingMetadata(variant: LandingVariant): Metadata {
       title: c.docTitle,
       description: c.metaDescription,
       url: c.path,
-      images: [{ url: "/images/landing/clinic.webp", width: 1200, height: 900, alt: c.heroImageAlt }],
+      images: [{ url: "/images/landing/clinic.webp", width: 1200, height: 900, alt: `استقبال ${CLIENT.name}` }],
     },
   };
 }
