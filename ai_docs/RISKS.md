@@ -4770,9 +4770,9 @@ written only by the DB function `consume_customer_package_session`, i.e. for **s
 Pulses packages (all 6 on production) are consumed through `consume_package_pulses` (Brief 34B) and the
 deficit route, neither of which writes a recognition. Result: September P&L revenue reads ~1,750 (products
 only) against 45,950 cash actually received. **Fix direction:** recognise revenue when pulses are
-consumed (pro-rata: `price_paid / total_pulses` per pulse), in the same transaction as
-`consume_package_pulses`, and back-fill from `package_pulse_usage` — needs a decision (new DEC) before
-code, because it changes reported revenue.
+consumed (pro-rata, in the same transaction as `consume_package_pulses`) and back-fill from
+`package_pulse_usage` — designed in **DEC-088 (Proposed 2026-09-25; two items need owner confirmation)**,
+no code yet.
 
 **2. Cash flow and `transactions` disagree.** `cashflow` sums `payments` (45,950); `transactions` holds
 52,300 of non-historical payments. The 7,800 gap is three `source = manual` payments with no invoice
