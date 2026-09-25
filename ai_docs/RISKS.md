@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**9 open** · **13 partially resolved** · **70 resolved** · 92 tracked total.
+**8 open** · **13 partially resolved** · **71 resolved** · 92 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4701,7 +4701,7 @@ the manual checklist.
 
 ---
 
-## RISK-102: New Historical Bookings Still Write No Invoice, So The Ledger Drifts From Customer Totals Again (OPEN)
+## RISK-102: New Historical Bookings Still Write No Invoice, So The Ledger Drifts From Customer Totals Again (RESOLVED 2026-09-25)
 
 **Severity:** Medium · **Type:** Financial ledger / data completeness · **Found:** 2026-09-25 · **Related:** DEC-086
 
@@ -4709,7 +4709,9 @@ the manual checklist.
 records a `transactions` payment, but writes no `invoices` / `invoice_lines` / `payments`. DEC-086's one-time
 script (`scripts/backfill_historical_invoices.sql`) fixes the existing rows only; every historical booking
 entered afterwards reopens the gap, and `GET /api/customers/reconcile` will report drift for that customer
-until the script is re-run (it is idempotent, so re-running is safe). **Fix options:** have the route write
+until the script is re-run (it is idempotent, so re-running is safe). **Resolved:** the route now writes the invoice + payment itself (`src/lib/historicalInvoice.ts`, DEC-086 item 6;
+`tests/routes/reservations-previous-invoice.test.ts`, 15 tests that fail without the change); failures are
+reported as `response.ledger.status = 'failed'`, repairable by re-running the idempotent script. Original fix options: have the route write
 the invoice + payment itself (`is_opening = true`, same rules as the script), or schedule the script. Also
 note the finance revenue/cash reports now exclude `is_opening` invoices (audited and fixed 2026-09-25, DEC-086), so this gap costs customer-value accuracy only, not P&L. **Applied on production 2026-09-25 (7 invoices, 16,600 EGP).** Finding: for 2 of the 3 backfilled customers `customers.spent_amount` disagrees with the ledger (Zeinab 10,000 vs 5,000; Khaled 1,200 vs 5,200) while the ledger matches `reservations.amount_paid` and `transactions` exactly — the scalar was already wrong; it was not modified. Checklist:
 `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.

@@ -2989,8 +2989,12 @@ the ledger under-reads every customer with pre-launch history. Production had 13
    writing again would double-count cash.
 5. `payments.method` is mapped into the CHECK set (card/instapay/wallet/transfer, else cash); the raw
    free-text method stays on the original `transactions` row.
-6. The `previous` route itself is **not** changed here; new historical bookings entered after the script has
-   run still get no invoice until that route is made to write one (open follow-up, RISK-102).
+6. **Update 2026-09-25:** `POST /api/reservations/previous` now writes the same invoice + payment itself
+   (`src/lib/historicalInvoice.ts`, `writeHistoricalBookingInvoice`, same rules: `is_opening`, dated to the
+   booking, total = entered value else paid, total 0 skipped, no `transactions` row). It is non-fatal — the
+   booking, balances and transactions row are already saved — and the outcome is returned as
+   `response.ledger` (`created` / `skipped` / `failed`) instead of being swallowed; the script remains the
+   idempotent repair for any `failed`. A partly written invoice is deleted on failure.
 
 **Verified (dev, 2026-09-25):** seeded historical bookings (paid in full, part-paid package, zero-value,
 overpaid product); the ledger figures matched the customer row exactly (spent 2,200 = 2,200, outstanding
