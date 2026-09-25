@@ -3068,8 +3068,9 @@ Checklist: `ai_docs/manual_tests/LASER_LANDING_PAGES_MANUAL_TESTS.md`.
 ## DEC-088: Laser-Pulse Package Revenue Is Recognised Per Pulse Consumed (Extends DEC-023)
 
 **Date:** 2026-09-25
-**Status:** Proposed — implementation not started. Items 5 and 6 need the owner's confirmation before code;
-items 1–4, 7 and 8 follow directly from DEC-023 and the existing schema.
+**Status:** Proposed — implementation not started. Item 6 confirmed by the owner 2026-09-25; item 5 (expiry)
+still awaits the owner's confirmation before it is built; items 1–4, 7 and 8 follow directly from DEC-023 and the
+existing schema.
 
 **Context:**
 DEC-023 defers package cash as a liability and recognises revenue as sessions are delivered. That works only
@@ -3108,7 +3109,8 @@ code writes it.
    lapses. Not part of the first release: it needs `reservation_id` nullable (or a sibling table) and a scheduled
    or on-read sweep, and there is currently no expiry job. Until it ships, expired-unused balances stay deferred
    (a conservative understatement, never an overstatement).
-6. **Historical packages (owner to confirm):** `POST /api/reservations/previous` creates the customer's package
+6. **Historical packages (CONFIRMED by the owner 2026-09-25 — the entered invoice value is used, and the catalog
+   price is the fallback/reference when none was entered):** `POST /api/reservations/previous` creates the customer's package
    with `price_paid = catalog price` even when the receptionist entered a smaller paid/invoice value.
    Recommended: recognise as the customer consumes (an undelivered obligation genuinely exists at launch,
    DEC-024), but set `price_paid` for a historical package to the **entered invoice value** (falling back to the
