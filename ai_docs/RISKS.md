@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**8 open** · **13 partially resolved** · **70 resolved** · 91 tracked total.
+**9 open** · **13 partially resolved** · **70 resolved** · 92 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4742,6 +4742,51 @@ The pages are live in code but these items came from Manus and were never checke
 **Fix:** clinic owner/doctor confirms each claim (or it is edited out); create the GTM container, set
 `NEXT_PUBLIC_GTM_ID` in Vercel, map the events to conversions, and test with Tag Assistant. Checklist:
 `ai_docs/manual_tests/LASER_LANDING_PAGES_MANUAL_TESTS.md` (check 11).
+
+---
+
+## RISK-104: Finance Section Understates Revenue And Cash — Pulses-Package Revenue Is Never Recognised, And Cash In `transactions` Exceeds The Ledger (OPEN)
+
+**Severity:** High (financial reporting) · **Type:** Financial ledger / revenue recognition · **Found:** 2026-09-25 (production audit, read-only SQL reproducing each report's inputs; the Finance UI itself was not reviewed — the browser pane had no signed-in session). **Related:** DEC-023, DEC-086, RISK-102.
+
+Production figures at audit time (September 2026 is the only month with live data; backfilled history excluded):
+
+| Input | Value | What it means |
+|---|---|---|
+| Live invoices | 29 issued, 48,300 EGP | lines: **package 46,550**, product 1,750, service 0 |
+| Ledger cash (`payments`) | 45,950 (all cash) | vs invoices 48,300: 3 underpaid invoices, 2,400 outstanding |
+| `transactions` payments, not historical | 52,300 | 44,500 linked to an invoice + **3 manual payments (7,800) with no invoice** |
+| `package_revenue_recognitions` | **0 rows** | while 6 pulses packages (30,000) are sold |
+| `invoice_lines.provider_id` | NULL on 29/29 | doctor P&L is 100% "unattributed" |
+| `cogs_snapshot` / `commission_snapshot` NULL | 19 of 29 lines | margins overstated on those lines |
+| expenses / fixed assets / loans | 0 / 0 / 0 | "fully-loaded profit" equals contribution margin |
+
+**1. Package revenue is never recognised for laser pulses packages.** `pnl` / `trend` / `branch-pnl` /
+`new-vs-returning` count `service` and `product` invoice lines plus `package_revenue_recognitions`
+(DEC-023: package cash is deferred, revenue is recognised as sessions are delivered). Recognitions are
+written only by the DB function `consume_customer_package_session`, i.e. for **services** packages.
+Pulses packages (all 6 on production) are consumed through `consume_package_pulses` (Brief 34B) and the
+deficit route, neither of which writes a recognition. Result: September P&L revenue reads ~1,750 (products
+only) against 45,950 cash actually received. **Fix direction:** recognise revenue when pulses are
+consumed (pro-rata: `price_paid / total_pulses` per pulse), in the same transaction as
+`consume_package_pulses`, and back-fill from `package_pulse_usage` — needs a decision (new DEC) before
+code, because it changes reported revenue.
+
+**2. Cash flow and `transactions` disagree.** `cashflow` sums `payments` (45,950); `transactions` holds
+52,300 of non-historical payments. The 7,800 gap is three `source = manual` payments with no invoice
+(e.g. the `zaki` booking, 2,000 paid, completed with no invoice before RISK-101 was fixed) plus payments
+recorded on the ledger but not in `transactions`. Which table the Finance screens should treat as the
+source of truth is undecided (RISK-016).
+
+**3. Doctor P&L has no attribution.** No invoice line carries `provider_id`, so `finance/doctor-pnl` puts
+everything in `unattributed` and `commission-payouts` returns nothing from the ledger.
+
+**4. Empty cost side.** No expenses, assets or loans are recorded, and 19 of 29 lines have no COGS or
+commission snapshot — every profit figure is a revenue figure until those are entered.
+
+**Not a Finance-code bug (verified):** the backfilled historical invoices (`is_opening`) are correctly
+excluded from all eight revenue/cash reports (DEC-086, `tests/routes/finance-opening-invoices.test.ts`).
+Checklist: `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.
 
 ---
 
