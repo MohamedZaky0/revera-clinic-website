@@ -1,0 +1,372 @@
+/* Ad landing pages (/laser-tagamoa, /laser-tagamoa/dark-skin, /laser-men-tagamoa, /privacy).
+   Everything is scoped under .lp-shell / .lp-privacy so the bare h1/h2/p/a rules never leak into
+   the rest of the site. Colors come from the brand tokens in globals.css; the only literal is the
+   WhatsApp green (--lp-wa), which is a recognised action color rather than a brand color. */
+
+.lp-shell,
+.lp-privacy {
+  --olive: var(--color-brand-primary);
+  --dark: var(--color-brand-dark);
+  --secondary: var(--color-brand-secondary);
+  --sand: var(--color-brand-sand);
+  --light: var(--color-brand-light);
+  --tint: var(--color-brand-tint);
+  --gold: var(--color-brand-accent);
+  --lp-wa: #1f7a4d;
+  --lp-wa-hover: #196340;
+  --line: color-mix(in srgb, var(--dark) 14%, transparent);
+  --on-dark: color-mix(in srgb, var(--light) 78%, transparent);
+  --on-dark-soft: color-mix(in srgb, var(--light) 62%, transparent);
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  font-family: var(--font-lp-cairo), Tajawal, sans-serif;
+  color: var(--dark);
+  text-rendering: optimizeLegibility;
+  line-height: 1.7;
+}
+
+/* The site-wide base layer animates every section/article in with a blur and delay and lifts
+   links/images on hover. That would delay LCP on a paid landing page, so opt out here. */
+.lp-shell :where(section, header, footer, article, aside, nav),
+.lp-privacy {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  animation: none;
+  will-change: auto;
+}
+.lp-shell :where(a, img):hover,
+.lp-privacy :where(a, img):hover {
+  transform: none;
+  box-shadow: none;
+  filter: none;
+}
+
+.lp-shell *,
+.lp-privacy * { box-sizing: border-box; }
+.lp-shell { overflow-x: clip; background: var(--light); }
+.lp-shell :where(h1, h2, h3, p),
+.lp-privacy :where(h1, h2, h3, p) { margin: 0; font-family: inherit; font-weight: inherit; color: inherit; }
+.lp-shell a,
+.lp-privacy a { color: inherit; text-decoration: none; }
+.lp-shell :focus-visible,
+.lp-privacy :focus-visible { outline: 2px solid var(--olive); outline-offset: 3px; }
+.lp-dark-skin :focus-visible,
+.lp-final :focus-visible,
+.lp-footer :focus-visible,
+.lp-reviews :focus-visible,
+.lp-trust :focus-visible { outline-color: var(--gold); }
+
+.lp-wrap { width: 100%; max-width: 1180px; margin: auto; padding-inline: 28px; }
+
+/* ── Announcement + header ─────────────────────────────── */
+.lp-announcement {
+  min-height: 36px; display: flex; justify-content: center; align-items: center;
+  padding: 4px 12px; text-align: center;
+  background: var(--dark); color: var(--on-dark); font-size: 12px;
+}
+.lp-header {
+  position: relative; z-index: 5;
+  background: color-mix(in srgb, var(--light) 94%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--dark) 8%, transparent);
+}
+.lp-header-inner { height: 80px; display: flex; align-items: center; justify-content: space-between; }
+.lp-header-actions { display: flex; align-items: center; gap: 9px; }
+
+/* Logo lockup: real brand mark + live wordmark */
+.lp-logo { display: inline-flex; align-items: center; gap: 10px; color: var(--olive); }
+.lp-logo-mark { height: 46px; width: auto; display: block; }
+.lp-logo-text { display: flex; flex-direction: column; line-height: 1; }
+.lp-logo-name { font-family: var(--font-lp-serif), Georgia, serif; font-size: 28px; font-weight: 600; letter-spacing: -0.01em; }
+.lp-logo-sub { margin-top: 5px; font-family: var(--font-lp-cairo), sans-serif; font-size: 9px; font-weight: 700; letter-spacing: 0.42em; }
+.lp-logo-light { color: var(--light); }
+.lp-logo-light .lp-logo-mark { filter: brightness(0) invert(1); opacity: 0.92; }
+
+/* ── Buttons ───────────────────────────────────────────── */
+.lp-wa, .lp-call {
+  min-height: 50px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 14px; font-weight: 800; cursor: pointer;
+  transition: transform 0.18s var(--ease), box-shadow 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+.lp-wa {
+  padding-inline: 19px; background: var(--lp-wa); color: #fff;
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--lp-wa) 18%, transparent);
+}
+.lp-wa:hover { background: var(--lp-wa-hover); transform: translateY(-2px); box-shadow: 0 17px 30px color-mix(in srgb, var(--lp-wa) 28%, transparent); }
+.lp-wa:active { transform: scale(0.97); }
+.lp-call { padding-inline: 17px; background: transparent; color: var(--olive); border: 1px solid color-mix(in srgb, var(--olive) 32%, transparent); }
+.lp-call:hover { background: var(--olive); color: var(--light); transform: translateY(-2px); }
+/* globals.css forces [dir="rtl"] a[href^="tel:"] to inline-block / ltr (for bare phone numbers).
+   Call buttons are tel: links too, so re-assert their layout with higher specificity. */
+.lp-shell .lp-call.lp-call { display: inline-flex; text-align: center; direction: rtl !important; unicode-bidi: normal !important; }
+
+/* ── Hero ──────────────────────────────────────────────── */
+.lp-hero {
+  padding: 65px 0 75px;
+  background: radial-gradient(circle at 7% 30%, color-mix(in srgb, var(--gold) 15%, transparent), transparent 28%), var(--sand);
+}
+.lp-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(420px, 0.86fr); gap: 78px; align-items: center; }
+.lp-hero-copy { padding-block: 20px; }
+.lp-eyebrow, .lp-kicker { display: flex; align-items: center; gap: 9px; color: var(--olive); font-size: 12px; font-weight: 900; letter-spacing: 0.05em; }
+.lp-eyebrow span { width: 30px; height: 1px; background: var(--olive); }
+.lp-shell h1 { margin-top: 20px; max-width: 690px; font-size: clamp(38px, 5vw, 66px); line-height: 1.15; letter-spacing: -0.04em; font-weight: 900; color: var(--dark); }
+.lp-shell h2 { margin-top: 12px; font-size: clamp(32px, 4vw, 52px); line-height: 1.15; letter-spacing: -0.04em; font-weight: 900; color: var(--dark); }
+.lp-shell h3 { font-size: 19px; line-height: 1.4; font-weight: 800; color: inherit; }
+.lp-shell h2 em { font-family: var(--font-lp-serif), Georgia, serif; font-style: italic; font-weight: 600; color: var(--olive); letter-spacing: -0.03em; }
+.lp-hero-copy > p { max-width: 590px; margin-top: 22px; color: var(--secondary); font-size: 18px; line-height: 1.9; }
+.lp-hero-ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 11px; margin-top: 28px; }
+.lp-micro { display: flex; align-items: center; gap: 5px; margin-top: 16px; color: var(--secondary); font-size: 12px; }
+.lp-micro svg { color: var(--olive); }
+.lp-rating { display: flex; align-items: center; gap: 6px; width: max-content; max-width: 100%; margin-top: 28px; color: var(--secondary); font-size: 12px; }
+.lp-rating strong { color: var(--dark); }
+.lp-stars { display: flex; gap: 2px; color: var(--gold); }
+.lp-hero-media { position: relative; height: 545px; }
+.lp-hero-media > img {
+  object-fit: cover; object-position: center;
+  border: 7px solid color-mix(in srgb, var(--light) 80%, transparent); border-radius: 205px 205px 22px 22px;
+  box-shadow: 0 26px 45px color-mix(in srgb, var(--dark) 16%, transparent);
+}
+.lp-media-note {
+  position: absolute; z-index: 1; right: 22px; bottom: 22px; left: 22px;
+  display: flex; align-items: center; gap: 10px; padding: 15px 17px;
+  border: 1px solid color-mix(in srgb, #fff 20%, transparent); border-radius: 15px;
+  color: var(--light); background: color-mix(in srgb, var(--dark) 86%, transparent);
+  backdrop-filter: blur(10px); font-size: 13px;
+}
+.lp-media-note svg { flex: none; color: var(--tint); }
+.lp-media-note small { display: block; margin-top: 3px; color: var(--on-dark); font-size: 11px; }
+
+/* ── Trust bar ─────────────────────────────────────────── */
+.lp-trust { background: var(--dark); color: var(--light); }
+.lp-trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
+.lp-trust-grid > div {
+  min-height: 88px; display: flex; align-items: center; justify-content: center; gap: 10px;
+  border-left: 1px solid color-mix(in srgb, var(--light) 18%, transparent); font-size: 13px;
+}
+.lp-trust-grid > div:last-child { border-left: 0; }
+.lp-trust-grid svg { color: var(--tint); }
+.lp-trust-grid strong { display: block; color: var(--tint); font-size: 22px; line-height: 1; }
+.lp-trust-grid > div:first-child { flex-direction: column; gap: 4px; }
+.lp-trust-grid > div:first-child span { color: var(--on-dark); font-size: 11px; }
+
+/* ── Sections ──────────────────────────────────────────── */
+.lp-section { padding: 105px 0; }
+.lp-problems { background: var(--light); }
+.lp-heading { max-width: 730px; margin-bottom: 42px; }
+.lp-heading.center { text-align: center; margin-inline: auto; }
+.lp-heading.center .lp-kicker { justify-content: center; }
+.lp-heading > p { max-width: 580px; margin-top: 19px; color: var(--secondary); font-size: 16px; line-height: 1.9; }
+.lp-problem-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+.lp-problem { min-height: 245px; padding: 24px 20px; background: var(--sand); border: 1px solid color-mix(in srgb, var(--olive) 10%, transparent); border-radius: 16px; }
+.lp-problem:nth-child(even) { background: var(--tint); }
+.lp-problem-no { font-family: var(--font-lp-serif), serif; font-size: 28px; color: var(--secondary); opacity: 0.7; }
+.lp-problem h3 { margin-top: 32px; }
+.lp-problem > div { display: flex; gap: 8px; margin-top: 21px; }
+.lp-problem > div svg { flex: none; margin-top: 3px; color: var(--olive); }
+.lp-problem p { color: var(--secondary); font-size: 13px; line-height: 1.85; }
+
+.lp-device { background: var(--sand); }
+.lp-split { display: grid; grid-template-columns: 1fr 1fr; gap: 86px; align-items: center; }
+.lp-split-copy { max-width: 510px; }
+.lp-split-copy > p { margin-top: 22px; color: var(--secondary); font-size: 16px; line-height: 2; }
+.lp-split-copy ul { display: grid; gap: 12px; margin: 25px 0 29px; padding: 0; list-style: none; color: var(--secondary); font-size: 14px; font-weight: 800; }
+.lp-split-copy li { display: flex; align-items: center; gap: 9px; }
+.lp-split-copy li svg { padding: 3px; color: var(--light); background: var(--olive); border-radius: 50%; }
+.lp-device-art { position: relative; min-height: 395px; display: grid; place-items: center; overflow: hidden; background: var(--olive); border-radius: 24px; }
+.lp-device-art::before, .lp-device-art::after { content: ""; position: absolute; border: 1px solid color-mix(in srgb, var(--light) 35%, transparent); border-radius: 50%; }
+.lp-device-art::before { width: 320px; height: 320px; }
+.lp-device-art::after { width: 215px; height: 215px; }
+.lp-wave { position: relative; z-index: 1; width: 100px; height: 100px; display: grid; place-items: center; color: var(--olive); background: var(--gold); border-radius: 50%; box-shadow: 0 0 0 19px color-mix(in srgb, var(--gold) 18%, transparent); }
+.lp-device-art > span { position: absolute; bottom: 24px; left: 26px; color: var(--on-dark); font-family: var(--font-lp-serif), serif; font-size: 15px; line-height: 1.1; letter-spacing: 0.12em; direction: ltr; }
+.lp-device-art > span b { font-size: 20px; }
+
+/* Dark / olive skin section: the swatches are illustrative skin tones, not brand colors */
+.lp-dark-skin { background: var(--dark); color: var(--light); }
+.lp-dark-skin .lp-kicker { color: var(--tint); }
+.lp-dark-skin h2 { color: var(--light); }
+.lp-dark-skin h2 em { color: var(--tint); }
+.lp-dark-skin .lp-split-copy > p { color: var(--on-dark); }
+.lp-dark-visual { min-height: 320px; display: flex; align-items: center; justify-content: center; gap: 11px; padding: 20px; background: color-mix(in srgb, var(--olive) 45%, var(--dark)); border-radius: 24px; }
+.lp-dark-visual span { width: 51px; height: 140px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 12px; border-radius: 28px 28px 13px 13px; background: #eee4db; color: #5e594e; font-family: var(--font-lp-serif), serif; font-size: 14px; }
+.lp-dark-visual span:nth-child(2) { background: #d6ad94; }
+.lp-dark-visual span:nth-child(3) { background: #ae7c63; color: #fff; }
+.lp-dark-visual span:nth-child(4) { background: #805540; color: #fff; }
+.lp-dark-visual span:nth-child(5) { background: #573323; color: #fff; }
+.lp-dark-visual span:nth-child(6) { background: #2d1710; color: #fff; }
+.lp-dark-visual .active { outline: 3px solid var(--gold); outline-offset: 5px; }
+.lp-note { display: flex; gap: 9px; align-items: flex-start; margin: 24px 0; padding: 15px 16px; color: var(--light); background: color-mix(in srgb, var(--light) 9%, transparent); border-right: 2px solid var(--gold); border-radius: 8px; font-size: 13px; line-height: 1.7; }
+.lp-note svg { flex: none; }
+.lp-disclaimer { display: block; max-width: 460px; margin-top: 18px; color: var(--on-dark-soft); font-size: 11px; line-height: 1.7; }
+
+.lp-process { background: var(--tint); }
+.lp-process-grid { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); margin-top: 55px; }
+.lp-step { min-height: 220px; padding: 24px 18px 0; border-left: 1px solid var(--line); }
+.lp-step:last-child { border-left: 0; }
+.lp-step > span { font-family: var(--font-lp-serif), serif; color: var(--secondary); font-size: 22px; }
+.lp-step > div { width: 46px; height: 46px; display: grid; place-items: center; margin: 20px 0 17px; color: var(--tint); background: var(--olive); border-radius: 50%; }
+.lp-step h3 { font-size: 17px; }
+.lp-step p { max-width: 205px; margin-top: 8px; color: var(--secondary); font-size: 13px; line-height: 1.8; }
+.lp-soft-line { text-align: center; margin-top: 30px; color: var(--secondary); font-size: 13px; font-weight: 800; }
+
+.lp-character { background: var(--light); }
+.lp-character-media { position: relative; height: 430px; overflow: hidden; border-radius: 24px; background: var(--tint); }
+.lp-character-media > img { object-fit: cover; object-position: center 22%; }
+.lp-quote { margin: 26px 0; padding: 18px 20px; color: var(--olive); background: var(--tint); border-right: 3px solid var(--gold); font-size: 16px; line-height: 1.8; font-weight: 800; }
+
+/* ── Reviews ───────────────────────────────────────────── */
+.lp-reviews { background: var(--olive); color: var(--light); }
+.lp-reviews .lp-kicker { color: var(--tint); }
+.lp-reviews h2 { color: var(--light); }
+.lp-reviews h2 em { color: var(--tint); }
+.lp-big-rating { display: flex; align-items: center; justify-content: center; gap: 13px; margin-top: 25px; }
+.lp-big-rating > strong { font-family: var(--font-lp-serif), serif; font-size: 51px; color: var(--tint); }
+.lp-big-rating > span { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; color: var(--on-dark); font-size: 12px; }
+.lp-reviews-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 44px; }
+.lp-reviews-grid article { min-height: 230px; padding: 22px 21px; background: var(--light); color: var(--dark); border-radius: 15px; }
+.lp-quote-mark { display: block; color: var(--gold); font-family: Georgia, serif; font-size: 42px; line-height: 0.7; }
+.lp-reviews-grid article p { margin-top: 18px; font-size: 14px; line-height: 1.9; }
+.lp-reviews-grid footer { display: flex; flex-direction: column; gap: 3px; margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; }
+.lp-reviews-grid footer span { color: var(--secondary); font-size: 11px; }
+.lp-outline-link { display: flex; align-items: center; justify-content: center; gap: 7px; width: max-content; margin: 29px auto 0; padding-bottom: 5px; color: var(--tint); border-bottom: 1px solid color-mix(in srgb, var(--tint) 50%, transparent); font-size: 13px; font-weight: 800; }
+
+/* ── FAQ ───────────────────────────────────────────────── */
+.lp-faq { background: var(--light); }
+.lp-faq-grid { display: grid; grid-template-columns: 0.7fr 1.3fr; gap: 90px; }
+.lp-faq .lp-heading { align-self: start; position: sticky; top: 20px; }
+.lp-faq-list { border-top: 1px solid var(--line); }
+.lp-faq-list details { border-bottom: 1px solid var(--line); }
+.lp-faq-list summary { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 22px 0; list-style: none; cursor: pointer; font-size: 16px; font-weight: 800; }
+.lp-faq-list summary::-webkit-details-marker { display: none; }
+.lp-faq-list summary svg { flex: none; color: var(--olive); transition: transform 0.2s; }
+.lp-faq-list details[open] summary svg { transform: rotate(180deg); }
+.lp-faq-list details p { max-width: 620px; padding: 0 0 21px; color: var(--secondary); line-height: 1.9; font-size: 14px; }
+
+/* ── Final CTA + footer ────────────────────────────────── */
+.lp-final { padding: 112px 0 118px; text-align: center; background: var(--dark); color: var(--light); }
+.lp-final > .lp-wrap { display: flex; flex-direction: column; align-items: center; }
+.lp-final > .lp-wrap > svg { color: var(--tint); margin-bottom: 24px; }
+.lp-final .lp-kicker { color: var(--tint); }
+.lp-final h2 { font-size: clamp(38px, 5vw, 62px); color: var(--light); }
+.lp-final h2 em { color: var(--tint); }
+.lp-final p { max-width: 430px; margin-top: 20px; color: var(--on-dark); font-size: 15px; line-height: 1.9; }
+.lp-final-actions { display: flex; gap: 10px; margin-top: 29px; }
+.lp-final-actions .lp-call { color: var(--light); border-color: color-mix(in srgb, var(--light) 35%, transparent); }
+.lp-final-actions .lp-call:hover { background: var(--light); color: var(--dark); }
+.lp-contact-line { display: flex; gap: 25px; margin-top: 29px; color: var(--on-dark-soft); font-size: 12px; }
+.lp-contact-line a { display: flex; align-items: center; gap: 5px; }
+.lp-shell .lp-contact-line a.lp-phone { display: flex; }
+.lp-contact-line a:hover { color: var(--light); }
+.lp-phone { direction: ltr; unicode-bidi: isolate; white-space: nowrap; }
+
+.lp-footer { padding: 42px 0 20px; background: color-mix(in srgb, var(--dark) 88%, #000); color: var(--on-dark); }
+.lp-footer-grid { display: flex; justify-content: space-between; gap: 35px; align-items: flex-start; padding-bottom: 32px; }
+.lp-footer p { max-width: 350px; margin-top: 13px; color: var(--on-dark-soft); font-size: 11px; line-height: 1.8; }
+.lp-footer-links { display: flex; gap: 20px; align-items: center; color: var(--on-dark); font-size: 12px; }
+.lp-footer-links a { display: flex; align-items: center; gap: 5px; }
+.lp-footer-links a:hover { color: var(--light); }
+.lp-footer-bottom { display: flex; justify-content: space-between; padding-top: 18px; border-top: 1px solid color-mix(in srgb, var(--light) 12%, transparent); color: var(--on-dark-soft); font-size: 11px; }
+.lp-sticky { display: none; }
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .lp-wrap { padding-inline: 20px; }
+  .lp-hero-grid, .lp-split { gap: 45px; }
+  .lp-problem-grid { grid-template-columns: repeat(2, 1fr); }
+  .lp-faq-grid { gap: 45px; }
+  .lp-device-art { min-height: 310px; }
+  .lp-hero-media { height: 485px; }
+}
+
+@media (max-width: 680px) {
+  .lp-wrap { padding-inline: 16px; }
+  .lp-announcement { font-size: 11px; }
+  .lp-header-inner { height: 70px; }
+  .lp-logo-mark { height: 38px; }
+  .lp-logo-name { font-size: 23px; }
+  .lp-logo-sub { font-size: 8px; }
+  .lp-header-actions { gap: 6px; }
+  .lp-shell .lp-header-actions .lp-call.lp-call { display: none; }
+  .lp-header-actions .lp-wa { min-height: 43px; padding-inline: 13px; font-size: 12px; }
+  .lp-header-actions .lp-wa svg:last-child { display: none; }
+  .lp-hero { padding: 28px 0 48px; }
+  .lp-hero-grid { display: flex; flex-direction: column; gap: 27px; }
+  .lp-hero-media { width: 100%; height: 310px; }
+  .lp-hero-media > img { border-width: 5px; border-radius: 110px 110px 17px 17px; }
+  .lp-media-note { right: 11px; bottom: 11px; left: 11px; padding: 10px 11px; font-size: 11px; }
+  .lp-media-note small { font-size: 10px; }
+  .lp-eyebrow { font-size: 11px; }
+  .lp-shell .lp-hero-copy h1 { font-size: 34px; margin-top: 15px; line-height: 1.22; }
+  .lp-hero-copy > p { font-size: 15px; line-height: 1.8; margin-top: 17px; }
+  .lp-hero-ctas { flex-direction: column; align-items: stretch; margin-top: 22px; }
+  .lp-hero-ctas .lp-wa, .lp-hero-ctas .lp-call { width: 100%; }
+  .lp-rating { font-size: 12px; margin-top: 22px; }
+  .lp-trust-grid { grid-template-columns: repeat(2, 1fr); }
+  .lp-trust-grid > div { min-height: 78px; border-bottom: 1px solid color-mix(in srgb, var(--light) 16%, transparent); border-left: 1px solid color-mix(in srgb, var(--light) 16%, transparent); font-size: 12px; text-align: center; }
+  .lp-trust-grid > div:nth-child(2n) { border-left: 0; }
+  .lp-trust-grid > div:nth-last-child(-n + 2) { border-bottom: 0; }
+  .lp-section { padding: 75px 0; }
+  .lp-heading { margin-bottom: 29px; }
+  .lp-heading > p { font-size: 14px; line-height: 1.85; }
+  .lp-shell .lp-heading h2 { font-size: 36px; }
+  .lp-problem-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .lp-problem { min-height: 238px; padding: 18px 13px; }
+  .lp-problem-no { font-size: 22px; }
+  .lp-problem h3 { margin-top: 24px; font-size: 15px; }
+  .lp-problem p { font-size: 12px; line-height: 1.7; }
+  .lp-problem > div { margin-top: 14px; gap: 5px; }
+  .lp-problem > div svg { width: 14px; }
+  .lp-split, .lp-faq-grid { display: flex; flex-direction: column; gap: 36px; }
+  .lp-faq .lp-heading { position: static; }
+  .lp-split-copy { width: 100%; }
+  .lp-split-copy > p { font-size: 14px; line-height: 1.9; }
+  .lp-device-art { width: 100%; min-height: 270px; }
+  .lp-dark-visual { width: 100%; min-height: 230px; gap: 7px; }
+  .lp-dark-visual span { width: 38px; height: 110px; }
+  .lp-process-grid { grid-template-columns: 1fr 1fr; margin-top: 37px; }
+  .lp-step { min-height: 205px; padding: 18px 11px 0; border-left: 0; border-bottom: 1px solid var(--line); }
+  .lp-step:nth-child(odd) { border-left: 1px solid var(--line); }
+  .lp-step:nth-last-child(-n + 2) { border-bottom: 0; }
+  .lp-step p { font-size: 12px; }
+  .lp-character-media { height: 320px; width: 100%; }
+  .lp-quote { font-size: 14px; }
+  .lp-reviews-grid { grid-template-columns: 1fr; gap: 10px; margin-top: 30px; }
+  .lp-reviews-grid article { min-height: 0; padding: 18px; }
+  .lp-big-rating > strong { font-size: 45px; }
+  .lp-final { padding: 78px 0 85px; }
+  .lp-final-actions { width: 100%; flex-direction: column; }
+  .lp-final-actions .lp-wa, .lp-final-actions .lp-call { width: 100%; }
+  .lp-contact-line { flex-direction: column; gap: 8px; }
+  .lp-footer { padding-bottom: 88px; }
+  .lp-footer-grid { flex-direction: column; gap: 25px; }
+  .lp-footer-links { flex-wrap: wrap; gap: 14px; }
+  .lp-footer-bottom { gap: 6px; flex-direction: column; }
+  .lp-sticky {
+    position: fixed; z-index: 20; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); left: 10px;
+    min-height: 54px; display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--lp-wa); color: #fff; border-radius: 999px;
+    box-shadow: 0 13px 28px color-mix(in srgb, var(--dark) 28%, transparent);
+    font-size: 14px; font-weight: 900;
+  }
+  .lp-sticky:active { transform: scale(0.98); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-shell *, .lp-privacy * { transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* ── Privacy page ──────────────────────────────────────── */
+.lp-privacy { min-height: 100vh; padding: 52px 20px; background: var(--sand); }
+.lp-privacy-wrap { max-width: 760px; margin: auto; padding: 42px; background: var(--light); border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 18px 45px color-mix(in srgb, var(--dark) 8%, transparent); }
+.lp-privacy-back { display: flex; align-items: center; gap: 6px; width: max-content; color: var(--olive); font-size: 13px; font-weight: 800; }
+.lp-privacy .lp-logo { margin: 46px 0 34px; }
+.lp-privacy h1 { margin-top: 14px; font-size: clamp(34px, 5vw, 52px); line-height: 1.2; font-weight: 900; color: var(--dark); }
+.lp-privacy h2 { margin-top: 34px; font-size: 24px; font-weight: 900; color: var(--dark); }
+.lp-privacy p { margin-top: 15px; color: var(--secondary); font-size: 16px; line-height: 2; }
+.lp-privacy .lp-wa { margin-top: 28px; width: max-content; }
+.lp-privacy small { display: block; margin-top: 30px; color: var(--secondary); font-size: 12px; }
+.lp-privacy .lp-kicker { margin-top: 0; }
+@media (max-width: 600px) {
+  .lp-privacy { padding: 18px 12px; }
+  .lp-privacy-wrap { padding: 26px 20px; }
+  .lp-privacy p { font-size: 14px; }
+}

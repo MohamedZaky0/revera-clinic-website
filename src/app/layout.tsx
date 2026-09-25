@@ -6,6 +6,7 @@ import { AlertConfirmProvider } from "@/contexts/AlertConfirmContext";
 import { GlobalBookingModal } from "@/components/GlobalBookingModal";
 
 import { CLIENT } from "@/config/client";
+import { AD_LANDING_PATH_RE } from "@/lib/landingPaths";
 
 const marcellus = Marcellus({
   weight: "400",
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
   },
 };
 
-const DIR_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|; )cr-language=([^;]*)/);var l=(m&&decodeURIComponent(m[1]))==='ar'?'ar':'en';document.documentElement.lang=l;document.documentElement.dir=l==='ar'?'rtl':'ltr';}catch(e){}})();`;
+const DIR_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|; )cr-language=([^;]*)/);var l=(/${AD_LANDING_PATH_RE.source}/.test(location.pathname)||(m&&decodeURIComponent(m[1]))==='ar')?'ar':'en';document.documentElement.lang=l;document.documentElement.dir=l==='ar'?'rtl':'ltr';}catch(e){}})();`;
 
 export default function RootLayout({
   children,

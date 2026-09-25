@@ -10,6 +10,7 @@ import React, {
 import type { Language, Direction, Translation } from "@/types";
 import { translations } from "@/lib/translations";
 import { WhatsappButton } from "@/components/WhatsappButton";
+import { isAdLandingPath } from "@/lib/landingPaths";
 
 interface LanguageContextValue {
   language: Language;
@@ -66,6 +67,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Ad landing pages are Arabic-only: don't overwrite their lang/dir, persist a language
+    // choice the visitor never made, or append ?lang= to the campaign URL.
+    if (isAdLandingPath(window.location.pathname)) return;
     const dir: Direction = language === "ar" ? "rtl" : "ltr";
     document.documentElement.lang = language;
     document.documentElement.dir = dir;
@@ -80,6 +84,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function loadSettings() {
+      if (isAdLandingPath(window.location.pathname)) return;
       try {
         const res = await fetch("/api/page-settings", { cache: "no-store" });
         if (res.ok) {

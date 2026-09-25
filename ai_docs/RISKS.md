@@ -4716,6 +4716,33 @@ open: it was not audited whether finance screens that sum `invoices` honour `is_
 
 ---
 
+## RISK-103: Laser Landing Pages Make Marketing Claims That Nobody Has Verified, And Conversion Tracking Is Inactive Until A GTM ID Is Set (OPEN)
+
+**Severity:** Medium · **Type:** Marketing claims / ad-policy / measurement · **Found:** 2026-09-25 · **Related:** DEC-087
+
+The pages are live in code but these items came from Manus and were never checked against the clinic:
+- **Google rating "4.9 ★ · 31 reviews"** and the three review quotes (`CLIENT.googleRating`,
+  `LANDING_REVIEWS`) — must match the Maps listing at the moment ads go live.
+- **"اسم الجهاز والموديل بوضوح"** is promised in three places, but no device name appears anywhere on the
+  page. Either name the device or drop the promise.
+- **"تبريد قبل كل نبضة"** (cooling) and **"8–10 جلسات"** — clinical claims; confirm with the doctor.
+- **Doctor photo** (`doctor-portrait.webp`, from `doctor/portrait-about.jpg`) is not confirmed to be the
+  laser practitioner. Note `doctor/portrait-main.jpg` is byte-identical to `clinic/treatment.jpg` (a
+  microneedling shot), so it must not be used as a "doctor" image.
+- **Address** "المنطقة الصناعية، قسم أول القاهرة الجديدة" came from Manus; confirm against the branch.
+- **Opening hours / reply time** are not stated anywhere; visitors are told to WhatsApp for "المواعيد".
+- **Tracking:** `landing_view`, `whatsapp_click`, `call_click`, `map_click`, `scroll_depth` go to
+  `dataLayer`, but nothing consumes them until `NEXT_PUBLIC_GTM_ID` is set and a GTM container maps them to
+  Google Ads conversions. Until then Google Ads sees zero conversions from these pages.
+- **Ad policy:** absolute outcome/safety claims were removed from headlines, but Google Ads' healthcare
+  policies should be re-read against the final ad text (not only the page).
+
+**Fix:** clinic owner/doctor confirms each claim (or it is edited out); create the GTM container, set
+`NEXT_PUBLIC_GTM_ID` in Vercel, map the events to conversions, and test with Tag Assistant. Checklist:
+`ai_docs/manual_tests/LASER_LANDING_PAGES_MANUAL_TESTS.md` (check 11).
+
+---
+
 ## PROPOSALS.md Reference
 
 
