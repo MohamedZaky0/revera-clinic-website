@@ -4787,6 +4787,8 @@ everything in `unattributed` and `commission-payouts` returns nothing from the l
 **4. Empty cost side.** No expenses, assets or loans are recorded, and 19 of 29 lines have no COGS or
 commission snapshot — every profit figure is a revenue figure until those are entered.
 
+**Presentation addressed (DEC-088 item 9, built 2026-09-26 on dev, not yet on main):** the P&L now shows a cash → revenue bridge and a deferred package balance, and the tiles are labelled "Revenue earned" / "Cash received", so the gap is explained on screen instead of looking like a bug. Observation from the production numbers: package cash in September (44,150) has no matching deferred balance because most package invoices have no surviving `customer_packages` row — see `ai_docs/manual_tests/FINANCE_CASH_VS_REVENUE_MANUAL_TESTS.md`.
+
 **Not a Finance-code bug (verified):** the backfilled historical invoices (`is_opening`) are correctly
 excluded from all eight revenue/cash reports (DEC-086, `tests/routes/finance-opening-invoices.test.ts`).
 Checklist: `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.

@@ -3162,6 +3162,14 @@ code writes it.
      الإيراد المُحقَّق"** for the P&L — never two screens that both just say "revenue".
    - Data source: `customer_packages` (`price_paid`, `total_pulses`, `pulses_remaining`, `status`, `expires_at`) and
      `customer_package_items` (`qty_remaining`, `service_id`); nothing new is stored for this.
+   - **Built 2026-09-26 (dev only, not merged to main):** `GET /api/finance/revenue-bridge` (cash received in the period on live
+     invoices — the Cash Flow definition — and the part that paid for packages, splitting mixed invoices by package share),
+     `GET /api/finance/deferred-packages`, `src/lib/financeBridge.ts` (pure arithmetic), `RevenueBridgeCard` and
+     `DeferredPackagesCard` on the P&L screen, and the two tiles relabelled. The bridge's revenue and package-recognised figures
+     are taken from the P&L response the screen already loaded, so it always adds up to the number shown above it; the fourth
+     line, **"other timing"**, is the honest residual (services/products billed but unpaid, or paid in another month). The
+     deferred balance is clinic-wide and as-of-now (`customer_packages` has no branch). Expired-but-unrecognised balances are
+     included and reported separately (breakage, item 5, is still not built).
 10. **Consumption without a booking.** `package_revenue_recognitions.reservation_id` stays NOT NULL (every revenue
     report joins `reservations!inner` for branch and doctor). A pulse consumption with no `reservation_id` (a manual
     deduction from the patient profile, or a backfilled legacy row) therefore recognises **no** revenue; it is

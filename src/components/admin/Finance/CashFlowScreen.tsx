@@ -147,7 +147,7 @@ export function CashFlowScreen({ accessToken, branches = [] }: CashFlowScreenPro
       ) : data ? (
         <>
           <div className="grid gap-6 sm:grid-cols-3">
-            <StatTile label="Cash Received" value={egp(data.cashReceived.total)} icon={<ArrowDownCircle size={18} />} accent="accent" />
+            <StatTile label="Cash received · المقبوض" value={egp(data.cashReceived.total)} icon={<ArrowDownCircle size={18} />} accent="accent" />
             <StatTile label="Cash Paid Out" value={egp(data.cashPaidOut.total)} icon={<ArrowUpCircle size={18} />} />
             <StatTile
               label={`Net Cash Flow (${data.netCashFlow >= 0 ? "cash increased" : "cash decreased"})`}
