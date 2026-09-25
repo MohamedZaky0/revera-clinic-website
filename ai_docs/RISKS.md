@@ -4736,8 +4736,9 @@ The pages are live in code but these items came from Manus and were never checke
 - **Address** "المنطقة الصناعية، قسم أول القاهرة الجديدة" came from Manus; confirm against the branch.
 - **Opening hours / reply time** are not stated anywhere; visitors are told to WhatsApp for "المواعيد".
 - **Tracking:** `landing_view`, `whatsapp_click`, `call_click`, `map_click`, `scroll_depth` go to
-  `dataLayer`, but nothing consumes them until `NEXT_PUBLIC_GTM_ID` is set and a GTM container maps them to
-  Google Ads conversions. Until then Google Ads sees zero conversions from these pages.
+  `dataLayer`. GTM container **GTM-5ZXBL7LR** is now installed on the landing pages (`CLIENT.gtmId`), but the
+  container still needs triggers/tags mapping these events to Google Ads conversions. Until then Google Ads
+  sees zero conversions from these pages.
 - **Ad policy:** absolute outcome/safety claims were removed from headlines, but Google Ads' healthcare
   policies should be re-read against the final ad text (not only the page).
 

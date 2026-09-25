@@ -3048,7 +3048,7 @@ to read them, and selected FAQ answers by `String.includes()` (three questions g
 6. Tracking: `LandingTracker` (client) pushes `landing_view`, `whatsapp_click`, `call_click`, `map_click` and
    `scroll_depth` (25/50/75/90, once each — the Manus version fired once, mostly with depth "0") to
    `dataLayer` via `data-lp-event` attributes, and stores `gclid`/`gbraid`/`wbraid`/`utm_*` in sessionStorage.
-   `LandingAnalytics` loads Google Tag Manager **only when `NEXT_PUBLIC_GTM_ID` is set**; unset, nothing loads.
+   `LandingAnalytics` loads Google Tag Manager on these routes only, using `CLIENT.gtmId` (GTM-5ZXBL7LR; `NEXT_PUBLIC_GTM_ID` overrides, empty disables), plus the noscript iframe.
 7. Copy changes (CRO review): removed absolute claims ("آمن لكل درجات البشرة", "من غير حروق", "من غير وجع");
    fixed masculine/feminine forms (the men page used feminine imperatives); the hero CTA no longer says
    "ابعتي «بشرتي»" when the WhatsApp text is already prefilled; the dark-skin variant now shows the dark-skin

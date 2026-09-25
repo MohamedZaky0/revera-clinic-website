@@ -18,7 +18,7 @@ and against the production deployment. Test on the deployed Vercel URL, not only
 | 7 | FAQ answers match their questions (all variants) | | | | |
 | 8 | Dark-skin page shows the dark-skin section under the hero | | | | |
 | 9 | Main site unaffected (`/`, `/services`, `/book`) incl. language switch | | | | |
-| 10 | GTM: events arrive in Tag Assistant / Preview once `NEXT_PUBLIC_GTM_ID` is set | | | | |
+| 10 | GTM: events arrive in Tag Assistant / Preview (container GTM-5ZXBL7LR is installed) | | | | |
 | 11 | RISK-103 claims confirmed or removed | | | | |
 | 12 | Lighthouse mobile (LCP < 2.5s, no CLS) | | | | |
 
@@ -45,7 +45,7 @@ and against the production deployment. Test on the deployed Vercel URL, not only
       on `/laser-tagamoa` it appears after the device section; on the men page it is absent.
 - [ ] **9.** Visit `/`, `/services`, `/book`. Headings still use the Marcellus serif, the floating WhatsApp
       button still appears on `/`, and switching language still updates `?lang=` and direction.
-- [ ] **10.** Set `NEXT_PUBLIC_GTM_ID` on Vercel, redeploy, open Tag Assistant on a landing URL. Click each CTA
+- [ ] **10.** Open Tag Assistant on a landing URL. Click each CTA
       and scroll: `landing_view`, `whatsapp_click` (with `placement`), `call_click`, `map_click`,
       `scroll_depth` (25/50/75/90) appear once per action.
 - [ ] **11.** Walk the RISK-103 list with the clinic owner/doctor; record what was confirmed or edited out.
