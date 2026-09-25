@@ -122,7 +122,7 @@
 .lp-stars { display: flex; gap: 2px; color: var(--gold); }
 .lp-hero-media { position: relative; height: 545px; }
 .lp-hero-media > img {
-  object-fit: cover; object-position: center;
+  object-fit: cover; object-position: center 20%; /* keep the face in frame when the box is cropped shorter than 4:5 */
   border: 7px solid color-mix(in srgb, var(--light) 80%, transparent); border-radius: 205px 205px 22px 22px;
   box-shadow: 0 26px 45px color-mix(in srgb, var(--dark) 16%, transparent);
 }

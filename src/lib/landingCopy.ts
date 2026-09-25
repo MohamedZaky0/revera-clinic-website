@@ -19,7 +19,7 @@ export interface LandingCopy {
   sub: string;
   heroCta: string;
   heroCallLabel: string;
-  heroImageAlt: string;
+  heroImage: { src: string; alt: string };
   headerCallLabel: string;
   stickyLabel: string;
   problemsTitle: string;
@@ -29,7 +29,7 @@ export interface LandingCopy {
   darkSkin: { ctaLabel: string } | null;
   darkSkinFirst: boolean;
   processLine: string;
-  conversation: { title: [string, string]; body: string; quote: string; cta: string };
+  conversation: { title: [string, string]; body: string; quote: string; cta: string; image: { src: string; alt: string } };
   faq: QA[];
   finalTitle: [string, string];
   finalBody: string;
@@ -70,7 +70,7 @@ const women: LandingCopy = {
   sub: "بنقيّم بشرتك ونوع الشعر الأول، وبعدها إعدادات مظبوطة لحالتك، مع دكتورة متخصصة وخطة واضحة من أول زيارة.",
   heroCta: "اعرفي لو الليزر مناسب لبشرتك",
   heroCallLabel: "أو اتصلي بينا",
-  heroImageAlt: `استقبال ${CLIENT.name} في التجمع الخامس`,
+  heroImage: { src: "/images/landing/hero-women.webp", alt: "سيدة في مساحة عيادة هادئة" },
   headerCallLabel: "اتصلي بينا",
   stickyLabel: "اسألي على WhatsApp",
   problemsTitle: "ليه ناس كتير بتقول الليزر ما نفعش معاها؟",
@@ -90,6 +90,7 @@ const women: LandingCopy = {
     body: "لو اتخدعتي قبل كده أو خايفة تكرري تجربة مش مريحة، مش محتاجة تصدقي وعد. محتاجة حد يسمعك ويشرح لك.",
     quote: "«أنا مش بدوّر على الأرخص، أنا بدوّر على اللي هيشتغل.»",
     cta: "ابدئي محادثتك على WhatsApp",
+    image: { src: "/images/landing/consultation.webp", alt: "استشارة بين طبيبة ومراجعة داخل العيادة" },
   },
   faq: [
     {
@@ -151,7 +152,7 @@ const men: LandingCopy = {
   sub: "تقييم واضح، إعدادات محسوبة، وخطة مفهومة من أول زيارة — من غير مبالغة ولا وعود سهلة.",
   heroCta: "اعرف لو الليزر مناسب ليك",
   heroCallLabel: "أو اتصل بينا",
-  heroImageAlt: `استقبال ${CLIENT.name} في التجمع الخامس`,
+  heroImage: { src: "/images/landing/hero-men.webp", alt: "رجل مبتسم في مساحة عيادة هادئة" },
   headerCallLabel: "اتصل بينا",
   stickyLabel: "اسأل على WhatsApp",
   problemsTitle: "أسئلة الرجالة الحقيقية",
@@ -171,6 +172,7 @@ const men: LandingCopy = {
     body: "لو جربت قبل كده ومفيش نتيجة، أو مش متأكد الليزر يناسبك أصلًا، مش محتاج تصدق وعد. محتاج حد يسمعك ويشرح لك.",
     quote: "«أنا مش عايز وعود، أنا عايز أفهم هيحصل إيه.»",
     cta: "ابدأ محادثتك على WhatsApp",
+    image: { src: "/images/landing/doctor-portrait.webp", alt: `الفريق الطبي في ${CLIENT.name}` },
   },
   faq: [
     pain,
