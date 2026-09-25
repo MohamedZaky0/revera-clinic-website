@@ -204,10 +204,12 @@ export async function POST(req: Request) {
     let packagePrice = 0;
     let resolvedPackageName = packageName || null;
     let packageRecord: any = null;
+    // Outcome of creating the patient's package, returned to the caller (DEC-088 item 6).
+    let packageOutcome: { created: boolean; pricePending: boolean; packageType: string; totalPulses: number; error?: string } | null = null;
     if (packageId) {
       const { data: pkgRow } = await supabaseServer
         .from('packages')
-        .select('id, name, name_ar, price, validity_days')
+        .select('id, name, name_ar, price, validity_days, package_type, total_pulses')
         .eq('id', packageId)
         .maybeSingle();
       if (pkgRow) {
@@ -517,6 +519,17 @@ export async function POST(req: Request) {
         const expiresAt = new Date(rawDate);
         expiresAt.setUTCDate(expiresAt.getUTCDate() + validityDays);
 
+        // DEC-088 item 6: never guess the price. The entered invoice value is the package price only when
+        // the booking is the package alone (a mixed booking's value cannot be split); otherwise the price is
+        // left pending for staff to enter — NOT defaulted to the catalog price.
+        const packageOnlyBooking = !resolvedServiceId && !resolvedProductName && !productId;
+        const enteredPackagePrice = packageOnlyBooking && parsedValue > 0 ? parsedValue : null;
+        const pricePending = enteredPackagePrice === null;
+        // The catalog decides what kind of package it is. Without this a pulses package was stored as
+        // 'services' with no quota, so its pulses could never be tracked or consumed.
+        const isPulsesPackage = packageRecord?.package_type === 'pulses';
+        const catalogTotalPulses = Math.max(0, Math.floor(Number(packageRecord?.total_pulses || 0)));
+
         try {
           const { data: cp, error: cpErr } = await supabaseServer
             .from('customer_packages')
@@ -525,11 +538,24 @@ export async function POST(req: Request) {
               package_id: pId,
               purchased_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
               expires_at: expiresAt.toISOString(),
-              price_paid: packagePrice,
-              status: 'active'
+              price_paid: pricePending ? 0 : enteredPackagePrice,
+              price_pending: pricePending,
+              status: 'active',
+              ...(isPulsesPackage
+                ? { package_type: 'pulses', total_pulses: catalogTotalPulses, pulses_used: 0, pulses_remaining: catalogTotalPulses }
+                : {})
             })
             .select('id')
             .maybeSingle();
+
+          packageOutcome = {
+            created: Boolean(cp?.id),
+            pricePending,
+            packageType: isPulsesPackage ? 'pulses' : 'services',
+            totalPulses: isPulsesPackage ? catalogTotalPulses : 0,
+            ...(cpErr ? { error: cpErr.message } : {}),
+          };
+          if (cpErr) console.error('Failed to create customer_packages record for historical booking:', cpErr.message);
 
           if (cp?.id) {
             const { data: pkgItems } = await supabaseServer
@@ -551,6 +577,7 @@ export async function POST(req: Request) {
           }
         } catch (cpErr: any) {
           console.warn('Could not insert customer_packages record (non-fatal):', cpErr?.message);
+          packageOutcome = { created: false, pricePending, packageType: isPulsesPackage ? 'pulses' : 'services', totalPulses: isPulsesPackage ? catalogTotalPulses : 0, error: cpErr?.message || String(cpErr) };
         }
       }
     }
@@ -622,6 +649,7 @@ export async function POST(req: Request) {
       booking: newReservation,
       customer: customerRecord,
       ledger,
+      package: packageOutcome,
       balances: {
         spent_amount: newSpent,
         outstanding: newOutstanding,
