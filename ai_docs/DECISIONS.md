@@ -2998,3 +2998,58 @@ Checklist: `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`. *
 - Backfilled invoices carry one summary line, not the original service/package/product breakdown.
 - Reports that sum `invoices` without honouring `is_opening` would now count this history; whether each
   finance screen does was not audited (it is why the flag is set).
+
+
+
+---
+
+## DEC-087: Google Ads Laser Landing Pages Are Next.js Routes In This App, Not A Separate Vite/Manus Deployment
+
+**Date:** 2026-09-25
+**Status:** Decided — active.
+
+**Context:**
+Manus generated `revera-conversion-landing` (Vite + React + wouter + an Express static server, images served
+from Manus's private `/manus-storage/`). Run as-is it would need its own host, and its logo and all three
+photos were unrecoverable outside Manus (the files were never in the repo), so the pages shipped with a
+broken logo and no images. It also loaded a Manus Umami script, pushed `dataLayer` events with no tag manager
+to read them, and selected FAQ answers by `String.includes()` (three questions got the wrong answer).
+
+**Decisions & Implementation:**
+1. The pages live in this app so they deploy on the same Vercel host as the site: `/laser-tagamoa`,
+   `/laser-tagamoa/dark-skin` (was `?h=dark`; a real path is CDN-cacheable and needs no `searchParams`),
+   `/laser-men-tagamoa`, plus `/privacy` (the site had none). One server component,
+   `src/components/landing/LaserLanding.tsx`, renders all three variants from `src/lib/landingCopy.ts`.
+2. Styling is `src/components/landing/landing.css`, scoped under `.lp-shell` / `.lp-privacy`, using the
+   brand tokens from `globals.css` (the Manus palette was already the brand palette). The only literal is the
+   WhatsApp green. It explicitly neutralises three site-wide base rules that would hurt a paid page: the
+   blur/delay section-entrance animation (delays LCP), the `a:hover`/`img:hover` lift, and the
+   `[dir="rtl"] a[href^="tel:"] { display: inline-block; direction: ltr !important }` rule (it broke the call buttons).
+3. Client-specific values moved to `src/config/client.ts` (`siteUrl`, `googleMapsUrl`, `instagramUrl`,
+   `addressAr`, `googleRating`, `logoMarkPath`) per hard rule 2. Arabic campaign copy is in `landingCopy.ts`,
+   **not** `translations.ts`, because the `Translation` type enforces en/ar parity and these pages are
+   single-language ad copy.
+4. Logo: the real brand mark (`main_logo.png`, trimmed to `public/images/landing/revera-mark.png`) plus a live
+   text wordmark. Photos are real clinic assets (reception, doctor portrait), pre-optimised to WebP in
+   `public/images/landing/`. The Manus AI-generated "consultation" people were dropped: they were presented as
+   real clinic staff/clients.
+5. `src/lib/landingPaths.ts` marks these routes as Arabic-only. `LanguageProvider` and the inline `DIR_SCRIPT`
+   in `layout.tsx` skip them, so the ad URL is not rewritten to `?lang=en`, `<html lang>` is `ar`, no
+   language cookie is set, and `/api/page-settings` is not fetched.
+6. Tracking: `LandingTracker` (client) pushes `landing_view`, `whatsapp_click`, `call_click`, `map_click` and
+   `scroll_depth` (25/50/75/90, once each — the Manus version fired once, mostly with depth "0") to
+   `dataLayer` via `data-lp-event` attributes, and stores `gclid`/`gbraid`/`wbraid`/`utm_*` in sessionStorage.
+   `LandingAnalytics` loads Google Tag Manager **only when `NEXT_PUBLIC_GTM_ID` is set**; unset, nothing loads.
+7. Copy changes (CRO review): removed absolute claims ("آمن لكل درجات البشرة", "من غير حروق", "من غير وجع");
+   fixed masculine/feminine forms (the men page used feminine imperatives); the hero CTA no longer says
+   "ابعتي «بشرتي»" when the WhatsApp text is already prefilled; the dark-skin variant now shows the dark-skin
+   section directly under the hero (message match); "عميلة على Google" → "تقييم على Google" (two reviewers are men).
+
+**Trade-offs:**
+- The old `/` Manus route is gone (the main site owns `/`); ads must point at the three paths above.
+- `revera-conversion-landing/` is now dead code and can be archived; it was not modified or deleted.
+- Landing pages are indexable (canonical + OG set). Whether they should be `noindex` to avoid overlapping with
+  future SEO pages is a marketing call, not made here.
+- Open claims that need a human to confirm are tracked in RISK-103.
+
+Checklist: `ai_docs/manual_tests/LASER_LANDING_PAGES_MANUAL_TESTS.md`.
