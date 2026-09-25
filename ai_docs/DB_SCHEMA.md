@@ -1,6 +1,6 @@
 # DB_SCHEMA.md — Revera Clinics Database Schema
 
-> **Last Updated:** 2026-08-27 (`providers.active` added — RISK-075)
+> **Last Updated:** 2026-09-17 (Reception bot automation tables added — see the end of this file)
 > **Database:** Supabase (PostgreSQL)
 > **Audited from:** `supabase/migrations/*.sql`, live API routes, and a direct linked dev schema dump on 2026-07-26
 > **Previous content was for a different project — discarded entirely**
@@ -1014,6 +1014,7 @@ Composite primary key `(package_id, service_id)`. The package's content list —
 | `total_pulses` | integer | NOT NULL DEFAULT 0 — included pulses for `'pulses'` packages. **Added 2026-09-20**, same migration |
 | `pulses_used` | integer | NOT NULL DEFAULT 0. **Added 2026-09-20**, same migration. The live pulse balance lives here since Brief 34B — see `package_pulse_usage` |
 | `pulses_remaining` | integer | NOT NULL DEFAULT 0. **Added 2026-09-20**, same migration |
+| `price_pending` | boolean | NOT NULL DEFAULT false. **Added 2026-09-25** by `20260925000000_pulse_revenue_recognition.sql` (DEC-088 item 6). True for a historical package whose invoice value was never entered: no revenue is recognised for it until staff confirm `price_paid`, then `recognise_package_pulses_catchup()` back-fills the recognitions |
 
 One row per package a patient bought. `price_paid` is the deferred-revenue basis — see
 `customer_package_items` below for the per-service breakdown that basis is allocated across.
@@ -1064,13 +1065,25 @@ Caught by `scratch/phase1packagecheck.ts` on the first implementation attempt.
 |---|---|---|
 | `id` | UUID | Primary key |
 | `customer_package_id` | UUID | FK → customer_packages.id ON DELETE CASCADE |
-| `customer_package_item_id` | UUID | FK → customer_package_items.id ON DELETE CASCADE |
+| `customer_package_item_id` | UUID | FK → customer_package_items.id ON DELETE CASCADE. **Nullable since 2026-09-25** (`20260925000000_pulse_revenue_recognition.sql`): a pulses package has no items — its rows carry `package_pulse_usage_id` instead |
+| `package_pulse_usage_id` | UUID | FK → package_pulse_usage.id ON DELETE CASCADE, nullable. **Added 2026-09-25** (DEC-088). Set on rows recognised from a laser-pulse consumption; UNIQUE (partial index) so a usage row is recognised at most once |
 | `reservation_id` | UUID | FK → reservations.id ON DELETE CASCADE (updated 2026-08-06 by `20260806202500_cascade_delete_package_revenue_recognitions.sql`); one row per delivered package service session |
 | `recognised_at` | timestamptz | Default now() |
 | `recognised_amount` | numeric | Non-negative amount released from deferred revenue |
 | `reason` | text | Default `'session'`, CHECK IN (`'session'`, `'expiry_breakage'`) |
 | `recognised_by_employee_id` | UUID | FK → employee_accounts.id ON DELETE SET NULL |
 | `created_at` | timestamptz | Default now() |
+
+**Pulse recognition (DEC-088, 2026-09-25):** `CHECK` — a `'session'` row has exactly one source, an item
+(services package) or a `package_pulse_usage_id` (pulses package); `'expiry_breakage'` rows are exempt (not built
+yet). `consume_package_pulses()` now calls `recognise_pulse_usage(usage_id)` in the same transaction: with
+`T(n) = least(price_paid, round(price_paid × n / total_pulses, 2))`, a usage that consumed pulses `before+1 …
+before+qty` (ordered by `created_at, id` over ALL the package's usage rows) is recognised for
+`T(before+qty) − T(before)`, so the amounts telescope to exactly `price_paid` at depletion and do not depend on when
+a row is recognised. Nothing is written when `price_pending`, `price_paid ≤ 0`, `total_pulses ≤ 0`, the usage has no
+`reservation_id` (its share stays deferred until linked), or the usage already has a row.
+`recognise_package_pulses_catchup(customer_package_id)` back-fills any unrecognised usage rows for one package
+(idempotent). All three functions: `service_role` only, no SECURITY DEFINER.
 
 Unique `(customer_package_item_id, reservation_id)` prevents consuming the same entitlement for the
 same delivered reservation more than once. This is a management-accounting event record, not a
@@ -1575,5 +1588,5 @@ enabled (30 days for memory, 180 days for the log).
   repo; measure it.** See RISK-020.
 - `reservations.branch_id` is nullable — reservations without a branch are treated as "no branch" and are filtered separately.
 - `reservations.date` is stored as `text`, not a native `date` column.
-- `terms_conditions`: Stores structured terms and conditions items managed in the admin dashboard and displayed on public `/terms` page. Fields: `id` (uuid), `sort_order` (int), `title_en` (text), `title_ar` (text), `content_en` (text), `content_ar` (text), `link_text_en` (text), `link_text_ar` (text), `link_url` (text), `is_active` (boolean), `created_at` (timestamptz), `updated_at` (timestamptz). Has public read RLS policy.
+- `terms_and_conditions` (**corrected 2026-09-23** — this entry previously called it `terms_conditions`, which no code uses; `src/app/api/terms/route.ts` reads and writes `terms_and_conditions`): Stores structured terms and conditions items managed in the admin dashboard and displayed on public `/terms` page. Fields: `id` (uuid), `sort_order` (int), `title_en` (text), `title_ar` (text), `content_en` (text), `content_ar` (text), `link_text_en` (text), `link_text_ar` (text), `link_url` (text), `is_active` (boolean), `created_at` (timestamptz), `updated_at` (timestamptz). Has public read RLS policy.
 - Still genuinely mock UI (no table exists): consultation notes, treatment plans, before/after photos, Finances Dashboard aggregate reporting, Refunds, Shipping. See `PROJECT.md` and `RISKS.md` RISK-005 for the current, corrected list.

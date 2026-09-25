@@ -2989,8 +2989,12 @@ the ledger under-reads every customer with pre-launch history. Production had 13
    writing again would double-count cash.
 5. `payments.method` is mapped into the CHECK set (card/instapay/wallet/transfer, else cash); the raw
    free-text method stays on the original `transactions` row.
-6. The `previous` route itself is **not** changed here; new historical bookings entered after the script has
-   run still get no invoice until that route is made to write one (open follow-up, RISK-102).
+6. **Update 2026-09-25:** `POST /api/reservations/previous` now writes the same invoice + payment itself
+   (`src/lib/historicalInvoice.ts`, `writeHistoricalBookingInvoice`, same rules: `is_opening`, dated to the
+   booking, total = entered value else paid, total 0 skipped, no `transactions` row). It is non-fatal — the
+   booking, balances and transactions row are already saved — and the outcome is returned as
+   `response.ledger` (`created` / `skipped` / `failed`) instead of being swallowed; the script remains the
+   idempotent repair for any `failed`. A partly written invoice is deleted on failure.
 
 **Verified (dev, 2026-09-25):** seeded historical bookings (paid in full, part-paid package, zero-value,
 overpaid product); the ledger figures matched the customer row exactly (spent 2,200 = 2,200, outstanding
@@ -3044,7 +3048,7 @@ to read them, and selected FAQ answers by `String.includes()` (three questions g
 6. Tracking: `LandingTracker` (client) pushes `landing_view`, `whatsapp_click`, `call_click`, `map_click` and
    `scroll_depth` (25/50/75/90, once each — the Manus version fired once, mostly with depth "0") to
    `dataLayer` via `data-lp-event` attributes, and stores `gclid`/`gbraid`/`wbraid`/`utm_*` in sessionStorage.
-   `LandingAnalytics` loads Google Tag Manager **only when `NEXT_PUBLIC_GTM_ID` is set**; unset, nothing loads.
+   `LandingAnalytics` loads Google Tag Manager on these routes only, using `CLIENT.gtmId` (GTM-5ZXBL7LR; `NEXT_PUBLIC_GTM_ID` overrides, empty disables), plus the noscript iframe.
 7. Copy changes (CRO review): removed absolute claims ("آمن لكل درجات البشرة", "من غير حروق", "من غير وجع");
    fixed masculine/feminine forms (the men page used feminine imperatives); the hero CTA no longer says
    "ابعتي «بشرتي»" when the WhatsApp text is already prefilled; the dark-skin variant now shows the dark-skin
@@ -3058,3 +3062,121 @@ to read them, and selected FAQ answers by `String.includes()` (three questions g
 - Open claims that need a human to confirm are tracked in RISK-103.
 
 Checklist: `ai_docs/manual_tests/LASER_LANDING_PAGES_MANUAL_TESTS.md`.
+
+---
+
+## DEC-088: Laser-Pulse Package Revenue Is Recognised Per Pulse Consumed (Extends DEC-023)
+
+**Date:** 2026-09-25
+**Status:** Decided — active (2026-09-25); implementation starting. Owner decisions: item 5 = expiry option A,
+item 6 = flag-and-enter (no catalog fallback), item 9 = cash and earned revenue shown side by side with the
+deferred balance broken down. Items 1–4, 7, 8 and 10 follow from DEC-023 and the existing schema.
+
+**Context:**
+DEC-023 defers package cash as a liability and recognises revenue as sessions are delivered. That works only
+for **services** packages: the DB function `consume_customer_package_session` writes a
+`package_revenue_recognitions` row per session. **Pulses packages** (Brief 34B) keep their balance on
+`customer_packages` (`total_pulses`, `pulses_used`, `pulses_remaining`) and are consumed through
+`consume_package_pulses`, which writes no recognition. Production audit 2026-09-25 (RISK-104): all 6 packages
+sold are pulses type (30,000 EGP) and `package_revenue_recognitions` has 0 rows, so the P&L's package revenue
+is permanently 0 for laser while the cash (45,950 in September) shows in Cash Flow — September P&L revenue read
+about 1,750 (products only). Two schema facts make this more than a one-line fix:
+`package_revenue_recognitions.customer_package_item_id` is NOT NULL (and UNIQUE with `reservation_id`), but a
+pulses package has no `customer_package_items`; and `reason = 'expiry_breakage'` exists in the CHECK but no
+code writes it.
+
+**Chosen Option:**
+1. **Recognise revenue when pulses are consumed, in the same transaction and under the same row lock as the
+   consume.** `consume_package_pulses` inserts the recognition itself, so it is atomic, idempotent (the
+   existing `(customer_package_id, reservation_id)` replay path returns before any insert) and covers every
+   caller — doctor consume, reception deficit resolution (BUY_NEW_PACKAGE), checkout — without touching them.
+2. **Pro-rata by pulse range:** with `T(n) = least(price_paid, round(price_paid × n / total_pulses, 2))`, a usage
+   row that consumed pulses `before+1 … before+qty` (ordered by `created_at, id` over **all** of the package's usage
+   rows) is worth `T(before+qty) − T(before)`. The amount depends only on that range, so it is the same whether it is
+   recognised live, in a backfill, or later once the row is linked to a booking or the price is confirmed — order of
+   recognition does not matter — and the amounts telescope to exactly `price_paid` at depletion. The pulses variant
+   deliberately does **not** round the per-pulse price first (as the session function does): 5,000 EGP over 3,000
+   pulses would lose ~1% to rounding. (A first version summed only booking-linked pulses and lost a share when an
+   orphan row was linked later — found in the live dev test and replaced.)
+3. **Schema (new migration, additive):** make `customer_package_item_id` nullable; add
+   `package_pulse_usage_id uuid REFERENCES package_pulse_usage(id) ON DELETE CASCADE`; add a `CHECK` that exactly
+   one of the two sources is set; add `UNIQUE (package_pulse_usage_id)`; keep the existing
+   `UNIQUE (customer_package_item_id, reservation_id)`. `reservation_id` stays NOT NULL for consumption rows
+   (the P&L, branch and doctor reports join `reservations!inner` on it). Update `DB_SCHEMA.md` in the same
+   change (CLAUDE.md rule 6).
+4. **No report code changes.** `pnl`, `trend`, `branch-pnl`, `new-vs-returning`, `doctor-pnl` and
+   `package-profitability` already sum `recognised_amount` by `recognised_at`; they show laser package revenue as
+   soon as rows exist. Cash Flow is unaffected (cash is still recognised when received).
+5. **Expiry (owner chose option A, 2026-09-25):** an unconsumed balance is recognised as revenue **at expiry**
+   (`reason = 'expiry_breakage'`), because the obligation ends there; staff can still extend a package before it
+   lapses. Not part of the first release: it needs `reservation_id` nullable (or a sibling table) and a scheduled
+   or on-read sweep, and there is currently no expiry job. Until it ships, expired-unused balances stay deferred
+   (a conservative understatement, never an overstatement).
+6. **Historical packages (owner decision 2026-09-25): never guess the price — flag it and let staff enter it.**
+   `POST /api/reservations/previous` used to create the customer's package with `price_paid = catalog price`
+   whatever was actually charged. New rule: if the receptionist entered an invoice value for a historical package
+   booking, that value is the package's `price_paid`. If they did **not**, the package is created with
+   `price_pending = true` (new boolean on `customer_packages`) instead of falling back to the catalog price.
+   While pending: no revenue is recognised for that package (its consumption is still recorded, so nothing is
+   lost), and the booking and the customer's package show an "Invoice value missing" badge. A per-booking
+   **"Enter invoice value"** action (reception/admin, on that historical booking only) opens a small dialog that
+   **pre-fills the catalog price as a suggestion, never as the saved value** — staff must confirm or change it.
+   Saving it (a) sets `price_paid` and clears `price_pending`, (b) updates the booking's ledger invoice and line to
+   the entered value, (c) applies the debt/wallet difference to the customer (`entered value − amount paid`, the
+   same settlement rule the route uses at entry), and (d) runs the recognition catch-up for the pulses already
+   consumed (item 8's logic, per package). The action is idempotent and refuses to run twice with a different
+   value unless the user explicitly edits. The cash for these packages predates the ledger and is excluded from
+   Cash Flow by `is_opening`, so their recognised revenue has no matching cash inside the ledger period —
+   accepted; that is what opening deferred revenue means. Scope: **packages only** — a non-package historical
+   booking with no entered value keeps the DEC-086 fallback (invoice = amount paid), which cannot misstate
+   revenue because it equals the cash received.
+7. **Reversals:** no code path un-consumes pulses today. Any future restore/correction must delete or negate
+   that consumption's recognition inside the same transaction (`ON DELETE CASCADE` on `package_pulse_usage_id`
+   covers a deleted usage row). Recorded here so it is not forgotten when one is added.
+8. **Backfill:** a one-time, idempotent script (same style as `backfill_historical_invoices.sql`, with a separate
+   SELECT-only dry run) creates the missing recognitions for existing `package_pulse_usage` rows, ordered by
+   `created_at` per package so the cumulative amounts come out identical to live consumption. Production had one
+   usage row at audit time, so the historical effect is negligible — the change matters going forward.
+
+9. **Finance presentation (owner decision 2026-09-25): show cash and earned revenue side by side, and explain the
+   difference on the screen.** The clinic owner must never see "50,000 came in, revenue 10,000" without the reason.
+   - P&L gets a **bridge** under the revenue figure: `Cash received (Cash Flow) − paid for packages not yet
+     delivered (deferred) + earned this period from earlier deferred packages = Revenue earned`.
+   - A **Deferred package balance** card (money collected for services not yet delivered) with a **breakdown by
+     what it is owed for**: pulses (total pulses remaining and the amount), and per service the sessions remaining
+     and the amount (e.g. "40,000 EGP = 30,000 pulses + 5 Underarm sessions + 6 Full Body sessions"). Per package:
+     `deferred = price_paid × remaining / total` (DEC-023 pro-rata; for a services package the amount is split
+     across its items by remaining sessions). Packages with `price_pending` (item 6) are listed separately as
+     "invoice value missing", not silently counted as 0.
+   - Labels are explicit in Arabic and English: **"Cash received / المقبوض"** for Cash Flow and **"Revenue earned /
+     الإيراد المُحقَّق"** for the P&L — never two screens that both just say "revenue".
+   - Data source: `customer_packages` (`price_paid`, `total_pulses`, `pulses_remaining`, `status`, `expires_at`) and
+     `customer_package_items` (`qty_remaining`, `service_id`); nothing new is stored for this.
+10. **Consumption without a booking.** `package_revenue_recognitions.reservation_id` stays NOT NULL (every revenue
+    report joins `reservations!inner` for branch and doctor). A pulse consumption with no `reservation_id` (a manual
+    deduction from the patient profile, or a backfilled legacy row) therefore recognises **no** revenue; it is
+    counted in the deferred figure and shown in the breakdown as "consumed without a booking — link it to
+    recognise". Production had none at audit time (1 usage row, with a booking); dev has 10 legacy rows, all
+    without one. Chosen over a nullable column because that would silently drop the revenue from the branch and
+    doctor reports instead of surfacing it.
+
+**Reason:**
+- Without it the P&L is wrong in the direction DEC-023 was written to prevent: laser package cash never becomes
+  revenue, so margin and every revenue report understate the clinic's largest product line.
+- The consume function is the only place that already holds the lock and the idempotency key; a second write
+  from application code would reintroduce the ordered-not-transactional risk RISK-097 documents.
+- Pro-rata on pulses mirrors DEC-023 exactly and is explainable to a non-specialist.
+
+**Trade-offs:**
+- Reported revenue for laser packages shifts from "at sale" (currently never) to "as delivered": months that sell
+  many packages look lower than cash, months that deliver them look higher — the intended effect, but numbers
+  will change for anyone comparing to old reports.
+- Recognition is only as good as `price_paid`; for pulses packages sold through `/api/packages/sell` that is the
+  catalog price at sale, which already includes any discount applied there.
+- A consumed pulse is recognised even if the visit is later cancelled, until a reversal path exists (item 7).
+
+**Verification plan (live, dev database — the in-memory fake cannot run PL/pgSQL):** consume in several steps and
+confirm `Σ recognised = price_paid` exactly at depletion; replay the same reservation and confirm no second row;
+concurrent consumes serialise; clamp at remaining; a package with `total_pulses = 0` still refuses; the `pnl`
+route's package line moves and Cash Flow does not; function grants unchanged (service_role only). Manual
+checklist `ai_docs/manual_tests/PULSE_REVENUE_RECOGNITION_MANUAL_TESTS.md` to be created with the code.

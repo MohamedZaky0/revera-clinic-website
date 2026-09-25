@@ -27,7 +27,11 @@
 | — | `GET /api/customers/reconcile` shows no drift for the backfilled customers | production/dev with a real staff session | — | Not run (needs a signed-in session) |
 | 2026-09-25 | Audit: which invoice readers honour `is_opening` | code + prod DB | Before: none did (only assets/expenses/loans). No views/functions/triggers on invoices/payments. Prod ledger: 29 invoices, all 2026-09, none opening | Finding |
 | 2026-09-25 | 8 finance routes now exclude `is_opening` (pnl, trend, branch-pnl, service-mix, service-margin, doctor-pnl, cashflow, new-vs-returning) | local | `tests/routes/finance-opening-invoices.test.ts`: pnl/cashflow tests fail without the filter (6,200 vs 1,200), pass with it; source guard covers all 8; tsc/eslint clean | Pass |
-| — | Finance screens show unchanged revenue/cash for Apr–Aug after a production backfill | production, browser | — | Not run — do after applying |
+| 2026-09-25 | **Production apply** (real script, after the read-only dry run; finance exclusion already deployed on main) | production | invoices 29→36, invoice_lines 29→36, 7 `is_opening` invoices + 7 `is_opening` payments, `transactions` 32→32 (untouched), 6 zero-value skipped, 0 reservations with more than one invoice. Invoices by month: Apr 5,200 / May 1,200 / Jun 6,200 / Jul 2,000 / Aug 2,000 (all opening) + Sep 29 live 48,300 | Pass |
+| 2026-09-25 | Ledger vs sources for the 3 customers | production | ledger spent = `reservations.amount_paid` = `transactions` payments for all three (Randa 6,400, Khaled 5,200, Zeinab 5,000), outstanding 0. **But `customers.spent_amount` disagrees for 2 of 3**: Zeinab 10,000 (ledger 5,000), Khaled 1,200 (ledger 5,200); Randa matches. Scalars were NOT touched by the backfill — pre-existing drift (RISK-012 family) | Finding — review, see below |
+| 2026-09-25 | `customers.spent_amount` set to the ledger figure for the 2 drifted customers (owner decision: trust the ledger) | production, guarded UPDATE by id + old value | Zeinab 10,000 → 5,000, Khaled 1,200 → 5,200; Randa unchanged 6,400; all three now equal ledger, `reservations.amount_paid` and `transactions` | Pass |
+| 2026-09-25 | Finance inputs audited from production data (Finance UI not opened: no signed-in session) | production, read-only SQL | Found the reporting gaps in RISK-104 (pulses revenue never recognised, 7,800 of manual payments not on the ledger, no doctor attribution, empty cost side) | Finding |
+| — | Finance screens show unchanged revenue/cash for Apr–Aug after the production backfill | production, browser (signed-in finance user) | — | **Not run** — needs a signed-in session |
 
 ## Checks
 
@@ -37,8 +41,20 @@
 - [x] Re-running is a no-op.
 - [x] Ledger `spent`/`outstanding` equal the customer row after backfill.
 - [x] Overpaid booking: invoice = total, payment = amount paid, no debt shown.
-- [ ] Run the dry run on production and confirm the candidate list before applying.
+- [x] Run the dry run on production and confirm the candidate list before applying.
 - [ ] After a production apply, open each backfilled customer's profile and confirm spent/outstanding are unchanged.
 - [x] Finance revenue/cash reports exclude `is_opening` invoices (route tests + source guard).
 - [ ] After a production apply, open Finance → P&L / Cash Flow / Service Mix for April–August and confirm revenue and cash stay at 0 for those months.
 - [ ] `GET /api/customers/reconcile` reports no drift for the backfilled customers.
+
+## Add Previous Booking now writes its own invoice (RISK-102 fix)
+
+Automated: `tests/routes/reservations-previous-invoice.test.ts` (15 tests: paid in full, part-paid package, zero value
+skipped, value-less fallback to paid, overpaid product, unpaid balance, failure reported without failing the booking,
+payment-method mapping); the route tests fail without the change. Live UI click-test not done (needs a signed-in session).
+
+- [ ] Admin → Add Previous Booking: service booking, value 1,200, paid 1,200, method Visa. Booking saves and customer spent rises by 1,200. `select * from invoices where reservation_id = <id>` → 1 invoice, `is_opening = true`, 1,200, dated the booking date; 1 payment 1,200 `card`.
+- [ ] Value 3,000, paid 1,000 (package): invoice 3,000, payment 1,000, customer `outstanding` +2,000 and ledger outstanding also 2,000.
+- [ ] Value 0 and paid 0: booking saves, no invoice.
+- [ ] `GET /api/customers/reconcile` shows no drift for a customer whose history was all entered through this screen.
+- [ ] Finance → P&L / Cash Flow for the booking's month do not move.
