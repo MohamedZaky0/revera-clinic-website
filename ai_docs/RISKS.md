@@ -4711,7 +4711,7 @@ script (`scripts/backfill_historical_invoices.sql`) fixes the existing rows only
 entered afterwards reopens the gap, and `GET /api/customers/reconcile` will report drift for that customer
 until the script is re-run (it is idempotent, so re-running is safe). **Fix options:** have the route write
 the invoice + payment itself (`is_opening = true`, same rules as the script), or schedule the script. Also
-open: it was not audited whether finance screens that sum `invoices` honour `is_opening`. Checklist:
+note the finance revenue/cash reports now exclude `is_opening` invoices (audited and fixed 2026-09-25, DEC-086), so this gap costs customer-value accuracy only, not P&L. Checklist:
 `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.
 
 ---
