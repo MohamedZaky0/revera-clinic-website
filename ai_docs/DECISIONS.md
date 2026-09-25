@@ -3068,7 +3068,7 @@ Checklist: `ai_docs/manual_tests/LASER_LANDING_PAGES_MANUAL_TESTS.md`.
 ## DEC-088: Laser-Pulse Package Revenue Is Recognised Per Pulse Consumed (Extends DEC-023)
 
 **Date:** 2026-09-25
-**Status:** Proposed — implementation not started. Item 6 confirmed by the owner 2026-09-25; item 5 (expiry)
+**Status:** Proposed — implementation not started. Item 6 decided by the owner 2026-09-25 (flag-and-enter, no catalog fallback); item 5 (expiry)
 still awaits the owner's confirmation before it is built; items 1–4, 7 and 8 follow directly from DEC-023 and the
 existing schema.
 
@@ -3109,15 +3109,24 @@ code writes it.
    lapses. Not part of the first release: it needs `reservation_id` nullable (or a sibling table) and a scheduled
    or on-read sweep, and there is currently no expiry job. Until it ships, expired-unused balances stay deferred
    (a conservative understatement, never an overstatement).
-6. **Historical packages (CONFIRMED by the owner 2026-09-25 — the entered invoice value is used, and the catalog
-   price is the fallback/reference when none was entered):** `POST /api/reservations/previous` creates the customer's package
-   with `price_paid = catalog price` even when the receptionist entered a smaller paid/invoice value.
-   Recommended: recognise as the customer consumes (an undelivered obligation genuinely exists at launch,
-   DEC-024), but set `price_paid` for a historical package to the **entered invoice value** (falling back to the
-   catalog price only if none was entered), so revenue is not recognised on money that was never charged. The
-   cash for these packages predates the ledger and is excluded from Cash Flow by `is_opening`, so their
-   recognised revenue will have no matching cash inside the ledger period — accepted; that is what opening
-   deferred revenue means.
+6. **Historical packages (owner decision 2026-09-25): never guess the price — flag it and let staff enter it.**
+   `POST /api/reservations/previous` used to create the customer's package with `price_paid = catalog price`
+   whatever was actually charged. New rule: if the receptionist entered an invoice value for a historical package
+   booking, that value is the package's `price_paid`. If they did **not**, the package is created with
+   `price_pending = true` (new boolean on `customer_packages`) instead of falling back to the catalog price.
+   While pending: no revenue is recognised for that package (its consumption is still recorded, so nothing is
+   lost), and the booking and the customer's package show an "Invoice value missing" badge. A per-booking
+   **"Enter invoice value"** action (reception/admin, on that historical booking only) opens a small dialog that
+   **pre-fills the catalog price as a suggestion, never as the saved value** — staff must confirm or change it.
+   Saving it (a) sets `price_paid` and clears `price_pending`, (b) updates the booking's ledger invoice and line to
+   the entered value, (c) applies the debt/wallet difference to the customer (`entered value − amount paid`, the
+   same settlement rule the route uses at entry), and (d) runs the recognition catch-up for the pulses already
+   consumed (item 8's logic, per package). The action is idempotent and refuses to run twice with a different
+   value unless the user explicitly edits. The cash for these packages predates the ledger and is excluded from
+   Cash Flow by `is_opening`, so their recognised revenue has no matching cash inside the ledger period —
+   accepted; that is what opening deferred revenue means. Scope: **packages only** — a non-package historical
+   booking with no entered value keeps the DEC-086 fallback (invoice = amount paid), which cannot misstate
+   revenue because it equals the cash received.
 7. **Reversals:** no code path un-consumes pulses today. Any future restore/correction must delete or negate
    that consumption's recognition inside the same transaction (`ON DELETE CASCADE` on `package_pulse_usage_id`
    covers a deleted usage row). Recorded here so it is not forgotten when one is added.
