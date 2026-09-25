@@ -700,6 +700,7 @@ when.
 
 **Date:** 2026-07-25
 **Status:** Decided — active. **Supersedes DEC-020.**
+**Update 2026-09-25:** partially superseded by DEC-086 — real historical bookings now do get backfilled invoices.
 
 **Context:**
 Every reservation, customer, sale and inventory row currently in the database is test data entered
@@ -2950,3 +2951,50 @@ services package legitimately has `total_pulses = 0`.
    pulses-catalog heuristic (too broad — caused the same false positive client-side). Also surfaces
    the real server error message when a package sale fails during booking, instead of a generic
    alert.
+
+---
+
+## DEC-086: Real Historical Bookings Get Backfilled Invoices (Narrows DEC-026)
+
+**Date:** 2026-09-25
+**Status:** Decided — active. **Partially supersedes DEC-026** (the "no backfill machinery" clause, for real
+historical bookings only).
+
+**Context:**
+DEC-026 (2026-07-25) built no backfill because every row then in the database was mock. That premise no
+longer holds: reception now enters real past visits through `POST /api/reservations/previous` (rows with
+`is_historical = true`). That route updates `customers.spent_amount` / `outstanding` / `wallet_balance` and
+records a `transactions` payment row, but never writes `invoices` / `invoice_lines` / `payments`. So the
+ledger-derived customer figures (`src/lib/customerBalances.ts`, `GET /api/customers/reconcile`) show those
+customers as having no spend and no debt, disagreeing with the scalars, and anything valuing a customer from
+the ledger under-reads every customer with pre-launch history. Production had 13 such bookings on
+2026-09-25 (7 with a paid amount, 16,600 EGP in total).
+
+**Decisions & Implementation:**
+1. One-time, idempotent SQL script `scripts/backfill_historical_invoices.sql` (not a migration — it is data,
+   run deliberately, per environment). For each `is_historical` completed booking with a customer and no
+   invoice it writes one `issued` invoice (`issued_at` = the booking's completion date, single line), and one
+   `payments` row when `amount_paid > 0`.
+2. **Total** = `[Invoice Total]: N EGP` from `reception_notes` if present, else `amount_paid + amount_left`.
+   Bookings whose total is 0 are skipped — there is nothing to value. The line description comes from the
+   route's own `Service:` / `Package:` / `Product:` note tags and is suffixed `[historical backfill]`.
+3. **Every backfilled invoice and payment is `is_opening = true`** (the DEC-024 import flag), so any report
+   can exclude backfilled history from live revenue.
+4. **No `transactions` rows are written** — the previous-bookings route already recorded the cash side there;
+   writing again would double-count cash.
+5. `payments.method` is mapped into the CHECK set (card/instapay/wallet/transfer, else cash); the raw
+   free-text method stays on the original `transactions` row.
+6. The `previous` route itself is **not** changed here; new historical bookings entered after the script has
+   run still get no invoice until that route is made to write one (open follow-up, RISK-102).
+
+**Verified (dev, 2026-09-25):** seeded historical bookings (paid in full, part-paid package, zero-value,
+overpaid product); the ledger figures matched the customer row exactly (spent 2,200 = 2,200, outstanding
+2,000 = 2,000), the overpaid booking counted as credit not debt, and re-running created no duplicates.
+Checklist: `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`. **Not yet run on production.**
+
+**Trade-offs:**
+- Totals are only as good as what reception typed: with no `[Invoice Total]` the total falls back to what was
+  paid, so an unpaid-but-owed old booking recorded without a total would not appear as a receivable.
+- Backfilled invoices carry one summary line, not the original service/package/product breakdown.
+- Reports that sum `invoices` without honouring `is_opening` would now count this history; whether each
+  finance screen does was not audited (it is why the flag is set).

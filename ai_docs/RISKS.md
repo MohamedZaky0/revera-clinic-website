@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **70 resolved** · 90 tracked total.
+**8 open** · **13 partially resolved** · **70 resolved** · 91 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4698,6 +4698,21 @@ same class of bug — an error swallowed as "non-fatal" on a column the fake doe
 sweep for other tables, not just `services`; (3) the live confirmation that a completion now writes its
 invoice was pending a fresh browser session (the dev login had expired) when this was committed — see
 the manual checklist.
+
+---
+
+## RISK-102: New Historical Bookings Still Write No Invoice, So The Ledger Drifts From Customer Totals Again (OPEN)
+
+**Severity:** Medium · **Type:** Financial ledger / data completeness · **Found:** 2026-09-25 · **Related:** DEC-086
+
+`POST /api/reservations/previous` updates `customers.spent_amount` / `outstanding` / `wallet_balance` and
+records a `transactions` payment, but writes no `invoices` / `invoice_lines` / `payments`. DEC-086's one-time
+script (`scripts/backfill_historical_invoices.sql`) fixes the existing rows only; every historical booking
+entered afterwards reopens the gap, and `GET /api/customers/reconcile` will report drift for that customer
+until the script is re-run (it is idempotent, so re-running is safe). **Fix options:** have the route write
+the invoice + payment itself (`is_opening = true`, same rules as the script), or schedule the script. Also
+open: it was not audited whether finance screens that sum `invoices` honour `is_opening`. Checklist:
+`ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.
 
 ---
 
