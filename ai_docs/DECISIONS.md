@@ -3104,7 +3104,7 @@ code writes it.
 4. **No report code changes.** `pnl`, `trend`, `branch-pnl`, `new-vs-returning`, `doctor-pnl` and
    `package-profitability` already sum `recognised_amount` by `recognised_at`; they show laser package revenue as
    soon as rows exist. Cash Flow is unaffected (cash is still recognised when received).
-5. **Expiry (owner to confirm) — recommended:** an unconsumed balance is recognised as revenue **at expiry**
+5. **Expiry (owner chose option A, 2026-09-25):** an unconsumed balance is recognised as revenue **at expiry**
    (`reason = 'expiry_breakage'`), because the obligation ends there; staff can still extend a package before it
    lapses. Not part of the first release: it needs `reservation_id` nullable (or a sibling table) and a scheduled
    or on-read sweep, and there is currently no expiry job. Until it ships, expired-unused balances stay deferred
@@ -3134,6 +3134,28 @@ code writes it.
    SELECT-only dry run) creates the missing recognitions for existing `package_pulse_usage` rows, ordered by
    `created_at` per package so the cumulative amounts come out identical to live consumption. Production had one
    usage row at audit time, so the historical effect is negligible — the change matters going forward.
+
+9. **Finance presentation (owner decision 2026-09-25): show cash and earned revenue side by side, and explain the
+   difference on the screen.** The clinic owner must never see "50,000 came in, revenue 10,000" without the reason.
+   - P&L gets a **bridge** under the revenue figure: `Cash received (Cash Flow) − paid for packages not yet
+     delivered (deferred) + earned this period from earlier deferred packages = Revenue earned`.
+   - A **Deferred package balance** card (money collected for services not yet delivered) with a **breakdown by
+     what it is owed for**: pulses (total pulses remaining and the amount), and per service the sessions remaining
+     and the amount (e.g. "40,000 EGP = 30,000 pulses + 5 Underarm sessions + 6 Full Body sessions"). Per package:
+     `deferred = price_paid × remaining / total` (DEC-023 pro-rata; for a services package the amount is split
+     across its items by remaining sessions). Packages with `price_pending` (item 6) are listed separately as
+     "invoice value missing", not silently counted as 0.
+   - Labels are explicit in Arabic and English: **"Cash received / المقبوض"** for Cash Flow and **"Revenue earned /
+     الإيراد المُحقَّق"** for the P&L — never two screens that both just say "revenue".
+   - Data source: `customer_packages` (`price_paid`, `total_pulses`, `pulses_remaining`, `status`, `expires_at`) and
+     `customer_package_items` (`qty_remaining`, `service_id`); nothing new is stored for this.
+10. **Consumption without a booking.** `package_revenue_recognitions.reservation_id` stays NOT NULL (every revenue
+    report joins `reservations!inner` for branch and doctor). A pulse consumption with no `reservation_id` (a manual
+    deduction from the patient profile, or a backfilled legacy row) therefore recognises **no** revenue; it is
+    counted in the deferred figure and shown in the breakdown as "consumed without a booking — link it to
+    recognise". Production had none at audit time (1 usage row, with a booking); dev has 10 legacy rows, all
+    without one. Chosen over a nullable column because that would silently drop the revenue from the branch and
+    doctor reports instead of surfacing it.
 
 **Reason:**
 - Without it the P&L is wrong in the direction DEC-023 was written to prevent: laser package cash never becomes
