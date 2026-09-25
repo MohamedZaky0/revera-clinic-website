@@ -36,6 +36,7 @@ The in-memory `supabaseFake` cannot run PL/pgSQL, so this feature is verified ag
 | 2026-09-25 | Function ACL (`has_function_privilege`) | dev | `consume_package_pulses`, `recognise_pulse_usage`, `recognise_package_pulses_catchup`: `anon` = false, `authenticated` = false, `service_role` = true, SECURITY DEFINER = false | Pass |
 | 2026-09-25 | Recognitions usable by the P&L join | dev | every row has `reservation_id` and `recognised_at`; reports sum by `recognised_at` | Pass |
 | 2026-09-25 | Dev test data removed | dev | disposable customer, 4 packages, 12 reservations deleted; 0 leftover recognitions/usage | Pass |
+| 2026-09-25 | **Repeatable DB test** `scripts/db_tests/pulse_revenue_recognition.test.sql` (12 groups: sum = price at depletion, replay, awkward rounding, orphan + link + catch-up, pending price, zero price, out-of-order linking, three refusals, CHECK + unique constraints, usage and reservation cascades, **services-package regression through `consume_customer_package_session`**, function ACL) | dev, one transaction always rolled back | `PASS: 36 assertions (rolled back)`, run twice, nothing left behind. Writing it caught a wrong expectation of mine (1,000 over 3 pulses gives 333.33 / 333.34 / 333.33, still 1,000.00); the code was right | Pass |
 | 2026-09-25 | Backfill dry run on dev | dev | 10 legacy usage rows, all `SKIP (no booking - stays deferred until linked)` | Pass |
 | — | Backfill dry run on production | production | Cannot run until the migration is applied (the dry run reads `price_pending`) | Not run |
 | — | Apply migration + backfill on production | production | — | **Not run** |
@@ -51,6 +52,8 @@ The in-memory `supabaseFake` cannot run PL/pgSQL, so this feature is verified ag
 - [x] Linking an orphan usage to a booking and running the catch-up recognises its share.
 - [x] Concurrent consumes on one package serialise and total correctly.
 - [x] The three functions are `service_role` only.
+- [x] Services (non-pulses) packages still recognise revenue through the old function after the table change (regression).
+- [x] The automated DB test passes on dev, twice: `npx supabase db query --linked -f scripts/db_tests/pulse_revenue_recognition.test.sql` → expect the error text `PASS: 36 assertions (rolled back)`.
 - [ ] Apply the migration to production; run the dry run and confirm it lists only the expected usage row(s).
 - [ ] Run the backfill on production; confirm `package_revenue_recognitions` gained only those rows.
 - [ ] Do one real laser consume from the doctor screen against a booking: Finance → P&L revenue rises by the pro-rata amount; Cash Flow is unchanged.
