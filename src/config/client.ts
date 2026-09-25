@@ -23,6 +23,8 @@ export const CLIENT = {
     "https://www.google.com/maps/place/Revera+Clinic+-+Tagamoa+Branch/@30.0012424,31.4513301,956m/data=!3m2!1e3!4b1!4m6!3m5!1s0x145823da15b7dca9:0xb388d9b9c32ebce5!8m2!3d30.0012378!4d31.4539104!16s%2Fg%2F11z28vdn2h",
   instagramUrl: "https://www.instagram.com/reveraclinicss/",
   addressAr: "المنطقة الصناعية، قسم أول القاهرة الجديدة",
+  // Laser device named on the ad landing pages (the pages promise "know the device before you book")
+  laserDevice: "Candela GentleMax Pro",
   // Google Business Profile snapshot shown on the landing pages. Update by hand when it moves —
   // it is a marketing claim, so it must match what a visitor sees on the Maps listing.
   googleRating: { score: "4.9", count: 31 },
