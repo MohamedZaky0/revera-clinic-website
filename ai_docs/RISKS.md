@@ -4711,7 +4711,7 @@ script (`scripts/backfill_historical_invoices.sql`) fixes the existing rows only
 entered afterwards reopens the gap, and `GET /api/customers/reconcile` will report drift for that customer
 until the script is re-run (it is idempotent, so re-running is safe). **Fix options:** have the route write
 the invoice + payment itself (`is_opening = true`, same rules as the script), or schedule the script. Also
-note the finance revenue/cash reports now exclude `is_opening` invoices (audited and fixed 2026-09-25, DEC-086), so this gap costs customer-value accuracy only, not P&L. Checklist:
+note the finance revenue/cash reports now exclude `is_opening` invoices (audited and fixed 2026-09-25, DEC-086), so this gap costs customer-value accuracy only, not P&L. **Applied on production 2026-09-25 (7 invoices, 16,600 EGP).** Finding: for 2 of the 3 backfilled customers `customers.spent_amount` disagrees with the ledger (Zeinab 10,000 vs 5,000; Khaled 1,200 vs 5,200) while the ledger matches `reservations.amount_paid` and `transactions` exactly — the scalar was already wrong; it was not modified. Checklist:
 `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.
 
 ---

@@ -27,7 +27,9 @@
 | — | `GET /api/customers/reconcile` shows no drift for the backfilled customers | production/dev with a real staff session | — | Not run (needs a signed-in session) |
 | 2026-09-25 | Audit: which invoice readers honour `is_opening` | code + prod DB | Before: none did (only assets/expenses/loans). No views/functions/triggers on invoices/payments. Prod ledger: 29 invoices, all 2026-09, none opening | Finding |
 | 2026-09-25 | 8 finance routes now exclude `is_opening` (pnl, trend, branch-pnl, service-mix, service-margin, doctor-pnl, cashflow, new-vs-returning) | local | `tests/routes/finance-opening-invoices.test.ts`: pnl/cashflow tests fail without the filter (6,200 vs 1,200), pass with it; source guard covers all 8; tsc/eslint clean | Pass |
-| — | Finance screens show unchanged revenue/cash for Apr–Aug after a production backfill | production, browser | — | Not run — do after applying |
+| 2026-09-25 | **Production apply** (real script, after the read-only dry run; finance exclusion already deployed on main) | production | invoices 29→36, invoice_lines 29→36, 7 `is_opening` invoices + 7 `is_opening` payments, `transactions` 32→32 (untouched), 6 zero-value skipped, 0 reservations with more than one invoice. Invoices by month: Apr 5,200 / May 1,200 / Jun 6,200 / Jul 2,000 / Aug 2,000 (all opening) + Sep 29 live 48,300 | Pass |
+| 2026-09-25 | Ledger vs sources for the 3 customers | production | ledger spent = `reservations.amount_paid` = `transactions` payments for all three (Randa 6,400, Khaled 5,200, Zeinab 5,000), outstanding 0. **But `customers.spent_amount` disagrees for 2 of 3**: Zeinab 10,000 (ledger 5,000), Khaled 1,200 (ledger 5,200); Randa matches. Scalars were NOT touched by the backfill — pre-existing drift (RISK-012 family) | Finding — review, see below |
+| — | Finance screens show unchanged revenue/cash for Apr–Aug after the production backfill | production, browser (signed-in finance user) | — | **Not run** — needs a signed-in session |
 
 ## Checks
 
@@ -37,7 +39,7 @@
 - [x] Re-running is a no-op.
 - [x] Ledger `spent`/`outstanding` equal the customer row after backfill.
 - [x] Overpaid booking: invoice = total, payment = amount paid, no debt shown.
-- [ ] Run the dry run on production and confirm the candidate list before applying.
+- [x] Run the dry run on production and confirm the candidate list before applying.
 - [ ] After a production apply, open each backfilled customer's profile and confirm spent/outstanding are unchanged.
 - [x] Finance revenue/cash reports exclude `is_opening` invoices (route tests + source guard).
 - [ ] After a production apply, open Finance → P&L / Cash Flow / Service Mix for April–August and confirm revenue and cash stay at 0 for those months.

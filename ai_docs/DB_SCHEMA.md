@@ -1,6 +1,6 @@
 # DB_SCHEMA.md — Revera Clinics Database Schema
 
-> **Last Updated:** 2026-08-27 (`providers.active` added — RISK-075)
+> **Last Updated:** 2026-09-17 (Reception bot automation tables added — see the end of this file)
 > **Database:** Supabase (PostgreSQL)
 > **Audited from:** `supabase/migrations/*.sql`, live API routes, and a direct linked dev schema dump on 2026-07-26
 > **Previous content was for a different project — discarded entirely**
@@ -1575,5 +1575,5 @@ enabled (30 days for memory, 180 days for the log).
   repo; measure it.** See RISK-020.
 - `reservations.branch_id` is nullable — reservations without a branch are treated as "no branch" and are filtered separately.
 - `reservations.date` is stored as `text`, not a native `date` column.
-- `terms_conditions`: Stores structured terms and conditions items managed in the admin dashboard and displayed on public `/terms` page. Fields: `id` (uuid), `sort_order` (int), `title_en` (text), `title_ar` (text), `content_en` (text), `content_ar` (text), `link_text_en` (text), `link_text_ar` (text), `link_url` (text), `is_active` (boolean), `created_at` (timestamptz), `updated_at` (timestamptz). Has public read RLS policy.
+- `terms_and_conditions` (**corrected 2026-09-23** — this entry previously called it `terms_conditions`, which no code uses; `src/app/api/terms/route.ts` reads and writes `terms_and_conditions`): Stores structured terms and conditions items managed in the admin dashboard and displayed on public `/terms` page. Fields: `id` (uuid), `sort_order` (int), `title_en` (text), `title_ar` (text), `content_en` (text), `content_ar` (text), `link_text_en` (text), `link_text_ar` (text), `link_url` (text), `is_active` (boolean), `created_at` (timestamptz), `updated_at` (timestamptz). Has public read RLS policy.
 - Still genuinely mock UI (no table exists): consultation notes, treatment plans, before/after photos, Finances Dashboard aggregate reporting, Refunds, Shipping. See `PROJECT.md` and `RISKS.md` RISK-005 for the current, corrected list.
