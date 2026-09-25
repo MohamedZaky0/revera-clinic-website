@@ -2,7 +2,7 @@
 
 > **Living document.** Update the evidence log with dated results as each check is run.
 > **Migration:** `supabase/migrations/20260925000000_pulse_revenue_recognition.sql` (idempotent, additive; the whole file
-> can be re-run). **Applied to dev 2026-09-25. NOT applied to production** — the owner applies it.
+> can be re-run). **Applied to dev and to production 2026-09-25.** The backfill has NOT been run on production (see the evidence log).
 > **Order on production:** (1) apply the migration; (2) run `scripts/backfill_pulse_revenue_recognition_dry_run.sql`
 > (SELECT only) and read it; (3) run `scripts/backfill_pulse_revenue_recognition.sql`. Never make a dry run by calling
 > the catch-up function — it writes.
@@ -38,8 +38,10 @@ The in-memory `supabaseFake` cannot run PL/pgSQL, so this feature is verified ag
 | 2026-09-25 | Dev test data removed | dev | disposable customer, 4 packages, 12 reservations deleted; 0 leftover recognitions/usage | Pass |
 | 2026-09-25 | **Repeatable DB test** `scripts/db_tests/pulse_revenue_recognition.test.sql` (12 groups: sum = price at depletion, replay, awkward rounding, orphan + link + catch-up, pending price, zero price, out-of-order linking, three refusals, CHECK + unique constraints, usage and reservation cascades, **services-package regression through `consume_customer_package_session`**, function ACL) | dev, one transaction always rolled back | `PASS: 36 assertions (rolled back)`, run twice, nothing left behind. Writing it caught a wrong expectation of mine (1,000 over 3 pulses gives 333.33 / 333.34 / 333.33, still 1,000.00); the code was right | Pass |
 | 2026-09-25 | Backfill dry run on dev | dev | 10 legacy usage rows, all `SKIP (no booking - stays deferred until linked)` | Pass |
-| — | Backfill dry run on production | production | Cannot run until the migration is applied (the dry run reads `price_pending`) | Not run |
-| — | Apply migration + backfill on production | production | — | **Not run** |
+| 2026-09-25 | **Apply migration on production** | production (`whmukkypceuizscpjcdo`) | `migration list`: 64 = 64, none mismatched, last `20260925000000`; only that migration was pending. Objects: `price_pending` col, `package_pulse_usage_id` col, `customer_package_item_id` nullable, CHECK + unique index present, 3 functions, exposed to anon/authenticated = 0; recognitions 0, pending packages 0 | Pass |
+| 2026-09-25 | Rollback-only DB test on production | production | `PASS: 36 assertions (rolled back)`; afterwards 0 test customers, 0 recognitions, usage rows 1, packages 6 (unchanged) | Pass |
+| 2026-09-25 | Backfill dry run on production (read-only) | production | exactly 1 row: `WOULD RECOGNISE 2,000.00` for the 2,500-pulse package fully used on booking `98277042…` (the `zaki` booking, dated 2026-09-26, which also has no invoice — RISK-101). Nothing else | Reviewed — **not applied** |
+| — | Run the backfill on production | production | Waiting for the owner to decide whether the `zaki` booking is real (it would add 2,000 EGP to September revenue) | **Not run** |
 | — | Finance P&L "package revenue" line moves after a real laser session; Cash Flow does not | dev/production, browser (signed-in) | — | **Not run** — needs a signed-in session |
 
 ## Checks
@@ -54,7 +56,11 @@ The in-memory `supabaseFake` cannot run PL/pgSQL, so this feature is verified ag
 - [x] The three functions are `service_role` only.
 - [x] Services (non-pulses) packages still recognise revenue through the old function after the table change (regression).
 - [x] The automated DB test passes on dev, twice: `npx supabase db query --linked -f scripts/db_tests/pulse_revenue_recognition.test.sql` → expect the error text `PASS: 36 assertions (rolled back)`.
-- [ ] Apply the migration to production; run the dry run and confirm it lists only the expected usage row(s).
+- [x] Apply the migration to production; run the dry run and confirm it lists only the expected usage row(s).
 - [ ] Run the backfill on production; confirm `package_revenue_recognitions` gained only those rows.
 - [ ] Do one real laser consume from the doctor screen against a booking: Finance → P&L revenue rises by the pro-rata amount; Cash Flow is unchanged.
 - [ ] A doctor consume from the patient profile with no booking: succeeds, no recognition (expected).
+
+## Finding on production data (2026-09-25)
+
+5 of the 6 `customer_packages` on production are typed `package_type = 'services'` with `total_pulses = 0`, although their catalog packages are pulses packages ("2,500 Pulses" x2, "10,000 Pulses" x3), and their `price_paid` is the catalog price (2,000 / 8,000). They came from `POST /api/reservations/previous`, which does not set `package_type`/`total_pulses` and stores the catalog price. Consequences: their remaining pulses cannot be tracked or consumed, and no revenue can be recognised for them. Fix belongs to DEC-088 item 6 (set the pulses type and quota from the catalog, use the entered invoice value / `price_pending`). Not fixed yet.
