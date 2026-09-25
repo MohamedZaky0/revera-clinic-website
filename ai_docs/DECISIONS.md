@@ -3068,9 +3068,9 @@ Checklist: `ai_docs/manual_tests/LASER_LANDING_PAGES_MANUAL_TESTS.md`.
 ## DEC-088: Laser-Pulse Package Revenue Is Recognised Per Pulse Consumed (Extends DEC-023)
 
 **Date:** 2026-09-25
-**Status:** Proposed — implementation not started. Item 6 decided by the owner 2026-09-25 (flag-and-enter, no catalog fallback); item 5 (expiry)
-still awaits the owner's confirmation before it is built; items 1–4, 7 and 8 follow directly from DEC-023 and the
-existing schema.
+**Status:** Decided — active (2026-09-25); implementation starting. Owner decisions: item 5 = expiry option A,
+item 6 = flag-and-enter (no catalog fallback), item 9 = cash and earned revenue shown side by side with the
+deferred balance broken down. Items 1–4, 7, 8 and 10 follow from DEC-023 and the existing schema.
 
 **Context:**
 DEC-023 defers package cash as a liability and recognises revenue as sessions are delivered. That works only
@@ -3090,11 +3090,14 @@ code writes it.
    consume.** `consume_package_pulses` inserts the recognition itself, so it is atomic, idempotent (the
    existing `(customer_package_id, reservation_id)` replay path returns before any insert) and covers every
    caller — doctor consume, reception deficit resolution (BUY_NEW_PACKAGE), checkout — without touching them.
-2. **Pro-rata, cumulative, computed on the running total:**
-   `recognised_to_date = least(price_paid, round(price_paid × pulses_used_after / total_pulses, 2))`; each
-   row's amount is `recognised_to_date − recognised_before`. The pulses variant deliberately does **not** round
-   the per-pulse price first (as the session function does): 5,000 EGP over 3,000 pulses would lose ~1% to
-   rounding. The last consumption therefore lands the exact remainder and `Σ recognised = price_paid` at depletion.
+2. **Pro-rata by pulse range:** with `T(n) = least(price_paid, round(price_paid × n / total_pulses, 2))`, a usage
+   row that consumed pulses `before+1 … before+qty` (ordered by `created_at, id` over **all** of the package's usage
+   rows) is worth `T(before+qty) − T(before)`. The amount depends only on that range, so it is the same whether it is
+   recognised live, in a backfill, or later once the row is linked to a booking or the price is confirmed — order of
+   recognition does not matter — and the amounts telescope to exactly `price_paid` at depletion. The pulses variant
+   deliberately does **not** round the per-pulse price first (as the session function does): 5,000 EGP over 3,000
+   pulses would lose ~1% to rounding. (A first version summed only booking-linked pulses and lost a share when an
+   orphan row was linked later — found in the live dev test and replaced.)
 3. **Schema (new migration, additive):** make `customer_package_item_id` nullable; add
    `package_pulse_usage_id uuid REFERENCES package_pulse_usage(id) ON DELETE CASCADE`; add a `CHECK` that exactly
    one of the two sources is set; add `UNIQUE (package_pulse_usage_id)`; keep the existing
