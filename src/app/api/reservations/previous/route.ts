@@ -3,6 +3,7 @@ import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordTransaction } from '@/lib/transactionLedger';
+import { writeHistoricalBookingInvoice } from '@/lib/historicalInvoice';
 
 function isValidPhoneNumber(phoneStr: string): boolean {
   if (!phoneStr) return false;
@@ -267,7 +268,7 @@ export async function POST(req: Request) {
     // diff === 0: exact payment -> no change to debt or wallet
     let newOutstanding = currentOutstanding;
     let newWallet = currentWallet;
-    let newSpent = currentSpent + parsedPaid;
+    const newSpent = currentSpent + parsedPaid;
 
     const diff = parsedValue - parsedPaid;
 
@@ -590,11 +591,37 @@ export async function POST(req: Request) {
       });
     }
 
+    // 9. Ledger invoice + payment for the historical booking (DEC-086 / RISK-102). Non-fatal — the
+    //    booking, balances and transactions row above are already saved — but a failure is reported in
+    //    the response (`ledger.status = 'failed'`) instead of being swallowed; the idempotent
+    //    scripts/backfill_historical_invoices.sql repairs any that slip through.
+    let ledger: Awaited<ReturnType<typeof writeHistoricalBookingInvoice>> = { status: 'skipped', reason: 'zero_total' };
+    if (customerId && newReservation?.id) {
+      ledger = await writeHistoricalBookingInvoice({
+        reservationId: newReservation.id,
+        customerId,
+        branchId: branchId || null,
+        serviceId: resolvedServiceId,
+        occurredAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
+        invoiceValue: parsedValue,
+        amountPaid: parsedPaid,
+        serviceName: resolvedServiceName,
+        packageName: resolvedPackageName,
+        productName: resolvedProductName,
+        paymentType: paymentType || null,
+        employeeId: staffEmployeeId,
+      });
+      if (ledger.status === 'failed') {
+        console.error('Failed to write ledger invoice for historical booking (non-fatal):', ledger.error);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Historical booking added successfully.',
       booking: newReservation,
       customer: customerRecord,
+      ledger,
       balances: {
         spent_amount: newSpent,
         outstanding: newOutstanding,
