@@ -391,6 +391,8 @@ export default function AdminNewBookingView({
           if (pRes.ok) {
             const pData = await pRes.json();
             const pkgs = Array.isArray(pData) ? pData : pData.packages || [];
+            // An explicit services package must not be pulled into the pulses catalog just
+            // because "laser" is in its name (e.g. a real "Laser Full Body 3x" services package).
             const pulseOnly = pkgs.filter((p: any) => {
               const totalPulses = Number(p.totalPulses ?? p.total_pulses ?? 0);
               const isPulsesType = p.packageType === "pulses" || p.package_type === "pulses";

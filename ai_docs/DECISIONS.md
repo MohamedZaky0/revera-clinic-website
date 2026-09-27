@@ -700,6 +700,7 @@ when.
 
 **Date:** 2026-07-25
 **Status:** Decided — active. **Supersedes DEC-020.**
+**Update 2026-09-25:** partially superseded by DEC-086 — real historical bookings now do get backfilled invoices.
 
 **Context:**
 Every reservation, customer, sale and inventory row currently in the database is test data entered
@@ -2701,7 +2702,6 @@ When superadmin or admin users attempted to create or edit a service in the admi
 
 ---
 
-<<<<<<< HEAD
 ## DEC-079: Doctor Screen Records Delivered Pulses Only — Package Sales And Payment Choices Move Entirely To Reception
 
 **Date:** 2026-09-22
@@ -2758,20 +2758,34 @@ pulse deficit is resolved, a package is sold, or money changes hands.
   short of pricing, package selection, or any write — the exact boundary is Brief 35's to define.
 
 **Impact on Codebase:**
-- `ai_docs/WINDSURF_BRIEFS.md` Brief 35 rewritten under this decision (see this file's history for the
-  prior draft) to remove the doctor's 3A/3B choice UI and make reception checkout the only deficit-
-  resolution surface, built on Brief 34's `laserDeficit.ts` and Brief 34B's `consume_package_pulses`
-  RPC exactly as before.
-- Brief D's original framing ("migrate the doctor flow onto the new server operation") is no longer
-  needed as a follow-up migration, since there is only one path from the start; Brief D is narrowed to
-  FEFO-across-packages only (still applies to reception's single checkout path).
-- No schema change required by this decision itself — `laser_payment_mode` / `laser_price_per_pulse` /
-  `delivered_pulses` (Brief 34) and Brief 35's own marker columns are unaffected; only which UI is
-  permitted to write them changes.
+- `ai_docs/WINDSURF_BRIEFS.md` Brief 35 rewritten under this decision to remove the doctor's 3A/3B choice UI and make reception checkout the only deficit-resolution surface, built on Brief 34's `laserDeficit.ts` and Brief 34B's `consume_package_pulses` RPC.
+- Brief D's original framing is no longer needed as a follow-up migration, since there is only one path from the start; Brief D is narrowed to FEFO-across-packages only.
+- No schema change required by this decision itself — `laser_payment_mode` / `laser_price_per_pulse` / `delivered_pulses` (Brief 34) and Brief 35's own marker columns are unaffected; only which UI is permitted to write them changes.
 
 ---
 
-## DEC-080: Strict Isolation of Customer Packages from Retail Product Balances
+## DEC-080: Laser Deficit Resolution Server Operation And Marker Design (Brief 35 implementation of DEC-079)
+
+**Date:** 2026-09-23
+**Status:** Decided — implemented
+
+**Context:**
+DEC-079 made reception checkout the only place a laser-pulse deficit is resolved. Brief 35 then needed
+a concrete shape for that operation: a client could never be trusted to state the deficit, the price,
+or the rate, and three separate writes (source-package consume, package sale or invoice line, and a
+"don't ask again" marker) had to stay consistent.
+
+**Decided:**
+1. **Route shape:** `POST /api/reservations/laser-deficit` resolves; `GET` on the same route previews (delivered/consumed/remaining/deficit/resolved-rate/marker state). A dedicated route rather than extending `PATCH /api/reservations`.
+2. **The client sends no amounts.** POST takes `reservationId`, `choice` (`BUY_NEW_PACKAGE` | `PAY_PER_PULSE`), `packageId` (buy only), `sourceCustomerPackageId` (optional), and the receptionist's real `paymentMethod`/`amountPaid`. The server re-reads `delivered_pulses`, the package balance, the catalog price, and the per-pulse rate.
+3. **Consume order:** the source package is drained first via `consume_package_pulses` (the Brief 34B RPC — no direct column writes), then the deficit remainder is settled by the choice.
+4. **Marker:** `reservations.laser_deficit_resolution` (`'BUY_NEW_PACKAGE'`/`'PAY_PER_PULSE'`) + `laser_deficit_pulses`, written only after the resolution writes succeed. `NULL` = unresolved / no deficit.
+5. **Internal reuse, not re-implementation:** BUY_NEW_PACKAGE calls `POST /api/packages/sell`'s handler with the caller's auth token; PAY_PER_PULSE calls `POST /api/reservation-products` with `lineType: 'device_pulses'`.
+6. **Blocking:** `LaserDeficitPrompt` renders inside the Checkout modal and `BookingDetailsModal`'s end-session panel; both flows also GET-check the deficit inside their confirm handlers and return before the money/status write while `deficit > 0 && !resolved`.
+
+---
+
+## DEC-081: Strict Isolation of Customer Packages from Retail Product Balances
 
 **Date:** 2026-09-23
 **Status:** Decided — active
@@ -2780,7 +2794,7 @@ pulse deficit is resolved, a package is sold, or money changes hands.
 When retail products (e.g., "Retinol Anti-Aging Serum", "Skin Protector") were sold to a patient via POS / patient profile, they correctly appeared under the "Purchased Products & Cart" tab. However, they also unexpectedly appeared as active items in the "Purchased Packages" section of the patient profile.
 
 **Root Causes:**
-In `src/app/api/customers/packages/route.ts`, the `GET` handler contained a legacy fallback step (section 2) that queried `customer_product_balances` and transformed every non-pulse product balance into a `syntheticPkg` object, appending it to the `packages` response array. As a result, every sold retail product was displayed as a package in the patient profile and wherever package lists were rendered.
+In `src/app/api/customers/packages/route.ts`, the `GET` handler contained a legacy fallback step (section 2) that queried `customer_product_balances` and transformed every non-pulse product balance into a `syntheticPkg` object, appending it to the `packages` response array.
 
 **Decisions & Implementation:**
 1. **Removed Synthetic Package Generation from `/api/customers/packages`:**
@@ -2788,32 +2802,6 @@ In `src/app/api/customers/packages/route.ts`, the `GET` handler contained a lega
    - Retail products stored in `customer_product_balances` remain strictly owned by `/api/customers/products` and the "Purchased Products & Cart" tab.
 2. **Added Regression Test:**
    - Added test in `tests/routes/customers-packages.test.ts` asserting that records in `customer_product_balances` are never returned as packages.
-
----
-
-## DEC-081: Accurate Package Classification and Pulse Quota Resolution in Package Sales
-
-**Date:** 2026-09-23
-**Status:** Decided — active
-
-**Context:**
-When attempting to purchase a package for a customer during new booking creation or from the package catalog, the system threw an error: *"The package could not be added to the patient's profile, so the booking was not created and nothing was charged."*
-
-**Root Causes:**
-1. In `src/app/api/packages/sell/route.ts`, `isPulsesPkg` checked generic keywords like `pkg.name.toLowerCase().includes('laser')` without checking if the package was an explicit service package with service items (`package_items`). Consequently, any service package containing the word "laser" in its title was incorrectly classified as a pulses package and rejected with a 400 error (`This package has no pulse quota configured`) because `total_pulses` was 0.
-2. `configuredTotalPulses` resolution was not unified across DB `total_pulses`, `packages_meta`, and package names, leading to false negatives on pulses packages that had quota metadata.
-3. In `AdminNewBookingView.tsx`, the catalog filter for Option 3 ("Pay with Pulses Package") included service packages with "laser" in their name, and error messages from the sell API were not surfaced to receptionists.
-
-**Decisions & Implementation:**
-1. **Package Sell Classification Refined:**
-   - In `src/app/api/packages/sell/route.ts`, explicit service packages (`packageItems.length > 0 && pkg.package_type !== 'pulses' && pkgMeta?.packageType !== 'pulses'`) are identified and exempted from pulse quota requirements.
-   - `configuredTotalPulses` resolves the quota across `pkg.total_pulses`, `pkgMeta.totalPulses`, and pulse name patterns.
-   - `customer_packages` record receives the resolved `configuredTotalPulses`.
-2. **Booking View Filter & Error Propagation:**
-   - In `AdminNewBookingView.tsx`, catalog pulses filtering strictly excludes service packages without pulse quotas.
-   - Any server-returned error message from `/api/packages/sell` is surfaced in the alert so the user is clearly informed.
-3. **Regression Tests Added:**
-   - In `tests/routes/packages-sell.test.ts`, added unit tests validating service packages with "laser" in their names, meta pulse resolution, and quota validation.
 
 ---
 
@@ -2878,64 +2866,72 @@ When a patient had an existing package and attended a booking paid via package r
 
 ---
 
-## DEC-085: Laser Pulse Package Deficit Detection, Unsettled Session Status, and Dual Interactive Checkout Options
-
-**Date:** 2026-09-23
-**Status:** Decided — active
-
-**Context:**
-When a patient redeems an active laser pulse package during a session and the delivered pulses exceed the remaining package balance (e.g. Package had 2,000 pulses remaining, session delivered 3,000 pulses → 1,000 excess/deficit pulses):
-1. The session payment status must automatically shift to "Partially Paid" / "Deficit" and the "Pay & Settle Invoice" button must remain accessible.
-2. In the Checkout Popup, staff must see that the delivered pulses exceeded the package quota and have two clear, interactive options to settle the excess deficit:
-   - **Option 1 (Buy New Package / Choice 3A):** Patient purchases a new catalog package (e.g. 5,000 pulses for 2,500 EGP) and the 1,000 pulse deficit is deducted from this new package (leaving 4,000 pulses remaining in the new package).
-   - **Option 2 (Pay per Pulse / Choice 3B):** Patient pays for the 1,000 remaining excess pulses at a customizable per-pulse rate (e.g. 1.5 EGP/pulse × 1,000 = 1,500 EGP).
-
-**Decisions & Implementation:**
-1. **Pulse Deficit Detection & Status Synchronization:**
-   - In `BookingDetailsModal.tsx` and `AdminBookingsView.tsx`, pulse deficit is calculated from delivered pulses vs package balance: `deficitPulses = (!hasSettledDeficit && notePkgRem > 0 && deliveredPulses > notePkgRem) ? deliveredPulses - notePkgRem : 0`.
-   - When an unsettled deficit exists, `isInvoicePaid` is set to `false`, the banner badge switches to an amber `Exceeded Package (+1,000 Pulses)` alert, and payment status displays `Partially Paid`.
-2. **Interactive Deficit Settlement UI in Checkout Modal:**
-   - In `src/app/admin/page.tsx`, when `deficitPulsesVal > 0` and `!hasSettledDeficit`, a dedicated 2-card interactive choice selector is rendered:
-     - **Option 1 Card:** Dropdown selection of active catalog pulses packages, pricing breakdown (+2,500 EGP), and calculated balance remaining after deficit deduction (4,000 pulses remaining).
-     - **Option 2 Card:** Number input for customizable per-pulse rate (e.g. 1.5 EGP), and live total calculation (1,000 pulses × 1.5 EGP = 1,500 EGP).
-   - The selected deficit charge is dynamically added to `totalCost`, `balanceDue`, and invoice line items.
-3. **Execution on Checkout Confirmation:**
-   - In `handleConfirmCheckout`:
-     - If Option 1: Calls `POST /api/packages/sell` to create the new package, calls `consume_package_pulses` to deduct the 1,000 deficit pulses from the new package, exhausts the old package (0 pulses), and appends audit note `[Laser Package Deficit Settlement]: Choice 3A...`.
-     - If Option 2: Exhausts the old package (0 pulses) and appends audit note `[Laser Package Deficit Settlement]: Choice 3B...`.
-4. **Automated Diagnostic Test Suite:**
-   - Added `TC-080: Laser Pulses Package Excess Deficit & Dual Interactive Settlement Engine` to Admin Settings System Test Suite.
-
----
-
-## DEC-086: Multi-Format Pulse Quota Extraction, Dynamic Package Fetching, and Real-Time Deficit Settlement in Patient Profiles
+## DEC-085: Explicit Services Packages Are Never Reclassified As Pulses-Type By Name
 
 **Date:** 2026-09-24
 **Status:** Decided — active
 
 **Context:**
-When a patient without packages books Option 3 (purchasing a new 2,500 pulses package during booking) and delivers 5,000 pulses during session (exceeding package balance by 2,500 pulses):
-1. The checkout modal failed to show the 2 interactive deficit options because `checkoutCustomerPackages` was never fetched when the modal opened and the regex expected the keyword "remaining" rather than in-booking purchase format (`· 2,500 pulses`).
-2. In the patient profile, the package showed 0 pulses used because pulse consumption was bypassed when deficit was unsettled.
+A real services package (`package_type: 'services'`, has real `package_items`) whose name happens to contain "laser" — e.g. "Laser Full Body 3x" — was misclassified as a pulses-type package by `isPulsesPkg`'s name-matching fallback and rejected with "no pulse quota configured", since a services package legitimately has `total_pulses = 0`.
 
 **Decisions & Implementation:**
-1. **Multi-Format Pulse Quota Extractor (`extractPulsePackageQuota` in `src/lib/laserDeficit.ts`):**
-   - Authoritative parser matching:
-     - `(\d+(?:,\d+)?)\s*pulses remaining` (from `[Laser Package Redemption]: ...`)
-     - `\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption)\]:[^(]*\([^)]*?[·•]\s*(\d+(?:,\d+)?)\s*pulses` (from in-booking new package purchases)
-     - `\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption)\]:[^(]*\((\d+(?:,\d+)?)\s*pulses`
-     - Any bracketed package line with pulse counts (`[Laser Package]: ... 2,500 pulses`).
-   - Unified across `src/app/admin/page.tsx`, `BookingDetailsModal.tsx`, `AdminBookingsView.tsx`, and tested via `tests/lib/laserDeficit.test.ts`.
-2. **Customer Packages Population on Checkout Modal Open:**
-   - In `src/app/admin/page.tsx`, the `useEffect` on `checkoutBooking` now fetches `/api/customers/packages?customerId=${custId}` to ensure `checkoutCustomerPackages` is populated for package lookup.
-3. **Robust Old Package Resolution & Consumption on Deficit Settlement:**
-   - On checkout deficit settlement (Choice 3A & Choice 3B), `oldPkgIdToExhaust` resolves across `matchedPulsePkg?.id`, `linkedPkgId`, notes match, and customer active package fallback, ensuring the original package balance is deducted / consumed and reflected accurately in the patient's profile.
-4. **Delivered Pulses Tagging & Reception Session End:**
-   - In `BookingDetailsModal.tsx` and `DoctorAccountView.tsx`, `delivered_pulses` and `[Laser Pulses Delivered]: Primary: X pulses, Total: Y pulses` are guaranteed on session completion.
+1. `src/app/api/packages/sell/route.ts`: added `isExplicitServicesPkg` (`packageItems.length > 0 && package_type !== 'pulses' && pkgMeta?.packageType !== 'pulses'`), checked before the name-based pulses signals so an explicit, correctly-configured services package can never be overridden by them. `tests/routes/packages-sell.test.ts` covers it.
+2. `src/components/admin/bookings/AdminNewBookingView.tsx`: the New Booking Option 3 catalog filter gets the same guard (an explicit `services`-type catalog package is included only if it actually has `total_pulses > 0`), and the generic `laser`/`ليزر` name keywords are dropped from the pulses-catalog heuristic. Also surfaces the real server error message when a package sale fails during booking.
 
 ---
 
-## DEC-087: Laser Service Toggle State Initialization & Multi-Field API Persistence Fix
+## DEC-086: Real Historical Bookings Get Backfilled Invoices (Narrows DEC-026)
+
+**Date:** 2026-09-25
+**Status:** Decided — active. **Partially supersedes DEC-026** (the "no backfill machinery" clause, for real historical bookings only).
+
+**Context:**
+DEC-026 (2026-07-25) built no backfill because every row then in the database was mock. That premise no longer holds: reception now enters real past visits through `POST /api/reservations/previous` (rows with `is_historical = true`). That route updates `customers.spent_amount` / `outstanding` / `wallet_balance` and records a `transactions` payment row, but never writes `invoices` / `invoice_lines` / `payments`. So the ledger-derived customer figures (`src/lib/customerBalances.ts`, `GET /api/customers/reconcile`) show those customers as having no spend and no debt.
+
+**Decisions & Implementation:**
+1. One-time, idempotent SQL script `scripts/backfill_historical_invoices.sql`. For each `is_historical` completed booking with a customer and no invoice it writes one `issued` invoice (`issued_at` = the booking's completion date, single line), and one `payments` row when `amount_paid > 0`.
+2. **Total** = `[Invoice Total]: N EGP` from `reception_notes` if present, else `amount_paid + amount_left`.
+3. **Every backfilled invoice and payment is `is_opening = true`**, and the revenue reports honour it (`EXCLUDE_OPENING_INVOICES`).
+4. `POST /api/reservations/previous` now writes the same invoice + payment itself (`src/lib/historicalInvoice.ts`).
+
+---
+
+## DEC-087: Google Ads Laser Landing Pages Are Next.js Routes In This App, Not A Separate Vite/Manus Deployment
+
+**Date:** 2026-09-25
+**Status:** Decided — active.
+
+**Context:**
+Manus generated `revera-conversion-landing` (Vite + React + wouter + an Express static server). Run as-is it would need its own host, and its logo and all three photos were unrecoverable outside Manus.
+
+**Decisions & Implementation:**
+1. The pages live in this app so they deploy on the same Vercel host as the site: `/laser-tagamoa`, `/laser-tagamoa/dark-skin`, `/laser-men-tagamoa`, plus `/privacy`. One server component, `src/components/landing/LaserLanding.tsx`, renders all three variants from `src/lib/landingCopy.ts`.
+2. Styling is `src/components/landing/landing.css`, scoped under `.lp-shell` / `.lp-privacy`, using the brand tokens from `globals.css`.
+3. Client-specific values moved to `src/config/client.ts`.
+4. Logo: the real brand mark (`public/images/landing/revera-mark.png`). Photos are real clinic assets in `public/images/landing/`.
+5. `src/lib/landingPaths.ts` marks these routes as Arabic-only.
+6. Tracking: `LandingTracker` pushes events to `dataLayer`. GTM loaded via `LandingAnalytics`.
+
+---
+
+## DEC-088: Laser-Pulse Package Revenue Is Recognised Per Pulse Consumed (Extends DEC-023)
+
+**Date:** 2026-09-25
+**Status:** Decided — active.
+
+**Context:**
+DEC-023 defers package cash as a liability and recognises revenue as sessions are delivered. That worked only for **services** packages. Pulses packages keep their balance on `customer_packages` and are consumed through `consume_package_pulses`, which wrote no recognition.
+
+**Decisions & Implementation:**
+1. **Recognise revenue when pulses are consumed**, in the same transaction and under the same row lock as the consume.
+2. **Pro-rata by pulse range:** with `T(n) = least(price_paid, round(price_paid × n / total_pulses, 2))`, a usage row that consumed pulses `before+1 … before+qty` is worth `T(before+qty) − T(before)`.
+3. **Schema:** make `customer_package_item_id` nullable; add `package_pulse_usage_id uuid REFERENCES package_pulse_usage(id) ON DELETE CASCADE`; add `CHECK` that exactly one source is set; `UNIQUE (package_pulse_usage_id)`.
+4. **Historical packages:** flag and enter price via `ConfirmPackagePriceModal` (`PATCH /api/customers/packages { action: 'confirm_package_price' }`).
+5. **Finance presentation:** P&L gets cash → revenue bridge (`RevenueBridgeCard`) and deferred package balance (`DeferredPackagesCard`).
+
+---
+
+## DEC-089: Laser Service Toggle State Initialization & Multi-Field API Persistence Fix
 
 **Date:** 2026-09-24
 **Status:** Decided — active
@@ -2951,37 +2947,248 @@ In Admin Services Settings (`AdminServicesView.tsx`), services under laser categ
    - Updated `mapServiceRow(r)` to include category & title keyword fallbacks alongside `r.islaser`, `r.is_laser`, and `r.isLaser`.
 3. **Category Auto-Detection in UI (`AdminServicesView.tsx`):**
    - When clicking "Add Service" inside any Laser category or changing category dropdown in Add mode, `serviceIsLaser` defaults to `true` while allowing manual toggle adjustments.
-   - Updated table laser badge rendering to use `checkIsLaserService(svc)`.
 
 ---
 
-## DEC-088: Universal Laser Package Deficit Detection, In-Booking Purchase Conversion & Status Synchronization
+## DEC-090: Universal Laser Package Deficit Detection, In-Booking Purchase Conversion & Status Synchronization
 
-**Date:** 2026-09-24  
-**Status:** Decided — active  
+**Date:** 2026-09-27
+**Status:** Decided — active
 
-**Context:**  
+**Context:**
 When scheduling a booking with Option 3 ("Pay with Pulses Package"), whether redeeming an existing active pulses package or purchasing a brand new package during the reservation (e.g. purchasing a 2,500 pulse package) and pulses delivered during the session exceed the package quota (e.g. 5,000 pulses delivered):
-1. In-booking new package purchases may not yet be initialized in `customer_packages` or `patientActivePackages` prior to session finalization.
-2. The payment and booking status failed to convert to "Partially Paid" across tables and modals because the deficit condition required `remainingPulses > 0` or missed in-booking note formats.
-3. The Dual-Option Deficit Settlement popup failed to trigger during checkout.
+1. The regex in `extractPulsePackageQuota` previously matched deduction notes (e.g. `Deducted 5,000 pulses`), treating the deducted pulses as the package quota, which caused deficit to evaluate to 0.
+2. In-booking package purchases were not decrementing pulse balances in `customer_packages` during doctor completion or reception end-session due to missing package ID resolution from notes tags.
+3. The booking status failed to display "Partially Paid" when quota was exceeded.
 
 **Decisions & Implementation:**
-1. **Multi-Language and Multi-Pattern Quota Parser (`src/lib/laserDeficit.ts`):**
-   - Enhanced `extractPulsePackageQuota` to detect pulse quotas across Arabic phrases (`نبضة`, `نبضات`, `نبضة متبقية`), in-booking catalog purchases (`[Purchasing New Pulses Package]`), bullet dots (`·`, `•`), and redemption notes.
-2. **Deficit Determination Across All Option 3 Scenarios:**
-   - In `src/app/admin/page.tsx`, `BookingDetailsModal.tsx`, `AdminBookingsView.tsx`, and `DoctorOngoingSessionTab.tsx`:
-   - Resolved quota fallback through `extractPulsePackageQuota` when patient packages are uninitialized.
-   - Simplified deficit trigger to `!hasSettledDeficit && isOption3Mode && deliveredPulses > packageQuota`, removing the obsolete `quota > 0` prerequisite that suppressed deficit when balance was 0.
-3. **Table Badging & Payment Status Synchronization:**
-   - When delivered pulses exceed package quota, booking status reflects `Partially Paid`, an amber badge `Exceeded Package (+X Pulses)` is displayed, and `isInvoicePaid` is set to `false` to keep "Pay & Settle Invoice" accessible.
-4. **Checkout Modal Interactive Settle Drawer:**
-   - In `src/app/admin/page.tsx`, when an unsettled deficit is detected on an Option 3 booking, the checkout modal automatically renders the 2 interactive settlement cards (Choice 3A: Buy New Package and deduct excess, Choice 3B: Pay excess pulses per pulse).
+1. **Accurate Quota Parsing (`src/lib/laserDeficit.ts`):**
+   - Strictly matches quota patterns (`pulses remaining`, `[Purchasing New Pulses Package]`, `total pulses`, `(Price EGP · X pulses)`) and isolates deductions (`Deducted X pulses`).
+2. **Doctor & Reception Package ID Resolution (`DoctorAccountView.tsx`, `BookingDetailsModal.tsx`):**
+   - Resolved `targetPkgId` from `[Customer Package ID]: ...` notes tags and customer active packages to guarantee `consume_package_pulses` executes and updates `customer_packages` balance.
+3. **Table & Details Deficit Status Synchronization:**
+   - In `AdminBookingsView.tsx`, `BookingDetailsModal.tsx`, and `src/app/admin/page.tsx`, bookings with delivered pulses exceeding package quota evaluate to `Partially Paid` and open the interactive settlement modal.
 
 
 
+---
 
+## DEC-087: Google Ads Laser Landing Pages Are Next.js Routes In This App, Not A Separate Vite/Manus Deployment
 
+**Date:** 2026-09-25
+**Status:** Decided — active.
 
+**Context:**
+Manus generated `revera-conversion-landing` (Vite + React + wouter + an Express static server, images served
+from Manus's private `/manus-storage/`). Run as-is it would need its own host, and its logo and all three
+photos were unrecoverable outside Manus (the files were never in the repo), so the pages shipped with a
+broken logo and no images. It also loaded a Manus Umami script, pushed `dataLayer` events with no tag manager
+to read them, and selected FAQ answers by `String.includes()` (three questions got the wrong answer).
 
+**Decisions & Implementation:**
+1. The pages live in this app so they deploy on the same Vercel host as the site: `/laser-tagamoa`,
+   `/laser-tagamoa/dark-skin` (was `?h=dark`; a real path is CDN-cacheable and needs no `searchParams`),
+   `/laser-men-tagamoa`, plus `/privacy` (the site had none). One server component,
+   `src/components/landing/LaserLanding.tsx`, renders all three variants from `src/lib/landingCopy.ts`.
+2. Styling is `src/components/landing/landing.css`, scoped under `.lp-shell` / `.lp-privacy`, using the
+   brand tokens from `globals.css` (the Manus palette was already the brand palette). The only literal is the
+   WhatsApp green. It explicitly neutralises three site-wide base rules that would hurt a paid page: the
+   blur/delay section-entrance animation (delays LCP), the `a:hover`/`img:hover` lift, and the
+   `[dir="rtl"] a[href^="tel:"] { display: inline-block; direction: ltr !important }` rule (it broke the call buttons).
+3. Client-specific values moved to `src/config/client.ts` (`siteUrl`, `googleMapsUrl`, `instagramUrl`,
+   `addressAr`, `googleRating`, `logoMarkPath`) per hard rule 2. Arabic campaign copy is in `landingCopy.ts`,
+   **not** `translations.ts`, because the `Translation` type enforces en/ar parity and these pages are
+   single-language ad copy.
+4. Logo: the real brand mark (`main_logo.png`, trimmed to `public/images/landing/revera-mark.png`) plus a live
+   text wordmark. Photos are real clinic assets (reception, doctor portrait), pre-optimised to WebP in
+   `public/images/landing/`. The Manus AI-generated "consultation" people were dropped: they were presented as
+   real clinic staff/clients.
+5. `src/lib/landingPaths.ts` marks these routes as Arabic-only. `LanguageProvider` and the inline `DIR_SCRIPT`
+   in `layout.tsx` skip them, so the ad URL is not rewritten to `?lang=en`, `<html lang>` is `ar`, no
+   language cookie is set, and `/api/page-settings` is not fetched.
+6. Tracking: `LandingTracker` (client) pushes `landing_view`, `whatsapp_click`, `call_click`, `map_click` and
+   `scroll_depth` (25/50/75/90, once each — the Manus version fired once, mostly with depth "0") to
+   `dataLayer` via `data-lp-event` attributes, and stores `gclid`/`gbraid`/`wbraid`/`utm_*` in sessionStorage.
+   `LandingAnalytics` loads Google Tag Manager on these routes only, using `CLIENT.gtmId` (GTM-5ZXBL7LR; `NEXT_PUBLIC_GTM_ID` overrides, empty disables), plus the noscript iframe.
+7. Copy changes (CRO review): removed absolute claims ("آمن لكل درجات البشرة", "من غير حروق", "من غير وجع");
+   fixed masculine/feminine forms (the men page used feminine imperatives); the hero CTA no longer says
+   "ابعتي «بشرتي»" when the WhatsApp text is already prefilled; the dark-skin variant now shows the dark-skin
+   section directly under the hero (message match); "عميلة على Google" → "تقييم على Google" (two reviewers are men).
+
+**Trade-offs:**
+- The old `/` Manus route is gone (the main site owns `/`); ads must point at the three paths above.
+- `revera-conversion-landing/` is now dead code and can be archived; it was not modified or deleted.
+- Landing pages are indexable (canonical + OG set). Whether they should be `noindex` to avoid overlapping with
+  future SEO pages is a marketing call, not made here.
+- Open claims that need a human to confirm are tracked in RISK-103.
+
+Checklist: `ai_docs/manual_tests/LASER_LANDING_PAGES_MANUAL_TESTS.md`.
+
+---
+
+## DEC-088: Laser-Pulse Package Revenue Is Recognised Per Pulse Consumed (Extends DEC-023)
+
+**Date:** 2026-09-25
+**Status:** Decided — active (2026-09-25); implementation starting. Owner decisions: item 5 = expiry option A,
+item 6 = flag-and-enter (no catalog fallback), item 9 = cash and earned revenue shown side by side with the
+deferred balance broken down. Items 1–4, 7, 8 and 10 follow from DEC-023 and the existing schema.
+
+**Context:**
+DEC-023 defers package cash as a liability and recognises revenue as sessions are delivered. That works only
+for **services** packages: the DB function `consume_customer_package_session` writes a
+`package_revenue_recognitions` row per session. **Pulses packages** (Brief 34B) keep their balance on
+`customer_packages` (`total_pulses`, `pulses_used`, `pulses_remaining`) and are consumed through
+`consume_package_pulses`, which writes no recognition. Production audit 2026-09-25 (RISK-104): all 6 packages
+sold are pulses type (30,000 EGP) and `package_revenue_recognitions` has 0 rows, so the P&L's package revenue
+is permanently 0 for laser while the cash (45,950 in September) shows in Cash Flow — September P&L revenue read
+about 1,750 (products only). Two schema facts make this more than a one-line fix:
+`package_revenue_recognitions.customer_package_item_id` is NOT NULL (and UNIQUE with `reservation_id`), but a
+pulses package has no `customer_package_items`; and `reason = 'expiry_breakage'` exists in the CHECK but no
+code writes it.
+
+**Chosen Option:**
+1. **Recognise revenue when pulses are consumed, in the same transaction and under the same row lock as the
+   consume.** `consume_package_pulses` inserts the recognition itself, so it is atomic, idempotent (the
+   existing `(customer_package_id, reservation_id)` replay path returns before any insert) and covers every
+   caller — doctor consume, reception deficit resolution (BUY_NEW_PACKAGE), checkout — without touching them.
+2. **Pro-rata by pulse range:** with `T(n) = least(price_paid, round(price_paid × n / total_pulses, 2))`, a usage
+   row that consumed pulses `before+1 … before+qty` (ordered by `created_at, id` over **all** of the package's usage
+   rows) is worth `T(before+qty) − T(before)`. The amount depends only on that range, so it is the same whether it is
+   recognised live, in a backfill, or later once the row is linked to a booking or the price is confirmed — order of
+   recognition does not matter — and the amounts telescope to exactly `price_paid` at depletion. The pulses variant
+   deliberately does **not** round the per-pulse price first (as the session function does): 5,000 EGP over 3,000
+   pulses would lose ~1% to rounding. (A first version summed only booking-linked pulses and lost a share when an
+   orphan row was linked later — found in the live dev test and replaced.)
+3. **Schema (new migration, additive):** make `customer_package_item_id` nullable; add
+   `package_pulse_usage_id uuid REFERENCES package_pulse_usage(id) ON DELETE CASCADE`; add a `CHECK` that exactly
+   one of the two sources is set; add `UNIQUE (package_pulse_usage_id)`; keep the existing
+   `UNIQUE (customer_package_item_id, reservation_id)`. `reservation_id` stays NOT NULL for consumption rows
+   (the P&L, branch and doctor reports join `reservations!inner` on it). Update `DB_SCHEMA.md` in the same
+   change (CLAUDE.md rule 6).
+4. **No report code changes.** `pnl`, `trend`, `branch-pnl`, `new-vs-returning`, `doctor-pnl` and
+   `package-profitability` already sum `recognised_amount` by `recognised_at`; they show laser package revenue as
+   soon as rows exist. Cash Flow is unaffected (cash is still recognised when received).
+5. **Expiry (owner chose option A, 2026-09-25):** an unconsumed balance is recognised as revenue **at expiry**
+   (`reason = 'expiry_breakage'`), because the obligation ends there; staff can still extend a package before it
+   lapses. Not part of the first release: it needs `reservation_id` nullable (or a sibling table) and a scheduled
+   or on-read sweep, and there is currently no expiry job. Until it ships, expired-unused balances stay deferred
+   (a conservative understatement, never an overstatement).
+6. **Historical packages (owner decision 2026-09-25): never guess the price — flag it and let staff enter it.**
+   `POST /api/reservations/previous` used to create the customer's package with `price_paid = catalog price`
+   whatever was actually charged. New rule: if the receptionist entered an invoice value for a historical package
+   booking, that value is the package's `price_paid`. If they did **not**, the package is created with
+   `price_pending = true` (new boolean on `customer_packages`) instead of falling back to the catalog price.
+   While pending: no revenue is recognised for that package (its consumption is still recorded, so nothing is
+   lost), and the booking and the customer's package show an "Invoice value missing" badge. A per-booking
+   **"Enter invoice value"** action (reception/admin, on that historical booking only) opens a small dialog that
+   **pre-fills the catalog price as a suggestion, never as the saved value** — staff must confirm or change it.
+   Saving it (a) sets `price_paid` and clears `price_pending`, (b) updates the booking's ledger invoice and line to
+   the entered value, (c) applies the debt/wallet difference to the customer (`entered value − amount paid`, the
+   same settlement rule the route uses at entry), and (d) runs the recognition catch-up for the pulses already
+   consumed (item 8's logic, per package). The action is idempotent and refuses to run twice with a different
+   value unless the user explicitly edits. The cash for these packages predates the ledger and is excluded from
+   Cash Flow by `is_opening`, so their recognised revenue has no matching cash inside the ledger period —
+   accepted; that is what opening deferred revenue means. **Delivered 2026-09-25 (dev; not yet on main/production):** the
+   "Enter invoice value" dialog (`ConfirmPackagePriceModal`, on the patient profile → Packages, reception/admin only) calls
+   `PATCH /api/customers/packages { action: 'confirm_package_price' }` → the `confirm_historical_package_price()` function
+   (`20260925010000_confirm_historical_package_price.sql`): in one transaction it sets `price_paid`, clears `price_pending`,
+   records the **pulses already used before launch** as a `package_pulse_usage` row with no booking (dated at the purchase
+   date, so it sorts first) and back-fills revenue for anything consumed while the price was pending (pulses via the catch-up
+   function; a services package by re-deriving its zero-amount recognitions). **Pre-launch pulses recognise no revenue** —
+   that consumption predates the ledger; only pulses used from now on earn `price_paid / total_pulses` each, so a package
+   with 3,000 of 10,000 pulses used before launch recognises at most 70% of its price. **Not done (deliberately):** updating
+   the booking's own ledger invoice and the customer's debt/wallet difference — there is no reliable link from a package to
+   its booking, and guessing one would edit money records; the historical booking's invoice stays as entered. Scope: **packages only** — a non-package historical
+   booking with no entered value keeps the DEC-086 fallback (invoice = amount paid), which cannot misstate
+   revenue because it equals the cash received.
+7. **Reversals:** no code path un-consumes pulses today. Any future restore/correction must delete or negate
+   that consumption's recognition inside the same transaction (`ON DELETE CASCADE` on `package_pulse_usage_id`
+   covers a deleted usage row). Recorded here so it is not forgotten when one is added.
+8. **Backfill:** a one-time, idempotent script (same style as `backfill_historical_invoices.sql`, with a separate
+   SELECT-only dry run) creates the missing recognitions for existing `package_pulse_usage` rows, ordered by
+   `created_at` per package so the cumulative amounts come out identical to live consumption. Production had one
+   usage row at audit time, so the historical effect is negligible — the change matters going forward.
+
+9. **Finance presentation (owner decision 2026-09-25): show cash and earned revenue side by side, and explain the
+   difference on the screen.** The clinic owner must never see "50,000 came in, revenue 10,000" without the reason.
+   - P&L gets a **bridge** under the revenue figure: `Cash received (Cash Flow) − paid for packages not yet
+     delivered (deferred) + earned this period from earlier deferred packages = Revenue earned`.
+   - A **Deferred package balance** card (money collected for services not yet delivered) with a **breakdown by
+     what it is owed for**: pulses (total pulses remaining and the amount), and per service the sessions remaining
+     and the amount (e.g. "40,000 EGP = 30,000 pulses + 5 Underarm sessions + 6 Full Body sessions"). Per package:
+     `deferred = price_paid × remaining / total` (DEC-023 pro-rata; for a services package the amount is split
+     across its items by remaining sessions). Packages with `price_pending` (item 6) are listed separately as
+     "invoice value missing", not silently counted as 0.
+   - Labels are explicit in Arabic and English: **"Cash received / المقبوض"** for Cash Flow and **"Revenue earned /
+     الإيراد المُحقَّق"** for the P&L — never two screens that both just say "revenue".
+   - Data source: `customer_packages` (`price_paid`, `total_pulses`, `pulses_remaining`, `status`, `expires_at`) and
+     `customer_package_items` (`qty_remaining`, `service_id`); nothing new is stored for this.
+   - **Built 2026-09-26 (dev only, not merged to main):** `GET /api/finance/revenue-bridge` (cash received in the period on live
+     invoices — the Cash Flow definition — and the part that paid for packages, splitting mixed invoices by package share),
+     `GET /api/finance/deferred-packages`, `src/lib/financeBridge.ts` (pure arithmetic), `RevenueBridgeCard` and
+     `DeferredPackagesCard` on the P&L screen, and the two tiles relabelled. The bridge's revenue and package-recognised figures
+     are taken from the P&L response the screen already loaded, so it always adds up to the number shown above it; the fourth
+     line, **"other timing"**, is the honest residual (services/products billed but unpaid, or paid in another month). The
+     deferred balance is clinic-wide and as-of-now (`customer_packages` has no branch). Expired-but-unrecognised balances are
+     included and reported separately (breakage, item 5, is still not built).
+10. **Consumption without a booking.** `package_revenue_recognitions.reservation_id` stays NOT NULL (every revenue
+    report joins `reservations!inner` for branch and doctor). A pulse consumption with no `reservation_id` (a manual
+    deduction from the patient profile, or a backfilled legacy row) therefore recognises **no** revenue; it is
+    counted in the deferred figure and shown in the breakdown as "consumed without a booking — link it to
+    recognise". Production had none at audit time (1 usage row, with a booking); dev has 10 legacy rows, all
+    without one. Chosen over a nullable column because that would silently drop the revenue from the branch and
+    doctor reports instead of surfacing it.
+
+**Reason:**
+- Without it the P&L is wrong in the direction DEC-023 was written to prevent: laser package cash never becomes
+  revenue, so margin and every revenue report understate the clinic's largest product line.
+- The consume function is the only place that already holds the lock and the idempotency key; a second write
+  from application code would reintroduce the ordered-not-transactional risk RISK-097 documents.
+- Pro-rata on pulses mirrors DEC-023 exactly and is explainable to a non-specialist.
+
+**Trade-offs:**
+- Reported revenue for laser packages shifts from "at sale" (currently never) to "as delivered": months that sell
+  many packages look lower than cash, months that deliver them look higher — the intended effect, but numbers
+  will change for anyone comparing to old reports.
+- Recognition is only as good as `price_paid`; for pulses packages sold through `/api/packages/sell` that is the
+  catalog price at sale, which already includes any discount applied there.
+
+---
+
+## DEC-089: Interactive Laser Deficit Settlement Prompt & Dual Treatment Parity (Brief 35)
+
+**Date:** 2026-09-27
+**Status:** Decided & Implemented
+
+**Context:**
+When laser pulse sessions deliver more pulses than remaining in a patient's pulse package, or when a customer purchases a pulse package during booking intake (Option 3) and exceeds the quota during treatment (e.g. 2,500 pulse package bought, 5,000 pulses delivered), the excess deficit (+2,500 pulses) requires structured financial settlement. Previously, in-booking package sales were treated differently from pre-purchased packages, causing bookings with delivered pulses exceeding the purchased package quota to be erroneously marked as "Package Covered" / "Paid", bypassing checkout settlement.
+
+**Decisions & Implementation:**
+1. **Interactive Deficit Settlement Prompt (`LaserDeficitPrompt` / `/api/reservations/laser-deficit`):**
+   - **Option 1 (BUY_NEW_PACKAGE):** Allows immediate purchase of a new package, automatically consumes the excess pulses from the newly acquired package balance, and generates the package sale invoice.
+   - **Option 2 (PAY_EXTRA_PULSES):** Charges the patient on a per-pulse basis for the exact deficit (`deficit × pricePerPulse`), creating an invoice line for excess pulses and transitioning the booking to paid upon settlement.
+2. **Dual Treatment Parity:**
+   - Packages purchased during booking creation (Option 3) are treated identically to pre-purchased customer packages in all views.
+   - Whenever delivered pulses exceed quota, the reservation state is marked as unpaid/deficit ("Partially Paid" / Amber badge "Exceeded Package (+X Pulses)"), ensuring checkout remains open for interactive resolution.
+3. **Database & Balance Consumption:**
+   - Package balance consumption (`consume_package_pulses`) correctly records pulse usage in `customer_packages` and `package_pulse_usage` when starting or completing sessions from Doctor and Reception views.
+
+---
+
+## DEC-090: Laser Deficit Detection Quota Parsing & Exceeded Package UX Hardening
+
+**Date:** 2026-09-27
+**Status:** Decided & Implemented
+
+**Context:**
+`extractPulsePackageQuota` previously matched historical note strings like `Deducted 5,000 pulses`, mistaking deduction statements for total package quotas. If delivered pulses equaled 5,000, `5000 - 5000 = 0`, masking the deficit. Furthermore, when completing sessions in Doctor Portal, missing `customerPackageId` on the root reservation object failed to consume package balances.
+
+**Decisions & Implementation:**
+1. **Strict Regex Quota Parsing (`src/lib/laserDeficit.ts`):**
+   - Negative lookbehind and explicit prefix filtering ensure note substrings like `Deducted ... pulses` or `تم استهلاك ... نبضة` are strictly ignored.
+   - Only actual package purchase quotas (e.g. `Package: 2,500 pulses`, `Laser Pulses: 2,500`, `[Customer Package ID]: ...`) are extracted as capacity.
+2. **Notes Tag Fallback for Doctor Session Completion:**
+   - Doctor Portal and Reception views parse `[Customer Package ID]: <id>` from reservation `notes` if not directly populated on the top-level reservation object, ensuring `consume_package_pulses` executes reliably.
+3. **Consistent Badging & Details Modal Actions:**
+   - `AdminBookingsView`, `BookingDetailsModal`, and `DoctorAccountView` display the amber deficit badge and allow staff to navigate directly to checkout/settlement prompt without dead ends.
 

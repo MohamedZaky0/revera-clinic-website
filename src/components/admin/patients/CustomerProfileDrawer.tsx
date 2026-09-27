@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
+import ConfirmPackagePriceModal from "@/components/admin/patients/ConfirmPackagePriceModal";
 import { PatientTransactionsHistoryTab } from "@/components/admin/patients/PatientTransactionsHistoryTab";
 import { NewManualTransactionView } from "@/components/admin/transactions/NewManualTransactionView";
 import type { Customer } from "@/components/admin/patients/useCustomerProfile";
@@ -114,6 +115,7 @@ interface CustomerProfileDrawerProps {
   // Hook functions
   fetchAvailablePackageOffers: () => void;
   handleSellPackageToCustomer: () => void;
+  fetchCustomerProfilePackages: (customerId: string) => Promise<void>;
   handleSaveUsageLog: () => void;
   handleAddProductToPatient: () => void;
   handleStartCreatePrescription: () => void;
@@ -228,6 +230,7 @@ export default function CustomerProfileDrawer({
   selectedHistoryRx = null,
   fetchAvailablePackageOffers,
   handleSellPackageToCustomer,
+  fetchCustomerProfilePackages,
   handleSaveUsageLog,
   handleAddProductToPatient,
   handleStartCreatePrescription,
@@ -264,6 +267,8 @@ export default function CustomerProfileDrawer({
   if (!viewingCustomerProfile) return null;
 
   const [showInlineManualTxnModal, setShowInlineManualTxnModal] = React.useState(false);
+  // DEC-088 item 6: the historical package whose invoice value is being entered (null = modal closed).
+  const [confirmPriceFor, setConfirmPriceFor] = React.useState<any>(null);
 
   // Laser Pulse Counter Engine states
   const [laserLogs, setLaserLogs] = React.useState<any[]>([]);
@@ -1702,8 +1707,32 @@ export default function CustomerProfileDrawer({
                           <p className="text-[11px] text-[#5A6A51]">
                             {t.purchasedPrefix} {new Date(pkg.purchasedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                             {pkg.expiresAt && ` · ${t.expiresPrefix} ${new Date(pkg.expiresAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`}
-                            {` · EGP ${Number(pkg.pricePaid).toLocaleString()} ${t.paidSuffix}`}
+                            {pkg.pricePending
+                              ? ` · ${lang === "ar" ? "السعر لم يُدخل بعد" : "price not entered yet"}`
+                              : ` · EGP ${Number(pkg.pricePaid).toLocaleString()} ${t.paidSuffix}`}
                           </p>
+                          {pkg.pricePending && (
+                            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                              <span className="font-bold">{lang === "ar" ? "قيمة الفاتورة ناقصة" : "Invoice value missing"}</span>
+                              <span className="text-amber-800">
+                                {lang === "ar"
+                                  ? "لا يُسجَّل إيراد لهذه الباقة حتى تُدخل القيمة."
+                                  : "No revenue is recognised for this package until the value is entered."}
+                              </span>
+                              {(adminRole === "superadmin" || adminRole === "admin" || adminRole === "receptionist" || adminRole === "reception") && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setConfirmPriceFor(pkg);
+                                    if (!availablePackageOffers?.length) fetchAvailablePackageOffers();
+                                  }}
+                                  className="ms-auto rounded-lg bg-[var(--cr-primary)] px-2.5 py-1 text-[11px] font-semibold text-white transition hover:opacity-90"
+                                >
+                                  {lang === "ar" ? "أدخل القيمة" : "Enter value"}
+                                </button>
+                              )}
+                            </div>
+                          )}
                           {isPulses ? (
                             <div className="flex items-center gap-3 bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 max-w-md">
                               <div className="p-1.5 bg-amber-500 text-white rounded-lg shrink-0 shadow-xs">
@@ -2140,6 +2169,21 @@ export default function CustomerProfileDrawer({
       )}
 
       {/* ── Modal: Sell Package to Patient ── */}
+      {confirmPriceFor && viewingCustomerProfile && (
+        <ConfirmPackagePriceModal
+          pkg={confirmPriceFor}
+          suggestedPrice={(() => {
+            const offer = (availablePackageOffers || []).find((o: any) => String(o.id) === String(confirmPriceFor.packageId));
+            const price = Number(offer?.price);
+            return Number.isFinite(price) && price > 0 ? price : null;
+          })()}
+          headers={authenticatedJsonHeaders}
+          isRTL={lang === "ar"}
+          onClose={() => setConfirmPriceFor(null)}
+          onSaved={() => { if (viewingCustomerProfile.id) void fetchCustomerProfilePackages(viewingCustomerProfile.id); }}
+        />
+      )}
+
       {showSellPackageModal && viewingCustomerProfile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/40" onClick={() => setShowSellPackageModal(false)} />

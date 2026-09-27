@@ -49,8 +49,9 @@ import { printInvoice, printPrescription } from "@/lib/printUtils";
 import { Branch } from "@/types";
 import { adminTranslations } from "../translations";
 import type { Req } from "@/app/admin/page";
-import { resolveLaserPulseRate } from "@/lib/laserRate";
 import { extractPulsePackageQuota } from "@/lib/laserDeficit";
+import { resolveLaserPulseRate } from "@/lib/laserRate";
+import LaserDeficitPrompt from "./LaserDeficitPrompt";
 
 export interface AdditionalServiceItem {
   id: string | number;
@@ -240,6 +241,32 @@ export default function BookingDetailsModal({
   const [drawerRxHasFollowUp, setDrawerRxHasFollowUp] = useState(false);
   const [drawerRxFollowUpDate, setDrawerRxFollowUpDate] = useState("");
   const [clinicDefaultPricePerPulse, setClinicDefaultPricePerPulse] = useState<number | null>(null);
+
+  // A completed booking with an unresolved laser pulse deficit is NOT settled: the "Pay & Settle
+  // Invoice" button is the only door to the reception deficit prompt (DEC-079/080), and DEC-084's
+  // 0-balance-means-paid rule alone hid it for every package booking — reception could never reach
+  // the prompt (found in the live browser pass, 2026-09-24).
+  const [pendingLaserDeficit, setPendingLaserDeficit] = useState(false);
+  const [deficitPromptKey, setDeficitPromptKey] = useState(0);
+  useEffect(() => {
+    if (!booking?.id || booking.status !== "completed") {
+      setPendingLaserDeficit(false);
+      return;
+    }
+    let active = true;
+    fetch(`/api/reservations/laser-deficit?reservationId=${encodeURIComponent(booking.id)}`, { headers: authenticatedJsonHeaders })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (active) setPendingLaserDeficit(Boolean(data && !data.resolved && Number(data.deficitPulses) > 0));
+      })
+      .catch(() => {
+        if (active) setPendingLaserDeficit(false);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booking?.id, booking?.status, booking?.amountPaid, booking?.amountLeft]);
 
   useEffect(() => {
     let active = true;
@@ -1259,6 +1286,24 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         return sum + ((s.isLaser || checkIsLaserService(srvObj)) ? Number(s.pulses || 0) : 0);
       }, 0);
 
+      // The deficit gate below (and the LaserDeficitPrompt) read reservations.delivered_pulses from
+      // the server. This flow only held the count in modal state until the final save, so the gate
+      // saw 0 and a real deficit was silently absorbed while the session still completed
+      // (found in the live browser pass, 2026-09-24). Persist it first, then remount the prompt so
+      // it re-reads.
+      if (isPackageModeEnding && totalLaserPulsesToDeduct > 0) {
+        try {
+          const persistRes = await fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}`, {
+            method: "PATCH",
+            headers: authenticatedJsonHeaders,
+            body: JSON.stringify({ id: booking.id, delivered_pulses: totalLaserPulsesToDeduct }),
+          });
+          if (persistRes.ok) setDeficitPromptKey((k) => k + 1);
+        } catch (persistErr) {
+          console.warn("Could not persist delivered pulses before ending the session:", persistErr);
+        }
+      }
+
       if (isPackageModeEnding && totalLaserPulsesToDeduct > 0) {
         try {
           let targetPkgId = (booking as any).packageId || (booking as any).package_id || null;
@@ -1429,6 +1474,28 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         );
       }
       await Promise.allSettled(lineItemWrites);
+
+      // Brief 35 / DEC-079: an unresolved package-mode laser pulse deficit must be resolved
+      // here — before this flow's own status/payment write — never silently absorbed.
+      if (isPackageMode && totalLaserPulsesToDeduct > 0) {
+        try {
+          const defRes = await fetch(
+            `/api/reservations/laser-deficit?reservationId=${encodeURIComponent(booking.id)}`,
+            { headers: authenticatedJsonHeaders }
+          );
+          const defData = defRes.ok ? await defRes.json().catch(() => null) : null;
+          if (defData && !defData.resolved && Number(defData.deficitPulses) > 0) {
+            alert(
+              isRTL
+                ? `هذا الحجز به عجز غير محسوم في نبضات الليزر قدره ${Number(defData.deficitPulses).toLocaleString()} نبضة. قم بتسويته من نافذة العجز قبل إنهاء الجلسة.`
+                : `This booking has an unresolved laser pulse deficit of ${Number(defData.deficitPulses).toLocaleString()} pulses. Resolve it in the deficit panel before ending the session.`
+            );
+            return;
+          }
+        } catch {
+          // the rendered prompt shows its own error state; don't double-alert
+        }
+      }
 
       // 7. Update Reservation Status to 'completed' with clinical notes and updated invoice
       const finalInvoiceAmount = calculatedInvoiceTotal;
@@ -1977,7 +2044,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           ? Number(rawLeft)
           : Math.max(0, totalPrice - sessionPaid);
 
-        const isInvoicePaid = (!pulseDeficit || hasSettledDeficit) && (
+        const deliveredPulsesForDeficit = Number((booking as any).deliveredPulses || (booking as any).delivered_pulses || (booking as any).pulsesUsed || 0);
+        const notesQuota = extractPulsePackageQuota(String(booking.notes || ""));
+        const isExceededDeficit = isLaserPackage && !hasSettledDeficit && notesQuota !== null && deliveredPulsesForDeficit > notesQuota;
+
+        const isInvoicePaid = !isExceededDeficit && (
           (sessionPaid >= totalPrice && totalPrice > 0) ||
           (sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || booking.status === 'completed'))
         );
@@ -2963,6 +3034,32 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             </div>
                           )}
                         </div>
+
+                        {/* Brief 35 / DEC-079: reception resolves the pulse deficit here,
+                            before Confirm & End Session is allowed to write status/money. */}
+                        {isLaserPackage && (
+                          <LaserDeficitPrompt
+                            key={deficitPromptKey}
+                            reservationId={booking.id}
+                            headers={authenticatedJsonHeaders}
+                            isRTL={isRTL}
+                            onResolved={(result: any) => {
+                              // PAY_PER_PULSE adds the charge to reservations.amount_left on the
+                              // server. This flow's final save recomputes amountLeft from the
+                              // modal's own booking copy, so without mirroring it here that save
+                              // overwrites the charge back to 0.
+                              const delta = result?.resolution === "PAY_PER_PULSE" && !result?.alreadyResolved
+                                ? Number(result?.invoiceDelta) || 0
+                                : 0;
+                              if (delta <= 0) return;
+                              setBooking((prev: any) => {
+                                if (!prev) return prev;
+                                const left = Number(prev.amountLeft ?? prev.amount_left ?? 0) + delta;
+                                return { ...prev, amountLeft: left, amount_left: left };
+                              });
+                            }}
+                          />
+                        )}
 
                         {/* FINAL SESSION INVOICE SUMMARY */}
                         <div className="bg-[#414E36]/05 p-4 rounded-2xl space-y-2 text-xs border border-[#414E36]/10">

@@ -567,6 +567,38 @@ describe('laser per-pulse rate guard (RISK-095)', () => {
 
 // ── Settlement: customer balances on completion ──────────────────────────────
 
+describe('delivered_pulses is persisted by PATCH (Brief 35 live browser pass)', () => {
+  beforeEach(() => {
+    seedStaffAuth();
+    fake.seed('services', [{ id: SERVICE_ID, price: 150, branch_pricing: null, en: 'Laser Hair Removal' }]);
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, spent_amount: 0, outstanding: 0 }]);
+  });
+
+  // The doctor's session completion is a PATCH and the only writer of delivered_pulses. The route
+  // used to map it in POST only, leaving the column NULL on every doctor-completed booking, so the
+  // reception deficit route saw delivered = 0 and never surfaced a deficit.
+  it.each([
+    ['snake_case', { delivered_pulses: 5000 }],
+    ['camelCase', { deliveredPulses: 5000 }],
+  ])('persists %s delivered pulses on a completing PATCH', async (_label, extra) => {
+    fake.seed('reservations', [baseReservation({
+      status: 'started', amount_paid: 0, amount_left: 0, laser_payment_mode: 'PACKAGE', delivered_pulses: null,
+    })]);
+    const res = await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 0, amountLeft: 0, ...extra } }));
+    expect(res.status).toBe(200);
+    expect(fake.rows('reservations')[0].delivered_pulses).toBe(5000);
+  });
+
+  it('ignores a non-numeric or negative delivered pulses value', async () => {
+    fake.seed('reservations', [baseReservation({
+      status: 'started', amount_paid: 0, amount_left: 0, laser_payment_mode: 'PACKAGE', delivered_pulses: 100,
+    })]);
+    const res = await PATCH(staffReq({ id: RES_ID, body: { status: 'completed', amountPaid: 0, amountLeft: 0, delivered_pulses: -5 } }));
+    expect(res.status).toBe(200);
+    expect(fake.rows('reservations')[0].delivered_pulses).toBe(100);
+  });
+});
+
 describe('settlement — customer balances on completion', () => {
   beforeEach(() => {
     seedStaffAuth();

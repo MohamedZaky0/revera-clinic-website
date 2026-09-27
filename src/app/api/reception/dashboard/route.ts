@@ -248,7 +248,7 @@ export async function GET(req: Request) {
     // 5. Fetch Real Services for title & pricing resolution
     const { data: servicesData } = await supabaseServer
       .from("services")
-      .select("id, en, name, ar, title, price");
+      .select("id, en, ar, price");
 
     const servicesMap = new Map<string, any>();
     if (Array.isArray(servicesData)) {

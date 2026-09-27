@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { TrendingUp, DollarSign, Package, Receipt, AlertCircle } from "lucide-react";
 import { StatTile, BarChart } from "./charts";
+import { RevenueBridgeCard } from "./RevenueBridgeCard";
+import { DeferredPackagesCard } from "./DeferredPackagesCard";
 
 export interface BranchOption {
   id: string;
@@ -135,7 +137,7 @@ export function PnlScreen({ accessToken, branches = [] }: PnlScreenProps) {
       ) : data ? (
         <>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <StatTile label="Total Revenue" value={egp(data.revenue.total)} icon={<DollarSign size={18} />} accent="accent" />
+            <StatTile label="Revenue earned · الإيراد المُحقَّق" value={egp(data.revenue.total)} icon={<DollarSign size={18} />} accent="accent" />
             <StatTile label="Cost of Materials & Devices" value={egp(data.cogs.total)} icon={<Package size={18} />} />
             <StatTile label="Doctor Commission" value={egp(data.commission.total)} icon={<Receipt size={18} />} />
           </div>
@@ -147,6 +149,16 @@ export function PnlScreen({ accessToken, branches = [] }: PnlScreenProps) {
                 `Some sales aren't costed yet (${data.cogs.uncostedLineCount} without a material/device cost, ${data.commission.uncommissionedLineCount} without a commission figure) — the numbers above may understate true cost.`}
             </div>
           )}
+
+          <RevenueBridgeCard
+            period={period}
+            branchId={branchId}
+            accessToken={accessToken}
+            revenueEarned={data.revenue.total}
+            packageRecognised={data.revenue.packageRecognised}
+          />
+
+          <DeferredPackagesCard accessToken={accessToken} />
 
           <div
             className="grid gap-6 rounded-[32px] border p-6 shadow-sm sm:grid-cols-2"

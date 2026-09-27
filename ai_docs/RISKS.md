@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**7 open** · **13 partially resolved** · **66 resolved** · 86 tracked total.
+**8 open** · **13 partially resolved** · **71 resolved** · 92 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -3958,12 +3958,39 @@ provider row, and a non-doctor hire must not touch `providers`).
 
 ---
 
-## RISK-086: `medical-records/templates` Writes To A Local File That Is Read-Only On Vercel
+## RISK-086: `medical-records/templates` Writes To A Local File That Is Read-Only On Vercel (RESOLVED)
 
 **Severity:** High (P1) · **Type:** Data integrity / platform mismatch
 **Found:** 2026-09-15, reviewing new routes added in the previous 4 weeks while auditing test
-coverage. **Not yet confirmed against a live Vercel deployment — this is a reasoned architectural
-finding, flagged so it gets verified deliberately rather than discovered by a clinic user.**
+coverage. **Fixed 2026-09-17 — see below.**
+
+**Fix:** `src/app/api/medical-records/templates/route.ts` no longer touches the filesystem at all —
+`fs`/`path` imports, `TEMPLATES_LOCAL_PATH`, `readLocalTemplates()`, and `writeLocalTemplates()` are
+gone. Supabase's `medical_record_templates` table is now the single store for GET/POST/PUT/DELETE,
+matching every other route in the codebase. First-run seeding (an empty table gets the 3 built-in
+default templates) now happens as a real Supabase insert instead of a local-file write, so it only
+ever needs to happen once per clinic, not once per cold serverless instance. A genuine Supabase
+error now surfaces as a 500 (matching the rest of the codebase) instead of silently falling back to
+stale local data.
+
+**No longer applicable:** the original finding's "not yet confirmed against a live Vercel
+deployment" caveat is moot — there is no local-file code path left to reproduce the bug against.
+`data/medical_record_templates.json` is now dead data (nothing reads or writes it); left in place
+rather than deleted as part of this fix — worth a deliberate decision on removing it, not a side
+effect of an unrelated change.
+
+**Tests:** `tests/routes/medical-records-templates.test.ts` rewritten — the `fs` mock is gone
+entirely (no longer needed, since the route no longer touches the filesystem), replaced with direct
+Supabase-fake seeding. Added a test that reproduces the exact original bug shape (create → edit →
+delete the same template in one flow) to guard against ever reintroducing a split store. Also added
+a case for a genuine Supabase error surfacing as a 500.
+
+**Manual verification still recommended:** `ai_docs/manual_tests/NEW_ROUTES_SEPT_2026_MANUAL_TESTS.md`
+check 6 was about surviving a server restart — now trivially true (Supabase persists regardless of
+serverless cold starts), but still worth a real click-through once against a live deployment before
+calling this fully closed operationally, not just architecturally.
+
+**Original finding (2026-09-15), kept for context:**
 
 **What it is:** `src/app/api/medical-records/templates/route.ts` treats a local JSON file
 (`data/medical_record_templates.json`, read/written via `fs.readFileSync`/`fs.writeFileSync`) as
@@ -3992,23 +4019,34 @@ swallows that error (logs a warning, keeps going), so the write appears to succe
 unable to edit or delete it — the exact kind of silent breakage that erodes trust in the system
 once discovered live, rather than in a demo.
 
-**Fix required:** make Supabase the single source of truth for this table (matching every other
-route in the codebase); either drop the local-file path entirely, or gate it strictly behind a
-local-dev-only check (e.g. `process.env.VERCEL` unset) so it can never run against a read-only
-filesystem in production.
-
-**Verification still needed:** confirm this reproduces against an actual Vercel preview/production
-deployment (not just local `next dev`, which has a writable filesystem and would not show the bug).
-No automated test can prove this either way — `tests/routes/medical-records-templates.test.ts`
-mocks `fs` entirely and is deliberately silent on this question (see that file's own header
-comment). Manual checklist: `ai_docs/manual_tests/NEW_ROUTES_SEPT_2026_MANUAL_TESTS.md`, check 6.
+**Fix required:** done — see the top of this entry.
 
 ---
 
-## RISK-087: Two Independent Implementations Decide How An Underpayment/Overpayment Settles
+## RISK-087: Two Independent Implementations Decide How An Underpayment/Overpayment Settles (PARTIALLY RESOLVED)
 
 **Severity:** Medium · **Type:** Maintainability / consistency risk
-**Found:** 2026-09-15, same review as RISK-086.
+**Found:** 2026-09-15, same review as RISK-086. **Extraction fixed 2026-09-17 — see below; the
+deeper cross-flow question this section originally raised is still open.**
+
+**Fix:** `src/app/api/reservations/previous/route.ts`'s inline wallet-vs-debt allocation
+(the block described below) is now `settlePaymentMismatch()` in `src/lib/billing.ts` — a small,
+named, directly-tested pure function, called by the route instead of the logic living inline in a
+route handler. This removes the "hand-written business logic buried in a route file, invisible to
+anyone not reading that file" problem, and gives the rule its own unit tests
+(`tests/lib/billing.test.ts`, 12 cases) independent of the route's own integration tests
+(`tests/routes/reservations-previous.test.ts`, unchanged and still green — confirming the
+extraction changed no behavior).
+
+**Not resolved by this — deliberately out of scope:** the regular checkout flow
+(`PATCH /api/reservations` + `admin/page.tsx`'s checkout modal) still decides wallet usage in the
+frontend rather than calling `settlePaymentMismatch()`; unifying that is a separate, larger change
+(it would mean the checkout modal's "use wallet balance" checkbox either goes away or the route
+gains an "auto-allocate" mode) and was not attempted here. The original finding below stays for that
+reason — two conceptually-equivalent rules still exist, just one of them is no longer the badly-
+factored one.
+
+**Original finding (2026-09-15), kept for context:**
 
 **What it is:** deciding *how much of an underpayment draws from an existing wallet credit before
 adding debt to `outstanding`, and how much of an overpayment pays down existing debt before
@@ -4035,16 +4073,15 @@ apply to the other unless someone remembers both exist. If the two rules are eve
 allowed to diverge further, staff could see different settlement behavior for what looks to them
 like the same kind of transaction, depending only on which screen recorded it.
 
-**Fix required (not urgent, but worth scheduling):** extract the wallet-vs-debt allocation decision
-in `reservations/previous` into a small, named, tested pure function (parallel to how
-`computeSettledBalances` was extracted from the checkout route) — either reusing/extending
-`billing.ts`, or as a clearly-named sibling — so there is one function both call sites can point at,
-not two hand-written copies of the same rule.
+**Fix required, done for implementation 1 (see the top of this entry):** extracted into
+`settlePaymentMismatch()` in `billing.ts`. Implementation 2 (the checkout flow) still splits the
+decision between the frontend and `computeSettledBalances()` and was deliberately left alone.
 
-**Tests:** `tests/routes/reservations-previous.test.ts`'s "settlement math" describe block (9 cases)
-documents implementation 1's exact current behavior; `tests/lib/billing.test.ts` documents
-implementation 2's. Neither test file currently asserts the two are equivalent — that assertion
-doesn't exist yet because the two functions don't share a common interface to compare.
+**Tests:** `tests/lib/billing.test.ts` now covers `settlePaymentMismatch()` directly (12 cases);
+`tests/routes/reservations-previous.test.ts`'s "settlement math" describe block (9 cases) covers it
+through the route. `tests/lib/billing.test.ts` separately covers `computeSettledBalances()`
+(implementation 2). No test asserts the two functions are equivalent — they still don't share a
+common interface, and per the note above, making them equivalent was not the goal of this fix.
 
 ---
 
@@ -4257,7 +4294,6 @@ Reception's End Session has no purchase step at all: a package is only sold at b
 
 ---
 
-<<<<<<< HEAD
 ## RISK-094: Laser Package Deficit Settlement Had No Safety Net and Could Bill an Unsold Package (PARTIALLY RESOLVED)
 
 **Severity:** Critical (P0) · **Type:** Money / data integrity / concurrency
@@ -4434,18 +4470,342 @@ afterward; confirmed zero residue.
 
 ---
 
-## RISK-097: Retail Product Balances Were Converted to Synthetic Packages in `GET /api/customers/packages` (RESOLVED)
+## RISK-097: Brief 35 Deficit Resolution Is Ordered, Not Transactional — A Failure Between Steps Leaves A Partially-Applied Settlement (PARTIALLY RESOLVED — retry path fixed, cross-table atomicity still open)
+
+**Found:** 2026-09-23 during Brief 35 implementation. **Retry-recovery bug found and fixed 2026-09-24
+during live verification** (migration applied, full scenario matrix run against the real dev
+database — see the Evidence log).
+**Status:** the specific failure mode below — a retry after a partial failure silently reporting
+"nothing to resolve" instead of recovering — is fixed. The underlying lack of a single cross-table
+transaction remains open by design (see "Not fixed").
+
+`POST /api/reservations/laser-deficit` performs up to three writes in sequence: (1) source-package
+consume via `consume_package_pulses` RPC, (2) the resolution write — `POST /api/packages/sell`
+(invoices + invoice_lines + customer_packages + payments) or the `reservation_products` deficit line,
+and (3) the `reservations.laser_deficit_resolution` marker. There is no single transaction spanning
+them (the sell path is a route handler, not an RPC), so a failure between steps is a real partial
+state:
+
+- **Marker write fails after the resolution succeeded** (including when migration
+  `20260923000000_add_laser_deficit_resolution_to_reservations.sql` has not been applied yet — the
+  columns won't exist): the route returns 500 with "do not retry; reconcile manually," but the
+  invoice line/package sale already happened. A retry that ignores the warning would double-charge
+  the invoice line; the PAY_PER_PULSE line-write has a `description ILIKE 'Excess Laser Pulses
+  Deficit%'` guard so the *line* is not duplicated, but the package-sale path has no equivalent
+  protection.
+- **BUY_NEW_PACKAGE sells the package, then the deficit consume fails or returns
+  `consumed < deficit`:** the patient owns a package and its invoice exists, but the deficit pulses
+  were not deducted. The route returns 500 with the exact partial state in the message.
+- **Marker columns absent entirely (migration unapplied):** resolution still works, but
+  `laser_deficit_resolution` stays NULL forever, so idempotency falls back to the notes-tag /
+  deficit-line heuristics — weaker than the column.
+
+**Mitigations already in place:** consume is idempotent per `(customer_package_id, reservation_id)`
+(Brief 34B unique index); the PAY_PER_PULSE line is guarded against double-write; every failure
+message states exactly what did and did not happen, and never reports success.
+
+**Bug found live, 2026-09-24, and fixed — the retry path was actually unsafe, not just loud.**
+Reproduced directly: forced the invoice-line write to fail after the consume step had already
+succeeded (see the `addedByRole` bug below), leaving the source package drained (`fully_used`, 0
+remaining) with no marker and no invoice line — exactly the documented partial state. But the
+*retry*, called after fixing the immediate cause, did not recover: `computeDeficitState`'s package
+lookup (`activePulsePackages`) filters `.eq('status', 'active')`, and Brief 34B flips a drained
+package to `'fully_used'`. The retry therefore found **no source package at all**, concluded
+`noActivePackage: true`, and returned `{ success: true, deficitPulses: 0 }` — a **silent no-op that
+looked like success**, worse than the loud 500 this risk originally described. A real ~2,000-pulse,
+10,000 EGP deficit would have gone permanently unbilled had the receptionist trusted that response.
+**Fix:** added `packageAlreadyTouchedForReservation()` — looks up `package_pulse_usage` rows for the
+specific reservation and treats that package as the authoritative source regardless of its current
+status, ahead of the active-package fallbacks. Re-verified live: the same reservation, retried after
+the fix, correctly recomputed the 2,000-pulse deficit and resolved it. Also verified this covers the
+rate-unconfigured retry case (consume succeeds, PAY_PER_PULSE's rate check fails after it, `NULL`
+rate then configured, retried — resolves correctly).
+
+**Separate bug found and fixed in the same pass:** the PAY_PER_PULSE line write hardcoded
+`addedByRole: 'receptionist_checkout'`, but `reservation_products.added_by_role`'s CHECK constraint
+only allows `'doctor_session'` or `'receptionist'` — every PAY_PER_PULSE resolution failed with a
+500 on the real database (never caught by the fake, which doesn't enforce CHECK constraints).
+Changed to `'receptionist'`.
+
+**Not fixed:** a single Postgres function wrapping consume + sale + marker in one transaction. That
+would require reimplementing `/api/packages/sell` inside SQL (invoices, invoice_lines, payments,
+wallet movements, transaction ledger — too much to duplicate); deferred as deliberate scope. A
+failure that happens *after* the source package is already fully drained now recovers correctly on
+retry (fixed above); a failure at the marker-write step specifically, after the resolution itself
+(sale or invoice line) already fully succeeded, still needs the manual reconciliation this risk
+originally described — that residual case was not exercised live (it requires injecting a failure
+at that exact point) and is left as-is.
+
+**Live-verified against the real dev database, 2026-09-24 (migration
+`20260923000000_add_laser_deficit_resolution_to_reservations.sql` applied):** GET preview and POST
+resolve for both `PAY_PER_PULSE` and `BUY_NEW_PACKAGE` on disposable test data — correct deficit
+math, correct invoice/payment amounts, correct marker writes; idempotent repeat calls for both
+choices (`alreadyResolved: true`, zero additional writes); no-deficit (sufficient balance) consumes
+normally and writes no marker; no-active-package refuses cleanly with no fabricated deficit;
+expired-package refuses before any write; unresolvable-rate refuses with a real 400 before any
+invoice write (and, per the fix above, recovers correctly once the rate is configured and the call
+is retried); unauthenticated → 401; invalid/missing reservationId → 400; non-existent reservation →
+404. All disposable test rows deleted afterward, confirmed zero residue. Doctor-side screen
+confirmed directly from source (`DoctorOngoingSessionTab.tsx`'s Option 3 block): delivered-pulses
+input plus presets, and — only when `packageDeficit > 0` — one neutral amber notice ("Recorded
+pulses exceed the package balance. Reception will resolve this at checkout."); no package name,
+balance, price, or choice control anywhere in that block, matching DEC-079 exactly.
+
+**Manual checklist:** `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_35_MANUAL_TESTS.md` — Evidence log
+filled in with the above.
+
+---
+
+## RISK-098: Retail Product Balances Were Converted to Synthetic Packages in `GET /api/customers/packages` (RESOLVED)
 
 **Severity:** Medium · **Type:** UI & Domain Isolation
 **Found:** 2026-09-23 · **Fixed same day.**
+**Note:** originally numbered RISK-097 by its author (`saifuldeennaser`), working in parallel on
+`origin/dev` without this session's RISK-097 — renumbered on merge to avoid a collision.
+Cherry-picked from commit `71c33e0`. See DEC-081.
 
 **What it was:** In `src/app/api/customers/packages/route.ts`, the `GET` endpoint included a fallback querying `customer_product_balances` and synthesising a `syntheticPkg` for every non-pulse product balance. Consequently, whenever a patient purchased a skincare product (e.g., "Retinol Anti-Aging Serum", "Skin Protector"), it appeared under "Purchased Packages" in addition to "Purchased Products & Cart".
 
 **Fix:** Removed the `customer_product_balances` conversion from `GET /api/customers/packages`. Packages are now sourced exclusively from `customer_packages`.
 
-**Verified:** Automated tests in `tests/routes/customers-packages.test.ts` (including new test verifying product balances are excluded from packages response) pass (806 passing tests total), and `npm run build` succeeds with zero errors.
+**Verified:** Automated tests in `tests/routes/customers-packages.test.ts` (including new test verifying product balances are excluded from packages response) pass, and this session independently re-ran the full suite after the merge — see the merge commit for the current count.
+---
+
+## RISK-099: The Real Doctor → Reception Flow Never Reached The Deficit Prompt — Three Separate Breaks Found Only By Driving The Actual UI (RESOLVED)
+
+**Severity:** Critical (P0) · **Type:** Money / feature never actually worked end to end
+**Found & fixed:** 2026-09-24, Brief 35 browser verification (doctor session → reception Checkout, real
+UI, real dev database). Every route-level test and API-level live check had passed; none of them
+exercised the doctor's real completion, which is why all three survived.
+
+1. **`delivered_pulses` was never persisted by the doctor's completion.** The doctor completes a
+   session with `PATCH /api/reservations`, which maps `laser_payment_mode` / `laser_price_per_pulse`
+   but had **no mapping for `delivered_pulses`** (only `POST` did). The column stayed NULL on every
+   doctor-completed booking, so reception's `GET /api/reservations/laser-deficit` read
+   `deliveredPulses: 0, deficitPulses: 0` — a real 2,000-pulse deficit was invisible. **Fix:** PATCH
+   now persists `deliveredPulses` / `delivered_pulses` (finite, non-negative, floored). Tests in
+   `tests/routes/reservations-patch.test.ts`, confirmed to fail without the fix.
+2. **The merged DEC-084 rule hid the only door to the prompt.** `BookingDetailsModal`'s `isInvoicePaid`
+   (from origin/dev `90436e5`, cherry-picked) treats every completed 0-balance package booking as
+   paid, which removed "Pay & Settle Invoice" — the button that opens the Checkout modal and its
+   `LaserDeficitPrompt`. I had judged that change display-only; the browser showed it made the
+   deficit **unreachable** ("✓ Invoice Settled & Paid", no button) for exactly the bookings that
+   needed it. **Fix:** the drawer now GETs the deficit for completed bookings and never reports paid
+   while one is unresolved (`pendingLaserDeficit`).
+3. **Resolving a PAY_PER_PULSE deficit never made anyone owe the money.** The route wrote the
+   `reservation_products` line but not `reservations.amount_left`, so after resolving, the Checkout
+   modal showed Total 0 / Net Due 0 and the drawer showed "Paid" — the 10,000 EGP (2,000 × 5) was
+   never collectable. **Fix:** the route adds the charge to `amount_left` on the first line write only
+   (idempotent on retry); the Checkout modal mirrors it via `onResolved` so its totals update without
+   a reload. Test added (once-only, checked on a repeat call).
+
+4. **The `BookingDetailsModal` end-session surface had the same first break, plus a money overwrite
+   (found 2026-09-25, browser pass).** Reception's "Confirm & End Session" consumed the pulses and
+   ran the deficit gate *before* `delivered_pulses` was ever saved (the modal only kept the count in
+   state until its final PATCH), so the gate saw 0: with 5,000 entered against a 3,000 balance, 3,000
+   were consumed, the 2,000-pulse deficit was silently absorbed and the session completed with a
+   success alert (`delivered_pulses` NULL, no marker, `amount_left` 0). **Fix:** persist
+   `delivered_pulses` first, remount the prompt so it re-reads, and mirror a resolved PAY_PER_PULSE
+   charge into the modal's booking copy — its final save recomputes `amountLeft` from that copy and
+   would otherwise overwrite the charge back to 0. The final PATCH also now sends the same count that
+   was consumed. **Verified live:** the gate now blocks with the 2,000-pulse alert and shows the
+   prompt (Delivered 5,000 / Balance 0 / Deficit 2,000); Pay Per Pulse → the panel's Final Session
+   Invoice reads 10,000 EGP / Outstanding 10,000; ending the session leaves `delivered_pulses 5000`,
+   marker `PAY_PER_PULSE / 2000`, `amount_left 10000`, customer `outstanding 10000`, one deficit line.
+
+**Verified live end to end after the fixes:** doctor UI (Option 3 shows only the pulses input +
+presets; the neutral amber notice appears above the balance; no package/price/choice anywhere) →
+Complete Treatment (clamped consume 3,000 of 5,000; no invoice, no sale, only a 0 EGP "Device — 5000
+pulses" line as `doctor_session`) → reception drawer shows Unpaid + "Pay & Settle Invoice" → Checkout
+shows Delivered 5,000 / Balance 0 / Deficit 2,000 → Confirm blocked with the unresolved-deficit
+alert → Pay Per Pulse → Resolve → totals become 10,000 EGP with "Pay Full" → Confirm & Complete →
+`amount_paid 10000, amount_left 0`, customer `spent_amount 10000`.
 
 ---
+
+## RISK-100: PAY_PER_PULSE Deficit Cash Is Recorded On The Booking And Customer But Not In The Invoices/Payments Ledger (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Financial ledger integrity · **Found:** 2026-09-24, same browser pass.
+
+After the flow above completes, the 10,000 EGP is in `reservations.amount_paid` and
+`customers.spent_amount`, but **no `invoices`, `invoice_lines`, `payments` or `transactions` row
+exists for it**. Cause: the doctor's completion is the booking's first completion, and for a fully
+package-covered session `writeCheckoutInvoice` writes no invoice; the reception checkout then takes
+the `wasAlreadyCompleted` branch, whose `appendPaymentToExistingInvoice` returns silently when there
+is no invoice, and `reservation-products`' late-append likewise only appends to an existing invoice.
+Finance reports built on the ledger would miss this cash. BUY_NEW_PACKAGE is unaffected (the
+package sale writes its own invoice and payment).
+
+**Fixed 2026-09-24 (option A — the deficit route owns it):** `POST /api/reservations/laser-deficit`
+now runs `syncDeficitIntoInvoiceLedger` after the PAY_PER_PULSE line is written, on every resolve
+(so a retry repairs it). For a **completed** booking: with no invoice it creates one
+(`next_invoice_no`, `buildInvoiceLine`/`buildInvoiceTotals`) carrying the deficit line; with an
+invoice it ensures the line is present and recomputes the invoice totals from its lines
+(`reservation-products`' late append adds a line but never updated the totals); it marks the
+`reservation_products` row invoiced so a later completion cannot re-bill it; and records one
+`service_charge` transaction (skipped if already present). For a booking not yet completed it does
+nothing — the completion writes the invoice from the pending line. Failure returns a 500 that says
+the line and amount owed were saved and that retrying is safe. The customer's payment at checkout
+then attaches through the existing `appendPaymentToExistingInvoice` path.
+
+**Verified live on dev:** a completed package booking with a 2,000-pulse deficit and no invoice →
+resolve created `INV-000117` (subtotal/grand_total 10,000, one `product` line 2,000 × 5) and a
+10,000 `service_charge`; the checkout PATCH (`amountPaid 10000`) then added a 10,000 cash
+`payments` row on that invoice and an `outstanding_payment` transaction; booking paid, customer
+`spent 10000 / outstanding 0`, exactly one invoice. Four new route tests (create, idempotent
+repeat, existing invoice + totals recompute, not-completed writes nothing) — the first three
+confirmed to fail without the fix.
+
+**Also noted, not fixed:** (a) the informational "Laser Package Pulse Deduction" card in the Checkout
+modal (merged from origin/dev `fdebc6b`) computes its own numbers and contradicts the prompt after the
+doctor's consume has already run — it showed "5,000 pulses exceed the balance" beside the prompt's
+"Deficit 2,000"; it was written for the old flow where the consume happens at checkout. (b) The
+`BookingDetailsModal` **end-session** surface of the deficit prompt was not click-tested. (c) For a
+moment after opening a completed booking's drawer it shows "Paid" until the deficit GET returns.
+
+---
+
+## RISK-101: Selecting A Nonexistent `services.name` Column Broke Invoice Writing For Every Completed Booking, On Dev And Production (RESOLVED)
+
+**Severity:** Critical (P0) · **Type:** Financial ledger / schema drift · **Found:** 2026-09-25 (dev server log during
+the BookingDetailsModal browser pass) · **Introduced:** `eadac73` (2026-09-20, "laser per-pulse invoice
+calculation…"), present on `main`.
+
+`public.services` has `en` / `ar` but **no `name` column** (confirmed on dev and on production). Two
+selects in `src/app/api/reservations/route.ts` (`writeCheckoutInvoice` and the PATCH costing path) asked
+for `name` (and `is_laser` etc. alongside it). PostgREST answered `42703 column services.name does not
+exist`; `writeCheckoutInvoice` threw and its caller logs it as `Failed to write Phase 1 invoice
+(dual-write, non-fatal)` and carries on. Result: **no `invoices`, `invoice_lines`, `payments` or
+transaction rows are written when any booking is completed** — the booking and customer counters update
+but the ledger does not. This is the real cause behind the "no invoice exists" symptom RISK-100 chased
+on a package-covered booking: it was not specific to package bookings. Because the error is swallowed,
+nothing failed visibly. Production impact at discovery: one booking completed since 2026-09-20, with no
+invoice (no other completions in that window) — a latent P0 that would have hit every checkout.
+
+Same drift, silently degraded, in three more places: `availability/route.ts` (the cached service list came
+back empty), `customers/packages/route.ts` (the joined package query failed and fell back, losing service
+names) and `reception/dashboard/route.ts` (selected `name` and `title`, so the dashboard showed
+"Service #5" instead of names).
+
+**Fix:** removed the nonexistent columns from all six selects (every use already falls back through
+`en || name`). `tests/lib/servicesColumnDrift.test.ts` scans `src/` for any select or PostgREST embed
+that requests `name` from `services` — the in-memory Supabase fake cannot validate columns, so no route
+test could ever catch this; the guard fails on the unfixed code and passes on the fixed code.
+
+**Follow-ups:** (1) the one production booking completed without an invoice needs a manual look; (2) the
+same class of bug — an error swallowed as "non-fatal" on a column the fake does not check — is worth a
+sweep for other tables, not just `services`; (3) the live confirmation that a completion now writes its
+invoice was pending a fresh browser session (the dev login had expired) when this was committed — see
+the manual checklist.
+
+---
+
+## RISK-102: New Historical Bookings Still Write No Invoice, So The Ledger Drifts From Customer Totals Again (RESOLVED 2026-09-25)
+
+**Severity:** Medium · **Type:** Financial ledger / data completeness · **Found:** 2026-09-25 · **Related:** DEC-086
+
+`POST /api/reservations/previous` updates `customers.spent_amount` / `outstanding` / `wallet_balance` and
+records a `transactions` payment, but writes no `invoices` / `invoice_lines` / `payments`. DEC-086's one-time
+script (`scripts/backfill_historical_invoices.sql`) fixes the existing rows only; every historical booking
+entered afterwards reopens the gap, and `GET /api/customers/reconcile` will report drift for that customer
+until the script is re-run (it is idempotent, so re-running is safe). **Resolved:** the route now writes the invoice + payment itself (`src/lib/historicalInvoice.ts`, DEC-086 item 6;
+`tests/routes/reservations-previous-invoice.test.ts`, 15 tests that fail without the change); failures are
+reported as `response.ledger.status = 'failed'`, repairable by re-running the idempotent script. Original fix options: have the route write
+the invoice + payment itself (`is_opening = true`, same rules as the script), or schedule the script. Also
+note the finance revenue/cash reports now exclude `is_opening` invoices (audited and fixed 2026-09-25, DEC-086), so this gap costs customer-value accuracy only, not P&L. **Applied on production 2026-09-25 (7 invoices, 16,600 EGP).** Finding: for 2 of the 3 backfilled customers `customers.spent_amount` disagrees with the ledger (Zeinab 10,000 vs 5,000; Khaled 1,200 vs 5,200) while the ledger matches `reservations.amount_paid` and `transactions` exactly — the scalar was already wrong; it was not modified. Checklist:
+`ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.
+
+---
+
+## RISK-103: Laser Landing Pages Make Marketing Claims That Nobody Has Verified, And Conversion Tracking Is Inactive Until A GTM ID Is Set (OPEN)
+
+**Severity:** Medium · **Type:** Marketing claims / ad-policy / measurement · **Found:** 2026-09-25 · **Related:** DEC-087
+
+The pages are live in code but these items came from Manus and were never checked against the clinic:
+- **Google rating "4.9 ★ · 31 reviews"** and the three review quotes (`CLIENT.googleRating`,
+  `LANDING_REVIEWS`) — must match the Maps listing at the moment ads go live.
+- ~~Device name promised but never shown~~ — **resolved 2026-09-25:** owner supplied **Candela GentleMax Pro**
+  (`CLIENT.laserDevice`); headlines, trust bar, device section and FAQ now name it and state it suits all skin
+  types. Still needs the owner's device photo to replace the placeholder panel in the device section, and the
+  "suits all skin types" wording should be kept tied to the device (not to outcomes) for Google Ads policy.
+- **"تبريد قبل كل نبضة"** (cooling) and **"8–10 جلسات"** — clinical claims; confirm with the doctor.
+- **Doctor photo** (`doctor-portrait.webp`, from `doctor/portrait-about.jpg`) is not confirmed to be the
+  laser practitioner. Note `doctor/portrait-main.jpg` is byte-identical to `clinic/treatment.jpg` (a
+  microneedling shot), so it must not be used as a "doctor" image.
+- **Address** "المنطقة الصناعية، قسم أول القاهرة الجديدة" came from Manus; confirm against the branch.
+- **Opening hours / reply time** are not stated anywhere; visitors are told to WhatsApp for "المواعيد".
+- **Tracking:** `landing_view`, `whatsapp_click`, `call_click`, `map_click`, `scroll_depth` go to
+  `dataLayer`. GTM container **GTM-5ZXBL7LR** is now installed on the landing pages (`CLIENT.gtmId`), but the
+  container still needs triggers/tags mapping these events to Google Ads conversions. Until then Google Ads
+  sees zero conversions from these pages.
+- **Ad policy:** absolute outcome/safety claims were removed from headlines, but Google Ads' healthcare
+  policies should be re-read against the final ad text (not only the page).
+
+**Fix:** clinic owner/doctor confirms each claim (or it is edited out); create the GTM container, set
+`NEXT_PUBLIC_GTM_ID` in Vercel, map the events to conversions, and test with Tag Assistant. Checklist:
+`ai_docs/manual_tests/LASER_LANDING_PAGES_MANUAL_TESTS.md` (check 11).
+
+---
+
+## RISK-104: Finance Section Understates Revenue And Cash — Pulses-Package Revenue Is Never Recognised, And Cash In `transactions` Exceeds The Ledger (OPEN)
+
+**Severity:** High (financial reporting) · **Type:** Financial ledger / revenue recognition · **Found:** 2026-09-25 (production audit, read-only SQL reproducing each report's inputs; the Finance UI itself was not reviewed — the browser pane had no signed-in session). **Related:** DEC-023, DEC-086, RISK-102.
+
+Production figures at audit time (September 2026 is the only month with live data; backfilled history excluded):
+
+| Input | Value | What it means |
+|---|---|---|
+| Live invoices | 29 issued, 48,300 EGP | lines: **package 46,550**, product 1,750, service 0 |
+| Ledger cash (`payments`) | 45,950 (all cash) | vs invoices 48,300: 3 underpaid invoices, 2,400 outstanding |
+| `transactions` payments, not historical | 52,300 | 44,500 linked to an invoice + **3 manual payments (7,800) with no invoice** |
+| `package_revenue_recognitions` | **0 rows** | while 6 pulses packages (30,000) are sold |
+| `invoice_lines.provider_id` | NULL on 29/29 | doctor P&L is 100% "unattributed" |
+| `cogs_snapshot` / `commission_snapshot` NULL | 19 of 29 lines | margins overstated on those lines |
+| expenses / fixed assets / loans | 0 / 0 / 0 | "fully-loaded profit" equals contribution margin |
+
+**1. Package revenue is never recognised for laser pulses packages.** `pnl` / `trend` / `branch-pnl` /
+`new-vs-returning` count `service` and `product` invoice lines plus `package_revenue_recognitions`
+(DEC-023: package cash is deferred, revenue is recognised as sessions are delivered). Recognitions are
+written only by the DB function `consume_customer_package_session`, i.e. for **services** packages.
+Pulses packages (all 6 on production) are consumed through `consume_package_pulses` (Brief 34B) and the
+deficit route, neither of which writes a recognition. Result: September P&L revenue reads ~1,750 (products
+only) against 45,950 cash actually received. **Fix direction:** recognise revenue when pulses are
+consumed (pro-rata, in the same transaction as `consume_package_pulses`) and back-fill from
+`package_pulse_usage` — designed in **DEC-088 (Proposed 2026-09-25; two items need owner confirmation)**,
+no code yet.
+
+**2. Cash flow and `transactions` disagree.** `cashflow` sums `payments` (45,950); `transactions` holds
+52,300 of non-historical payments. The 7,800 gap is three `source = manual` payments with no invoice
+(e.g. the `zaki` booking, 2,000 paid, completed with no invoice before RISK-101 was fixed) plus payments
+recorded on the ledger but not in `transactions`. Which table the Finance screens should treat as the
+source of truth is undecided (RISK-016).
+
+**3. Doctor P&L has no attribution.** No invoice line carries `provider_id`, so `finance/doctor-pnl` puts
+everything in `unattributed` and `commission-payouts` returns nothing from the ledger.
+
+**4. Empty cost side.** No expenses, assets or loans are recorded, and 19 of 29 lines have no COGS or
+commission snapshot — every profit figure is a revenue figure until those are entered.
+
+**Presentation addressed (DEC-088 item 9, built 2026-09-26 on dev, not yet on main):** the P&L now shows a cash → revenue bridge and a deferred package balance, and the tiles are labelled "Revenue earned" / "Cash received", so the gap is explained on screen instead of looking like a bug. Observation from the production numbers: package cash in September (44,150) has no matching deferred balance because most package invoices have no surviving `customer_packages` row — see `ai_docs/manual_tests/FINANCE_CASH_VS_REVENUE_MANUAL_TESTS.md`.
+
+**Not a Finance-code bug (verified):** the backfilled historical invoices (`is_opening`) are correctly
+excluded from all eight revenue/cash reports (DEC-086, `tests/routes/finance-opening-invoices.test.ts`).
+Checklist: `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.
+
+---
+
+## RISK-105: Quota Extractor Misidentifying Deductions as Quota and In-Booking Package Purchases Bypassing Pulse Consumption (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Logic / Deficit detection  
+**Found:** 2026-09-27 · **Fixed:** 2026-09-27  
+
+**What it was:**
+1. `extractPulsePackageQuota` in `src/lib/laserDeficit.ts` had a generic fallback regex matching deduction strings like `[Laser Package Redemption]: Deducted 5,000 pulses`, treating `5,000` as the package quota instead of `2,500`. Consequently, when delivered pulses was 5,000, deficit calculated to 0 and marked the booking "Package Covered" / "Paid" instead of triggering "Partially Paid" and the interactive settlement options.
+2. In-booking package purchases (Option 3 in New Booking) were not resolving `targetPkgId` from `[Customer Package ID]: ...` notes upon ending sessions in Doctor and Reception views, preventing `consume_package_pulses` from deducting used pulses in `customer_packages`.
+
+**Fix:**
+1. Updated regexes in `extractPulsePackageQuota` to strictly require quota indicators (`pulses remaining`, `[Purchasing New Pulses Package]`, `total pulses`, `(Price EGP · X pulses)`) and never match `Deducted X pulses` or `تم استهلاك X نبضة`.
+2. Added `targetPkgId` note extraction and phone lookup in `DoctorAccountView.tsx` and `BookingDetailsModal.tsx` to ensure `customer_packages` balance is consumed and reflected in patient profiles.
 
 ## PROPOSALS.md Reference
 
