@@ -3237,5 +3237,9 @@ When patients joined Revera with packages purchased under previous historical sy
 3. **Bilingual Translations & Test Coverage:**
    - Fully localized in English and Arabic (`src/components/admin/translations.ts`).
    - Vitest suite in `tests/routes/reservations-previous-package.test.ts` validates partial usage, full consumption, and itemized quota recording with 100% pass rate.
+4. **Input Stabilization & Lifecycle Decoupling:**
+   - Decoupled package initialization (`initializedTargetBookingIdRef`) from reactive catalog dependency triggers to prevent background re-renders or catalog fetches from reverting user edits.
+   - Converted pulse input handlers to flexible string/number state with auto-balancing and blur normalization so users can backspace and type values naturally without jumping back to prior numbers.
+
 
 
