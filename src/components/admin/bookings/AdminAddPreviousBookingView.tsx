@@ -537,15 +537,12 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 }}
                 title={tr.dateTooltip}
                 placeholder={tr.datePlaceholder}
-                className={`w-full rounded-xl border bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] ${
+                className={`w-full rounded-xl border bg-white py-3 pl-10 pr-3.5 rtl:pl-3.5 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] cursor-pointer ${
                   errors.date
                     ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
                     : "border-gray-200 focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
                 }`}
               />
-              <div className="pointer-events-none absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] z-10">
-                <CalendarIcon size={16} className="text-[#9CA3AF]" />
-              </div>
             </div>
             {errors.date && (
               <p className="text-xs font-semibold text-rose-600 flex items-center gap-1 mt-1">
