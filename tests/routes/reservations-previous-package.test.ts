@@ -131,3 +131,113 @@ describe('a booking without a package is unaffected', () => {
     expect(rows('customer_packages')).toHaveLength(0);
   });
 });
+
+describe('historical package: quota and session usage breakdown', () => {
+  it('pulses package with partial usage records exact pulses_used and pulses_remaining and active status', async () => {
+    const res = await POST(
+      staffPost(
+        body({
+          packageId: 'pulses-10k',
+          packagePulsesTotal: 10000,
+          packagePulsesUsed: 4000,
+          packagePulsesRemaining: 6000,
+          invoiceValue: 8000,
+          actualSpent: 8000
+        })
+      )
+    );
+    expect(res.status).toBe(200);
+    const cp = rows('customer_packages')[0];
+    expect(cp).toMatchObject({
+      package_id: 'pulses-10k',
+      package_type: 'pulses',
+      total_pulses: 10000,
+      pulses_used: 4000,
+      pulses_remaining: 6000,
+      status: 'active'
+    });
+    const resv = rows('reservations')[0];
+    expect(resv.notes).toContain('[Package Usage]: 4,000 / 10,000 pulses used (6,000 pulses remaining).');
+  });
+
+  it('pulses package with all quota consumed sets status to fully_used', async () => {
+    const res = await POST(
+      staffPost(
+        body({
+          packageId: 'pulses-10k',
+          packagePulsesTotal: 10000,
+          packagePulsesUsed: 10000,
+          packagePulsesRemaining: 0,
+          invoiceValue: 8000,
+          actualSpent: 8000
+        })
+      )
+    );
+    expect(res.status).toBe(200);
+    const cp = rows('customer_packages')[0];
+    expect(cp).toMatchObject({
+      package_id: 'pulses-10k',
+      package_type: 'pulses',
+      total_pulses: 10000,
+      pulses_used: 10000,
+      pulses_remaining: 0,
+      status: 'fully_used'
+    });
+    const resv = rows('reservations')[0];
+    expect(resv.notes).toContain('[Package Usage]: 10,000 / 10,000 pulses used (0 pulses remaining).');
+  });
+
+  it('services package with itemized usage records qty_used and qty_remaining', async () => {
+    const res = await POST(
+      staffPost(
+        body({
+          packageId: 'svc-pkg',
+          packageItemsUsage: [
+            { serviceId: 15, serviceName: 'Laser Face', qtyTotal: 6, qtyUsed: 2, qtyRemaining: 4 }
+          ],
+          invoiceValue: 3000,
+          actualSpent: 3000
+        })
+      )
+    );
+    expect(res.status).toBe(200);
+    const cp = rows('customer_packages')[0];
+    expect(cp.status).toBe('active');
+    const cpi = rows('customer_package_items')[0];
+    expect(cpi).toMatchObject({
+      service_id: 15,
+      qty_total: 6,
+      qty_used: 2,
+      qty_remaining: 4
+    });
+    const resv = rows('reservations')[0];
+    expect(resv.notes).toContain('[Package Usage]: Laser Face: 2/6 used (4 remaining).');
+  });
+
+  it('services package with all sessions consumed sets status to fully_used', async () => {
+    const res = await POST(
+      staffPost(
+        body({
+          packageId: 'svc-pkg',
+          packageItemsUsage: [
+            { serviceId: 15, serviceName: 'Laser Face', qtyTotal: 6, qtyUsed: 6, qtyRemaining: 0 }
+          ],
+          invoiceValue: 3000,
+          actualSpent: 3000
+        })
+      )
+    );
+    expect(res.status).toBe(200);
+    const cp = rows('customer_packages')[0];
+    expect(cp.status).toBe('fully_used');
+    const cpi = rows('customer_package_items')[0];
+    expect(cpi).toMatchObject({
+      service_id: 15,
+      qty_total: 6,
+      qty_used: 6,
+      qty_remaining: 0
+    });
+    const resv = rows('reservations')[0];
+    expect(resv.notes).toContain('[Package Usage]: Laser Face: 6/6 used (0 remaining).');
+  });
+});

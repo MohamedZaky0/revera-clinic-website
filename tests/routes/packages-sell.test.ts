@@ -114,7 +114,7 @@ describe('POST /api/packages/sell — invoice status must satisfy the schema (RI
 describe('POST /api/packages/sell — pulse quota must be real (Brief 34B)', () => {
   it('refuses a pulses-type package with no configured total_pulses and writes nothing', async () => {
     fake.seed('packages', [{
-      id: PACKAGE_ID, name: 'Laser Pulses', branch_id: null, price: 1000, tax_rate: 0,
+      id: PACKAGE_ID, name: 'Laser Pulses Custom', branch_id: null, price: 1000, tax_rate: 0,
       validity_days: 365, active: true, package_type: 'pulses', total_pulses: 0,
     }]);
 
@@ -140,7 +140,35 @@ describe('POST /api/packages/sell — pulse quota must be real (Brief 34B)', () 
     expect(res.status).toBe(201);
     const cps = fake.rows('customer_packages');
     expect(cps).toHaveLength(1);
-    expect(cps[0]).toMatchObject({ package_type: 'services', total_pulses: 0, pulses_remaining: 0 });
+    expect(cps[0]).toMatchObject({
+      package_type: 'services',
+      total_pulses: 0,
+      pulses_remaining: 0,
+    });
+    const cpItems = fake.rows('customer_package_items');
+    expect(cpItems).toHaveLength(1);
+    expect(cpItems[0]).toMatchObject({
+      service_id: 101,
+      qty_total: 3,
+      qty_remaining: 3,
+    });
+  });
+
+  it('resolves pulses from package name or packages_meta when total_pulses column is zero', async () => {
+    fake.seed('packages', [{
+      id: PACKAGE_ID, name: '5000 Laser Pulses', branch_id: null, price: 2000, tax_rate: 0,
+      validity_days: 365, active: true, package_type: 'pulses', total_pulses: 0,
+    }]);
+
+    const res = await POST(sellReq({ customerId: CUSTOMER_ID, packageId: PACKAGE_ID, amountPaid: 2000 }));
+    expect(res.status).toBe(201);
+    const cps = fake.rows('customer_packages');
+    expect(cps).toHaveLength(1);
+    expect(cps[0]).toMatchObject({
+      package_type: 'pulses',
+      total_pulses: 5000,
+      pulses_remaining: 5000,
+    });
   });
 });
 

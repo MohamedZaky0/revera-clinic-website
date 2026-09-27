@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -22,7 +22,11 @@ import {
   Stethoscope,
   Wallet,
   FileText,
-  Coins
+  Coins,
+  X,
+  Check,
+  Search,
+  Zap
 } from "lucide-react";
 import { adminTranslations } from "@/components/admin/translations";
 import { getAuthHeaders } from "@/lib/authHeaders";
@@ -51,11 +55,24 @@ interface CustomerItem {
   wallet_balance?: number;
 }
 
+interface PackageServiceItem {
+  id?: string;
+  serviceId: number;
+  serviceName?: string;
+  serviceNameAr?: string;
+  qty: number;
+}
+
 interface PackageItem {
   id: string | number;
   name: string;
   nameAr?: string | null;
   price?: number;
+  packageType?: 'services' | 'pulses';
+  package_type?: 'services' | 'pulses';
+  totalPulses?: number;
+  total_pulses?: number;
+  items?: PackageServiceItem[];
 }
 
 interface ProductItem {
@@ -69,6 +86,9 @@ interface ProductItem {
 interface AdminAddPreviousBookingViewProps {
   onClose: () => void;
   onBookingCreated?: () => void;
+  onBookingUpdated?: () => void;
+  editingBooking?: any;
+  initialBooking?: any;
   initialCustomer?: CustomerItem | any;
   initialPatientPhone?: string;
   initialPatientName?: string;
@@ -108,6 +128,9 @@ function isValidPhone(raw: string): boolean {
 export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewProps> = ({
   onClose,
   onBookingCreated,
+  onBookingUpdated,
+  editingBooking,
+  initialBooking,
   initialCustomer,
   initialPatientPhone,
   initialPatientName,
@@ -123,6 +146,9 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 }) => {
   const tr = t || adminTranslations[lang].bookings.adminAddPreviousBooking;
 
+  const targetBooking = editingBooking || initialBooking;
+  const isEditMode = Boolean(targetBooking && targetBooking.id);
+
   const initPhone = initialPatientPhone || initialCustomer?.mobile || initialCustomer?.phone || "";
   const initName = initialPatientName || initialCustomer?.name || "";
 
@@ -132,17 +158,29 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
   const [selectedDoctorId, setSelectedDoctorId] = useState("");
 
   useEffect(() => {
-    const nextPhone = initialPatientPhone || initialCustomer?.mobile || initialCustomer?.phone;
-    const nextName = initialPatientName || initialCustomer?.name;
-    if (nextPhone) setPatientPhone(nextPhone);
-    if (nextName) setPatientName(nextName);
-  }, [initialCustomer, initialPatientPhone, initialPatientName]);
+    if (!targetBooking) {
+      const nextPhone = initialPatientPhone || initialCustomer?.mobile || initialCustomer?.phone;
+      const nextName = initialPatientName || initialCustomer?.name;
+      if (nextPhone) setPatientPhone(nextPhone);
+      if (nextName) setPatientName(nextName);
+    }
+  }, [initialCustomer, initialPatientPhone, initialPatientName, targetBooking]);
 
   // Row 2 State: Date *, Service (Optional), Package (Optional), Products (Optional)
   const [bookingDate, setBookingDate] = useState("");
   const [selectedServiceId, setSelectedServiceId] = useState("");
+  const [serviceSearchQuery, setServiceSearchQuery] = useState("");
+  const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
+  const serviceDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [selectedProductId, setSelectedProductId] = useState("");
+
+  // Package Breakdown State (Laser pulses or service sessions)
+  const [packagePulsesUsed, setPackagePulsesUsed] = useState<number>(0);
+  const [packagePulsesRemaining, setPackagePulsesRemaining] = useState<number>(0);
+  const [packageServicesUsage, setPackageServicesUsage] = useState<
+    Record<string | number, { qtyTotal: number; qtyUsed: number; qtyRemaining: number; serviceName?: string }>
+  >({});
 
   // Row 3 State: Invoice Value, Actual Spent, Payment Method
   const [invoiceValue, setInvoiceValue] = useState<string>("");
@@ -236,6 +274,34 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     return s.en || s.name || s.title || `Service #${s.id}`;
   };
 
+  // Filter services dynamically by typed query
+  const filteredServices = useMemo(() => {
+    const q = serviceSearchQuery.trim().toLowerCase();
+    if (!q) return services;
+    return services.filter((s) => {
+      const nameEn = (s.en || s.name || s.title || "").toLowerCase();
+      const nameAr = (s.ar || "").toLowerCase();
+      return nameEn.includes(q) || nameAr.includes(q);
+    });
+  }, [services, serviceSearchQuery]);
+
+  // Click outside to close service dropdown & sync display text
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(e.target as Node)) {
+        setIsServiceDropdownOpen(false);
+        if (selectedServiceId) {
+          const found = services.find((s) => String(s.id) === String(selectedServiceId));
+          if (found) {
+            setServiceSearchQuery(getServiceName(found));
+          }
+        }
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [selectedServiceId, services, lang]);
+
   // Helper to extract package name cleanly
   const getPackageName = (p: PackageItem) => {
     if (lang === "ar" && p.nameAr) return p.nameAr;
@@ -247,6 +313,153 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     if (lang === "ar" && pr.arabic_name) return pr.arabic_name;
     return pr.name || `Product #${pr.id}`;
   };
+
+  // Selected package helper & metadata
+  const selectedPackageObj = useMemo(() => {
+    if (!selectedPackageId) return null;
+    return pkgList.find((p) => String(p.id) === String(selectedPackageId)) || null;
+  }, [selectedPackageId, pkgList]);
+
+  const isPulsePackage = useMemo(() => {
+    if (!selectedPackageObj) return false;
+    return (
+      selectedPackageObj.packageType === "pulses" ||
+      selectedPackageObj.package_type === "pulses" ||
+      (selectedPackageObj.totalPulses != null && selectedPackageObj.totalPulses > 0) ||
+      (selectedPackageObj.total_pulses != null && selectedPackageObj.total_pulses > 0)
+    );
+  }, [selectedPackageObj]);
+
+  const packageTotalPulses = useMemo(() => {
+    if (!selectedPackageObj) return 0;
+    return Number(selectedPackageObj.totalPulses ?? selectedPackageObj.total_pulses ?? 0);
+  }, [selectedPackageObj]);
+
+  // Pre-fill state when editing an existing historical booking
+  useEffect(() => {
+    if (targetBooking) {
+      const rawNotes = String(targetBooking.notes || targetBooking.reception_notes || "");
+      const cleanNotes = rawNotes
+        .replace(/\[Historical Booking\]\s*Added manually for historical records\./gi, "")
+        .replace(/Service:\s*[^\.\n]+\./gi, "")
+        .replace(/Package:\s*[^\.\n]+\./gi, "")
+        .replace(/\[Package Usage\]:\s*[^\.\n]+(?:\.|$)/gi, "")
+        .replace(/Product:\s*[^\.\n]+\./gi, "")
+        .replace(/\[Invoice Total\]:\s*\d+(?:\.\d+)?\s*EGP\./gi, "")
+        .replace(/Actual Spent:\s*\d+(?:\.\d+)?\s*EGP\./gi, "")
+        .replace(/Payment Method:\s*[^\.\n]+\./gi, "")
+        .trim();
+
+      const invTotalMatch = rawNotes.match(/\[Invoice Total\]:\s*(\d+(?:\.\d+)?)/i);
+      const spentMatch = rawNotes.match(/Actual Spent:\s*(\d+(?:\.\d+)?)/i);
+      const payMethodMatch = rawNotes.match(/Payment Method:\s*([^\.\n]+)/i);
+
+      const sId = String(targetBooking.service_id || targetBooking.serviceId || (targetBooking.serviceIds && targetBooking.serviceIds[0]) || "");
+      const dId = String(targetBooking.provider_id || targetBooking.doctorId || targetBooking.doctor_id || "");
+      const pPhone = targetBooking.phone || targetBooking.customer_phone || targetBooking.patientPhone || "";
+      const pName = targetBooking.name || targetBooking.customer_name || targetBooking.patientName || "";
+      const bDate = (targetBooking.date || "").slice(0, 10);
+      const invVal = targetBooking.price != null
+        ? String(targetBooking.price)
+        : (invTotalMatch ? invTotalMatch[1] : (targetBooking.amount_paid != null ? String(Number(targetBooking.amount_paid) + Number(targetBooking.amount_left || 0)) : ""));
+      const actSpent = targetBooking.amount_paid != null
+        ? String(targetBooking.amount_paid)
+        : (spentMatch ? spentMatch[1] : (targetBooking.amountPaid != null ? String(targetBooking.amountPaid) : ""));
+      const payType = targetBooking.payment_type || targetBooking.payment_method || (payMethodMatch ? payMethodMatch[1].trim() : "");
+
+      if (pPhone) setPatientPhone(pPhone);
+      if (pName) setPatientName(pName);
+      if (bDate) setBookingDate(bDate);
+      if (dId) setSelectedDoctorId(dId);
+      if (sId) setSelectedServiceId(sId);
+      if (invVal) setInvoiceValue(invVal);
+      if (actSpent) setActualSpent(actSpent);
+      if (payType) setSelectedPaymentType(payType);
+      if (cleanNotes) setNotes(cleanNotes);
+
+      if (sId && services.length > 0) {
+        const foundSvc = services.find((s) => String(s.id) === sId);
+        if (foundSvc) {
+          setServiceSearchQuery(getServiceName(foundSvc));
+        }
+      }
+
+      // Package extraction in edit mode
+      const pkgMatch = rawNotes.match(/Package:\s*([^\.\n]+)/i);
+      const rawPkgId = targetBooking.package_id || targetBooking.packageId;
+      if (rawPkgId) {
+        setSelectedPackageId(String(rawPkgId));
+      } else if (pkgMatch && pkgList.length > 0) {
+        const matchedPkgName = pkgMatch[1].trim();
+        const foundPkg = pkgList.find((p) => p.name === matchedPkgName || p.nameAr === matchedPkgName);
+        if (foundPkg) {
+          setSelectedPackageId(String(foundPkg.id));
+        }
+      }
+
+      // Product extraction in edit mode
+      const prodMatch = rawNotes.match(/Product:\s*([^\.\n]+)/i);
+      const rawProdId = targetBooking.product_id || targetBooking.productId;
+      if (rawProdId) {
+        setSelectedProductId(String(rawProdId));
+      } else if (prodMatch && prodList.length > 0) {
+        const matchedProdName = prodMatch[1].trim();
+        const foundProd = prodList.find((pr) => pr.name === matchedProdName || pr.arabic_name === matchedProdName);
+        if (foundProd) {
+          setSelectedProductId(String(foundProd.id));
+        }
+      }
+
+      // Parse Package Usage note breakdown
+      const pulseUsageMatch = rawNotes.match(/\[Package Usage\]:\s*([\d,]+)\s*\/\s*([\d,]+)\s*pulses used(?:\s*\(([\d,]+)\s*pulses remaining\))?/i);
+      if (pulseUsageMatch) {
+        const u = parseInt(pulseUsageMatch[1].replace(/,/g, ""), 10) || 0;
+        const r = pulseUsageMatch[3] ? parseInt(pulseUsageMatch[3].replace(/,/g, ""), 10) : 0;
+        setPackagePulsesUsed(u);
+        setPackagePulsesRemaining(r);
+      }
+    }
+  }, [targetBooking, services, pkgList, prodList, lang]);
+
+  // Sync package default usage whenever a package is selected in create mode or switched
+  useEffect(() => {
+    if (!selectedPackageObj) {
+      setPackagePulsesUsed(0);
+      setPackagePulsesRemaining(0);
+      setPackageServicesUsage({});
+      return;
+    }
+
+    if (isPulsePackage) {
+      const total = packageTotalPulses;
+      setPackagePulsesRemaining((currRemaining) => {
+        // If not already set or in create mode
+        if (currRemaining === 0 && packagePulsesUsed === 0 && total > 0) {
+          return total;
+        }
+        return currRemaining;
+      });
+    } else {
+      // Services package
+      const items = selectedPackageObj.items || [];
+      setPackageServicesUsage((prev) => {
+        const next = { ...prev };
+        items.forEach((item) => {
+          const key = item.serviceId || item.id || 0;
+          if (!next[key]) {
+            const svcName = lang === "ar" && item.serviceNameAr ? item.serviceNameAr : (item.serviceName || `Service #${item.serviceId}`);
+            next[key] = {
+              qtyTotal: item.qty,
+              qtyUsed: 0,
+              qtyRemaining: item.qty,
+              serviceName: svcName,
+            };
+          }
+        });
+        return next;
+      });
+    }
+  }, [selectedPackageObj, isPulsePackage, packageTotalPulses, lang]);
 
   // Recalculate invoice value when Service, Package, or Product changes
   const recalculateInvoice = (nextSrvId: string, nextPkgId: string, nextProdId: string) => {
@@ -311,7 +524,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       const parsedInvoiceVal = invoiceValue !== "" ? parseFloat(invoiceValue) : 0;
       const parsedSpentVal = actualSpent !== "" ? parseFloat(actualSpent) : 0;
 
-      const payload = {
+      const payload: Record<string, any> = {
         patientPhone: trimmedPhone,
         patientName: trimmedName,
         date: bookingDate,
@@ -323,6 +536,22 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         packageName: selectedPkg ? getPackageName(selectedPkg) : null,
         productId: selectedProductId || null,
         productName: selectedProd ? getProductName(selectedProd) : null,
+        packagePulsesTotal: isPulsePackage ? packageTotalPulses : null,
+        packagePulsesUsed: isPulsePackage ? packagePulsesUsed : null,
+        packagePulsesRemaining: isPulsePackage ? packagePulsesRemaining : null,
+        packageItemsUsage: (!isPulsePackage && selectedPackageObj?.items && selectedPackageObj.items.length > 0)
+          ? selectedPackageObj.items.map((it) => {
+              const key = it.serviceId || it.id || 0;
+              const usage = packageServicesUsage[key] || { qtyTotal: it.qty, qtyUsed: 0, qtyRemaining: it.qty };
+              return {
+                serviceId: it.serviceId,
+                serviceName: usage.serviceName || (lang === "ar" && it.serviceNameAr ? it.serviceNameAr : it.serviceName),
+                qtyTotal: usage.qtyTotal,
+                qtyUsed: usage.qtyUsed,
+                qtyRemaining: usage.qtyRemaining,
+              };
+            })
+          : null,
         invoiceValue: isNaN(parsedInvoiceVal) ? 0 : parsedInvoiceVal,
         actualSpent: isNaN(parsedSpentVal) ? 0 : parsedSpentVal,
         paymentType: selectedPaymentType || null,
@@ -330,9 +559,13 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         branchId: activeBranchId || null
       };
 
-      // POST /api/reservations/previous is staff-gated
+      if (isEditMode) {
+        payload.id = targetBooking.id;
+      }
+
+      // POST / PATCH /api/reservations/previous is staff-gated
       const res = await fetch("/api/reservations/previous", {
-        method: "POST",
+        method: isEditMode ? "PATCH" : "POST",
         headers: await getAuthHeaders(),
         body: JSON.stringify(payload)
       });
@@ -349,16 +582,22 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         return;
       }
 
-      setSuccessMsg(tr.successMessage);
+      setSuccessMsg(isEditMode ? (tr.updateSuccessMessage || "Previous booking updated successfully!") : tr.successMessage);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("revera-booking-change"));
         window.dispatchEvent(new CustomEvent("revera-prescription-change"));
       }
       setTimeout(() => {
-        onBookingCreated?.();
+        if (isEditMode && onBookingUpdated) {
+          onBookingUpdated();
+        } else if (onBookingCreated) {
+          onBookingCreated();
+        } else {
+          onClose();
+        }
       }, 750);
     } catch (err: any) {
-      console.error("Error creating previous booking:", err);
+      console.error("Error saving previous booking:", err);
       setErrors({ general: tr.errorMessage });
       setSaving(false);
     }
@@ -385,10 +624,10 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         </div>
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#111827] tracking-tight">
-            {tr.title}
+            {isEditMode ? (tr.editTitle || "Edit Previous Booking") : tr.title}
           </h1>
           <p className="text-xs sm:text-sm text-[#5A6A51] mt-0.5 font-medium">
-            {tr.subtitle}
+            {isEditMode ? (tr.editSubtitle || "Update historical booking details and financial records.") : tr.subtitle}
           </p>
         </div>
       </div>
@@ -537,15 +776,12 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 }}
                 title={tr.dateTooltip}
                 placeholder={tr.datePlaceholder}
-                className={`w-full rounded-xl border bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] ${
+                className={`w-full rounded-xl border bg-white py-3 pl-10 pr-3.5 rtl:pl-3.5 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] cursor-pointer ${
                   errors.date
                     ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
                     : "border-gray-200 focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
                 }`}
               />
-              <div className="pointer-events-none absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] z-10">
-                <CalendarIcon size={16} className="text-[#9CA3AF]" />
-              </div>
             </div>
             {errors.date && (
               <p className="text-xs font-semibold text-rose-600 flex items-center gap-1 mt-1">
@@ -554,35 +790,93 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             )}
           </div>
 
-          {/* FIELD 5: SERVICE (OPTIONAL) - No price written beside name */}
-          <div className="space-y-1.5">
-            <label htmlFor="serviceSelect" className="text-xs sm:text-sm font-bold text-[#111827]">
+          {/* FIELD 5: SERVICE (OPTIONAL) - Searchable autocomplete input */}
+          <div className="space-y-1.5 relative" ref={serviceDropdownRef}>
+            <label htmlFor="serviceSearchInput" className="text-xs sm:text-sm font-bold text-[#111827]">
               {tr.serviceOptional || tr.serviceLabel}
             </label>
             <div className="relative flex items-center">
               <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
                 <Layers size={17} />
               </div>
-              <select
-                id="serviceSelect"
-                value={selectedServiceId}
+              <input
+                id="serviceSearchInput"
+                type="text"
+                autoComplete="off"
+                value={serviceSearchQuery}
                 onChange={(e) => {
-                  const sId = e.target.value;
-                  setSelectedServiceId(sId);
-                  recalculateInvoice(sId, selectedPackageId, selectedProductId);
+                  const val = e.target.value;
+                  setServiceSearchQuery(val);
+                  setIsServiceDropdownOpen(true);
+                  if (!val) {
+                    setSelectedServiceId("");
+                    recalculateInvoice("", selectedPackageId, selectedProductId);
+                  }
                 }}
-                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 cursor-pointer"
-              >
-                <option value="">{tr.selectServicePlaceholder}</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {getServiceName(s)}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] z-10">
-                <ChevronDown size={17} />
-              </div>
+                onFocus={() => setIsServiceDropdownOpen(true)}
+                placeholder={tr.searchServicePlaceholder || tr.selectServicePlaceholder || "Search service..."}
+                className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
+              />
+              {serviceSearchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedServiceId("");
+                    setServiceSearchQuery("");
+                    setIsServiceDropdownOpen(false);
+                    recalculateInvoice("", selectedPackageId, selectedProductId);
+                  }}
+                  className="absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#9CA3AF] hover:text-[#414E36] transition cursor-pointer z-10"
+                  title="Clear service"
+                >
+                  <X size={16} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsServiceDropdownOpen((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] hover:text-[#414E36] transition cursor-pointer z-10"
+                >
+                  <ChevronDown size={17} className={`transition-transform duration-200 ${isServiceDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+              )}
+
+              {/* Dropdown Results */}
+              {isServiceDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1.5 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl z-50 py-1 divide-y divide-gray-50">
+                  {filteredServices.length > 0 ? (
+                    filteredServices.map((s) => {
+                      const isSelected = String(selectedServiceId) === String(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedServiceId(String(s.id));
+                            setServiceSearchQuery(getServiceName(s));
+                            setIsServiceDropdownOpen(false);
+                            recalculateInvoice(String(s.id), selectedPackageId, selectedProductId);
+                          }}
+                          className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs sm:text-sm text-start font-medium transition cursor-pointer ${
+                            isSelected
+                              ? "bg-[#E8EFE5] text-[#344E41] font-bold"
+                              : "text-[#111827] hover:bg-[#F4F7F2] hover:text-[#344E41]"
+                          }`}
+                        >
+                          <span className="truncate">{getServiceName(s)}</span>
+                          {isSelected && (
+                            <Check size={16} className="text-[#414E36] shrink-0 ml-2 rtl:ml-0 rtl:mr-2" />
+                          )}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="px-3.5 py-3 text-xs sm:text-sm text-center text-gray-500 font-medium">
+                      {tr.noServicesFound || "No services found"}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -650,6 +944,354 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             </div>
           </div>
         </div>
+
+        {/* ── PACKAGE USAGE BREAKDOWN CARD (WHEN PACKAGE IS SELECTED) ── */}
+        {selectedPackageObj && (
+          <div className="rounded-2xl border border-[#414E36]/20 bg-gradient-to-br from-[#F4F7F2] via-white to-[#EBF3E7] p-5 shadow-sm space-y-4 animate-fadeIn transition-all">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#414E36]/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-[#414E36] text-white shadow-sm">
+                  {isPulsePackage ? <Zap size={18} className="text-amber-300" /> : <PackageIcon size={18} />}
+                </div>
+                <div>
+                  <h4 className="text-sm sm:text-base font-bold text-[#1F2937] flex items-center gap-2">
+                    {tr.packageUsageTitle || "Package Quota & Sessions Breakdown"}
+                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-[#414E36]/10 text-[#414E36]">
+                      {getPackageName(selectedPackageObj)}
+                    </span>
+                  </h4>
+                  <p className="text-xs text-[#5A6A51] mt-0.5">
+                    {tr.packageUsageSubtitle || "Specify sessions or pulses previously consumed from this package and what remains active."}
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div className="flex items-center gap-1.5">
+                {isPulsePackage ? (
+                  packagePulsesRemaining <= 0 ? (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                      <CheckCircle2 size={13} /> {tr.fullyUsedBadge || "Fully Consumed (0 Left)"}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Sparkles size={13} className="text-emerald-600" /> {tr.activeRemainingBadge || "Active Quota Left"}
+                    </span>
+                  )
+                ) : (
+                  Object.values(packageServicesUsage).length > 0 &&
+                  Object.values(packageServicesUsage).every((it) => it.qtyRemaining <= 0) ? (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                      <CheckCircle2 size={13} /> {tr.fullyUsedBadge || "Fully Consumed (0 Left)"}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Sparkles size={13} className="text-emerald-600" /> {tr.activeRemainingBadge || "Active Quota Left"}
+                    </span>
+                  )
+                )}
+              </div>
+            </div>
+
+            {/* BREAKDOWN TYPE 1: PULSES PACKAGE */}
+            {isPulsePackage ? (
+              <div className="space-y-4 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Total Pulses */}
+                  <div className="p-3.5 bg-white rounded-xl border border-gray-200/80 shadow-xs flex flex-col justify-between">
+                    <span className="text-xs font-medium text-gray-500">{tr.pulsesTotalLabel || "Total Pulses Quota"}</span>
+                    <div className="flex items-baseline gap-1 mt-2">
+                      <span className="text-xl font-bold text-[#111827]">{packageTotalPulses.toLocaleString()}</span>
+                      <span className="text-xs text-gray-400 font-medium">{lang === "ar" ? "نبضة" : "pulses"}</span>
+                    </div>
+                  </div>
+
+                  {/* Pulses Used (Input) */}
+                  <div className="p-3.5 bg-white rounded-xl border border-amber-200 shadow-xs space-y-1.5 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/10 transition">
+                    <label htmlFor="pulsesUsedInput" className="text-xs font-bold text-amber-900 block">
+                      {tr.pulsesUsedLabel || "Pulses Used"}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="pulsesUsedInput"
+                        type="number"
+                        min="0"
+                        max={packageTotalPulses || undefined}
+                        value={packagePulsesUsed}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                          const total = packageTotalPulses;
+                          const boundedUsed = total > 0 ? Math.min(total, val) : val;
+                          setPackagePulsesUsed(boundedUsed);
+                          setPackagePulsesRemaining(total > 0 ? Math.max(0, total - boundedUsed) : 0);
+                        }}
+                        className="w-full text-base font-bold text-amber-950 bg-amber-50/50 border border-amber-200 rounded-lg px-2.5 py-1.5 outline-none focus:bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Pulses Remaining (Input) */}
+                  <div className="p-3.5 bg-white rounded-xl border border-emerald-200 shadow-xs space-y-1.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10 transition">
+                    <label htmlFor="pulsesRemainingInput" className="text-xs font-bold text-emerald-900 block">
+                      {tr.pulsesRemainingLabel || "Pulses Left (Remaining)"}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="pulsesRemainingInput"
+                        type="number"
+                        min="0"
+                        max={packageTotalPulses || undefined}
+                        value={packagePulsesRemaining}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                          const total = packageTotalPulses;
+                          const boundedRem = total > 0 ? Math.min(total, val) : val;
+                          setPackagePulsesRemaining(boundedRem);
+                          setPackagePulsesUsed(total > 0 ? Math.max(0, total - boundedRem) : 0);
+                        }}
+                        className="w-full text-base font-bold text-emerald-950 bg-emerald-50/50 border border-emerald-200 rounded-lg px-2.5 py-1.5 outline-none focus:bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pulses Presets & Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-xs text-gray-500 font-medium mr-1 rtl:mr-0 rtl:ml-1">
+                        {lang === "ar" ? "تحديد سريع:" : "Quick presets:"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPackagePulsesUsed(0);
+                          setPackagePulsesRemaining(packageTotalPulses);
+                        }}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                          packagePulsesUsed === 0
+                            ? "bg-[#414E36] text-white border-[#414E36]"
+                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        {tr.noneUsedBtn || "0 Used (Full)"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const u = Math.round(packageTotalPulses * 0.25);
+                          setPackagePulsesUsed(u);
+                          setPackagePulsesRemaining(packageTotalPulses - u);
+                        }}
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                      >
+                        25%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const u = Math.round(packageTotalPulses * 0.5);
+                          setPackagePulsesUsed(u);
+                          setPackagePulsesRemaining(packageTotalPulses - u);
+                        }}
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                      >
+                        50%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const u = Math.round(packageTotalPulses * 0.75);
+                          setPackagePulsesUsed(u);
+                          setPackagePulsesRemaining(packageTotalPulses - u);
+                        }}
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                      >
+                        75%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPackagePulsesUsed(packageTotalPulses);
+                          setPackagePulsesRemaining(0);
+                        }}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                          packagePulsesUsed === packageTotalPulses && packageTotalPulses > 0
+                            ? "bg-amber-600 text-white border-amber-600"
+                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        {tr.allUsedBtn || "All Used"}
+                      </button>
+                    </div>
+
+                    <div className="text-xs font-medium text-gray-500">
+                      {packageTotalPulses > 0 ? (
+                        <span>
+                          {Math.round((packagePulsesUsed / packageTotalPulses) * 100)}% {lang === "ar" ? "مستهلك" : "used"} · {Math.round((packagePulsesRemaining / packageTotalPulses) * 100)}% {lang === "ar" ? "متبقي" : "remaining"}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  {packageTotalPulses > 0 && (
+                    <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden flex">
+                      <div
+                        className="bg-amber-500 h-2.5 transition-all duration-300"
+                        style={{ width: `${Math.min(100, (packagePulsesUsed / packageTotalPulses) * 100)}%` }}
+                        title={`Used: ${packagePulsesUsed}`}
+                      />
+                      <div
+                        className="bg-emerald-500 h-2.5 transition-all duration-300"
+                        style={{ width: `${Math.min(100, (packagePulsesRemaining / packageTotalPulses) * 100)}%` }}
+                        title={`Remaining: ${packagePulsesRemaining}`}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* BREAKDOWN TYPE 2: SERVICES-BASED PACKAGE */
+              <div className="space-y-3 pt-1">
+                {selectedPackageObj.items && selectedPackageObj.items.length > 0 ? (
+                  <div className="divide-y divide-gray-100 bg-white rounded-xl border border-gray-200/80 overflow-hidden shadow-xs">
+                    {selectedPackageObj.items.map((item) => {
+                      const key = item.serviceId || item.id || 0;
+                      const usage = packageServicesUsage[key] || {
+                        qtyTotal: item.qty,
+                        qtyUsed: 0,
+                        qtyRemaining: item.qty,
+                        serviceName: lang === "ar" && item.serviceNameAr ? item.serviceNameAr : (item.serviceName || `Service #${item.serviceId}`),
+                      };
+
+                      return (
+                        <div key={key} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <span className="text-sm font-bold text-[#111827] block">
+                              {usage.serviceName}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs px-2 py-0.5 rounded-md bg-gray-100 font-semibold text-gray-700">
+                                {usage.qtyTotal} {tr.sessionsTotalLabel || "Total Sessions"}
+                              </span>
+                              {usage.qtyRemaining <= 0 ? (
+                                <span className="text-xs px-2 py-0.5 rounded-md bg-amber-100 font-semibold text-amber-800">
+                                  {tr.fullyUsedBadge || "0 Left"}
+                                </span>
+                              ) : (
+                                <span className="text-xs px-2 py-0.5 rounded-md bg-emerald-100 font-semibold text-emerald-800">
+                                  {usage.qtyRemaining} {lang === "ar" ? "متبقية" : "left"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Steppers & Inputs */}
+                          <div className="flex flex-wrap items-center gap-3">
+                            {/* Used Input */}
+                            <div className="flex items-center gap-1.5 bg-amber-50/70 border border-amber-200 rounded-lg p-1">
+                              <span className="text-xs font-bold text-amber-900 px-1.5">
+                                {tr.sessionsUsedLabel || "Used"}:
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextUsed = Math.max(0, usage.qtyUsed - 1);
+                                  setPackageServicesUsage((prev) => ({
+                                    ...prev,
+                                    [key]: {
+                                      ...usage,
+                                      qtyUsed: nextUsed,
+                                      qtyRemaining: usage.qtyTotal - nextUsed,
+                                    },
+                                  }));
+                                }}
+                                className="w-6 h-6 rounded bg-white text-amber-900 font-bold hover:bg-amber-100 transition flex items-center justify-center text-xs shadow-xs cursor-pointer"
+                              >
+                                -
+                              </button>
+                              <span className="w-6 text-center text-sm font-bold text-amber-950">
+                                {usage.qtyUsed}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextUsed = Math.min(usage.qtyTotal, usage.qtyUsed + 1);
+                                  setPackageServicesUsage((prev) => ({
+                                    ...prev,
+                                    [key]: {
+                                      ...usage,
+                                      qtyUsed: nextUsed,
+                                      qtyRemaining: usage.qtyTotal - nextUsed,
+                                    },
+                                  }));
+                                }}
+                                className="w-6 h-6 rounded bg-white text-amber-900 font-bold hover:bg-amber-100 transition flex items-center justify-center text-xs shadow-xs cursor-pointer"
+                              >
+                                +
+                              </button>
+                            </div>
+
+                            {/* Remaining Indicator */}
+                            <div className="flex items-center gap-1.5 bg-emerald-50/70 border border-emerald-200 rounded-lg p-1">
+                              <span className="text-xs font-bold text-emerald-900 px-1.5">
+                                {tr.sessionsRemainingLabel || "Left"}:
+                              </span>
+                              <span className="w-6 text-center text-sm font-bold text-emerald-950">
+                                {usage.qtyRemaining}
+                              </span>
+                            </div>
+
+                            {/* Quick Toggle Buttons */}
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPackageServicesUsage((prev) => ({
+                                    ...prev,
+                                    [key]: {
+                                      ...usage,
+                                      qtyUsed: 0,
+                                      qtyRemaining: usage.qtyTotal,
+                                    },
+                                  }));
+                                }}
+                                className="px-2 py-1 text-xs font-semibold rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                              >
+                                {tr.noneUsedBtn || "0 Used"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPackageServicesUsage((prev) => ({
+                                    ...prev,
+                                    [key]: {
+                                      ...usage,
+                                      qtyUsed: usage.qtyTotal,
+                                      qtyRemaining: 0,
+                                    },
+                                  }));
+                                }}
+                                className="px-2 py-1 text-xs font-semibold rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                              >
+                                {tr.allUsedBtn || "All Used"}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-white rounded-xl border border-gray-200 text-xs text-gray-500 font-medium text-center">
+                    {lang === "ar" ? "باقة بدون بنود خدمات مسبقة." : "Package has no preset service items configured."}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── ROW 3: 3 FIELDS (INVOICE VALUE, ACTUAL SPENT, PAYMENT METHOD) ── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -834,12 +1476,12 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             {saving ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                <span>{tr.savingBtn}</span>
+                <span>{isEditMode ? (tr.updatingBtn || "Updating...") : tr.savingBtn}</span>
               </>
             ) : (
               <>
                 <Save size={16} />
-                <span>{tr.submitBtn}</span>
+                <span>{isEditMode ? (tr.updateBookingBtn || "Update Booking") : tr.submitBtn}</span>
               </>
             )}
           </button>

@@ -4569,7 +4569,6 @@ Cherry-picked from commit `71c33e0`. See DEC-081.
 **Fix:** Removed the `customer_product_balances` conversion from `GET /api/customers/packages`. Packages are now sourced exclusively from `customer_packages`.
 
 **Verified:** Automated tests in `tests/routes/customers-packages.test.ts` (including new test verifying product balances are excluded from packages response) pass, and this session independently re-ran the full suite after the merge — see the merge commit for the current count.
-
 ---
 
 ## RISK-099: The Real Doctor → Reception Flow Never Reached The Deficit Prompt — Three Separate Breaks Found Only By Driving The Actual UI (RESOLVED)
@@ -4787,11 +4786,26 @@ everything in `unattributed` and `commission-payouts` returns nothing from the l
 **4. Empty cost side.** No expenses, assets or loans are recorded, and 19 of 29 lines have no COGS or
 commission snapshot — every profit figure is a revenue figure until those are entered.
 
+**Presentation addressed (DEC-088 item 9, built 2026-09-26 on dev, not yet on main):** the P&L now shows a cash → revenue bridge and a deferred package balance, and the tiles are labelled "Revenue earned" / "Cash received", so the gap is explained on screen instead of looking like a bug. Observation from the production numbers: package cash in September (44,150) has no matching deferred balance because most package invoices have no surviving `customer_packages` row — see `ai_docs/manual_tests/FINANCE_CASH_VS_REVENUE_MANUAL_TESTS.md`.
+
 **Not a Finance-code bug (verified):** the backfilled historical invoices (`is_opening`) are correctly
 excluded from all eight revenue/cash reports (DEC-086, `tests/routes/finance-opening-invoices.test.ts`).
 Checklist: `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.
 
 ---
+
+## RISK-105: Quota Extractor Misidentifying Deductions as Quota and In-Booking Package Purchases Bypassing Pulse Consumption (RESOLVED)
+
+**Severity:** High (P1) · **Type:** Logic / Deficit detection  
+**Found:** 2026-09-27 · **Fixed:** 2026-09-27  
+
+**What it was:**
+1. `extractPulsePackageQuota` in `src/lib/laserDeficit.ts` had a generic fallback regex matching deduction strings like `[Laser Package Redemption]: Deducted 5,000 pulses`, treating `5,000` as the package quota instead of `2,500`. Consequently, when delivered pulses was 5,000, deficit calculated to 0 and marked the booking "Package Covered" / "Paid" instead of triggering "Partially Paid" and the interactive settlement options.
+2. In-booking package purchases (Option 3 in New Booking) were not resolving `targetPkgId` from `[Customer Package ID]: ...` notes upon ending sessions in Doctor and Reception views, preventing `consume_package_pulses` from deducting used pulses in `customer_packages`.
+
+**Fix:**
+1. Updated regexes in `extractPulsePackageQuota` to strictly require quota indicators (`pulses remaining`, `[Purchasing New Pulses Package]`, `total pulses`, `(Price EGP · X pulses)`) and never match `Deducted X pulses` or `تم استهلاك X نبضة`.
+2. Added `targetPkgId` note extraction and phone lookup in `DoctorAccountView.tsx` and `BookingDetailsModal.tsx` to ensure `customer_packages` balance is consumed and reflected in patient profiles.
 
 ## PROPOSALS.md Reference
 

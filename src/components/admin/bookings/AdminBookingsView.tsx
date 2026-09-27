@@ -37,6 +37,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { getAuthHeaders } from "@/lib/authHeaders";
 import { getSessionStaleness } from "@/lib/services";
 import { adminTranslations } from "@/components/admin/translations";
+import { extractPrimaryPulses } from "./BookingDetailsModal";
+import { extractPulsePackageQuota } from "@/lib/laserDeficit";
 
 interface ReservationItem {
   id: string | number;
@@ -516,11 +518,31 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         r.customer_package_id ||
         r.packageId ||
         r.package_id ||
+        (r as any).purchasingPackageId ||
+        (r as any).purchasing_package_id ||
+        String(r.notes || "").toLowerCase().includes("package session") ||
         String(r.notes || "").toLowerCase().includes("package redemption") ||
-        String(r.notes || "").includes("[Laser Package]")
+        String(r.notes || "").toLowerCase().includes("pulses package") ||
+        String(r.notes || "").includes("[Laser Package]") ||
+        String(r.notes || "").includes("[Laser Package Redemption]") ||
+        String(r.notes || "").includes("[Purchasing New Pulses Package]") ||
+        String(r.notes || "").includes("Option 3: Pay with Pulses Package")
       );
+      const notesStr = String(r.notes || "");
+      const notePkgRem = extractPulsePackageQuota(notesStr);
+      const deliveredPulsesVal = Number(r.deliveredPulses || r.delivered_pulses || extractPrimaryPulses(notesStr, r) || 0);
+      const hasSettledDeficit = Boolean(
+        notesStr.includes("[Laser Package Deficit Settlement]") ||
+        notesStr.includes("Choice 3A") ||
+        notesStr.includes("Choice 3B")
+      );
+      const resolvedPkgQuota = notePkgRem !== null ? notePkgRem : 0;
+      const isDeficit = !hasSettledDeficit && isPkgCovered && deliveredPulsesVal > resolvedPkgQuota;
+
       let paySt: string;
-      if (rawPaid === null || rawPaid === undefined || Number.isNaN(amtPaid)) {
+      if (isDeficit) {
+        paySt = "Partially Paid";
+      } else if (rawPaid === null || rawPaid === undefined || Number.isNaN(amtPaid)) {
         paySt = isPkgCovered && (st === "completed" || amtLeft === 0) ? "Paid" : "—";
       } else if (amtPaid <= 0 && amtLeft !== 0 && !isPkgCovered && st !== "completed") {
         paySt = "Unpaid";

@@ -18,7 +18,7 @@ vi.mock('@/lib/supabaseServer', () => ({
   },
 }));
 
-import { POST } from '@/app/api/reservations/previous/route';
+import { POST, PATCH } from '@/app/api/reservations/previous/route';
 
 const USER_ID = 'staff-user';
 const EMP_ID = 'emp-1';
@@ -162,3 +162,62 @@ describe('mapPaymentMethod stays inside the payments.method CHECK set', () => {
     expect(mapPaymentMethod(input as any)).toBe(expected);
   });
 });
+
+function staffPatch(body: any): Request {
+  return new Request('http://localhost:3000/api/reservations/previous', {
+    method: 'PATCH',
+    headers: new Headers({ 'content-type': 'application/json', Authorization: 'Bearer staff-token' }),
+    body: JSON.stringify(body),
+  });
+}
+
+describe('PATCH /api/reservations/previous (SuperAdmin editing)', () => {
+  it('rejects non-superadmin users with 403', async () => {
+    fake.seed('employee_accounts', [{ id: EMP_ID, auth_user_id: USER_ID, role_name: 'reception', name: 'Nour', email: 'n@test.com' }]);
+    fake.seed('roles', [{ name: 'reception', permissions: [] }]);
+
+    const res = await PATCH(staffPatch({ id: 'res-1', patientPhone: '01012345678', patientName: 'Amira' }));
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toContain('superadmin');
+  });
+
+  it('allows superadmin to edit an existing previous booking and updates reservation + ledger', async () => {
+    // 1. Create a booking first
+    const createRes = await POST(staffPost(body({ serviceId: 15, invoiceValue: 1200, actualSpent: 1200, paymentType: 'Visa' })));
+    expect(createRes.status).toBe(200);
+    const createJson = await createRes.json();
+    const resId = createJson.booking.id;
+
+    // 2. Switch to superadmin
+    fake.seed('employee_accounts', [{ id: EMP_ID, auth_user_id: USER_ID, role_name: 'superadmin', name: 'Admin', email: 'admin@revera.com' }]);
+    fake.seed('roles', [{ name: 'superadmin', permissions: ['all'] }]);
+
+    // 3. Edit the booking
+    const patchRes = await PATCH(staffPatch({
+      id: resId,
+      patientPhone: '01099998888',
+      patientName: 'Amira Updated',
+      date: '2026-05-15',
+      serviceId: 15,
+      invoiceValue: 1500,
+      actualSpent: 1500,
+      paymentType: 'InstaPay',
+      notes: 'Updated historical note by superadmin',
+    }));
+
+    expect(patchRes.status).toBe(200);
+    const patchJson = await patchRes.json();
+    expect(patchJson.success).toBe(true);
+    expect(patchJson.booking.name).toBe('Amira Updated');
+    expect(patchJson.booking.amount_paid).toBe(1500);
+    expect(patchJson.booking.amount_left).toBe(0);
+
+    // Verify DB update
+    const updatedBooking = rows('reservations').find(r => r.id === resId);
+    expect(updatedBooking.name).toBe('Amira Updated');
+    expect(updatedBooking.phone).toBe('01099998888');
+    expect(updatedBooking.amount_paid).toBe(1500);
+  });
+});
+

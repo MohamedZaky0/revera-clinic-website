@@ -24,6 +24,7 @@ import {
 import { compressImage } from "@/lib/image";
 import ServiceRecipeEditor from "@/components/admin/services/ServiceRecipeEditor";
 import ServiceDeviceEditor from "@/components/admin/services/ServiceDeviceEditor";
+import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
 import { adminTranslations } from "@/components/admin/translations";
 
 interface AdminServicesViewProps {
@@ -506,6 +507,11 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       setServiceDescAr("");
                       setServiceSortOrder(0);
                       setServiceIsShared(false);
+                      setServiceIsLaser(
+                        cat.key.toLowerCase().includes("laser") ||
+                        (cat.en ? cat.en.toLowerCase().includes("laser") : false) ||
+                        (cat.ar ? cat.ar.includes("ليزر") : false)
+                      );
                       setServiceEnableReminder(true);
                       setServiceImageUrl("");
                       setServicePrice(0);
@@ -602,7 +608,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                 <td className="px-5 py-3">
                                   <div className="flex items-center gap-2">
                                     <p className={`font-semibold ${ rowFaded ? "line-through text-[#5A6A51]" : "text-[#1F251A]" }`}>{svc.en}</p>
-                                    {(svc.islaser || svc.is_laser) && (
+                                    {(svc.islaser || svc.is_laser || checkIsLaserService(svc)) && (
                                       <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
                                         <Sparkles size={11} className="text-emerald-600" />
                                         <span>Laser</span>
@@ -1003,7 +1009,17 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                   </label>
                   <select
                     value={serviceCategory}
-                    onChange={(e) => setServiceCategory(e.target.value)}
+                    onChange={(e) => {
+                      const newCatKey = e.target.value;
+                      setServiceCategory(newCatKey);
+                      if (!editingService) {
+                        const catObj = localCategories.find(c => c.key === newCatKey);
+                        const isLaserCat = newCatKey.toLowerCase().includes("laser") ||
+                          Boolean(catObj?.en?.toLowerCase().includes("laser")) ||
+                          Boolean(catObj?.ar?.includes("ليزر"));
+                        setServiceIsLaser(isLaserCat);
+                      }
+                    }}
                     className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
                   >
                     <option value="" disabled>{t.selectCategory}</option>

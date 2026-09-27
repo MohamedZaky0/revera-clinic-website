@@ -38,9 +38,10 @@ import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import CustomerFormModal from "@/components/admin/patients/CustomerFormModal";
 import PatientsDirectoryView from "@/components/admin/patients/PatientsDirectoryView";
-import { useCustomerProfile } from "@/components/admin/patients/useCustomerProfile";
 import CustomerProfileDrawer from "@/components/admin/patients/CustomerProfileDrawer";
-import BookingDetailsModal, { checkIsLaserService, parseAdditionalServiceLine } from "@/components/admin/bookings/BookingDetailsModal";
+import { useCustomerProfile } from "@/components/admin/patients/useCustomerProfile";
+import BookingDetailsModal, { checkIsLaserService, parseAdditionalServiceLine, extractPrimaryPulses } from "@/components/admin/bookings/BookingDetailsModal";
+import { extractPulsePackageQuota } from "@/lib/laserDeficit";
 import {
   AlarmClock,
   ArrowLeft,
@@ -86,6 +87,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
   FlaskConical,
   CheckCircle2,
   XCircle,
@@ -196,6 +198,8 @@ export type Req = {
   laserPricePerPulse?: number | null;
   laserSettlementNote?: string | null;
   attachedProducts?: any[];
+  is_historical?: boolean;
+  isHistorical?: boolean;
 };
 
 function getStatusBadgeClass(status: string): string {
@@ -1171,6 +1175,50 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [useWalletBalance, setUseWalletBalance] = useState<boolean>(false);
   const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(false);
   const [savingCheckout, setSavingCheckout] = useState<boolean>(false);
+  const [checkoutDeficitChoice, setCheckoutDeficitChoice] = useState<"BUY_NEW_PACKAGE" | "PAY_PER_PULSE">("BUY_NEW_PACKAGE");
+  const [checkoutDeficitPackageId, setCheckoutDeficitPackageId] = useState<string>("");
+  const [checkoutDeficitPulseRate, setCheckoutDeficitPulseRate] = useState<number>(1.5);
+  const [allCatalogPackages, setAllCatalogPackages] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (checkoutBooking) {
+      fetch("/api/packages", { cache: "no-store" })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          const pkgs = Array.isArray(data) ? data : [];
+          setAllCatalogPackages(pkgs);
+          const pulsePkgs = pkgs.filter(
+            (p: any) =>
+              p.active !== false &&
+              (p.package_type === "pulses" ||
+                p.packageType === "pulses" ||
+                Number(p.total_pulses || p.totalPulses || 0) > 0)
+          );
+          if (pulsePkgs.length > 0) {
+            setCheckoutDeficitPackageId(String(pulsePkgs[0].id));
+          }
+        })
+        .catch(() => {});
+
+      const custId = checkoutBooking.customerId || (checkoutBooking as any).customer_id;
+      const phone = checkoutBooking.phone || (checkoutBooking as any).customer_phone;
+      const param = custId ? `customerId=${encodeURIComponent(custId)}` : phone ? `phone=${encodeURIComponent(phone)}` : null;
+      if (param) {
+        fetch(`/api/customers/packages?${param}`, { headers: authenticatedJsonHeaders, cache: "no-store" })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            const list = data?.customerPackages || data?.packages || [];
+            setCheckoutCustomerPackages(list);
+          })
+          .catch(() => setCheckoutCustomerPackages([]));
+      } else {
+        setCheckoutCustomerPackages([]);
+      }
+    } else {
+      setCheckoutCustomerPackages([]);
+    }
+  }, [checkoutBooking]);
+
   const [invoiceBooking, setInvoiceBooking] = useState<any>(null);
   const [ledgerInvoice, setLedgerInvoice] = useState<{ invoice: any; lines: any[] } | null>(null);
 
@@ -1361,7 +1409,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     setServiceDescAr(svc.descriptionAr || "");
     setServiceSortOrder(svc.sortOrder ?? 0);
     setServiceIsShared(svc.isShared ?? false);
-    setServiceIsLaser(Boolean(svc.islaser ?? svc.is_laser ?? false));
+    setServiceIsLaser(checkIsLaserService(svc));
     setServiceEnableReminder(svc.enableReminder ?? true);
     setServiceImageUrl(svc.img || "");
     setServicePrice(svc.price ?? 0);
@@ -1489,6 +1537,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [showFullViewNewBooking, setShowFullViewNewBooking] = useState(false);
   const [newBookingInitialData, setNewBookingInitialData] = useState<any | null>(null);
   const [showAddPreviousBooking, setShowAddPreviousBooking] = useState(false);
+  const [editingPreviousBooking, setEditingPreviousBooking] = useState<any | null>(null);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -2503,7 +2552,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-035', name: 'Patient Profile Edit & Customer Intake Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies customer profile records, phone/WhatsApp validation, address structure (City, Street, Building, Floor), and balances.', status: 'idle' },
     { id: 'TC-036', name: 'Doctor Status Management & Availability Lifecycle Engine', category: 'Services & Bookings', endpoint: '/api/providers', description: 'Verifies doctor status modal dialog, Active/Inactive status changes, and real-time synchronization across providers and linked employee accounts.', status: 'idle' },
     { id: 'TC-037', name: 'Financial Transactions & Daily Ledger Engine', category: 'Finance & Accounting', endpoint: '/api/transactions', description: 'Verifies the clinic financial transactions dashboard, daily net payments, outstanding debts, wallet balances, and manual transaction logging.', status: 'idle' },
-    { id: 'TC-038', name: 'Historical & Previous Bookings Intake Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies recording of previous historical clinic bookings, patient matching/creation, and booking history preservation.', status: 'idle' },
+    { id: 'TC-038', name: 'Historical & Previous Bookings Intake & Superadmin Editing Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies recording of previous historical clinic bookings, superadmin booking edits, patient matching/creation, and ledger synchronization.', status: 'idle' },
     { id: 'TC-039', name: 'Granular Role Permissions & Action-Level Access Control Engine', category: 'HR & Payroll', endpoint: '/api/roles', description: 'Validates system roles retrieval, permission structure integrity, and granular action-level access control matrix.', status: 'idle' },
     { id: 'TC-040', name: 'Availability Doctor & Inactive Status Filtering Engine', category: 'Services & Bookings', endpoint: '/api/availability', description: 'Verifies doctor slot availability engine, service name resolution, and inactive doctor exclusions.', status: 'idle' },
     { id: 'TC-041', name: 'Prescription Deduplication & Clinical Intake Engine', category: 'Medical & Patients', endpoint: '/api/prescriptions', description: 'Verifies doctor prescription generation, duplicate prevention on repeated saves, and intake templates.', status: 'idle' },
@@ -2541,8 +2590,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-075', name: 'Laser Option 3 Multi-Package & Non-Laser Add-on Pricing Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies laser packages isolation to Option 3, patient multi-package selection, catalog package purchase, and package price + non-laser service total calculation.', status: 'idle' },
     { id: 'TC-076', name: 'Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies accurate deduction of delivered laser pulses from customer pulses packages across doctor portal session finalization, reception session completion, and checkout settlement workflows with DB synchronization and idempotency.', status: 'idle' },
     { id: 'TC-077', name: 'In-Booking Package Selling & Integrated Patient Search Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies selling catalog packages directly during new booking creation with customer_packages persistence and instant patient profile appearance, as well as integrated patient search dropdown rendering.', status: 'idle' },
-    { id: 'TC-078', name: 'In-Booking Package Partial Payment & Session Balance Preservation Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies that when a patient purchases a new pulses package during booking with a partial payment (e.g. 500 EGP of 1000 EGP), the remaining 500 EGP outstanding balance is preserved correctly through doctor portal session completion and receptionist session finalization — preventing amountLeft from being zeroed out. Also verifies Payment Mode displays Pulses Package and Pay & Settle Invoice button remains visible.', status: 'idle' },
-    { id: 'TC-079', name: 'Database-Driven Service Categories & Zero Mock Defaults Engine', category: 'Services & Bookings', endpoint: '/api/categories', description: 'Verifies dynamic database-driven categories CRUD, zero hardcoded/mock defaults, instant category deletion without re-seeding resurrection, and associated service cascade cleanup.', status: 'idle' }
+    { id: 'TC-079', name: 'Database-Driven Service Categories & Zero Mock Defaults Engine', category: 'Services & Bookings', endpoint: '/api/categories', description: 'Verifies dynamic database-driven categories CRUD, zero hardcoded/mock defaults, instant category deletion without re-seeding resurrection, and associated service cascade cleanup.', status: 'idle' },
+    { id: 'TC-080', name: 'Laser Pulses Package Excess Deficit & Dual Interactive Settlement Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies package deficit detection when delivered pulses exceed remaining balance, automatic payment status transition to Partially Paid, and dual interactive settlement choices (Option 1: Buy New Package with deficit deduction vs Option 2: Pay per Pulse with customizable rate) at checkout.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -6398,6 +6447,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 onClose={() => {
                   setTransactionsSubView("list");
                   setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
                 }}
                 onBookingCreated={() => {
                   clearFetchCache();
@@ -6405,7 +6455,17 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   fetchCustomers();
                   setTransactionsSubView("list");
                   setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
                 }}
+                onBookingUpdated={() => {
+                  clearFetchCache();
+                  fetchAllReservations();
+                  fetchCustomers();
+                  setTransactionsSubView("list");
+                  setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
+                }}
+                editingBooking={editingPreviousBooking}
                 initialCustomer={previousBookingCustomer}
                 services={localServices}
                 providers={providers}
@@ -6491,6 +6551,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 onClose={() => {
                   setShowAddPreviousBooking(false);
                   setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
                 }}
                 onBookingCreated={() => {
                   clearFetchCache();
@@ -6498,7 +6559,17 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   fetchCustomers();
                   setShowAddPreviousBooking(false);
                   setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
                 }}
+                onBookingUpdated={() => {
+                  clearFetchCache();
+                  fetchAllReservations();
+                  fetchCustomers();
+                  setShowAddPreviousBooking(false);
+                  setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
+                }}
+                editingBooking={editingPreviousBooking}
                 initialCustomer={previousBookingCustomer}
                 services={localServices}
                 providers={providers}
@@ -7656,6 +7727,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 onClose={() => {
                   setShowAddPreviousBooking(false);
                   setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
                 }}
                 onBookingCreated={() => {
                   clearFetchCache();
@@ -7663,7 +7735,17 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   fetchCustomers();
                   setShowAddPreviousBooking(false);
                   setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
                 }}
+                onBookingUpdated={() => {
+                  clearFetchCache();
+                  fetchAllReservations();
+                  fetchCustomers();
+                  setShowAddPreviousBooking(false);
+                  setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
+                }}
+                editingBooking={editingPreviousBooking}
                 initialCustomer={previousBookingCustomer}
                 services={localServices}
                 providers={providers}
@@ -7951,6 +8033,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           booking={viewingBooking}
           onClose={() => setViewingBooking(null)}
           setBooking={setViewingBooking}
+          onEditPreviousBooking={(b) => {
+            setEditingPreviousBooking(b);
+            setActiveNav("Bookings");
+            setShowAddPreviousBooking(true);
+            setViewingBooking(null);
+          }}
           rooms={rooms}
           branches={branches}
           dbCustomers={dbCustomers}
@@ -9384,22 +9472,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               return m ? Number(m[1]) : 1;
             })()
           ) || 1;
-          const primaryPulsesMatch = String(checkoutBooking?.notes || "").match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
-            String(checkoutBooking?.notes || "").match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
-            String(checkoutBooking?.notes || "").match(/Primary:\s*(\d+)\s*pulses/i) ||
-            String(checkoutBooking?.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
-            String(checkoutBooking?.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
-            String(checkoutBooking?.notes || "").match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
-            String(checkoutBooking?.notes || "").match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
-          const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
+          const notesStr = String(checkoutBooking?.notes || "");
+          const primaryDeliveredPulses = extractPrimaryPulses(notesStr, checkoutBooking);
           const checkoutPackageMatch = String(checkoutBooking?.notes || "").match(/\[Laser Package (?:Redemption|Purchase & Redemption|Deficit Settlement)\]:\s*([^\n]+)/i);
           const checkoutPackageSettlementText = checkoutPackageMatch ? checkoutPackageMatch[1] : (
             isRTL
               ? "تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مغطاة بنظام باقات النبضات"
               : "Agreed that laser services in this session are covered under patient Pulses Package"
           );
-
-          const notesStr = String(checkoutBooking?.notes || "");
           const notePkgIdMatch = notesStr.match(/\[Customer Package ID\]:\s*([0-9a-f-]+)/i) ||
             notesStr.match(/\[Customer Package ID\]:\s*([^\n\]]+)/i) ||
             notesStr.match(/Package ID:\s*([0-9a-f-]+)/i);
@@ -9409,6 +9489,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             (checkoutBooking as any)?.package_id ||
             (notePkgIdMatch ? notePkgIdMatch[1]?.trim() : null);
 
+          const notePkgRemPulses = extractPulsePackageQuota(notesStr);
+
           const matchedPulsePkg = (checkoutCustomerPackages || []).find((p: any) =>
             (linkedPkgId && String(p.id) === String(linkedPkgId)) ||
             (linkedPkgId && String(p.packageId) === String(linkedPkgId))
@@ -9417,10 +9499,27 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             (p.status || "active").toLowerCase() === "active"
           );
 
+          const catalogPkgMatch = (allCatalogPackages || []).find(
+            (p: any) =>
+              (checkoutBooking.purchasingPackageId && String(p.id) === String(checkoutBooking.purchasingPackageId)) ||
+              (p.name && notesStr.toLowerCase().includes(p.name.toLowerCase())) ||
+              (p.title && notesStr.toLowerCase().includes(p.title.toLowerCase())) ||
+              (p.name_ar && notesStr.includes(p.name_ar))
+          );
+          const catalogTotalPulses = Number(
+            catalogPkgMatch?.total_pulses ??
+            catalogPkgMatch?.totalPulses ??
+            catalogPkgMatch?.included_pulses ??
+            catalogPkgMatch?.includedPulses ??
+            0
+          );
+
           const totalPkgPulses = Number(matchedPulsePkg?.totalPulses ?? matchedPulsePkg?.includedPulses ?? 0);
-          const currentRemainingPulses = matchedPulsePkg
-            ? Number(matchedPulsePkg.pulsesRemaining ?? matchedPulsePkg.remainingPulses ?? totalPkgPulses)
-            : 0;
+          const currentRemainingPulses = notePkgRemPulses !== null
+            ? notePkgRemPulses
+            : (matchedPulsePkg
+                ? Number(matchedPulsePkg.pulsesRemaining ?? matchedPulsePkg.remainingPulses ?? totalPkgPulses)
+                : (catalogTotalPulses > 0 ? catalogTotalPulses : 0));
 
           const deliveredPulsesVal = Number(
             checkoutBooking?.deliveredPulses ||
@@ -9429,8 +9528,58 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             0
           );
 
+          const hasSettledDeficit = Boolean(
+            notesStr.includes("[Laser Package Deficit Settlement]") ||
+            notesStr.includes("Choice 3A") ||
+            notesStr.includes("Choice 3B")
+          );
+
+          const isOption3Mode = isCheckoutPackage ||
+            notesStr.includes("[Purchasing New Pulses Package]") ||
+            notesStr.includes("Option 3: Pay with Pulses Package");
+
+          const deficitPulsesVal = (!hasSettledDeficit && isOption3Mode && deliveredPulsesVal > currentRemainingPulses)
+            ? (deliveredPulsesVal - currentRemainingPulses)
+            : 0;
+
           const remainingPulsesAfterCheckout = Math.max(0, currentRemainingPulses - deliveredPulsesVal);
-          const deficitPulsesVal = Math.max(0, deliveredPulsesVal - currentRemainingPulses);
+
+          const selectedDeficitPackage = (allCatalogPackages || []).find(
+            (p: any) => String(p.id) === String(checkoutDeficitPackageId)
+          ) || (allCatalogPackages || []).find(
+            (p: any) =>
+              p.active !== false &&
+              (p.package_type === "pulses" ||
+                p.packageType === "pulses" ||
+                Number(p.total_pulses || p.totalPulses || 0) > 0)
+          );
+
+          const selectedDeficitPkgPrice = Number(
+            selectedDeficitPackage?.price ||
+            selectedDeficitPackage?.selling_price ||
+            0
+          );
+          const selectedDeficitPkgTotalPulses = Number(
+            selectedDeficitPackage?.total_pulses ||
+            selectedDeficitPackage?.totalPulses ||
+            selectedDeficitPackage?.included_pulses ||
+            0
+          );
+          const selectedDeficitPkgRemainingAfterDeduction = Math.max(
+            0,
+            selectedDeficitPkgTotalPulses - deficitPulsesVal
+          );
+
+          const perPulseDeficitTotal = deficitPulsesVal * checkoutDeficitPulseRate;
+
+          let activeDeficitCharge = 0;
+          if (deficitPulsesVal > 0 && !hasSettledDeficit) {
+            if (checkoutDeficitChoice === "BUY_NEW_PACKAGE") {
+              activeDeficitCharge = selectedDeficitPkgPrice;
+            } else {
+              activeDeficitCharge = perPulseDeficitTotal;
+            }
+          }
 
           // 1. Calculate service cost
           const svcIds = Array.isArray(checkoutBooking.serviceIds) ? checkoutBooking.serviceIds : [checkoutBooking.serviceId];
@@ -9817,18 +9966,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   checkoutBooking.laserPaymentMode === "PACKAGE" ||
                   (checkoutBooking as any).laser_payment_mode === "PACKAGE" ||
                   String(checkoutBooking.notes || "").toLowerCase().includes("package redemption") ||
+                  String(checkoutBooking.notes || "").toLowerCase().includes("pulses package") ||
                   String(checkoutBooking.notes || "").includes("[Laser Package]") ||
-                  String(checkoutBooking.notes || "").includes("[Laser Package Redemption]")
+                  String(checkoutBooking.notes || "").includes("[Laser Package Redemption]") ||
+                  String(checkoutBooking.notes || "").includes("[Purchasing New Pulses Package]") ||
+                  String(checkoutBooking.notes || "").includes("Option 3: Pay with Pulses Package")
                 );
                 if (isLaserPkgCheckout) {
                   try {
                     const deliveredPulsesVal = Number(
                       checkoutBooking.deliveredPulses ||
                       (checkoutBooking as any).delivered_pulses ||
-                      (() => {
-                        const m = String(checkoutBooking.notes || "").match(/(\d+(?:,\d+)?)\s*pulses/i);
-                        return m ? Number(m[1].replace(/,/g, '')) : 0;
-                      })()
+                      extractPrimaryPulses(String(checkoutBooking.notes || ""), checkoutBooking) ||
+                      0
                     );
                     const targetCustId = customerRecord?.id || (checkoutBooking as any).customerId || (checkoutBooking as any).customer_id;
                     const notesStr = String(checkoutBooking.notes || "");
@@ -9875,6 +10025,25 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     }
                   } catch (pulseErr) {
                     console.error("Error consuming laser package pulses at checkout:", pulseErr);
+                  }
+                }
+
+                // If customer had an outstanding balance (e.g. from in-booking package purchase) and paid now at checkout, settle debt
+                if (customerRecord && Number(customerRecord.outstanding || 0) > 0 && amountPaidNum > 0) {
+                  try {
+                    const settleAmount = Math.min(Number(customerRecord.outstanding || 0), amountPaidNum);
+                    await fetch("/api/customers/settle-debt", {
+                      method: "POST",
+                      headers: authenticatedJsonHeaders,
+                      body: JSON.stringify({
+                        customerId: customerRecord.id,
+                        amount: settleAmount,
+                        paymentMethod: "cash",
+                        note: `Checkout settlement for booking #${checkoutBooking.id}`
+                      })
+                    });
+                  } catch (debtErr) {
+                    console.warn("Non-fatal debt settlement error at checkout:", debtErr);
                   }
                 }
 
@@ -10594,14 +10763,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               return m ? Number(m[1]) : 1;
             })()
           ) || 1;
-          const primaryPulsesMatch = String(invoiceBooking.notes || "").match(/\[Laser Pulses Delivered\]:[^\d\n]*Primary:\s*(\d+)/i) ||
-            String(invoiceBooking.notes || "").match(/\[Laser Pulses Delivered\]:\s*(\d+)/i) ||
-            String(invoiceBooking.notes || "").match(/Primary:\s*(\d+)\s*pulses/i) ||
-            String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*pulses/i) ||
-            String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:[^\d\n]*\((\d+)\s*نبضة/i) ||
-            String(invoiceBooking.notes || "").match(/\[Extra Device Pulses\]:\s*(\d+)/i) ||
-            String(invoiceBooking.notes || "").match(/Laser Pulses Delivered\s*\(\s*(\d+)\s*pulses/i);
-          const primaryDeliveredPulses = primaryPulsesMatch ? Number(primaryPulsesMatch[1]) : 0;
+          const primaryDeliveredPulses = extractPrimaryPulses(String(invoiceBooking.notes || ""), invoiceBooking);
           const settlementMatch = String(invoiceBooking.notes || "").match(/\[Laser Settlement\]:\s*([^\n]+)/i);
           const invoiceSettlementText = invoiceBooking.laserSettlementNote || (settlementMatch ? settlementMatch[1] : (
             isInvoicePerPulse

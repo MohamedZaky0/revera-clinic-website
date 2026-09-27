@@ -3,6 +3,7 @@ import {
   computeDeficitInvoiceImpact,
   computePackageDeficit,
   resolveDeliveredPulses,
+  extractPulsePackageQuota,
 } from '@/lib/laserDeficit';
 
 describe('laser deficit arithmetic', () => {
@@ -72,3 +73,48 @@ describe('laser deficit arithmetic', () => {
     })).toBe(0);
   });
 });
+
+describe('extractPulsePackageQuota', () => {
+  it('extracts quota from in-booking new package purchase format', () => {
+    const notes = '\n[Purchasing New Pulses Package]: 2.5k Pulses (1500 EGP · 2,500 pulses)\n[Customer Package ID]: CP-123';
+    expect(extractPulsePackageQuota(notes)).toBe(2500);
+  });
+
+  it('extracts quota from bullet dot formatted purchase note', () => {
+    const notes = '[Purchasing New Pulses Package]: 5k Pulses (2500 EGP • 5,000 pulses)';
+    expect(extractPulsePackageQuota(notes)).toBe(5000);
+  });
+
+  it('extracts quota from laser package redemption note', () => {
+    const notes = '\n[Laser Package Redemption]: 2.5k Pulses (2,500 pulses remaining)\n[Customer Package ID]: CP-123';
+    expect(extractPulsePackageQuota(notes)).toBe(2500);
+  });
+
+  it('extracts quota without remaining keyword if inside bracketed note', () => {
+    const notes = '[Laser Package Purchase & Redemption]: Full Body (3000 EGP · 10,000 pulses)';
+    expect(extractPulsePackageQuota(notes)).toBe(10000);
+  });
+
+  it('returns null for notes without pulses quota', () => {
+    expect(extractPulsePackageQuota(null)).toBeNull();
+    expect(extractPulsePackageQuota('')).toBeNull();
+    expect(extractPulsePackageQuota('Just standard clinical note')).toBeNull();
+  });
+
+  it('extracts quota from Arabic package notes', () => {
+    const arabicNotes1 = 'تم حجز باقة نبضات: باقة 2500 نبضة (1500 ج.م · 2,500 نبضة)';
+    expect(extractPulsePackageQuota(arabicNotes1)).toBe(2500);
+
+    const arabicNotes2 = '[Laser Package Redemption]: 5000 نبضة متبقية';
+    expect(extractPulsePackageQuota(arabicNotes2)).toBe(5000);
+  });
+
+  it('does not confuse deducted delivered pulses with package quota', () => {
+    const notesWithDeduction = `[Purchasing New Pulses Package]: 2.5k Pulses (1500 EGP · 2,500 pulses)
+[Customer Package ID]: CP-123
+[Laser Pulses Delivered]: Primary: 5,000 pulses, Total: 5,000 pulses
+[Laser Package Redemption]: Deducted 5,000 pulses from 2.5k Pulses / تم استهلاك 5,000 نبضة من باقة 2.5k Pulses`;
+    expect(extractPulsePackageQuota(notesWithDeduction)).toBe(2500);
+  });
+});
+

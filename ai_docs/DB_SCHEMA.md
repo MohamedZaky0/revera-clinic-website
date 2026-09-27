@@ -1085,6 +1085,14 @@ a row is recognised. Nothing is written when `price_pending`, `price_paid ≤ 0`
 `recognise_package_pulses_catchup(customer_package_id)` back-fills any unrecognised usage rows for one package
 (idempotent). All three functions: `service_role` only, no SECURITY DEFINER.
 
+`confirm_historical_package_price(customer_package_id, price, pulses_used, employee_id)` (**2026-09-25**,
+`20260925010000_confirm_historical_package_price.sql`, `service_role` only): the "Enter invoice value" action for a
+`price_pending` package. Locks the package row; refuses a negative price/pulses, pulses above the remaining balance, pulses on a
+services package, and a different price once confirmed (same price = no-op `already_confirmed`). For a pulses package it records
+the pulses used before launch as a `package_pulse_usage` row with `reservation_id NULL` dated at `purchased_at`, updates
+`pulses_used`/`pulses_remaining`/`status`, then runs `recognise_package_pulses_catchup`. For a services package it re-derives
+zero-amount recognitions with the cumulative rule of `consume_customer_package_session`.
+
 Unique `(customer_package_item_id, reservation_id)` prevents consuming the same entitlement for the
 same delivered reservation more than once. This is a management-accounting event record, not a
 second customer-facing invoice; it records the revenue release required by DEC-023.

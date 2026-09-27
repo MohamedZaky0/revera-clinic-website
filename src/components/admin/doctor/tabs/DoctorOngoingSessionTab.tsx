@@ -24,7 +24,7 @@ import { DoctorTab, MedicationItem } from "../types";
 import { getAuthHeaders } from "../utils";
 import { MedicalRecordTemplate, IntakeField } from "@/app/api/medical-records/templates/route";
 import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
-import { computePackageDeficit, resolveDeliveredPulses } from "@/lib/laserDeficit";
+import { computePackageDeficit, resolveDeliveredPulses, extractPulsePackageQuota } from "@/lib/laserDeficit";
 
 export interface AdditionalServiceItem {
   id: string | number;
@@ -164,7 +164,15 @@ export default function DoctorOngoingSessionTab({
     const rawMode = activeSessionBooking.laserPaymentMode || activeSessionBooking.laser_payment_mode;
     if (rawMode === "PER_PULSE" || notesStr.includes("pay per pulse") || notesStr.includes("per_pulse")) {
       setLaserMode("PER_PULSE");
-    } else if (rawMode === "PACKAGE" || notesStr.includes("pulse package") || notesStr.includes("package redemption")) {
+    } else if (
+      rawMode === "PACKAGE" ||
+      notesStr.includes("pulse package") ||
+      notesStr.includes("pulses package") ||
+      notesStr.includes("package redemption") ||
+      notesStr.includes("purchasing new pulses package") ||
+      notesStr.includes("[laser package") ||
+      notesStr.includes("option 3")
+    ) {
       setLaserMode("PACKAGE");
     } else {
       setLaserMode("SERVICE");
@@ -608,7 +616,13 @@ export default function DoctorOngoingSessionTab({
     selectedPkg.pulses_remaining ??
     (Number(selectedPkg.totalPulses ?? selectedPkg.includedPulses ?? selectedPkg.total_pulses ?? selectedPkg.included_pulses ?? 0) - Number(selectedPkg.usedPulses ?? selectedPkg.used_pulses ?? 0))
   ) : 0;
-  const isNoActivePackage = patientActivePackages.length === 0;
+  const bookingNotesStr = String(activeSessionBooking?.notes || "");
+  const notePkgQuota = extractPulsePackageQuota(bookingNotesStr);
+  const effectiveAvailablePulses = availablePkgPulses > 0
+    ? availablePkgPulses
+    : (notePkgQuota ?? 0);
+  const isNoActivePackage = patientActivePackages.length === 0 && (notePkgQuota === null || notePkgQuota <= 0);
+  const effectiveHasPackage = !isNoActivePackage || (notePkgQuota !== null && notePkgQuota > 0);
 
   // Additional laser pulses delivered in this session
   const additionalLaserPulses = additionalServices.reduce((sum, item) => {
@@ -619,8 +633,8 @@ export default function DoctorOngoingSessionTab({
   const totalLaserDeliveredPulses = resolveDeliveredPulses(standardPulsesDelivered, additionalLaserPulses);
   const packageDeficit = computePackageDeficit({
     deliveredPulses: totalLaserDeliveredPulses,
-    remainingPulses: availablePkgPulses,
-    hasActivePackage: !isNoActivePackage,
+    remainingPulses: effectiveAvailablePulses,
+    hasActivePackage: effectiveHasPackage,
   });
 
   // Calculate Subtotals

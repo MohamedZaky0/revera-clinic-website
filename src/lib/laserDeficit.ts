@@ -43,3 +43,45 @@ export function computeDeficitInvoiceImpact({
     ? deficit * nonNegativeAmount(pricePerPulse)
     : nonNegativeAmount(newPackagePrice);
 }
+
+/**
+ * Extracts the pulse quota or remaining pulse count from reservation notes across all supported formats:
+ * 1. Explicit remaining pulses format: "(2,500 pulses remaining)" / "(2,500 نبضة متبقية)"
+ * 2. New Package Purchase format: "[Purchasing New Pulses Package]: Name (1500 EGP · 2,500 pulses)" / "(2500 نبضة)"
+ * 3. Laser Service Payment Mode: "[Laser Service Payment Mode]: Option 3: ... (New Package: Name - 2,500 pulses)"
+ * 4. Package Redemption format: "[Laser Package Redemption]: Name (2,500 pulses)"
+ * 5. General package note: "[Laser Package]: ... 2,500 pulses"
+ */
+export function extractPulsePackageQuota(notesStr?: string | null): number | null {
+  if (!notesStr || typeof notesStr !== 'string') return null;
+
+  // 1. Explicit remaining pulses format: "(X pulses remaining)" or "(X نبضة متبقية)" or "remaining: X pulses"
+  const remMatch =
+    notesStr.match(/(\d+(?:,\d+)?)\s*(?:pulses remaining|نبضة متبقية|نبضات متبقية)/i) ||
+    notesStr.match(/remaining:\s*(\d+(?:,\d+)?)\s*(?:pulses|نبضة)/i) ||
+    notesStr.match(/والمتبقي\s*(\d+(?:,\d+)?)\s*(?:نبضة|نبضات)/i);
+  if (remMatch) return Number(remMatch[1].replace(/,/g, ''));
+
+  // 2. New Package Purchase format (EN & AR): "[Purchasing New Pulses Package]: Name (Price EGP · 2,500 pulses)" or "(2,500 نبضة)"
+  const newPkgMatch =
+    notesStr.match(/(?:\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption)\]|تم حجز باقة نبضات|باقة نبضات)[^:\n]*:[^(]*\([^)]*?[·•]\s*(\d+(?:,\d+)?)\s*(?:pulses|نبضة|نبضات)/i) ||
+    notesStr.match(/(?:\[(?:Purchasing New Pulses Package|Laser Package Purchase & Redemption)\]|تم حجز باقة نبضات|باقة نبضات)[^:\n]*:\s*[^(]*\((\d+(?:,\d+)?)\s*(?:pulses|نبضة|نبضات)/i);
+  if (newPkgMatch) return Number(newPkgMatch[1].replace(/,/g, ''));
+
+  // 3. Laser Service Payment Mode format: "[Laser Service Payment Mode]: Option 3: ... 2,500 pulses"
+  const modeMatch = notesStr.match(/\[Laser Service Payment Mode\]:[^\n]*?(\d+(?:,\d+)?)\s*(?:pulses|نبضة|نبضات)/i);
+  if (modeMatch) return Number(modeMatch[1].replace(/,/g, ''));
+
+  // 4. Initial package purchase in redemption notes: "Initial package purchase: Name (2500 pulses @ ...)"
+  const initMatch = notesStr.match(/Initial package purchase:[^(]*\((\d+(?:,\d+)?)\s*(?:pulses|نبضة|نبضات)/i);
+  if (initMatch) return Number(initMatch[1].replace(/,/g, ''));
+
+  // 5. Total pulses format in package lines: "(2,500 total pulses)" or "(2500 pulses @ 1500 EGP)"
+  const totalPulsesMatch =
+    notesStr.match(/\((\d+(?:,\d+)?)\s*(?:total pulses|إجمالي نبضات|pulses @|نبضة @)/i) ||
+    notesStr.match(/\[Laser Package[^\]]*\]:[^(]*\([^)]*?[·•]\s*(\d+(?:,\d+)?)\s*(?:pulses|نبضة)/i);
+  if (totalPulsesMatch) return Number(totalPulsesMatch[1].replace(/,/g, ''));
+
+  return null;
+}
+

@@ -35,6 +35,8 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchFake.fetch);
   fake.seed('providers', [{ id: 'doc-1', name: 'Dr. Sara Adel' }]);
   fake.seed('branches', [{ id: 'b1', name_en: 'Maadi' }]);
+  fetchFake.on('GET', '/api/inventory/devices', () => ({ status: 200, body: [] }));
+  fetchFake.on('GET', '/api/services', () => ({ status: 200, body: [] }));
 });
 
 afterEach(() => {
