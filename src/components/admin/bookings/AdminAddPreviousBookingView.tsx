@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -22,7 +22,10 @@ import {
   Stethoscope,
   Wallet,
   FileText,
-  Coins
+  Coins,
+  X,
+  Check,
+  Search
 } from "lucide-react";
 import { adminTranslations } from "@/components/admin/translations";
 import { getAuthHeaders } from "@/lib/authHeaders";
@@ -141,6 +144,9 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
   // Row 2 State: Date *, Service (Optional), Package (Optional), Products (Optional)
   const [bookingDate, setBookingDate] = useState("");
   const [selectedServiceId, setSelectedServiceId] = useState("");
+  const [serviceSearchQuery, setServiceSearchQuery] = useState("");
+  const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
+  const serviceDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [selectedProductId, setSelectedProductId] = useState("");
 
@@ -235,6 +241,34 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     if (lang === "ar" && s.ar) return s.ar;
     return s.en || s.name || s.title || `Service #${s.id}`;
   };
+
+  // Filter services dynamically by typed query
+  const filteredServices = useMemo(() => {
+    const q = serviceSearchQuery.trim().toLowerCase();
+    if (!q) return services;
+    return services.filter((s) => {
+      const nameEn = (s.en || s.name || s.title || "").toLowerCase();
+      const nameAr = (s.ar || "").toLowerCase();
+      return nameEn.includes(q) || nameAr.includes(q);
+    });
+  }, [services, serviceSearchQuery]);
+
+  // Click outside to close service dropdown & sync display text
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(e.target as Node)) {
+        setIsServiceDropdownOpen(false);
+        if (selectedServiceId) {
+          const found = services.find((s) => String(s.id) === String(selectedServiceId));
+          if (found) {
+            setServiceSearchQuery(getServiceName(found));
+          }
+        }
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [selectedServiceId, services, lang]);
 
   // Helper to extract package name cleanly
   const getPackageName = (p: PackageItem) => {
@@ -551,35 +585,93 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             )}
           </div>
 
-          {/* FIELD 5: SERVICE (OPTIONAL) - No price written beside name */}
-          <div className="space-y-1.5">
-            <label htmlFor="serviceSelect" className="text-xs sm:text-sm font-bold text-[#111827]">
+          {/* FIELD 5: SERVICE (OPTIONAL) - Searchable autocomplete input */}
+          <div className="space-y-1.5 relative" ref={serviceDropdownRef}>
+            <label htmlFor="serviceSearchInput" className="text-xs sm:text-sm font-bold text-[#111827]">
               {tr.serviceOptional || tr.serviceLabel}
             </label>
             <div className="relative flex items-center">
               <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
                 <Layers size={17} />
               </div>
-              <select
-                id="serviceSelect"
-                value={selectedServiceId}
+              <input
+                id="serviceSearchInput"
+                type="text"
+                autoComplete="off"
+                value={serviceSearchQuery}
                 onChange={(e) => {
-                  const sId = e.target.value;
-                  setSelectedServiceId(sId);
-                  recalculateInvoice(sId, selectedPackageId, selectedProductId);
+                  const val = e.target.value;
+                  setServiceSearchQuery(val);
+                  setIsServiceDropdownOpen(true);
+                  if (!val) {
+                    setSelectedServiceId("");
+                    recalculateInvoice("", selectedPackageId, selectedProductId);
+                  }
                 }}
-                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 cursor-pointer"
-              >
-                <option value="">{tr.selectServicePlaceholder}</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {getServiceName(s)}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] z-10">
-                <ChevronDown size={17} />
-              </div>
+                onFocus={() => setIsServiceDropdownOpen(true)}
+                placeholder={tr.searchServicePlaceholder || tr.selectServicePlaceholder || "Search service..."}
+                className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
+              />
+              {serviceSearchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedServiceId("");
+                    setServiceSearchQuery("");
+                    setIsServiceDropdownOpen(false);
+                    recalculateInvoice("", selectedPackageId, selectedProductId);
+                  }}
+                  className="absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#9CA3AF] hover:text-[#414E36] transition cursor-pointer z-10"
+                  title="Clear service"
+                >
+                  <X size={16} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsServiceDropdownOpen((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] hover:text-[#414E36] transition cursor-pointer z-10"
+                >
+                  <ChevronDown size={17} className={`transition-transform duration-200 ${isServiceDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+              )}
+
+              {/* Dropdown Results */}
+              {isServiceDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1.5 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl z-50 py-1 divide-y divide-gray-50">
+                  {filteredServices.length > 0 ? (
+                    filteredServices.map((s) => {
+                      const isSelected = String(selectedServiceId) === String(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedServiceId(String(s.id));
+                            setServiceSearchQuery(getServiceName(s));
+                            setIsServiceDropdownOpen(false);
+                            recalculateInvoice(String(s.id), selectedPackageId, selectedProductId);
+                          }}
+                          className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs sm:text-sm text-start font-medium transition cursor-pointer ${
+                            isSelected
+                              ? "bg-[#E8EFE5] text-[#344E41] font-bold"
+                              : "text-[#111827] hover:bg-[#F4F7F2] hover:text-[#344E41]"
+                          }`}
+                        >
+                          <span className="truncate">{getServiceName(s)}</span>
+                          {isSelected && (
+                            <Check size={16} className="text-[#414E36] shrink-0 ml-2 rtl:ml-0 rtl:mr-2" />
+                          )}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="px-3.5 py-3 text-xs sm:text-sm text-center text-gray-500 font-medium">
+                      {tr.noServicesFound || "No services found"}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
