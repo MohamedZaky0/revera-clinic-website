@@ -3240,6 +3240,12 @@ When patients joined Revera with packages purchased under previous historical sy
 4. **Input Stabilization & Lifecycle Decoupling:**
    - Decoupled package initialization (`initializedTargetBookingIdRef`) from reactive catalog dependency triggers to prevent background re-renders or catalog fetches from reverting user edits.
    - Converted pulse input handlers to flexible string/number state with auto-balancing and blur normalization so users can backspace and type values naturally without jumping back to prior numbers.
+5. **Patient's Existing Package Recognition & Multi-Session Intake:**
+   - When entering or editing a historical booking for a patient, the system automatically fetches existing active and historical packages owned by the patient via `/api/customers/packages`.
+   - Displays a dedicated discovery banner showing the patient's existing packages with their live quota (pulses or services remaining) and a `[Use This Package]` 1-click action button.
+   - Groups packages in `<select id="packageSelect">` into `optgroup` sections: "Patient's Existing Packages" vs "Package Catalog".
+   - When an existing customer package is selected, the invoice automatically sets the package charge to 0 EGP (as it was paid in an earlier transaction) and routes session consumption against the existing `customer_packages` / `customer_package_items` records in `POST /api/reservations/previous` and `PATCH /api/reservations/previous`.
+
 
 
 

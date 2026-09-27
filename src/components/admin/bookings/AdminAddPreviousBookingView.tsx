@@ -195,6 +195,11 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
   const [pkgList, setPkgList] = useState<PackageItem[]>(packages);
   const [prodList, setProdList] = useState<ProductItem[]>(products);
 
+  // Patient's Existing Packages State
+  const [patientExistingPackages, setPatientExistingPackages] = useState<any[]>([]);
+  const [loadingExistingPackages, setLoadingExistingPackages] = useState(false);
+  const [selectedCustomerPackageId, setSelectedCustomerPackageId] = useState<string>("");
+
   const initializedTargetBookingIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -249,6 +254,45 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     }
     return null;
   }, [patientPhone, customers, initialCustomer]);
+
+  // Reactive fetch for patient's existing packages
+  useEffect(() => {
+    const cleanP = cleanPhone(patientPhone);
+    const targetCustId = matchedCustomer?.id;
+    if ((!cleanP || cleanP.length < 8) && !targetCustId) {
+      setPatientExistingPackages([]);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingExistingPackages(true);
+
+    (async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const param = targetCustId
+          ? `customerId=${encodeURIComponent(String(targetCustId))}`
+          : `mobile=${encodeURIComponent(cleanP)}`;
+        const res = await fetch(`/api/customers/packages?${param}`, { headers });
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          if (Array.isArray(data.packages)) {
+            setPatientExistingPackages(data.packages);
+          } else {
+            setPatientExistingPackages([]);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching patient existing packages:", err);
+      } finally {
+        if (isMounted) setLoadingExistingPackages(false);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [patientPhone, matchedCustomer?.id]);
 
   // Handle phone change & auto-populate name if patient matched
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -305,9 +349,9 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
   }, [selectedServiceId, services, lang]);
 
   // Helper to extract package name cleanly
-  const getPackageName = (p: PackageItem) => {
-    if (lang === "ar" && p.nameAr) return p.nameAr;
-    return p.name || `Package #${p.id}`;
+  const getPackageName = (p: PackageItem | any) => {
+    if (lang === "ar" && (p.nameAr || p.packageNameAr)) return p.nameAr || p.packageNameAr;
+    return p.name || p.packageName || `Package #${p.id || p.packageId}`;
   };
 
   // Helper to extract product name cleanly
@@ -316,25 +360,44 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     return pr.name || `Product #${pr.id}`;
   };
 
-  // Selected package helper & metadata
+  // Selected existing customer package object (if linked)
+  const selectedExistingPkgObj = useMemo(() => {
+    if (!selectedCustomerPackageId) return null;
+    return patientExistingPackages.find((cp) => String(cp.id) === String(selectedCustomerPackageId)) || null;
+  }, [selectedCustomerPackageId, patientExistingPackages]);
+
+  // Selected package helper & metadata (supports both catalog package and existing customer package)
   const selectedPackageObj = useMemo(() => {
+    if (selectedExistingPkgObj) {
+      return {
+        id: selectedExistingPkgObj.packageId || selectedExistingPkgObj.id,
+        name: selectedExistingPkgObj.packageName || selectedExistingPkgObj.name,
+        nameAr: selectedExistingPkgObj.packageNameAr || selectedExistingPkgObj.nameAr,
+        price: 0,
+        packageType: selectedExistingPkgObj.packageType,
+        totalPulses: selectedExistingPkgObj.totalPulses ?? selectedExistingPkgObj.includedPulses,
+        items: selectedExistingPkgObj.items,
+        isExistingCustomerPackage: true,
+        existingRecord: selectedExistingPkgObj
+      };
+    }
     if (!selectedPackageId) return null;
     return pkgList.find((p) => String(p.id) === String(selectedPackageId)) || null;
-  }, [selectedPackageId, pkgList]);
+  }, [selectedCustomerPackageId, selectedExistingPkgObj, selectedPackageId, pkgList]);
 
   const isPulsePackage = useMemo(() => {
     if (!selectedPackageObj) return false;
     return (
       selectedPackageObj.packageType === "pulses" ||
-      selectedPackageObj.package_type === "pulses" ||
+      (selectedPackageObj as any).package_type === "pulses" ||
       (selectedPackageObj.totalPulses != null && selectedPackageObj.totalPulses > 0) ||
-      (selectedPackageObj.total_pulses != null && selectedPackageObj.total_pulses > 0)
+      (Number((selectedPackageObj as any).total_pulses) > 0)
     );
   }, [selectedPackageObj]);
 
   const packageTotalPulses = useMemo(() => {
     if (!selectedPackageObj) return 0;
-    return Number(selectedPackageObj.totalPulses ?? selectedPackageObj.total_pulses ?? 0);
+    return Number(selectedPackageObj.totalPulses ?? (selectedPackageObj as any).total_pulses ?? 0);
   }, [selectedPackageObj]);
 
   // Pre-fill state when editing an existing historical booking
@@ -457,9 +520,9 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
   }, [targetBooking, services, pkgList, prodList, lang]);
 
   // Recalculate invoice value when Service, Package, or Product changes
-  const recalculateInvoice = (nextSrvId: string, nextPkgId: string, nextProdId: string) => {
+  const recalculateInvoice = (nextSrvId: string, nextPkgId: string, nextProdId: string, isExistingCustomerPkg = Boolean(selectedCustomerPackageId)) => {
     const srv = services.find(s => String(s.id) === String(nextSrvId));
-    const pkg = pkgList.find(p => String(p.id) === String(nextPkgId));
+    const pkg = isExistingCustomerPkg ? null : pkgList.find(p => String(p.id) === String(nextPkgId));
     const prod = prodList.find(pr => String(pr.id) === String(nextProdId));
 
     const srvPrice = Number(srv?.price || 0);
@@ -475,45 +538,90 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     }
   };
 
-  // Handle package selection change explicitly from dropdown
-  const handlePackageChange = (pId: string) => {
-    setSelectedPackageId(pId);
-    recalculateInvoice(selectedServiceId, pId, selectedProductId);
-
-    if (!pId) {
+  // Handle package selection change (handles "existing:ID", "catalog:ID", or plain ID)
+  const handlePackageChange = (val: string) => {
+    if (!val) {
+      setSelectedCustomerPackageId("");
+      setSelectedPackageId("");
       setPackagePulsesUsed(0);
       setPackagePulsesRemaining(0);
       setPackageServicesUsage({});
+      recalculateInvoice(selectedServiceId, "", selectedProductId, false);
       return;
     }
 
-    const pkg = pkgList.find((p) => String(p.id) === String(pId));
-    if (!pkg) return;
+    if (val.startsWith("existing:")) {
+      const cpId = val.replace("existing:", "");
+      const cp = patientExistingPackages.find((p) => String(p.id) === String(cpId));
+      if (!cp) return;
 
-    const isPulse =
-      pkg.packageType === "pulses" ||
-      pkg.package_type === "pulses" ||
-      (pkg.totalPulses != null && pkg.totalPulses > 0) ||
-      (pkg.total_pulses != null && pkg.total_pulses > 0);
+      setSelectedCustomerPackageId(cpId);
+      setSelectedPackageId(String(cp.packageId || cp.id));
 
-    if (isPulse) {
-      const total = Number(pkg.totalPulses ?? pkg.total_pulses ?? 0);
-      setPackagePulsesUsed(0);
-      setPackagePulsesRemaining(total);
+      const isPulse =
+        cp.packageType === "pulses" ||
+        cp.package_type === "pulses" ||
+        Number(cp.totalPulses || cp.includedPulses || 0) > 0;
+
+      if (isPulse) {
+        const total = Number(cp.totalPulses ?? cp.includedPulses ?? 0);
+        const used = Number(cp.usedPulses ?? 0);
+        const rem = Number(cp.pulsesRemaining ?? cp.remainingPulses ?? Math.max(0, total - used));
+        setPackagePulsesUsed(used);
+        setPackagePulsesRemaining(rem);
+      } else {
+        const items = cp.items || [];
+        const newUsage: Record<string | number, { qtyTotal: number; qtyUsed: number; qtyRemaining: number; serviceName?: string }> = {};
+        items.forEach((item: any) => {
+          const key = item.serviceId || item.id || 0;
+          const svcName = lang === "ar" && item.serviceNameAr ? item.serviceNameAr : (item.serviceName || `Service #${item.serviceId}`);
+          newUsage[key] = {
+            qtyTotal: Number(item.qtyTotal ?? item.qty_total ?? item.qty ?? 0),
+            qtyUsed: Number(item.qtyUsed ?? item.qty_used ?? 0),
+            qtyRemaining: Number(item.qtyRemaining ?? item.qty_remaining ?? Math.max(0, Number(item.qtyTotal || 0) - Number(item.qtyUsed || 0))),
+            serviceName: svcName,
+          };
+        });
+        setPackageServicesUsage(newUsage);
+      }
+
+      // Existing package already paid in earlier transaction -> default 0 invoice increment
+      recalculateInvoice(selectedServiceId, String(cp.packageId || cp.id), selectedProductId, true);
     } else {
-      const items = pkg.items || [];
-      const newUsage: Record<string | number, { qtyTotal: number; qtyUsed: number; qtyRemaining: number; serviceName?: string }> = {};
-      items.forEach((item) => {
-        const key = item.serviceId || item.id || 0;
-        const svcName = lang === "ar" && item.serviceNameAr ? item.serviceNameAr : (item.serviceName || `Service #${item.serviceId}`);
-        newUsage[key] = {
-          qtyTotal: item.qty,
-          qtyUsed: 0,
-          qtyRemaining: item.qty,
-          serviceName: svcName,
-        };
-      });
-      setPackageServicesUsage(newUsage);
+      const pId = val.replace("catalog:", "");
+      const pkg = pkgList.find((p) => String(p.id) === String(pId));
+      setSelectedCustomerPackageId("");
+      setSelectedPackageId(pId);
+
+      if (!pkg) return;
+
+      const isPulse =
+        pkg.packageType === "pulses" ||
+        pkg.package_type === "pulses" ||
+        (pkg.totalPulses != null && pkg.totalPulses > 0) ||
+        (pkg.total_pulses != null && pkg.total_pulses > 0);
+
+      if (isPulse) {
+        const total = Number(pkg.totalPulses ?? pkg.total_pulses ?? 0);
+        setPackagePulsesUsed(0);
+        setPackagePulsesRemaining(total);
+      } else {
+        const items = pkg.items || [];
+        const newUsage: Record<string | number, { qtyTotal: number; qtyUsed: number; qtyRemaining: number; serviceName?: string }> = {};
+        items.forEach((item) => {
+          const key = item.serviceId || item.id || 0;
+          const svcName = lang === "ar" && item.serviceNameAr ? item.serviceNameAr : (item.serviceName || `Service #${item.serviceId}`);
+          newUsage[key] = {
+            qtyTotal: item.qty,
+            qtyUsed: 0,
+            qtyRemaining: item.qty,
+            serviceName: svcName,
+          };
+        });
+        setPackageServicesUsage(newUsage);
+      }
+
+      recalculateInvoice(selectedServiceId, pId, selectedProductId, false);
     }
   };
 
@@ -636,14 +744,16 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         serviceId: selectedServiceId ? Number(selectedServiceId) : null,
         serviceName: selectedSrv ? getServiceName(selectedSrv) : null,
         packageId: selectedPackageId || null,
-        packageName: selectedPkg ? getPackageName(selectedPkg) : null,
+        packageName: selectedPackageObj ? getPackageName(selectedPackageObj) : null,
+        customerPackageId: selectedCustomerPackageId || null,
+        existingCustomerPackageId: selectedCustomerPackageId || null,
         productId: selectedProductId || null,
         productName: selectedProd ? getProductName(selectedProd) : null,
         packagePulsesTotal: isPulsePackage ? packageTotalPulses : null,
         packagePulsesUsed: isPulsePackage ? numUsed : null,
         packagePulsesRemaining: isPulsePackage ? numRemaining : null,
         packageItemsUsage: (!isPulsePackage && selectedPackageObj?.items && selectedPackageObj.items.length > 0)
-          ? selectedPackageObj.items.map((it) => {
+          ? selectedPackageObj.items.map((it: any) => {
               const key = it.serviceId || it.id || 0;
               const usage = packageServicesUsage[key] || { qtyTotal: it.qty, qtyUsed: 0, qtyRemaining: it.qty };
               return {
@@ -858,6 +968,118 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
           </div>
         </div>
 
+        {/* ── PATIENT'S EXISTING PACKAGES DISCOVERY BANNER ── */}
+        {patientExistingPackages.length > 0 && (
+          <div className="rounded-2xl border border-emerald-300/80 bg-gradient-to-r from-emerald-50/90 via-[#F4F9F2] to-white p-4.5 shadow-2xs space-y-3 animate-fadeIn">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-emerald-600 text-white shadow-xs">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-2">
+                    {tr.patientExistingPackagesTitle || "Patient's Existing Packages"}
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      {patientExistingPackages.length} {lang === "ar" ? "باقات مسجلة" : "found"}
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-emerald-800 font-medium">
+                    {tr.patientExistingPackagesSubtitle || "This patient already has packages in the system. Select one to record session consumption against it, or select a catalog package."}
+                  </p>
+                </div>
+              </div>
+              {loadingExistingPackages && (
+                <Loader2 size={15} className="animate-spin text-emerald-600" />
+              )}
+            </div>
+
+            {/* List of existing packages */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+              {patientExistingPackages.map((cp: any) => {
+                const isSelected = selectedCustomerPackageId === String(cp.id);
+                const isPulses = cp.packageType === "pulses" || cp.package_type === "pulses" || Number(cp.totalPulses || cp.includedPulses || 0) > 0;
+                const total = isPulses
+                  ? Number(cp.totalPulses ?? cp.includedPulses ?? 0)
+                  : (cp.items || []).reduce((sum: number, it: any) => sum + Number(it.qtyTotal ?? it.qty_total ?? it.qty ?? 0), 0);
+                const used = isPulses
+                  ? Number(cp.usedPulses ?? 0)
+                  : (cp.items || []).reduce((sum: number, it: any) => sum + Number(it.qtyUsed ?? it.qty_used ?? 0), 0);
+                const rem = isPulses
+                  ? Number(cp.pulsesRemaining ?? cp.remainingPulses ?? Math.max(0, total - used))
+                  : (cp.items || []).reduce((sum: number, it: any) => sum + Number(it.qtyRemaining ?? it.qty_remaining ?? Math.max(0, Number(it.qtyTotal || 0) - Number(it.qtyUsed || 0))), 0);
+
+                const isFullyUsed = cp.status === "fully_used" || rem <= 0;
+
+                return (
+                  <div
+                    key={cp.id}
+                    className={`rounded-xl border p-3 flex flex-col justify-between gap-2.5 transition ${
+                      isSelected
+                        ? "bg-[#E8EFE5] border-[#414E36] ring-2 ring-[#414E36]/20 shadow-xs"
+                        : "bg-white border-gray-200/90 hover:border-emerald-300"
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-gray-900 truncate">
+                          {lang === "ar" && (cp.packageNameAr || cp.nameAr) ? (cp.packageNameAr || cp.nameAr) : (cp.packageName || cp.name || `Package #${cp.id}`)}
+                        </span>
+                        {isFullyUsed ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200 shrink-0">
+                            {tr.noRemainingQuota || "Fully Consumed"}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                            {lang === "ar" ? "نشطة" : "Active"}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-[11px] text-gray-600 font-medium">
+                        {isPulses ? (
+                          <span>
+                            {used.toLocaleString()} / {total.toLocaleString()} {lang === "ar" ? "نبضة مستهلكة" : "pulses used"} (
+                            <strong className={rem > 0 ? "text-emerald-700 font-bold" : "text-gray-500 font-bold"}>
+                              {rem.toLocaleString()} {lang === "ar" ? "متبقية" : "left"}
+                            </strong>)
+                          </span>
+                        ) : (
+                          <span>
+                            {used} / {total} {lang === "ar" ? "جلسة مستهلكة" : "sessions used"} (
+                            <strong className={rem > 0 ? "text-emerald-700 font-bold" : "text-gray-500 font-bold"}>
+                              {rem} {lang === "ar" ? "متبقية" : "left"}
+                            </strong>)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handlePackageChange(isSelected ? "" : `existing:${cp.id}`)}
+                      className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                        isSelected
+                          ? "bg-[#414E36] text-white shadow-xs"
+                          : "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
+                      }`}
+                    >
+                      {isSelected ? (
+                        <>
+                          <Check size={13} /> {lang === "ar" ? "محددة للاستهلاك" : "Selected"}
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={13} /> {tr.useThisPackageBtn || "Use This Package"}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── ROW 2: 4 FIELDS (DATE *, SERVICE, PACKAGE, PRODUCTS) ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* FIELD 4: DATE (REQUIRED) */}
@@ -985,25 +1207,52 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
           {/* FIELD 6: PACKAGE (OPTIONAL) */}
           <div className="space-y-1.5">
-            <label htmlFor="packageSelect" className="text-xs sm:text-sm font-bold text-[#111827]">
-              {tr.packageOptional || tr.packageLabel}
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="packageSelect" className="text-xs sm:text-sm font-bold text-[#111827]">
+                {tr.packageOptional || tr.packageLabel}
+              </label>
+              {selectedCustomerPackageId && (
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
+                  {tr.linkedExistingPackageBadge || "Linked to Existing Package"}
+                </span>
+              )}
+            </div>
             <div className="relative flex items-center">
               <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
                 <PackageIcon size={17} />
               </div>
               <select
                 id="packageSelect"
-                value={selectedPackageId}
+                value={selectedCustomerPackageId ? `existing:${selectedCustomerPackageId}` : (selectedPackageId ? `catalog:${selectedPackageId}` : "")}
                 onChange={(e) => handlePackageChange(e.target.value)}
                 className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 cursor-pointer"
               >
                 <option value="">{tr.selectPackagePlaceholder}</option>
-                {pkgList.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {getPackageName(p)}
-                  </option>
-                ))}
+                
+                {patientExistingPackages.length > 0 && (
+                  <optgroup label={`📌 ${tr.patientExistingPackagesGroup || "Patient's Existing Packages"}`}>
+                    {patientExistingPackages.map((cp: any) => {
+                      const isPulses = cp.packageType === "pulses" || cp.package_type === "pulses" || Number(cp.totalPulses || cp.includedPulses || 0) > 0;
+                      const total = isPulses ? Number(cp.totalPulses ?? cp.includedPulses ?? 0) : (cp.items || []).reduce((sum: number, it: any) => sum + Number(it.qtyTotal || it.qty || 0), 0);
+                      const used = isPulses ? Number(cp.usedPulses ?? 0) : (cp.items || []).reduce((sum: number, it: any) => sum + Number(it.qtyUsed || 0), 0);
+                      const rem = isPulses ? Number(cp.pulsesRemaining ?? (total - used)) : (total - used);
+                      const name = lang === "ar" && (cp.packageNameAr || cp.nameAr) ? (cp.packageNameAr || cp.nameAr) : (cp.packageName || cp.name || `Package #${cp.id}`);
+                      return (
+                        <option key={`existing-${cp.id}`} value={`existing:${cp.id}`}>
+                          ⭐ [Existing] {name} ({rem.toLocaleString()} {isPulses ? (lang === "ar" ? "نبضة متبقية" : "pulses left") : (lang === "ar" ? "جلسات متبقية" : "sessions left")})
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                )}
+
+                <optgroup label={`🏷️ ${tr.catalogPackagesGroup || "Catalog Packages (New Purchase)"}`}>
+                  {pkgList.map((p) => (
+                    <option key={`catalog-${p.id}`} value={`catalog:${p.id}`}>
+                      {getPackageName(p)}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] z-10">
                 <ChevronDown size={17} />
@@ -1249,7 +1498,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               <div className="space-y-3 pt-1">
                 {selectedPackageObj.items && selectedPackageObj.items.length > 0 ? (
                   <div className="divide-y divide-gray-100 bg-white rounded-xl border border-gray-200/80 overflow-hidden shadow-xs">
-                    {selectedPackageObj.items.map((item) => {
+                    {selectedPackageObj.items.map((item: any) => {
                       const key = item.serviceId || item.id || 0;
                       const usage = packageServicesUsage[key] || {
                         qtyTotal: item.qty,
