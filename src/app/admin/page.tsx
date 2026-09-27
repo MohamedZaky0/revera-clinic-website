@@ -198,6 +198,8 @@ export type Req = {
   laserPricePerPulse?: number | null;
   laserSettlementNote?: string | null;
   attachedProducts?: any[];
+  is_historical?: boolean;
+  isHistorical?: boolean;
 };
 
 function getStatusBadgeClass(status: string): string {
@@ -1535,6 +1537,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [showFullViewNewBooking, setShowFullViewNewBooking] = useState(false);
   const [newBookingInitialData, setNewBookingInitialData] = useState<any | null>(null);
   const [showAddPreviousBooking, setShowAddPreviousBooking] = useState(false);
+  const [editingPreviousBooking, setEditingPreviousBooking] = useState<any | null>(null);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -2549,7 +2552,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-035', name: 'Patient Profile Edit & Customer Intake Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies customer profile records, phone/WhatsApp validation, address structure (City, Street, Building, Floor), and balances.', status: 'idle' },
     { id: 'TC-036', name: 'Doctor Status Management & Availability Lifecycle Engine', category: 'Services & Bookings', endpoint: '/api/providers', description: 'Verifies doctor status modal dialog, Active/Inactive status changes, and real-time synchronization across providers and linked employee accounts.', status: 'idle' },
     { id: 'TC-037', name: 'Financial Transactions & Daily Ledger Engine', category: 'Finance & Accounting', endpoint: '/api/transactions', description: 'Verifies the clinic financial transactions dashboard, daily net payments, outstanding debts, wallet balances, and manual transaction logging.', status: 'idle' },
-    { id: 'TC-038', name: 'Historical & Previous Bookings Intake Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies recording of previous historical clinic bookings, patient matching/creation, and booking history preservation.', status: 'idle' },
+    { id: 'TC-038', name: 'Historical & Previous Bookings Intake & Superadmin Editing Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies recording of previous historical clinic bookings, superadmin booking edits, patient matching/creation, and ledger synchronization.', status: 'idle' },
     { id: 'TC-039', name: 'Granular Role Permissions & Action-Level Access Control Engine', category: 'HR & Payroll', endpoint: '/api/roles', description: 'Validates system roles retrieval, permission structure integrity, and granular action-level access control matrix.', status: 'idle' },
     { id: 'TC-040', name: 'Availability Doctor & Inactive Status Filtering Engine', category: 'Services & Bookings', endpoint: '/api/availability', description: 'Verifies doctor slot availability engine, service name resolution, and inactive doctor exclusions.', status: 'idle' },
     { id: 'TC-041', name: 'Prescription Deduplication & Clinical Intake Engine', category: 'Medical & Patients', endpoint: '/api/prescriptions', description: 'Verifies doctor prescription generation, duplicate prevention on repeated saves, and intake templates.', status: 'idle' },
@@ -6444,6 +6447,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 onClose={() => {
                   setTransactionsSubView("list");
                   setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
                 }}
                 onBookingCreated={() => {
                   clearFetchCache();
@@ -6451,7 +6455,17 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   fetchCustomers();
                   setTransactionsSubView("list");
                   setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
                 }}
+                onBookingUpdated={() => {
+                  clearFetchCache();
+                  fetchAllReservations();
+                  fetchCustomers();
+                  setTransactionsSubView("list");
+                  setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
+                }}
+                editingBooking={editingPreviousBooking}
                 initialCustomer={previousBookingCustomer}
                 services={localServices}
                 providers={providers}
@@ -6537,6 +6551,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 onClose={() => {
                   setShowAddPreviousBooking(false);
                   setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
                 }}
                 onBookingCreated={() => {
                   clearFetchCache();
@@ -6544,7 +6559,17 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   fetchCustomers();
                   setShowAddPreviousBooking(false);
                   setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
                 }}
+                onBookingUpdated={() => {
+                  clearFetchCache();
+                  fetchAllReservations();
+                  fetchCustomers();
+                  setShowAddPreviousBooking(false);
+                  setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
+                }}
+                editingBooking={editingPreviousBooking}
                 initialCustomer={previousBookingCustomer}
                 services={localServices}
                 providers={providers}
@@ -7702,6 +7727,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 onClose={() => {
                   setShowAddPreviousBooking(false);
                   setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
                 }}
                 onBookingCreated={() => {
                   clearFetchCache();
@@ -7709,7 +7735,17 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   fetchCustomers();
                   setShowAddPreviousBooking(false);
                   setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
                 }}
+                onBookingUpdated={() => {
+                  clearFetchCache();
+                  fetchAllReservations();
+                  fetchCustomers();
+                  setShowAddPreviousBooking(false);
+                  setPreviousBookingCustomer(null);
+                  setEditingPreviousBooking(null);
+                }}
+                editingBooking={editingPreviousBooking}
                 initialCustomer={previousBookingCustomer}
                 services={localServices}
                 providers={providers}
@@ -7997,6 +8033,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           booking={viewingBooking}
           onClose={() => setViewingBooking(null)}
           setBooking={setViewingBooking}
+          onEditPreviousBooking={(b) => {
+            setEditingPreviousBooking(b);
+            setActiveNav("Bookings");
+            setShowAddPreviousBooking(true);
+            setViewingBooking(null);
+          }}
           rooms={rooms}
           branches={branches}
           dbCustomers={dbCustomers}

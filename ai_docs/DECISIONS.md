@@ -3192,3 +3192,25 @@ When laser pulse sessions deliver more pulses than remaining in a patient's puls
 3. **Consistent Badging & Details Modal Actions:**
    - `AdminBookingsView`, `BookingDetailsModal`, and `DoctorAccountView` display the amber deficit badge and allow staff to navigate directly to checkout/settlement prompt without dead ends.
 
+---
+
+## DEC-091: Superadmin Previous (Historical) Booking Editing & Search UI Hardening
+
+**Date:** 2026-09-27
+**Status:** Decided & Implemented
+
+**Context:**
+Historical / previous bookings intake (`/api/reservations/previous` and `AdminAddPreviousBookingView`) previously only supported creation. If errors occurred in patient details, services, dates, notes, or payment amounts, staff could not edit historical records. Furthermore, search dropdowns in previous booking intake were cluttered with duplicate icons and full unranked dropdowns.
+
+**Decisions & Implementation:**
+1. **Superadmin RBAC Gate for Historical Edits:**
+   - Created `PATCH /api/reservations/previous` with strict superadmin authentication guard (`role === 'superadmin' || role.includes('super')`). Non-superadmin staff receive HTTP 403.
+   - Updates `reservations` table (date, name, phone, doctor, service, amounts, notes, branch) and synchronizes associated ledger `invoices`, `invoice_lines`, and `payments` records.
+2. **UI Edit Integration:**
+   - Added `editingBooking` and `onBookingUpdated` support to `AdminAddPreviousBookingView.tsx`, hydating form states on load and dynamically altering the title, action buttons, and submit labels.
+   - `BookingDetailsModal.tsx` renders a `"HISTORICAL"` badge and an `"Edit Previous Booking"` button for superadmin accounts when viewing a historical booking.
+3. **Previous Booking UI Polish:**
+   - Removed redundant double calendar icons in the date input field.
+   - Services input converted to an interactive searchable combobox filtering services dynamically as the user types.
+
+

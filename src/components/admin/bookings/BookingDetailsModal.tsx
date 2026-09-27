@@ -183,6 +183,7 @@ interface BookingDetailsModalProps {
   setPostponeNewTime: (t: string) => void;
   setPostponeFollowUpDate: (d: string) => void;
   globalEndingSession?: boolean;
+  onEditPreviousBooking?: (booking: any) => void;
 }
 
 export default function BookingDetailsModal({
@@ -213,6 +214,7 @@ export default function BookingDetailsModal({
   setPostponeNewTime,
   setPostponeFollowUpDate,
   globalEndingSession = false,
+  onEditPreviousBooking,
 }: BookingDetailsModalProps) {
   const { isRTL } = useLanguage();
   const { showConfirm } = useAlertConfirm();
@@ -3244,6 +3246,29 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     }`}>
                       {booking.isManual ? "MANUAL BOOKING" : "WEBSITE BOOKING"}
                     </span>
+
+                    {/* Historical Booking Badge & Superadmin Edit Action */}
+                    {(booking.is_historical || (booking as any).isHistorical || String(booking.notes || "").includes("[Historical Booking]")) && (
+                      <>
+                        <span className="rounded-full px-3 py-0.5 text-[11px] font-extrabold uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200">
+                          {isRTL ? "حجز سابق" : "HISTORICAL"}
+                        </span>
+                        {hasPermission("superadmin") && onEditPreviousBooking && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onClose();
+                              onEditPreviousBooking(booking);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-[#2D3F2A] hover:bg-[#1E2D1C] text-white px-3 py-0.5 text-[11px] font-bold shadow-2xs transition cursor-pointer"
+                            title={isRTL ? "تعديل الحجز السابق" : "Edit Previous Booking"}
+                          >
+                            <Pencil size={11} />
+                            <span>{isRTL ? "تعديل الحجز السابق" : "Edit Previous Booking"}</span>
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
 

@@ -72,6 +72,9 @@ interface ProductItem {
 interface AdminAddPreviousBookingViewProps {
   onClose: () => void;
   onBookingCreated?: () => void;
+  onBookingUpdated?: () => void;
+  editingBooking?: any;
+  initialBooking?: any;
   initialCustomer?: CustomerItem | any;
   initialPatientPhone?: string;
   initialPatientName?: string;
@@ -111,6 +114,9 @@ function isValidPhone(raw: string): boolean {
 export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewProps> = ({
   onClose,
   onBookingCreated,
+  onBookingUpdated,
+  editingBooking,
+  initialBooking,
   initialCustomer,
   initialPatientPhone,
   initialPatientName,
@@ -126,6 +132,9 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 }) => {
   const tr = t || adminTranslations[lang].bookings.adminAddPreviousBooking;
 
+  const targetBooking = editingBooking || initialBooking;
+  const isEditMode = Boolean(targetBooking && targetBooking.id);
+
   const initPhone = initialPatientPhone || initialCustomer?.mobile || initialCustomer?.phone || "";
   const initName = initialPatientName || initialCustomer?.name || "";
 
@@ -135,11 +144,13 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
   const [selectedDoctorId, setSelectedDoctorId] = useState("");
 
   useEffect(() => {
-    const nextPhone = initialPatientPhone || initialCustomer?.mobile || initialCustomer?.phone;
-    const nextName = initialPatientName || initialCustomer?.name;
-    if (nextPhone) setPatientPhone(nextPhone);
-    if (nextName) setPatientName(nextName);
-  }, [initialCustomer, initialPatientPhone, initialPatientName]);
+    if (!targetBooking) {
+      const nextPhone = initialPatientPhone || initialCustomer?.mobile || initialCustomer?.phone;
+      const nextName = initialPatientName || initialCustomer?.name;
+      if (nextPhone) setPatientPhone(nextPhone);
+      if (nextName) setPatientName(nextName);
+    }
+  }, [initialCustomer, initialPatientPhone, initialPatientName, targetBooking]);
 
   // Row 2 State: Date *, Service (Optional), Package (Optional), Products (Optional)
   const [bookingDate, setBookingDate] = useState("");
@@ -270,6 +281,56 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [selectedServiceId, services, lang]);
 
+  // Pre-fill state when editing an existing historical booking
+  useEffect(() => {
+    if (targetBooking) {
+      const rawNotes = String(targetBooking.notes || targetBooking.reception_notes || "");
+      const cleanNotes = rawNotes
+        .replace(/\[Historical Booking\]\s*Added manually for historical records\./gi, "")
+        .replace(/Service:\s*[^\.\n]+\./gi, "")
+        .replace(/Package:\s*[^\.\n]+\./gi, "")
+        .replace(/Product:\s*[^\.\n]+\./gi, "")
+        .replace(/\[Invoice Total\]:\s*\d+(?:\.\d+)?\s*EGP\./gi, "")
+        .replace(/Actual Spent:\s*\d+(?:\.\d+)?\s*EGP\./gi, "")
+        .replace(/Payment Method:\s*[^\.\n]+\./gi, "")
+        .trim();
+
+      const invTotalMatch = rawNotes.match(/\[Invoice Total\]:\s*(\d+(?:\.\d+)?)/i);
+      const spentMatch = rawNotes.match(/Actual Spent:\s*(\d+(?:\.\d+)?)/i);
+      const payMethodMatch = rawNotes.match(/Payment Method:\s*([^\.\n]+)/i);
+
+      const sId = String(targetBooking.service_id || targetBooking.serviceId || (targetBooking.serviceIds && targetBooking.serviceIds[0]) || "");
+      const dId = String(targetBooking.provider_id || targetBooking.doctorId || targetBooking.doctor_id || "");
+      const pPhone = targetBooking.phone || targetBooking.customer_phone || targetBooking.patientPhone || "";
+      const pName = targetBooking.name || targetBooking.customer_name || targetBooking.patientName || "";
+      const bDate = (targetBooking.date || "").slice(0, 10);
+      const invVal = targetBooking.price != null
+        ? String(targetBooking.price)
+        : (invTotalMatch ? invTotalMatch[1] : (targetBooking.amount_paid != null ? String(Number(targetBooking.amount_paid) + Number(targetBooking.amount_left || 0)) : ""));
+      const actSpent = targetBooking.amount_paid != null
+        ? String(targetBooking.amount_paid)
+        : (spentMatch ? spentMatch[1] : (targetBooking.amountPaid != null ? String(targetBooking.amountPaid) : ""));
+      const payType = targetBooking.payment_type || targetBooking.payment_method || (payMethodMatch ? payMethodMatch[1].trim() : "");
+
+      if (pPhone) setPatientPhone(pPhone);
+      if (pName) setPatientName(pName);
+      if (bDate) setBookingDate(bDate);
+      if (dId) setSelectedDoctorId(dId);
+      if (sId) setSelectedServiceId(sId);
+      if (invVal) setInvoiceValue(invVal);
+      if (actSpent) setActualSpent(actSpent);
+      if (payType) setSelectedPaymentType(payType);
+      if (cleanNotes) setNotes(cleanNotes);
+
+      if (sId && services.length > 0) {
+        const foundSvc = services.find((s) => String(s.id) === sId);
+        if (foundSvc) {
+          setServiceSearchQuery(getServiceName(foundSvc));
+        }
+      }
+    }
+  }, [targetBooking, services, lang]);
+
   // Helper to extract package name cleanly
   const getPackageName = (p: PackageItem) => {
     if (lang === "ar" && p.nameAr) return p.nameAr;
@@ -345,7 +406,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       const parsedInvoiceVal = invoiceValue !== "" ? parseFloat(invoiceValue) : 0;
       const parsedSpentVal = actualSpent !== "" ? parseFloat(actualSpent) : 0;
 
-      const payload = {
+      const payload: Record<string, any> = {
         patientPhone: trimmedPhone,
         patientName: trimmedName,
         date: bookingDate,
@@ -364,9 +425,13 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         branchId: activeBranchId || null
       };
 
-      // POST /api/reservations/previous is staff-gated
+      if (isEditMode) {
+        payload.id = targetBooking.id;
+      }
+
+      // POST / PATCH /api/reservations/previous is staff-gated
       const res = await fetch("/api/reservations/previous", {
-        method: "POST",
+        method: isEditMode ? "PATCH" : "POST",
         headers: await getAuthHeaders(),
         body: JSON.stringify(payload)
       });
@@ -383,16 +448,22 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         return;
       }
 
-      setSuccessMsg(tr.successMessage);
+      setSuccessMsg(isEditMode ? (tr.updateSuccessMessage || "Previous booking updated successfully!") : tr.successMessage);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("revera-booking-change"));
         window.dispatchEvent(new CustomEvent("revera-prescription-change"));
       }
       setTimeout(() => {
-        onBookingCreated?.();
+        if (isEditMode && onBookingUpdated) {
+          onBookingUpdated();
+        } else if (onBookingCreated) {
+          onBookingCreated();
+        } else {
+          onClose();
+        }
       }, 750);
     } catch (err: any) {
-      console.error("Error creating previous booking:", err);
+      console.error("Error saving previous booking:", err);
       setErrors({ general: tr.errorMessage });
       setSaving(false);
     }
@@ -419,10 +490,10 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         </div>
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#111827] tracking-tight">
-            {tr.title}
+            {isEditMode ? (tr.editTitle || "Edit Previous Booking") : tr.title}
           </h1>
           <p className="text-xs sm:text-sm text-[#5A6A51] mt-0.5 font-medium">
-            {tr.subtitle}
+            {isEditMode ? (tr.editSubtitle || "Update historical booking details and financial records.") : tr.subtitle}
           </p>
         </div>
       </div>
@@ -923,12 +994,12 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             {saving ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                <span>{tr.savingBtn}</span>
+                <span>{isEditMode ? (tr.updatingBtn || "Updating...") : tr.savingBtn}</span>
               </>
             ) : (
               <>
                 <Save size={16} />
-                <span>{tr.submitBtn}</span>
+                <span>{isEditMode ? (tr.updateBookingBtn || "Update Booking") : tr.submitBtn}</span>
               </>
             )}
           </button>

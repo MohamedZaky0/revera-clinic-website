@@ -3,7 +3,7 @@ import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordTransaction } from '@/lib/transactionLedger';
-import { writeHistoricalBookingInvoice } from '@/lib/historicalInvoice';
+import { writeHistoricalBookingInvoice, mapPaymentMethod } from '@/lib/historicalInvoice';
 
 function isValidPhoneNumber(phoneStr: string): boolean {
   if (!phoneStr) return false;
@@ -661,6 +661,209 @@ export async function POST(req: Request) {
     console.error('POST /api/reservations/previous error:', err);
     return NextResponse.json(
       { error: 'Internal server error while saving historical booking.', details: err?.message },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PATCH /api/reservations/previous
+ * Allows Superadmin accounts to edit a previously recorded historical booking.
+ * Updates reservation details, clinical notes, and reconciles associated ledger invoices.
+ */
+export async function PATCH(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
+  const role = access.access.role;
+  const isSuperadmin = role === 'superadmin' || role.includes('super');
+  if (!isSuperadmin) {
+    return NextResponse.json(
+      { error: 'Only superadmin accounts are authorized to edit previous bookings.' },
+      { status: 403 }
+    );
+  }
+
+  try {
+    const body = await req.json();
+    const {
+      id,
+      patientPhone,
+      patientName,
+      date,
+      doctorId,
+      doctorName,
+      serviceId,
+      serviceName,
+      packageId,
+      packageName,
+      productId,
+      productName,
+      invoiceValue,
+      actualSpent,
+      paymentType,
+      notes,
+      branchId
+    } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Missing required reservation id' }, { status: 400 });
+    }
+
+    // 1. Fetch existing reservation to ensure it exists and is historical
+    const { data: existing, error: findError } = await supabaseServer
+      .from('reservations')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError || !existing) {
+      return NextResponse.json({ error: 'Reservation not found.' }, { status: 404 });
+    }
+
+    // 2. Validate input fields
+    const rawName = patientName ? String(patientName).trim() : existing.name;
+    const rawPhone = patientPhone ? String(patientPhone).trim() : existing.phone;
+    const rawDate = date ? String(date).trim() : existing.date;
+
+    if (!rawName) return NextResponse.json({ error: 'Patient name is required.', field: 'patientName' }, { status: 400 });
+    if (!rawPhone || !isValidPhoneNumber(rawPhone)) return NextResponse.json({ error: 'Invalid phone number format.', field: 'patientPhone' }, { status: 400 });
+    if (!rawDate) return NextResponse.json({ error: 'Date is required.', field: 'date' }, { status: 400 });
+
+    const cleanMobile = cleanPhoneForDb(rawPhone);
+    const parsedValue = typeof invoiceValue === 'number' ? invoiceValue : parseFloat(invoiceValue) || 0;
+    const parsedPaid = typeof actualSpent === 'number' ? actualSpent : parseFloat(actualSpent) || 0;
+
+    let resolvedDoctorId = doctorId || existing.provider_id || null;
+    let resolvedDoctorName = doctorName || existing.doctor_name || null;
+    if (resolvedDoctorId) {
+      const { data: prov } = await supabaseServer.from('providers').select('id, name').eq('id', resolvedDoctorId).maybeSingle();
+      if (prov?.name) resolvedDoctorName = prov.name;
+    }
+
+    let resolvedServiceId = serviceId ? Number(serviceId) : (existing.service_id ? Number(existing.service_id) : null);
+    let resolvedServiceName = serviceName || null;
+    if (resolvedServiceId && !resolvedServiceName) {
+      const { data: svc } = await supabaseServer.from('services').select('id, en, ar').eq('id', resolvedServiceId).maybeSingle();
+      if (svc) resolvedServiceName = svc.en || svc.ar || `Service #${svc.id}`;
+    }
+
+    // 3. Reconstruct clean historical reception notes
+    const historicalTag = '[Historical Booking]';
+    const srvNote = resolvedServiceName ? ` Service: ${resolvedServiceName}.` : '';
+    const pkgNote = packageName ? ` Package: ${packageName}.` : '';
+    const prodNote = productName ? ` Product: ${productName}.` : '';
+    const valNote = parsedValue > 0 ? ` [Invoice Total]: ${parsedValue} EGP.` : '';
+    const spentNote = ` Actual Spent: ${parsedPaid} EGP.`;
+    const paymentNote = paymentType ? ` Payment Method: ${paymentType}.` : '';
+    const userNote = notes ? ` ${notes}` : '';
+    const receptionNote = `${historicalTag} Added manually for historical records.${srvNote}${pkgNote}${prodNote}${valNote}${spentNote}${paymentNote}${userNote}`.trim();
+
+    // 4. Update reservation row
+    const updatePayload: Record<string, any> = {
+      name: rawName,
+      phone: cleanMobile,
+      date: rawDate.slice(0, 10),
+      service_id: resolvedServiceId,
+      service_ids: resolvedServiceId ? [resolvedServiceId] : [],
+      provider_id: resolvedDoctorId,
+      doctor_name: resolvedDoctorName || '—',
+      branch_id: branchId || existing.branch_id || null,
+      reception_notes: receptionNote,
+      notes: receptionNote,
+      amount_paid: parsedPaid,
+      amount_left: Math.max(0, parsedValue - parsedPaid),
+      completed_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: updatedReservation, error: updateError } = await supabaseServer
+      .from('reservations')
+      .update(updatePayload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Failed to update historical reservation:', updateError.message);
+      return NextResponse.json(
+        { error: 'Failed to update historical booking in database.', details: updateError.message },
+        { status: 500 }
+      );
+    }
+
+    // 5. Reconcile associated invoice / invoice_lines / payments if existing
+    try {
+      const { data: existingInv } = await supabaseServer
+        .from('invoices')
+        .select('id')
+        .eq('reservation_id', id)
+        .maybeSingle();
+
+      if (existingInv) {
+        const total = parsedValue > 0 ? parsedValue : parsedPaid;
+        await supabaseServer
+          .from('invoices')
+          .update({
+            issued_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
+            subtotal: total,
+            grand_total: total,
+            branch_id: branchId || existing.branch_id || null
+          })
+          .eq('id', existingInv.id);
+
+        await supabaseServer
+          .from('invoice_lines')
+          .update({
+            unit_price: total,
+            total: total,
+            description: `${resolvedServiceName || 'Historical booking'} [historical backfill]`,
+            service_id: resolvedServiceId || null
+          })
+          .eq('invoice_id', existingInv.id);
+
+        if (parsedPaid > 0) {
+          const { data: existingPay } = await supabaseServer
+            .from('payments')
+            .select('id')
+            .eq('invoice_id', existingInv.id)
+            .maybeSingle();
+
+          if (existingPay) {
+            await supabaseServer
+              .from('payments')
+              .update({
+                amount: parsedPaid,
+                received_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
+                method: mapPaymentMethod(paymentType)
+              })
+              .eq('id', existingPay.id);
+          } else {
+            await supabaseServer
+              .from('payments')
+              .insert({
+                invoice_id: existingInv.id,
+                received_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
+                amount: parsedPaid,
+                method: mapPaymentMethod(paymentType),
+                recorded_by: (access as any).access?.employee?.id || null
+              });
+          }
+        }
+      }
+    } catch (invErr: any) {
+      console.warn('Could not reconcile historical invoice (non-fatal):', invErr?.message);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Historical booking updated successfully.',
+      booking: updatedReservation
+    });
+  } catch (err: any) {
+    console.error('PATCH /api/reservations/previous error:', err);
+    return NextResponse.json(
+      { error: 'Internal server error while updating historical booking.', details: err?.message },
       { status: 500 }
     );
   }
