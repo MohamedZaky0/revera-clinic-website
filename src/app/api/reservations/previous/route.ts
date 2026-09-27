@@ -128,6 +128,8 @@ export async function POST(req: Request) {
       serviceName,
       packageId,
       packageName,
+      customerPackageId,
+      existingCustomerPackageId,
       packagePulsesTotal,
       packagePulsesUsed,
       packagePulsesRemaining,
@@ -208,8 +210,8 @@ export async function POST(req: Request) {
     let packagePrice = 0;
     let resolvedPackageName = packageName || null;
     let packageRecord: any = null;
-    // Outcome of creating the patient's package, returned to the caller (DEC-088 item 6).
-    let packageOutcome: { created: boolean; pricePending: boolean; packageType: string; totalPulses: number; error?: string } | null = null;
+    // Outcome of creating or updating the patient's package, returned to the caller (DEC-088 item 6).
+    let packageOutcome: { created: boolean; updated?: boolean; existingId?: string; pricePending?: boolean; packageType?: string; totalPulses?: number; error?: string } | null = null;
     if (packageId) {
       const { data: pkgRow } = await supabaseServer
         .from('packages')
@@ -537,8 +539,9 @@ export async function POST(req: Request) {
         console.warn('Could not insert reservation_products for package (non-fatal):', rpErr?.message);
       }
 
-      // Create active package record for patient profile
-      if (customerId && (packageId || packageRecord?.id)) {
+      // Create or update active package record for patient profile
+      const targetExistingPkgId = customerPackageId || existingCustomerPackageId;
+      if (customerId && (targetExistingPkgId || packageId || packageRecord?.id)) {
         const pId = packageId || packageRecord?.id;
         const validityDays = Number(packageRecord?.validity_days || 365);
         const expiresAt = new Date(rawDate);
@@ -559,61 +562,99 @@ export async function POST(req: Request) {
           : (isServicesFullyUsed ? 'fully_used' : 'active');
 
         try {
-          const { data: cp, error: cpErr } = await supabaseServer
-            .from('customer_packages')
-            .insert({
-              customer_id: customerId,
-              package_id: pId,
-              purchased_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
-              expires_at: expiresAt.toISOString(),
-              price_paid: pricePending ? 0 : enteredPackagePrice,
-              price_pending: pricePending,
-              status,
-              ...(isPulsesPackage
-                ? { package_type: 'pulses', total_pulses: catalogTotalPulses, pulses_used: pulsesUsed, pulses_remaining: pulsesRemaining }
-                : {})
-            })
-            .select('id')
-            .maybeSingle();
+          if (targetExistingPkgId) {
+            // Update existing customer_packages record
+            const { data: cp, error: cpErr } = await supabaseServer
+              .from('customer_packages')
+              .update({
+                status,
+                ...(isPulsesPackage
+                  ? { pulses_used: pulsesUsed, pulses_remaining: pulsesRemaining }
+                  : {})
+              })
+              .eq('id', targetExistingPkgId)
+              .select('id')
+              .maybeSingle();
 
-          packageOutcome = {
-            created: Boolean(cp?.id),
-            pricePending,
-            packageType: isPulsesPackage ? 'pulses' : 'services',
-            totalPulses: isPulsesPackage ? catalogTotalPulses : 0,
-            ...(cpErr ? { error: cpErr.message } : {}),
-          };
-          if (cpErr) console.error('Failed to create customer_packages record for historical booking:', cpErr.message);
+            packageOutcome = {
+              created: false,
+              updated: Boolean(cp?.id),
+              existingId: targetExistingPkgId,
+              packageType: isPulsesPackage ? 'pulses' : 'services',
+              totalPulses: isPulsesPackage ? catalogTotalPulses : 0,
+              ...(cpErr ? { error: cpErr.message } : {})
+            };
 
-          if (cp?.id) {
-            const { data: pkgItems } = await supabaseServer
-              .from('package_items')
-              .select('service_id, qty')
-              .eq('package_id', pId);
+            if (Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0) {
+              for (const it of packageItemsUsage) {
+                await supabaseServer
+                  .from('customer_package_items')
+                  .update({
+                    qty_used: it.qtyUsed,
+                    qty_remaining: it.qtyRemaining
+                  })
+                  .eq('customer_package_id', targetExistingPkgId)
+                  .eq('service_id', it.serviceId);
+              }
+            }
+          } else {
+            // Insert fresh customer_packages record
+            const { data: cp, error: cpErr } = await supabaseServer
+              .from('customer_packages')
+              .insert({
+                customer_id: customerId,
+                package_id: pId,
+                purchased_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
+                expires_at: expiresAt.toISOString(),
+                price_paid: pricePending ? 0 : enteredPackagePrice,
+                price_pending: pricePending,
+                status,
+                ...(isPulsesPackage
+                  ? { package_type: 'pulses', total_pulses: catalogTotalPulses, pulses_used: pulsesUsed, pulses_remaining: pulsesRemaining }
+                  : {})
+              })
+              .select('id')
+              .maybeSingle();
 
-            if (pkgItems && pkgItems.length > 0) {
-              await supabaseServer.from('customer_package_items').insert(
-                pkgItems.map((item: any) => {
-                  const usageMatch = Array.isArray(packageItemsUsage)
-                    ? packageItemsUsage.find((u: any) => Number(u.serviceId) === Number(item.service_id))
-                    : null;
-                  const qtyTotal = Number(usageMatch?.qtyTotal ?? item.qty);
-                  const qtyUsed = Number(usageMatch?.qtyUsed ?? 0);
-                  const qtyRemaining = Number(usageMatch?.qtyRemaining ?? Math.max(0, qtyTotal - qtyUsed));
+            packageOutcome = {
+              created: Boolean(cp?.id),
+              pricePending,
+              packageType: isPulsesPackage ? 'pulses' : 'services',
+              totalPulses: isPulsesPackage ? catalogTotalPulses : 0,
+              ...(cpErr ? { error: cpErr.message } : {}),
+            };
+            if (cpErr) console.error('Failed to create customer_packages record for historical booking:', cpErr.message);
 
-                  return {
-                    customer_package_id: cp.id,
-                    service_id: item.service_id,
-                    qty_total: qtyTotal,
-                    qty_used: qtyUsed,
-                    qty_remaining: qtyRemaining
-                  };
-                })
-              );
+            if (cp?.id) {
+              const { data: pkgItems } = await supabaseServer
+                .from('package_items')
+                .select('service_id, qty')
+                .eq('package_id', pId);
+
+              if (pkgItems && pkgItems.length > 0) {
+                await supabaseServer.from('customer_package_items').insert(
+                  pkgItems.map((item: any) => {
+                    const usageMatch = Array.isArray(packageItemsUsage)
+                      ? packageItemsUsage.find((u: any) => Number(u.serviceId) === Number(item.service_id))
+                      : null;
+                    const qtyTotal = Number(usageMatch?.qtyTotal ?? item.qty);
+                    const qtyUsed = Number(usageMatch?.qtyUsed ?? 0);
+                    const qtyRemaining = Number(usageMatch?.qtyRemaining ?? Math.max(0, qtyTotal - qtyUsed));
+
+                    return {
+                      customer_package_id: cp.id,
+                      service_id: item.service_id,
+                      qty_total: qtyTotal,
+                      qty_used: qtyUsed,
+                      qty_remaining: qtyRemaining
+                    };
+                  })
+                );
+              }
             }
           }
         } catch (cpErr: any) {
-          console.warn('Could not insert customer_packages record (non-fatal):', cpErr?.message);
+          console.warn('Could not process customer_packages record (non-fatal):', cpErr?.message);
           packageOutcome = { created: false, pricePending, packageType: isPulsesPackage ? 'pulses' : 'services', totalPulses: isPulsesPackage ? catalogTotalPulses : 0, error: cpErr?.message || String(cpErr) };
         }
       }
@@ -734,6 +775,8 @@ export async function PATCH(req: Request) {
       serviceName,
       packageId,
       packageName,
+      customerPackageId,
+      existingCustomerPackageId,
       packagePulsesTotal,
       packagePulsesUsed,
       packagePulsesRemaining,
@@ -865,7 +908,8 @@ export async function PATCH(req: Request) {
     }
 
     // 4b. If package is associated with this booking, update or create customer_packages record
-    if (existing.customer_id && (packageId || packageRecord?.id)) {
+    const targetPatchPkgId = customerPackageId || existingCustomerPackageId;
+    if (existing.customer_id && (targetPatchPkgId || packageId || packageRecord?.id)) {
       const pId = packageId || packageRecord?.id;
       const isServicesFullyUsed = Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0
         ? packageItemsUsage.every((it: any) => Number(it.qtyRemaining ?? 0) <= 0)
@@ -875,16 +919,22 @@ export async function PATCH(req: Request) {
         : (isServicesFullyUsed ? 'fully_used' : 'active');
 
       try {
-        const { data: existingCp } = await supabaseServer
-          .from('customer_packages')
-          .select('id')
-          .eq('customer_id', existing.customer_id)
-          .eq('package_id', pId)
-          .order('purchased_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        let cpIdToUpdate = targetPatchPkgId;
+        if (!cpIdToUpdate) {
+          const { data: existingCp } = await supabaseServer
+            .from('customer_packages')
+            .select('id')
+            .eq('customer_id', existing.customer_id)
+            .eq('package_id', pId)
+            .order('purchased_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (existingCp?.id) {
+            cpIdToUpdate = existingCp.id;
+          }
+        }
 
-        if (existingCp?.id) {
+        if (cpIdToUpdate) {
           await supabaseServer
             .from('customer_packages')
             .update({
@@ -893,7 +943,7 @@ export async function PATCH(req: Request) {
                 ? { package_type: 'pulses', total_pulses: catalogTotalPulses, pulses_used: pulsesUsed, pulses_remaining: pulsesRemaining }
                 : {})
             })
-            .eq('id', existingCp.id);
+            .eq('id', cpIdToUpdate);
 
           if (Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0) {
             for (const it of packageItemsUsage) {
@@ -904,7 +954,7 @@ export async function PATCH(req: Request) {
                   qty_used: it.qtyUsed,
                   qty_remaining: it.qtyRemaining
                 })
-                .eq('customer_package_id', existingCp.id)
+                .eq('customer_package_id', cpIdToUpdate)
                 .eq('service_id', it.serviceId);
             }
           }
