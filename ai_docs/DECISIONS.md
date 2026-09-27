@@ -3213,4 +3213,29 @@ Historical / previous bookings intake (`/api/reservations/previous` and `AdminAd
    - Removed redundant double calendar icons in the date input field.
    - Services input converted to an interactive searchable combobox filtering services dynamically as the user types.
 
+---
+
+## DEC-092: Historical Booking Package Consumption & Remaining Quota Breakdown
+
+**Date:** 2026-09-27
+**Status:** Decided & Implemented
+
+**Context:**
+When patients joined Revera with packages purchased under previous historical systems (prior to clinic software adoption), receptionists and clinic staff could select the package in Previous Bookings intake, but could not specify how much of the package was already consumed prior to onboarding versus what remained active. This resulted in either recording full package capacity as fresh or requiring manual ledger adjustments.
+
+**Decisions & Implementation:**
+1. **Interactive Breakdown UI (`AdminAddPreviousBookingView.tsx`):**
+   - When any package is selected in Previous Booking intake or Superadmin Edit mode, a dedicated breakdown card appears dynamically under Row 2.
+   - **Pulses Packages:** Displays total pulses quota, editable **Pulses Used** input, and editable **Pulses Left (Remaining)** input with live two-way synchronization (`total - used = remaining`, `total - remaining = used`), quick preset buttons (0 Used, 25%, 50%, 75%, All Used), and live capacity progress bar.
+   - **Services Packages:** Displays itemized list of package services with total sessions, increment/decrement steppers for **Sessions Used** and **Sessions Remaining**, and fast toggle buttons (`0 Used`, `All Used`).
+   - Dynamic status badging displays either `"Active Quota Left"` (green) or `"Fully Consumed (0 Left)"` (amber).
+2. **Backend Persistence (`/api/reservations/previous` POST & PATCH):**
+   - Accepts `packagePulsesTotal`, `packagePulsesUsed`, `packagePulsesRemaining`, and `packageItemsUsage`.
+   - Inserts or updates `customer_packages` with exact `pulses_used`, `pulses_remaining`, and sets `status = 'fully_used'` when remaining quota is 0, or `'active'` when quota remains.
+   - For services packages, populates `customer_package_items` with itemized `qty_total`, `qty_used`, and `qty_remaining`.
+   - Formats and appends structured breakdown note `[Package Usage]: ...` to historical reservation notes.
+3. **Bilingual Translations & Test Coverage:**
+   - Fully localized in English and Arabic (`src/components/admin/translations.ts`).
+   - Vitest suite in `tests/routes/reservations-previous-package.test.ts` validates partial usage, full consumption, and itemized quota recording with 100% pass rate.
+
 
