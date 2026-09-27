@@ -10052,18 +10052,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     checkoutBooking.laserPaymentMode === "PACKAGE" ||
                     (checkoutBooking as any).laser_payment_mode === "PACKAGE" ||
                     String(checkoutBooking.notes || "").toLowerCase().includes("package redemption") ||
+                    String(checkoutBooking.notes || "").toLowerCase().includes("pulses package") ||
                     String(checkoutBooking.notes || "").includes("[Laser Package]") ||
-                    String(checkoutBooking.notes || "").includes("[Laser Package Redemption]")
+                    String(checkoutBooking.notes || "").includes("[Laser Package Redemption]") ||
+                    String(checkoutBooking.notes || "").includes("[Purchasing New Pulses Package]") ||
+                    String(checkoutBooking.notes || "").includes("Option 3: Pay with Pulses Package")
                   );
                   if (isLaserPkgCheckout) {
                     try {
                       const deliveredPulsesVal = Number(
                         checkoutBooking.deliveredPulses ||
                         (checkoutBooking as any).delivered_pulses ||
-                        (() => {
-                          const m = String(checkoutBooking.notes || "").match(/(\d+(?:,\d+)?)\s*pulses/i);
-                          return m ? Number(m[1].replace(/,/g, '')) : 0;
-                        })()
+                        extractPrimaryPulses(String(checkoutBooking.notes || ""), checkoutBooking) ||
+                        0
                       );
                       const targetCustId = customerRecord?.id || (checkoutBooking as any).customerId || (checkoutBooking as any).customer_id;
                       const notesStr = String(checkoutBooking.notes || "");

@@ -109,9 +109,12 @@ describe('extractPulsePackageQuota', () => {
     expect(extractPulsePackageQuota(arabicNotes2)).toBe(5000);
   });
 
-  it('extracts quota when laser payment mode note is present', () => {
-    const notes = '[Laser Service Payment Mode]: Option 3: Pay with Pulses Package\n[Purchasing New Pulses Package]: 2.5k Pulses (1500 EGP · 2,500 pulses)';
-    expect(extractPulsePackageQuota(notes)).toBe(2500);
+  it('does not confuse deducted delivered pulses with package quota', () => {
+    const notesWithDeduction = `[Purchasing New Pulses Package]: 2.5k Pulses (1500 EGP · 2,500 pulses)
+[Customer Package ID]: CP-123
+[Laser Pulses Delivered]: Primary: 5,000 pulses, Total: 5,000 pulses
+[Laser Package Redemption]: Deducted 5,000 pulses from 2.5k Pulses / تم استهلاك 5,000 نبضة من باقة 2.5k Pulses`;
+    expect(extractPulsePackageQuota(notesWithDeduction)).toBe(2500);
   });
 });
 

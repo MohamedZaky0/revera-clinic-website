@@ -1480,6 +1480,54 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const pkgDetails = pkgMatch ? pkgMatch[1] : `Delivered ${finalDeliveredPulses} pulses covered by pulses package`;
         const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are covered by Pulses Package (${pkgDetails}) / تم الاتفاق على أن تكون خدمات الليزر مغطاة بباقة النبضات`;
         updatedNotes = updatedNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
+
+        // Automatically deduct pulses used up to package quota from the customer package record
+        if (finalDeliveredPulses > 0) {
+          const custId = booking.customerId || (booking as any).customer_id;
+          const notePkgIdMatch = String(booking?.notes || "").match(/\[Customer Package ID\]:\s*([0-9a-f-]+)/i) ||
+            String(booking?.notes || "").match(/Package ID:\s*([0-9a-f-]+)/i) ||
+            String(booking?.notes || "").match(/\[Customer Package ID\]:\s*([^\n\]]+)/i);
+          let targetPkgId = (booking as any)?.customerPackageId ||
+            (booking as any)?.customer_package_id ||
+            (booking as any)?.packageId ||
+            (booking as any)?.package_id ||
+            (notePkgIdMatch ? notePkgIdMatch[1]?.trim() : null);
+
+          if (!targetPkgId && custId) {
+            const cust = (dbCustomers || []).find((c: any) => String(c.id) === String(custId));
+            const pList = cust?.packages || [];
+            const actPkg = pList.find((p: any) => {
+              const rem = Number(p.remainingPulses ?? p.pulsesRemaining ?? p.remaining_pulses ?? p.pulses_remaining ?? 0);
+              return (p.status || "active").toLowerCase() === "active" && rem > 0;
+            });
+            if (actPkg) targetPkgId = actPkg.id;
+          }
+
+          const notePkgQuotaVal = extractPulsePackageQuota(String(booking?.notes || ""));
+          const pkgQuotaForDeduction = notePkgQuotaVal !== null ? notePkgQuotaVal : finalDeliveredPulses;
+          const pulsesToDeduct = Math.min(pkgQuotaForDeduction > 0 ? pkgQuotaForDeduction : finalDeliveredPulses, finalDeliveredPulses);
+          if (targetPkgId && pulsesToDeduct > 0) {
+            try {
+              await fetch("/api/customers/packages", {
+                method: "PATCH",
+                headers: authenticatedJsonHeaders,
+                body: JSON.stringify({
+                  action: "consume_package_pulses",
+                  customer_package_id: targetPkgId,
+                  package_id: targetPkgId,
+                  quantity_used: pulsesToDeduct,
+                  pulses: pulsesToDeduct,
+                  booking_id: booking.id,
+                  reservationId: booking.id,
+                  used_by: "Reception Session Finalization",
+                  notes: `Session pulse deduction (${pulsesToDeduct} pulses)`
+                })
+              });
+            } catch (e) {
+              console.error("Error deducting package pulses during reception end session:", e);
+            }
+          }
+        }
       }
 
       const patchRes = await fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}`, {

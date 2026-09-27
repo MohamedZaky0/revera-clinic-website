@@ -55,8 +55,11 @@ export function computeDeficitInvoiceImpact({
 export function extractPulsePackageQuota(notesStr?: string | null): number | null {
   if (!notesStr || typeof notesStr !== 'string') return null;
 
-  // 1. Explicit remaining pulses format: "(X pulses remaining)" or "(X نبضة متبقية)"
-  const remMatch = notesStr.match(/(\d+(?:,\d+)?)\s*(?:pulses remaining|نبضة متبقية|نبضات متبقية)/i);
+  // 1. Explicit remaining pulses format: "(X pulses remaining)" or "(X نبضة متبقية)" or "remaining: X pulses"
+  const remMatch =
+    notesStr.match(/(\d+(?:,\d+)?)\s*(?:pulses remaining|نبضة متبقية|نبضات متبقية)/i) ||
+    notesStr.match(/remaining:\s*(\d+(?:,\d+)?)\s*(?:pulses|نبضة)/i) ||
+    notesStr.match(/والمتبقي\s*(\d+(?:,\d+)?)\s*(?:نبضة|نبضات)/i);
   if (remMatch) return Number(remMatch[1].replace(/,/g, ''));
 
   // 2. New Package Purchase format (EN & AR): "[Purchasing New Pulses Package]: Name (Price EGP · 2,500 pulses)" or "(2,500 نبضة)"
@@ -73,9 +76,11 @@ export function extractPulsePackageQuota(notesStr?: string | null): number | nul
   const initMatch = notesStr.match(/Initial package purchase:[^(]*\((\d+(?:,\d+)?)\s*(?:pulses|نبضة|نبضات)/i);
   if (initMatch) return Number(initMatch[1].replace(/,/g, ''));
 
-  // 5. Fallback to any quota in bracketed package line:
-  const pkgLineMatch = notesStr.match(/\[(?:Laser Package|Laser Package Redemption|Purchasing New Pulses Package)[^\]]*\]:[^\n]*?(\d+(?:,\d+)?)\s*(?:pulses|نبضة|نبضات)/i);
-  if (pkgLineMatch) return Number(pkgLineMatch[1].replace(/,/g, ''));
+  // 5. Total pulses format in package lines: "(2,500 total pulses)" or "(2500 pulses @ 1500 EGP)"
+  const totalPulsesMatch =
+    notesStr.match(/\((\d+(?:,\d+)?)\s*(?:total pulses|إجمالي نبضات|pulses @|نبضة @)/i) ||
+    notesStr.match(/\[Laser Package[^\]]*\]:[^(]*\([^)]*?[·•]\s*(\d+(?:,\d+)?)\s*(?:pulses|نبضة)/i);
+  if (totalPulsesMatch) return Number(totalPulsesMatch[1].replace(/,/g, ''));
 
   return null;
 }

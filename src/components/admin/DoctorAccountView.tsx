@@ -20,6 +20,7 @@ import DoctorSessionDrawer from "./doctor/modals/DoctorSessionDrawer";
 import DoctorPatientHistoryDrawer from "./doctor/modals/DoctorPatientHistoryDrawer";
 import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
 import { resolveLaserPulseRate } from "@/lib/laserRate";
+import { extractPulsePackageQuota } from "@/lib/laserDeficit";
 
 // Local Date Helper to avoid UTC conversion shifts
 const getLocalDateString = (d: Date = new Date()): string => {
@@ -1368,9 +1369,18 @@ export default function DoctorAccountView({
 
             // Resolve target pulses package ID from multiple sources to guarantee deduction
             let targetPkgId = laserData.sourceId || targetBooking?.packageId || targetBooking?.package_id || (targetBooking as any)?.packageId || null;
-            if (!targetPkgId && custId) {
+            if (!targetPkgId) {
+              const notesPkgMatch = String(targetBooking?.notes || "").match(/\[Customer Package ID\]:\s*([0-9a-f-]+)/i) ||
+                String(targetBooking?.notes || "").match(/Package ID:\s*([0-9a-f-]+)/i) ||
+                String(targetBooking?.notes || "").match(/\[Customer Package ID\]:\s*([^\n\]]+)/i);
+              if (notesPkgMatch) {
+                targetPkgId = notesPkgMatch[1].trim();
+              }
+            }
+            if (!targetPkgId && (custId || phone)) {
               try {
-                const pkgLookupRes = await fetch(`/api/customers/packages?customerId=${encodeURIComponent(custId)}`, { headers });
+                const param = custId ? `customerId=${encodeURIComponent(custId)}` : `phone=${encodeURIComponent(phone)}`;
+                const pkgLookupRes = await fetch(`/api/customers/packages?${param}`, { headers });
                 if (pkgLookupRes.ok) {
                   const pkgLookupData = await pkgLookupRes.json();
                   const pList = pkgLookupData.customerPackages || pkgLookupData.packages || [];
@@ -1649,7 +1659,10 @@ export default function DoctorAccountView({
         }
       } else if (doctorDeliveredPulses > 0) {
         const pkgName = laserData?.sourceName || "Laser Pulses Package";
-        const pulseString = `\n[Laser Package Redemption]: Deducted ${doctorDeliveredPulses} pulses from ${pkgName} / تم استهلاك ${doctorDeliveredPulses} نبضة من باقة ${pkgName}`;
+        const notePkgRem = extractPulsePackageQuota(completionNotes);
+        const pkgQuota = notePkgRem !== null ? notePkgRem : doctorDeliveredPulses;
+        const deductedPulses = Math.min(pkgQuota > 0 ? pkgQuota : doctorDeliveredPulses, doctorDeliveredPulses);
+        const pulseString = `\n[Laser Package Redemption]: Deducted ${deductedPulses} pulses from ${pkgName} / تم استهلاك ${deductedPulses} نبضة من باقة ${pkgName}`;
         completionNotes = completionNotes.replace(/\[(?:Laser Package Redemption|Laser Package Settlement)\]:[^\n\[]*/gi, "").trim() + pulseString;
         const settlementString = `\n[Laser Settlement]: Settled that laser services in this session are covered by Pulses Package (${pkgName}) / تم الاتفاق على أن تكون خدمات الليزر مغطاة بباقة النبضات (${pkgName})`;
         completionNotes = completionNotes.replace(/\[Laser Settlement\]:[^\n\[]*/gi, "").trim() + settlementString;
