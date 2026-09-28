@@ -3,7 +3,7 @@ import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordTransaction } from '@/lib/transactionLedger';
-import { writeHistoricalBookingInvoice, mapPaymentMethod } from '@/lib/historicalInvoice';
+import { writeHistoricalBookingInvoice, mapPaymentMethod, syncPreLaunchPulseUsage } from '@/lib/historicalInvoice';
 
 function isValidPhoneNumber(phoneStr: string): boolean {
   if (!phoneStr) return false;
@@ -211,7 +211,7 @@ export async function POST(req: Request) {
     let resolvedPackageName = packageName || null;
     let packageRecord: any = null;
     // Outcome of creating or updating the patient's package, returned to the caller (DEC-088 item 6).
-    let packageOutcome: { created: boolean; updated?: boolean; existingId?: string; pricePending?: boolean; packageType?: string; totalPulses?: number; error?: string } | null = null;
+    let packageOutcome: { created: boolean; updated?: boolean; existingId?: string; pricePending?: boolean; packageType?: string; totalPulses?: number; error?: string; pulseUsageSyncError?: string } | null = null;
     if (packageId) {
       const { data: pkgRow } = await supabaseServer
         .from('packages')
@@ -585,6 +585,22 @@ export async function POST(req: Request) {
               ...(cpErr ? { error: cpErr.message } : {})
             };
 
+            // RISK-106: keep the pulses used before launch in the same audit trail
+            // confirm_historical_package_price uses, so they stay visible to the deferred
+            // balance and remain eligible for revenue recognition once linked to a booking.
+            if (isPulsesPackage && cp?.id) {
+              const sync = await syncPreLaunchPulseUsage({
+                customerPackageId: targetExistingPkgId,
+                quantityUsed: pulsesUsed,
+                remainingAfter: pulsesRemaining,
+                purchasedAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
+              });
+              if (sync.status === 'failed') {
+                console.warn('Could not sync pre-launch pulse usage (non-fatal):', sync.error);
+                packageOutcome.pulseUsageSyncError = sync.error;
+              }
+            }
+
             if (Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0) {
               for (const it of packageItemsUsage) {
                 await supabaseServer
@@ -624,6 +640,20 @@ export async function POST(req: Request) {
               ...(cpErr ? { error: cpErr.message } : {}),
             };
             if (cpErr) console.error('Failed to create customer_packages record for historical booking:', cpErr.message);
+
+            // RISK-106: same audit trail as the update branch above.
+            if (isPulsesPackage && cp?.id) {
+              const sync = await syncPreLaunchPulseUsage({
+                customerPackageId: cp.id,
+                quantityUsed: pulsesUsed,
+                remainingAfter: pulsesRemaining,
+                purchasedAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
+              });
+              if (sync.status === 'failed') {
+                console.warn('Could not sync pre-launch pulse usage (non-fatal):', sync.error);
+                packageOutcome.pulseUsageSyncError = sync.error;
+              }
+            }
 
             if (cp?.id) {
               const { data: pkgItems } = await supabaseServer
@@ -818,14 +848,14 @@ export async function PATCH(req: Request) {
     const parsedValue = typeof invoiceValue === 'number' ? invoiceValue : parseFloat(invoiceValue) || 0;
     const parsedPaid = typeof actualSpent === 'number' ? actualSpent : parseFloat(actualSpent) || 0;
 
-    let resolvedDoctorId = doctorId || existing.provider_id || null;
+    const resolvedDoctorId = doctorId || existing.provider_id || null;
     let resolvedDoctorName = doctorName || existing.doctor_name || null;
     if (resolvedDoctorId) {
       const { data: prov } = await supabaseServer.from('providers').select('id, name').eq('id', resolvedDoctorId).maybeSingle();
       if (prov?.name) resolvedDoctorName = prov.name;
     }
 
-    let resolvedServiceId = serviceId ? Number(serviceId) : (existing.service_id ? Number(existing.service_id) : null);
+    const resolvedServiceId = serviceId ? Number(serviceId) : (existing.service_id ? Number(existing.service_id) : null);
     let resolvedServiceName = serviceName || null;
     if (resolvedServiceId && !resolvedServiceName) {
       const { data: svc } = await supabaseServer.from('services').select('id, en, ar').eq('id', resolvedServiceId).maybeSingle();
@@ -944,6 +974,20 @@ export async function PATCH(req: Request) {
                 : {})
             })
             .eq('id', cpIdToUpdate);
+
+          // RISK-106: same audit trail as POST, so a superadmin edit keeps pre-launch pulses
+          // visible to the deferred balance and eligible for revenue recognition once linked.
+          if (isPulsesPackage) {
+            const sync = await syncPreLaunchPulseUsage({
+              customerPackageId: cpIdToUpdate,
+              quantityUsed: pulsesUsed,
+              remainingAfter: pulsesRemaining,
+              purchasedAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
+            });
+            if (sync.status === 'failed') {
+              console.warn('Could not sync pre-launch pulse usage during edit (non-fatal):', sync.error);
+            }
+          }
 
           if (Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0) {
             for (const it of packageItemsUsage) {

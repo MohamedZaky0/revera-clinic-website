@@ -3249,3 +3249,37 @@ When patients joined Revera with packages purchased under previous historical sy
 
 
 
+
+---
+
+## DEC-093: Re-Affirms DEC-085 / RISK-096 — Pulse Quota Is Never Fabricated From The Package Name Or `packages_meta`
+
+**Date:** 2026-09-28
+**Status:** Decided — active. Re-affirms DEC-085 after a regression, not a new policy.
+
+**Context:**
+A pull of `saifuldeennaser`'s parallel work (17 commits, 2026-09-23–27) brought in commit `a1f689e`
+("multi-format pulse quota extraction... (DEC-086)" — mislabelled; DEC-086 is the unrelated historical-invoice
+decision) which changed `POST /api/packages/sell` to resolve the pulse quota as
+`pkg.total_pulses || pkgMeta?.totalPulses || extractedPulsesFromName || 0` instead of `pkg.total_pulses`
+alone. A package named "5000 Laser Pulses" with `total_pulses: 0` on the real column then sold with a quota
+of 5,000 guessed from its name — exactly the pattern DEC-085 (2026-09-24) rejected, and undocumented: no DEC
+entry recorded the reversal, no commit body explained it.
+
+**Chosen Option:** Reverted on pull-in, before merging to `main`. `configuredTotalPulses` is
+`Number(pkg.total_pulses || 0)` again — the real column only. `pkgMeta?.packageType` (a classification
+fallback: is this a pulses package at all) is kept, since DEC-085 only ever rejected fabricating the
+*quantity*, not that classification signal. `pkgMeta?.totalPulses` and the name-regex extractor are removed
+outright. Two guard tests added (name match, `packages_meta` match) asserting the sale is refused, not guessed.
+
+**Reason:** Same as DEC-085/RISK-096 — a guessed quota is data entered nobody actually configured, silently
+wrong in either direction, and the whole point of the original refusal was to force the owner to set it once
+in Admin → Packages instead.
+
+**Note — pre-existing documentation drift found while writing this entry (not fixed here, out of scope for
+this change):** `DECISIONS.md` currently has real, non-duplicate content collisions on `DEC-087`/`DEC-088`
+(an abridged and a full version of the same landing-pages/pulse-revenue decisions) and `DEC-089`/`DEC-090`
+(two genuinely different decisions each, from `saifuldeennaser`'s parallel work) — introduced by merge
+commit `799aa4e`. A pre-existing, unrelated `DEC-024` duplicate (two different topics) predates this pull.
+Needs a dedicated cleanup pass to renumber and de-duplicate; this entry deliberately took the next free
+number (`093`) rather than either colliding number.

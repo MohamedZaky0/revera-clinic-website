@@ -154,21 +154,32 @@ describe('POST /api/packages/sell — pulse quota must be real (Brief 34B)', () 
     });
   });
 
-  it('resolves pulses from package name or packages_meta when total_pulses column is zero', async () => {
+  // DEC-085 / RISK-096, re-affirmed by DEC-093 (2026-09-28): a commit on 2026-09-27 briefly resolved
+  // the quota from the package name / packages_meta when the real column was 0 — a package named
+  // "5000 Laser Pulses" with `total_pulses: 0` sold with a guessed quota of 5000. Reverted; this
+  // guards against it coming back a third time.
+  it('never resolves the quota from the package name, even when it names an exact pulse count', async () => {
     fake.seed('packages', [{
       id: PACKAGE_ID, name: '5000 Laser Pulses', branch_id: null, price: 2000, tax_rate: 0,
       validity_days: 365, active: true, package_type: 'pulses', total_pulses: 0,
     }]);
 
     const res = await POST(sellReq({ customerId: CUSTOMER_ID, packageId: PACKAGE_ID, amountPaid: 2000 }));
-    expect(res.status).toBe(201);
-    const cps = fake.rows('customer_packages');
-    expect(cps).toHaveLength(1);
-    expect(cps[0]).toMatchObject({
-      package_type: 'pulses',
-      total_pulses: 5000,
-      pulses_remaining: 5000,
-    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: expect.stringContaining('pulse quota') });
+    expect(fake.rows('customer_packages')).toHaveLength(0);
+  });
+
+  it('never resolves the quota from packages_meta when the real column is zero', async () => {
+    fake.seed('packages', [{
+      id: PACKAGE_ID, name: 'Custom Pulses Deal', branch_id: null, price: 2000, tax_rate: 0,
+      validity_days: 365, active: true, package_type: 'pulses', total_pulses: 0,
+    }]);
+    fake.seed('page_settings', [{ key: 'packages_meta', value: { [PACKAGE_ID]: { packageType: 'pulses', totalPulses: 5000 } } }]);
+
+    const res = await POST(sellReq({ customerId: CUSTOMER_ID, packageId: PACKAGE_ID, amountPaid: 2000 }));
+    expect(res.status).toBe(400);
+    expect(fake.rows('customer_packages')).toHaveLength(0);
   });
 });
 

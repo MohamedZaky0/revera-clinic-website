@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**8 open** · **13 partially resolved** · **71 resolved** · 92 tracked total.
+**8 open** · **13 partially resolved** · **72 resolved** · 93 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -4806,6 +4806,35 @@ Checklist: `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.
 **Fix:**
 1. Updated regexes in `extractPulsePackageQuota` to strictly require quota indicators (`pulses remaining`, `[Purchasing New Pulses Package]`, `total pulses`, `(Price EGP · X pulses)`) and never match `Deducted X pulses` or `تم استهلاك X نبضة`.
 2. Added `targetPkgId` note extraction and phone lookup in `DoctorAccountView.tsx` and `BookingDetailsModal.tsx` to ensure `customer_packages` balance is consumed and reflected in patient profiles.
+
+---
+
+## RISK-106: A Historical Package's "Pulses Used Before Launch" Could Be Entered Two Different, Non-Interoperable Ways (RESOLVED)
+
+**Severity:** Medium · **Type:** Financial ledger / data integrity · **Found:** 2026-09-28 (review of a pull of
+`saifuldeennaser`'s parallel work). **Related:** DEC-088 items 6 and 10.
+
+The pull added `packagePulsesUsed` / `packagePulsesRemaining` fields to Add/Edit Previous Booking, writing
+straight onto `customer_packages.pulses_used` / `pulses_remaining` at package creation/edit time. This is a
+second way to record "pulses the patient already used before the clinic went live on this system" — the same
+concept `confirm_historical_package_price` (DEC-088 item 6, "Enter invoice value") exists for — but without
+that function's `package_pulse_usage` audit row. Since `consume_package_pulses`'s clamp and
+`recognise_pulse_usage`'s pro-rata ranges both read `package_pulse_usage`, pulses marked "used" only on the
+`customer_packages` columns are invisible to both: correctly excluded from the deferred balance, but also
+permanently unrecognisable as revenue later — a real loss, not a deferral, and with no audit trail explaining
+where the number came from.
+
+**Fix:** `src/lib/historicalInvoice.ts` → `syncPreLaunchPulseUsage()`, called from both POST and PATCH
+`/api/reservations/previous` wherever `pulses_used`/`pulses_remaining` are written for a pulses package. It
+keeps at most one `package_pulse_usage` row per package (`reservation_id = NULL`, `used_by = 'Pre-launch
+usage'`): creates it, updates its quantity on a re-save with a different value (never a second row), or
+deletes it if the value becomes 0. `reservation_id` staying NULL means `recognise_pulse_usage` still
+recognises no revenue for it (DEC-088 item 10) — this only restores the audit trail, it does not change what
+gets recognised. 5 tests in `tests/routes/reservations-previous-package.test.ts` (2 fail without the fix).
+
+**Not done:** the equivalent gap for a *services* package's `qty_used` written directly via
+`packageItemsUsage` at booking creation (same missing-audit-trail shape, lower severity — `services` packages
+have no production instances of this pattern yet, unlike pulses).
 
 ## PROPOSALS.md Reference
 
