@@ -3,8 +3,8 @@ import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordTransaction } from '@/lib/transactionLedger';
-import { writeHistoricalBookingInvoice, mapPaymentMethod, syncPreLaunchPulseUsage } from '@/lib/historicalInvoice';
-import { settlePaymentMismatch } from '@/lib/billing';
+import { writeHistoricalBookingInvoice, mapPaymentMethod, mapTransactionPaymentMethod, syncPreLaunchPulseUsage } from '@/lib/historicalInvoice';
+import { settlePaymentMismatch, effectiveInvoiceValue, settleHistoricalEdit } from '@/lib/billing';
 
 function isValidPhoneNumber(phoneStr: string): boolean {
   if (!phoneStr) return false;
@@ -277,7 +277,7 @@ export async function POST(req: Request) {
     // diff === 0: exact payment -> no change to debt or wallet
     const settled = settlePaymentMismatch({
       current: { outstanding: currentOutstanding, wallet: currentWallet, spent: currentSpent },
-      invoiceValue: parsedValue,
+      invoiceValue: effectiveInvoiceValue(parsedValue, parsedPaid),
       amountPaid: parsedPaid,
     });
     const newOutstanding = settled.outstanding;
@@ -667,17 +667,6 @@ export async function POST(req: Request) {
 
     // 8. Record Financial Transaction (RISK-076) in `transactions` table
     if (parsedPaid > 0 && customerId) {
-      let standardMethod = 'cash';
-      if (paymentType) {
-        const pLower = paymentType.toLowerCase();
-        if (pLower.includes('card') || pLower.includes('visa') || pLower.includes('mastercard')) standardMethod = 'card';
-        else if (pLower.includes('instapay')) standardMethod = 'instapay';
-        else if (pLower.includes('wallet')) standardMethod = 'wallet';
-        else if (pLower.includes('transfer')) standardMethod = 'transfer';
-        else if (pLower.includes('vodafone') || pLower.includes('cash')) standardMethod = 'cash';
-        else standardMethod = paymentType;
-      }
-
       const descItems: string[] = [];
       if (resolvedServiceName) descItems.push(`Service: ${resolvedServiceName}`);
       if (resolvedPackageName) descItems.push(`Package: ${resolvedPackageName}`);
@@ -691,7 +680,7 @@ export async function POST(req: Request) {
         customerId: customerId,
         branchId: branchId || null,
         reservationId: newReservation.id,
-        paymentMethod: standardMethod,
+        paymentMethod: mapTransactionPaymentMethod(paymentType),
         status: 'completed',
         source: 'manual',
         reason: notes || 'Historical booking payment',
@@ -758,9 +747,8 @@ export async function PATCH(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const role = access.access.role;
-  const isSuperadmin = role === 'superadmin' || role.includes('super');
-  if (!isSuperadmin) {
+  // 1. Superadmin check
+  if (access.access.role !== 'superadmin') {
     return NextResponse.json(
       { error: 'Only superadmin accounts are authorized to edit previous bookings.' },
       { status: 403 }
@@ -799,7 +787,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Missing required reservation id' }, { status: 400 });
     }
 
-    // 1. Fetch existing reservation to ensure it exists and is historical
+    // 2. Fetch existing reservation to ensure it exists
     const { data: existing, error: findError } = await supabaseServer
       .from('reservations')
       .select('*')
@@ -810,7 +798,17 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Reservation not found.' }, { status: 404 });
     }
 
-    // 2. Validate input fields
+    // 3. Only historical bookings
+    const isHistoricalByFlag = existing.is_historical === true;
+    const isHistoricalByTag = (existing.notes || '').includes('[Historical Booking]') || (existing.reception_notes || '').includes('[Historical Booking]');
+    if (!isHistoricalByFlag && !isHistoricalByTag) {
+      return NextResponse.json(
+        { error: 'Only historical bookings can be edited here.' },
+        { status: 409 }
+      );
+    }
+
+    // 4. Validate input fields
     const rawName = patientName ? String(patientName).trim() : existing.name;
     const rawPhone = patientPhone ? String(patientPhone).trim() : existing.phone;
     const rawDate = date ? String(date).trim() : existing.date;
@@ -819,9 +817,56 @@ export async function PATCH(req: Request) {
     if (!rawPhone || !isValidPhoneNumber(rawPhone)) return NextResponse.json({ error: 'Invalid phone number format.', field: 'patientPhone' }, { status: 400 });
     if (!rawDate) return NextResponse.json({ error: 'Date is required.', field: 'date' }, { status: 400 });
 
+    // 5. Phone change is not supported yet
     const cleanMobile = cleanPhoneForDb(rawPhone);
+    if (cleanPhoneForDb(existing.phone) !== cleanMobile) {
+      return NextResponse.json(
+        {
+          error: 'Changing the patient phone of a historical booking is not supported. Delete and re-add the booking under the correct patient.',
+          field: 'patientPhone'
+        },
+        { status: 400 }
+      );
+    }
+
     const parsedValue = typeof invoiceValue === 'number' ? invoiceValue : parseFloat(invoiceValue) || 0;
     const parsedPaid = typeof actualSpent === 'number' ? actualSpent : parseFloat(actualSpent) || 0;
+
+    const warnings: string[] = [];
+
+    // 6. Old values, read BEFORE updating anything
+    const oldPaid = Number(existing.amount_paid || 0);
+    let oldInvoiceValue = 0;
+
+    const { data: invRows, error: invError } = await supabaseServer
+      .from('invoices')
+      .select('id, grand_total')
+      .eq('reservation_id', id)
+      .order('issued_at', { ascending: true })
+      .limit(1);
+
+    // Abort before writing anything: treating a failed read as "no invoice" would make the
+    // invoice step below create a second invoice for this booking.
+    if (invError) {
+      console.error('Error loading invoice for PATCH:', invError.message);
+      return NextResponse.json(
+        { error: 'Could not load the booking invoice; nothing was changed.', details: invError.message },
+        { status: 500 }
+      );
+    }
+    const existingInv: { id: string; grand_total: number } | null = (invRows && invRows[0]) || null;
+
+    if (existingInv) {
+      oldInvoiceValue = Number(existingInv.grand_total || 0);
+    } else {
+      // Parse from notes
+      const invoiceMatch = (existing.reception_notes || existing.notes || '').match(/\[Invoice Total\]:\s*([\d.]+)/);
+      if (invoiceMatch) {
+        oldInvoiceValue = Number(invoiceMatch[1]) || 0;
+      } else {
+        oldInvoiceValue = oldPaid + Number(existing.amount_left || 0);
+      }
+    }
 
     const resolvedDoctorId = doctorId || existing.provider_id || null;
     let resolvedDoctorName = doctorName || existing.doctor_name || null;
@@ -868,7 +913,16 @@ export async function PATCH(req: Request) {
       }
     }
 
-    // 3. Reconstruct clean historical reception notes
+    // 7. Preserve machine markers in the notes
+    function preservedMarkerLines(previous: string | null): string[] {
+      if (!previous) return [];
+      const lines = previous.split('\n');
+      return lines
+        .slice(1) // Skip the first line
+        .filter((line) => line.startsWith('[') && !line.startsWith('[Historical Booking]'));
+    }
+
+    // 8. Reconstruct reception notes with preserved markers
     const historicalTag = '[Historical Booking]';
     const srvNote = resolvedServiceName ? ` Service: ${resolvedServiceName}.` : '';
     const pkgNote = packageName ? ` Package: ${packageName}.` : '';
@@ -877,9 +931,37 @@ export async function PATCH(req: Request) {
     const spentNote = ` Actual Spent: ${parsedPaid} EGP.`;
     const paymentNote = paymentType ? ` Payment Method: ${paymentType}.` : '';
     const userNote = notes ? ` ${notes}` : '';
-    const receptionNote = `${historicalTag} Added manually for historical records.${srvNote}${pkgNote}${pkgUsageNote}${prodNote}${valNote}${spentNote}${paymentNote}${userNote}`.trim();
+    const receptionNoteBase = `${historicalTag} Added manually for historical records.${srvNote}${pkgNote}${pkgUsageNote}${prodNote}${valNote}${spentNote}${paymentNote}${userNote}`.trim();
+    const preservedNotesMarkers = preservedMarkerLines(existing.notes);
+    const receptionNote = preservedNotesMarkers.length > 0 ? `${receptionNoteBase}\n${preservedNotesMarkers.join('\n')}` : receptionNoteBase;
 
-    // 4. Update reservation row
+    const preservedReceptionMarkers = preservedMarkerLines(existing.reception_notes);
+    const finalReceptionNote = preservedReceptionMarkers.length > 0 ? `${receptionNoteBase}\n${preservedReceptionMarkers.join('\n')}` : receptionNoteBase;
+
+    // Load customer for balance updates
+    let balancesBefore: { wallet: number; spent: number; outstanding: number } | null = null;
+    let balancesAfter: { wallet: number; spent: number; outstanding: number } | null = null;
+
+    if (existing.customer_id) {
+      const { data: customer, error: custErr } = await supabaseServer
+        .from('customers')
+        .select('spent_amount, outstanding, wallet_balance')
+        .eq('id', existing.customer_id)
+        .maybeSingle();
+
+      if (custErr) {
+        console.warn('Error loading customer for PATCH:', custErr.message);
+        warnings.push(`Could not load customer balances: ${custErr.message}`);
+      } else if (customer) {
+        balancesBefore = {
+          wallet: Number(customer.wallet_balance || 0),
+          spent: Number(customer.spent_amount || 0),
+          outstanding: Number(customer.outstanding || 0),
+        };
+      }
+    }
+
+    // 9. Update reservation row (this can fail fatally)
     const updatePayload: Record<string, any> = {
       name: rawName,
       phone: cleanMobile,
@@ -889,7 +971,7 @@ export async function PATCH(req: Request) {
       provider_id: resolvedDoctorId,
       doctor_name: resolvedDoctorName || '—',
       branch_id: branchId || existing.branch_id || null,
-      reception_notes: receptionNote,
+      reception_notes: finalReceptionNote,
       notes: receptionNote,
       amount_paid: parsedPaid,
       amount_left: Math.max(0, parsedValue - parsedPaid),
@@ -912,7 +994,7 @@ export async function PATCH(req: Request) {
       );
     }
 
-    // 4b. If package is associated with this booking, update or create customer_packages record
+    // 10. 4b. If package is associated with this booking, update or create customer_packages record
     const targetPatchPkgId = customerPackageId || existingCustomerPackageId;
     if (existing.customer_id && (targetPatchPkgId || packageId || packageRecord?.id)) {
       const pId = packageId || packageRecord?.id;
@@ -961,6 +1043,7 @@ export async function PATCH(req: Request) {
             });
             if (sync.status === 'failed') {
               console.warn('Could not sync pre-launch pulse usage during edit (non-fatal):', sync.error);
+              warnings.push(`Pre-launch pulse sync failed: ${sync.error}`);
             }
           }
 
@@ -980,76 +1063,334 @@ export async function PATCH(req: Request) {
         }
       } catch (cpUpdateErr: any) {
         console.warn('Could not update customer_packages record during edit:', cpUpdateErr?.message);
+        warnings.push(`Package update failed: ${cpUpdateErr?.message}`);
       }
     }
 
-    // 5. Reconcile associated invoice / invoice_lines / payments if existing
+    // 11. Customer balances (non-fatal errors)
+    if (existing.customer_id && balancesBefore) {
+      try {
+        const settled = settleHistoricalEdit({
+          current: balancesBefore as any,
+          oldInvoiceValue,
+          oldAmountPaid: oldPaid,
+          newInvoiceValue: parsedValue,
+          newAmountPaid: parsedPaid,
+        });
+
+        balancesAfter = settled;
+
+        if (settled.wallet !== balancesBefore.wallet || settled.spent !== balancesBefore.spent || settled.outstanding !== balancesBefore.outstanding) {
+          const { error: balErr } = await supabaseServer
+            .from('customers')
+            .update({
+              spent_amount: settled.spent,
+              outstanding: settled.outstanding,
+              wallet_balance: settled.wallet,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existing.customer_id);
+
+          if (balErr) {
+            console.warn('Error updating customer balances:', balErr.message);
+            warnings.push(`Customer balance update failed: ${balErr.message}`);
+          }
+
+          // Record wallet transaction if wallet changed
+          if (settled.wallet !== balancesBefore.wallet) {
+            const walletDelta = settled.wallet - balancesBefore.wallet;
+            try {
+              const dateStr = rawDate.slice(0, 10);
+              const { error: walletErr } = await supabaseServer.from('wallet_txns').insert({
+                customer_id: existing.customer_id,
+                direction: walletDelta > 0 ? 'in' : 'out',
+                amount: Math.abs(walletDelta),
+                reason: `Adjusted by edit of historical booking on ${dateStr}`
+              });
+              if (walletErr) warnings.push(`Wallet transaction failed: ${walletErr.message}`);
+            } catch (wErr: any) {
+              console.warn('Could not insert wallet_txns entry:', wErr?.message);
+              warnings.push(`Wallet transaction failed: ${wErr?.message}`);
+            }
+          }
+        }
+      } catch (balErr: any) {
+        console.warn('Error settling balances:', balErr?.message);
+        warnings.push(`Balance settlement failed: ${balErr?.message}`);
+      }
+    }
+
+    // 12. Invoice (non-fatal errors)
+    let transactionIdToLog: string | null = null;
     try {
-      const { data: existingInv } = await supabaseServer
-        .from('invoices')
-        .select('id')
-        .eq('reservation_id', id)
-        .maybeSingle();
+      const newTotal = effectiveInvoiceValue(parsedValue, parsedPaid);
 
       if (existingInv) {
-        const total = parsedValue > 0 ? parsedValue : parsedPaid;
-        await supabaseServer
+        // Update existing invoice
+        const { error: upErr } = await supabaseServer
           .from('invoices')
           .update({
             issued_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
-            subtotal: total,
-            grand_total: total,
+            subtotal: newTotal,
+            grand_total: newTotal,
             branch_id: branchId || existing.branch_id || null
           })
           .eq('id', existingInv.id);
 
-        await supabaseServer
-          .from('invoice_lines')
-          .update({
-            unit_price: total,
-            total: total,
-            description: `${resolvedServiceName || 'Historical booking'} [historical backfill]`,
-            service_id: resolvedServiceId || null
-          })
-          .eq('invoice_id', existingInv.id);
+        if (upErr) {
+          console.warn('Error updating invoice:', upErr.message);
+          warnings.push(`Invoice update failed: ${upErr.message}`);
+        } else {
+          // Update invoice lines
+          const { error: lineErr } = await supabaseServer
+            .from('invoice_lines')
+            .update({
+              unit_price: newTotal,
+              line_total: newTotal,
+              description: `${resolvedServiceName || 'Historical booking'} [historical backfill]`,
+              service_id: resolvedServiceId || null
+            })
+            .eq('invoice_id', existingInv.id);
 
-        if (parsedPaid > 0) {
-          const { data: existingPay } = await supabaseServer
-            .from('payments')
-            .select('id')
-            .eq('invoice_id', existingInv.id)
-            .maybeSingle();
-
-          if (existingPay) {
-            await supabaseServer
-              .from('payments')
-              .update({
-                amount: parsedPaid,
-                received_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
-                method: mapPaymentMethod(paymentType)
-              })
-              .eq('id', existingPay.id);
-          } else {
-            await supabaseServer
-              .from('payments')
-              .insert({
-                invoice_id: existingInv.id,
-                received_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
-                amount: parsedPaid,
-                method: mapPaymentMethod(paymentType),
-                recorded_by: (access as any).access?.employee?.id || null
-              });
+          if (lineErr) {
+            console.warn('Error updating invoice lines:', lineErr.message);
+            warnings.push(`Invoice line update failed: ${lineErr.message}`);
           }
+        }
+
+        // Handle payments
+        const { data: existingPayments, error: payErr } = await supabaseServer
+          .from('payments')
+          .select('id')
+          .eq('invoice_id', existingInv.id)
+          .order('received_at', { ascending: true });
+
+        if (payErr) {
+          console.warn('Error loading payments:', payErr.message);
+          warnings.push(`Payment lookup failed: ${payErr.message}`);
+        } else if (existingPayments) {
+          if (parsedPaid > 0) {
+            if (existingPayments.length > 0) {
+              // Update first payment
+              const { error: updPayErr } = await supabaseServer
+                .from('payments')
+                .update({
+                  amount: parsedPaid,
+                  received_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
+                  method: mapPaymentMethod(paymentType)
+                })
+                .eq('id', existingPayments[0].id);
+
+              if (updPayErr) {
+                console.warn('Error updating payment:', updPayErr.message);
+                warnings.push(`Payment update failed: ${updPayErr.message}`);
+              }
+            } else {
+              // Insert new payment
+              const staffEmployeeId = (access as any).access?.employee?.id || null;
+              const { error: insPayErr } = await supabaseServer
+                .from('payments')
+                .insert({
+                  invoice_id: existingInv.id,
+                  received_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
+                  amount: parsedPaid,
+                  method: mapPaymentMethod(paymentType),
+                  received_by_employee_id: staffEmployeeId,
+                  is_opening: true
+                });
+
+              if (insPayErr) {
+                console.warn('Error inserting payment:', insPayErr.message);
+                warnings.push(`Payment insertion failed: ${insPayErr.message}`);
+              }
+            }
+          } else {
+            // Delete all payments
+            if (existingPayments.length > 0) {
+              const { error: delPayErr } = await supabaseServer
+                .from('payments')
+                .delete()
+                .eq('invoice_id', existingInv.id);
+
+              if (delPayErr) {
+                console.warn('Error deleting payments:', delPayErr.message);
+                warnings.push(`Payment deletion failed: ${delPayErr.message}`);
+              }
+            }
+          }
+        }
+      } else if (existing.customer_id && newTotal > 0) {
+        // Create new invoice
+        const staffEmployeeId = (access as any).access?.employee?.id || null;
+        const result = await writeHistoricalBookingInvoice({
+          reservationId: id,
+          customerId: existing.customer_id,
+          branchId: branchId || existing.branch_id || null,
+          serviceId: resolvedServiceId,
+          occurredAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
+          invoiceValue: parsedValue,
+          amountPaid: parsedPaid,
+          serviceName: resolvedServiceName,
+          packageName: packageName,
+          productName: productName,
+          paymentType,
+          employeeId: staffEmployeeId,
+        });
+
+        if (result.status === 'failed') {
+          console.warn('Error creating invoice:', result.error);
+          warnings.push(`Invoice creation failed: ${result.error}`);
         }
       }
     } catch (invErr: any) {
       console.warn('Could not reconcile historical invoice (non-fatal):', invErr?.message);
+      warnings.push(`Invoice reconciliation failed: ${invErr?.message}`);
+    }
+
+    // 13. Transactions row (non-fatal errors)
+    try {
+      const { data: txnRows, error: txnErr } = await supabaseServer
+        .from('transactions')
+        .select('id')
+        .eq('reservation_id', id)
+        .eq('type', 'payment')
+        .order('occurred_at', { ascending: true })
+        .limit(1);
+      const existingTxn: { id: string } | null = (txnRows && txnRows[0]) || null;
+
+      if (txnErr) {
+        console.warn('Error loading transaction:', txnErr.message);
+        warnings.push(`Transaction lookup failed: ${txnErr.message}`);
+      } else if (existingTxn) {
+        transactionIdToLog = existingTxn.id;
+        if (parsedPaid > 0) {
+          // Update existing transaction
+          const { error: upTxnErr } = await supabaseServer
+            .from('transactions')
+            .update({
+              amount: parsedPaid,
+              payment_method: mapTransactionPaymentMethod(paymentType),
+              occurred_at: `${rawDate.slice(0, 10)}T12:00:00Z`
+            })
+            .eq('id', existingTxn.id);
+
+          if (upTxnErr) {
+            console.warn('Error updating transaction:', upTxnErr.message);
+            warnings.push(`Transaction update failed: ${upTxnErr.message}`);
+          }
+        } else {
+          // Delete existing transaction
+          const { error: delTxnErr } = await supabaseServer
+            .from('transactions')
+            .delete()
+            .eq('id', existingTxn.id);
+
+          if (delTxnErr) {
+            console.warn('Error deleting transaction:', delTxnErr.message);
+            warnings.push(`Transaction deletion failed: ${delTxnErr.message}`);
+          } else {
+            transactionIdToLog = null;
+          }
+        }
+      } else if (parsedPaid > 0 && existing.customer_id) {
+        // Create new transaction
+        const staffEmployeeId = (access as any).access?.employee?.id || null;
+        const staffEmployeeName = (access as any).access?.employee?.email || 'Superadmin';
+
+        const descItems: string[] = [];
+        if (resolvedServiceName) descItems.push(`Service: ${resolvedServiceName}`);
+        if (packageName) descItems.push(`Package: ${packageName}`);
+        if (productName) descItems.push(`Product: ${productName}`);
+        const itemsDesc = descItems.length > 0 ? ` (${descItems.join(', ')})` : '';
+
+        await recordTransaction({
+          type: 'payment',
+          amount: parsedPaid,
+          description: `Payment for historical booking on ${rawDate.slice(0, 10)}${itemsDesc}`,
+          customerId: existing.customer_id,
+          branchId: branchId || existing.branch_id || null,
+          reservationId: id,
+          paymentMethod: mapTransactionPaymentMethod(paymentType),
+          status: 'completed',
+          source: 'manual',
+          reason: notes || 'Historical booking payment',
+          createdByEmployeeId: staffEmployeeId,
+          createdByName: staffEmployeeName,
+          occurredAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
+        });
+        // recordTransaction does not return the row; read it back for the audit log.
+        const { data: createdTxn } = await supabaseServer
+          .from('transactions')
+          .select('id')
+          .eq('reservation_id', id)
+          .eq('type', 'payment')
+          .order('occurred_at', { ascending: true })
+          .limit(1);
+        if (createdTxn && createdTxn[0]) {
+          transactionIdToLog = createdTxn[0].id;
+        } else {
+          warnings.push('Transaction creation failed: no payment row was recorded.');
+        }
+      }
+    } catch (txnErr: any) {
+      console.warn('Could not reconcile transaction (non-fatal):', txnErr?.message);
+      warnings.push(`Transaction reconciliation failed: ${txnErr?.message}`);
+    }
+
+    // 14. Audit log (non-fatal)
+    try {
+      const staffEmployeeId = (access as any).access?.employee?.id || null;
+      const staffEmployeeEmail = (access as any).access?.employee?.email || null;
+
+      const auditDetails = {
+        reservation_id: id,
+        before: {
+          invoiceValue: oldInvoiceValue,
+          amountPaid: oldPaid,
+          date: existing.date,
+          serviceId: existing.service_id,
+          name: existing.name
+        },
+        after: {
+          invoiceValue: parsedValue,
+          amountPaid: parsedPaid,
+          date: rawDate.slice(0, 10),
+          serviceId: resolvedServiceId,
+          name: rawName
+        },
+        ...(balancesBefore && balancesAfter
+          ? {
+              balancesBefore,
+              balancesAfter
+            }
+          : {})
+      };
+
+      const { error: auditErr } = await supabaseServer
+        .from('transaction_audit_logs')
+        .insert({
+          transaction_id: transactionIdToLog,
+          action: 'edited_historical_booking',
+          performed_by_employee_id: staffEmployeeId,
+          performed_by_name: staffEmployeeEmail,
+          details: auditDetails
+        });
+
+      if (auditErr) {
+        console.warn('Error inserting audit log:', auditErr.message);
+        warnings.push(`Audit log insertion failed: ${auditErr.message}`);
+      }
+    } catch (auditErr: any) {
+      console.warn('Could not insert audit log (non-fatal):', auditErr?.message);
+      warnings.push(`Audit log failed: ${auditErr?.message}`);
     }
 
     return NextResponse.json({
       success: true,
       message: 'Historical booking updated successfully.',
-      booking: updatedReservation
+      booking: updatedReservation,
+      balances: balancesAfter || null,
+      warnings: warnings.length > 0 ? warnings : undefined
     });
   } catch (err: any) {
     console.error('PATCH /api/reservations/previous error:', err);

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireStaffAccess } from '@/lib/access';
+import { requireFinanceAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +8,7 @@ const VALID_CADENCES = ['monthly', 'quarterly', 'yearly'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(req: Request) {
-  const access = await requireStaffAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_expenses', 'finance.view_pnl']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   try {
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const access = await requireStaffAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_expenses']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   try {
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const access = await requireStaffAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_expenses']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const url = new URL(req.url);
@@ -152,7 +152,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const access = await requireStaffAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_expenses']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const url = new URL(req.url);

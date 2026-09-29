@@ -324,7 +324,7 @@ export async function PATCH(req: Request) {
     // price and the pulses already used before launch, atomically (confirm_historical_package_price RPC).
     if (action === 'confirm_package_price') {
       const role = String(access.access.role || '').toLowerCase().replace(/[\s_-]+/g, '');
-      if (!(role.includes('super') || role.includes('admin') || role.includes('reception'))) {
+      if (!(['superadmin', 'admin', 'reception', 'receptionist'].includes(role))) {
         return NextResponse.json({ success: false, error: 'Only reception or admin can enter a package invoice value.' }, { status: 403 });
       }
       if (!PKG_UUID_RE.test(String(pkgId))) {

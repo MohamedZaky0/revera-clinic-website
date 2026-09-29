@@ -28,7 +28,7 @@ function monthBounds(period: string): { fromDate: string; toDateExclusive: strin
 export async function GET(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
-  if (!hasFinancePermission(access.access, 'finance.manage_expenses')) {
+  if (!hasFinancePermission(access.access, 'finance.manage_expenses') && !hasFinancePermission(access.access, 'finance.view_pnl')) {
     return NextResponse.json({ error: 'Finance budget access is required.' }, { status: 403 });
   }
 

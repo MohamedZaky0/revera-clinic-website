@@ -127,6 +127,17 @@ in the browser — see RISK-078 for the original finding and RISK-081/CORRUPT-A1
 `requireAdministratorAccess`-only (superadmin/admin, no granular distinction), which is intentional
 per RISK-069, not an oversight.
 
+**Finance record routes (RISK-107, 2026-09-29):** `expenses`, `expenses/categories`,
+`expenses/recurring`, `expenses/generate-due`, `assets`, `assets/post-depreciation` and `loans` use
+`requireFinanceAccess(req, [...])` (`access.ts`): GET needs `finance.manage_<x>` **or** `finance.view_pnl`;
+POST/PATCH/DELETE need `finance.manage_<x>`. `superadmin` always passes; a plain `admin` needs the grant
+(DEC-022). Before this, `expenses` accepted any staff token for every method and `assets`/`loans` reads were
+open to any staff. `finance/budget-vs-actual` accepts `finance.manage_expenses` or `finance.view_pnl`.
+
+**Role names match exactly (RISK-109, 2026-09-29):** `access.ts` treats a role as `superadmin`/`admin` only when
+its name, lowercased with spaces/underscores/hyphens removed, equals exactly `superadmin`/`admin`. It previously
+accepted any name containing "super", so a custom "Supervisor" role was the owner.
+
 ### 3b. Middleware-only (authenticated-user check, no role check)
 `hr/alerts`, `hr/attendance`, `hr/doctor-payroll`, `hr/leaves`, `hr/payroll`, `hr/performance`,
 `providers/schedule-audit-logs`. **Any authenticated Supabase user — including a patient — passes.**

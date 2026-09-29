@@ -123,4 +123,20 @@ describe('confirm_package_price', () => {
     const res = await PATCH(patch({ action: 'confirm_package_price', customer_package_id: PKG, price_paid: 100 }));
     expect(res.status).toBe(500);
   });
+
+  it('a role named "Supervisor" (contains "super" but is not superadmin) is rejected', async () => {
+    seedRole('Supervisor');
+    rpcOk({});
+    const res = await PATCH(patch({ action: 'confirm_package_price', customer_package_id: PKG, price_paid: 5000 }));
+    expect(res.status).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('a role "receptionist" is allowed', async () => {
+    seedRole('receptionist');
+    rpcOk({ already_confirmed: false, price_paid: 5000, pulses_used: 3000, pulses_remaining: 7000, recognition_rows: 0 });
+    const res = await PATCH(patch({ action: 'confirm_package_price', customer_package_id: PKG, price_paid: 5000 }));
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+  });
 });

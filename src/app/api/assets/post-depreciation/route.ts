@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdministratorAccess } from '@/lib/access';
+import { requireFinanceAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { monthlyDepreciation, bookValueAfter } from '@/lib/depreciation';
 
@@ -21,7 +21,7 @@ function currentPeriod(): string {
  * the same period: the second call finds every asset already posted and skips all of them.
  */
 export async function POST(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_assets']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   try {

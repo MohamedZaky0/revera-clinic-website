@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeSettledBalances, settlePaymentMismatch } from '@/lib/billing';
+import { computeSettledBalances, settlePaymentMismatch, effectiveInvoiceValue, settleHistoricalEdit } from '@/lib/billing';
 
 describe('computeSettledBalances', () => {
   const base = { wallet: 100, spent: 500, outstanding: 200 };
@@ -197,5 +197,112 @@ describe('settlePaymentMismatch (RISK-087)', () => {
   it('zero-value booking, unpaid: no wallet/debt change, spent unaffected', () => {
     const result = settlePaymentMismatch({ current: { wallet: 100, spent: 500, outstanding: 200 }, invoiceValue: 0, amountPaid: 0 });
     expect(result).toEqual({ outstanding: 200, wallet: 100, spent: 500 });
+  });
+});
+
+describe('effectiveInvoiceValue', () => {
+  it('1200 / 1000 → 1200', () => {
+    expect(effectiveInvoiceValue(1200, 1000)).toBe(1200);
+  });
+
+  it('0 / 1000 → 1000', () => {
+    expect(effectiveInvoiceValue(0, 1000)).toBe(1000);
+  });
+
+  it('0 / 0 → 0', () => {
+    expect(effectiveInvoiceValue(0, 0)).toBe(0);
+  });
+});
+
+describe('settleHistoricalEdit', () => {
+  const base = { wallet: 0, spent: 1000, outstanding: 0 };
+
+  it('no change → identical balances', () => {
+    const result = settleHistoricalEdit({
+      current: base,
+      oldInvoiceValue: 1000,
+      oldAmountPaid: 1000,
+      newInvoiceValue: 1000,
+      newAmountPaid: 1000,
+    });
+    expect(result).toEqual(base);
+  });
+
+  it('invoice raised 1000→1500, paid stays 1000, no wallet → outstanding +500, spent unchanged', () => {
+    const result = settleHistoricalEdit({
+      current: base,
+      oldInvoiceValue: 1000,
+      oldAmountPaid: 1000,
+      newInvoiceValue: 1500,
+      newAmountPaid: 1000,
+    });
+    expect(result).toEqual({ wallet: 0, spent: 1000, outstanding: 500 });
+  });
+
+  it('same, but wallet 300 → wallet 0, outstanding +200', () => {
+    const result = settleHistoricalEdit({
+      current: { wallet: 300, spent: 1000, outstanding: 0 },
+      oldInvoiceValue: 1000,
+      oldAmountPaid: 1000,
+      newInvoiceValue: 1500,
+      newAmountPaid: 1000,
+    });
+    expect(result).toEqual({ wallet: 0, spent: 1000, outstanding: 200 });
+  });
+
+  it('paid lowered 1000→600 (value 1000) → spent −400, outstanding +400', () => {
+    const result = settleHistoricalEdit({
+      current: base,
+      oldInvoiceValue: 1000,
+      oldAmountPaid: 1000,
+      newInvoiceValue: 1000,
+      newAmountPaid: 600,
+    });
+    expect(result).toEqual({ wallet: 0, spent: 600, outstanding: 400 });
+  });
+
+  it('paid raised 600→1000 (value 1000) with outstanding 400 → outstanding 0, spent +400', () => {
+    const result = settleHistoricalEdit({
+      current: { wallet: 0, spent: 600, outstanding: 400 },
+      oldInvoiceValue: 1000,
+      oldAmountPaid: 600,
+      newInvoiceValue: 1000,
+      newAmountPaid: 1000,
+    });
+    expect(result).toEqual({ wallet: 0, spent: 1000, outstanding: 0 });
+  });
+
+  it('paid raised beyond value (value 1000, paid 1000→1300), no debt → wallet +300', () => {
+    const result = settleHistoricalEdit({
+      current: base,
+      oldInvoiceValue: 1000,
+      oldAmountPaid: 1000,
+      newInvoiceValue: 1000,
+      newAmountPaid: 1300,
+    });
+    expect(result).toEqual({ wallet: 300, spent: 1300, outstanding: 0 });
+  });
+
+  it('old booking had no invoice value (0, paid 800), edit enters value 1000 & paid 800 → outstanding +200', () => {
+    const result = settleHistoricalEdit({
+      current: base,
+      oldInvoiceValue: 0,
+      oldAmountPaid: 800,
+      newInvoiceValue: 1000,
+      newAmountPaid: 800,
+    });
+    expect(result).toEqual({ wallet: 0, spent: 1000, outstanding: 200 });
+  });
+
+  it('spent never goes negative', () => {
+    const result = settleHistoricalEdit({
+      current: { wallet: 0, spent: 100, outstanding: 0 },
+      oldInvoiceValue: 1000,
+      oldAmountPaid: 500,
+      newInvoiceValue: 1000,
+      newAmountPaid: 200,
+    });
+    expect(result.spent).toBe(0);
+    expect(result.spent).not.toBeLessThan(0);
   });
 });

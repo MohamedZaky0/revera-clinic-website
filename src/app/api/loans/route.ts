@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireStaffAccess, requireAdministratorAccess } from '@/lib/access';
+import { requireFinanceAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { amortizeLoanPayment } from '@/lib/depreciation';
 
@@ -25,7 +25,7 @@ function nextPeriod(period: string): string {
  * `/api/assets` (task 3.11): loans are infrequent, high-stakes liability records.
  */
 export async function GET(req: Request) {
-  const access = await requireStaffAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_loans', 'finance.view_pnl']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   try {
@@ -84,7 +84,7 @@ export async function GET(req: Request) {
  * history is being imported (DEC-026 — all current data is mock, no backfill).
  */
 export async function POST(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_loans']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   try {
@@ -217,7 +217,7 @@ export async function POST(req: Request) {
  * supported here; delete and recreate the loan instead.
  */
 export async function PATCH(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_loans']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const url = new URL(req.url);
@@ -259,7 +259,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_loans']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const url = new URL(req.url);

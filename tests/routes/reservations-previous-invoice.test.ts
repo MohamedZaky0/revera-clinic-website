@@ -193,10 +193,10 @@ describe('PATCH /api/reservations/previous (SuperAdmin editing)', () => {
     fake.seed('employee_accounts', [{ id: EMP_ID, auth_user_id: USER_ID, role_name: 'superadmin', name: 'Admin', email: 'admin@revera.com' }]);
     fake.seed('roles', [{ name: 'superadmin', permissions: ['all'] }]);
 
-    // 3. Edit the booking
+    // 3. Edit the booking (keeping the same phone as per C2.3: phone changes not supported)
     const patchRes = await PATCH(staffPatch({
       id: resId,
-      patientPhone: '01099998888',
+      patientPhone: '01012345678',
       patientName: 'Amira Updated',
       date: '2026-05-15',
       serviceId: 15,
@@ -216,7 +216,7 @@ describe('PATCH /api/reservations/previous (SuperAdmin editing)', () => {
     // Verify DB update
     const updatedBooking = rows('reservations').find(r => r.id === resId);
     expect(updatedBooking.name).toBe('Amira Updated');
-    expect(updatedBooking.phone).toBe('01099998888');
+    expect(updatedBooking.phone).toBe('01012345678');
     expect(updatedBooking.amount_paid).toBe(1500);
   });
 });
