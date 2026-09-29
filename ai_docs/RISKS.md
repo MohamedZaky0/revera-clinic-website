@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**8 open** · **13 partially resolved** · **71 resolved** · 92 tracked total.
+**8 open** · **13 partially resolved** · **72 resolved** · 93 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -3962,7 +3962,14 @@ provider row, and a non-doctor hire must not touch `providers`).
 
 **Severity:** High (P1) · **Type:** Data integrity / platform mismatch
 **Found:** 2026-09-15, reviewing new routes added in the previous 4 weeks while auditing test
-coverage. **Fixed 2026-09-17 — see below.**
+coverage. **Fixed 2026-09-17. Regressed** — an uncommitted local-file version of this fix was
+destroyed by a `git checkout origin/dev -- .` during an unrelated main-merge earlier in this
+project (2026-09-2x), silently reverting the route back to the original bug while `RISKS.md` kept
+saying RESOLVED. Not caught until a full code review on 2026-09-29. **Re-fixed 2026-09-29,
+verbatim to the description below** — the untracked, already-correct test file
+(`tests/routes/medical-records-templates.test.ts`) had survived and drove the rewrite; all 22
+pass. `data/medical_record_templates.json` remains tracked-but-dead per the original fix's own
+note below — still not deleted, still a deliberate separate decision.
 
 **Fix:** `src/app/api/medical-records/templates/route.ts` no longer touches the filesystem at all —
 `fs`/`path` imports, `TEMPLATES_LOCAL_PATH`, `readLocalTemplates()`, and `writeLocalTemplates()` are
@@ -4026,8 +4033,14 @@ once discovered live, rather than in a demo.
 ## RISK-087: Two Independent Implementations Decide How An Underpayment/Overpayment Settles (PARTIALLY RESOLVED)
 
 **Severity:** Medium · **Type:** Maintainability / consistency risk
-**Found:** 2026-09-15, same review as RISK-086. **Extraction fixed 2026-09-17 — see below; the
-deeper cross-flow question this section originally raised is still open.**
+**Found:** 2026-09-15, same review as RISK-086. **Extraction fixed 2026-09-17. Regressed** by the
+same `git checkout origin/dev -- .` incident as RISK-086 — `settlePaymentMismatch()` and its 12
+tests were lost entirely (not just reverted to the local-file shape; the function and
+`tests/lib/billing.test.ts`'s coverage of it were gone), and the inline `diff`-based block was back
+in `previous/route.ts`. Not caught until 2026-09-29. **Re-extracted 2026-09-29** — same signature
+shape as `computeSettledBalances`, 12 new cases in `tests/lib/billing.test.ts`; the existing
+`tests/routes/reservations-previous.test.ts` (never touched) stayed green throughout, confirming
+the re-extraction changed no behavior. The deeper cross-flow question (below) is still open.
 
 **Fix:** `src/app/api/reservations/previous/route.ts`'s inline wallet-vs-debt allocation
 (the block described below) is now `settlePaymentMismatch()` in `src/lib/billing.ts` — a small,
@@ -4806,6 +4819,35 @@ Checklist: `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.
 **Fix:**
 1. Updated regexes in `extractPulsePackageQuota` to strictly require quota indicators (`pulses remaining`, `[Purchasing New Pulses Package]`, `total pulses`, `(Price EGP · X pulses)`) and never match `Deducted X pulses` or `تم استهلاك X نبضة`.
 2. Added `targetPkgId` note extraction and phone lookup in `DoctorAccountView.tsx` and `BookingDetailsModal.tsx` to ensure `customer_packages` balance is consumed and reflected in patient profiles.
+
+---
+
+## RISK-106: A Historical Package's "Pulses Used Before Launch" Could Be Entered Two Different, Non-Interoperable Ways (RESOLVED)
+
+**Severity:** Medium · **Type:** Financial ledger / data integrity · **Found:** 2026-09-28 (review of a pull of
+`saifuldeennaser`'s parallel work). **Related:** DEC-088 items 6 and 10.
+
+The pull added `packagePulsesUsed` / `packagePulsesRemaining` fields to Add/Edit Previous Booking, writing
+straight onto `customer_packages.pulses_used` / `pulses_remaining` at package creation/edit time. This is a
+second way to record "pulses the patient already used before the clinic went live on this system" — the same
+concept `confirm_historical_package_price` (DEC-088 item 6, "Enter invoice value") exists for — but without
+that function's `package_pulse_usage` audit row. Since `consume_package_pulses`'s clamp and
+`recognise_pulse_usage`'s pro-rata ranges both read `package_pulse_usage`, pulses marked "used" only on the
+`customer_packages` columns are invisible to both: correctly excluded from the deferred balance, but also
+permanently unrecognisable as revenue later — a real loss, not a deferral, and with no audit trail explaining
+where the number came from.
+
+**Fix:** `src/lib/historicalInvoice.ts` → `syncPreLaunchPulseUsage()`, called from both POST and PATCH
+`/api/reservations/previous` wherever `pulses_used`/`pulses_remaining` are written for a pulses package. It
+keeps at most one `package_pulse_usage` row per package (`reservation_id = NULL`, `used_by = 'Pre-launch
+usage'`): creates it, updates its quantity on a re-save with a different value (never a second row), or
+deletes it if the value becomes 0. `reservation_id` staying NULL means `recognise_pulse_usage` still
+recognises no revenue for it (DEC-088 item 10) — this only restores the audit trail, it does not change what
+gets recognised. 5 tests in `tests/routes/reservations-previous-package.test.ts` (2 fail without the fix).
+
+**Not done:** the equivalent gap for a *services* package's `qty_used` written directly via
+`packageItemsUsage` at booking creation (same missing-audit-trail shape, lower severity — `services` packages
+have no production instances of this pattern yet, unlike pulses).
 
 ## PROPOSALS.md Reference
 

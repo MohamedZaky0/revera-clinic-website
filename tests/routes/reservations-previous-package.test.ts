@@ -37,7 +37,7 @@ beforeEach(() => {
   for (const t of [
     'reservations', 'customers', 'providers', 'products', 'packages', 'package_items', 'reservation_products',
     'product_sales', 'customer_packages', 'customer_package_items', 'wallet_txns', 'transactions',
-    'invoices', 'invoice_lines', 'payments',
+    'invoices', 'invoice_lines', 'payments', 'package_pulse_usage',
   ]) fake.seed(t, []);
   fake.authGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null });
   fake.seed('employee_accounts', [{ id: 'emp-1', auth_user_id: USER_ID, role_name: 'reception', name: 'Nour', email: 'n@test.com' }]);
@@ -239,5 +239,83 @@ describe('historical package: quota and session usage breakdown', () => {
     });
     const resv = rows('reservations')[0];
     expect(resv.notes).toContain('[Package Usage]: Laser Face: 6/6 used (0 remaining).');
+  });
+});
+
+describe('RISK-106: pulses used before launch stay in the package_pulse_usage audit trail', () => {
+  it('recorded as one booking-less "Pre-launch usage" row, not baked silently into the package columns', async () => {
+    const res = await POST(
+      staffPost(
+        body({
+          packageId: 'pulses-10k',
+          packagePulsesTotal: 10000,
+          packagePulsesUsed: 3000,
+          packagePulsesRemaining: 7000,
+          invoiceValue: 8000,
+          actualSpent: 8000,
+        })
+      )
+    );
+    expect(res.status).toBe(200);
+    const cp = rows('customer_packages')[0];
+    expect(cp).toMatchObject({ pulses_used: 3000, pulses_remaining: 7000 });
+
+    const usage = rows('package_pulse_usage');
+    expect(usage).toHaveLength(1);
+    expect(usage[0]).toMatchObject({
+      customer_package_id: cp.id,
+      reservation_id: null,
+      quantity_used: 3000,
+      remaining_after: 7000,
+      used_by: 'Pre-launch usage',
+    });
+  });
+
+  it('re-saving the same booking with a different pulses-used value updates the one audit row, never adds a second', async () => {
+    const create = await POST(
+      staffPost(body({ packageId: 'pulses-10k', packagePulsesTotal: 10000, packagePulsesUsed: 3000, packagePulsesRemaining: 7000 }))
+    );
+    const cpId = rows('customer_packages')[0].id;
+
+    const resave = await POST(
+      staffPost(
+        body({
+          customerPackageId: cpId,
+          packageId: 'pulses-10k',
+          packagePulsesTotal: 10000,
+          packagePulsesUsed: 5000,
+          packagePulsesRemaining: 5000,
+        })
+      )
+    );
+    expect(resave.status).toBe(200);
+
+    const usage = rows('package_pulse_usage');
+    expect(usage).toHaveLength(1);
+    expect(usage[0]).toMatchObject({ quantity_used: 5000, remaining_after: 5000 });
+    expect(rows('customer_packages')).toHaveLength(1);
+    void create;
+  });
+
+  it('re-saving with 0 pulses used removes the audit row instead of leaving a stale one', async () => {
+    await POST(staffPost(body({ packageId: 'pulses-10k', packagePulsesTotal: 10000, packagePulsesUsed: 3000, packagePulsesRemaining: 7000 })));
+    const cpId = rows('customer_packages')[0].id;
+
+    await POST(
+      staffPost(
+        body({ customerPackageId: cpId, packageId: 'pulses-10k', packagePulsesTotal: 10000, packagePulsesUsed: 0, packagePulsesRemaining: 10000 })
+      )
+    );
+    expect(rows('package_pulse_usage')).toHaveLength(0);
+  });
+
+  it('a package created with no pulses-used value writes no audit row at all', async () => {
+    await POST(staffPost(body({ packageId: 'pulses-10k', invoiceValue: 8000, actualSpent: 8000 })));
+    expect(rows('package_pulse_usage')).toHaveLength(0);
+  });
+
+  it('a services package (no pulses) never touches package_pulse_usage', async () => {
+    await POST(staffPost(body({ packageId: 'svc-pkg', invoiceValue: 3000, actualSpent: 3000 })));
+    expect(rows('package_pulse_usage')).toHaveLength(0);
   });
 });

@@ -78,3 +78,58 @@ export function computeSettledBalances(input: SettlementInput): SettlementResult
     walletIgnored,
   };
 }
+
+/**
+ * RISK-087: how much of an underpayment draws from an existing wallet credit before adding debt to
+ * `outstanding`, and how much of an overpayment pays down existing debt before crediting the
+ * wallet — extracted from `POST /api/reservations/previous`'s inline calculation (a historical /
+ * pre-system booking recorded by reception) so it is a named, directly-tested pure function instead
+ * of hand-written business logic buried in a route file. `spent` always grows by `amountPaid`
+ * (recorded cash), independent of the wallet/outstanding allocation.
+ */
+export interface PaymentMismatchInput {
+  current: CustomerBalances;
+  /** What the booking was actually worth (the invoice value). */
+  invoiceValue: number;
+  /** What the patient actually paid toward it. */
+  amountPaid: number;
+}
+
+export function settlePaymentMismatch(input: PaymentMismatchInput): CustomerBalances {
+  let outstanding = input.current.outstanding;
+  let wallet = input.current.wallet;
+  const spent = input.current.spent + input.amountPaid;
+
+  const diff = input.invoiceValue - input.amountPaid;
+
+  if (diff > 0) {
+    // Underpaid by `diff`. Existing wallet credit is used first; whatever it doesn't cover
+    // becomes new debt.
+    if (wallet > 0) {
+      if (wallet >= diff) {
+        wallet -= diff;
+      } else {
+        outstanding += diff - wallet;
+        wallet = 0;
+      }
+    } else {
+      outstanding += diff;
+    }
+  } else if (diff < 0) {
+    // Overpaid by `overpaid`. Existing debt is settled first; whatever is left over becomes
+    // wallet credit.
+    const overpaid = -diff;
+    if (outstanding > 0) {
+      if (overpaid <= outstanding) {
+        outstanding -= overpaid;
+      } else {
+        wallet += overpaid - outstanding;
+        outstanding = 0;
+      }
+    } else {
+      wallet += overpaid;
+    }
+  }
+
+  return { outstanding, wallet, spent };
+}

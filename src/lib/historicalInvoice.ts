@@ -116,3 +116,69 @@ export async function writeHistoricalBookingInvoice(input: HistoricalInvoiceInpu
     return { status: 'failed', error: err?.message || String(err) };
   }
 }
+
+/**
+ * DEC-088 item 6 / RISK-106: a historical package can arrive with pulses already used before the clinic
+ * started using the system — entered as a plain number on the Add/Edit Previous Booking screen
+ * (`packagePulsesUsed`), separate from the "Enter invoice value" flow's own pre-launch-pulses field
+ * (`confirm_historical_package_price`). Both must leave the same trail: exactly one `package_pulse_usage`
+ * row with `reservation_id = NULL` (so revenue recognition — which requires a booking — never fires for
+ * it, per DEC-088 item 10) tagged `used_by = 'Pre-launch usage'`. Without this row the pulses vanish from
+ * package_pulse_usage entirely: `consume_package_pulses`'s clamp and `recognise_pulse_usage`'s range-based
+ * amounts both read the package's usage history, so a "used" figure written straight onto
+ * `customer_packages.pulses_used` with no matching usage row is invisible to both — it isn't part of the
+ * deferred balance (correct) and it can never be recognised as revenue later either (a real loss of
+ * information, not merely deferred).
+ *
+ * Idempotent and safe to call on every save of the same booking: at most one such row per package: an
+ * unchanged or zero quantity is a no-op or a delete, not a second row that would double the usage total.
+ */
+export async function syncPreLaunchPulseUsage(input: {
+  customerPackageId: string;
+  quantityUsed: number;
+  remainingAfter: number;
+  purchasedAt: string;
+}): Promise<{ status: 'synced' | 'failed'; error?: string }> {
+  const qty = Math.max(0, Math.floor(input.quantityUsed));
+  const remaining = Math.max(0, Math.floor(input.remainingAfter));
+  try {
+    const { data: existing, error: findErr } = await supabaseServer
+      .from('package_pulse_usage')
+      .select('id')
+      .eq('customer_package_id', input.customerPackageId)
+      .is('reservation_id', null)
+      .eq('used_by', 'Pre-launch usage')
+      .maybeSingle();
+    if (findErr) throw findErr;
+
+    if (qty <= 0) {
+      if (existing?.id) {
+        const { error: delErr } = await supabaseServer.from('package_pulse_usage').delete().eq('id', existing.id);
+        if (delErr) throw delErr;
+      }
+      return { status: 'synced' };
+    }
+
+    if (existing?.id) {
+      const { error: updErr } = await supabaseServer
+        .from('package_pulse_usage')
+        .update({ quantity_used: qty, remaining_after: remaining })
+        .eq('id', existing.id);
+      if (updErr) throw updErr;
+    } else {
+      const { error: insErr } = await supabaseServer.from('package_pulse_usage').insert({
+        customer_package_id: input.customerPackageId,
+        reservation_id: null,
+        quantity_used: qty,
+        remaining_after: remaining,
+        used_by: 'Pre-launch usage',
+        notes: 'Pulses used before the clinic started using the system (entered on the Add/Edit Previous Booking screen)',
+        created_at: input.purchasedAt,
+      });
+      if (insErr) throw insErr;
+    }
+    return { status: 'synced' };
+  } catch (err: any) {
+    return { status: 'failed', error: err?.message || String(err) };
+  }
+}

@@ -3,7 +3,8 @@ import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordTransaction } from '@/lib/transactionLedger';
-import { writeHistoricalBookingInvoice, mapPaymentMethod } from '@/lib/historicalInvoice';
+import { writeHistoricalBookingInvoice, mapPaymentMethod, syncPreLaunchPulseUsage } from '@/lib/historicalInvoice';
+import { settlePaymentMismatch } from '@/lib/billing';
 
 function isValidPhoneNumber(phoneStr: string): boolean {
   if (!phoneStr) return false;
@@ -211,7 +212,7 @@ export async function POST(req: Request) {
     let resolvedPackageName = packageName || null;
     let packageRecord: any = null;
     // Outcome of creating or updating the patient's package, returned to the caller (DEC-088 item 6).
-    let packageOutcome: { created: boolean; updated?: boolean; existingId?: string; pricePending?: boolean; packageType?: string; totalPulses?: number; error?: string } | null = null;
+    let packageOutcome: { created: boolean; updated?: boolean; existingId?: string; pricePending?: boolean; packageType?: string; totalPulses?: number; error?: string; pulseUsageSyncError?: string } | null = null;
     if (packageId) {
       const { data: pkgRow } = await supabaseServer
         .from('packages')
@@ -270,44 +271,18 @@ export async function POST(req: Request) {
       currentBookings = Number(customerRecord.number_of_bookings || 0);
     }
 
-    // ── FINANCIAL LEDGER BALANCE CALCULATIONS ──
-    // diff > 0: underpaid (cost exceeds payment) -> debt added to outstanding
+    // ── FINANCIAL LEDGER BALANCE CALCULATIONS (RISK-087) ──
+    // diff > 0: underpaid (cost exceeds payment) -> debt added to outstanding, wallet used first
     // diff < 0: overpaid (payment exceeds cost) -> settles outstanding debt first, excess credited to wallet
     // diff === 0: exact payment -> no change to debt or wallet
-    let newOutstanding = currentOutstanding;
-    let newWallet = currentWallet;
-    const newSpent = currentSpent + parsedPaid;
-
-    const diff = parsedValue - parsedPaid;
-
-    if (diff > 0) {
-      // Patient owes `diff`. If they have existing wallet credit, utilize wallet first.
-      if (newWallet > 0) {
-        if (newWallet >= diff) {
-          newWallet = newWallet - diff;
-        } else {
-          const remainingDebt = diff - newWallet;
-          newWallet = 0;
-          newOutstanding = newOutstanding + remainingDebt;
-        }
-      } else {
-        newOutstanding = newOutstanding + diff;
-      }
-    } else if (diff < 0) {
-      // Patient overpaid by `overpaid`. Settle existing outstanding debt first, remainder goes to wallet.
-      const overpaid = -diff;
-      if (newOutstanding > 0) {
-        if (overpaid <= newOutstanding) {
-          newOutstanding = newOutstanding - overpaid;
-        } else {
-          const remainder = overpaid - newOutstanding;
-          newOutstanding = 0;
-          newWallet = newWallet + remainder;
-        }
-      } else {
-        newWallet = newWallet + overpaid;
-      }
-    }
+    const settled = settlePaymentMismatch({
+      current: { outstanding: currentOutstanding, wallet: currentWallet, spent: currentSpent },
+      invoiceValue: parsedValue,
+      amountPaid: parsedPaid,
+    });
+    const newOutstanding = settled.outstanding;
+    const newWallet = settled.wallet;
+    const newSpent = settled.spent;
 
     if (customerRecord) {
       // Update existing customer profile balances
@@ -585,6 +560,22 @@ export async function POST(req: Request) {
               ...(cpErr ? { error: cpErr.message } : {})
             };
 
+            // RISK-106: keep the pulses used before launch in the same audit trail
+            // confirm_historical_package_price uses, so they stay visible to the deferred
+            // balance and remain eligible for revenue recognition once linked to a booking.
+            if (isPulsesPackage && cp?.id) {
+              const sync = await syncPreLaunchPulseUsage({
+                customerPackageId: targetExistingPkgId,
+                quantityUsed: pulsesUsed,
+                remainingAfter: pulsesRemaining,
+                purchasedAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
+              });
+              if (sync.status === 'failed') {
+                console.warn('Could not sync pre-launch pulse usage (non-fatal):', sync.error);
+                packageOutcome.pulseUsageSyncError = sync.error;
+              }
+            }
+
             if (Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0) {
               for (const it of packageItemsUsage) {
                 await supabaseServer
@@ -624,6 +615,20 @@ export async function POST(req: Request) {
               ...(cpErr ? { error: cpErr.message } : {}),
             };
             if (cpErr) console.error('Failed to create customer_packages record for historical booking:', cpErr.message);
+
+            // RISK-106: same audit trail as the update branch above.
+            if (isPulsesPackage && cp?.id) {
+              const sync = await syncPreLaunchPulseUsage({
+                customerPackageId: cp.id,
+                quantityUsed: pulsesUsed,
+                remainingAfter: pulsesRemaining,
+                purchasedAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
+              });
+              if (sync.status === 'failed') {
+                console.warn('Could not sync pre-launch pulse usage (non-fatal):', sync.error);
+                packageOutcome.pulseUsageSyncError = sync.error;
+              }
+            }
 
             if (cp?.id) {
               const { data: pkgItems } = await supabaseServer
@@ -818,14 +823,14 @@ export async function PATCH(req: Request) {
     const parsedValue = typeof invoiceValue === 'number' ? invoiceValue : parseFloat(invoiceValue) || 0;
     const parsedPaid = typeof actualSpent === 'number' ? actualSpent : parseFloat(actualSpent) || 0;
 
-    let resolvedDoctorId = doctorId || existing.provider_id || null;
+    const resolvedDoctorId = doctorId || existing.provider_id || null;
     let resolvedDoctorName = doctorName || existing.doctor_name || null;
     if (resolvedDoctorId) {
       const { data: prov } = await supabaseServer.from('providers').select('id, name').eq('id', resolvedDoctorId).maybeSingle();
       if (prov?.name) resolvedDoctorName = prov.name;
     }
 
-    let resolvedServiceId = serviceId ? Number(serviceId) : (existing.service_id ? Number(existing.service_id) : null);
+    const resolvedServiceId = serviceId ? Number(serviceId) : (existing.service_id ? Number(existing.service_id) : null);
     let resolvedServiceName = serviceName || null;
     if (resolvedServiceId && !resolvedServiceName) {
       const { data: svc } = await supabaseServer.from('services').select('id, en, ar').eq('id', resolvedServiceId).maybeSingle();
@@ -944,6 +949,20 @@ export async function PATCH(req: Request) {
                 : {})
             })
             .eq('id', cpIdToUpdate);
+
+          // RISK-106: same audit trail as POST, so a superadmin edit keeps pre-launch pulses
+          // visible to the deferred balance and eligible for revenue recognition once linked.
+          if (isPulsesPackage) {
+            const sync = await syncPreLaunchPulseUsage({
+              customerPackageId: cpIdToUpdate,
+              quantityUsed: pulsesUsed,
+              remainingAfter: pulsesRemaining,
+              purchasedAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
+            });
+            if (sync.status === 'failed') {
+              console.warn('Could not sync pre-launch pulse usage during edit (non-fatal):', sync.error);
+            }
+          }
 
           if (Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0) {
             for (const it of packageItemsUsage) {

@@ -12,7 +12,6 @@ import {
   Sparkles,
   Printer,
   FileSpreadsheet,
-  ArrowUpRight,
   Filter,
   CheckCircle2,
   Package,
@@ -43,24 +42,44 @@ export default function ReportsAnalyticsView({
 
   // Summary Metrics (real when data is loaded; a genuine zero must render as 0, not fall back to demo numbers)
   const totalVisits = allReservations.length;
-  const completedVisits = allReservations.filter(r => r.status === "completed").length;
+  const completedReservations = allReservations.filter(r => r.status === "completed");
+  const completedVisits = completedReservations.length;
   const totalRevenue = allReservations.reduce((acc, curr) => acc + (Number(curr.amountPaid) || 0), 0);
   const activeDoctorsCount = providers.length;
 
-  // Mock Top Performing Services
-  const topServices = [
-    { name: isAr ? "إزالة الشعر بالليزر (فول بودي)" : "Full Body Laser Hair Removal", count: 84, revenue: "168,000 EGP", growth: "+14%" },
-    { name: isAr ? "تنظيف البشرة العميق (هيدرافيشل)" : "HydraFacial Deep Cleansing", count: 62, revenue: "74,400 EGP", growth: "+22%" },
-    { name: isAr ? "جلسات النضارة والميزوثيرابي" : "Skin Booster & Mesotherapy", count: 45, revenue: "112,500 EGP", growth: "+8%" },
-    { name: isAr ? "فراكشنال ليزر لتجديد البشرة" : "Fractional CO2 Laser Resurfacing", count: 31, revenue: "93,000 EGP", growth: "+18%" }
-  ];
+  // Top Performing Services — computed from real completed reservations. No fabricated growth
+  // figure: that would need a prior-period comparison this component doesn't have data for.
+  const topServices = (() => {
+    const byService = new Map<string, { name: string; count: number; revenue: number }>();
+    for (const r of completedReservations) {
+      if (r.serviceId === undefined || r.serviceId === null) continue;
+      const key = String(r.serviceId);
+      const svc = localServices.find((s) => String(s.id) === key);
+      const name = svc ? (isAr ? svc.ar || svc.en : svc.en || svc.ar) : `${isAr ? "خدمة" : "Service"} #${key}`;
+      const entry = byService.get(key) || { name, count: 0, revenue: 0 };
+      entry.count += 1;
+      entry.revenue += Number(r.amountPaid) || 0;
+      byService.set(key, entry);
+    }
+    return Array.from(byService.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  })();
 
-  // Mock Doctor Performance Breakdown
-  const doctorUtilization = [
-    { name: "Dr. Sara El Gamel", specialty: "Dermatology & Laser", sessions: 58, revenue: "186,000 EGP", rate: "96%" },
-    { name: "Dr. Ahmed Mansour", specialty: "Plastic Surgery", sessions: 34, revenue: "142,000 EGP", rate: "88%" },
-    { name: "Dr. Nouran Tarek", specialty: "Aesthetic Specialist", sessions: 42, revenue: "115,000 EGP", rate: "92%" }
-  ];
+  // Doctor Utilization — computed from real completed reservations. No fabricated occupancy rate:
+  // that needs each doctor's schedule/room capacity, which isn't passed to this component.
+  const doctorUtilization = (() => {
+    const byDoctor = new Map<string, { name: string; specialty: string; sessions: number; revenue: number }>();
+    for (const r of completedReservations) {
+      const name = (r.doctorName || r.doctor_name || "").trim();
+      if (!name) continue;
+      const prov = providers.find((p) => p.name === name);
+      const entry = byDoctor.get(name) || { name, specialty: prov?.specialty || "", sessions: 0, revenue: 0 };
+      entry.sessions += 1;
+      entry.revenue += Number(r.amountPaid) || 0;
+      byDoctor.set(name, entry);
+    }
+    return Array.from(byDoctor.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  })();
+  const doctorsWithSessions = doctorUtilization.length;
 
   return (
     <div className="space-y-6 animate-fadeIn" dir={isAr ? "rtl" : "ltr"}>
@@ -162,9 +181,7 @@ export default function ReportsAnalyticsView({
             </div>
           </div>
           <div className="mt-3 text-3xl font-extrabold text-[#1F251A]">{totalVisits}</div>
-          <p className="mt-1 text-xs text-emerald-600 font-semibold flex items-center gap-1">
-            <ArrowUpRight size={14} /> +18.2% {isAr ? "مقارنة بالشهر الماضي" : "vs. last month"}
-          </p>
+          <p className="mt-1 text-xs text-[#5A6A51] font-semibold">{isAr ? "كل الحجوزات المسجلة" : "All recorded bookings"}</p>
         </div>
 
         <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-xs">
@@ -190,9 +207,7 @@ export default function ReportsAnalyticsView({
           <div className="mt-3 text-2xl sm:text-3xl font-extrabold text-[#1F251A]">
             {totalRevenue.toLocaleString()} <span className="text-xs font-semibold text-gray-500">EGP</span>
           </div>
-          <p className="mt-1 text-xs text-emerald-600 font-semibold flex items-center gap-1">
-            <ArrowUpRight size={14} /> +12.4% {isAr ? "نمو الإيرادات" : "revenue growth"}
-          </p>
+          <p className="mt-1 text-xs text-[#5A6A51] font-semibold">{isAr ? "من كل الحجوزات المسجلة" : "Across all recorded bookings"}</p>
         </div>
 
         <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-xs">
@@ -203,7 +218,9 @@ export default function ReportsAnalyticsView({
             </div>
           </div>
           <div className="mt-3 text-3xl font-extrabold text-[#1F251A]">{activeDoctorsCount}</div>
-          <p className="mt-1 text-xs text-[#5A6A51] font-semibold">{isAr ? "بكامل طاقتهم التشغيلية" : "Full schedule availability"}</p>
+          <p className="mt-1 text-xs text-[#5A6A51] font-semibold">
+            {doctorsWithSessions} {isAr ? "منهم عندهم جلسات مكتملة" : "with completed sessions on record"}
+          </p>
         </div>
       </div>
 
@@ -219,26 +236,31 @@ export default function ReportsAnalyticsView({
             <span className="px-2.5 py-1 rounded-xl bg-gray-100 text-[11px] font-bold text-gray-600">30 Days</span>
           </div>
 
-          <div className="mt-4 divide-y divide-gray-100">
-            {topServices.map((svc, idx) => (
-              <div key={idx} className="py-3.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EDE4C8] text-xs font-bold text-[#414E36]">
-                    #{idx + 1}
-                  </span>
-                  <div>
-                    <div className="font-bold text-xs text-[#1F251A]">{svc.name}</div>
-                    <div className="text-[10px] text-[#5A6A51]">{svc.count} {isAr ? "جلسة منجزة" : "sessions completed"}</div>
+          {topServices.length === 0 ? (
+            <p className="py-8 text-center text-xs text-[#5A6A51]">
+              {isAr ? "لا توجد حجوزات مكتملة لعرضها بعد." : "No completed bookings to show yet."}
+            </p>
+          ) : (
+            <div className="mt-4 divide-y divide-gray-100">
+              {topServices.map((svc, idx) => (
+                <div key={idx} className="py-3.5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EDE4C8] text-xs font-bold text-[#414E36]">
+                      #{idx + 1}
+                    </span>
+                    <div>
+                      <div className="font-bold text-xs text-[#1F251A]">{svc.name}</div>
+                      <div className="text-[10px] text-[#5A6A51]">{svc.count} {isAr ? "جلسة منجزة" : "sessions completed"}</div>
+                    </div>
+                  </div>
+
+                  <div className="text-end">
+                    <div className="font-bold text-xs text-[#1F251A]">{svc.revenue.toLocaleString()} EGP</div>
                   </div>
                 </div>
-
-                <div className="text-end">
-                  <div className="font-bold text-xs text-[#1F251A]">{svc.revenue}</div>
-                  <div className="text-[10px] font-semibold text-emerald-600">{svc.growth}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Doctor Performance Card */}
@@ -251,23 +273,28 @@ export default function ReportsAnalyticsView({
             <span className="px-2.5 py-1 rounded-xl bg-gray-100 text-[11px] font-bold text-gray-600">30 Days</span>
           </div>
 
-          <div className="mt-4 divide-y divide-gray-100">
-            {doctorUtilization.map((doc, idx) => (
-              <div key={idx} className="py-3.5 flex items-center justify-between gap-3">
-                <div>
-                  <div className="font-bold text-xs text-[#1F251A]">{doc.name}</div>
-                  <div className="text-[10px] text-[#5A6A51]">{doc.specialty} • {doc.sessions} {isAr ? "جلسة" : "sessions"}</div>
-                </div>
+          {doctorUtilization.length === 0 ? (
+            <p className="py-8 text-center text-xs text-[#5A6A51]">
+              {isAr ? "لا توجد جلسات مكتملة لعرضها بعد." : "No completed sessions to show yet."}
+            </p>
+          ) : (
+            <div className="mt-4 divide-y divide-gray-100">
+              {doctorUtilization.map((doc, idx) => (
+                <div key={idx} className="py-3.5 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="font-bold text-xs text-[#1F251A]">{doc.name}</div>
+                    <div className="text-[10px] text-[#5A6A51]">
+                      {doc.specialty ? `${doc.specialty} • ` : ""}{doc.sessions} {isAr ? "جلسة" : "sessions"}
+                    </div>
+                  </div>
 
-                <div className="text-end">
-                  <div className="font-bold text-xs text-[#1F251A]">{doc.revenue}</div>
-                  <div className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                    {doc.rate} {isAr ? "إشغال" : "Occupancy"}
+                  <div className="text-end">
+                    <div className="font-bold text-xs text-[#1F251A]">{doc.revenue.toLocaleString()} EGP</div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

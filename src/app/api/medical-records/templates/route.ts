@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess } from '@/lib/access';
-import fs from 'fs';
-import path from 'path';
 
-const TEMPLATES_LOCAL_PATH = path.join(process.cwd(), 'data', 'medical_record_templates.json');
+/**
+ * RISK-086 (resolved, then regressed 2026-09-2x, restored 2026-09-29): this route used to treat a
+ * local JSON file (`data/medical_record_templates.json`) as its primary store for POST/PUT/DELETE,
+ * with Supabase as a best-effort mirror — broken on Vercel, where the deployed filesystem is
+ * read-only: writes there silently failed, so a newly created template showed up in GET (Supabase-
+ * first) but 404'd on PUT/DELETE (which read the never-actually-written local file). Supabase's
+ * `medical_record_templates` table is the ONLY store now, matching every other route in the
+ * codebase — no filesystem access anywhere in this file.
+ */
 
 export interface IntakeField {
   id: string;
@@ -41,8 +47,6 @@ const DEFAULT_TEMPLATES: MedicalRecordTemplate[] = [
       { id: 'previous_treatments', label: 'Previous Cosmetic & Medical Treatments', type: 'textarea', placeholder: 'Describe past peels, surgeries, laser, or filler sessions...', required: false },
       { id: 'general_notes', label: 'Additional Clinical Remarks', type: 'textarea', placeholder: 'Doctor or patient remarks...', required: false }
     ],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
   },
   {
     id: 'tmpl-laser',
@@ -58,8 +62,6 @@ const DEFAULT_TEMPLATES: MedicalRecordTemplate[] = [
       { id: 'pain_tolerance', label: 'Pain & Heat Sensitivity Tolerance', type: 'select', options: ['Normal Tolerance', 'High Sensitivity', 'High Tolerance'], required: false },
       { id: 'laser_contraindications', label: 'Contraindications (Pregnancy, Epilepsy, Pacemaker)', type: 'text', placeholder: 'e.g. None', required: false }
     ],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
   },
   {
     id: 'tmpl-injectables',
@@ -75,38 +77,23 @@ const DEFAULT_TEMPLATES: MedicalRecordTemplate[] = [
       { id: 'facial_surgeries', label: 'Previous Facial Surgeries, Implants, or Permanent Threads', type: 'text', placeholder: 'e.g. Rhinoplasty in 2024, None', required: false },
       { id: 'aesthetic_goals', label: 'Patient Desired Aesthetic Goals & Target Areas', type: 'textarea', placeholder: 'Detail target treatment areas and expected outcome...', required: false }
     ],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
   }
 ];
 
-function readLocalTemplates(): MedicalRecordTemplate[] {
-  try {
-    if (fs.existsSync(TEMPLATES_LOCAL_PATH)) {
-      const data = fs.readFileSync(TEMPLATES_LOCAL_PATH, 'utf8');
-      const parsed = JSON.parse(data || '[]');
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.error(`Error reading ${TEMPLATES_LOCAL_PATH}:`, err);
-  }
-  // Initialize with default templates
-  writeLocalTemplates(DEFAULT_TEMPLATES);
-  return DEFAULT_TEMPLATES;
-}
+/** Reads the store; on a genuinely empty table, seeds it once with the 3 built-in defaults. */
+async function readOrSeedTemplates(): Promise<MedicalRecordTemplate[]> {
+  const { data, error } = await supabaseServer
+    .from('medical_record_templates')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  if (data && data.length > 0) return data;
 
-function writeLocalTemplates(templates: MedicalRecordTemplate[]) {
-  try {
-    const dir = path.dirname(TEMPLATES_LOCAL_PATH);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(TEMPLATES_LOCAL_PATH, JSON.stringify(templates, null, 2), 'utf8');
-  } catch (err) {
-    console.error(`Error writing ${TEMPLATES_LOCAL_PATH}:`, err);
-  }
+  const now = new Date().toISOString();
+  const seeded = DEFAULT_TEMPLATES.map((t) => ({ ...t, created_at: now, updated_at: now }));
+  const { error: seedError } = await supabaseServer.from('medical_record_templates').insert(seeded);
+  if (seedError) throw seedError;
+  return seeded;
 }
 
 export async function GET(req: Request) {
@@ -120,26 +107,8 @@ export async function GET(req: Request) {
     const serviceId = searchParams.get('serviceId') || searchParams.get('service_id');
     const templateId = searchParams.get('id') || searchParams.get('templateId');
 
-    let templates: MedicalRecordTemplate[] = [];
+    const templates = await readOrSeedTemplates();
 
-    // Try Supabase first
-    try {
-      const { data, error } = await supabaseServer
-        .from('medical_record_templates')
-        .select('*')
-        .order('created_at', { ascending: true });
-      if (!error && data && data.length > 0) {
-        templates = data;
-      }
-    } catch (err) {
-      console.warn('Supabase medical_record_templates query fallback to local');
-    }
-
-    if (templates.length === 0) {
-      templates = readLocalTemplates();
-    }
-
-    // Lookup specific template by ID
     if (templateId) {
       const found = templates.find((t) => String(t.id) === String(templateId));
       if (!found) {
@@ -148,7 +117,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ template: found });
     }
 
-    // Lookup matching template by service ID
     if (serviceId) {
       const matched = templates.find((t) =>
         Array.isArray(t.service_ids) && t.service_ids.some((sId) => String(sId) === String(serviceId))
@@ -156,8 +124,6 @@ export async function GET(req: Request) {
       if (matched) {
         return NextResponse.json({ template: matched, matchType: 'exact_service' });
       }
-
-      // Fallback to default template
       const defaultTmpl = templates.find((t) => t.is_default) || templates[0];
       return NextResponse.json({ template: defaultTmpl, matchType: 'default_fallback' });
     }
@@ -182,6 +148,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Template title is required' }, { status: 400 });
     }
 
+    const now = new Date().toISOString();
     const newTemplate: MedicalRecordTemplate = {
       id: body.id || `tmpl-${Date.now()}`,
       title,
@@ -189,27 +156,20 @@ export async function POST(req: Request) {
       service_ids: Array.isArray(body.service_ids) ? body.service_ids : [],
       fields: Array.isArray(body.fields) ? body.fields : [],
       is_default: Boolean(body.is_default),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      created_at: now,
+      updated_at: now
     };
 
-    let templates = readLocalTemplates();
-
     if (newTemplate.is_default) {
-      templates = templates.map((t) => ({ ...t, is_default: false }));
-    }
-
-    templates.push(newTemplate);
-    writeLocalTemplates(templates);
-
-    // Try Supabase insert
-    try {
-      await supabaseServer
+      const { error: unmarkError } = await supabaseServer
         .from('medical_record_templates')
-        .upsert([newTemplate], { onConflict: 'id' });
-    } catch (err) {
-      console.warn('Supabase medical_record_templates upsert fallback');
+        .update({ is_default: false })
+        .eq('is_default', true);
+      if (unmarkError) throw unmarkError;
     }
+
+    const { error: insertError } = await supabaseServer.from('medical_record_templates').insert([newTemplate]);
+    if (insertError) throw insertError;
 
     return NextResponse.json({ success: true, template: newTemplate });
   } catch (err: any) {
@@ -231,37 +191,39 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Template ID is required' }, { status: 400 });
     }
 
-    let templates = readLocalTemplates();
-    const index = templates.findIndex((t) => String(t.id) === String(id));
-    if (index === -1) {
+    const { data: existing, error: findError } = await supabaseServer
+      .from('medical_record_templates')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (findError) throw findError;
+    if (!existing) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
     }
 
     if (body.is_default) {
-      templates = templates.map((t) => ({ ...t, is_default: false }));
+      const { error: unmarkError } = await supabaseServer
+        .from('medical_record_templates')
+        .update({ is_default: false })
+        .eq('is_default', true);
+      if (unmarkError) throw unmarkError;
     }
 
     const updatedTemplate: MedicalRecordTemplate = {
-      ...templates[index],
-      title: body.title !== undefined ? body.title.trim() : templates[index].title,
-      description: body.description !== undefined ? body.description.trim() : templates[index].description,
-      service_ids: Array.isArray(body.service_ids) ? body.service_ids : templates[index].service_ids,
-      fields: Array.isArray(body.fields) ? body.fields : templates[index].fields,
-      is_default: body.is_default !== undefined ? Boolean(body.is_default) : templates[index].is_default,
+      ...existing,
+      title: body.title !== undefined ? body.title.trim() : existing.title,
+      description: body.description !== undefined ? body.description.trim() : existing.description,
+      service_ids: Array.isArray(body.service_ids) ? body.service_ids : existing.service_ids,
+      fields: Array.isArray(body.fields) ? body.fields : existing.fields,
+      is_default: body.is_default !== undefined ? Boolean(body.is_default) : existing.is_default,
       updated_at: new Date().toISOString()
     };
 
-    templates[index] = updatedTemplate;
-    writeLocalTemplates(templates);
-
-    // Try Supabase update
-    try {
-      await supabaseServer
-        .from('medical_record_templates')
-        .upsert([updatedTemplate], { onConflict: 'id' });
-    } catch (err) {
-      console.warn('Supabase medical_record_templates update fallback');
-    }
+    const { error: updateError } = await supabaseServer
+      .from('medical_record_templates')
+      .update(updatedTemplate)
+      .eq('id', id);
+    if (updateError) throw updateError;
 
     return NextResponse.json({ success: true, template: updatedTemplate });
   } catch (err: any) {
@@ -283,24 +245,27 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Template ID is required' }, { status: 400 });
     }
 
-    let templates = readLocalTemplates();
-    const target = templates.find((t) => String(t.id) === String(id));
-    if (target?.is_default && templates.length > 1) {
-      return NextResponse.json({ error: 'Cannot delete the default intake template. Please mark another template as default first.' }, { status: 400 });
+    const { data: all, error: listError } = await supabaseServer
+      .from('medical_record_templates')
+      .select('id, is_default');
+    if (listError) throw listError;
+
+    const target = (all || []).find((t: any) => String(t.id) === String(id));
+    if (!target) {
+      return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+    }
+    if (target.is_default && (all || []).length > 1) {
+      return NextResponse.json(
+        { error: 'Cannot delete the default intake template. Please mark another template as default first.' },
+        { status: 400 }
+      );
     }
 
-    templates = templates.filter((t) => String(t.id) !== String(id));
-    writeLocalTemplates(templates);
-
-    // Try Supabase delete
-    try {
-      await supabaseServer
-        .from('medical_record_templates')
-        .delete()
-        .eq('id', String(id));
-    } catch (err) {
-      console.warn('Supabase medical_record_templates delete fallback');
-    }
+    const { error: deleteError } = await supabaseServer
+      .from('medical_record_templates')
+      .delete()
+      .eq('id', String(id));
+    if (deleteError) throw deleteError;
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

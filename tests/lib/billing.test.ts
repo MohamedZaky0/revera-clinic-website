@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeSettledBalances } from '@/lib/billing';
+import { computeSettledBalances, settlePaymentMismatch } from '@/lib/billing';
 
 describe('computeSettledBalances', () => {
   const base = { wallet: 100, spent: 500, outstanding: 200 };
@@ -133,5 +133,69 @@ describe('computeSettledBalances', () => {
     // outstanding delta = 30 - 100 = -70 → 50 - 70 = -20 → clamped to 0
     expect(result.outstanding).toBe(0);
     expect(result.clamped).toBe(true);
+  });
+});
+
+describe('settlePaymentMismatch (RISK-087)', () => {
+  const zero = { wallet: 0, spent: 0, outstanding: 0 };
+
+  it('exact payment: no change to wallet or outstanding, spent grows by amountPaid', () => {
+    const result = settlePaymentMismatch({ current: { wallet: 100, spent: 500, outstanding: 200 }, invoiceValue: 300, amountPaid: 300 });
+    expect(result).toEqual({ outstanding: 200, wallet: 100, spent: 800 });
+  });
+
+  it('underpaid, no wallet credit: the whole shortfall becomes debt', () => {
+    const result = settlePaymentMismatch({ current: zero, invoiceValue: 500, amountPaid: 300 });
+    expect(result).toEqual({ outstanding: 200, wallet: 0, spent: 300 });
+  });
+
+  it('underpaid, existing wallet fully covers the shortfall', () => {
+    const result = settlePaymentMismatch({ current: { wallet: 300, spent: 0, outstanding: 0 }, invoiceValue: 500, amountPaid: 300 });
+    expect(result).toEqual({ outstanding: 0, wallet: 100, spent: 300 });
+  });
+
+  it('underpaid, wallet exactly covers the shortfall (wallet lands at 0, no debt)', () => {
+    const result = settlePaymentMismatch({ current: { wallet: 200, spent: 0, outstanding: 0 }, invoiceValue: 500, amountPaid: 300 });
+    expect(result).toEqual({ outstanding: 0, wallet: 0, spent: 300 });
+  });
+
+  it('underpaid, wallet only partly covers the shortfall: wallet drained, remainder becomes debt', () => {
+    const result = settlePaymentMismatch({ current: { wallet: 100, spent: 0, outstanding: 0 }, invoiceValue: 500, amountPaid: 300 });
+    expect(result).toEqual({ outstanding: 100, wallet: 0, spent: 300 });
+  });
+
+  it('underpaid, wallet partly covers on top of pre-existing debt: wallet drained, remainder adds to the existing debt', () => {
+    const result = settlePaymentMismatch({ current: { wallet: 100, spent: 0, outstanding: 50 }, invoiceValue: 500, amountPaid: 300 });
+    expect(result).toEqual({ outstanding: 150, wallet: 0, spent: 300 }); // 50 + (200 - 100)
+  });
+
+  it('overpaid, no existing debt: the whole overpayment becomes wallet credit', () => {
+    const result = settlePaymentMismatch({ current: zero, invoiceValue: 300, amountPaid: 500 });
+    expect(result).toEqual({ outstanding: 0, wallet: 200, spent: 500 });
+  });
+
+  it('overpaid, existing debt fully absorbs the overpayment', () => {
+    const result = settlePaymentMismatch({ current: { wallet: 0, spent: 0, outstanding: 300 }, invoiceValue: 300, amountPaid: 500 });
+    expect(result).toEqual({ outstanding: 100, wallet: 0, spent: 500 });
+  });
+
+  it('overpaid, overpayment exactly clears existing debt (no wallet credit)', () => {
+    const result = settlePaymentMismatch({ current: { wallet: 0, spent: 0, outstanding: 200 }, invoiceValue: 300, amountPaid: 500 });
+    expect(result).toEqual({ outstanding: 0, wallet: 0, spent: 500 });
+  });
+
+  it('overpaid, overpayment clears existing debt with credit left over for the wallet', () => {
+    const result = settlePaymentMismatch({ current: { wallet: 0, spent: 0, outstanding: 100 }, invoiceValue: 300, amountPaid: 500 });
+    expect(result).toEqual({ outstanding: 0, wallet: 100, spent: 500 }); // 200 overpaid - 100 debt
+  });
+
+  it('overpaid on top of existing wallet credit: both add up', () => {
+    const result = settlePaymentMismatch({ current: { wallet: 50, spent: 0, outstanding: 0 }, invoiceValue: 300, amountPaid: 500 });
+    expect(result).toEqual({ outstanding: 0, wallet: 250, spent: 500 });
+  });
+
+  it('zero-value booking, unpaid: no wallet/debt change, spent unaffected', () => {
+    const result = settlePaymentMismatch({ current: { wallet: 100, spent: 500, outstanding: 200 }, invoiceValue: 0, amountPaid: 0 });
+    expect(result).toEqual({ outstanding: 200, wallet: 100, spent: 500 });
   });
 });

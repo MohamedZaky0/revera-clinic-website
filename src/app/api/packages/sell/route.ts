@@ -189,25 +189,21 @@ export async function POST(req: Request) {
     }
 
     const pkgMeta = pkgMetaStore[packageId];
-    const extractedPulsesFromName = (() => {
-      const nameStr = String(pkg.name || '');
-      const kMatch = nameStr.match(/(\d+)\s*k\b/i);
-      if (kMatch) return Number(kMatch[1]) * 1000;
-      const numMatch = nameStr.match(/(\d+(?:,\d+)?)\s*(?:pulses|pulse|shots|shot|نبضة|نبضات|طلقة|طلقات)/i);
-      if (numMatch) return Number(numMatch[1].replace(/,/g, ''));
-      const genericMatch = nameStr.match(/(\d+(?:,\d+)?)/);
-      if (genericMatch && (nameStr.toLowerCase().includes('pulse') || nameStr.toLowerCase().includes('laser') || nameStr.includes('نبض') || nameStr.includes('ليزر'))) {
-        return Number(genericMatch[1].replace(/,/g, ''));
-      }
-      return 0;
-    })();
 
     // An explicit services package (package_type/meta say 'services' and it actually has service
     // items) must never be reclassified as pulses-type just because "laser" appears in its name —
-    // e.g. a real "Laser Full Body 3x" services package. Checked first so the name-based signals
-    // below can't override an explicit, correctly-configured services package.
+    // e.g. a real "Laser Full Body 3x" services package. Checked first so the signals below can't
+    // override an explicit, correctly-configured services package.
     const isExplicitServicesPkg = packageItems.length > 0 && pkg.package_type !== 'pulses' && pkgMeta?.packageType !== 'pulses';
-    const configuredTotalPulses = Number(pkg.total_pulses || pkgMeta?.totalPulses || extractedPulsesFromName || 0);
+
+    // DEC-085 / RISK-096 (re-affirmed 2026-09-28 — see DEC-093): the pulse QUOTA is never fabricated
+    // from the package name or from the page_settings `packages_meta` blob. `pkgMeta?.packageType`
+    // is a schema-resilience classification fallback (does this look like a pulses package at all?)
+    // and is fine to consult; the QUANTITY that gets written and enforced comes from the real
+    // `packages.total_pulses` column only. A commit on 2026-09-27 briefly reintroduced a
+    // name-regex/`pkgMeta.totalPulses` fallback here (a package literally named "5000 Laser Pulses"
+    // with `total_pulses: 0` sold with a quota of 5000 guessed from its name) — reverted.
+    const configuredTotalPulses = Number(pkg.total_pulses || 0);
 
     const isPulsesPkg = !isExplicitServicesPkg && Boolean(
       pkg.package_type === 'pulses' ||
@@ -220,6 +216,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Package must contain at least one service with a positive quantity.' }, { status: 400 });
     }
 
+    // Pulse quota comes from the real packages.total_pulses column only — never the package name
+    // and never a fabricated default. A pulses-type package with no configured quota is refused
+    // before any invoice/package is written, so the owner sets Total Pulses in Admin → Packages
+    // instead of the patient getting a guessed one.
     if (isPulsesPkg && configuredTotalPulses <= 0) {
       return NextResponse.json(
         { error: 'This package has no pulse quota configured — set Total Pulses in Admin → Packages.' },
