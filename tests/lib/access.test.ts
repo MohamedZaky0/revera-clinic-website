@@ -7,8 +7,18 @@
  * both the granular key and the coarse category is now actually rejected server-side, not just
  * hidden from in the UI.
  */
-import { describe, it, expect } from 'vitest';
-import { hasGranularPermission, type StaffAccess } from '@/lib/access';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { hasGranularPermission, hasStaffPermission, hasFinancePermission, requireStaffAccess, type StaffAccess } from '@/lib/access';
+import { createSupabaseFake } from '../helpers/supabaseFake';
+
+const fake = createSupabaseFake();
+
+vi.mock('@/lib/supabaseServer', () => ({
+  supabaseServer: {
+    auth: { getUser: (...args: any[]) => fake.authGetUser(...args) },
+    from: (table: string) => fake.client.from(table),
+  },
+}));
 
 function access(role: string, permissions: string[] = []): StaffAccess {
   return { user: { id: 'u1' }, employee: { id: 'e1' }, role, permissions };
@@ -106,5 +116,103 @@ describe('hasGranularPermission', () => {
 
   it('an unrelated category permission does not leak across categories', () => {
     expect(hasGranularPermission(access('custom-role', ['Bookings']), 'providers.delete')).toBe(false);
+  });
+});
+
+describe('role normalization and exact matching', () => {
+  function staffRequest(token: string): Request {
+    return new Request('http://localhost:3000/api/test', {
+      method: 'GET',
+      headers: new Headers({ Authorization: `Bearer ${token}` }),
+    });
+  }
+
+  beforeEach(() => {
+    fake.reset();
+  });
+
+  it('role name "Super Admin" normalizes to "superadmin"', async () => {
+    fake.authGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
+    fake.seed('employee_accounts', [{ id: 'emp-1', auth_user_id: 'user-1', role_name: 'Super Admin', email: 'x@test.com' }]);
+    fake.seed('roles', [{ name: 'Super Admin', permissions: [] }]);
+
+    const result = await requireStaffAccess(staffRequest('token'));
+    expect('access' in result && result.access.role).toBe('superadmin');
+  });
+
+  it('role name "super_admin" normalizes to "superadmin"', async () => {
+    fake.authGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
+    fake.seed('employee_accounts', [{ id: 'emp-1', auth_user_id: 'user-1', role_name: 'super_admin', email: 'x@test.com' }]);
+    fake.seed('roles', [{ name: 'super_admin', permissions: [] }]);
+
+    const result = await requireStaffAccess(staffRequest('token'));
+    expect('access' in result && result.access.role).toBe('superadmin');
+  });
+
+  it('role name "SUPER-ADMIN" normalizes to "superadmin"', async () => {
+    fake.authGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
+    fake.seed('employee_accounts', [{ id: 'emp-1', auth_user_id: 'user-1', role_name: 'SUPER-ADMIN', email: 'x@test.com' }]);
+    fake.seed('roles', [{ name: 'SUPER-ADMIN', permissions: [] }]);
+
+    const result = await requireStaffAccess(staffRequest('token'));
+    expect('access' in result && result.access.role).toBe('superadmin');
+  });
+
+  it('role name "Supervisor" is NOT superadmin and has no automatic permissions', async () => {
+    fake.authGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
+    fake.seed('employee_accounts', [{ id: 'emp-1', auth_user_id: 'user-1', role_name: 'Supervisor', email: 'x@test.com' }]);
+    fake.seed('roles', [{ name: 'Supervisor', permissions: [] }]);
+
+    const result = await requireStaffAccess(staffRequest('token'));
+    expect('access' in result).toBe(true);
+    if ('access' in result) {
+      expect(result.access.role).toBe('supervisor');
+      expect(hasStaffPermission(result.access, 'bookings.view')).toBe(false);
+      expect(hasFinancePermission(result.access, 'finance.view_pnl')).toBe(false);
+      expect(hasGranularPermission(result.access, 'providers.delete')).toBe(false);
+    }
+  });
+
+  it('role name "Reception Supervisor" with explicit permission grants that permission only', async () => {
+    fake.authGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
+    fake.seed('employee_accounts', [{ id: 'emp-1', auth_user_id: 'user-1', role_name: 'Reception Supervisor', email: 'x@test.com' }]);
+    fake.seed('roles', [{ name: 'Reception Supervisor', permissions: ['finance.view_pnl'] }]);
+
+    const result = await requireStaffAccess(staffRequest('token'));
+    expect('access' in result).toBe(true);
+    if ('access' in result) {
+      expect(hasFinancePermission(result.access, 'finance.view_pnl')).toBe(true);
+      expect(hasFinancePermission(result.access, 'finance.manage_expenses')).toBe(false);
+    }
+  });
+
+  it('role name "Admin" normalizes to "admin"', async () => {
+    fake.authGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
+    fake.seed('employee_accounts', [{ id: 'emp-1', auth_user_id: 'user-1', role_name: 'Admin', email: 'x@test.com' }]);
+    fake.seed('roles', [{ name: 'Admin', permissions: [] }]);
+
+    const result = await requireStaffAccess(staffRequest('token'));
+    expect('access' in result && result.access.role).toBe('admin');
+  });
+
+  it('role name "admin" normalizes to "admin"', async () => {
+    fake.authGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
+    fake.seed('employee_accounts', [{ id: 'emp-1', auth_user_id: 'user-1', role_name: 'admin', email: 'x@test.com' }]);
+    fake.seed('roles', [{ name: 'admin', permissions: [] }]);
+
+    const result = await requireStaffAccess(staffRequest('token'));
+    expect('access' in result && result.access.role).toBe('admin');
+  });
+
+  it('role name "Sub-admin" is NOT "admin"', async () => {
+    fake.authGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
+    fake.seed('employee_accounts', [{ id: 'emp-1', auth_user_id: 'user-1', role_name: 'Sub-admin', email: 'x@test.com' }]);
+    fake.seed('roles', [{ name: 'Sub-admin', permissions: [] }]);
+
+    const result = await requireStaffAccess(staffRequest('token'));
+    expect('access' in result).toBe(true);
+    if ('access' in result) {
+      expect(result.access.role).toBe('sub-admin');
+    }
   });
 });

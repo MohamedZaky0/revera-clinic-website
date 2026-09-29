@@ -133,3 +133,42 @@ export function settlePaymentMismatch(input: PaymentMismatchInput): CustomerBala
 
   return { outstanding, wallet, spent };
 }
+
+/** A historical booking with no invoice value entered is worth what was paid (same rule as
+ *  writeHistoricalBookingInvoice and scripts/backfill_historical_invoices.sql). */
+export function effectiveInvoiceValue(invoiceValue: number, amountPaid: number): number {
+  return invoiceValue > 0 ? invoiceValue : amountPaid;
+}
+
+export interface HistoricalEditInput {
+  current: CustomerBalances;
+  oldInvoiceValue: number;
+  oldAmountPaid: number;
+  newInvoiceValue: number;
+  newAmountPaid: number;
+}
+
+/** Re-settles a customer's balances when an already-recorded historical booking is edited:
+ *  applies only the CHANGE between the old and new booking, never the whole booking again. */
+export function settleHistoricalEdit(input: HistoricalEditInput): CustomerBalances {
+  const oldEff = effectiveInvoiceValue(input.oldInvoiceValue, input.oldAmountPaid);
+  const newEff = effectiveInvoiceValue(input.newInvoiceValue, input.newAmountPaid);
+
+  const spentDelta = input.newAmountPaid - input.oldAmountPaid;
+  const netDelta = (input.newAmountPaid - newEff) - (input.oldAmountPaid - oldEff);
+
+  // Allocate netDelta with the same wallet/debt priority as settlePaymentMismatch
+  const allocated = settlePaymentMismatch({
+    current: { ...input.current, spent: 0 },
+    invoiceValue: -netDelta,
+    amountPaid: 0,
+  });
+
+  const spent = Math.max(0, input.current.spent + spentDelta);
+
+  return {
+    wallet: allocated.wallet,
+    outstanding: allocated.outstanding,
+    spent,
+  };
+}

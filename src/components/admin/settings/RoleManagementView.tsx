@@ -176,8 +176,8 @@ const PERMISSION_STRUCTURE = [
     category: "Reports & Analytics",
     prefix: "reports",
     items: [
-      { key: "reports.view_analytics", label: "View Operational Analytics" },
-      { key: "reports.view_financial_reports", label: "View Financial & Revenue Reports" },
+      { key: "reports.view_analytics", label: "View Operational Reports (capacity & utilisation)" },
+      { key: "reports.view_financial_reports", label: "View Financial Reports (trend, margins, doctor/branch profit, packages, service mix, no-show cost, new vs returning)" },
       { key: "reports.export_reports", label: "Export Business Data Reports" }
     ]
   },

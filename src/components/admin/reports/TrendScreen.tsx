@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { LineChart as LineChartIcon, AlertCircle } from "lucide-react";
-import { StatTile, LineAreaChart } from "./charts";
+import { StatTile, LineAreaChart } from "../Finance/charts";
 
 export interface BranchOption {
   id: string;

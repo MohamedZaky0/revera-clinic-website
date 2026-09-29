@@ -74,9 +74,9 @@ export async function requireStaffAccess(req: Request): Promise<AccessResult> {
 
     const rawRole = (employee.role_name || "").toLowerCase().trim();
     const cleanRole = rawRole.replace(/[\s_-]+/g, "");
-    const normalizedRole = (cleanRole === "superadmin" || rawRole.includes("super"))
-      ? "superadmin"
-      : (cleanRole === "admin" ? "admin" : rawRole);
+    // Role must match exactly (after normalization): "Super Admin", "super_admin", "SUPER-ADMIN" → "superadmin".
+    // "Supervisor" is its own role and must not become the owner, even though it contains "super".
+    const normalizedRole = (cleanRole === "superadmin" ? "superadmin" : (cleanRole === "admin" ? "admin" : rawRole));
 
     const { data: roleRecord, error: roleError } = await supabaseServer
       .from("roles")
@@ -102,12 +102,12 @@ export async function requireStaffAccess(req: Request): Promise<AccessResult> {
 
 export function hasStaffPermission(access: StaffAccess, permission: string) {
   const normRole = (access.role || "").toLowerCase().trim().replace(/[\s_-]+/g, "");
-  return normRole === "superadmin" || normRole.includes("super") || normRole === "admin" || access.permissions.includes(permission);
+  return normRole === "superadmin" || normRole === "admin" || access.permissions.includes(permission);
 }
 
 export function hasFinancePermission(access: StaffAccess, permission: string) {
   const normRole = (access.role || "").toLowerCase().trim().replace(/[\s_-]+/g, "");
-  return normRole === "superadmin" || normRole.includes("super") || access.permissions.includes(permission);
+  return normRole === "superadmin" || access.permissions.includes(permission);
 }
 
 /**
@@ -116,7 +116,7 @@ export function hasFinancePermission(access: StaffAccess, permission: string) {
  */
 export function hasGranularPermission(access: StaffAccess, permKey: string): boolean {
   const normRole = (access.role || "").toLowerCase().trim().replace(/[\s_-]+/g, "");
-  if (normRole === "superadmin" || normRole.includes("super")) return true;
+  if (normRole === "superadmin") return true;
   const perms = access.permissions || [];
   if (perms.includes("*") || perms.includes(permKey)) return true;
 
@@ -162,6 +162,22 @@ export function hasGranularPermission(access: StaffAccess, permKey: string): boo
   }
 
   return false;
+}
+
+/**
+ * Staff access plus at least one of the given `finance.*` permissions (checked with
+ * `hasFinancePermission`, so `superadmin` passes and a plain `admin` needs the grant — DEC-022).
+ * Used by the finance record routes (expenses, assets, loans), which previously checked only
+ * `requireStaffAccess`/`requireAdministratorAccess` and so let any receptionist read or delete
+ * expenses, and any admin manage assets/loans even with finance revoked.
+ */
+export async function requireFinanceAccess(req: Request, anyOf: string[]): Promise<AccessResult> {
+  const result = await requireStaffAccess(req);
+  if ("error" in result) return result;
+  if (!anyOf.some((perm) => hasFinancePermission(result.access, perm))) {
+    return { error: "Finance access is required.", status: 403 };
+  }
+  return result;
 }
 
 export async function requireAdministratorAccess(req: Request): Promise<AccessResult> {

@@ -4849,6 +4849,91 @@ gets recognised. 5 tests in `tests/routes/reservations-previous-package.test.ts`
 `packageItemsUsage` at booking creation (same missing-audit-trail shape, lower severity — `services` packages
 have no production instances of this pattern yet, unlike pulses).
 
+## RISK-107: Any Staff Member Could Read, Create, Edit And Delete Clinic Expenses; Any Staff Could Read Assets And Loans (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/FINANCE_ACCESS_AND_HISTORICAL_EDIT_MANUAL_TESTS.md` (section 1)
+
+**Severity:** High · **Type:** Authorization · **Found:** 2026-09-29, Finance section review.
+
+**What was wrong:** `/api/expenses` (+ `categories`, `recurring`, `generate-due`) checked only
+`requireStaffAccess` on every method, so a receptionist's or doctor's token could list every clinic expense
+and create, edit or delete them — directly changing the P&L and cash flow. `/api/assets` and `/api/loans`
+GET were open to any staff, and their mutations checked `requireAdministratorAccess` (any admin), so revoking
+an admin's finance permissions in Role Management did not stop them (contradicting DEC-022).
+Verified on production 2026-09-29: the `receptionist` role (7 employees) holds no `finance.*` permission, so
+this closes access nobody was meant to have and removes none that was granted.
+
+**Fix:** new `requireFinanceAccess(req, anyOf)` in `src/lib/access.ts`; the seven route files use it (GET:
+`finance.manage_<x>` or `finance.view_pnl`; writes: `finance.manage_<x>`). `finance/budget-vs-actual` now also
+accepts `finance.view_pnl` (it is a read-only report; it was gated on `finance.manage_expenses`).
+**Tests:** `tests/routes/finance-records-auth.test.ts` (20).
+
+---
+
+## RISK-108: Editing A Historical Booking Corrupted Patient Balances, The Invoice Ledger And Laser Markers (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/FINANCE_ACCESS_AND_HISTORICAL_EDIT_MANUAL_TESTS.md` (section 2)
+
+**Severity:** High · **Type:** Financial integrity · **Found:** 2026-09-29, review of `a44fad5` (DEC-091).
+
+**What was wrong in `PATCH /api/reservations/previous`:**
+1. It never checked the booking was historical — any live reservation could be rewritten.
+2. It overwrote `notes`/`reception_notes` wholesale, deleting marker lines (`[Customer Package ID]`,
+   `[Laser Settlement]`, `[Laser Pulses Delivered]`) that the laser-deficit engine parses.
+3. It changed `amount_paid`/`amount_left` but never the patient's `outstanding`/`wallet_balance`/`spent_amount`
+   (the RISK-102 drift shape again).
+4. It wrote `invoice_lines.total` (the column is `line_total`) and `payments.recorded_by` (the column is
+   `received_by_employee_id`), without `is_opening`, and ignored every Supabase `{ error }` — so the invoice
+   total changed while its line did not, and new payments were silently never written.
+5. The `transactions` row, zero-paid edits, legacy bookings with no invoice, and an audit trail were not handled;
+   the superadmin check was `role.includes('super')`.
+Its test passed because the Supabase fake does not validate column names, and it never asserted the ledger.
+
+**Also fixed in `POST`:** with no invoice value entered, `settlePaymentMismatch` treated the whole payment as an
+overpayment and **credited it to the patient's wallet**, while the ledger invoice (value = paid) recorded the same
+money as the visit's price. The `transactions.payment_method` value was the raw free text or `'transfer'`, which
+violates that column's CHECK (`bank_transfer`, …) — the insert failed silently.
+
+**Fix:** `src/lib/billing.ts` → `effectiveInvoiceValue()` and `settleHistoricalEdit()` (applies only the change
+between the old and new booking, same wallet/debt priority as `settlePaymentMismatch`);
+`src/lib/historicalInvoice.ts` → `mapTransactionPaymentMethod()`. The PATCH now: exact `superadmin` only; 409 for
+non-historical bookings; 400 on phone change (the booking would stay linked to the old `customer_id`); reads the old
+invoice value first and aborts with nothing written if that read fails (a failed read treated as "no invoice" would
+create a duplicate); preserves marker lines; re-settles customer balances (+ `wallet_txns`); updates
+invoice/line/payment with the real columns and `is_opening`, deletes payments when paid becomes 0, creates the invoice
+for legacy bookings; updates/deletes/creates the `transactions` row (through `recordTransaction`, which assigns the
+NOT NULL `transaction_id`); writes a `transaction_audit_logs` row with before/after; reports non-fatal failures in
+`warnings`.
+**Tests:** `tests/routes/reservations-previous-edit.test.ts` (13, incl. exact column-key checks against the schema),
+`tests/lib/billing.test.ts`, `tests/lib/historicalInvoice.test.ts`. Mutation-checked: flipping the settlement sign
+fails 9 tests.
+
+**Not done / follow-up:** (a) production may already hold historical bookings added with no invoice value whose
+payment the old POST wrongly credited to the wallet — needs a read-only SQL audit before any correction;
+(b) changing the package of a historical booking from A to B leaves A active; (c) a phone change needs a proper
+re-link (reverse balances on the old patient, apply on the new) instead of the current refusal.
+
+---
+
+## RISK-109: Any Role Whose Name Contained "super" Was Treated As The Owner (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/FINANCE_ACCESS_AND_HISTORICAL_EDIT_MANUAL_TESTS.md` (section 3)
+
+**Severity:** High · **Type:** Privilege escalation · **Found:** 2026-09-29.
+
+`access.ts` normalised a role to `superadmin` when the name merely *contained* "super"
+(`rawRole.includes("super")`), and `hasStaffPermission`/`hasFinancePermission`/`hasGranularPermission` repeated the
+substring test. Role names are free text in Role Management, so an admin creating "Supervisor" or "Reception
+Supervisor" created a full owner (all permissions, finance, hard deletes). The `confirm_package_price` action in
+`customers/packages` had the same shape for "super"/"admin"/"reception".
+
+**Fix:** exact match after normalisation (`Super Admin`, `super_admin`, `SUPER-ADMIN` still work); the package
+check uses an exact list (`superadmin, admin, reception, receptionist`). Verified on production 2026-09-29 before
+merge: role names are exactly `superadmin` (3 employees), `receptionist` (7), `doctor` (2), `admin` (0) — nobody
+loses access. **Tests:** `tests/lib/access.test.ts` (+8), `tests/routes/customers-packages-confirm-price.test.ts` (+2).
+
+---
+
 ## PROPOSALS.md Reference
 
 

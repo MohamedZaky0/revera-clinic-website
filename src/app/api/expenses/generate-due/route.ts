@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireStaffAccess } from '@/lib/access';
+import { requireFinanceAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { nextCadenceDate } from '@/lib/expenses';
 
@@ -20,7 +20,7 @@ function todayDateString(): string {
  * periods only advances one period at a time, by design.
  */
 export async function POST(req: Request) {
-  const access = await requireStaffAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_expenses']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   try {

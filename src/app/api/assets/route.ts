@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireStaffAccess, requireAdministratorAccess } from '@/lib/access';
+import { requireFinanceAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +15,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * latitude task 3.11 explicitly offers, unlike expenses (task 3.10), which is staff-triggerable.
  */
 export async function GET(req: Request) {
-  const access = await requireStaffAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_assets', 'finance.view_pnl']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   try {
@@ -61,7 +61,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_assets']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   try {
@@ -136,7 +136,7 @@ export async function POST(req: Request) {
  * mistake by deleting and recreating the asset instead.
  */
 export async function PATCH(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_assets']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const url = new URL(req.url);
@@ -204,7 +204,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const access = await requireAdministratorAccess(req);
+  const access = await requireFinanceAccess(req, ['finance.manage_assets']);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const url = new URL(req.url);

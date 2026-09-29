@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createFetchFake } from '../../helpers/fetchFake';
-import { NewVsReturningScreen, type BranchOption } from '@/components/admin/Finance/NewVsReturningScreen';
+import { NewVsReturningScreen, type BranchOption } from '@/components/admin/reports/NewVsReturningScreen';
 
 const fetchFake = createFetchFake();
 

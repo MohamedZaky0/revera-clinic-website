@@ -3591,6 +3591,10 @@ the correct age bucket.
 
 ## 4.11 — Migration: `budget_lines` + `GET /api/finance/budget-vs-actual`
 
+> **2026-09-29 — tab hidden (DEC-097).** Nothing writes `budget_lines` (no route, no screen), so the report
+> can only be empty. The tab is commented out in `FinanceSection.tsx`; screen, route and tests are kept. Planned:
+> decide whether a budget-entry feature is worth building before re-enabling.
+
 **Depends on 3.1 (expense categories to budget against).** **Where:**
 `supabase/migrations/<timestamp>_create_budget_lines.sql`, then new
 `src/app/api/finance/budget-vs-actual/route.ts`.

@@ -59,7 +59,7 @@ function addLine(bucket: Bucket, lineTotal: number, cogs: number | null | undefi
 export async function GET(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
-  if (!hasFinancePermission(access.access, 'finance.view_pnl')) {
+  if (!hasFinancePermission(access.access, 'finance.view_pnl') && !hasFinancePermission(access.access, 'reports.view_financial_reports')) {
     return NextResponse.json({ error: 'Finance P&L access is required.' }, { status: 403 });
   }
 

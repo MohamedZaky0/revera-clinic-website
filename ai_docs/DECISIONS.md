@@ -1078,7 +1078,7 @@ mock screen) reserved as a third tab **later**.
 ## DEC-037: Capacity and Service Mix (5.9/5.10) Live As Finance Tabs, Not A New Reports Section
 
 **Date:** 2026-07-30
-**Status:** Decided — active
+**Status:** Superseded by DEC-097 (2026-09-29)
 
 **Context:**
 An open question deferred from 2026-07-26 asked whether Phase 5's capacity/break-even/service-mix
@@ -3253,5 +3253,94 @@ When laser pulse sessions deliver more pulses than remaining in a patient's puls
    - Doctor Portal and Reception views parse `[Customer Package ID]: <id>` from reservation `notes` if not directly populated on the top-level reservation object, ensuring `consume_package_pulses` executes reliably.
 3. **Consistent Badging & Details Modal Actions:**
    - `AdminBookingsView`, `BookingDetailsModal`, and `DoctorAccountView` display the amber deficit badge and allow staff to navigate directly to checkout/settlement prompt without dead ends.
+
+---
+
+## DEC-097: Finance Keeps Records And Statements; Decision Reports Move To A Real Reports Section (Supersedes DEC-037)
+
+**Date:** 2026-09-29
+**Status:** Decided & implemented (2026-09-29)
+
+**Context:**
+Finance had grown to 17 tabs in one flat bar, mixing three different things: where money is *recorded*
+(expenses, assets, loans), the *statements* of what happened to it (P&L, cash flow, receivables), and
+*analysis* for decisions (trend, margins, doctor/branch profit, package profitability, capacity, service mix,
+no-show cost, new vs returning). Meanwhile the sidebar's **Reports** section was a mock page showing fabricated
+numbers ("+18.2% vs last month", invented doctors and services) to the clinic owner. DEC-037 had kept Capacity
+and Service Mix in Finance to avoid a new section; it explicitly said to revisit if the tab bar became unwieldy.
+
+**Decision:**
+- **Finance** = records + statements: Overview; Records (Expenses, Assets & Depreciation, Loans); Statements
+  (P&L, Cash Flow, Receivables Aging, Commission Payouts).
+- **Reports** = read-only decision analysis, grouped: Performance (Trend, Service Margins, Doctor / Branch P&L,
+  Package Profitability); Operations (Capacity, Service Mix, No-Show / Cancellation Cost); Patients (New vs
+  Returning). The mock `ReportsAnalyticsView` is deleted.
+- Permissions: `reports.view_financial_reports` gates every report that shows money (all except Capacity);
+  `reports.view_analytics` gates Capacity. Both keys already existed in Role Management but guarded nothing.
+  Every moved endpoint (`/api/finance/*`, paths unchanged) also still accepts the `finance.*` key it used before,
+  and the Reports sidebar item is shown to roles holding those `finance.*` keys, so nobody loses access.
+- **Budget vs Actual is hidden, not deleted.** Nothing in the system can write `budget_lines` (no route, no
+  screen), so the report can only ever be empty. The tab is commented out; the screen, route and tests stay.
+  **Planned:** study whether budgeting is worth building (a budget-entry screen + route, e.g. per category per
+  month with "copy last month") before re-enabling it — owner decision 2026-09-29.
+
+**Reason:**
+- The split lets an owner give a branch manager operational reports (capacity/utilisation) without exposing
+  salaries, margins or the P&L — impossible while those screens sat behind `finance.*`.
+- A report page showing invented numbers is worse than no page: an owner may act on them.
+
+**Trade-offs:**
+- Two sidebar entries instead of one for money-related screens. Accepted — they answer different questions and
+  are used by different people.
+- The moved screens keep calling `/api/finance/*`; renaming the endpoints is not worth the churn.
+
+**Supersedes:** DEC-037.
+
+**Implemented:** 2026-09-29. Manual test checklist: `ai_docs/manual_tests/FINANCE_REPORTS_SPLIT_MANUAL_TESTS.md`.
+Known limitation: the Reports tabs are shown per two flags (financial / analytics); a legacy role holding only one
+of `finance.view_pnl`/`finance.view_margins` without a `reports.*` key sees tabs the server then refuses. No production
+role is in that state (admin holds all `finance.*`, checked 2026-09-29).
+
+---
+
+## DEC-098: Several Packages On One Historical Booking — Kept, Re-Built On One Shared Writer With The DEC-088 / RISK-106 Rules
+
+**Date:** 2026-09-29
+**Status:** Decided & implemented
+
+**Context:**
+`origin/dev` commits `b299751`, `7daf4f1`, `1a7fc48` (saifuldeennaser) let the Add/Edit Previous Booking screen attach
+several packages to one historical booking (`packages: [...]`), each with the pulses used in that session. Review found
+four defects in the route side: (1) a new package's `price_paid` was the price the form sent (catalog price) with
+`price_pending: false` — reversing DEC-088 item 6; (2) the pre-launch usage row received "pulses used this session"
+(default 0), and a 0 deletes it while `customer_packages.pulses_used` still counts those pulses — reintroducing RISK-106;
+(3) PATCH only updated existing packages, so a package added while editing was invoiced but never created; (4) no check
+that a package belongs to the patient, no duplicate check, write errors ignored. The same commits also collided with the
+RISK-108 rewrite of the PATCH handler.
+
+**Decision:**
+Keep the multi-package feature and its form unchanged; re-build the route side on `src/lib/historicalPackages.ts`, used by
+both POST and PATCH so they cannot drift:
+- **Validation before any write:** duplicate `customerPackageId` → 400; a `customerPackageId` must belong to the booking's
+  patient (a brand-new patient cannot have one) → 400; a new package must exist in the catalog → 400. Pulse totals of an
+  existing package come from the database, not the request.
+- **Price (DEC-088 item 6):** a new package's price is the entered invoice value only when exactly one package is attached,
+  it is new, and the booking has no service and no product; otherwise `price_pending = true`. The sent/catalog price is
+  never stored as `price_paid`.
+- **Pre-launch pulses (RISK-106), owner-approved 2026-09-29:** the one `Pre-launch usage` row per package holds
+  *everything used* (`total − remaining`) *minus what every other usage row already carries* (live bookings, no-booking
+  consumes). The package's usage rows therefore add up to `pulses_used`, historical usage is never recognised as revenue
+  (DEC-088 item 10), and a session that used 0 pulses no longer deletes the history.
+- **PATCH:** a package added while editing is created (same price rule); the row this booking created earlier is found by
+  catalog id + `purchased_at = booking date` so re-saving never creates a second one. Patient balances are re-settled once
+  (RISK-108), never per package.
+- The RISK-108 PATCH safeguards (historical-only, phone lock, invoice-read abort, marker lines, ledger/transactions/audit)
+  and POST's `effectiveInvoiceValue` / `mapTransactionPaymentMethod` are kept as they were.
+
+**Tests:** `tests/routes/reservations-previous-multi-package.test.ts` (13; mutation-checked: storing the session pulses
+fails 2, storing the sent price fails 8). Manual checklist: `ai_docs/manual_tests/PREVIOUS_BOOKING_MULTI_PACKAGE_MANUAL_TESTS.md`.
+
+**Not done:** removing a package from a booking during an edit leaves that package's row as it was (no automatic
+"un-consume"); a phone change is still refused rather than re-linked (RISK-108 follow-up).
 
 ---

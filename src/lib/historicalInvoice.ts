@@ -43,6 +43,21 @@ export function mapPaymentMethod(paymentType: string | null | undefined): 'cash'
   return 'cash';
 }
 
+/** Map free-text payment type into the `transactions.payment_method` CHECK set. */
+export function mapTransactionPaymentMethod(
+  paymentType: string | null | undefined
+): 'cash' | 'card' | 'bank_transfer' | 'wallet' | 'instapay' | 'vodafone_cash' | 'other' {
+  const p = String(paymentType || '').toLowerCase();
+  if (/card|visa|mastercard/.test(p)) return 'card';
+  if (p.includes('instapay')) return 'instapay';
+  if (p.includes('wallet')) return 'wallet';
+  if (p.includes('transfer') || p.includes('bank')) return 'bank_transfer';
+  if (p.includes('vodafone') || p.includes('vodafone_cash')) return 'vodafone_cash';
+  if (p.includes('cash')) return 'cash';
+  if (!p || p === '') return 'cash';
+  return 'other';
+}
+
 export async function writeHistoricalBookingInvoice(input: HistoricalInvoiceInput): Promise<HistoricalInvoiceResult> {
   // Same rule as the script: the entered invoice value, else what was paid.
   const total = input.invoiceValue > 0 ? input.invoiceValue : input.amountPaid;
