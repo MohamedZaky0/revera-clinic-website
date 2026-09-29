@@ -1191,4 +1191,23 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
    - `isInvoicePaid = (sessionPaid >= totalPrice && totalPrice > 0) || (sessionLeft <= 0 && sessionPaid > 0)`
    - The `rawLeft <= 0` condition alone MUST NOT determine paid status, because it can be a stale/incorrect DB value from a prior buggy session completion. Use the recomputed `totalPrice` (which includes the booked package price) as the authoritative floor.
 
+---
+
+## Historical / Previous Booking Rules
+
+### 1. Zero Invoice & Zero Paid Status (`invoice = 0 && paid = 0`)
+**Enforced in:** `CustomerProfileDrawer.tsx`, `AdminBookingsView.tsx`, `BookingDetailsModal.tsx`, `POST /api/reservations/previous`, `PATCH /api/reservations/previous`
+- When a previous/historical booking is entered with 0 invoice value and 0 actual paid (e.g. historical follow-up, package redemption session with 0 invoice increment), it MUST be displayed as **"Paid"** / **"مسدد بالكامل"** with 0 left, NOT "Unpaid".
+- A 0-invoice booking has zero outstanding financial liability.
+
+### 2. Historical Pulses Packages Quota & Live Balance Invariant
+**Enforced in:** `AdminAddPreviousBookingView.tsx`, `POST /api/reservations/previous`, `PATCH /api/reservations/previous`
+- **Pulses Used starts at 0 for every new session**: When adding a new previous booking (whether purchasing a new package or linking an existing customer package), `Pulses Used` starts at `0`.
+- **Pulses Remaining is Uneditable (Read-Only)**: The `Pulses Left (Remaining)` field is strictly read-only and automatically computed based on the pulses used in that session.
+- **Dynamic Session Boundary**:
+  - For a new previous booking: `maxPulsesAllowed = packageLiveRemaining`. `packagePulsesRemaining = Math.max(0, packageLiveRemaining - pulsesUsed)`.
+  - For editing an existing historical booking: `maxPulsesAllowed = initialBookingPulsesUsed + packageLiveRemaining`. `packagePulsesRemaining = Math.max(0, packageLiveRemaining + (initialBookingPulsesUsed - pulsesUsed))`.
+- **Customer Package Cumulative Tracking**: In `customer_packages`, `pulses_remaining` is set to the remaining pulses balance, and `pulses_used` is saved as the cumulative total consumed across all sessions: `catalogTotalPulses > 0 ? catalogTotalPulses - pulsesRemaining : pulsesUsed`.
+
+
 

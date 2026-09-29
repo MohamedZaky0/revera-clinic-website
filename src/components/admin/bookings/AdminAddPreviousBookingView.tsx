@@ -26,7 +26,8 @@ import {
   X,
   Check,
   Search,
-  Zap
+  Zap,
+  Lock
 } from "lucide-react";
 import { adminTranslations } from "@/components/admin/translations";
 import { getAuthHeaders } from "@/lib/authHeaders";
@@ -178,6 +179,8 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
   // Package Breakdown State (Laser pulses or service sessions)
   const [packagePulsesUsed, setPackagePulsesUsed] = useState<number | string>(0);
   const [packagePulsesRemaining, setPackagePulsesRemaining] = useState<number | string>(0);
+  const [initialBookingPulsesUsed, setInitialBookingPulsesUsed] = useState<number>(0);
+  const [packageLiveRemaining, setPackageLiveRemaining] = useState<number>(0);
   const [packageServicesUsage, setPackageServicesUsage] = useState<
     Record<string | number, { qtyTotal: number; qtyUsed: number; qtyRemaining: number; serviceName?: string }>
   >({});
@@ -510,14 +513,49 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     }
 
     // Parse Package Usage note breakdown
-    const pulseUsageMatch = rawNotes.match(/\[Package Usage\]:\s*([\d,]+)\s*\/\s*([\d,]+)\s*pulses used(?:\s*\(([\d,]+)\s*pulses remaining\))?/i);
-    if (pulseUsageMatch) {
-      const u = parseInt(pulseUsageMatch[1].replace(/,/g, ""), 10) || 0;
-      const r = pulseUsageMatch[3] ? parseInt(pulseUsageMatch[3].replace(/,/g, ""), 10) : 0;
-      setPackagePulsesUsed(u);
-      setPackagePulsesRemaining(r);
-    }
+    const pulseUsageMatch = rawNotes.match(/\[Package Usage\]:\s*([\d,]+)\s*(?:\/\s*[\d,]+)?\s*pulses used(?:\s*\(([\d,]+)\s*pulses remaining\))?/i);
+    const u = pulseUsageMatch
+      ? (parseInt(pulseUsageMatch[1].replace(/,/g, ""), 10) || 0)
+      : (Number((targetBooking as any).package_pulses_used ?? (targetBooking as any).packagePulsesUsed ?? (targetBooking as any).pulsesUsed ?? 0) || 0);
+    const r = pulseUsageMatch && pulseUsageMatch[2]
+      ? (parseInt(pulseUsageMatch[2].replace(/,/g, ""), 10) || 0)
+      : (Number((targetBooking as any).package_pulses_remaining ?? (targetBooking as any).packagePulsesRemaining ?? 0) || 0);
+    setInitialBookingPulsesUsed(u);
+    setPackagePulsesUsed(u);
+    setPackageLiveRemaining(r);
+    setPackagePulsesRemaining(r);
   }, [targetBooking, services, pkgList, prodList, lang]);
+
+  // Sync live package remaining in edit mode or when existing customer packages load
+  useEffect(() => {
+    if (patientExistingPackages.length === 0) return;
+    const targetCpId = selectedCustomerPackageId || (targetBooking as any)?.customer_package_id || (targetBooking as any)?.customerPackageId;
+    const targetPkgId = selectedPackageId || (targetBooking as any)?.package_id || (targetBooking as any)?.packageId;
+    const matchedCp = patientExistingPackages.find(
+      (p) => (targetCpId && String(p.id) === String(targetCpId)) ||
+             (targetPkgId && String(p.packageId || p.id) === String(targetPkgId))
+    );
+    if (matchedCp) {
+      const total = Number(matchedCp.totalPulses ?? matchedCp.includedPulses ?? 0);
+      const liveRem = Number(matchedCp.pulsesRemaining ?? matchedCp.remainingPulses ?? Math.max(0, total - Number(matchedCp.usedPulses ?? 0)));
+      setPackageLiveRemaining(liveRem);
+      if (isEditMode) {
+        const currentUsed = typeof packagePulsesUsed === "number" ? packagePulsesUsed : (parseInt(String(packagePulsesUsed), 10) || 0);
+        setPackagePulsesRemaining(Math.max(0, liveRem + (initialBookingPulsesUsed - currentUsed)));
+      } else if (selectedCustomerPackageId) {
+        const currentUsed = typeof packagePulsesUsed === "number" ? packagePulsesUsed : (parseInt(String(packagePulsesUsed), 10) || 0);
+        setPackagePulsesRemaining(Math.max(0, liveRem - currentUsed));
+      }
+    }
+  }, [patientExistingPackages, isEditMode, selectedCustomerPackageId, selectedPackageId, targetBooking, initialBookingPulsesUsed]);
+
+  const maxPulsesAllowed = useMemo(() => {
+    if (!isPulsePackage) return 0;
+    if (isEditMode) {
+      return Math.max(0, initialBookingPulsesUsed + packageLiveRemaining);
+    }
+    return Math.max(0, packageLiveRemaining);
+  }, [isPulsePackage, isEditMode, initialBookingPulsesUsed, packageLiveRemaining]);
 
   // Recalculate invoice value when Service, Package, or Product changes
   const recalculateInvoice = (nextSrvId: string, nextPkgId: string, nextProdId: string, isExistingCustomerPkg = Boolean(selectedCustomerPackageId)) => {
@@ -543,6 +581,8 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     if (!val) {
       setSelectedCustomerPackageId("");
       setSelectedPackageId("");
+      setInitialBookingPulsesUsed(0);
+      setPackageLiveRemaining(0);
       setPackagePulsesUsed(0);
       setPackagePulsesRemaining(0);
       setPackageServicesUsage({});
@@ -565,9 +605,10 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
       if (isPulse) {
         const total = Number(cp.totalPulses ?? cp.includedPulses ?? 0);
-        const used = Number(cp.usedPulses ?? 0);
-        const rem = Number(cp.pulsesRemaining ?? cp.remainingPulses ?? Math.max(0, total - used));
-        setPackagePulsesUsed(used);
+        const rem = Number(cp.pulsesRemaining ?? cp.remainingPulses ?? Math.max(0, total - Number(cp.usedPulses ?? 0)));
+        setInitialBookingPulsesUsed(0);
+        setPackageLiveRemaining(rem);
+        setPackagePulsesUsed(0);
         setPackagePulsesRemaining(rem);
       } else {
         const items = cp.items || [];
@@ -577,7 +618,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
           const svcName = lang === "ar" && item.serviceNameAr ? item.serviceNameAr : (item.serviceName || `Service #${item.serviceId}`);
           newUsage[key] = {
             qtyTotal: Number(item.qtyTotal ?? item.qty_total ?? item.qty ?? 0),
-            qtyUsed: Number(item.qtyUsed ?? item.qty_used ?? 0),
+            qtyUsed: 0,
             qtyRemaining: Number(item.qtyRemaining ?? item.qty_remaining ?? Math.max(0, Number(item.qtyTotal || 0) - Number(item.qtyUsed || 0))),
             serviceName: svcName,
           };
@@ -603,6 +644,8 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
       if (isPulse) {
         const total = Number(pkg.totalPulses ?? pkg.total_pulses ?? 0);
+        setInitialBookingPulsesUsed(0);
+        setPackageLiveRemaining(total);
         setPackagePulsesUsed(0);
         setPackagePulsesRemaining(total);
       } else {
@@ -625,12 +668,15 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     }
   };
 
-  // Pulses input handlers (flexible for typing, deleting, and auto-balancing)
+  // Pulses input handlers (Pulses Used drives Pulses Left automatically)
   const handlePulsesUsedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     if (raw === "") {
       setPackagePulsesUsed("");
-      setPackagePulsesRemaining(packageTotalPulses);
+      const rem = isEditMode
+        ? Math.max(0, packageLiveRemaining + initialBookingPulsesUsed)
+        : packageLiveRemaining;
+      setPackagePulsesRemaining(rem);
       return;
     }
     const parsed = parseInt(raw, 10);
@@ -639,52 +685,29 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       return;
     }
     const val = Math.max(0, parsed);
-    const total = packageTotalPulses;
-    const boundedUsed = total > 0 ? Math.min(total, val) : val;
-    setPackagePulsesUsed(raw.startsWith("0") && raw.length > 1 && !raw.startsWith("0.") ? String(boundedUsed) : raw);
-    setPackagePulsesRemaining(total > 0 ? Math.max(0, total - boundedUsed) : 0);
-  };
-
-  const handlePulsesRemainingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    if (raw === "") {
-      setPackagePulsesRemaining("");
-      setPackagePulsesUsed(packageTotalPulses);
-      return;
-    }
-    const parsed = parseInt(raw, 10);
-    if (isNaN(parsed)) {
-      setPackagePulsesRemaining("");
-      return;
-    }
-    const val = Math.max(0, parsed);
-    const total = packageTotalPulses;
-    const boundedRem = total > 0 ? Math.min(total, val) : val;
-    setPackagePulsesRemaining(raw.startsWith("0") && raw.length > 1 && !raw.startsWith("0.") ? String(boundedRem) : raw);
-    setPackagePulsesUsed(total > 0 ? Math.max(0, total - boundedRem) : 0);
+    const boundedUsed = maxPulsesAllowed > 0 ? Math.min(maxPulsesAllowed, val) : val;
+    setPackagePulsesUsed(raw.startsWith("0") && raw.length > 1 && !raw.startsWith("0.") ? String(boundedUsed) : (val > maxPulsesAllowed ? boundedUsed : raw));
+    const newRem = isEditMode
+      ? Math.max(0, packageLiveRemaining + (initialBookingPulsesUsed - boundedUsed))
+      : Math.max(0, packageLiveRemaining - boundedUsed);
+    setPackagePulsesRemaining(newRem);
   };
 
   const handlePulsesUsedBlur = () => {
     if (packagePulsesUsed === "" || isNaN(Number(packagePulsesUsed))) {
       setPackagePulsesUsed(0);
-      setPackagePulsesRemaining(packageTotalPulses);
+      const rem = isEditMode
+        ? Math.max(0, packageLiveRemaining + initialBookingPulsesUsed)
+        : packageLiveRemaining;
+      setPackagePulsesRemaining(rem);
     } else {
       const num = Math.max(0, Number(packagePulsesUsed));
-      const bounded = packageTotalPulses > 0 ? Math.min(packageTotalPulses, num) : num;
+      const bounded = maxPulsesAllowed > 0 ? Math.min(maxPulsesAllowed, num) : num;
       setPackagePulsesUsed(bounded);
-      setPackagePulsesRemaining(packageTotalPulses > 0 ? Math.max(0, packageTotalPulses - bounded) : 0);
-    }
-  };
-
-  const handlePulsesRemainingBlur = () => {
-    if (packagePulsesRemaining === "" || isNaN(Number(packagePulsesRemaining))) {
-      setPackagePulsesRemaining(0);
-      setPackagePulsesUsed(packageTotalPulses);
-    } else {
-      const num = Math.max(0, Number(packagePulsesRemaining));
-      const bounded = packageTotalPulses > 0 ? Math.min(packageTotalPulses, num) : num;
-      setPackagePulsesRemaining(bounded);
-      setPackagePulsesUsed(packageTotalPulses > 0 ? Math.max(0, packageTotalPulses - bounded) : 0);
+      const newRem = isEditMode
+        ? Math.max(0, packageLiveRemaining + (initialBookingPulsesUsed - bounded))
+        : Math.max(0, packageLiveRemaining - bounded);
+      setPackagePulsesRemaining(newRem);
     }
   };
 
@@ -1351,7 +1374,14 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {/* Total Pulses */}
                     <div className="p-3.5 bg-white rounded-xl border border-gray-200/80 shadow-xs flex flex-col justify-between">
-                      <span className="text-xs font-medium text-gray-500">{tr.pulsesTotalLabel || "Total Pulses Quota"}</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-gray-500">{tr.pulsesTotalLabel || "Total Pulses Quota"}</span>
+                        {isEditMode ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                            {lang === "ar" ? "تعديل حجز" : "Editing"}
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="flex items-baseline gap-1 mt-2">
                         <span className="text-xl font-bold text-[#111827]">{packageTotalPulses.toLocaleString()}</span>
                         <span className="text-xs text-gray-400 font-medium">{lang === "ar" ? "نبضة" : "pulses"}</span>
@@ -1360,15 +1390,22 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
                     {/* Pulses Used (Input) */}
                     <div className="p-3.5 bg-white rounded-xl border border-amber-200 shadow-xs space-y-1.5 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/10 transition">
-                      <label htmlFor="pulsesUsedInput" className="text-xs font-bold text-amber-900 block">
-                        {tr.pulsesUsedLabel || "Pulses Used"}
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="pulsesUsedInput" className="text-xs font-bold text-amber-900 block">
+                          {tr.pulsesUsedLabel || "Pulses Used"}
+                        </label>
+                        {maxPulsesAllowed > 0 && (
+                          <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/70">
+                            {lang === "ar" ? `الحد الأقصى: ${maxPulsesAllowed.toLocaleString()}` : `Max: ${maxPulsesAllowed.toLocaleString()}`}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2">
                         <input
                           id="pulsesUsedInput"
                           type="number"
                           min="0"
-                          max={packageTotalPulses || undefined}
+                          max={maxPulsesAllowed > 0 ? maxPulsesAllowed : undefined}
                           value={packagePulsesUsed}
                           onChange={handlePulsesUsedChange}
                           onBlur={handlePulsesUsedBlur}
@@ -1377,21 +1414,25 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                       </div>
                     </div>
 
-                    {/* Pulses Remaining (Input) */}
-                    <div className="p-3.5 bg-white rounded-xl border border-emerald-200 shadow-xs space-y-1.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10 transition">
-                      <label htmlFor="pulsesRemainingInput" className="text-xs font-bold text-emerald-900 block">
-                        {tr.pulsesRemainingLabel || "Pulses Left (Remaining)"}
-                      </label>
+                    {/* Pulses Remaining (Read-Only Input) */}
+                    <div className="p-3.5 bg-gray-50/80 rounded-xl border border-emerald-200 shadow-xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="pulsesRemainingInput" className="text-xs font-bold text-emerald-900 block">
+                          {tr.pulsesRemainingLabel || "Pulses Left (Remaining)"}
+                        </label>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded border border-emerald-200">
+                          <Lock size={10} />
+                          {lang === "ar" ? "محسوب تلقائياً" : "Auto-calculated"}
+                        </span>
+                      </div>
                       <div className="flex items-center gap-2">
                         <input
                           id="pulsesRemainingInput"
                           type="number"
-                          min="0"
-                          max={packageTotalPulses || undefined}
+                          readOnly
+                          tabIndex={-1}
                           value={packagePulsesRemaining}
-                          onChange={handlePulsesRemainingChange}
-                          onBlur={handlePulsesRemainingBlur}
-                          className="w-full text-base font-bold text-emerald-950 bg-emerald-50/50 border border-emerald-200 rounded-lg px-2.5 py-1.5 outline-none focus:bg-white"
+                          className="w-full text-base font-bold text-emerald-950 bg-emerald-50/40 border border-emerald-200/80 rounded-lg px-2.5 py-1.5 outline-none cursor-not-allowed select-none"
                         />
                       </div>
                     </div>
@@ -1408,7 +1449,10 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                           type="button"
                           onClick={() => {
                             setPackagePulsesUsed(0);
-                            setPackagePulsesRemaining(packageTotalPulses);
+                            const rem = isEditMode
+                              ? Math.max(0, packageLiveRemaining + initialBookingPulsesUsed)
+                              : packageLiveRemaining;
+                            setPackagePulsesRemaining(rem);
                           }}
                           className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
                             numUsedPulses === 0
@@ -1421,9 +1465,12 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                         <button
                           type="button"
                           onClick={() => {
-                            const u = Math.round(packageTotalPulses * 0.25);
+                            const u = Math.round(maxPulsesAllowed * 0.25);
                             setPackagePulsesUsed(u);
-                            setPackagePulsesRemaining(packageTotalPulses - u);
+                            const rem = isEditMode
+                              ? Math.max(0, packageLiveRemaining + (initialBookingPulsesUsed - u))
+                              : Math.max(0, packageLiveRemaining - u);
+                            setPackagePulsesRemaining(rem);
                           }}
                           className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                         >
@@ -1432,9 +1479,12 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                         <button
                           type="button"
                           onClick={() => {
-                            const u = Math.round(packageTotalPulses * 0.5);
+                            const u = Math.round(maxPulsesAllowed * 0.5);
                             setPackagePulsesUsed(u);
-                            setPackagePulsesRemaining(packageTotalPulses - u);
+                            const rem = isEditMode
+                              ? Math.max(0, packageLiveRemaining + (initialBookingPulsesUsed - u))
+                              : Math.max(0, packageLiveRemaining - u);
+                            setPackagePulsesRemaining(rem);
                           }}
                           className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                         >
@@ -1443,9 +1493,12 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                         <button
                           type="button"
                           onClick={() => {
-                            const u = Math.round(packageTotalPulses * 0.75);
+                            const u = Math.round(maxPulsesAllowed * 0.75);
                             setPackagePulsesUsed(u);
-                            setPackagePulsesRemaining(packageTotalPulses - u);
+                            const rem = isEditMode
+                              ? Math.max(0, packageLiveRemaining + (initialBookingPulsesUsed - u))
+                              : Math.max(0, packageLiveRemaining - u);
+                            setPackagePulsesRemaining(rem);
                           }}
                           className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                         >
@@ -1454,11 +1507,15 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                         <button
                           type="button"
                           onClick={() => {
-                            setPackagePulsesUsed(packageTotalPulses);
-                            setPackagePulsesRemaining(0);
+                            const u = maxPulsesAllowed;
+                            setPackagePulsesUsed(u);
+                            const rem = isEditMode
+                              ? Math.max(0, packageLiveRemaining + (initialBookingPulsesUsed - u))
+                              : 0;
+                            setPackagePulsesRemaining(rem);
                           }}
                           className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
-                            numUsedPulses === packageTotalPulses && packageTotalPulses > 0
+                            numUsedPulses === maxPulsesAllowed && maxPulsesAllowed > 0
                               ? "bg-amber-600 text-white border-amber-600"
                               : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                           }`}

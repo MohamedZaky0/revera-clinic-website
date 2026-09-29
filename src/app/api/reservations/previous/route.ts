@@ -544,7 +544,7 @@ export async function POST(req: Request) {
               .update({
                 status,
                 ...(isPulsesPackage
-                  ? { pulses_used: pulsesUsed, pulses_remaining: pulsesRemaining }
+                  ? { pulses_used: catalogTotalPulses > 0 ? catalogTotalPulses - pulsesRemaining : pulsesUsed, pulses_remaining: pulsesRemaining }
                   : {})
               })
               .eq('id', targetExistingPkgId)
@@ -601,7 +601,7 @@ export async function POST(req: Request) {
                 price_pending: pricePending,
                 status,
                 ...(isPulsesPackage
-                  ? { package_type: 'pulses', total_pulses: catalogTotalPulses, pulses_used: pulsesUsed, pulses_remaining: pulsesRemaining }
+                  ? { package_type: 'pulses', total_pulses: catalogTotalPulses, pulses_used: catalogTotalPulses > 0 ? catalogTotalPulses - pulsesRemaining : pulsesUsed, pulses_remaining: pulsesRemaining }
                   : {})
               })
               .select('id')
@@ -945,7 +945,7 @@ export async function PATCH(req: Request) {
             .update({
               status,
               ...(isPulsesPackage
-                ? { package_type: 'pulses', total_pulses: catalogTotalPulses, pulses_used: pulsesUsed, pulses_remaining: pulsesRemaining }
+                ? { package_type: 'pulses', total_pulses: catalogTotalPulses, pulses_used: catalogTotalPulses > 0 ? catalogTotalPulses - pulsesRemaining : pulsesUsed, pulses_remaining: pulsesRemaining }
                 : {})
             })
             .eq('id', cpIdToUpdate);
