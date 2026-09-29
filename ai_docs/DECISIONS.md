@@ -3337,6 +3337,8 @@ both POST and PATCH so they cannot drift:
 - The RISK-108 PATCH safeguards (historical-only, phone lock, invoice-read abort, marker lines, ledger/transactions/audit)
   and POST's `effectiveInvoiceValue` / `mapTransactionPaymentMethod` are kept as they were.
 
+**Risk entry:** RISK-110 (the four defects in detail).
+
 **Tests:** `tests/routes/reservations-previous-multi-package.test.ts` (13; mutation-checked: storing the session pulses
 fails 2, storing the sent price fails 8). Manual checklist: `ai_docs/manual_tests/PREVIOUS_BOOKING_MULTI_PACKAGE_MANUAL_TESTS.md`.
 
