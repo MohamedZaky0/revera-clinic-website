@@ -1209,5 +1209,20 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
   - For editing an existing historical booking: `maxPulsesAllowed = initialBookingPulsesUsed + packageLiveRemaining`. `packagePulsesRemaining = Math.max(0, packageLiveRemaining + (initialBookingPulsesUsed - pulsesUsed))`.
 - **Customer Package Cumulative Tracking**: In `customer_packages`, `pulses_remaining` is set to the remaining pulses balance, and `pulses_used` is saved as the cumulative total consumed across all sessions: `catalogTotalPulses > 0 ? catalogTotalPulses - pulsesRemaining : pulsesUsed`.
 
+### 3. Multi-Package Previous Booking Support & Split Pulse Redemptions
+**Enforced in:** `AdminAddPreviousBookingView.tsx`, `POST /api/reservations/previous`, `PATCH /api/reservations/previous`
+- **Multiple Packages in a Single Session**: Staff can attach multiple packages (any combination of existing patient packages and new catalog package purchases) to a single historical session.
+- **Independent Tracking per Package**: Each attached package maintains independent quotas, pulses used inputs bounded by its respective `maxPulsesAllowed`, read-only calculated pulses remaining, and quick presets.
+- **Split Consumption Scenario**: If a patient uses 400 pulses total, but their existing package has only 200 pulses remaining, 200 pulses are consumed from Package 1 (leaving 0 remaining and transitioning to `fully_used`), and a newly purchased package (e.g. 1000 pulses) consumes the remaining 200 pulses (leaving 800 pulses remaining in Package 2).
+- **Invoice Calculation Invariant**:
+  - `totalInvoice = servicePrice + sum(newCatalogPackagePrices) + productPrice`.
+  - Existing packages add `0 EGP` to the session invoice because their financial settlement occurred in their historical purchase transaction.
+- **Backend Consistency**:
+  - `POST` / `PATCH` `/api/reservations/previous` processes `packages: Array<AttachedPackageItem>`.
+  - Line items are created in `reservation_products` for each package attached.
+  - Formatted reception notes capture usage for every attached package: `Package: <Name>. [Package Usage]: <Used> / <Total> pulses used (<Remaining> pulses remaining).`
+  - Cumulative `pulses_remaining`, `pulses_used`, and `status` (`fully_used` vs `active`) are synced across all affected `customer_packages` records and pre-launch audit logs.
+
+
 
 
