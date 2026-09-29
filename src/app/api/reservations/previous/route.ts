@@ -4,6 +4,7 @@ import { supabaseServer } from '@/lib/supabaseServer';
 import { normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordTransaction } from '@/lib/transactionLedger';
 import { writeHistoricalBookingInvoice, mapPaymentMethod, syncPreLaunchPulseUsage } from '@/lib/historicalInvoice';
+import { settlePaymentMismatch } from '@/lib/billing';
 
 function isValidPhoneNumber(phoneStr: string): boolean {
   if (!phoneStr) return false;
@@ -270,44 +271,18 @@ export async function POST(req: Request) {
       currentBookings = Number(customerRecord.number_of_bookings || 0);
     }
 
-    // ── FINANCIAL LEDGER BALANCE CALCULATIONS ──
-    // diff > 0: underpaid (cost exceeds payment) -> debt added to outstanding
+    // ── FINANCIAL LEDGER BALANCE CALCULATIONS (RISK-087) ──
+    // diff > 0: underpaid (cost exceeds payment) -> debt added to outstanding, wallet used first
     // diff < 0: overpaid (payment exceeds cost) -> settles outstanding debt first, excess credited to wallet
     // diff === 0: exact payment -> no change to debt or wallet
-    let newOutstanding = currentOutstanding;
-    let newWallet = currentWallet;
-    const newSpent = currentSpent + parsedPaid;
-
-    const diff = parsedValue - parsedPaid;
-
-    if (diff > 0) {
-      // Patient owes `diff`. If they have existing wallet credit, utilize wallet first.
-      if (newWallet > 0) {
-        if (newWallet >= diff) {
-          newWallet = newWallet - diff;
-        } else {
-          const remainingDebt = diff - newWallet;
-          newWallet = 0;
-          newOutstanding = newOutstanding + remainingDebt;
-        }
-      } else {
-        newOutstanding = newOutstanding + diff;
-      }
-    } else if (diff < 0) {
-      // Patient overpaid by `overpaid`. Settle existing outstanding debt first, remainder goes to wallet.
-      const overpaid = -diff;
-      if (newOutstanding > 0) {
-        if (overpaid <= newOutstanding) {
-          newOutstanding = newOutstanding - overpaid;
-        } else {
-          const remainder = overpaid - newOutstanding;
-          newOutstanding = 0;
-          newWallet = newWallet + remainder;
-        }
-      } else {
-        newWallet = newWallet + overpaid;
-      }
-    }
+    const settled = settlePaymentMismatch({
+      current: { outstanding: currentOutstanding, wallet: currentWallet, spent: currentSpent },
+      invoiceValue: parsedValue,
+      amountPaid: parsedPaid,
+    });
+    const newOutstanding = settled.outstanding;
+    const newWallet = settled.wallet;
+    const newSpent = settled.spent;
 
     if (customerRecord) {
       // Update existing customer profile balances

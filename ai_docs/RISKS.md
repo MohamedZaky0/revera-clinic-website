@@ -3962,7 +3962,14 @@ provider row, and a non-doctor hire must not touch `providers`).
 
 **Severity:** High (P1) · **Type:** Data integrity / platform mismatch
 **Found:** 2026-09-15, reviewing new routes added in the previous 4 weeks while auditing test
-coverage. **Fixed 2026-09-17 — see below.**
+coverage. **Fixed 2026-09-17. Regressed** — an uncommitted local-file version of this fix was
+destroyed by a `git checkout origin/dev -- .` during an unrelated main-merge earlier in this
+project (2026-09-2x), silently reverting the route back to the original bug while `RISKS.md` kept
+saying RESOLVED. Not caught until a full code review on 2026-09-29. **Re-fixed 2026-09-29,
+verbatim to the description below** — the untracked, already-correct test file
+(`tests/routes/medical-records-templates.test.ts`) had survived and drove the rewrite; all 22
+pass. `data/medical_record_templates.json` remains tracked-but-dead per the original fix's own
+note below — still not deleted, still a deliberate separate decision.
 
 **Fix:** `src/app/api/medical-records/templates/route.ts` no longer touches the filesystem at all —
 `fs`/`path` imports, `TEMPLATES_LOCAL_PATH`, `readLocalTemplates()`, and `writeLocalTemplates()` are
@@ -4026,8 +4033,14 @@ once discovered live, rather than in a demo.
 ## RISK-087: Two Independent Implementations Decide How An Underpayment/Overpayment Settles (PARTIALLY RESOLVED)
 
 **Severity:** Medium · **Type:** Maintainability / consistency risk
-**Found:** 2026-09-15, same review as RISK-086. **Extraction fixed 2026-09-17 — see below; the
-deeper cross-flow question this section originally raised is still open.**
+**Found:** 2026-09-15, same review as RISK-086. **Extraction fixed 2026-09-17. Regressed** by the
+same `git checkout origin/dev -- .` incident as RISK-086 — `settlePaymentMismatch()` and its 12
+tests were lost entirely (not just reverted to the local-file shape; the function and
+`tests/lib/billing.test.ts`'s coverage of it were gone), and the inline `diff`-based block was back
+in `previous/route.ts`. Not caught until 2026-09-29. **Re-extracted 2026-09-29** — same signature
+shape as `computeSettledBalances`, 12 new cases in `tests/lib/billing.test.ts`; the existing
+`tests/routes/reservations-previous.test.ts` (never touched) stayed green throughout, confirming
+the re-extraction changed no behavior. The deeper cross-flow question (below) is still open.
 
 **Fix:** `src/app/api/reservations/previous/route.ts`'s inline wallet-vs-debt allocation
 (the block described below) is now `settlePaymentMismatch()` in `src/lib/billing.ts` — a small,
