@@ -1745,10 +1745,20 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           ? primaryDeliveredPulses - resolvedPkgQuota
           : 0;
 
+        const isHistoricalBooking = Boolean(
+          (booking as any)?.is_historical ||
+          (booking as any)?.isHistorical ||
+          String(booking?.notes || "").includes("[Historical Booking]")
+        );
+        const histInvMatch = String(booking?.notes || "").match(/\[Invoice Total\]:\s*(\d+(?:\.\d+)?)\s*EGP|Invoice Value:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+        const isZeroHistoricalBooking = isHistoricalBooking && ((histInvMatch && Number(histInvMatch[1] || histInvMatch[2]) === 0) || (Number((booking as any).amountPaid ?? (booking as any).amount_paid ?? 0) === 0 && Number((booking as any).amountLeft ?? (booking as any).amount_left ?? 0) === 0 && !(booking as any).price));
+
         const bookingServices = selectedServiceIds.map(id => {
           const s = localServices.find(item => item.id === id);
           const isLaser = checkIsLaserService(s);
-          let price = s ? getEffectiveServicePrice(s, booking.branchId, branches) : (prices[id] ?? 500);
+          let price = isZeroHistoricalBooking
+            ? 0
+            : (s ? getEffectiveServicePrice(s, booking.branchId, branches) : (prices[id] ?? 500));
           let pulseDetails = "";
 
           if (isLaserPerPulse && isLaser) {
@@ -1762,6 +1772,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           } else if (isLaserPackage && isLaser) {
             price = 0;
             pulseDetails = ` (Package Redemption · 0 EGP)`;
+          } else if (isZeroHistoricalBooking) {
+            price = 0;
+            pulseDetails = ` (0 EGP)`;
           }
 
           return {
@@ -2029,17 +2042,19 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           }
         }
 
-        const totalPrice = (isLaserPerPulse || isLaserPackage)
-          ? Math.max(
-              calculatedTotal,
-              bookedPackagePurchasePrice,
-              rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
-            )
-          : Math.max(
-              calculatedTotal,
-              targetInvoiceTotal,
-              rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
-            );
+        const totalPrice = isZeroHistoricalBooking
+          ? (histInvMatch ? Number(histInvMatch[1] || histInvMatch[2]) : 0)
+          : ((isLaserPerPulse || isLaserPackage)
+            ? Math.max(
+                calculatedTotal,
+                bookedPackagePurchasePrice,
+                rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
+              )
+            : Math.max(
+                calculatedTotal,
+                targetInvoiceTotal,
+                rawPaid + (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)) ? Number(rawLeft) : 0)
+              ));
 
         const sessionPaid = rawPaid;
         const sessionLeft = (rawLeft !== null && rawLeft !== undefined && !isNaN(Number(rawLeft)))
@@ -2051,8 +2066,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const isExceededDeficit = isLaserPackage && !hasSettledDeficit && notesQuota !== null && deliveredPulsesForDeficit > notesQuota;
 
         const isInvoicePaid = !isExceededDeficit && (
+          isZeroHistoricalBooking ||
           (sessionPaid >= totalPrice && totalPrice > 0) ||
-          (sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || booking.status === 'completed'))
+          (sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || booking.status === 'completed' || isHistoricalBooking))
         );
 
         // Primary effective service for end session

@@ -394,7 +394,7 @@ export async function POST(req: Request) {
     }
 
     const prodNote = resolvedProductName ? ` Product: ${resolvedProductName}.` : '';
-    const valNote = parsedValue > 0 ? ` [Invoice Total]: ${parsedValue} EGP.` : '';
+    const valNote = ` [Invoice Total]: ${parsedValue} EGP.`;
     const spentNote = ` Actual Spent: ${parsedPaid} EGP.`;
     const paymentNote = paymentType ? ` Payment Method: ${paymentType}.` : '';
     const userNote = notes ? ` ${notes}` : '';
@@ -873,7 +873,7 @@ export async function PATCH(req: Request) {
     const srvNote = resolvedServiceName ? ` Service: ${resolvedServiceName}.` : '';
     const pkgNote = packageName ? ` Package: ${packageName}.` : '';
     const prodNote = productName ? ` Product: ${productName}.` : '';
-    const valNote = parsedValue > 0 ? ` [Invoice Total]: ${parsedValue} EGP.` : '';
+    const valNote = ` [Invoice Total]: ${parsedValue} EGP.`;
     const spentNote = ` Actual Spent: ${parsedPaid} EGP.`;
     const paymentNote = paymentType ? ` Payment Method: ${paymentType}.` : '';
     const userNote = notes ? ` ${notes}` : '';

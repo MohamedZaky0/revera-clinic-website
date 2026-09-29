@@ -471,8 +471,8 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     if (bDate) setBookingDate(bDate);
     if (dId) setSelectedDoctorId(dId);
     if (sId) setSelectedServiceId(sId);
-    if (invVal) setInvoiceValue(invVal);
-    if (actSpent) setActualSpent(actSpent);
+    if (invVal !== undefined && invVal !== null && invVal !== "") setInvoiceValue(String(invVal));
+    if (actSpent !== undefined && actSpent !== null && actSpent !== "") setActualSpent(String(actSpent));
     if (payType) setSelectedPaymentType(payType);
     if (cleanNotes) setNotes(cleanNotes);
 
@@ -1746,8 +1746,6 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
           const numSpent = parseFloat(actualSpent) || 0;
           const diff = numInvoice - numSpent;
 
-          if (numInvoice === 0 && numSpent === 0) return null;
-
           return (
             <div className="rounded-2xl border border-gray-200/80 bg-[#F9FBF8] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
               <div className="flex items-center gap-2 font-semibold text-[#374151]">
@@ -1771,7 +1769,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 ) : (
                   <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 font-bold text-emerald-700">
                     <CheckCircle2 size={13} />
-                    <span>{tr.ledgerExact || "Fully Settled (0 EGP Debt)"}</span>
+                    <span>{tr.ledgerExact || "Fully Settled (0 EGP Debt — Paid)"}</span>
                   </span>
                 )}
               </div>

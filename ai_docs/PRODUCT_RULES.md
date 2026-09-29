@@ -357,6 +357,10 @@ The following are **not currently enforced in code**:
 7. **Patient & Booking History Visibility & Automated Verification**:
    - The historical reservation is displayed in the patient's Profile Booking History, the Transactions list, and the All Appointments directory.
    - Verified under System Test Suite `TC-038` and `TC-047`.
+8. **Zero-Invoice & Zero-Spent Fully Settled Paid Status Rule**:
+   - When a previous/historical booking is recorded with `invoiceValue = 0` (or 0.00) and `actualSpent = 0` (or 0.00), the booking has 0 remaining debt (`amount_left = 0`) and is considered fully settled / paid.
+   - The system displays the payment status badge as **"Paid"** across the Patient Profile Booking History (`CustomerProfileDrawer.tsx`), All Appointments directory (`AdminBookingsView.tsx`), and Booking Details drawer (`BookingDetailsModal.tsx`).
+   - The live Financial Ledger Preview in `AdminAddPreviousBookingView.tsx` indicates `Fully Settled (0 EGP Debt — Paid)`.
 
 ---
 
@@ -552,6 +556,10 @@ The following are **not currently enforced in code**:
 7. **Patient & Booking History Visibility & Automated Verification**:
    - The historical reservation is displayed in the patient's Profile Booking History, the Transactions list, and the All Appointments directory.
    - Verified under System Test Suite `TC-038` and `TC-047`.
+8. **Zero-Invoice & Zero-Spent Fully Settled Paid Status Rule**:
+   - When a previous/historical booking is recorded with `invoiceValue = 0` (or 0.00) and `actualSpent = 0` (or 0.00), the booking has 0 remaining debt (`amount_left = 0`) and is considered fully settled / paid.
+   - The system displays the payment status badge as **"Paid"** across the Patient Profile Booking History (`CustomerProfileDrawer.tsx`), All Appointments directory (`AdminBookingsView.tsx`), and Booking Details drawer (`BookingDetailsModal.tsx`).
+   - The live Financial Ledger Preview in `AdminAddPreviousBookingView.tsx` indicates `Fully Settled (0 EGP Debt — Paid)`.
 
 ---
 
