@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Gift, AlertCircle, Info } from "lucide-react";
-import { StatTile } from "./charts";
+import { StatTile } from "../Finance/charts";
 
 interface PackageRow {
   packageId: string;

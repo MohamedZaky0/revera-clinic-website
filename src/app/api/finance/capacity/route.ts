@@ -32,7 +32,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
-  if (!hasFinancePermission(access.access, 'finance.view_capacity')) {
+  if (!hasFinancePermission(access.access, 'finance.view_capacity') && !hasFinancePermission(access.access, 'reports.view_analytics')) {
     return NextResponse.json({ error: 'Finance capacity access is required.' }, { status: 403 });
   }
 

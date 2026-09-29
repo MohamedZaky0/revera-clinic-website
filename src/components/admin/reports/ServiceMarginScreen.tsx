@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Activity, AlertCircle, Search } from "lucide-react";
-import { StatTile } from "./charts";
+import { StatTile } from "../Finance/charts";
 
 export interface BranchOption {
   id: string;

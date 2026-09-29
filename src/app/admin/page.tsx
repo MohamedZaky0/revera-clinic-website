@@ -161,7 +161,7 @@ import AdminInventoryView from "@/components/admin/inventory/AdminInventoryView"
 import AdminEmployeesView from "@/components/admin/employees/AdminEmployeesView";
 import AdminHrView from "@/components/admin/hr/AdminHrView";
 import CustomerSupportView from "@/components/admin/support/CustomerSupportView";
-import ReportsAnalyticsView from "@/components/admin/reports/ReportsAnalyticsView";
+import { ReportsSection } from "@/components/admin/reports/ReportsSection";
 import type { InventoryProductsTabRef } from "@/components/admin/inventory/InventoryProductsTab";
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
@@ -961,6 +961,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       const prefix = parentScreenMap[item.label];
       if (prefix && (adminPermissions.includes(prefix) || adminPermissions.some(p => p.startsWith(prefix + ".")))) return true;
       if (prefix && hasPermission(prefix)) return true;
+
+      // DEC-097: Reports item is visible if user has any legacy finance permission (finance.view_pnl, finance.view_margins,
+      // finance.view_capacity) so that users who could see these reports inside Finance still see the Reports sidebar item.
+      if (item.label === "Reports" && (hasPermission('finance.view_pnl') || hasPermission('finance.view_margins') || hasPermission('finance.view_capacity'))) return true;
 
       // Legacy roles (created before the granular permission keys existed) store coarse labels like
       // "Customers" and "Providers". Three of those five happen to equal a sidebar label exactly
@@ -1866,7 +1870,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       if (adminPermissions.includes(prefix) || adminPermissions.some(p => p.startsWith(prefix + "."))) return true;
       if (hasPermission(prefix)) return true;
     }
-    
+
+    // DEC-097: Allow access to Reports if user has any legacy finance permission (for backward compatibility)
+    if (nav === "Reports" && (hasPermission('finance.view_pnl') || hasPermission('finance.view_margins') || hasPermission('finance.view_capacity'))) return true;
+
     return false;
   }, [adminRole, adminPermissions, hasPermission]);
 
@@ -6430,13 +6437,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
           {/* ── REPORTS & ANALYTICS VIEW ── */}
           {activeNav === "Reports" && (
-            <ReportsAnalyticsView
+            <ReportsSection
+              accessToken={session?.access_token}
+              branches={branches.map((b) => ({ id: b.id, name_en: b.name_en, name_ar: b.name_ar }))}
               lang={lang}
-              hasPermission={hasPermission}
-              allReservations={allReservations}
-              providers={providers}
-              localServices={localServices}
-              branches={branches}
+              canViewFinancialReports={hasPermission('reports.view_financial_reports') || hasPermission('finance.view_pnl') || hasPermission('finance.view_margins')}
+              canViewAnalytics={hasPermission('reports.view_analytics') || hasPermission('finance.view_capacity')}
             />
           )}
 
@@ -6519,6 +6525,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             <FinanceSection
               accessToken={session?.access_token}
               branches={branches.map((b) => ({ id: b.id, name_en: b.name_en, name_ar: b.name_ar }))}
+              lang={lang}
             />
           )}
 
@@ -7683,7 +7690,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 setViewingBooking((raw || booking) as any);
               }}
               onViewTransactions={() => {
-                setActiveNav("Finance");
+                setActiveNav("Transactions");
               }}
               onPendingApprovalsClick={() => {
                 setActiveNav("Bookings");

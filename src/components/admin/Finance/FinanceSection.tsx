@@ -3,40 +3,23 @@
 import { useState, type ReactNode } from "react";
 import {
   CircleDollarSign,
-  TrendingUp,
   Wallet,
   Landmark,
   FileBarChart2,
-  Activity,
-  Users,
   Banknote,
   Clock,
-  Target,
-  Gift,
-  CalendarX,
   HandCoins,
-  LineChart as LineChartIcon,
-  UserPlus,
-  Gauge,
-  PieChart,
 } from "lucide-react";
 import { ExpensesScreen } from "./ExpensesScreen";
 import { AssetsScreen } from "./AssetsScreen";
 import { LoansScreen } from "./LoansScreen";
 import { FinanceOverview } from "./FinanceOverview";
 import { PnlScreen } from "./PnlScreen";
-import { ServiceMarginScreen } from "./ServiceMarginScreen";
-import { DoctorBranchPnlScreen } from "./DoctorBranchPnlScreen";
 import { CashFlowScreen } from "./CashFlowScreen";
 import { ReceivablesAgingScreen } from "./ReceivablesAgingScreen";
-import { BudgetVsActualScreen } from "./BudgetVsActualScreen";
-import { PackageProfitabilityScreen } from "./PackageProfitabilityScreen";
-import { NoShowCostScreen } from "./NoShowCostScreen";
+// DEC-097: hidden, see the TABS comment below.
+// import { BudgetVsActualScreen } from "./BudgetVsActualScreen";
 import { CommissionPayoutsScreen } from "./CommissionPayoutsScreen";
-import { TrendScreen } from "./TrendScreen";
-import { NewVsReturningScreen } from "./NewVsReturningScreen";
-import { CapacityScreen } from "./CapacityScreen";
-import { ServiceMixScreen } from "./ServiceMixScreen";
 
 export type FinanceTab =
   | "overview"
@@ -44,18 +27,10 @@ export type FinanceTab =
   | "assets"
   | "loans"
   | "pnl"
-  | "service-margin"
-  | "doctor-branch-pnl"
   | "cashflow"
   | "receivables-aging"
   | "budget-vs-actual"
-  | "package-profitability"
-  | "no-show-cost"
-  | "commission-payouts"
-  | "trend"
-  | "new-vs-returning"
-  | "capacity"
-  | "service-mix";
+  | "commission-payouts";
 
 export interface BranchOption {
   id: string;
@@ -66,60 +41,127 @@ export interface BranchOption {
 interface FinanceSectionProps {
   accessToken?: string;
   branches?: BranchOption[];
+  lang?: 'en' | 'ar';
 }
 
-const TABS: { id: FinanceTab; label: string; icon: ReactNode }[] = [
-  { id: "overview", label: "Overview", icon: <CircleDollarSign size={16} /> },
-  { id: "expenses", label: "Expenses", icon: <Wallet size={16} /> },
-  { id: "assets", label: "Assets & Depreciation", icon: <TrendingUp size={16} /> },
-  { id: "loans", label: "Loans", icon: <Landmark size={16} /> },
-  { id: "pnl", label: "P&L", icon: <FileBarChart2 size={16} /> },
-  { id: "service-margin", label: "Service Margins", icon: <Activity size={16} /> },
-  { id: "doctor-branch-pnl", label: "Doctor / Branch P&L", icon: <Users size={16} /> },
-  { id: "cashflow", label: "Cash Flow", icon: <Banknote size={16} /> },
-  { id: "receivables-aging", label: "Receivables Aging", icon: <Clock size={16} /> },
-  { id: "budget-vs-actual", label: "Budget vs Actual", icon: <Target size={16} /> },
-  { id: "package-profitability", label: "Package Profitability", icon: <Gift size={16} /> },
-  { id: "no-show-cost", label: "No-Show / Cancellation Cost", icon: <CalendarX size={16} /> },
-  { id: "commission-payouts", label: "Commission Payouts", icon: <HandCoins size={16} /> },
-  { id: "trend", label: "Trend", icon: <LineChartIcon size={16} /> },
-  { id: "new-vs-returning", label: "New vs Returning", icon: <UserPlus size={16} /> },
-  { id: "capacity", label: "Capacity", icon: <Gauge size={16} /> },
-  { id: "service-mix", label: "Service Mix", icon: <PieChart size={16} /> },
+interface TabDef {
+  id: FinanceTab;
+  label: string;
+  labelAr: string;
+  group: 'overview' | 'records' | 'statements';
+  icon: ReactNode;
+}
+
+const TABS: TabDef[] = [
+  { id: "overview", label: "Overview", labelAr: "نظرة عامة", group: 'overview', icon: <CircleDollarSign size={16} /> },
+  { id: "expenses", label: "Expenses", labelAr: "المصروفات", group: 'records', icon: <Wallet size={16} /> },
+  { id: "assets", label: "Assets & Depreciation", labelAr: "الأصول والإهلاك", group: 'records', icon: <Wallet size={16} /> },
+  { id: "loans", label: "Loans", labelAr: "القروض", group: 'records', icon: <Landmark size={16} /> },
+  { id: "pnl", label: "P&L", labelAr: "قائمة الأرباح والخسائر", group: 'statements', icon: <FileBarChart2 size={16} /> },
+  { id: "cashflow", label: "Cash Flow", labelAr: "التدفق النقدي", group: 'statements', icon: <Banknote size={16} /> },
+  { id: "receivables-aging", label: "Receivables Aging", labelAr: "أعمار المديونيات", group: 'statements', icon: <Clock size={16} /> },
+  { id: "commission-payouts", label: "Commission Payouts", labelAr: "مستحقات العمولات", group: 'statements', icon: <HandCoins size={16} /> },
+  // DEC-097: Budget vs Actual hidden — no budget entry exists yet. Planned: study whether the feature is worth
+  // building (budget entry UI + route) before re-enabling. Screen: ./BudgetVsActualScreen.tsx, route: /api/finance/budget-vs-actual.
 ];
 
-export function FinanceSection({ accessToken, branches = [] }: FinanceSectionProps) {
+export function FinanceSection({ accessToken, branches = [], lang = 'en' }: FinanceSectionProps) {
+  const isAr = lang === 'ar';
   const [activeTab, setActiveTab] = useState<FinanceTab>("overview");
 
+  const groupLabels: Record<string, { en: string; ar: string }> = {
+    overview: { en: 'Overview', ar: 'نظرة عامة' },
+    records: { en: 'Records', ar: 'السجلات' },
+    statements: { en: 'Statements', ar: 'القوائم' },
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isAr ? 'rtl' : 'ltr'}>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold" style={{ color: "var(--cr-primary, var(--cr-dark))" }}>
-            Finance
+            {isAr ? 'الماليات' : 'Finance'}
           </h2>
           <p className="mt-2 text-sm" style={{ color: "var(--cr-primary, var(--cr-dark))", opacity: 0.7 }}>
-            Reporting and management for clinic P&L, margins, cash flow, and budgets.
+            {isAr ? 'تسجيل وإدارة الأرباح والخسائر والتدفق النقدي والميزانية.' : 'Reporting and management for clinic P&L, cash flow, and budgets.'}
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar w-full">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-150 min-w-max ${
-              activeTab === tab.id
-                ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
-                : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Overview group */}
+      {TABS.filter(t => t.group === 'overview').length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--cr-primary, var(--cr-dark))" }}>
+            {isAr ? groupLabels.overview.ar : groupLabels.overview.en}
+          </h3>
+          <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar w-full mb-6">
+            {TABS.filter(t => t.group === 'overview').map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-150 min-w-max ${
+                  activeTab === tab.id
+                    ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+                    : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
+                }`}
+              >
+                {tab.icon}
+                {isAr ? tab.labelAr : tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Records group */}
+      {TABS.filter(t => t.group === 'records').length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--cr-primary, var(--cr-dark))" }}>
+            {isAr ? groupLabels.records.ar : groupLabels.records.en}
+          </h3>
+          <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar w-full mb-6">
+            {TABS.filter(t => t.group === 'records').map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-150 min-w-max ${
+                  activeTab === tab.id
+                    ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+                    : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
+                }`}
+              >
+                {tab.icon}
+                {isAr ? tab.labelAr : tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Statements group */}
+      {TABS.filter(t => t.group === 'statements').length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--cr-primary, var(--cr-dark))" }}>
+            {isAr ? groupLabels.statements.ar : groupLabels.statements.en}
+          </h3>
+          <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar w-full mb-6">
+            {TABS.filter(t => t.group === 'statements').map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-150 min-w-max ${
+                  activeTab === tab.id
+                    ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+                    : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
+                }`}
+              >
+                {tab.icon}
+                {isAr ? tab.labelAr : tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {activeTab === "overview" && <FinanceOverview accessToken={accessToken} />}
 
@@ -128,19 +170,10 @@ export function FinanceSection({ accessToken, branches = [] }: FinanceSectionPro
       {activeTab === "loans" && <LoansScreen accessToken={accessToken} />}
 
       {activeTab === "pnl" && <PnlScreen accessToken={accessToken} branches={branches} />}
-      {activeTab === "service-margin" && <ServiceMarginScreen accessToken={accessToken} branches={branches} />}
-      {activeTab === "doctor-branch-pnl" && <DoctorBranchPnlScreen accessToken={accessToken} branches={branches} />}
       {activeTab === "cashflow" && <CashFlowScreen accessToken={accessToken} branches={branches} />}
       {activeTab === "receivables-aging" && <ReceivablesAgingScreen accessToken={accessToken} branches={branches} />}
-      {activeTab === "budget-vs-actual" && <BudgetVsActualScreen accessToken={accessToken} branches={branches} />}
-
-      {activeTab === "package-profitability" && <PackageProfitabilityScreen accessToken={accessToken} />}
-      {activeTab === "no-show-cost" && <NoShowCostScreen accessToken={accessToken} branches={branches} />}
+      {/* {activeTab === "budget-vs-actual" && <BudgetVsActualScreen accessToken={accessToken} branches={branches} />} */}
       {activeTab === "commission-payouts" && <CommissionPayoutsScreen accessToken={accessToken} />}
-      {activeTab === "trend" && <TrendScreen accessToken={accessToken} branches={branches} />}
-      {activeTab === "new-vs-returning" && <NewVsReturningScreen accessToken={accessToken} branches={branches} />}
-      {activeTab === "capacity" && <CapacityScreen accessToken={accessToken} branches={branches} />}
-      {activeTab === "service-mix" && <ServiceMixScreen accessToken={accessToken} branches={branches} />}
     </div>
   );
 }

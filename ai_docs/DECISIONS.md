@@ -1078,7 +1078,7 @@ mock screen) reserved as a third tab **later**.
 ## DEC-037: Capacity and Service Mix (5.9/5.10) Live As Finance Tabs, Not A New Reports Section
 
 **Date:** 2026-07-30
-**Status:** Decided — active
+**Status:** Superseded by DEC-097 (2026-09-29)
 
 **Context:**
 An open question deferred from 2026-07-26 asked whether Phase 5's capacity/break-even/service-mix
@@ -3253,5 +3253,52 @@ When laser pulse sessions deliver more pulses than remaining in a patient's puls
    - Doctor Portal and Reception views parse `[Customer Package ID]: <id>` from reservation `notes` if not directly populated on the top-level reservation object, ensuring `consume_package_pulses` executes reliably.
 3. **Consistent Badging & Details Modal Actions:**
    - `AdminBookingsView`, `BookingDetailsModal`, and `DoctorAccountView` display the amber deficit badge and allow staff to navigate directly to checkout/settlement prompt without dead ends.
+
+---
+
+## DEC-097: Finance Keeps Records And Statements; Decision Reports Move To A Real Reports Section (Supersedes DEC-037)
+
+**Date:** 2026-09-29
+**Status:** Decided & implemented (2026-09-29)
+
+**Context:**
+Finance had grown to 17 tabs in one flat bar, mixing three different things: where money is *recorded*
+(expenses, assets, loans), the *statements* of what happened to it (P&L, cash flow, receivables), and
+*analysis* for decisions (trend, margins, doctor/branch profit, package profitability, capacity, service mix,
+no-show cost, new vs returning). Meanwhile the sidebar's **Reports** section was a mock page showing fabricated
+numbers ("+18.2% vs last month", invented doctors and services) to the clinic owner. DEC-037 had kept Capacity
+and Service Mix in Finance to avoid a new section; it explicitly said to revisit if the tab bar became unwieldy.
+
+**Decision:**
+- **Finance** = records + statements: Overview; Records (Expenses, Assets & Depreciation, Loans); Statements
+  (P&L, Cash Flow, Receivables Aging, Commission Payouts).
+- **Reports** = read-only decision analysis, grouped: Performance (Trend, Service Margins, Doctor / Branch P&L,
+  Package Profitability); Operations (Capacity, Service Mix, No-Show / Cancellation Cost); Patients (New vs
+  Returning). The mock `ReportsAnalyticsView` is deleted.
+- Permissions: `reports.view_financial_reports` gates every report that shows money (all except Capacity);
+  `reports.view_analytics` gates Capacity. Both keys already existed in Role Management but guarded nothing.
+  Every moved endpoint (`/api/finance/*`, paths unchanged) also still accepts the `finance.*` key it used before,
+  and the Reports sidebar item is shown to roles holding those `finance.*` keys, so nobody loses access.
+- **Budget vs Actual is hidden, not deleted.** Nothing in the system can write `budget_lines` (no route, no
+  screen), so the report can only ever be empty. The tab is commented out; the screen, route and tests stay.
+  **Planned:** study whether budgeting is worth building (a budget-entry screen + route, e.g. per category per
+  month with "copy last month") before re-enabling it — owner decision 2026-09-29.
+
+**Reason:**
+- The split lets an owner give a branch manager operational reports (capacity/utilisation) without exposing
+  salaries, margins or the P&L — impossible while those screens sat behind `finance.*`.
+- A report page showing invented numbers is worse than no page: an owner may act on them.
+
+**Trade-offs:**
+- Two sidebar entries instead of one for money-related screens. Accepted — they answer different questions and
+  are used by different people.
+- The moved screens keep calling `/api/finance/*`; renaming the endpoints is not worth the churn.
+
+**Supersedes:** DEC-037.
+
+**Implemented:** 2026-09-29. Manual test checklist: `ai_docs/manual_tests/FINANCE_REPORTS_SPLIT_MANUAL_TESTS.md`.
+Known limitation: the Reports tabs are shown per two flags (financial / analytics); a legacy role holding only one
+of `finance.view_pnl`/`finance.view_margins` without a `reports.*` key sees tabs the server then refuses. No production
+role is in that state (admin holds all `finance.*`, checked 2026-09-29).
 
 ---

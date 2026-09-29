@@ -2222,8 +2222,8 @@ export const adminTranslations = {
         "support.resolve_tickets": "Close & Archive Tickets",
 
         // 12. Reports & Analytics
-        "reports.view_analytics": "View Operational Analytics",
-        "reports.view_financial_reports": "View Financial & Revenue Reports",
+        "reports.view_analytics": "View Operational Reports (capacity & utilisation)",
+        "reports.view_financial_reports": "View Financial Reports (trend, margins, doctor/branch profit, packages, service mix, no-show cost, new vs returning)",
         "reports.export_reports": "Export Business Data Reports",
 
         // 13. Finance & Accounting
@@ -5053,8 +5053,8 @@ export const adminTranslations = {
         "support.resolve_tickets": "إغلاق وأرشفة تذاكر الدعم",
 
         // 12. Reports & Analytics
-        "reports.view_analytics": "عرض التحليلات التشغيلية وتقارير الحجوزات",
-        "reports.view_financial_reports": "عرض التقارير المالية والإيرادات",
+        "reports.view_analytics": "عرض التقارير التشغيلية (الطاقة الاستيعابية والإشغال)",
+        "reports.view_financial_reports": "عرض التقارير المالية (الاتجاه، الهوامش، أرباح الأطباء والفروع، الباقات، مزيج الخدمات، تكلفة عدم الحضور، المرضى الجدد والعائدون)",
         "reports.export_reports": "تصدير تقارير وبيانات الأعمال",
 
         // 13. Finance & Accounting

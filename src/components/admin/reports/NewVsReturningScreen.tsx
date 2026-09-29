@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { UserPlus, Users2, AlertCircle, Info } from "lucide-react";
-import { StatTile, BarChart } from "./charts";
+import { StatTile, BarChart } from "../Finance/charts";
 
 export interface BranchOption {
   id: string;
