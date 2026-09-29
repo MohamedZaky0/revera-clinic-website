@@ -163,7 +163,7 @@ export function FinanceSection({ accessToken, branches = [], lang = 'en' }: Fina
         </div>
       )}
 
-      {activeTab === "overview" && <FinanceOverview accessToken={accessToken} />}
+      {activeTab === "overview" && <FinanceOverview accessToken={accessToken} lang={lang} branches={branches} />}
 
       {activeTab === "expenses" && <ExpensesScreen accessToken={accessToken} branches={branches} />}
       {activeTab === "assets" && <AssetsScreen accessToken={accessToken} branches={branches} />}

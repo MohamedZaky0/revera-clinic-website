@@ -41,3 +41,17 @@
 ## 4. Reception dashboard link
 
 - [ ] Reception dashboard → "View transactions" opens **Transactions** (it used to open Finance).
+
+## 5. Finance Overview (rebuilt, Step 3)
+
+- [ ] Finance → Overview shows a **Month** and **Branch** selector, defaulting to the current month / all branches.
+- [ ] Tiles: Revenue earned, Cash received, Contribution margin, Profit after overheads, Expenses this month,
+      Net cash flow, Owed by patients, Prepaid packages not yet delivered; plus Total asset cost and Total loans.
+- [ ] Each value equals the same figure on its own screen for the same month/branch: Revenue/margin/profit/expenses
+      = P&L; Cash received = the P&L's cash bridge card; Net cash flow = Cash Flow; Owed by patients = Receivables Aging
+      total; Prepaid packages = the P&L's deferred packages card.
+- [ ] With no expenses recorded for the month, the note "No expenses recorded this month" appears.
+- [ ] When some sales have no cost recorded (current production state), the amber "profit is overstated" warning appears.
+- [ ] Change the month → every tile reloads for that month (Owed by patients and Prepaid packages stay "as of today").
+- [ ] Arabic: labels are Arabic, amounts read "12,345 ج.م".
+- [ ] No tile ever shows a made-up 0: if a figure fails to load it shows "—".
