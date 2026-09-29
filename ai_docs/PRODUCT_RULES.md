@@ -357,6 +357,10 @@ The following are **not currently enforced in code**:
 7. **Patient & Booking History Visibility & Automated Verification**:
    - The historical reservation is displayed in the patient's Profile Booking History, the Transactions list, and the All Appointments directory.
    - Verified under System Test Suite `TC-038` and `TC-047`.
+8. **Zero-Invoice & Zero-Spent Fully Settled Paid Status Rule**:
+   - When a previous/historical booking is recorded with `invoiceValue = 0` (or 0.00) and `actualSpent = 0` (or 0.00), the booking has 0 remaining debt (`amount_left = 0`) and is considered fully settled / paid.
+   - The system displays the payment status badge as **"Paid"** across the Patient Profile Booking History (`CustomerProfileDrawer.tsx`), All Appointments directory (`AdminBookingsView.tsx`), and Booking Details drawer (`BookingDetailsModal.tsx`).
+   - The live Financial Ledger Preview in `AdminAddPreviousBookingView.tsx` indicates `Fully Settled (0 EGP Debt — Paid)`.
 
 ---
 
@@ -552,6 +556,10 @@ The following are **not currently enforced in code**:
 7. **Patient & Booking History Visibility & Automated Verification**:
    - The historical reservation is displayed in the patient's Profile Booking History, the Transactions list, and the All Appointments directory.
    - Verified under System Test Suite `TC-038` and `TC-047`.
+8. **Zero-Invoice & Zero-Spent Fully Settled Paid Status Rule**:
+   - When a previous/historical booking is recorded with `invoiceValue = 0` (or 0.00) and `actualSpent = 0` (or 0.00), the booking has 0 remaining debt (`amount_left = 0`) and is considered fully settled / paid.
+   - The system displays the payment status badge as **"Paid"** across the Patient Profile Booking History (`CustomerProfileDrawer.tsx`), All Appointments directory (`AdminBookingsView.tsx`), and Booking Details drawer (`BookingDetailsModal.tsx`).
+   - The live Financial Ledger Preview in `AdminAddPreviousBookingView.tsx` indicates `Fully Settled (0 EGP Debt — Paid)`.
 
 ---
 
@@ -1182,5 +1190,39 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
 6. **`isInvoicePaid` Evaluation**:
    - `isInvoicePaid = (sessionPaid >= totalPrice && totalPrice > 0) || (sessionLeft <= 0 && sessionPaid > 0)`
    - The `rawLeft <= 0` condition alone MUST NOT determine paid status, because it can be a stale/incorrect DB value from a prior buggy session completion. Use the recomputed `totalPrice` (which includes the booked package price) as the authoritative floor.
+
+---
+
+## Historical / Previous Booking Rules
+
+### 1. Zero Invoice & Zero Paid Status (`invoice = 0 && paid = 0`)
+**Enforced in:** `CustomerProfileDrawer.tsx`, `AdminBookingsView.tsx`, `BookingDetailsModal.tsx`, `POST /api/reservations/previous`, `PATCH /api/reservations/previous`
+- When a previous/historical booking is entered with 0 invoice value and 0 actual paid (e.g. historical follow-up, package redemption session with 0 invoice increment), it MUST be displayed as **"Paid"** / **"مسدد بالكامل"** with 0 left, NOT "Unpaid".
+- A 0-invoice booking has zero outstanding financial liability.
+
+### 2. Historical Pulses Packages Quota & Live Balance Invariant
+**Enforced in:** `AdminAddPreviousBookingView.tsx`, `POST /api/reservations/previous`, `PATCH /api/reservations/previous`
+- **Pulses Used starts at 0 for every new session**: When adding a new previous booking (whether purchasing a new package or linking an existing customer package), `Pulses Used` starts at `0`.
+- **Pulses Remaining is Uneditable (Read-Only)**: The `Pulses Left (Remaining)` field is strictly read-only and automatically computed based on the pulses used in that session.
+- **Dynamic Session Boundary**:
+  - For a new previous booking: `maxPulsesAllowed = packageLiveRemaining`. `packagePulsesRemaining = Math.max(0, packageLiveRemaining - pulsesUsed)`.
+  - For editing an existing historical booking: `maxPulsesAllowed = initialBookingPulsesUsed + packageLiveRemaining`. `packagePulsesRemaining = Math.max(0, packageLiveRemaining + (initialBookingPulsesUsed - pulsesUsed))`.
+- **Customer Package Cumulative Tracking**: In `customer_packages`, `pulses_remaining` is set to the remaining pulses balance, and `pulses_used` is saved as the cumulative total consumed across all sessions: `catalogTotalPulses > 0 ? catalogTotalPulses - pulsesRemaining : pulsesUsed`.
+
+### 3. Multi-Package Previous Booking Support & Split Pulse Redemptions
+**Enforced in:** `AdminAddPreviousBookingView.tsx`, `POST /api/reservations/previous`, `PATCH /api/reservations/previous`
+- **Multiple Packages in a Single Session**: Staff can attach multiple packages (any combination of existing patient packages and new catalog package purchases) to a single historical session.
+- **Independent Tracking per Package**: Each attached package maintains independent quotas, pulses used inputs bounded by its respective `maxPulsesAllowed`, read-only calculated pulses remaining, and quick presets.
+- **Split Consumption Scenario**: If a patient uses 400 pulses total, but their existing package has only 200 pulses remaining, 200 pulses are consumed from Package 1 (leaving 0 remaining and transitioning to `fully_used`), and a newly purchased package (e.g. 1000 pulses) consumes the remaining 200 pulses (leaving 800 pulses remaining in Package 2).
+- **Invoice Calculation Invariant**:
+  - `totalInvoice = servicePrice + sum(newCatalogPackagePrices) + productPrice`.
+  - Existing packages add `0 EGP` to the session invoice because their financial settlement occurred in their historical purchase transaction.
+- **Backend Consistency**:
+  - `POST` / `PATCH` `/api/reservations/previous` processes `packages: Array<AttachedPackageItem>`.
+  - Line items are created in `reservation_products` for each package attached.
+  - Formatted reception notes capture usage for every attached package: `Package: <Name>. [Package Usage]: <Used> / <Total> pulses used (<Remaining> pulses remaining).`
+  - Cumulative `pulses_remaining`, `pulses_used`, and `status` (`fully_used` vs `active`) are synced across all affected `customer_packages` records and pre-launch audit logs.
+
+
 
 

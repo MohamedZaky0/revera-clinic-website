@@ -3,7 +3,15 @@ import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordTransaction } from '@/lib/transactionLedger';
-import { writeHistoricalBookingInvoice, mapPaymentMethod, mapTransactionPaymentMethod, syncPreLaunchPulseUsage } from '@/lib/historicalInvoice';
+import { writeHistoricalBookingInvoice, mapPaymentMethod, mapTransactionPaymentMethod } from '@/lib/historicalInvoice';
+import {
+  normalizeIncomingPackages,
+  resolveHistoricalPackages,
+  historicalPackageNotes,
+  enteredHistoricalPackagePrice,
+  applyHistoricalPackage,
+  type HistoricalPackageOutcome,
+} from '@/lib/historicalPackages';
 import { settlePaymentMismatch, effectiveInvoiceValue, settleHistoricalEdit } from '@/lib/billing';
 
 function isValidPhoneNumber(phoneStr: string): boolean {
@@ -127,14 +135,6 @@ export async function POST(req: Request) {
       doctorName,
       serviceId,
       serviceName,
-      packageId,
-      packageName,
-      customerPackageId,
-      existingCustomerPackageId,
-      packagePulsesTotal,
-      packagePulsesUsed,
-      packagePulsesRemaining,
-      packageItemsUsage,
       productId,
       productName,
       invoiceValue,
@@ -207,24 +207,10 @@ export async function POST(req: Request) {
       }
     }
 
-    // Resolve package metadata & prices
-    let packagePrice = 0;
-    let resolvedPackageName = packageName || null;
-    let packageRecord: any = null;
-    // Outcome of creating or updating the patient's package, returned to the caller (DEC-088 item 6).
-    let packageOutcome: { created: boolean; updated?: boolean; existingId?: string; pricePending?: boolean; packageType?: string; totalPulses?: number; error?: string; pulseUsageSyncError?: string } | null = null;
-    if (packageId) {
-      const { data: pkgRow } = await supabaseServer
-        .from('packages')
-        .select('id, name, name_ar, price, validity_days, package_type, total_pulses')
-        .eq('id', packageId)
-        .maybeSingle();
-      if (pkgRow) {
-        packageRecord = pkgRow;
-        packagePrice = Number(pkgRow.price ?? 0);
-        if (!resolvedPackageName) resolvedPackageName = pkgRow.name || pkgRow.name_ar;
-      }
-    }
+    // DEC-098: every attached package — the multi-package form (`packages`) or the legacy single fields.
+    // Validated against the patient below, before anything is written.
+    const incomingPackages = normalizeIncomingPackages(body);
+    const packageOutcomes: HistoricalPackageOutcome[] = [];
 
     // Resolve service metadata
     let resolvedServiceId = serviceId ? Number(serviceId) : null;
@@ -270,6 +256,13 @@ export async function POST(req: Request) {
       currentSpent = Number(customerRecord.spent_amount || 0);
       currentBookings = Number(customerRecord.number_of_bookings || 0);
     }
+
+    // DEC-098: reject a duplicate, foreign or unknown package before the first write.
+    const packageCheck = await resolveHistoricalPackages(incomingPackages, customerId);
+    if (!packageCheck.ok) {
+      return NextResponse.json({ error: packageCheck.error, field: 'packages' }, { status: 400 });
+    }
+    const resolvedPackageName = incomingPackages.map((p) => p.packageName).filter(Boolean).join(', ') || null;
 
     // ── FINANCIAL LEDGER BALANCE CALCULATIONS (RISK-087) ──
     // diff > 0: underpaid (cost exceeds payment) -> debt added to outstanding, wallet used first
@@ -371,34 +364,14 @@ export async function POST(req: Request) {
     // 6. Prepare historical reservation payload
     const historicalTag = '[Historical Booking]';
     const srvNote = resolvedServiceName ? ` Service: ${resolvedServiceName}.` : '';
-    const pkgNote = resolvedPackageName ? ` Package: ${resolvedPackageName}.` : '';
-
-    // Construct package usage breakdown note
-    let pkgUsageNote = '';
-    const isPulsesPackage = packageRecord?.package_type === 'pulses' || (packageRecord?.total_pulses && Number(packageRecord.total_pulses) > 0) || (packagePulsesTotal != null && Number(packagePulsesTotal) > 0);
-    const catalogTotalPulses = packagePulsesTotal != null ? Math.max(0, Math.floor(Number(packagePulsesTotal))) : Math.max(0, Math.floor(Number(packageRecord?.total_pulses || 0)));
-    const pulsesUsed = packagePulsesUsed != null ? Math.max(0, Math.min(catalogTotalPulses, Math.floor(Number(packagePulsesUsed)))) : 0;
-    const pulsesRemaining = packagePulsesRemaining != null ? Math.max(0, Math.min(catalogTotalPulses, Math.floor(Number(packagePulsesRemaining)))) : Math.max(0, catalogTotalPulses - pulsesUsed);
-
-    if (packageId || resolvedPackageName) {
-      if (isPulsesPackage && catalogTotalPulses > 0) {
-        pkgUsageNote = ` [Package Usage]: ${pulsesUsed.toLocaleString()} / ${catalogTotalPulses.toLocaleString()} pulses used (${pulsesRemaining.toLocaleString()} pulses remaining).`;
-      } else if (Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0) {
-        const usageParts = packageItemsUsage.map(
-          (it: any) => `${it.serviceName || `Service #${it.serviceId}`}: ${it.qtyUsed ?? 0}/${it.qtyTotal ?? it.qty ?? 0} used (${it.qtyRemaining ?? 0} remaining)`
-        );
-        if (usageParts.length > 0) {
-          pkgUsageNote = ` [Package Usage]: ${usageParts.join('; ')}.`;
-        }
-      }
-    }
+    const pkgNotes = historicalPackageNotes(incomingPackages);
 
     const prodNote = resolvedProductName ? ` Product: ${resolvedProductName}.` : '';
-    const valNote = parsedValue > 0 ? ` [Invoice Total]: ${parsedValue} EGP.` : '';
+    const valNote = ` [Invoice Total]: ${parsedValue} EGP.`;
     const spentNote = ` Actual Spent: ${parsedPaid} EGP.`;
     const paymentNote = paymentType ? ` Payment Method: ${paymentType}.` : '';
     const userNote = notes ? ` ${notes}` : '';
-    const receptionNote = `${historicalTag} Added manually for historical records.${srvNote}${pkgNote}${pkgUsageNote}${prodNote}${valNote}${spentNote}${paymentNote}${userNote}`.trim();
+    const receptionNote = `${historicalTag} Added manually for historical records.${srvNote}${pkgNotes}${prodNote}${valNote}${spentNote}${paymentNote}${userNote}`.trim();
 
     const reservationPayload: Record<string, any> = {
       customer_id: customerId,
@@ -497,171 +470,32 @@ export async function POST(req: Request) {
       }
     }
 
-    // 7b. Insert package into reservation_products and customer_packages
-    if (packageId || resolvedPackageName) {
-      try {
-        await supabaseServer.from('reservation_products').insert({
-          reservation_id: newReservation.id,
-          line_type: 'additional_service',
-          description: resolvedPackageName ? `Package: ${resolvedPackageName}` : 'Package',
-          qty: 1,
-          unit_price: packagePrice,
-          total: packagePrice,
-          added_by_employee_id: staffEmployeeId,
-          added_by_role: 'receptionist'
-        });
-      } catch (rpErr: any) {
-        console.warn('Could not insert reservation_products for package (non-fatal):', rpErr?.message);
-      }
+    // 7b. Packages (DEC-098): one display line each in reservation_products, then the patient's package rows.
+    const enteredPackagePrice = enteredHistoricalPackagePrice(incomingPackages, {
+      hasService: Boolean(resolvedServiceId),
+      hasProduct: Boolean(productId || resolvedProductName),
+      invoiceValue: parsedValue,
+    });
+    for (const p of incomingPackages) {
+      // An existing package was paid for in an earlier transaction; a new one shows its list price.
+      const linePrice = p.customerPackageId ? 0 : (p.clientPrice || Number(p.record?.price || 0));
+      const { error: rpErr } = await supabaseServer.from('reservation_products').insert({
+        reservation_id: newReservation.id,
+        line_type: 'additional_service',
+        description: `Package: ${p.packageName}`,
+        qty: 1,
+        unit_price: linePrice,
+        total: linePrice,
+        added_by_employee_id: staffEmployeeId,
+        added_by_role: 'receptionist'
+      });
+      if (rpErr) console.warn('Could not insert reservation_products for package (non-fatal):', rpErr.message);
 
-      // Create or update active package record for patient profile
-      const targetExistingPkgId = customerPackageId || existingCustomerPackageId;
-      if (customerId && (targetExistingPkgId || packageId || packageRecord?.id)) {
-        const pId = packageId || packageRecord?.id;
-        const validityDays = Number(packageRecord?.validity_days || 365);
-        const expiresAt = new Date(rawDate);
-        expiresAt.setUTCDate(expiresAt.getUTCDate() + validityDays);
-
-        // DEC-088 item 6: never guess the price. The entered invoice value is the package price only when
-        // the booking is the package alone (a mixed booking's value cannot be split); otherwise the price is
-        // left pending for staff to enter — NOT defaulted to the catalog price.
-        const packageOnlyBooking = !resolvedServiceId && !resolvedProductName && !productId;
-        const enteredPackagePrice = packageOnlyBooking && parsedValue > 0 ? parsedValue : null;
-        const pricePending = enteredPackagePrice === null;
-
-        const isServicesFullyUsed = Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0
-          ? packageItemsUsage.every((it: any) => Number(it.qtyRemaining ?? 0) <= 0)
-          : false;
-        const status = isPulsesPackage
-          ? (catalogTotalPulses > 0 && pulsesRemaining <= 0 ? 'fully_used' : 'active')
-          : (isServicesFullyUsed ? 'fully_used' : 'active');
-
-        try {
-          if (targetExistingPkgId) {
-            // Update existing customer_packages record
-            const { data: cp, error: cpErr } = await supabaseServer
-              .from('customer_packages')
-              .update({
-                status,
-                ...(isPulsesPackage
-                  ? { pulses_used: pulsesUsed, pulses_remaining: pulsesRemaining }
-                  : {})
-              })
-              .eq('id', targetExistingPkgId)
-              .select('id')
-              .maybeSingle();
-
-            packageOutcome = {
-              created: false,
-              updated: Boolean(cp?.id),
-              existingId: targetExistingPkgId,
-              packageType: isPulsesPackage ? 'pulses' : 'services',
-              totalPulses: isPulsesPackage ? catalogTotalPulses : 0,
-              ...(cpErr ? { error: cpErr.message } : {})
-            };
-
-            // RISK-106: keep the pulses used before launch in the same audit trail
-            // confirm_historical_package_price uses, so they stay visible to the deferred
-            // balance and remain eligible for revenue recognition once linked to a booking.
-            if (isPulsesPackage && cp?.id) {
-              const sync = await syncPreLaunchPulseUsage({
-                customerPackageId: targetExistingPkgId,
-                quantityUsed: pulsesUsed,
-                remainingAfter: pulsesRemaining,
-                purchasedAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
-              });
-              if (sync.status === 'failed') {
-                console.warn('Could not sync pre-launch pulse usage (non-fatal):', sync.error);
-                packageOutcome.pulseUsageSyncError = sync.error;
-              }
-            }
-
-            if (Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0) {
-              for (const it of packageItemsUsage) {
-                await supabaseServer
-                  .from('customer_package_items')
-                  .update({
-                    qty_used: it.qtyUsed,
-                    qty_remaining: it.qtyRemaining
-                  })
-                  .eq('customer_package_id', targetExistingPkgId)
-                  .eq('service_id', it.serviceId);
-              }
-            }
-          } else {
-            // Insert fresh customer_packages record
-            const { data: cp, error: cpErr } = await supabaseServer
-              .from('customer_packages')
-              .insert({
-                customer_id: customerId,
-                package_id: pId,
-                purchased_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
-                expires_at: expiresAt.toISOString(),
-                price_paid: pricePending ? 0 : enteredPackagePrice,
-                price_pending: pricePending,
-                status,
-                ...(isPulsesPackage
-                  ? { package_type: 'pulses', total_pulses: catalogTotalPulses, pulses_used: pulsesUsed, pulses_remaining: pulsesRemaining }
-                  : {})
-              })
-              .select('id')
-              .maybeSingle();
-
-            packageOutcome = {
-              created: Boolean(cp?.id),
-              pricePending,
-              packageType: isPulsesPackage ? 'pulses' : 'services',
-              totalPulses: isPulsesPackage ? catalogTotalPulses : 0,
-              ...(cpErr ? { error: cpErr.message } : {}),
-            };
-            if (cpErr) console.error('Failed to create customer_packages record for historical booking:', cpErr.message);
-
-            // RISK-106: same audit trail as the update branch above.
-            if (isPulsesPackage && cp?.id) {
-              const sync = await syncPreLaunchPulseUsage({
-                customerPackageId: cp.id,
-                quantityUsed: pulsesUsed,
-                remainingAfter: pulsesRemaining,
-                purchasedAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
-              });
-              if (sync.status === 'failed') {
-                console.warn('Could not sync pre-launch pulse usage (non-fatal):', sync.error);
-                packageOutcome.pulseUsageSyncError = sync.error;
-              }
-            }
-
-            if (cp?.id) {
-              const { data: pkgItems } = await supabaseServer
-                .from('package_items')
-                .select('service_id, qty')
-                .eq('package_id', pId);
-
-              if (pkgItems && pkgItems.length > 0) {
-                await supabaseServer.from('customer_package_items').insert(
-                  pkgItems.map((item: any) => {
-                    const usageMatch = Array.isArray(packageItemsUsage)
-                      ? packageItemsUsage.find((u: any) => Number(u.serviceId) === Number(item.service_id))
-                      : null;
-                    const qtyTotal = Number(usageMatch?.qtyTotal ?? item.qty);
-                    const qtyUsed = Number(usageMatch?.qtyUsed ?? 0);
-                    const qtyRemaining = Number(usageMatch?.qtyRemaining ?? Math.max(0, qtyTotal - qtyUsed));
-
-                    return {
-                      customer_package_id: cp.id,
-                      service_id: item.service_id,
-                      qty_total: qtyTotal,
-                      qty_used: qtyUsed,
-                      qty_remaining: qtyRemaining
-                    };
-                  })
-                );
-              }
-            }
-          }
-        } catch (cpErr: any) {
-          console.warn('Could not process customer_packages record (non-fatal):', cpErr?.message);
-          packageOutcome = { created: false, pricePending, packageType: isPulsesPackage ? 'pulses' : 'services', totalPulses: isPulsesPackage ? catalogTotalPulses : 0, error: cpErr?.message || String(cpErr) };
-        }
+      if (customerId) {
+        const outcome = await applyHistoricalPackage({ pkg: p, customerId, bookingDate: rawDate, enteredPrice: enteredPackagePrice, mode: 'post' });
+        if (outcome.error) console.error('Historical package write failed (non-fatal):', outcome.error);
+        if (outcome.pulseUsageSyncError) console.warn('Could not sync pre-launch pulse usage (non-fatal):', outcome.pulseUsageSyncError);
+        packageOutcomes.push(outcome);
       }
     }
 
@@ -721,7 +555,8 @@ export async function POST(req: Request) {
       booking: newReservation,
       customer: customerRecord,
       ledger,
-      package: packageOutcome,
+      package: packageOutcomes[0] ?? null,
+      packages: packageOutcomes,
       balances: {
         spent_amount: newSpent,
         outstanding: newOutstanding,
@@ -766,14 +601,6 @@ export async function PATCH(req: Request) {
       doctorName,
       serviceId,
       serviceName,
-      packageId,
-      packageName,
-      customerPackageId,
-      existingCustomerPackageId,
-      packagePulsesTotal,
-      packagePulsesUsed,
-      packagePulsesRemaining,
-      packageItemsUsage,
       productId,
       productName,
       invoiceValue,
@@ -882,36 +709,14 @@ export async function PATCH(req: Request) {
       if (svc) resolvedServiceName = svc.en || svc.ar || `Service #${svc.id}`;
     }
 
-    // Fetch package details if packageId present
-    let packageRecord: any = null;
-    if (packageId) {
-      const { data: pkgData } = await supabaseServer
-        .from('packages')
-        .select('*')
-        .eq('id', packageId)
-        .maybeSingle();
-      if (pkgData) packageRecord = pkgData;
+    // DEC-098: every attached package, validated against this booking's patient before any write.
+    const incomingPackages = normalizeIncomingPackages(body);
+    const packageCheck = await resolveHistoricalPackages(incomingPackages, existing.customer_id || null);
+    if (!packageCheck.ok) {
+      return NextResponse.json({ error: packageCheck.error, field: 'packages' }, { status: 400 });
     }
-
-    // Construct package usage breakdown note
-    let pkgUsageNote = '';
-    const isPulsesPackage = packageRecord?.package_type === 'pulses' || (packageRecord?.total_pulses && Number(packageRecord.total_pulses) > 0) || (packagePulsesTotal != null && Number(packagePulsesTotal) > 0);
-    const catalogTotalPulses = packagePulsesTotal != null ? Math.max(0, Math.floor(Number(packagePulsesTotal))) : Math.max(0, Math.floor(Number(packageRecord?.total_pulses || 0)));
-    const pulsesUsed = packagePulsesUsed != null ? Math.max(0, Math.min(catalogTotalPulses, Math.floor(Number(packagePulsesUsed)))) : 0;
-    const pulsesRemaining = packagePulsesRemaining != null ? Math.max(0, Math.min(catalogTotalPulses, Math.floor(Number(packagePulsesRemaining)))) : Math.max(0, catalogTotalPulses - pulsesUsed);
-
-    if (packageId || packageName) {
-      if (isPulsesPackage && catalogTotalPulses > 0) {
-        pkgUsageNote = ` [Package Usage]: ${pulsesUsed.toLocaleString()} / ${catalogTotalPulses.toLocaleString()} pulses used (${pulsesRemaining.toLocaleString()} pulses remaining).`;
-      } else if (Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0) {
-        const usageParts = packageItemsUsage.map(
-          (it: any) => `${it.serviceName || `Service #${it.serviceId}`}: ${it.qtyUsed ?? 0}/${it.qtyTotal ?? it.qty ?? 0} used (${it.qtyRemaining ?? 0} remaining)`
-        );
-        if (usageParts.length > 0) {
-          pkgUsageNote = ` [Package Usage]: ${usageParts.join('; ')}.`;
-        }
-      }
-    }
+    const pkgNotes = historicalPackageNotes(incomingPackages);
+    const resolvedPackageName = incomingPackages.map((pk) => pk.packageName).filter(Boolean).join(', ') || null;
 
     // 7. Preserve machine markers in the notes
     function preservedMarkerLines(previous: string | null): string[] {
@@ -925,13 +730,12 @@ export async function PATCH(req: Request) {
     // 8. Reconstruct reception notes with preserved markers
     const historicalTag = '[Historical Booking]';
     const srvNote = resolvedServiceName ? ` Service: ${resolvedServiceName}.` : '';
-    const pkgNote = packageName ? ` Package: ${packageName}.` : '';
     const prodNote = productName ? ` Product: ${productName}.` : '';
-    const valNote = parsedValue > 0 ? ` [Invoice Total]: ${parsedValue} EGP.` : '';
+    const valNote = ` [Invoice Total]: ${parsedValue} EGP.`;
     const spentNote = ` Actual Spent: ${parsedPaid} EGP.`;
     const paymentNote = paymentType ? ` Payment Method: ${paymentType}.` : '';
     const userNote = notes ? ` ${notes}` : '';
-    const receptionNoteBase = `${historicalTag} Added manually for historical records.${srvNote}${pkgNote}${pkgUsageNote}${prodNote}${valNote}${spentNote}${paymentNote}${userNote}`.trim();
+    const receptionNoteBase = `${historicalTag} Added manually for historical records.${srvNote}${pkgNotes}${prodNote}${valNote}${spentNote}${paymentNote}${userNote}`.trim();
     const preservedNotesMarkers = preservedMarkerLines(existing.notes);
     const receptionNote = preservedNotesMarkers.length > 0 ? `${receptionNoteBase}\n${preservedNotesMarkers.join('\n')}` : receptionNoteBase;
 
@@ -994,76 +798,24 @@ export async function PATCH(req: Request) {
       );
     }
 
-    // 10. 4b. If package is associated with this booking, update or create customer_packages record
-    const targetPatchPkgId = customerPackageId || existingCustomerPackageId;
-    if (existing.customer_id && (targetPatchPkgId || packageId || packageRecord?.id)) {
-      const pId = packageId || packageRecord?.id;
-      const isServicesFullyUsed = Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0
-        ? packageItemsUsage.every((it: any) => Number(it.qtyRemaining ?? 0) <= 0)
-        : false;
-      const status = isPulsesPackage
-        ? (catalogTotalPulses > 0 && pulsesRemaining <= 0 ? 'fully_used' : 'active')
-        : (isServicesFullyUsed ? 'fully_used' : 'active');
-
-      try {
-        let cpIdToUpdate = targetPatchPkgId;
-        if (!cpIdToUpdate) {
-          const { data: existingCp } = await supabaseServer
-            .from('customer_packages')
-            .select('id')
-            .eq('customer_id', existing.customer_id)
-            .eq('package_id', pId)
-            .order('purchased_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (existingCp?.id) {
-            cpIdToUpdate = existingCp.id;
-          }
-        }
-
-        if (cpIdToUpdate) {
-          await supabaseServer
-            .from('customer_packages')
-            .update({
-              status,
-              ...(isPulsesPackage
-                ? { package_type: 'pulses', total_pulses: catalogTotalPulses, pulses_used: pulsesUsed, pulses_remaining: pulsesRemaining }
-                : {})
-            })
-            .eq('id', cpIdToUpdate);
-
-          // RISK-106: same audit trail as POST, so a superadmin edit keeps pre-launch pulses
-          // visible to the deferred balance and eligible for revenue recognition once linked.
-          if (isPulsesPackage) {
-            const sync = await syncPreLaunchPulseUsage({
-              customerPackageId: cpIdToUpdate,
-              quantityUsed: pulsesUsed,
-              remainingAfter: pulsesRemaining,
-              purchasedAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
-            });
-            if (sync.status === 'failed') {
-              console.warn('Could not sync pre-launch pulse usage during edit (non-fatal):', sync.error);
-              warnings.push(`Pre-launch pulse sync failed: ${sync.error}`);
-            }
-          }
-
-          if (Array.isArray(packageItemsUsage) && packageItemsUsage.length > 0) {
-            for (const it of packageItemsUsage) {
-              await supabaseServer
-                .from('customer_package_items')
-                .update({
-                  qty_total: it.qtyTotal,
-                  qty_used: it.qtyUsed,
-                  qty_remaining: it.qtyRemaining
-                })
-                .eq('customer_package_id', cpIdToUpdate)
-                .eq('service_id', it.serviceId);
-            }
-          }
-        }
-      } catch (cpUpdateErr: any) {
-        console.warn('Could not update customer_packages record during edit:', cpUpdateErr?.message);
-        warnings.push(`Package update failed: ${cpUpdateErr?.message}`);
+    // 10. Packages (DEC-098): update the patient's existing package or create a package added while editing.
+    // Balances are NOT touched here — they are re-settled exactly once in step 11.
+    if (existing.customer_id && incomingPackages.length > 0) {
+      const enteredPackagePrice = enteredHistoricalPackagePrice(incomingPackages, {
+        hasService: Boolean(resolvedServiceId),
+        hasProduct: Boolean(productId || productName),
+        invoiceValue: parsedValue,
+      });
+      for (const pkg of incomingPackages) {
+        const outcome = await applyHistoricalPackage({
+          pkg,
+          customerId: existing.customer_id,
+          bookingDate: rawDate,
+          enteredPrice: enteredPackagePrice,
+          mode: 'patch',
+        });
+        if (outcome.error) warnings.push(`Package ${pkg.packageName}: ${outcome.error}`);
+        if (outcome.pulseUsageSyncError) warnings.push(`Package ${pkg.packageName} pulse history: ${outcome.pulseUsageSyncError}`);
       }
     }
 
@@ -1231,7 +983,7 @@ export async function PATCH(req: Request) {
           invoiceValue: parsedValue,
           amountPaid: parsedPaid,
           serviceName: resolvedServiceName,
-          packageName: packageName,
+          packageName: resolvedPackageName,
           productName: productName,
           paymentType,
           employeeId: staffEmployeeId,
@@ -1299,7 +1051,7 @@ export async function PATCH(req: Request) {
 
         const descItems: string[] = [];
         if (resolvedServiceName) descItems.push(`Service: ${resolvedServiceName}`);
-        if (packageName) descItems.push(`Package: ${packageName}`);
+        if (resolvedPackageName) descItems.push(`Package: ${resolvedPackageName}`);
         if (productName) descItems.push(`Product: ${productName}`);
         const itemsDesc = descItems.length > 0 ? ` (${descItems.join(', ')})` : '';
 

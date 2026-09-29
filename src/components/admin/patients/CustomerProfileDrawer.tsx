@@ -887,11 +887,21 @@ export default function CustomerProfileDrawer({
                         31: 400, 32: 350, 33: 400, 34: 500
                       };
                       const serviceCost = localServices.find(s => s.id === res.serviceId)?.price ?? pricesMap[res.serviceId] ?? 500;
-                      const spent = res.amountPaid ?? 0;
-                      const left = res.amountLeft !== undefined && res.amountLeft !== null ? res.amountLeft : Math.max(0, serviceCost - spent);
+                      const spent = Number(res.amountPaid ?? (res as any).amount_paid ?? 0);
+                      const isHistorical = Boolean(
+                        (res as any).is_historical ||
+                        (res as any).isHistorical ||
+                        String(res.notes || "").includes("[Historical Booking]")
+                      );
+                      const histInvMatch = String(res.notes || "").match(/\[Invoice Total\]:\s*(\d+(?:\.\d+)?)\s*EGP|Invoice Value:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+                      const hasExplicitLeft = (res.amountLeft !== undefined && res.amountLeft !== null) || ((res as any).amount_left !== undefined && (res as any).amount_left !== null);
+                      const rawLeftVal = res.amountLeft !== undefined && res.amountLeft !== null ? res.amountLeft : (res as any).amount_left;
+                      const left = hasExplicitLeft
+                        ? Number(rawLeftVal)
+                        : (isHistorical && histInvMatch ? Math.max(0, Number(histInvMatch[1] || histInvMatch[2]) - spent) : (isHistorical ? 0 : Math.max(0, serviceCost - spent)));
                       const redemptions = customerPackageRedemptions.filter((r: any) => r.reservationId === res.id);
                       const roomName = rooms.find((rm: any) => rm.id === res.roomId)?.name || "—";
-                      const paymentStatus: "paid" | "partial" | "unpaid" = spent <= 0 ? "unpaid" : (left > 0 ? "partial" : "paid");
+                      const paymentStatus: "paid" | "partial" | "unpaid" = left <= 0 ? "paid" : (spent > 0 ? "partial" : "unpaid");
                       const paymentBadgeClass =
                         paymentStatus === "paid"
                           ? "bg-emerald-100 text-emerald-800 border border-emerald-200"

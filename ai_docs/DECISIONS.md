@@ -3302,3 +3302,45 @@ of `finance.view_pnl`/`finance.view_margins` without a `reports.*` key sees tabs
 role is in that state (admin holds all `finance.*`, checked 2026-09-29).
 
 ---
+
+## DEC-098: Several Packages On One Historical Booking — Kept, Re-Built On One Shared Writer With The DEC-088 / RISK-106 Rules
+
+**Date:** 2026-09-29
+**Status:** Decided & implemented
+
+**Context:**
+`origin/dev` commits `b299751`, `7daf4f1`, `1a7fc48` (saifuldeennaser) let the Add/Edit Previous Booking screen attach
+several packages to one historical booking (`packages: [...]`), each with the pulses used in that session. Review found
+four defects in the route side: (1) a new package's `price_paid` was the price the form sent (catalog price) with
+`price_pending: false` — reversing DEC-088 item 6; (2) the pre-launch usage row received "pulses used this session"
+(default 0), and a 0 deletes it while `customer_packages.pulses_used` still counts those pulses — reintroducing RISK-106;
+(3) PATCH only updated existing packages, so a package added while editing was invoiced but never created; (4) no check
+that a package belongs to the patient, no duplicate check, write errors ignored. The same commits also collided with the
+RISK-108 rewrite of the PATCH handler.
+
+**Decision:**
+Keep the multi-package feature and its form unchanged; re-build the route side on `src/lib/historicalPackages.ts`, used by
+both POST and PATCH so they cannot drift:
+- **Validation before any write:** duplicate `customerPackageId` → 400; a `customerPackageId` must belong to the booking's
+  patient (a brand-new patient cannot have one) → 400; a new package must exist in the catalog → 400. Pulse totals of an
+  existing package come from the database, not the request.
+- **Price (DEC-088 item 6):** a new package's price is the entered invoice value only when exactly one package is attached,
+  it is new, and the booking has no service and no product; otherwise `price_pending = true`. The sent/catalog price is
+  never stored as `price_paid`.
+- **Pre-launch pulses (RISK-106), owner-approved 2026-09-29:** the one `Pre-launch usage` row per package holds
+  *everything used* (`total − remaining`) *minus what every other usage row already carries* (live bookings, no-booking
+  consumes). The package's usage rows therefore add up to `pulses_used`, historical usage is never recognised as revenue
+  (DEC-088 item 10), and a session that used 0 pulses no longer deletes the history.
+- **PATCH:** a package added while editing is created (same price rule); the row this booking created earlier is found by
+  catalog id + `purchased_at = booking date` so re-saving never creates a second one. Patient balances are re-settled once
+  (RISK-108), never per package.
+- The RISK-108 PATCH safeguards (historical-only, phone lock, invoice-read abort, marker lines, ledger/transactions/audit)
+  and POST's `effectiveInvoiceValue` / `mapTransactionPaymentMethod` are kept as they were.
+
+**Tests:** `tests/routes/reservations-previous-multi-package.test.ts` (13; mutation-checked: storing the session pulses
+fails 2, storing the sent price fails 8). Manual checklist: `ai_docs/manual_tests/PREVIOUS_BOOKING_MULTI_PACKAGE_MANUAL_TESTS.md`.
+
+**Not done:** removing a package from a booking during an edit leaves that package's row as it was (no automatic
+"un-consume"); a phone change is still refused rather than re-linked (RISK-108 follow-up).
+
+---

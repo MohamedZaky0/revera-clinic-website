@@ -539,15 +539,25 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       const resolvedPkgQuota = notePkgRem !== null ? notePkgRem : 0;
       const isDeficit = !hasSettledDeficit && isPkgCovered && deliveredPulsesVal > resolvedPkgQuota;
 
+      const isHistorical = Boolean(
+        r.is_historical ||
+        (r as any).isHistorical ||
+        notesStr.includes("[Historical Booking]")
+      );
+      const histInvMatch = notesStr.match(/\[Invoice Total\]:\s*(\d+(?:\.\d+)?)\s*EGP|Invoice Value:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+      const isExplicitZeroHistorical = isHistorical && ((histInvMatch && Number(histInvMatch[1] || histInvMatch[2]) === 0) || (amtPaid === 0 && (amtLeft === 0 || rawLeft === null || rawLeft === undefined)));
+
       let paySt: string;
       if (isDeficit) {
         paySt = "Partially Paid";
+      } else if (isExplicitZeroHistorical || (isHistorical && amtLeft === 0)) {
+        paySt = "Paid";
       } else if (rawPaid === null || rawPaid === undefined || Number.isNaN(amtPaid)) {
-        paySt = isPkgCovered && (st === "completed" || amtLeft === 0) ? "Paid" : "—";
-      } else if (amtPaid <= 0 && amtLeft !== 0 && !isPkgCovered && st !== "completed") {
+        paySt = (isPkgCovered || isHistorical) && (st === "completed" || amtLeft === 0) ? "Paid" : "—";
+      } else if (amtPaid <= 0 && amtLeft !== 0 && !isPkgCovered && !isHistorical && st !== "completed") {
         paySt = "Unpaid";
       } else if (rawLeft === null || rawLeft === undefined || Number.isNaN(amtLeft)) {
-        paySt = isPkgCovered ? "Paid" : "—";
+        paySt = (isPkgCovered || isHistorical) ? "Paid" : "—";
       } else if (amtLeft > 0) {
         paySt = "Partially Paid";
       } else {
