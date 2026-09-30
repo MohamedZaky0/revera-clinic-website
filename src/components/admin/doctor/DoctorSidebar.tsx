@@ -11,6 +11,7 @@ import {
   X
 } from "lucide-react";
 import { DoctorTab } from "./types";
+import { CLIENT } from "@/config/client";
 
 interface DoctorSidebarProps {
   activeTab: DoctorTab;
@@ -80,8 +81,8 @@ export default function DoctorSidebar({
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-md p-1.5">
                 <Image
-                  src="/images/main_logo.png"
-                  alt="Revera Clinics"
+                  src={CLIENT.logoPath}
+                  alt={CLIENT.name}
                   fill
                   style={{ objectFit: "contain", padding: "2px" }}
                 />

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function OurApproachSection() {
   const { t, isRTL } = useLanguage();
@@ -202,7 +203,7 @@ export function OurApproachSection() {
                 }}
               >
                 <img 
-                  src="/images/main_logo.png" 
+                  src={CLIENT.logoPath} 
                   alt="" 
                   style={{ width: 44, height: 44, objectFit: "contain", flexShrink: 0 }} 
                 />
@@ -295,7 +296,7 @@ export function OurApproachSection() {
               <div className="oas2-clinic-img">
                 <Image
                   src="/images/clinic/room.jpg"
-                  alt="Revera Clinic"
+                  alt={`${CLIENT.nameShort} Clinic`}
                   fill
                   sizes="(max-width: 1024px) 100vw, 480px"
                   style={{ objectFit: "cover", objectPosition: "center" }}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function TestimonialsSection() {
   const { t, isRTL } = useLanguage();
@@ -307,7 +308,7 @@ export function TestimonialsSection() {
                       }}
                     >
                       <Image
-                        src="/images/main_logo.png"
+                        src={CLIENT.logoPath}
                         alt=""
                         width={20}
                         height={20}

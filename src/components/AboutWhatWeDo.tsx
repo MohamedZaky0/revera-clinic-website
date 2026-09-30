@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function AboutWhatWeDo() {
   const { t, isRTL } = useLanguage();
@@ -211,7 +212,7 @@ export function AboutWhatWeDo() {
           >
             <img
               src={t.aboutPage.whatWeDoImage1 || "/images/clinic/interior.jpg"}
-              alt="Revera care"
+              alt={`${CLIENT.nameShort} care`}
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
           </div>
@@ -231,7 +232,7 @@ export function AboutWhatWeDo() {
               }}
             >
               <img 
-                src="/images/main_logo.png" 
+                src={CLIENT.logoPath} 
                 alt="" 
                 style={{ width: 44, height: 44, objectFit: "contain", flexShrink: 0 }} 
               />

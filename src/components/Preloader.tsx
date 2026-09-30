@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CLIENT } from "@/config/client";
 
 export function Preloader() {
   const [hidden, setHidden] = useState(false);
@@ -32,7 +33,7 @@ export function Preloader() {
         <svg className="arc arc2" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <circle cx="80" cy="80" r="60" strokeWidth="2" strokeDasharray="160 400" transform="rotate(10 80 80)" />
         </svg>
-        <img src="/images/main_logo.png" alt="logo" className="preloader-logo" />
+        <img src={CLIENT.logoPath} alt="logo" className="preloader-logo" />
       </div>
     </div>
   );

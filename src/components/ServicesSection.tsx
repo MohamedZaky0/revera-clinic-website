@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Category, ServiceItem, getServicePriceDetails } from "@/lib/services";
+import { CLIENT } from "@/config/client";
 import { 
   getServiceToggles, 
   ServiceToggleState, 
@@ -20,7 +21,7 @@ function FlowerIcon() {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src="/images/main_logo.png"
+      src={CLIENT.logoPath}
       alt="Clinic Logo"
       width={44}
       height={44}

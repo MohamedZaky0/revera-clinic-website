@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { CLIENT } from "@/config/client";
 import { 
   FileText, 
   ShieldCheck, 
@@ -173,7 +174,7 @@ export default function TermsModal({ isOpen, onClose, defaultLang = "en" }: Term
         {/* Top Header Bar */}
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-6 mb-8">
           <div className="flex items-center gap-3">
-            <img src="/images/main_logo.png" alt="Revera logo" className="h-9 w-auto object-contain" />
+            <img src={CLIENT.logoPath} alt={`${CLIENT.nameShort} logo`} className="h-9 w-auto object-contain" />
           </div>
 
           {/* Language Switcher */}
@@ -196,7 +197,7 @@ export default function TermsModal({ isOpen, onClose, defaultLang = "en" }: Term
         {/* Header Title Section */}
         <div className="flex items-start gap-4 mb-8">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#EEF5EE] p-2 border border-[#414E36]/15 shadow-sm">
-            <img src="/images/main_logo.png" alt="Revera logo" className="h-10 w-auto object-contain" />
+            <img src={CLIENT.logoPath} alt={`${CLIENT.nameShort} logo`} className="h-10 w-auto object-contain" />
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">

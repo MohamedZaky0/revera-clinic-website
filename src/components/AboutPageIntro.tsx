@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function AboutPageIntro() {
   const { t, isRTL } = useLanguage();
@@ -214,8 +215,8 @@ export function AboutPageIntro() {
                 {/* Gold rose badge overlay */}
                 <div className="api-rose-badge">
                   <Image
-                    src="/images/main_logo.png"
-                    alt="Revera Clinics"
+                    src={CLIENT.logoPath}
+                    alt={CLIENT.name}
                     width={88}
                     height={88}
                     style={{ objectFit: "contain", width: "auto", height: "auto", transform: "scale(1.7)" }}
@@ -226,7 +227,7 @@ export function AboutPageIntro() {
                 <div className="api-second-img">
                   <Image
                     src="/images/clinic/room.jpg"
-                    alt="Revera Clinics"
+                    alt={CLIENT.name}
                     fill
                     sizes="180px"
                     style={{ objectFit: "cover", objectPosition: "center" }}

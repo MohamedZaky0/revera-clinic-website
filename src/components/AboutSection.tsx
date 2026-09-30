@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Check, ArrowUpRight } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function AboutSection() {
   const { t, isRTL } = useLanguage();
@@ -59,7 +60,7 @@ export function AboutSection() {
                 }`}
               >
                 <img
-                  src="/images/main_logo.png"
+                  src={CLIENT.logoPath}
                   alt=""
                   className="w-full h-full object-contain transition-all duration-500"
                   style={{
@@ -112,8 +113,8 @@ export function AboutSection() {
               >
                 <div className="w-full h-full animate-[spin_10s_linear_infinite] flex items-center justify-center">
                   <img
-                    src="/images/main_logo.png"
-                    alt="Revera logo"
+                    src={CLIENT.logoPath}
+                    alt={`${CLIENT.nameShort} logo`}
                     className="w-full h-full object-contain"
                     style={{ transform: "scale(1.7)" }}
                   />
@@ -131,7 +132,7 @@ export function AboutSection() {
               style={{ direction: isRTL ? "rtl" : "ltr" }}
             >
               <img 
-                src="/images/main_logo.png" 
+                src={CLIENT.logoPath} 
                 alt="" 
                 className="w-12 h-12 object-contain shrink-0" 
               />
@@ -191,7 +192,7 @@ export function AboutSection() {
                 <div className="relative aspect-[16/10] w-full rounded-[20px] overflow-hidden shadow-md transition-transform duration-500 hover:scale-[1.03]">
                   <Image
                     src={t.about.image3 || "/images/clinic/interior.jpg"}
-                    alt="Revera Clinics Interior"
+                    alt={`${CLIENT.name} Interior`}
                     fill
                     sizes="(max-width: 768px) 100vw, 250px"
                     className="object-cover"

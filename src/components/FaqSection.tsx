@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function FaqSection() {
   const { t, isRTL } = useLanguage();
@@ -153,7 +154,7 @@ export function FaqSection() {
               }}
             >
               <img
-                src="/images/main_logo.png"
+                src={CLIENT.logoPath}
                 alt=""
                 style={{ width: 44, height: 44, objectFit: "contain", flexShrink: 0 }}
               />

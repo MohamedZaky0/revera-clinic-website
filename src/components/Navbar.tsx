@@ -217,7 +217,7 @@ export function Navbar() {
           {/* Logo */}
           <Link href="/" className="shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/main_logo.png" alt="Revera Clinics" className="h-10 lg:h-[72px] w-auto" />
+            <img src={CLIENT.logoPath} alt={CLIENT.name} className="h-10 lg:h-[72px] w-auto" />
           </Link>
 
           {/* Desktop nav links */}

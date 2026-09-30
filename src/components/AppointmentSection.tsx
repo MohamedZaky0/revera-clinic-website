@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function AppointmentSection() {
   const { t, isRTL } = useLanguage();
@@ -206,7 +207,7 @@ export function AppointmentSection() {
                 <div className="ap-image-container">
                   <Image
                     src="/images/clinic/support-agent.jpg"
-                    alt="Contact support — Revera Clinics"
+                    alt={`Contact support — ${CLIENT.name}`}
                     fill
                     sizes="(max-width: 768px) 100vw, 400px"
                     style={{ objectFit: "cover", objectPosition: "center top" }}

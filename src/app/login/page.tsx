@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { getRoleSlug, getRoleDisplayName } from "@/lib/roleUtils";
 import { Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowLeft } from "lucide-react";
+import { CLIENT } from "@/config/client";
 
 export default function UnifiedStaffLoginPage() {
   const router = useRouter();
@@ -186,8 +187,8 @@ export default function UnifiedStaffLoginPage() {
             <div className="h-16 w-16 rounded-2xl bg-[#414E36] p-3 shadow-md flex items-center justify-center mb-4 ring-1 ring-white/10">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/images/main_logo.png"
-                alt="Revera Clinic"
+                src={CLIENT.logoPath}
+                alt={`${CLIENT.nameShort} Clinic`}
                 className="w-full h-full object-contain brightness-0 invert"
               />
             </div>

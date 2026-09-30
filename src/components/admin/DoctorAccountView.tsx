@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { DoctorAccountViewProps, DoctorTab, DoctorPatient, UsedProduct } from "./doctor/types";
 import { doctorTranslations } from "./doctor/translations";
 import { adminTranslations } from "./translations";
+import { CLIENT } from "@/config/client";
 import { parseBookingNotes, getAuthHeaders } from "./doctor/utils";
 import DoctorSidebar from "./doctor/DoctorSidebar";
 import DoctorScheduleTab from "./doctor/tabs/DoctorScheduleTab";
@@ -1558,7 +1559,7 @@ export default function DoctorAccountView({
           
           <div className="flex items-center gap-2 min-w-0">
             <div className="relative h-7 w-7 rounded-lg bg-white p-1 overflow-hidden shrink-0">
-              <Image src="/images/main_logo.png" alt="Revera Clinics" fill style={{ objectFit: "contain" }} />
+              <Image src={CLIENT.logoPath} alt={CLIENT.name} fill style={{ objectFit: "contain" }} />
             </div>
             <div className="min-w-0">
               <h1 className="text-xs font-bold leading-tight truncate">{t.portalTitle}</h1>

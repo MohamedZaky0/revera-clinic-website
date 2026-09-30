@@ -1012,7 +1012,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
               style={{ backgroundColor: "var(--cr-secondary)" }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/main_logo.png" alt="Revera" width={28} height={28} style={{ objectFit: "contain" }} />
+              <img src={CLIENT.logoPath} alt={CLIENT.nameShort} width={28} height={28} style={{ objectFit: "contain" }} />
             </div>
             <h3 className="text-lg font-semibold" style={{ color: "var(--cr-primary)" }}>
               {t.booking.title}

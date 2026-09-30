@@ -5629,8 +5629,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           <div className="mx-auto relative h-16 w-16 overflow-hidden rounded-2xl bg-[#414E36] p-2.5 shadow-md">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/main_logo.png"
-              alt="Revera Clinics"
+              src={CLIENT.logoPath}
+              alt={CLIENT.name}
               className="w-full h-full object-contain brightness-0 invert"
             />
           </div>
@@ -5735,8 +5735,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             <div className="flex items-center gap-2.5">
               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-md p-1.5">
                 <Image
-                  src="/images/main_logo.png"
-                  alt="Revera Clinics"
+                  src={CLIENT.logoPath}
+                  alt={CLIENT.name}
                   fill
                   style={{ objectFit: "contain", padding: "2px" }}
                 />

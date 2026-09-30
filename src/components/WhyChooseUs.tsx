@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Phone } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function WhyChooseUs() {
   const { t, isRTL } = useLanguage();
@@ -218,7 +219,7 @@ export function WhyChooseUs() {
                 <div className="wcu-left-img">
                   <Image
                     src={t.whyChooseUs.image1 || "/images/clinic/treatment.jpg"}
-                    alt="Physical therapy clinic room — Revera Clinics"
+                    alt={`Physical therapy clinic room — ${CLIENT.name}`}
                     fill
                     priority
                     unoptimized
@@ -233,7 +234,7 @@ export function WhyChooseUs() {
                   <div className="wcu-right-img">
                     <Image
                       src={t.whyChooseUs.image2 || "/images/clinic/room.jpg"}
-                      alt="Skin treatment — Revera Clinics"
+                      alt={`Skin treatment — ${CLIENT.name}`}
                       fill
                       unoptimized
                       sizes="(max-width: 768px) 100vw, 400px"
