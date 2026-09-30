@@ -417,12 +417,12 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
   };
 
   return (
-    <div className="space-y-6 pb-12 font-sans bg-[#FBFBF9] p-2 sm:p-6 rounded-[36px]">
+    <div className="space-y-6 pb-12 font-sans bg-[var(--color-brand-light)] p-2 sm:p-6 rounded-[36px]">
       {/* ── TOP HEADER / NAV BAR ── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-2xl border border-[#E6E9EB] bg-white px-4 py-2 text-xs font-semibold text-[#1F251A] shadow-xs transition hover:bg-[#F2EFE9]"
+          className="inline-flex items-center gap-2 rounded-2xl border border-[#E6E9EB] bg-white px-4 py-2 text-xs font-semibold text-[var(--cr-dark)] shadow-xs transition hover:bg-[var(--color-brand-sand)]"
         >
           <ArrowLeft size={16} />
           <span>Back to Doctors</span>
@@ -432,17 +432,17 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
           {onEdit && (
             <button
               onClick={() => onEdit(doctor)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-[#414E36]/15 bg-white px-4.5 py-2 text-xs font-semibold text-[#1F251A] shadow-xs transition hover:bg-[#F2EFE9] cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4.5 py-2 text-xs font-semibold text-[var(--cr-dark)] shadow-xs transition hover:bg-[var(--color-brand-sand)] cursor-pointer"
             >
-              <Pencil size={14} className="text-[#5A6A51]" />
+              <Pencil size={14} className="text-[var(--color-brand-secondary)]" />
               <span>Edit Doctor</span>
             </button>
           )}
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 rounded-2xl border border-[#E6E9EB] bg-white px-4.5 py-2 text-xs font-semibold text-[#1F251A] shadow-xs transition hover:bg-[#F2EFE9] cursor-pointer"
+            className="inline-flex items-center gap-2 rounded-2xl border border-[#E6E9EB] bg-white px-4.5 py-2 text-xs font-semibold text-[var(--cr-dark)] shadow-xs transition hover:bg-[var(--color-brand-sand)] cursor-pointer"
           >
-            <Printer size={16} className="text-[#5A6A51]" />
+            <Printer size={16} className="text-[var(--color-brand-secondary)]" />
             <span>Print Profile</span>
           </button>
         </div>
@@ -473,13 +473,13 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
 
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl font-bold text-[#1F251A]">{doctorName}</h1>
+                <h1 className="text-2xl font-bold text-[var(--cr-dark)]">{doctorName}</h1>
                 <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${getDoctorStatusBadgeClass(doctor?.active !== false)}`}>
                   {doctor?.active !== false ? "Active" : "Inactive"}
                 </span>
               </div>
 
-              <p className="text-xs font-medium text-[#5A6A51]">
+              <p className="text-xs font-medium text-[var(--color-brand-secondary)]">
                 {doctorSpecialty}
               </p>
 
@@ -495,26 +495,26 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
           <div className="hidden lg:block h-16 w-px bg-gray-100 mx-2" />
 
           {/* Integrated Personal Information Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs bg-[#FBFBF9] p-4 rounded-2xl border border-gray-100 flex-1">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs bg-[var(--color-brand-light)] p-4 rounded-2xl border border-gray-100 flex-1">
             <div>
               <span className="text-[#9CA3AF] block mb-0.5 text-[11px] font-medium">Specialty / Role</span>
-              <span className="font-semibold text-[#1F251A]">{doctorSubSpecialty}</span>
+              <span className="font-semibold text-[var(--cr-dark)]">{doctorSubSpecialty}</span>
             </div>
 
             <div>
               <span className="text-[#9CA3AF] block mb-0.5 text-[11px] font-medium">Employment Type</span>
-              <span className="font-semibold text-[#1F251A]">{employmentType}</span>
+              <span className="font-semibold text-[var(--cr-dark)]">{employmentType}</span>
             </div>
 
             <div>
               <span className="text-[#9CA3AF] block mb-0.5 text-[11px] font-medium">Languages</span>
-              <span className="font-semibold text-[#1F251A]">{languages}</span>
+              <span className="font-semibold text-[var(--cr-dark)]">{languages}</span>
             </div>
 
             <div>
               <span className="text-[#9CA3AF] block mb-0.5 text-[11px] font-medium">Rating</span>
-              <span className="inline-flex items-center gap-1 font-semibold text-[#1F251A]">
-                <Star size={12} className="text-[#C4AE7C] fill-[#C4AE7C]" />
+              <span className="inline-flex items-center gap-1 font-semibold text-[var(--cr-dark)]">
+                <Star size={12} className="text-[var(--cr-accent)] fill-[var(--cr-accent)]" />
                 {doctor?.rating || "5.0"}
               </span>
             </div>
@@ -526,23 +526,23 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
       <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-[0_10px_30px_rgba(47,61,41,0.03)] w-full">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-4 mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F2EFE9] text-[#1E3A2B]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-brand-sand)] text-[#1E3A2B]">
               <Clock size={16} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-[#1F251A]">Working Schedule</h2>
-              <p className="text-[11px] text-[#5A6A51]">View weekly working hours per branch</p>
+              <h2 className="text-base font-bold text-[var(--cr-dark)]">Working Schedule</h2>
+              <p className="text-[11px] text-[var(--color-brand-secondary)]">View weekly working hours per branch</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             {/* Branch Filter Selector */}
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-[#5A6A51]">Branch:</span>
+              <span className="text-xs font-semibold text-[var(--color-brand-secondary)]">Branch:</span>
               <select
                 value={selectedScheduleBranch}
                 onChange={(e) => setSelectedScheduleBranch(e.target.value)}
-                className="rounded-xl border border-gray-200 bg-[#F7F7F9] px-3 py-1.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C] shadow-2xs cursor-pointer"
+                className="rounded-xl border border-gray-200 bg-[#F7F7F9] px-3 py-1.5 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] shadow-2xs cursor-pointer"
               >
                 <option value="All">All Branches</option>
                 {doctorBranches.map((bName: string) => (
@@ -558,7 +558,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                 className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition ${
                   scheduleType === "In-Clinic"
                     ? "bg-white text-[#1E3A2B] shadow-xs border border-gray-200"
-                    : "text-[#6B7280] hover:text-[#1F251A]"
+                    : "text-[#6B7280] hover:text-[var(--cr-dark)]"
                 }`}
               >
                 <span className="h-2 w-2 rounded-full bg-emerald-600" />
@@ -569,7 +569,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                 className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition ${
                   scheduleType === "Online"
                     ? "bg-white text-[#1E3A2B] shadow-xs border border-gray-200"
-                    : "text-[#6B7280] hover:text-[#1F251A]"
+                    : "text-[#6B7280] hover:text-[var(--cr-dark)]"
                 }`}
               >
                 Online
@@ -598,7 +598,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
 
                 return (
                   <tr key={item.day || idx} className="hover:bg-gray-50/50">
-                    <td className="py-3 px-4 font-semibold text-[#1F251A] align-middle">{item.day}</td>
+                    <td className="py-3 px-4 font-semibold text-[var(--cr-dark)] align-middle">{item.day}</td>
                     <td className="py-3 px-4 font-medium align-middle">
                       {displayShifts.length === 0 ? (
                         <span className="inline-block rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
@@ -609,10 +609,10 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                           {displayShifts.map((shiftObj: any, sIdx: number) => (
                             <div
                               key={sIdx}
-                              className="flex flex-col gap-0.5 rounded-xl border border-[#E6E9EB] bg-[#F2EFE9]/60 px-3 py-1.5 transition hover:bg-[#F2EFE9]"
+                              className="flex flex-col gap-0.5 rounded-xl border border-[#E6E9EB] bg-[var(--color-brand-sand)]/60 px-3 py-1.5 transition hover:bg-[var(--color-brand-sand)]"
                             >
                               {selectedScheduleBranch === "All" && shiftObj.branchName ? (
-                                <span className="text-[9px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">
                                   {shiftObj.branchName}
                                 </span>
                               ) : null}
@@ -635,10 +635,10 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
       {/* ── SERVICES PROVIDED CARD ── */}
       <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-[0_10px_30px_rgba(47,61,41,0.03)] w-full">
         <div className="flex items-center gap-2.5 border-b border-gray-100 pb-4 mb-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F2EFE9] text-[#1E3A2B]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-brand-sand)] text-[#1E3A2B]">
             <ShoppingBag size={16} />
           </div>
-          <h2 className="text-base font-bold text-[#1F251A]">Services Provided</h2>
+          <h2 className="text-base font-bold text-[var(--cr-dark)]">Services Provided</h2>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -650,7 +650,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
             servicesProvided.map((service: string, idx: number) => (
               <span
                 key={idx}
-                className="rounded-xl border border-gray-100 bg-[#F7F7F9] px-3.5 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#F2EFE9] transition"
+                className="rounded-xl border border-gray-100 bg-[#F7F7F9] px-3.5 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[var(--color-brand-sand)] transition"
               >
                 {service}
               </span>
@@ -663,10 +663,10 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
       <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-[0_10px_30px_rgba(47,61,41,0.03)]">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-5 mb-5">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F2EFE9] text-[#1E3A2B]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-brand-sand)] text-[#1E3A2B]">
               <ClipboardList size={16} />
             </div>
-            <h2 className="text-base font-bold text-[#1F251A]">Patient Visit History</h2>
+            <h2 className="text-base font-bold text-[var(--cr-dark)]">Patient Visit History</h2>
           </div>
 
           {/* Action Buttons: Filter & Export */}
@@ -677,7 +677,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                 title="Filter"
                 className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] hover:bg-gray-50 transition shadow-xs cursor-pointer"
               >
-                <Filter size={14} className="text-[#5A6A51]" />
+                <Filter size={14} className="text-[var(--color-brand-secondary)]" />
               </button>
 
               {showFilterDropdown && (
@@ -702,7 +702,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
               onClick={handleExportCSV}
               className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-[#374151] hover:bg-gray-50 transition shadow-xs"
             >
-              <Download size={14} className="text-[#5A6A51]" />
+              <Download size={14} className="text-[var(--color-brand-secondary)]" />
               <span>Export</span>
             </button>
           </div>
@@ -738,7 +738,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                   className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
                     dateFilter === tab
                       ? "bg-white text-[#1E3A2B] border border-gray-200 shadow-xs"
-                      : "text-[#6B7280] hover:text-[#1F251A]"
+                      : "text-[#6B7280] hover:text-[var(--cr-dark)]"
                   }`}
                 >
                   {tab === "Custom" && <Calendar size={12} />}
@@ -760,7 +760,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                     setCustomStartDate(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="rounded-xl border border-gray-200 bg-[#FFFFFF] px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#1E3A2B]"
+                  className="rounded-xl border border-gray-200 bg-[#FFFFFF] px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[#1E3A2B]"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -772,7 +772,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                     setCustomEndDate(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="rounded-xl border border-gray-200 bg-[#FFFFFF] px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#1E3A2B]"
+                  className="rounded-xl border border-gray-200 bg-[#FFFFFF] px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[#1E3A2B]"
                 />
               </div>
               {(customStartDate || customEndDate) && (
@@ -815,13 +815,13 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
               ) : (
                 paginatedVisits.map((v) => (
                   <tr key={v.id} className="hover:bg-gray-50/60 transition">
-                    <td className="py-3.5 px-3 whitespace-nowrap font-medium text-[#1F251A]">
+                    <td className="py-3.5 px-3 whitespace-nowrap font-medium text-[var(--cr-dark)]">
                       {v.date}
                     </td>
 
                     <td className="py-3.5 px-3 whitespace-nowrap">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-[#1F251A]">{v.patientName}</span>
+                        <span className="font-semibold text-[var(--cr-dark)]">{v.patientName}</span>
                         <span className="text-[11px] font-medium text-[#9CA3AF]">
                           {v.patientPhone}
                         </span>
@@ -830,7 +830,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
 
                     <td className="py-3.5 px-3">
                       <div className="flex flex-col max-w-[140px]">
-                        <span className="font-semibold text-[#1F251A] truncate">{v.service}</span>
+                        <span className="font-semibold text-[var(--cr-dark)] truncate">{v.service}</span>
                         <span className="text-[11px] font-medium text-[#9CA3AF] truncate">
                           {v.variant}
                         </span>
@@ -854,7 +854,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                     <td className="py-3.5 px-2 text-center whitespace-nowrap">
                       <button
                         onClick={() => setSelectedVisit(v)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-[#1F251A] transition"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-[var(--cr-dark)] transition"
                         title="View Visit Details"
                       >
                         <Eye size={14} />
@@ -935,7 +935,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="font-bold text-[#1F251A]">Patient Visit Details</h3>
+              <h3 className="font-bold text-[var(--cr-dark)]">Patient Visit Details</h3>
               <button
                 onClick={() => setSelectedVisit(null)}
                 className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
@@ -947,23 +947,23 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
             <div className="space-y-3 text-xs">
               <div className="flex justify-between py-1 border-b border-gray-50">
                 <span className="text-[#9CA3AF]">Patient</span>
-                <span className="font-bold text-[#1F251A]">{selectedVisit.patientName} ({selectedVisit.patientPhone})</span>
+                <span className="font-bold text-[var(--cr-dark)]">{selectedVisit.patientName} ({selectedVisit.patientPhone})</span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-50">
                 <span className="text-[#9CA3AF]">Date</span>
-                <span className="font-semibold text-[#1F251A]">{selectedVisit.date}</span>
+                <span className="font-semibold text-[var(--cr-dark)]">{selectedVisit.date}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-50">
                 <span className="text-[#9CA3AF]">Service</span>
-                <span className="font-semibold text-[#1F251A]">{selectedVisit.service} ({selectedVisit.variant})</span>
+                <span className="font-semibold text-[var(--cr-dark)]">{selectedVisit.service} ({selectedVisit.variant})</span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-50">
                 <span className="text-[#9CA3AF]">Branch</span>
-                <span className="font-semibold text-[#1F251A]">{selectedVisit.branch}</span>
+                <span className="font-semibold text-[var(--cr-dark)]">{selectedVisit.branch}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-50">
                 <span className="text-[#9CA3AF]">Session Type</span>
-                <span className="font-semibold text-[#1F251A]">{selectedVisit.sessionType}</span>
+                <span className="font-semibold text-[var(--cr-dark)]">{selectedVisit.sessionType}</span>
               </div>
               <div className="py-1">
                 <span className="text-[#9CA3AF] block mb-1">Doctor Clinical Notes</span>
