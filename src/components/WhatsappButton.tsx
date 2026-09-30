@@ -37,7 +37,7 @@ export function WhatsappButton() {
   // Double check session or DOM for staff views
   if (typeof window !== "undefined") {
     if (
-      sessionStorage.getItem("revera_admin_session_active") === "true" ||
+      sessionStorage.getItem(`${CLIENT.storagePrefix}_admin_session_active`) === "true" ||
       document.getElementById("admin-root") ||
       document.querySelector(".admin-view")
     ) {
@@ -62,7 +62,7 @@ export function WhatsappButton() {
 
       {/* Tooltip */}
       <span
-        className={`absolute bottom-full mb-3 hidden rounded-xl bg-[#1F251A] px-3 py-1.5 text-xs font-semibold text-white shadow-xl transition-all group-hover:block whitespace-nowrap border border-[#414E36]/10 ${
+        className={`absolute bottom-full mb-3 hidden rounded-xl bg-[var(--cr-dark)] px-3 py-1.5 text-xs font-semibold text-white shadow-xl transition-all group-hover:block whitespace-nowrap border border-[var(--cr-primary)]/10 ${
           isRTL ? "left-0 origin-bottom-left" : "right-0 origin-bottom-right"
         }`}
       >

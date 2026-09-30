@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { CLIENT } from "@/config/client";
 
 function SetupContent() {
   const router = useRouter();
@@ -165,11 +166,11 @@ function SetupContent() {
               <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-[#1F251A]">Initialization Error</h2>
+          <h2 className="text-xl font-bold text-[var(--cr-dark)]">Initialization Error</h2>
           <p className="text-sm text-red-600 font-medium">{error}</p>
           <button
             onClick={() => router.push("/")}
-            className="inline-block mt-2 text-sm font-semibold text-[#414E36] underline"
+            className="inline-block mt-2 text-sm font-semibold text-[var(--cr-primary)] underline"
           >
             Return to Homepage
           </button>
@@ -183,8 +184,8 @@ function SetupContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F4F1EC]">
         <div className="text-center space-y-3">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#414E36] border-t-transparent" />
-          <p className="text-sm text-[#5A6A51] font-medium">Verifying your invitation…</p>
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[var(--cr-primary)] border-t-transparent" />
+          <p className="text-sm text-[var(--color-brand-secondary)] font-medium">Verifying your invitation…</p>
         </div>
       </div>
     );
@@ -200,13 +201,13 @@ function SetupContent() {
               <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-[#1F251A]">Invitation Link Expired</h2>
-          <p className="text-sm text-[#5A6A51]">
+          <h2 className="text-xl font-bold text-[var(--cr-dark)]">Invitation Link Expired</h2>
+          <p className="text-sm text-[var(--color-brand-secondary)]">
             This invitation link has expired or is no longer valid. Please ask your admin to resend the invitation.
           </p>
           <button
             onClick={() => router.push("/")}
-            className="inline-block mt-2 text-sm font-semibold text-[#414E36] underline"
+            className="inline-block mt-2 text-sm font-semibold text-[var(--cr-primary)] underline"
           >
             Return to Homepage
           </button>
@@ -219,13 +220,13 @@ function SetupContent() {
     <div className="min-h-screen flex items-center justify-center bg-[#F4F1EC] p-4">
       <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-br from-[#1F251A] to-[#414E36] px-8 py-10 text-center">
-          <img src="/images/main_logo.png" alt="Revera Clinics" className="mx-auto mb-5 h-14 w-14 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-          <p className="text-xs uppercase tracking-[0.25em] text-[#C4AE7C] font-semibold mb-1">Revera Clinics</p>
+        <div className="bg-gradient-to-br from-[var(--cr-dark)] to-[var(--cr-primary)] px-8 py-10 text-center">
+          <img src={CLIENT.logoPath} alt={CLIENT.name} className="mx-auto mb-5 h-14 w-14 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          <p className="text-xs uppercase tracking-[0.25em] text-[var(--cr-accent)] font-semibold mb-1">{CLIENT.name}</p>
           <h1 className="text-2xl font-bold text-white mb-2">Complete Your Setup</h1>
           {employeeName && (
-            <p className="text-sm text-[#C4AE7C]/80">
-              Welcome, <strong className="text-[#C4AE7C]">{employeeName}</strong>! Set a password to access the dashboard.
+            <p className="text-sm text-[var(--cr-accent)]/80">
+              Welcome, <strong className="text-[var(--cr-accent)]">{employeeName}</strong>! Set a password to access the dashboard.
             </p>
           )}
         </div>
@@ -244,7 +245,7 @@ function SetupContent() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-2">
                   New Password
                 </label>
                 <input
@@ -252,7 +253,7 @@ function SetupContent() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="At least 8 characters"
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
                   disabled={loading}
                   autoFocus
                 />
@@ -282,7 +283,7 @@ function SetupContent() {
                 )}
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-2">
                   Confirm Password
                 </label>
                 <input
@@ -290,7 +291,7 @@ function SetupContent() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Re-enter your password"
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
                   disabled={loading}
                 />
               </div>
@@ -304,7 +305,7 @@ function SetupContent() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-xl bg-[#414E36] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full rounded-xl bg-[var(--cr-primary)] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -328,7 +329,7 @@ export default function SetupPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-[#F4F1EC]">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#414E36] border-t-transparent" />
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--cr-primary)] border-t-transparent" />
       </div>
     }>
       <SetupContent />

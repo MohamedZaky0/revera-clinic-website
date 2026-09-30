@@ -42,11 +42,11 @@ export const TransactionAuditLogsModal: React.FC<TransactionAuditLogsModalProps>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-[#414E36]/10 text-[#414E36] flex items-center justify-center font-bold">
+            <div className="h-10 w-10 rounded-2xl bg-[var(--cr-primary)]/10 text-[var(--cr-primary)] flex items-center justify-center font-bold">
               <ShieldCheck size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-[#1F251A]">
+              <h3 className="text-lg font-bold text-[var(--cr-dark)]">
                 Financial Audit Logs
               </h3>
               <p className="text-xs text-gray-500">

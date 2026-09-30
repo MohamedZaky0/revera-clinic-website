@@ -3,6 +3,7 @@
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { CLIENT } from "@/config/client";
 
 function AuthCallbackContent() {
   const router = useRouter();
@@ -67,10 +68,10 @@ function AuthCallbackContent() {
           <svg className="arc arc2" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <circle cx="80" cy="80" r="60" strokeWidth="2" strokeDasharray="160 400" transform="rotate(10 80 80)" />
           </svg>
-          <img src="/images/main_logo.png" alt="logo" className="preloader-logo" />
+          <img src={CLIENT.logoPath} alt="logo" className="preloader-logo" />
         </div>
         <div style={{ textAlign: "center", color: "#FFFFFF", fontFamily: "var(--font-primary, sans-serif)", zIndex: 10, marginTop: "10px" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 500, color: "#C4AE7C", marginBottom: "0.5rem", letterSpacing: "1px" }}>Authenticating...</h2>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 500, color: "var(--cr-accent)", marginBottom: "0.5rem", letterSpacing: "1px" }}>Authenticating...</h2>
           <p style={{ fontSize: "0.875rem", opacity: 0.8, color: "#E0E0E0" }}>Setting up your secure session.</p>
         </div>
       </div>
@@ -83,7 +84,7 @@ export default function AuthCallbackPage() {
     <Suspense fallback={
       <div className="preloader" style={{ position: "fixed", inset: 0, zIndex: 9999 }}>
         <div className="preloader-inner">
-          <img src="/images/main_logo.png" alt="logo" className="preloader-logo" />
+          <img src={CLIENT.logoPath} alt="logo" className="preloader-logo" />
         </div>
       </div>
     }>

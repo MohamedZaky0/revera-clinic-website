@@ -108,20 +108,20 @@ export function DoctorServiceCommissionEditor({
   };
 
   const labelClass = compact
-    ? 'block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1'
-    : 'block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5';
+    ? 'block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1'
+    : 'block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5';
 
   const inputClass = compact
-    ? 'w-full rounded-2xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]'
-    : 'w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]';
+    ? 'w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-3 py-1.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]'
+    : 'w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]';
 
   const selectClass = inputClass;
 
   return (
     <div className="space-y-4">
       {/* Default commission fallback */}
-      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-3 space-y-3">
-        <h4 className={compact ? 'text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#414E36]/10 pb-2' : 'text-xs font-bold uppercase tracking-wider text-[#414E36] border-b border-[#414E36]/10 pb-2'}>
+      <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-3 space-y-3">
+        <h4 className={compact ? 'text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] border-b border-[var(--cr-primary)]/10 pb-2' : 'text-xs font-bold uppercase tracking-wider text-[var(--cr-primary)] border-b border-[var(--cr-primary)]/10 pb-2'}>
           Default Commission (fallback when a service has no override)
         </h4>
         <div className={`grid gap-3 ${compact ? 'sm:grid-cols-3' : 'md:grid-cols-3'}`}>
@@ -185,13 +185,13 @@ export function DoctorServiceCommissionEditor({
       </div>
 
       {/* Per-service commission list */}
-      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-3 space-y-3">
-        <h4 className={compact ? 'text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#414E36]/10 pb-2' : 'text-xs font-bold uppercase tracking-wider text-[#414E36] border-b border-[#414E36]/10 pb-2'}>
+      <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-3 space-y-3">
+        <h4 className={compact ? 'text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] border-b border-[var(--cr-primary)]/10 pb-2' : 'text-xs font-bold uppercase tracking-wider text-[var(--cr-primary)] border-b border-[var(--cr-primary)]/10 pb-2'}>
           Services &amp; Commissions
         </h4>
 
         {services.length === 0 && (
-          <p className="text-xs text-[#5A6A51]">No services added. Use the button below to add a service.</p>
+          <p className="text-xs text-[var(--color-brand-secondary)]">No services added. Use the button below to add a service.</p>
         )}
 
         <div className="space-y-2">
@@ -203,10 +203,10 @@ export function DoctorServiceCommissionEditor({
             return (
               <div
                 key={serviceName}
-                className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-xl border border-[#414E36]/10 bg-[#FBFBF9] p-2"
+                className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-xl border border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] p-2"
               >
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-[#1F251A] truncate">{serviceName}</div>
+                  <div className="text-sm font-medium text-[var(--cr-dark)] truncate">{serviceName}</div>
                   {svc?.ar && <div className="text-[10px] text-gray-400 truncate">{svc.ar}</div>}
                 </div>
                 <div className="flex flex-1 gap-2 items-center">

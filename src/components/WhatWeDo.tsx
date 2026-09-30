@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function WhatWeDo() {
   const { t, isRTL } = useLanguage();
@@ -88,7 +89,7 @@ export function WhatWeDo() {
               >
                 <Image
                   src="/images/clinic/room.jpg"
-                  alt="Physical therapy clinic — Revera Clinics"
+                  alt={`Physical therapy clinic — ${CLIENT.name}`}
                   fill
                   sizes="(max-width: 768px) 100vw, 33vw"
                   style={{ objectFit: "cover", objectPosition: "center" }}
@@ -281,7 +282,7 @@ export function WhatWeDo() {
               >
                 <Image
                   src="/images/clinic/treatment.jpg"
-                  alt="Treatment — Revera Clinics"
+                  alt={`Treatment — ${CLIENT.name}`}
                   fill
                   sizes="(max-width: 768px) 100vw, 30vw"
                   style={{ objectFit: "cover", objectPosition: "center top" }}
@@ -305,7 +306,7 @@ export function WhatWeDo() {
                   justifyContent: "center",
                   gap: "2px",
                   boxShadow: "0 8px 24px rgba(90, 61, 52, 0.2)",
-                  border: "4px solid var(--cr-bg, #EDF1EC)",
+                  border: "4px solid var(--cr-bg, var(--color-brand-tint))",
                 }}
               >
                 <span

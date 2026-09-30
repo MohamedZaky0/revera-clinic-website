@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { CLIENT } from "@/config/client";
 
 export type Customer = {
   id?: string;
@@ -663,14 +664,14 @@ export function useCustomerProfile({
         <style>
           body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            color: #1F251A;
+            color: var(--cr-dark);
             margin: 0;
             padding: 40px;
             background-color: #fff;
           }
           .letterhead {
             text-align: center;
-            border-bottom: 2px solid #414E36;
+            border-bottom: 2px solid var(--cr-primary);
             padding-bottom: 20px;
             margin-bottom: 30px;
           }
@@ -678,7 +679,7 @@ export function useCustomerProfile({
             font-size: 28px;
             font-weight: 700;
             letter-spacing: 0.1em;
-            color: #414E36;
+            color: var(--cr-primary);
             margin: 0;
             text-transform: uppercase;
           }
@@ -700,7 +701,7 @@ export function useCustomerProfile({
           }
           .meta-label {
             font-weight: bold;
-            color: #5A6A51;
+            color: var(--color-brand-secondary);
             text-transform: uppercase;
             font-size: 11px;
             letter-spacing: 0.1em;
@@ -709,15 +710,15 @@ export function useCustomerProfile({
           .meta-value {
             font-size: 16px;
             font-weight: 600;
-            color: #1F251A;
+            color: var(--cr-dark);
           }
           .section-title {
             font-size: 14px;
             font-weight: bold;
-            color: #414E36;
+            color: var(--cr-primary);
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            border-bottom: 1px solid #F2EFE9;
+            border-bottom: 1px solid var(--color-brand-sand);
             padding-bottom: 8px;
             margin-top: 30px;
             margin-bottom: 15px;
@@ -741,13 +742,13 @@ export function useCustomerProfile({
             width: 200px;
           }
           .signature-line {
-            border-bottom: 1px solid #1F251A;
+            border-bottom: 1px solid var(--cr-dark);
             margin-bottom: 5px;
             height: 40px;
           }
           .signature-label {
             font-size: 12px;
-            color: #5A6A51;
+            color: var(--color-brand-secondary);
             font-weight: 500;
           }
           .clinic-info {
@@ -763,7 +764,7 @@ export function useCustomerProfile({
       </head>
       <body>
         <div class="letterhead">
-          <h1 class="logo">Revera Clinic</h1>
+          <h1 class="logo">${CLIENT.nameShort} Clinic</h1>
           <p class="tagline">Aesthetic & Medical Center</p>
         </div>
 
@@ -793,12 +794,12 @@ export function useCustomerProfile({
 
         ${followUpDateStr ? `
           <div class="section-title">Next Follow-Up Date</div>
-          <div class="content-block" style="font-weight: 600; color: #414E36;">${followUpDateStr}</div>
+          <div class="content-block" style="font-weight: 600; color: var(--cr-primary);">${followUpDateStr}</div>
         ` : ''}
 
         <div class="footer">
           <div class="clinic-info">
-            <strong>Revera Clinic Cairo</strong><br/>
+            <strong>${CLIENT.nameShort} Clinic Cairo</strong><br/>
             El-Ghad St, Pyramids, Giza<br/>
             Tel: +20 100 000 0000 | info@revera.com
           </div>

@@ -29,6 +29,7 @@ import {
   Wrench,
   Check
 } from "lucide-react";
+import { CLIENT } from "@/config/client";
 
 interface ReceptionDashboardViewProps {
   receptionistName?: string;
@@ -90,7 +91,7 @@ export default function ReceptionDashboardView({
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const userKey = employeeId || email || "staff_user";
-    return `revera_shift_prompted_${todayStr}_${userKey}`;
+    return `${CLIENT.storagePrefix}_shift_prompted_${todayStr}_${userKey}`;
   };
 
   const handleDismissStartShiftPopup = () => {
@@ -417,7 +418,7 @@ export default function ReceptionDashboardView({
     if (currentHour < 12) {
       return {
         title: tr.goodMorning ?? "Good Morning",
-        subtitle: tr.morningSubtitle ?? "Let's make today a great day at Revera Clinics.",
+        subtitle: tr.morningSubtitle ?? `Let's make today a great day at ${CLIENT.name}.`,
         icon: "👋"
       };
     }
@@ -506,7 +507,7 @@ export default function ReceptionDashboardView({
       {/* ── TOP HEADER / GREETING BAR ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-[#1F251A] tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-[var(--cr-dark)] tracking-tight flex items-center gap-2">
             <span>{greetingData.title}</span>
             <span>{greetingData.icon}</span>
           </h1>
@@ -516,11 +517,11 @@ export default function ReceptionDashboardView({
         </div>
 
         <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-2xl border border-[#EBE8E0] shadow-xs shrink-0 self-start sm:self-auto">
-          <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
+          <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
             <Calendar size={18} />
           </div>
           <div>
-            <p className="text-xs font-bold text-[#1F251A]">{todayFormatted}</p>
+            <p className="text-xs font-bold text-[var(--cr-dark)]">{todayFormatted}</p>
             <p className="text-[11px] text-[#788272] font-medium">{displayBranchName}</p>
           </div>
         </div>
@@ -530,11 +531,11 @@ export default function ReceptionDashboardView({
       <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#EBE8E0] shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#F3F0E8]">
           <div className="flex items-center gap-3.5">
-            <div className="h-11 w-11 rounded-full bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
+            <div className="h-11 w-11 rounded-full bg-[#F0F4EC] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
               <Clock size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-[#1F251A]">
+              <h3 className="text-lg font-bold text-[var(--cr-dark)]">
                 {isCompleted ? (tr.shiftSummaryTitle ?? "Shift Summary") : (tr.shiftTitle ?? "Today's Shift")}
               </h3>
               <p className="text-xs text-[#788272]">
@@ -576,7 +577,7 @@ export default function ReceptionDashboardView({
                 type="button"
                 disabled={shiftProcessing}
                 onClick={handleStartShift}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-[#414E36] hover:bg-[#343e2b] text-white shadow-sm transition disabled:opacity-50 cursor-pointer"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-[var(--cr-primary)] hover:bg-[#343e2b] text-white shadow-sm transition disabled:opacity-50 cursor-pointer"
               >
                 <Play size={14} fill="currentColor" />
                 <span>{shiftProcessing ? (tr.updating ?? "Updating...") : (tr.startShift ?? "Start Shift")}</span>
@@ -588,7 +589,7 @@ export default function ReceptionDashboardView({
                 type="button"
                 disabled={shiftProcessing}
                 onClick={() => setShowEndShiftModal(true)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-white border border-[#E0DCCE] hover:bg-[#F2EFE9] text-[#1F251A] shadow-xs transition disabled:opacity-50 cursor-pointer"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-white border border-[#E0DCCE] hover:bg-[var(--color-brand-sand)] text-[var(--cr-dark)] shadow-xs transition disabled:opacity-50 cursor-pointer"
               >
                 <LogOut size={14} />
                 <span>{shiftProcessing ? (tr.updating ?? "Updating...") : (tr.endShift ?? "End Shift")}</span>
@@ -618,23 +619,23 @@ export default function ReceptionDashboardView({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           {/* 1. Today's Date */}
           <div className="flex items-center gap-3.5">
-            <div className="h-10 w-10 rounded-xl bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 rounded-xl bg-[#F0F4EC] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
               <Calendar size={18} />
             </div>
             <div>
               <p className="text-[11px] font-bold text-[#8C9686] uppercase tracking-wider">{tr.todayDate ?? "Today's Date"}</p>
-              <p className="text-base sm:text-lg font-black text-[#1F251A] mt-0.5">{todayShortDate}</p>
+              <p className="text-base sm:text-lg font-black text-[var(--cr-dark)] mt-0.5">{todayShortDate}</p>
             </div>
           </div>
 
           {/* 2. Shift Start */}
           <div className="flex items-center gap-3.5">
-            <div className="h-10 w-10 rounded-xl bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 rounded-xl bg-[#F0F4EC] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
               <Clock size={18} />
             </div>
             <div>
               <p className="text-[11px] font-bold text-[#8C9686] uppercase tracking-wider">{tr.shiftStart ?? "Shift Start"}</p>
-              <p className="text-base sm:text-lg font-black text-[#1F251A] mt-0.5">
+              <p className="text-base sm:text-lg font-black text-[var(--cr-dark)] mt-0.5">
                 {isNotStarted ? "—" : (dashboardData?.shift?.actualStartingTime || "--:--")}
               </p>
             </div>
@@ -642,12 +643,12 @@ export default function ReceptionDashboardView({
 
           {/* 3. Shift End */}
           <div className="flex items-center gap-3.5">
-            <div className="h-10 w-10 rounded-xl bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 rounded-xl bg-[#F0F4EC] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
               <Clock size={18} />
             </div>
             <div>
               <p className="text-[11px] font-bold text-[#8C9686] uppercase tracking-wider">{tr.shiftEnd ?? "Shift End"}</p>
-              <p className="text-base sm:text-lg font-black text-[#1F251A] mt-0.5">
+              <p className="text-base sm:text-lg font-black text-[var(--cr-dark)] mt-0.5">
                 {isCompleted
                   ? (dashboardData?.shift?.actualEndingTime || "--:--")
                   : (dashboardData?.shift?.scheduledEnd || "06:00 PM")}
@@ -657,12 +658,12 @@ export default function ReceptionDashboardView({
 
           {/* 4. Working Hours */}
           <div className="flex items-center gap-3.5">
-            <div className="h-10 w-10 rounded-xl bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 rounded-xl bg-[#F0F4EC] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
               <CheckCircle2 size={18} />
             </div>
             <div>
               <p className="text-[11px] font-bold text-[#8C9686] uppercase tracking-wider">{tr.workingHours ?? "Working Hours"}</p>
-              <p className="text-base sm:text-lg font-black text-[#1F251A] mt-0.5">
+              <p className="text-base sm:text-lg font-black text-[var(--cr-dark)] mt-0.5">
                 {isNotStarted
                   ? "—"
                   : isInProgress
@@ -680,8 +681,8 @@ export default function ReceptionDashboardView({
           {/* ── 2. TODAY'S OVERVIEW (3 COMPACT KPI CARDS) ── */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <FileText size={18} className="text-[#414E36]" />
-              <h2 className="text-base font-bold text-[#1F251A]">{tr.todaysOverview ?? "Today's Overview"}</h2>
+              <FileText size={18} className="text-[var(--cr-primary)]" />
+              <h2 className="text-base font-bold text-[var(--cr-dark)]">{tr.todaysOverview ?? "Today's Overview"}</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
@@ -690,12 +691,12 @@ export default function ReceptionDashboardView({
                 onClick={() => onNavigateTab ? onNavigateTab("Bookings") : null}
                 className="bg-white p-5 rounded-3xl border border-[#EBE8E0] shadow-xs flex items-center gap-4 hover:shadow-md transition cursor-pointer"
               >
-                <div className="h-14 w-14 rounded-2xl bg-[#EBF0E6] text-[#414E36] flex items-center justify-center shrink-0">
+                <div className="h-14 w-14 rounded-2xl bg-[#EBF0E6] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
                   <Calendar size={24} />
                 </div>
                 <div>
-                  <p className="text-2xl sm:text-3xl font-black text-[#1F251A]">{todayBookingsCount}</p>
-                  <p className="text-xs font-bold text-[#1F251A] mt-0.5">{tr.todaysBookings ?? "Today's Bookings"}</p>
+                  <p className="text-2xl sm:text-3xl font-black text-[var(--cr-dark)]">{todayBookingsCount}</p>
+                  <p className="text-xs font-bold text-[var(--cr-dark)] mt-0.5">{tr.todaysBookings ?? "Today's Bookings"}</p>
                   <p className="text-[11px] text-[#788272] font-medium">{tr.scheduledForToday ?? "Scheduled for today"}</p>
                 </div>
               </div>
@@ -712,8 +713,8 @@ export default function ReceptionDashboardView({
                   <Clock size={24} />
                 </div>
                 <div>
-                  <p className="text-2xl sm:text-3xl font-black text-[#1F251A]">{pendingApprovalCount}</p>
-                  <p className="text-xs font-bold text-[#1F251A] mt-0.5">{tr.pendingApproval ?? "Pending Approval"}</p>
+                  <p className="text-2xl sm:text-3xl font-black text-[var(--cr-dark)]">{pendingApprovalCount}</p>
+                  <p className="text-xs font-bold text-[var(--cr-dark)] mt-0.5">{tr.pendingApproval ?? "Pending Approval"}</p>
                   <p className="text-[11px] text-[#788272] font-medium">{tr.bookingsWaitingForAction ?? "Bookings waiting for action"}</p>
                 </div>
               </div>
@@ -727,8 +728,8 @@ export default function ReceptionDashboardView({
                   <CreditCard size={24} />
                 </div>
                 <div>
-                  <p className="text-2xl sm:text-3xl font-black text-[#1F251A]">{formatCurrency(expectedPayments)}</p>
-                  <p className="text-xs font-bold text-[#1F251A] mt-0.5">{tr.expectedPayments ?? "Expected Payments"}</p>
+                  <p className="text-2xl sm:text-3xl font-black text-[var(--cr-dark)]">{formatCurrency(expectedPayments)}</p>
+                  <p className="text-xs font-bold text-[var(--cr-dark)] mt-0.5">{tr.expectedPayments ?? "Expected Payments"}</p>
                   <p className="text-[11px] text-[#788272] font-medium">{tr.toBeCollectedToday ?? "To be collected today"}</p>
                 </div>
               </div>
@@ -740,17 +741,17 @@ export default function ReceptionDashboardView({
             {/* Quick Actions Card */}
             <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#EBE8E0] shadow-sm space-y-4">
               <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
+                <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
                   <Plus size={18} />
                 </div>
-                <h3 className="text-base font-bold text-[#1F251A]">{tr.quickActions ?? "Quick Actions"}</h3>
+                <h3 className="text-base font-bold text-[var(--cr-dark)]">{tr.quickActions ?? "Quick Actions"}</h3>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <button
                   type="button"
                   onClick={() => onNewBooking ? onNewBooking() : onNavigateTab?.("Bookings")}
-                  className="w-full bg-[#414E36] hover:bg-[#343e2b] text-white py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
+                  className="w-full bg-[var(--cr-primary)] hover:bg-[#343e2b] text-white py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
                 >
                   <Plus size={16} />
                   <span>{tr.newBooking ?? "New Booking"}</span>
@@ -759,7 +760,7 @@ export default function ReceptionDashboardView({
                 <button
                   type="button"
                   onClick={() => onNewPatient ? onNewPatient() : onNavigateTab?.("Patients")}
-                  className="w-full bg-white border border-[#E0DCCE] hover:bg-[#FAF9F5] text-[#1F251A] py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-2xs transition cursor-pointer"
+                  className="w-full bg-white border border-[#E0DCCE] hover:bg-[#FAF9F5] text-[var(--cr-dark)] py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-2xs transition cursor-pointer"
                 >
                   <Plus size={16} />
                   <span>{tr.newPatient ?? "New Patient"}</span>
@@ -774,13 +775,13 @@ export default function ReceptionDashboardView({
                   <div className="h-9 w-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
                     <AlertCircle size={18} />
                   </div>
-                  <h3 className="text-base font-bold text-[#1F251A]">{tr.attentionNeeded ?? "Attention Needed"}</h3>
+                  <h3 className="text-base font-bold text-[var(--cr-dark)]">{tr.attentionNeeded ?? "Attention Needed"}</h3>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => onNavigateTab ? onNavigateTab("Bookings") : null}
-                  className="text-xs font-bold text-[#414E36] hover:underline cursor-pointer"
+                  className="text-xs font-bold text-[var(--cr-primary)] hover:underline cursor-pointer"
                 >
                   {tr.viewAll ?? "View All"}
                 </button>
@@ -793,14 +794,14 @@ export default function ReceptionDashboardView({
                     if (onPendingApprovalsClick) onPendingApprovalsClick();
                     else if (onNavigateTab) onNavigateTab("Bookings");
                   }}
-                  className="flex items-center justify-between p-3 rounded-2xl bg-[#FAF9F5] border border-[#EBE8E0] hover:bg-[#F2EFE9] transition cursor-pointer group"
+                  className="flex items-center justify-between p-3 rounded-2xl bg-[#FAF9F5] border border-[#EBE8E0] hover:bg-[var(--color-brand-sand)] transition cursor-pointer group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="h-9 w-9 rounded-full bg-[#FEF3E6] text-[#D97706] flex items-center justify-center shrink-0">
                       <Clock size={16} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-[#1F251A]">
+                      <p className="text-xs font-bold text-[var(--cr-dark)]">
                         {pendingApprovalCount} {tr.bookingsPendingApproval ?? "bookings pending approval"}
                       </p>
                       <p className="text-[11px] text-[#788272] font-medium">{tr.needYourConfirmation ?? "Need your confirmation"}</p>
@@ -812,14 +813,14 @@ export default function ReceptionDashboardView({
                 {/* Item 2: Upcoming Confirmation */}
                 <div
                   onClick={() => onNavigateTab ? onNavigateTab("Bookings") : null}
-                  className="flex items-center justify-between p-3 rounded-2xl bg-[#FAF9F5] border border-[#EBE8E0] hover:bg-[#F2EFE9] transition cursor-pointer group"
+                  className="flex items-center justify-between p-3 rounded-2xl bg-[#FAF9F5] border border-[#EBE8E0] hover:bg-[var(--color-brand-sand)] transition cursor-pointer group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="h-9 w-9 rounded-full bg-[#EAF2FA] text-[#2563EB] flex items-center justify-center shrink-0">
                       <Calendar size={16} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-[#1F251A]">
+                      <p className="text-xs font-bold text-[var(--cr-dark)]">
                         {upcomingConfirmationsCount} {tr.upcomingConfirmations ?? "upcoming confirmations"}
                       </p>
                       <p className="text-[11px] text-[#788272] font-medium">{tr.inTheNext30Minutes ?? "In the next 30 minutes"}</p>
@@ -835,16 +836,16 @@ export default function ReceptionDashboardView({
           <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#EBE8E0] shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
+                <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
                   <Calendar size={18} />
                 </div>
-                <h3 className="text-base font-bold text-[#1F251A]">{tr.todaysBookings ?? "Today's Bookings"}</h3>
+                <h3 className="text-base font-bold text-[var(--cr-dark)]">{tr.todaysBookings ?? "Today's Bookings"}</h3>
               </div>
 
               <button
                 type="button"
                 onClick={() => onNavigateTab ? onNavigateTab("Bookings") : null}
-                className="text-xs font-bold text-[#414E36] hover:underline cursor-pointer"
+                className="text-xs font-bold text-[var(--cr-primary)] hover:underline cursor-pointer"
               >
                 {tr.viewAll ?? "View All"}
               </button>
@@ -890,14 +891,14 @@ export default function ReceptionDashboardView({
                           className="hover:bg-[#FAF9F5] transition cursor-pointer group"
                         >
                           {/* 1. Time */}
-                          <td className="py-3.5 px-3.5 font-black text-[#1F251A] whitespace-nowrap">
+                          <td className="py-3.5 px-3.5 font-black text-[var(--cr-dark)] whitespace-nowrap">
                             {row.time}
                           </td>
 
                           {/* 2. Patient */}
                           <td className="py-3.5 px-3.5">
                             <div>
-                              <p className="font-bold text-[#1F251A]">{row.patientName}</p>
+                              <p className="font-bold text-[var(--cr-dark)]">{row.patientName}</p>
                               <p className="text-[11px] text-[#8C9686] font-medium">{row.patientPhone}</p>
                             </div>
                           </td>
@@ -912,19 +913,19 @@ export default function ReceptionDashboardView({
                                   className="h-7 w-7 rounded-full object-cover border border-[#EBE8E0]"
                                 />
                               ) : (
-                                <div className="h-7 w-7 rounded-full bg-[#EBF0E6] text-[#414E36] flex items-center justify-center text-[10px] font-bold shrink-0">
+                                <div className="h-7 w-7 rounded-full bg-[#EBF0E6] text-[var(--cr-primary)] flex items-center justify-center text-[10px] font-bold shrink-0">
                                   {row.doctorName?.slice(0, 2)?.toUpperCase() || "DR"}
                                 </div>
                               )}
                               <div>
-                                <p className="font-bold text-[#1F251A] whitespace-nowrap">{row.doctorName}</p>
+                                <p className="font-bold text-[var(--cr-dark)] whitespace-nowrap">{row.doctorName}</p>
                                 <p className="text-[10px] text-[#8C9686] font-medium">{row.doctorSpecialty}</p>
                               </div>
                             </div>
                           </td>
 
                           {/* 4. Service */}
-                          <td className="py-3.5 px-3.5 font-medium text-[#414E36] whitespace-nowrap">
+                          <td className="py-3.5 px-3.5 font-medium text-[var(--cr-primary)] whitespace-nowrap">
                             {row.service}
                           </td>
 
@@ -969,7 +970,7 @@ export default function ReceptionDashboardView({
                             <button
                               type="button"
                               onClick={() => setActiveBookingMenuId(activeBookingMenuId === row.id ? null : row.id)}
-                              className="p-1.5 rounded-xl hover:bg-[#F0F4EC] text-[#8C9686] hover:text-[#1F251A] transition cursor-pointer"
+                              className="p-1.5 rounded-xl hover:bg-[#F0F4EC] text-[#8C9686] hover:text-[var(--cr-dark)] transition cursor-pointer"
                             >
                               <MoreVertical size={16} />
                             </button>
@@ -986,7 +987,7 @@ export default function ReceptionDashboardView({
                                     if (onViewBookingDetails) onViewBookingDetails(row.raw || row);
                                     else if (onNavigateTab) onNavigateTab("Bookings");
                                   }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[#1F251A] hover:bg-[#F0F4EC] rounded-xl transition cursor-pointer"
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[var(--cr-dark)] hover:bg-[#F0F4EC] rounded-xl transition cursor-pointer"
                                 >
                                   <Eye size={14} />
                                   <span>{tr.viewBookingDetails ?? "View Details"}</span>
@@ -1011,19 +1012,19 @@ export default function ReceptionDashboardView({
           {/* ── 2. TODAY'S PERFORMANCE (3 COMPACT KPI CARDS) ── */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Sparkles size={18} className="text-[#414E36]" />
-              <h2 className="text-base font-bold text-[#1F251A]">{tr.todaysPerformance ?? "Today's Performance"}</h2>
+              <Sparkles size={18} className="text-[var(--cr-primary)]" />
+              <h2 className="text-base font-bold text-[var(--cr-dark)]">{tr.todaysPerformance ?? "Today's Performance"}</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
               {/* Card 1: Completed Bookings */}
               <div className="bg-white p-5 rounded-3xl border border-[#EBE8E0] shadow-xs flex items-center gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-[#EBF0E6] text-[#414E36] flex items-center justify-center shrink-0">
+                <div className="h-14 w-14 rounded-2xl bg-[#EBF0E6] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
                   <CheckCircle2 size={24} />
                 </div>
                 <div>
-                  <p className="text-2xl sm:text-3xl font-black text-[#1F251A]">{completedCount}</p>
-                  <p className="text-xs font-bold text-[#1F251A] mt-0.5">{tr.completedBookings ?? "Completed"}</p>
+                  <p className="text-2xl sm:text-3xl font-black text-[var(--cr-dark)]">{completedCount}</p>
+                  <p className="text-xs font-bold text-[var(--cr-dark)] mt-0.5">{tr.completedBookings ?? "Completed"}</p>
                   <p className="text-[11px] text-[#788272] font-medium">{tr.bookingsFinished ?? "Bookings finished"}</p>
                 </div>
               </div>
@@ -1034,8 +1035,8 @@ export default function ReceptionDashboardView({
                   <X size={24} />
                 </div>
                 <div>
-                  <p className="text-2xl sm:text-3xl font-black text-[#1F251A]">{cancelledCount}</p>
-                  <p className="text-xs font-bold text-[#1F251A] mt-0.5">{tr.cancelled ?? "Cancelled"}</p>
+                  <p className="text-2xl sm:text-3xl font-black text-[var(--cr-dark)]">{cancelledCount}</p>
+                  <p className="text-xs font-bold text-[var(--cr-dark)] mt-0.5">{tr.cancelled ?? "Cancelled"}</p>
                   <p className="text-[11px] text-[#788272] font-medium">{tr.bookingsCancelled ?? "Bookings cancelled"}</p>
                 </div>
               </div>
@@ -1046,8 +1047,8 @@ export default function ReceptionDashboardView({
                   <UserX size={24} />
                 </div>
                 <div>
-                  <p className="text-2xl sm:text-3xl font-black text-[#1F251A]">{noShowsCount}</p>
-                  <p className="text-xs font-bold text-[#1F251A] mt-0.5">{tr.noShows ?? "No Shows"}</p>
+                  <p className="text-2xl sm:text-3xl font-black text-[var(--cr-dark)]">{noShowsCount}</p>
+                  <p className="text-xs font-bold text-[var(--cr-dark)] mt-0.5">{tr.noShows ?? "No Shows"}</p>
                   <p className="text-[11px] text-[#788272] font-medium">{tr.didNotAttend ?? "Did not attend"}</p>
                 </div>
               </div>
@@ -1058,16 +1059,16 @@ export default function ReceptionDashboardView({
           <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[#414E36] flex items-center justify-center shrink-0">
+                <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
                   <CreditCard size={18} />
                 </div>
-                <h3 className="text-base font-bold text-[#1F251A]">{tr.paymentsReceived ?? "Payments Received"}</h3>
+                <h3 className="text-base font-bold text-[var(--cr-dark)]">{tr.paymentsReceived ?? "Payments Received"}</h3>
               </div>
 
               <button
                 type="button"
                 onClick={() => onViewTransactions ? onViewTransactions() : onNavigateTab?.("Finance")}
-                className="text-xs font-bold text-[#414E36] hover:underline cursor-pointer"
+                className="text-xs font-bold text-[var(--cr-primary)] hover:underline cursor-pointer"
               >
                 {tr.viewDetails ?? "View Details"}
               </button>
@@ -1081,7 +1082,7 @@ export default function ReceptionDashboardView({
                   <DollarSign size={20} />
                 </div>
                 <div>
-                  <p className="text-base sm:text-lg font-black text-[#1F251A]">{formatCurrency(payments.cash)}</p>
+                  <p className="text-base sm:text-lg font-black text-[var(--cr-dark)]">{formatCurrency(payments.cash)}</p>
                   <p className="text-[11px] font-bold text-[#8C9686]">{tr.cash ?? "Cash"}</p>
                 </div>
               </div>
@@ -1092,7 +1093,7 @@ export default function ReceptionDashboardView({
                   <Zap size={20} />
                 </div>
                 <div>
-                  <p className="text-base sm:text-lg font-black text-[#1F251A]">{formatCurrency(payments.instapay)}</p>
+                  <p className="text-base sm:text-lg font-black text-[var(--cr-dark)]">{formatCurrency(payments.instapay)}</p>
                   <p className="text-[11px] font-bold text-[#8C9686]">{tr.instapay ?? "InstaPay"}</p>
                 </div>
               </div>
@@ -1103,7 +1104,7 @@ export default function ReceptionDashboardView({
                   <CreditCard size={20} />
                 </div>
                 <div>
-                  <p className="text-base sm:text-lg font-black text-[#1F251A]">{formatCurrency(payments.visa)}</p>
+                  <p className="text-base sm:text-lg font-black text-[var(--cr-dark)]">{formatCurrency(payments.visa)}</p>
                   <p className="text-[11px] font-bold text-[#8C9686]">{tr.visa ?? "Visa"}</p>
                 </div>
               </div>
@@ -1114,7 +1115,7 @@ export default function ReceptionDashboardView({
                   <Wallet size={20} />
                 </div>
                 <div>
-                  <p className="text-base sm:text-lg font-black text-[#1F251A]">{formatCurrency(payments.wallet)}</p>
+                  <p className="text-base sm:text-lg font-black text-[var(--cr-dark)]">{formatCurrency(payments.wallet)}</p>
                   <p className="text-[11px] font-bold text-[#8C9686]">{tr.wallet ?? "Wallet"}</p>
                 </div>
               </div>
@@ -1122,7 +1123,7 @@ export default function ReceptionDashboardView({
 
             {/* Total Payments Received Banner */}
             <div className="bg-[#EBF0E6]/70 border border-[#D5DDD0] rounded-2xl p-5 text-center space-y-1">
-              <p className="text-2xl sm:text-3xl font-black text-[#1F251A]">
+              <p className="text-2xl sm:text-3xl font-black text-[var(--cr-dark)]">
                 {formatCurrency(payments.totalPayments)}
               </p>
               <p className="text-xs font-bold text-[#45523A] uppercase tracking-wider">
@@ -1160,7 +1161,7 @@ export default function ReceptionDashboardView({
             {/* Modal Header */}
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-xl font-bold text-[#1F251A]">{tr.endShiftModalTitle ?? "End Shift"}</h3>
+                <h3 className="text-xl font-bold text-[var(--cr-dark)]">{tr.endShiftModalTitle ?? "End Shift"}</h3>
                 <p className="text-xs text-[#788272] mt-1">
                   {tr.endShiftModalSubtitle ?? "Are you sure you want to end your shift? Please review the summary below before confirming."}
                 </p>
@@ -1169,7 +1170,7 @@ export default function ReceptionDashboardView({
               <button
                 type="button"
                 onClick={() => setShowEndShiftModal(false)}
-                className="p-2 text-[#8C9686] hover:text-[#1F251A] hover:bg-[#F0F4EC] rounded-xl transition cursor-pointer"
+                className="p-2 text-[#8C9686] hover:text-[var(--cr-dark)] hover:bg-[#F0F4EC] rounded-xl transition cursor-pointer"
               >
                 <X size={20} />
               </button>
@@ -1177,26 +1178,26 @@ export default function ReceptionDashboardView({
 
             {/* Shift Summary Box */}
             <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0] space-y-3">
-              <p className="text-xs font-bold text-[#1F251A] uppercase tracking-wider">{tr.shiftSummaryTitle ?? "Shift Summary"}</p>
+              <p className="text-xs font-bold text-[var(--cr-dark)] uppercase tracking-wider">{tr.shiftSummaryTitle ?? "Shift Summary"}</p>
               <div className="grid grid-cols-3 gap-3 text-start">
                 <div>
                   <p className="text-[10px] text-[#8C9686] font-semibold">{tr.shiftStart ?? "Shift Start"}</p>
-                  <p className="text-sm font-black text-[#1F251A] mt-0.5">{dashboardData?.shift?.actualStartingTime || "--:--"}</p>
+                  <p className="text-sm font-black text-[var(--cr-dark)] mt-0.5">{dashboardData?.shift?.actualStartingTime || "--:--"}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-[#8C9686] font-semibold">{tr.currentTime ?? "Current Time"}</p>
-                  <p className="text-sm font-black text-[#1F251A] mt-0.5">{currentTimeFormatted}</p>
+                  <p className="text-sm font-black text-[var(--cr-dark)] mt-0.5">{currentTimeFormatted}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-[#8C9686] font-semibold">{tr.workingHours ?? "Working Hours"}</p>
-                  <p className="text-sm font-black text-[#1F251A] mt-0.5">{formatElapsedTime(liveElapsedSeconds)}</p>
+                  <p className="text-sm font-black text-[var(--cr-dark)] mt-0.5">{formatElapsedTime(liveElapsedSeconds)}</p>
                 </div>
               </div>
             </div>
 
             {/* Today's Performance Box */}
             <div className="space-y-2">
-              <p className="text-xs font-bold text-[#1F251A] uppercase tracking-wider">{tr.todaysPerformance ?? "Today's Performance"}</p>
+              <p className="text-xs font-bold text-[var(--cr-dark)] uppercase tracking-wider">{tr.todaysPerformance ?? "Today's Performance"}</p>
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-emerald-50 border border-emerald-200/60 p-3 rounded-2xl text-center">
                   <p className="text-lg font-black text-emerald-800">{completedCount}</p>
@@ -1215,37 +1216,37 @@ export default function ReceptionDashboardView({
 
             {/* Payments Received Breakdown */}
             <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0] space-y-2.5">
-              <p className="text-xs font-bold text-[#1F251A] uppercase tracking-wider">{tr.paymentsReceived ?? "Payments Received"}</p>
+              <p className="text-xs font-bold text-[var(--cr-dark)] uppercase tracking-wider">{tr.paymentsReceived ?? "Payments Received"}</p>
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between py-1">
-                  <span className="text-[#5A6A51] flex items-center gap-1.5 font-medium">
+                  <span className="text-[var(--color-brand-secondary)] flex items-center gap-1.5 font-medium">
                     <DollarSign size={14} className="text-emerald-700" />
                     {tr.cash ?? "Cash"}
                   </span>
-                  <span className="font-bold text-[#1F251A]">{formatCurrency(payments.cash)}</span>
+                  <span className="font-bold text-[var(--cr-dark)]">{formatCurrency(payments.cash)}</span>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-[#5A6A51] flex items-center gap-1.5 font-medium">
+                  <span className="text-[var(--color-brand-secondary)] flex items-center gap-1.5 font-medium">
                     <Zap size={14} className="text-purple-700" />
                     {tr.instapay ?? "InstaPay"}
                   </span>
-                  <span className="font-bold text-[#1F251A]">{formatCurrency(payments.instapay)}</span>
+                  <span className="font-bold text-[var(--cr-dark)]">{formatCurrency(payments.instapay)}</span>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-[#5A6A51] flex items-center gap-1.5 font-medium">
+                  <span className="text-[var(--color-brand-secondary)] flex items-center gap-1.5 font-medium">
                     <CreditCard size={14} className="text-blue-700" />
                     {tr.visa ?? "Visa"}
                   </span>
-                  <span className="font-bold text-[#1F251A]">{formatCurrency(payments.visa)}</span>
+                  <span className="font-bold text-[var(--cr-dark)]">{formatCurrency(payments.visa)}</span>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-[#5A6A51] flex items-center gap-1.5 font-medium">
+                  <span className="text-[var(--color-brand-secondary)] flex items-center gap-1.5 font-medium">
                     <Wallet size={14} className="text-amber-700" />
                     {tr.wallet ?? "Wallet"}
                   </span>
-                  <span className="font-bold text-[#1F251A]">{formatCurrency(payments.wallet)}</span>
+                  <span className="font-bold text-[var(--cr-dark)]">{formatCurrency(payments.wallet)}</span>
                 </div>
-                <div className="border-t border-[#EBE8E0] pt-2 flex justify-between font-black text-sm text-[#1F251A]">
+                <div className="border-t border-[#EBE8E0] pt-2 flex justify-between font-black text-sm text-[var(--cr-dark)]">
                   <span>{tr.totalPayments ?? "Total Payments"}</span>
                   <span>{formatCurrency(payments.totalPayments)}</span>
                 </div>
@@ -1268,7 +1269,7 @@ export default function ReceptionDashboardView({
                 type="button"
                 disabled={shiftProcessing}
                 onClick={() => setShowEndShiftModal(false)}
-                className="py-3 px-4 rounded-2xl font-bold text-xs sm:text-sm text-[#1F251A] border border-[#E6E9EB] hover:bg-[#F2EFE9] transition cursor-pointer"
+                className="py-3 px-4 rounded-2xl font-bold text-xs sm:text-sm text-[var(--cr-dark)] border border-[#E6E9EB] hover:bg-[var(--color-brand-sand)] transition cursor-pointer"
               >
                 {tr.cancel ?? "Cancel"}
               </button>
@@ -1277,7 +1278,7 @@ export default function ReceptionDashboardView({
                 type="button"
                 disabled={shiftProcessing}
                 onClick={handleConfirmEndShift}
-                className="py-3 px-4 rounded-2xl font-bold text-xs sm:text-sm text-white bg-[#414E36] hover:bg-[#343e2b] shadow-md transition disabled:opacity-50 cursor-pointer"
+                className="py-3 px-4 rounded-2xl font-bold text-xs sm:text-sm text-white bg-[var(--cr-primary)] hover:bg-[#343e2b] shadow-md transition disabled:opacity-50 cursor-pointer"
               >
                 {shiftProcessing ? (tr.updating ?? "Ending Shift...") : (tr.endShift ?? "End Shift")}
               </button>
@@ -1297,10 +1298,10 @@ export default function ReceptionDashboardView({
 
             {/* Title and Subtitle */}
             <div className="space-y-2">
-              <h3 className="text-xl font-bold text-[#1F251A] flex items-center justify-center gap-1.5">
+              <h3 className="text-xl font-bold text-[var(--cr-dark)] flex items-center justify-center gap-1.5">
                 {tr.startShiftGreeting ?? "Hi,"} {effectiveName} <span className="inline-block text-xl">👋</span>
               </h3>
-              <p className="text-xs sm:text-sm text-[#5A6A51] leading-relaxed max-w-[260px] mx-auto">
+              <p className="text-xs sm:text-sm text-[var(--color-brand-secondary)] leading-relaxed max-w-[260px] mx-auto">
                 {tr.startShiftPrompt ?? "Start your shift now to track your work and stay organized."}
               </p>
             </div>
@@ -1319,7 +1320,7 @@ export default function ReceptionDashboardView({
                 type="button"
                 disabled={shiftProcessing}
                 onClick={handleStartShift}
-                className="w-full flex items-center justify-center gap-3 bg-[#414E36] hover:bg-[#323D2A] text-white py-3.5 px-6 rounded-2xl font-bold text-sm shadow-md transition disabled:opacity-60 cursor-pointer"
+                className="w-full flex items-center justify-center gap-3 bg-[var(--cr-primary)] hover:bg-[#323D2A] text-white py-3.5 px-6 rounded-2xl font-bold text-sm shadow-md transition disabled:opacity-60 cursor-pointer"
               >
                 {shiftProcessing ? (
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -1335,7 +1336,7 @@ export default function ReceptionDashboardView({
                 type="button"
                 disabled={shiftProcessing}
                 onClick={handleDismissStartShiftPopup}
-                className="w-full py-3 px-6 rounded-2xl font-bold text-sm text-[#1F251A] border border-[#E6E9EB] hover:bg-[#F2EFE9] transition cursor-pointer"
+                className="w-full py-3 px-6 rounded-2xl font-bold text-sm text-[var(--cr-dark)] border border-[#E6E9EB] hover:bg-[var(--color-brand-sand)] transition cursor-pointer"
               >
                 <span>{tr.cancel ?? "Cancel"}</span>
               </button>

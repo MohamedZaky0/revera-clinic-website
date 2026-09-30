@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Check, ArrowUpRight } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function AboutSection() {
   const { t, isRTL } = useLanguage();
@@ -59,7 +60,7 @@ export function AboutSection() {
                 }`}
               >
                 <img
-                  src="/images/main_logo.png"
+                  src={CLIENT.logoPath}
                   alt=""
                   className="w-full h-full object-contain transition-all duration-500"
                   style={{
@@ -112,8 +113,8 @@ export function AboutSection() {
               >
                 <div className="w-full h-full animate-[spin_10s_linear_infinite] flex items-center justify-center">
                   <img
-                    src="/images/main_logo.png"
-                    alt="Revera logo"
+                    src={CLIENT.logoPath}
+                    alt={`${CLIENT.nameShort} logo`}
                     className="w-full h-full object-contain"
                     style={{ transform: "scale(1.7)" }}
                   />
@@ -131,12 +132,12 @@ export function AboutSection() {
               style={{ direction: isRTL ? "rtl" : "ltr" }}
             >
               <img 
-                src="/images/main_logo.png" 
+                src={CLIENT.logoPath} 
                 alt="" 
                 className="w-12 h-12 object-contain shrink-0" 
               />
               <span 
-                className="section-tag mb-0 font-sans font-bold text-xl text-[#5A6A51] uppercase"
+                className="section-tag mb-0 font-sans font-bold text-xl text-[var(--color-brand-secondary)] uppercase"
                 style={{ letterSpacing: isRTL ? "normal" : "0.15em" }}
               >
                 {t.about.tag}
@@ -145,7 +146,7 @@ export function AboutSection() {
 
             {/* Subtitle / Main Heading */}
             <h2 
-              className={`mb-6 text-4xl lg:text-5xl font-normal leading-tight text-[#414E36] font-heading ${
+              className={`mb-6 text-4xl lg:text-5xl font-normal leading-tight text-[var(--cr-primary)] font-heading ${
                 isRTL ? "text-right" : "text-left"
               }`}
             >
@@ -154,7 +155,7 @@ export function AboutSection() {
 
             {/* Description Paragraph */}
             <p
-              className={`mb-8 text-base leading-relaxed text-[#5A6A51] ${
+              className={`mb-8 text-base leading-relaxed text-[var(--color-brand-secondary)] ${
                 isRTL ? "text-right" : "text-left"
               }`}
             >
@@ -175,12 +176,12 @@ export function AboutSection() {
                       <span
                         className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white shadow-sm"
                         style={{
-                          backgroundColor: "var(--cr-primary, #414E36)",
+                          backgroundColor: "var(--cr-primary, var(--cr-primary))",
                         }}
                       >
                         <Check size={13} strokeWidth={3} />
                       </span>
-                      <span className="text-sm font-semibold text-[#414E36]">{service}</span>
+                      <span className="text-sm font-semibold text-[var(--cr-primary)]">{service}</span>
                     </li>
                   ))}
                 </ul>
@@ -191,7 +192,7 @@ export function AboutSection() {
                 <div className="relative aspect-[16/10] w-full rounded-[20px] overflow-hidden shadow-md transition-transform duration-500 hover:scale-[1.03]">
                   <Image
                     src={t.about.image3 || "/images/clinic/interior.jpg"}
-                    alt="Revera Clinics Interior"
+                    alt={`${CLIENT.name} Interior`}
                     fill
                     sizes="(max-width: 768px) 100vw, 250px"
                     className="object-cover"
@@ -203,7 +204,7 @@ export function AboutSection() {
 
             {/* ── Bottom Premium Help & Action Banner ── */}
             <div
-              className="bg-[#EDF1EC] p-6 md:p-8 rounded-[24px] flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm border border-[#F2EFE9]/30"
+              className="bg-[var(--color-brand-tint)] p-6 md:p-8 rounded-[24px] flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm border border-[var(--color-brand-sand)]/30"
             >
               {/* Left Side: Phone call details */}
               <div
@@ -232,13 +233,13 @@ export function AboutSection() {
                 </div>
                 <div>
                   <p
-                    className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-[#5A6A51]"
+                    className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]"
                   >
                     {t.about.needHelp}
                   </p>
                   <a
                     href={`tel:${t.about.phone.replace(/\s/g, "")}`}
-                    className="text-lg font-normal text-[#414E36] font-heading hover:text-[#5A6A51] transition-colors"
+                    className="text-lg font-normal text-[var(--cr-primary)] font-heading hover:text-[var(--color-brand-secondary)] transition-colors"
                   >
                     <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">{t.about.phone}</span>
                   </a>
@@ -249,12 +250,12 @@ export function AboutSection() {
               <div>
                 <button
                   onClick={handleBooking}
-                  className="group inline-flex items-center gap-3.5 bg-[#414E36] hover:bg-[#2e3a26] text-white text-sm font-semibold py-3 px-6 rounded-full transition-all duration-300 shadow-md hover:shadow-lg"
+                  className="group inline-flex items-center gap-3.5 bg-[var(--cr-primary)] hover:bg-[#2e3a26] text-white text-sm font-semibold py-3 px-6 rounded-full transition-all duration-300 shadow-md hover:shadow-lg"
                   type="button"
                 >
                   <span className="tracking-wide capitalize">{t.about.readMore}</span>
                   <span 
-                    className={`flex h-7 w-7 items-center justify-center rounded-full bg-[#5A6A51] text-white ${
+                    className={`flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-brand-secondary)] text-white ${
                       isRTL ? "group-hover:-translate-x-0.5" : "group-hover:translate-x-0.5"
                     } group-hover:-translate-y-0.5 transition-transform duration-300`}
                   >

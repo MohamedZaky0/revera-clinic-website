@@ -37,7 +37,7 @@ export function PageHeader({ pageKey }: { pageKey: PageKey }) {
           dir={dir}
           style={{
             position: "relative",
-            backgroundColor: "var(--cr-primary, #414E36)",
+            backgroundColor: "var(--cr-primary, var(--cr-primary))",
             borderRadius: "60px",
             overflow: "hidden",
             padding: "clamp(80px, 10vw, 130px) clamp(24px, 5vw, 64px) clamp(56px, 8vw, 90px)",

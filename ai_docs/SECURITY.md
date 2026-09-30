@@ -1,6 +1,7 @@
 # SECURITY.md — Current Security Posture
 
-> **Last Updated:** 2026-09-07
+> **Last Updated:** 2026-09-07; §3a's `providers`/`customers` DELETE entries and `assets`/`loans`/
+> `expenses` guards corrected 2026-09-30 (RISK-107/RISK-078 follow-up) — see the inline notes.
 > **Audited from:** `src/middleware.ts`, `src/lib/access.ts`, every `src/app/api/**/route.ts`,
 > `supabase/migrations/`, and `ai_docs/RISKS.md`.
 > **Purpose:** a single, current answer to "is X protected, and how" — so nobody has to re-derive
@@ -88,24 +89,31 @@ inline. Only `auth/employee-email` remains genuinely open, and that is a documen
 exception (RISK-080), not a gap.
 
 ### 3a. Server-side role-gated (import a helper from `access.ts`, route level)
-`assets`, `assets/post-depreciation`, `branches` (GET public/intentional, POST/DELETE
+`assets`, `assets/post-depreciation`, `loans` (all `requireFinanceAccess` since RISK-107,
+2026-09-29 — previously any staff could read; writes needed only `requireAdministratorAccess`, any
+admin, with no way to revoke it via Role Management), `branches` (GET public/intentional, POST/DELETE
 `requireAdministratorAccess` — RISK-080), `categories` (GET `requireStaffAccess`,
 POST/DELETE `requireAdministratorAccess` — RISK-080), `clinic-settings` (GET `requireStaffAccess`,
-POST `requireAdministratorAccess` — RISK-080), `customers` (identity-scoped, not blanket),
+POST `requireAdministratorAccess` — RISK-080), `customers` (GET/PATCH identity-scoped, not blanket;
+**DELETE — soft and hard both — is `requireSuperadminAccess`-only since commit `0976a72`,
+2026-09-10, an `admin` is refused**),
 `customers/package-redemptions`, `customers/packages`, `customers/products`, `customers/reconcile`,
 `employees`, `employees/notes`, `expenses`, `expenses/categories`, `expenses/generate-due`,
-`expenses/recurring`, `finance/*` (all 12 sub-routes), `health/supabase`
+`expenses/recurring` (all `requireFinanceAccess` since RISK-107, 2026-09-29 — previously any staff
+could read/write these), `finance/*` (all 12 sub-routes; `budget-vs-actual` also accepts
+`finance.view_pnl` since RISK-107), `health/supabase`
 (`requireAdministratorAccess` — RISK-080; previously public and leaked the first characters of the
 Supabase service-role key, now reports presence/source-var-name only), `inventory/devices`
 (+ `[id]/reset-pulses`, `audit-logs`), `inventory/products` (+ `reconcile`),
-`inventory/products/sales`, `loans`, `medical-records` (`requireStaffAccess` — RISK-080; PHI, was
+`inventory/products/sales`, `medical-records` (`requireStaffAccess` — RISK-080; PHI, was
 previously fully public), `packages` (+ `consume`, `extend`, `sell`), `page-settings` (GET
 deliberately dual-mode — staff get the full blob, everyone else gets `stripInternalFields()`'d
 public CMS content; POST `requireAdministratorAccess` — RISK-067), `customer-avatars` (GET
 public/intentional, POST `requireStaffAccess` — RISK-080), `prescriptions`
 (`requireStaffAccess` — RISK-080; PHI, was previously fully public), `provider-attendance`,
-`providers` (GET public/intentional, POST/PATCH/DELETE `requireStaffAccess` +
-`hasGranularPermission` — RISK-080/RISK-078), `purchases`, `reservations` (staff-only for every
+`providers` (GET public/intentional, POST/PATCH `requireStaffAccess` + `hasGranularPermission` —
+RISK-080/RISK-078; **DELETE is `requireSuperadminAccess`-only since commit `0976a72`, 2026-09-10 —
+narrower than the granular-permission path, an `admin` is refused**), `purchases`, `reservations` (staff-only for every
 mutating action except the one deliberately-anonymous deposit self-report — see RISK-018),
 `reservations/previous` (`requireStaffAccess` on GET and POST — RISK-080; GET returns up to 50
 reservations with real patient names/phones, POST creates patient + booking records, both were
@@ -115,7 +123,8 @@ RISK-078), `suppliers`, `terms` (GET public/intentional — public Terms & Condi
 POST/PUT/DELETE `requireAdministratorAccess` — RISK-080), `translate`.
 
 **Granular permission layer on top of `requireStaffAccess` (RISK-078/A10, 2026-09-07):** for
-`providers` (POST/PATCH/DELETE), `services` (POST/DELETE), `inventory/products`
+`providers` (POST/PATCH — **not** DELETE, which moved to `requireSuperadminAccess`-only, see above),
+`services` (POST/DELETE), `inventory/products`
 (POST/PUT/DELETE), `inventory/devices` (POST/PUT), and `customers/products` (POST/PATCH), passing
 `requireStaffAccess` (any staff role) is no longer sufficient — the handler also calls
 `hasGranularPermission(access.access, '<key>')`, matching the specific action-level permission

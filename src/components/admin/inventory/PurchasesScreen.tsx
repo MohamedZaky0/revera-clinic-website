@@ -182,25 +182,25 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
     <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold text-[#1F251A]">{t.heading}</h3>
-          <p className="text-xs text-[#5A6A51]">{t.subtitle}</p>
+          <h3 className="text-xl font-bold text-[var(--cr-dark)]">{t.heading}</h3>
+          <p className="text-xs text-[var(--color-brand-secondary)]">{t.subtitle}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-64">
-            <Search size={16} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+            <Search size={16} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]" />
             <input
               type="text"
               placeholder={t.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2 ps-9 pe-4 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
+              className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2 ps-9 pe-4 text-xs text-[var(--cr-dark)] focus:border-[var(--cr-primary)] focus:outline-none"
             />
           </div>
           <button
             type="button"
             onClick={openModal}
-            className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]`}
+            className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[var(--cr-primary)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]`}
           >
             <Plus size={14} /> {t.recordPurchaseBtn}
           </button>
@@ -216,7 +216,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
       <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
         <table className="w-full min-w-[800px] text-sm">
           <thead>
-            <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+            <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-secondary)]">
               <th className="px-6 py-4 text-start">{t.thDate}</th>
               <th className="px-6 py-4 text-start">{t.thSupplier}</th>
               <th className="px-6 py-4 text-start">{t.thItems}</th>
@@ -225,18 +225,18 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
               <th className="px-6 py-4 text-start">{t.thStatus}</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+          <tbody className="divide-y divide-[#E6E9EB] text-[var(--cr-primary)]">
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-[#5A6A51]">{t.loading}</td>
+                <td colSpan={6} className="px-6 py-12 text-center text-[var(--color-brand-secondary)]">{t.loading}</td>
               </tr>
             ) : filteredPurchases.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-[#5A6A51]">
+                <td colSpan={6} className="px-6 py-12 text-center text-[var(--color-brand-secondary)]">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <PackageCheck size={32} className="text-[#A3B19B]" />
-                    <p className="font-semibold text-[#1F251A]">{t.emptyTitle}</p>
-                    <p className="text-xs text-[#5A6A51]">{t.emptyDesc}</p>
+                    <p className="font-semibold text-[var(--cr-dark)]">{t.emptyTitle}</p>
+                    <p className="text-xs text-[var(--color-brand-secondary)]">{t.emptyDesc}</p>
                   </div>
                 </td>
               </tr>
@@ -246,19 +246,19 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
                 const isPartial = p.paid > 0 && p.paid < p.total;
                 return (
                   <tr key={p.id} className="transition hover:bg-[#F9F9F7]">
-                    <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">
+                    <td className="px-6 py-4 font-mono text-xs text-[var(--color-brand-secondary)]">
                       {new Date(p.purchased_at).toLocaleDateString("en-GB", { dateStyle: "medium" })}
                     </td>
-                    <td className="px-6 py-4 font-semibold text-[#1F251A]">{p.suppliers?.name || "—"}</td>
-                    <td className="px-6 py-4 text-xs text-[#5A6A51]">
+                    <td className="px-6 py-4 font-semibold text-[var(--cr-dark)]">{p.suppliers?.name || "—"}</td>
+                    <td className="px-6 py-4 text-xs text-[var(--color-brand-secondary)]">
                       {(p.purchase_lines || [])
                         .map((l) => `${l.inventory_products?.name || t.unknownItem} (${l.qty})`)
                         .join(", ")}
                     </td>
-                    <td className="px-6 py-4 text-end font-mono font-semibold text-[#1F251A]">
+                    <td className="px-6 py-4 text-end font-mono font-semibold text-[var(--cr-dark)]">
                       EGP {Number(p.total).toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 text-end font-mono text-xs text-[#5A6A51]">
+                    <td className="px-6 py-4 text-end font-mono text-xs text-[var(--color-brand-secondary)]">
                       EGP {Number(p.paid).toFixed(2)}
                     </td>
                     <td className="px-6 py-4">
@@ -284,9 +284,9 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
 
       {modalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl border border-[#414E36]/10 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4 mb-4">
-              <h3 className="text-xl font-bold text-[#1F251A]">{t.modalTitle}</h3>
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl border border-[var(--cr-primary)]/10 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4 mb-4">
+              <h3 className="text-xl font-bold text-[var(--cr-dark)]">{t.modalTitle}</h3>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
@@ -298,11 +298,11 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">{t.supplierLabel}</label>
+                <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">{t.supplierLabel}</label>
                 <select
                   value={supplierId}
                   onChange={(e) => setSupplierId(e.target.value)}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[var(--cr-primary)]"
                 >
                   <option value="">{t.noSupplierOption}</option>
                   {suppliers.map((s) => (
@@ -312,14 +312,14 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">{t.linesLabel}</label>
+                <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider">{t.linesLabel}</label>
                 {lines.map((line, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <select
                       required
                       value={line.productId}
                       onChange={(e) => updateLine(index, { productId: e.target.value })}
-                      className="flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[#414E36]"
+                      className="flex-1 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--cr-primary)]"
                     >
                       <option value="" disabled>{t.selectProductOption}</option>
                       {products.map((p) => (
@@ -334,7 +334,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
                       placeholder={t.qtyPlaceholder}
                       value={line.qty}
                       onChange={(e) => updateLine(index, { qty: e.target.value })}
-                      className="w-24 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[#414E36]"
+                      className="w-24 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--cr-primary)]"
                     />
                     <input
                       type="number"
@@ -344,7 +344,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
                       placeholder={t.unitCostPlaceholder}
                       value={line.unitCost}
                       onChange={(e) => updateLine(index, { unitCost: e.target.value })}
-                      className="w-28 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[#414E36]"
+                      className="w-28 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--cr-primary)]"
                     />
                     <button
                       type="button"
@@ -360,20 +360,20 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
                 <button
                   type="button"
                   onClick={addLine}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/20 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EBF0E6]"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/20 px-3 py-1.5 text-xs font-semibold text-[var(--cr-primary)] transition hover:bg-[#EBF0E6]"
                 >
                   <Plus size={13} /> {t.addLineBtn}
                 </button>
               </div>
 
               <div className="flex items-center justify-between rounded-xl bg-[#F7F7F9] px-4 py-2.5 text-sm">
-                <span className="text-[#5A6A51]">{t.estimatedTotalLabel}</span>
-                <span className="font-mono font-bold text-[#1F251A]">EGP {previewTotal.toFixed(2)}</span>
+                <span className="text-[var(--color-brand-secondary)]">{t.estimatedTotalLabel}</span>
+                <span className="font-mono font-bold text-[var(--cr-dark)]">EGP {previewTotal.toFixed(2)}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">{t.paidNowLabel}</label>
+                  <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">{t.paidNowLabel}</label>
                   <input
                     type="number"
                     min="0"
@@ -381,16 +381,16 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
                     placeholder="0.00"
                     value={paid}
                     onChange={(e) => setPaid(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#414E36]"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[var(--cr-primary)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">{t.dueDateLabel}</label>
+                  <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">{t.dueDateLabel}</label>
                   <input
                     type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#414E36]"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[var(--cr-primary)]"
                   />
                 </div>
               </div>
@@ -404,7 +404,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full rounded-3xl bg-[#414E36] py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-2"
+                className="w-full rounded-3xl bg-[var(--cr-primary)] py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-2"
               >
                 {saving ? t.recordingBtn : t.recordPurchaseBtn}
               </button>

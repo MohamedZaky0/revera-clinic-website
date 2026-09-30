@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Phone } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function WhyChooseUs() {
   const { t, isRTL } = useLanguage();
@@ -48,7 +49,7 @@ export function WhyChooseUs() {
         <div
           style={{
             position: "relative",
-            backgroundColor: "var(--cr-secondary, #EDF1EC)",
+            backgroundColor: "var(--cr-secondary, var(--color-brand-tint))",
             borderRadius: "32px",
             border: "1px solid rgba(196,174,124,0.35)",
             overflow: "hidden",
@@ -218,7 +219,7 @@ export function WhyChooseUs() {
                 <div className="wcu-left-img">
                   <Image
                     src={t.whyChooseUs.image1 || "/images/clinic/treatment.jpg"}
-                    alt="Physical therapy clinic room — Revera Clinics"
+                    alt={`Physical therapy clinic room — ${CLIENT.name}`}
                     fill
                     priority
                     unoptimized
@@ -233,7 +234,7 @@ export function WhyChooseUs() {
                   <div className="wcu-right-img">
                     <Image
                       src={t.whyChooseUs.image2 || "/images/clinic/room.jpg"}
-                      alt="Skin treatment — Revera Clinics"
+                      alt={`Skin treatment — ${CLIENT.name}`}
                       fill
                       unoptimized
                       sizes="(max-width: 768px) 100vw, 400px"
@@ -306,7 +307,7 @@ export function WhyChooseUs() {
                   fontSize: "clamp(26px, 3.5vw, 40px)",
                   lineHeight: 1.15,
                   fontWeight: 400,
-                  color: "var(--cr-primary, #1F251A)",
+                  color: "var(--cr-primary, var(--cr-dark))",
                 }}
               >
                 {t.whyChooseUs.heading}
@@ -318,7 +319,7 @@ export function WhyChooseUs() {
                   margin: "0 0 24px 0",
                   fontSize: "15px",
                   lineHeight: 1.7,
-                  color: "var(--cr-primary, #1F251A)",
+                  color: "var(--cr-primary, var(--cr-dark))",
                   opacity: 0.75,
                 }}
               >
@@ -332,7 +333,7 @@ export function WhyChooseUs() {
                   margin: "0 0 32px 0",
                   fontSize: "clamp(15px, 1.8vw, 17px)",
                   lineHeight: 1.6,
-                  color: "var(--cr-primary, #1F251A)",
+                  color: "var(--cr-primary, var(--cr-dark))",
                   fontWeight: 500,
                   opacity: 0.9,
                 }}
@@ -358,10 +359,10 @@ export function WhyChooseUs() {
                     width: "48px",
                     height: "48px",
                     borderRadius: "50%",
-                    backgroundColor: "#1F251A",
+                    backgroundColor: "var(--cr-dark)",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: "var(--color-brand-accent, #C4AE7C)",
+                    color: "var(--color-brand-accent, var(--cr-accent))",
                     transition: "transform 0.3s ease, background-color 0.3s ease",
                     flexShrink: 0,
                   }}
@@ -375,7 +376,7 @@ export function WhyChooseUs() {
                   style={{
                     fontSize: "16px",
                     fontWeight: 600,
-                    color: "var(--cr-primary, #1F251A)",
+                    color: "var(--cr-primary, var(--cr-dark))",
                     display: "flex",
                     gap: "6px",
                   }}
@@ -386,7 +387,7 @@ export function WhyChooseUs() {
                   <a
                     href={`tel:${t.whyChooseUs.phone.replace(/\s/g, "")}`}
                     style={{
-                      color: "var(--cr-primary, #1F251A)",
+                      color: "var(--cr-primary, var(--cr-dark))",
                       textDecoration: "none",
                       transition: "color 0.2s ease",
                     }}

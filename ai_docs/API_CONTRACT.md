@@ -232,7 +232,9 @@ miss).
 
 ## DELETE /api/providers?id={id}
 
-Deletes a provider. Requires `requireStaffAccess`. Falls back to JSON file on DB error.
+Deletes a provider. **Corrected 2026-09-30 (was stale):** both soft (deactivate) and hard (permanent)
+delete require `requireSuperadminAccess` — an `admin` is refused, not just non-staff (since commit
+`0976a72`, 2026-09-10; see `SECURITY.md` and `RISKS.md` RISK-078). Falls back to JSON file on DB error.
 
 **Response:** `{ success: true }`
 
@@ -771,7 +773,9 @@ Required: `name`, `mobile`. If `id` is present, updates the existing customer. O
 
 ## DELETE /api/customers?id={id}
 
-Deletes a customer profile record. Nullifies references in `reservations` to prevent foreign key violations, and deletes the linked account in Supabase Auth if applicable.
+Deletes a customer profile record. **Added 2026-09-30 (was missing):** both soft and hard delete
+require `requireSuperadminAccess` — an `admin` is refused (since commit `0976a72`, 2026-09-10; see
+`SECURITY.md` and `RISKS.md` RISK-078). Nullifies references in `reservations` to prevent foreign key violations, and deletes the linked account in Supabase Auth if applicable.
 
 **Response:** `{ message: "Customer deleted successfully" }`
 

@@ -102,22 +102,22 @@ export function MaterialDatePicker({
     <div
       className="w-full max-w-md rounded-[28px] p-5 shadow-xs transition-all"
       style={{
-        backgroundColor: "#EDF1EC", // Revera light brand background (secondary token)
+        backgroundColor: "var(--color-brand-tint)", // Clinic light brand background (secondary token)
         border: "1px solid rgba(65, 78, 54, 0.18)",
       }}
       dir={isRTL ? "rtl" : "ltr"}
     >
       {/* Header Title */}
-      <p className="text-xs font-semibold tracking-wide mb-1" style={{ color: "#5A6A51" }}>
+      <p className="text-xs font-semibold tracking-wide mb-1" style={{ color: "var(--color-brand-secondary)" }}>
         {isRTL ? "اختر التاريخ" : "Select date"}
       </p>
 
       {/* Main Selected Date Display with Edit Icon */}
-      <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-[#414E36]/15">
-        <h2 className="text-2xl font-bold tracking-tight" style={{ color: "#414E36" }}>
+      <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-[var(--cr-primary)]/15">
+        <h2 className="text-2xl font-bold tracking-tight" style={{ color: "var(--cr-primary)" }}>
           {formattedHeaderDate}
         </h2>
-        <div className="p-1.5 rounded-full text-[#414E36] hover:bg-[#414E36]/10 transition cursor-pointer">
+        <div className="p-1.5 rounded-full text-[var(--cr-primary)] hover:bg-[var(--cr-primary)]/10 transition cursor-pointer">
           <Edit2 size={18} />
         </div>
       </div>
@@ -125,7 +125,7 @@ export function MaterialDatePicker({
       {/* Month Switcher Navigation Bar */}
       <div className="flex items-center justify-between mb-4 px-1">
         <div className="flex items-center gap-1">
-          <span className="text-sm font-bold" style={{ color: "#414E36" }}>
+          <span className="text-sm font-bold" style={{ color: "var(--cr-primary)" }}>
             {isRTL ? `${monthNamesAR[month]} ${year}` : `${monthNamesEN[month]} ${year}`}
           </span>
         </div>
@@ -134,7 +134,7 @@ export function MaterialDatePicker({
             type="button"
             onClick={handlePrevMonth}
             disabled={isPrevDisabled}
-            className="p-1.5 rounded-full text-[#414E36] hover:bg-[#414E36]/10 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+            className="p-1.5 rounded-full text-[var(--cr-primary)] hover:bg-[var(--cr-primary)]/10 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
             aria-label="Previous month"
           >
             {isRTL ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -142,7 +142,7 @@ export function MaterialDatePicker({
           <button
             type="button"
             onClick={handleNextMonth}
-            className="p-1.5 rounded-full text-[#414E36] hover:bg-[#414E36]/10 transition cursor-pointer"
+            className="p-1.5 rounded-full text-[var(--cr-primary)] hover:bg-[var(--cr-primary)]/10 transition cursor-pointer"
             aria-label="Next month"
           >
             {isRTL ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
@@ -151,7 +151,7 @@ export function MaterialDatePicker({
       </div>
 
       {/* Days of Week Header */}
-      <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold mb-2" style={{ color: "#5A6A51" }}>
+      <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold mb-2" style={{ color: "var(--color-brand-secondary)" }}>
         {(isRTL ? weekdaysAR : weekdaysEN).map((day, i) => (
           <div key={i} className="py-1">
             {day}
@@ -185,12 +185,12 @@ export function MaterialDatePicker({
                 onClick={() => !isDisabled && onSelectDate(item.date!)}
                 className={`h-9 w-9 rounded-full flex items-center justify-center text-xs font-medium transition-all ${
                   isSelected
-                    ? "bg-[#414E36] text-white font-bold shadow-sm scale-105"
+                    ? "bg-[var(--cr-primary)] text-white font-bold shadow-sm scale-105"
                     : isToday
-                    ? "border-2 border-[#414E36] text-[#414E36] font-bold bg-white"
+                    ? "border-2 border-[var(--cr-primary)] text-[var(--cr-primary)] font-bold bg-white"
                     : isDisabled
-                    ? "text-[#414E36]/30 opacity-40 cursor-not-allowed"
-                    : "text-[#1F251A] hover:bg-[#414E36]/15 hover:text-[#414E36] font-semibold"
+                    ? "text-[var(--cr-primary)]/30 opacity-40 cursor-not-allowed"
+                    : "text-[var(--cr-dark)] hover:bg-[var(--cr-primary)]/15 hover:text-[var(--cr-primary)] font-semibold"
                 }`}
               >
                 {item.date.getDate()}

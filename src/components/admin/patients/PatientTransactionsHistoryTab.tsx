@@ -151,7 +151,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
       {/* ── 3 Summary Cards matching Screenshot 3 ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* TOTAL SPENT */}
-        <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 shadow-xs flex items-center gap-4">
+        <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-5 shadow-xs flex items-center gap-4">
           <div className="h-12 w-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
             <Wallet size={20} />
           </div>
@@ -169,7 +169,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
         </div>
 
         {/* OUTSTANDING */}
-        <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 shadow-xs flex items-center gap-4">
+        <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-5 shadow-xs flex items-center gap-4">
           <div className="h-12 w-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
             <FileText size={20} />
           </div>
@@ -187,7 +187,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
         </div>
 
         {/* WALLET BALANCE */}
-        <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 shadow-xs flex items-center gap-4">
+        <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-5 shadow-xs flex items-center gap-4">
           <div className="h-12 w-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
             <Coins size={20} />
           </div>
@@ -218,7 +218,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
                 setPage(1);
               }}
               placeholder="Search transactions..."
-              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 pe-9 text-xs font-medium text-gray-800 placeholder-gray-400 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all shadow-2xs"
+              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 pe-9 text-xs font-medium text-gray-800 placeholder-gray-400 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all shadow-2xs"
             />
             <div className="absolute right-3 top-3 text-gray-400">
               <Search size={14} />
@@ -317,7 +317,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
         <button
           type="button"
           onClick={onAddTransaction}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#313A28] hover:bg-[#1F251A] text-[#FBFBF9] font-bold text-xs shadow-sm transition-all shrink-0"
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#313A28] hover:bg-[var(--cr-dark)] text-[var(--color-brand-light)] font-bold text-xs shadow-sm transition-all shrink-0"
         >
           <Plus size={14} />
           <span>{lang === "ar" ? "إضافة معاملة" : "Add Transaction"}</span>
@@ -325,7 +325,7 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
       </div>
 
       {/* ── Patient Transactions Table ── */}
-      <div className="overflow-hidden rounded-2xl border border-[#414E36]/10 bg-white shadow-xs">
+      <div className="overflow-hidden rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-start text-xs border-collapse">
             <thead>

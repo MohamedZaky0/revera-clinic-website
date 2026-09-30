@@ -1,6 +1,9 @@
 # PROJECT.md — Revera Clinics Website & Admin System
 
-> **Last Updated:** 2026-07-25
+> **Last Updated:** 2026-09-30 (partial — "Critical Known Gaps" section corrected; the rest of this
+> file predates the Finance module, the `/admin` auth hardening and the Finance/Reports split and has
+> not been re-audited line by line. Trust `ai_docs/DB_SCHEMA.md`, `SECURITY.md` and `PRODUCT_SPECS.md`
+> over this file where they disagree.)
 > **Audited from:** live source code, cross-checked against `supabase/migrations/` (no trust placed in stub files)
 
 ---
@@ -18,7 +21,7 @@ A Next.js (App Router) web application serving two purposes:
 
 | Role | Access | What They Do |
 |---|---|---|
-| Clinic owner / admin | `/admin` (no auth gate currently) | Manage bookings, services, providers, branches, page content |
+| Clinic owner / admin | `/admin`, Supabase email/password login | Manage bookings, services, providers, branches, page content, finance |
 | Receptionist | `/admin` | Approve/reject/create bookings, view customer list |
 | Patients / website visitors | Public pages | Browse services, read about clinic, submit booking request |
 
@@ -28,7 +31,9 @@ A Next.js (App Router) web application serving two purposes:
 
 - **Single-tenant:** One Supabase project, one deployment — exclusively for Revera Clinics.
 - **Hosted on Vercel** (Next.js, App Router).
-- **Database:** Supabase (PostgreSQL) — 28+ tables as of 2026-07-25. Full list with columns: `ai_docs/DB_SCHEMA.md`. Migration history: `supabase/migrations/`.
+- **Database:** Supabase (PostgreSQL) — 60+ tables as of 2026-09-30 (the Finance module alone added
+  invoices/invoice_lines/payments/wallet_txns/expenses/fixed_assets/loans and more). Full current list
+  with columns: `ai_docs/DB_SCHEMA.md` — trust that file's own table count, not the number on this line.
 - **No multi-tenancy.** No org/tenant layer in the schema.
 
 ---
@@ -68,7 +73,9 @@ src/
   app/
     page.tsx              — Homepage
     layout.tsx            — Root layout + metadata
-    admin/page.tsx        — Full admin panel (single file, ~550KB)
+    admin/page.tsx        — Admin panel shell/composer (11.3k lines as of 2026-09-30, down from
+                            27.7k — most sections are extracted into src/components/admin/, see
+                            ARCHITECTURE.md; do not add new section logic here, DEC-027)
     profile/page.tsx      — Patient profile + wallet + visit history
     auth/callback/page.tsx — Supabase invite/recovery redirect handler
     about/page.tsx
@@ -124,12 +131,23 @@ supabase/migrations/      — SQL migration history (manual — see its README)
 
 ## Critical Known Gaps
 
-- Admin auth is **client-side login gate only** — browser login form exists, but `/api/*` routes still don't validate tokens/middleware. (RISK-002 partially resolved)
-- Patient OTP auth is **simulated** (setTimeout) — no real SMS gateway wired. (RISK-003)
+- **Corrected 2026-09-30 (was stale):** admin auth is **not** "client-side login gate only" anymore.
+  Real Supabase email/password auth plus per-route server-side authorization exist across most of
+  `/api/*` (`requireStaffAccess`/`requireAdministratorAccess`/`requireSuperadminAccess`/
+  `requireFinanceAccess`/`hasGranularPermission`) — see `SECURITY.md` for the current, route-by-route
+  picture; do not trust this line's 2026-07-25 claim.
+- Patient OTP auth is **real**, not simulated — through actual Supabase Auth (RISK-003, resolved
+  2026-07-22). Do not trust an older claim that it is UI-only.
 - **Corrected 2026-07-21:** Prescriptions, Payroll (both `hr_payroll` and `doctor_payroll`), Inventory (products/devices), and POS (`product_sales`) are **real Supabase tables with real API routes** — see `DB_SCHEMA.md`. They were previously mislabeled mock UI in this doc; that was wrong as of the 2026-07-20/21 migrations.
-- Still genuinely mock UI (hardcoded constant arrays, not Supabase): consultation notes, treatment plans, before/after photos (clinical, not the `prescriptions` table), the **Finances Dashboard** aggregate reporting view (`MOCK_POS_ORDERS` constant — individual sales records underneath it in `product_sales` are real), Refunds, Shipping.
-- Separately, 4 sidebar items (Marketing, Customer Support, Reports, Finance) are **disabled placeholders** with no page behind them at all — superadmin-only, see DECISIONS.md DEC-011. Note the "Finance" name collision with the mock-UI `Finances Dashboard` above; they are unrelated.
+- Still genuinely mock UI (hardcoded constant arrays, not Supabase): consultation notes, treatment plans, before/after photos (clinical, not the `prescriptions` table), Refunds, Shipping, and the Customer Support ticket inbox. The old "Finances Dashboard" mock view no longer exists — Finance is real (see below).
+- **Corrected 2026-09-30 (was stale — DEC-011 is superseded, not current):** Finance, Reports and
+  Marketing are no longer disabled placeholders — they are real, built-out sections (Finance: records
+  + statements, DEC-097; Reports: performance/operations/patient analysis, also DEC-097; Marketing:
+  packages + promotions). Customer Support remains a disabled/mock stub. See `PRODUCT_SPECS.md` for
+  the current, marketing-facing status of every feature (`LIVE`/`BETA`/`DEMO`/`PLANNED` tags).
 - localStorage is used as primary storage for services/categories on the admin side (Supabase is secondary/fallback in several places).
-- `customers` and `reservations` are **unlinked** — no FK; booking name/phone is not auto-matched to a customer record.
+- **Corrected 2026-09-30 (was stale):** `customers` and `reservations` **are** linked —
+  `reservations.customer_id` is a real FK to `customers.id` (`ON DELETE SET NULL`), added in the
+  `20260726000000_dev_schema_baseline.sql` migration. See `DB_SCHEMA.md`.
 - Employee attendance relies on browser geolocation — GPS spoofing is not mitigated.
 - Booking invoice PDF is generated client-side; print behavior varies by browser.

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import { X } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 const YOUTUBE_EMBED_URL = "https://www.youtube.com/embed/dQw4w9WgXcQ";
 
@@ -74,7 +75,7 @@ export function IntroVideo() {
             {/* Thumbnail image */}
             <Image
               src="/images/clinic/video-thumbnail.jpg"
-              alt="Revera Clinics — Introduction Video"
+              alt={`${CLIENT.name} — Introduction Video`}
               fill
               sizes="(max-width: 768px) 100vw, 1480px"
               className="object-cover"
@@ -182,7 +183,7 @@ export function IntroVideo() {
             {/* YouTube iframe */}
             <iframe
               src={`${YOUTUBE_EMBED_URL}?autoplay=1&rel=0`}
-              title="Revera Clinics Introduction"
+              title={`${CLIENT.name} Introduction`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               className="absolute inset-0 h-full w-full rounded-xl"

@@ -125,12 +125,12 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
   const [isWhatsappSame, setIsWhatsappSame] = useState(true);
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [serviceHours, setServiceHours] = useState<any[]>([]);
-  const [instapayName, setInstapayName] = useState("Revera Clinics");
+  const [instapayName, setInstapayName] = useState<string>(CLIENT.name);
   const [instapayAddress, setInstapayAddress] = useState("revera@instapay");
   const [instapayLink, setInstapayLink] = useState("https://www.instapay.eg");
   const [walletEnabled, setWalletEnabled] = useState(true);
   const [walletName, setWalletName] = useState("Vodafone Cash / Mobile Wallet");
-  const [walletNumber, setWalletNumber] = useState("01035595691");
+  const [walletNumber, setWalletNumber] = useState(CLIENT.phoneTel);
   const [walletLink, setWalletLink] = useState("");
   const [selectedDepositMethod, setSelectedDepositMethod] = useState<"instapay" | "wallet">("instapay");
   const [customerPaymentSender, setCustomerPaymentSender] = useState("");
@@ -269,7 +269,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
 
   useEffect(() => {
     if (open) {
-      const stored = localStorage.getItem("revera_user");
+      const stored = localStorage.getItem(`${CLIENT.storagePrefix}_user`);
       if (stored) {
         try {
           const cust = JSON.parse(stored);
@@ -277,7 +277,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
           if (cust.mobile) setPhone(cust.mobile);
           if (cust.email) setEmail(cust.email);
         } catch (err) {
-          console.error("Error reading revera_user in BookingModal:", err);
+          console.error(`Error reading ${CLIENT.storagePrefix}_user in BookingModal:`, err);
         }
       }
     }
@@ -407,7 +407,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
           if (data.deposit.walletNumber) {
             setWalletNumber(data.deposit.walletNumber);
           } else {
-            setWalletNumber("01035595691");
+            setWalletNumber(CLIENT.phoneTel);
           }
           if (data.deposit.walletLink) {
             setWalletLink(data.deposit.walletLink);
@@ -860,18 +860,17 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
     const formattedDate = selectedDate ? formatDate(selectedDate) : "";
     const svcName = allSelectedServices.map((s) => (isRTL ? s.ar : s.en)).join(isRTL ? "، " : ", ");
     
-    const textMessage = `Hello Revera Clinics,
-
-I have paid the reservation deposit for my booking:
-• Patient: ${name}
-• Phone: ${phone}${isWhatsappSame ? "" : ` (WhatsApp: ${whatsappNumber})`}
-• Service: ${svcName}
-• Date: ${formattedDate} at ${selectedTime}
-• Deposit Amount: EGP ${depAmount}
-• Payment Method: ${methodLabel}
-• Sent From: ${customerPaymentSender}
-
-Attached is my payment transaction receipt photo.`;
+    const textMessage = CLIENT.whatsappDepositReceipt({
+      patientName: name,
+      phone,
+      whatsappNumber: isWhatsappSame ? undefined : whatsappNumber,
+      serviceName: svcName,
+      date: formattedDate,
+      time: selectedTime,
+      depositAmount: depAmount,
+      paymentMethod: methodLabel,
+      sender: customerPaymentSender,
+    });
 
     let cleanWhatsapp = (clinicWhatsapp || CLIENT.whatsappNumber || "").replace(/[^0-9]/g, "");
     if (cleanWhatsapp.startsWith("200")) {
@@ -977,10 +976,10 @@ Attached is my payment transaction receipt photo.`;
 
   const walletQrUrl = walletLink 
     ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(walletLink)}`
-    : `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(walletNumber || "01035595691")}`;
+    : `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(walletNumber || CLIENT.phoneTel)}`;
 
   const currentQrUrl = selectedDepositMethod === "wallet" ? walletQrUrl : instapayQrUrl;
-  const currentPaymentLink = selectedDepositMethod === "wallet" ? (walletLink || `tel:${walletNumber || "01035595691"}`) : instapayLink;
+  const currentPaymentLink = selectedDepositMethod === "wallet" ? (walletLink || `tel:${walletNumber || CLIENT.phoneTel}`) : instapayLink;
 
   const handleDonePage = useCallback(() => {
     resetState();
@@ -1013,7 +1012,7 @@ Attached is my payment transaction receipt photo.`;
               style={{ backgroundColor: "var(--cr-secondary)" }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/main_logo.png" alt="Revera" width={28} height={28} style={{ objectFit: "contain" }} />
+              <img src={CLIENT.logoPath} alt={CLIENT.nameShort} width={28} height={28} style={{ objectFit: "contain" }} />
             </div>
             <h3 className="text-lg font-semibold" style={{ color: "var(--cr-primary)" }}>
               {t.booking.title}
@@ -1085,7 +1084,7 @@ Attached is my payment transaction receipt photo.`;
             {/* Step progress */}
             <div className="relative mb-8">
               <div 
-                className="absolute top-4 left-0 right-0 h-0.5 bg-[#414E36]/10 -translate-y-1/2 z-0" 
+                className="absolute top-4 left-0 right-0 h-0.5 bg-[var(--cr-primary)]/10 -translate-y-1/2 z-0" 
                 style={{
                   left: `${100 / (stepsList.length * 2)}%`,
                   right: `${100 / (stepsList.length * 2)}%`
@@ -1137,14 +1136,14 @@ Attached is my payment transaction receipt photo.`;
                   <p className="mb-2.5 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
                     {isRTL ? "نوع الجلسة" : "Session Type"}
                   </p>
-                  <div className="flex rounded-3xl border border-[#414E36]/15 p-1 bg-[#F2EFE9]/30">
+                  <div className="flex rounded-3xl border border-[var(--cr-primary)]/15 p-1 bg-[var(--color-brand-sand)]/30">
                     <button
                       type="button"
                       onClick={() => setSessionType("in_person")}
                       className={`flex-1 rounded-2xl py-2.5 text-xs font-bold transition-all ${
                         sessionType === "in_person"
-                          ? "bg-[#414E36] text-[#FBFBF9] shadow-sm"
-                          : "text-[#5A6A51] hover:text-[#414E36]"
+                          ? "bg-[var(--cr-primary)] text-[var(--color-brand-light)] shadow-sm"
+                          : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)]"
                       }`}
                     >
                       {isRTL ? "بالعيادة (حضوري)" : "In-Clinic (In-Person)"}
@@ -1154,8 +1153,8 @@ Attached is my payment transaction receipt photo.`;
                       onClick={() => setSessionType("online")}
                       className={`flex-1 rounded-2xl py-2.5 text-xs font-bold transition-all ${
                         sessionType === "online"
-                          ? "bg-[#414E36] text-[#FBFBF9] shadow-sm"
-                          : "text-[#5A6A51] hover:text-[#414E36]"
+                          ? "bg-[var(--cr-primary)] text-[var(--color-brand-light)] shadow-sm"
+                          : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)]"
                       }`}
                     >
                       {isRTL ? "استشارة عبر الإنترنت" : "Online Consultation"}
@@ -1165,8 +1164,8 @@ Attached is my payment transaction receipt photo.`;
 
                 {/* Branch Picker or Online Info */}
                 {sessionType === "online" ? (
-                  <div className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-3.5 flex items-start gap-2.5 text-xs text-[#414E36]">
-                    <svg className="w-5 h-5 shrink-0 text-[#C4AE7C] mt-0.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-tint)] p-3.5 flex items-start gap-2.5 text-xs text-[var(--cr-primary)]">
+                    <svg className="w-5 h-5 shrink-0 text-[var(--cr-accent)] mt-0.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                     <div>
@@ -1387,7 +1386,7 @@ Attached is my payment transaction receipt photo.`;
                     </p>
                   )}
                   {selectedService && depositPercentage > 0 && (
-                    <div className="mt-2 border-t border-[#414E36]/10 pt-2 text-xs space-y-1 text-[#414E36] font-medium">
+                    <div className="mt-2 border-t border-[var(--cr-primary)]/10 pt-2 text-xs space-y-1 text-[var(--cr-primary)] font-medium">
                       <p>
                         <span className="font-semibold text-purple-800">{isRTL ? "عربون الحجز المطلـوب:" : "Required Deposit:"} </span>
                         EGP {Math.round(effectiveServicePrice * (depositPercentage / 100))} ({depositPercentage}%)
@@ -1413,7 +1412,7 @@ Attached is my payment transaction receipt photo.`;
                   {isRTL ? "الطبيب المعالج (اختياري)" : "Select Doctor (Optional)"}
                 </label>
                 <select
-                  className="cr-input mb-3 bg-white text-[#1F251A] font-medium"
+                  className="cr-input mb-3 bg-white text-[var(--cr-dark)] font-medium"
                   value={selectedDoctor}
                   onChange={(e) => setSelectedDoctor(e.target.value)}
                 >
@@ -1435,12 +1434,12 @@ Attached is my payment transaction receipt photo.`;
                 <input className="cr-input mb-2" value={phone} onChange={(e)=>setPhone(e.target.value)} />
 
                 <div className="mb-4 space-y-2 text-left">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-[#414E36]">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-[var(--cr-primary)]">
                     <input 
                       type="checkbox" 
                       checked={isWhatsappSame} 
                       onChange={(e) => setIsWhatsappSame(e.target.checked)} 
-                      className="h-4 w-4 rounded accent-[#414E36]"
+                      className="h-4 w-4 rounded accent-[var(--cr-primary)]"
                     />
                     <span>{isRTL ? "هذا الرقم هو رقم الواتساب أيضاً" : "This is the WhatsApp number too"}</span>
                   </label>
@@ -1551,13 +1550,13 @@ Attached is my payment transaction receipt photo.`;
             {/* Step 3: Payment (Deposit Payment) */}
             {step === 3 && (
               <div className="space-y-4">
-                <p className="text-sm font-bold text-[#1F251A]">
+                <p className="text-sm font-bold text-[var(--cr-dark)]">
                   {selectedDepositMethod === "wallet"
                     ? (isRTL ? "دفع عربون الحجز عبر المحفظة الإلكترونية" : "Reservation Deposit via Mobile Wallet")
                     : (isRTL ? "دفع عربون الحجز عبر إنستاباي" : "Reservation Deposit via InstaPay")
                   }
                 </p>
-                <p className="text-xs text-[#5A6A51] leading-relaxed">
+                <p className="text-xs text-[var(--color-brand-secondary)] leading-relaxed">
                   {selectedDepositMethod === "wallet"
                     ? (isRTL 
                         ? `لتأكيد حجزك، يرجى تحويل عربون الحجز المطلـوب (${depositPercentage}%) إلى رقم المحفظة أدناه، ثم أدخل رقم الهاتف وأرسل صورة التحويل عبر الواتساب.` 
@@ -1570,20 +1569,20 @@ Attached is my payment transaction receipt photo.`;
 
                 {/* Payment Method Selector Tab */}
                 <div className="space-y-1.5 pt-1">
-                  <label className="block text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider">
+                  <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider">
                     {isRTL ? "اختر طريقة دفع العربون" : "Select Payment Method"}
                   </label>
-                  <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-[#EDF1EC] border border-[#414E36]/15">
+                  <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-[var(--color-brand-tint)] border border-[var(--cr-primary)]/15">
                     <button
                       type="button"
                       onClick={() => setSelectedDepositMethod("instapay")}
                       className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                         selectedDepositMethod === "instapay"
-                          ? "bg-white text-[#414E36] shadow-sm border border-[#414E36]/10"
-                          : "text-[#5A6A51] hover:text-[#1F251A]"
+                          ? "bg-white text-[var(--cr-primary)] shadow-sm border border-[var(--cr-primary)]/10"
+                          : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-dark)]"
                       }`}
                     >
-                      <span className={`h-2 w-2 rounded-full ${selectedDepositMethod === "instapay" ? "bg-[#C4AE7C]" : "bg-gray-400"}`}></span>
+                      <span className={`h-2 w-2 rounded-full ${selectedDepositMethod === "instapay" ? "bg-[var(--cr-accent)]" : "bg-gray-400"}`}></span>
                       {isRTL ? "إنستاباي (InstaPay)" : "InstaPay"}
                     </button>
                     <button
@@ -1591,8 +1590,8 @@ Attached is my payment transaction receipt photo.`;
                       onClick={() => setSelectedDepositMethod("wallet")}
                       className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                         selectedDepositMethod === "wallet"
-                          ? "bg-white text-[#414E36] shadow-sm border border-[#414E36]/10"
-                          : "text-[#5A6A51] hover:text-[#1F251A]"
+                          ? "bg-white text-[var(--cr-primary)] shadow-sm border border-[var(--cr-primary)]/10"
+                          : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-dark)]"
                       }`}
                     >
                       <span className={`h-2 w-2 rounded-full ${selectedDepositMethod === "wallet" ? "bg-emerald-600" : "bg-gray-400"}`}></span>
@@ -1624,7 +1623,7 @@ Attached is my payment transaction receipt photo.`;
                 )}
 
                 {/* Price Breakdown */}
-                <div className="rounded-2xl border border-[#C4AE7C]/20 bg-[#FBFBF9] p-4 text-xs space-y-2 text-[#1F251A]">
+                <div className="rounded-2xl border border-[var(--cr-accent)]/20 bg-[var(--color-brand-light)] p-4 text-xs space-y-2 text-[var(--cr-dark)]">
                   <div className="flex justify-between">
                     <span className="opacity-70">{isRTL ? "سعر الخدمة الإجمالي:" : "Service Price:"}</span>
                     <span className="font-semibold">EGP {effectiveServicePrice}</span>
@@ -1633,7 +1632,7 @@ Attached is my payment transaction receipt photo.`;
                     <span>{isRTL ? `عربون الحجز المطلـوب (${depositPercentage}%):` : `Required Deposit (${depositPercentage}%):`}</span>
                     <span>EGP {Math.round(effectiveServicePrice * (depositPercentage / 100))}</span>
                   </div>
-                  <div className="border-t border-dashed border-[#C4AE7C]/20 pt-2 flex justify-between font-bold">
+                  <div className="border-t border-dashed border-[var(--cr-accent)]/20 pt-2 flex justify-between font-bold">
                     <span>{isRTL ? "المبلغ المتبقي بالعيادة:" : "Remaining Balance (Pay at Clinic):"}</span>
                     <span>EGP {effectiveServicePrice - Math.round(effectiveServicePrice * (depositPercentage / 100))}</span>
                   </div>
@@ -1641,12 +1640,12 @@ Attached is my payment transaction receipt photo.`;
 
                 {selectedDepositMethod === "instapay" ? (
                   /* Clinic InstaPay Info Box */
-                  <div className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 space-y-3">
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-tint)] p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "عنوان إنستاباي الخاص بالعيادة" : "CLINIC INSTAPAY ADDRESS"}</p>
-                        <p className="text-xs font-bold text-[#1F251A] mt-0.5">{instapayAddress}</p>
-                        {instapayName && <p className="text-[10px] font-bold text-[#5A6A51] mt-0.5">{instapayName}</p>}
+                        <p className="text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider">{isRTL ? "عنوان إنستاباي الخاص بالعيادة" : "CLINIC INSTAPAY ADDRESS"}</p>
+                        <p className="text-xs font-bold text-[var(--cr-dark)] mt-0.5">{instapayAddress}</p>
+                        {instapayName && <p className="text-[10px] font-bold text-[var(--color-brand-secondary)] mt-0.5">{instapayName}</p>}
                       </div>
                       <button
                         type="button"
@@ -1656,20 +1655,20 @@ Attached is my payment transaction receipt photo.`;
                             setTimeout(() => setCopiedAddress(false), 2000);
                           }
                         }}
-                        className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition cursor-pointer"
+                        className="rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs font-bold text-[var(--cr-primary)] hover:bg-[#f7f6f2] transition cursor-pointer"
                       >
                         {copiedAddress ? (isRTL ? "تم النسخ!" : "Copied!") : (isRTL ? "نسخ" : "Copy")}
                       </button>
                     </div>
 
                     {instapayLink && (
-                      <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط تحويل إنستاباي" : "INSTAPAY QUICK LINK"}</span>
+                      <div className="border-t border-[var(--cr-primary)]/10 pt-2 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider">{isRTL ? "رابط تحويل إنستاباي" : "INSTAPAY QUICK LINK"}</span>
                         <a 
                           href={instapayLink} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-xs font-bold text-[#C4AE7C] hover:underline"
+                          className="text-xs font-bold text-[var(--cr-accent)] hover:underline"
                         >
                           {isRTL ? "فتح تطبيق إنستاباي" : "Open InstaPay"} &rarr;
                         </a>
@@ -1678,10 +1677,10 @@ Attached is my payment transaction receipt photo.`;
 
                     {/* InstaPay QR Code */}
                     <div className="pt-2 text-center">
-                      <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{isRTL ? "امسح رمز الاستجابة السريعة (QR) [انقر للتكبير]" : "SCAN QR CODE TO PAY [Click to Zoom]"}</p>
+                      <p className="text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-2">{isRTL ? "امسح رمز الاستجابة السريعة (QR) [انقر للتكبير]" : "SCAN QR CODE TO PAY [Click to Zoom]"}</p>
                       <div 
                         onClick={() => setZoomQr(true)}
-                        className="inline-block rounded-2xl bg-white p-2 border border-[#C4AE7C]/20 shadow-sm hover:border-[#C4AE7C] hover:scale-105 transition duration-200 cursor-pointer"
+                        className="inline-block rounded-2xl bg-white p-2 border border-[var(--cr-accent)]/20 shadow-sm hover:border-[var(--cr-accent)] hover:scale-105 transition duration-200 cursor-pointer"
                         title={isRTL ? "انقر لتكبير رمز الاستجابة السريعة" : "Click to zoom QR Code"}
                       >
                         <img 
@@ -1694,11 +1693,11 @@ Attached is my payment transaction receipt photo.`;
                   </div>
                 ) : (
                   /* Clinic Wallet Info Box */
-                  <div className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 space-y-3">
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-tint)] p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{walletName ? (isRTL ? `رقم محفظة ${walletName}` : `CLINIC ${walletName.toUpperCase()} NUMBER`) : (isRTL ? "رقم المحفظة الإلكترونية للعيادة" : "CLINIC WALLET NUMBER")}</p>
-                        <p className="text-sm font-extrabold text-[#1F251A] mt-0.5 tracking-wider">{walletNumber}</p>
+                        <p className="text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider">{walletName ? (isRTL ? `رقم محفظة ${walletName}` : `CLINIC ${walletName.toUpperCase()} NUMBER`) : (isRTL ? "رقم المحفظة الإلكترونية للعيادة" : "CLINIC WALLET NUMBER")}</p>
+                        <p className="text-sm font-extrabold text-[var(--cr-dark)] mt-0.5 tracking-wider">{walletNumber}</p>
                       </div>
                       <button
                         type="button"
@@ -1708,19 +1707,19 @@ Attached is my payment transaction receipt photo.`;
                             setTimeout(() => setCopiedAddress(false), 2000);
                           }
                         }}
-                        className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition cursor-pointer"
+                        className="rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs font-bold text-[var(--cr-primary)] hover:bg-[#f7f6f2] transition cursor-pointer"
                       >
                         {copiedAddress ? (isRTL ? "تم النسخ!" : "Copied!") : (isRTL ? "نسخ" : "Copy")}
                       </button>
                     </div>
 
-                    <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط المحفظة الإلكترونية" : "WALLET QUICK LINK"}</span>
+                    <div className="border-t border-[var(--cr-primary)]/10 pt-2 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider">{isRTL ? "رابط المحفظة الإلكترونية" : "WALLET QUICK LINK"}</span>
                       <a 
                         href={currentPaymentLink} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="text-xs font-bold text-[#C4AE7C] hover:underline"
+                        className="text-xs font-bold text-[var(--cr-accent)] hover:underline"
                       >
                         {walletLink ? (isRTL ? "فتح رابط المحفظة" : "Open Wallet") : (isRTL ? "اتصال بالرقم" : "Dial Number")} &rarr;
                       </a>
@@ -1728,12 +1727,12 @@ Attached is my payment transaction receipt photo.`;
 
                     {/* Wallet QR Code */}
                     <div className="pt-2 text-center">
-                      <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">
+                      <p className="text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-2">
                         {isRTL ? "امسح رمز الاستجابة السريعة للمحفظة (QR) [انقر للتكبير]" : "SCAN WALLET QR CODE TO PAY [Click to Zoom]"}
                       </p>
                       <div 
                         onClick={() => setZoomQr(true)}
-                        className="inline-block rounded-2xl bg-white p-2 border border-[#C4AE7C]/20 shadow-sm hover:border-[#C4AE7C] hover:scale-105 transition duration-200 cursor-pointer"
+                        className="inline-block rounded-2xl bg-white p-2 border border-[var(--cr-accent)]/20 shadow-sm hover:border-[var(--cr-accent)] hover:scale-105 transition duration-200 cursor-pointer"
                         title={isRTL ? "انقر لتكبير رمز الاستجابة السريعة" : "Click to zoom QR Code"}
                       >
                         <img 
@@ -1748,7 +1747,7 @@ Attached is my payment transaction receipt photo.`;
 
                 {/* Patient's Account / Phone Input */}
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider">
+                  <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider">
                     {selectedDepositMethod === "wallet"
                       ? (isRTL ? "رقم المحفظة الإلكترونية الخاص بك (الذي قمت بالتحويل منه)" : "Your Wallet Mobile Number (Sent From)")
                       : (isRTL ? "عنوان إنستاباي الخاص بك (الذي قمت بالتحويل منه)" : "Your InstaPay Address (Sent From)")}
@@ -1825,7 +1824,7 @@ Attached is my payment transaction receipt photo.`;
                     type="button"
                     onClick={handlePayDeposit}
                     disabled={isPaying || ((hasTerms || termsText.trim() !== "") && !acceptedTerms)}
-                    className="w-full justify-center rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-extrabold text-white bg-[#414E36] transition shadow-md flex items-center justify-center gap-2 hover:bg-[#2e3a26] disabled:opacity-50 cursor-pointer"
+                    className="w-full justify-center rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-extrabold text-white bg-[var(--cr-primary)] transition shadow-md flex items-center justify-center gap-2 hover:bg-[#2e3a26] disabled:opacity-50 cursor-pointer"
                   >
                     {isPaying ? (
                       <>
@@ -1915,20 +1914,20 @@ Attached is my payment transaction receipt photo.`;
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm transition-all cursor-pointer"
           onClick={() => setZoomQr(false)}
         >
-          <div className="relative max-w-sm w-full bg-white rounded-3xl p-6 shadow-2xl flex flex-col items-center border border-[#414E36]/10 animate-scaleIn cursor-default" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-sm w-full bg-white rounded-3xl p-6 shadow-2xl flex flex-col items-center border border-[var(--cr-primary)]/10 animate-scaleIn cursor-default" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setZoomQr(false)}
               className="absolute right-6 top-6 h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition font-bold text-lg cursor-pointer"
             >
               &times;
             </button>
-            <p className="text-sm font-bold text-[#414E36] mb-4 uppercase tracking-wider text-center">
+            <p className="text-sm font-bold text-[var(--cr-primary)] mb-4 uppercase tracking-wider text-center">
               {selectedDepositMethod === "wallet"
                 ? (isRTL ? `رمز الاستجابة السريعة للمحفظة` : `SCAN WALLET QR CODE`)
                 : (isRTL ? "رمز الاستجابة السريعة (InstaPay)" : "SCAN INSTAPAY QR CODE")
               }
             </p>
-            <div className="bg-white p-3 rounded-2xl border border-[#C4AE7C]/20 shadow-inner">
+            <div className="bg-white p-3 rounded-2xl border border-[var(--cr-accent)]/20 shadow-inner">
               <img 
                 src={currentQrUrl} 
                 alt="QR Code Zoomed" 
@@ -1940,7 +1939,7 @@ Attached is my payment transaction receipt photo.`;
                 href={currentPaymentLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white hover:bg-[#2e3a26] transition shadow"
+                className="mt-4 rounded-xl bg-[var(--cr-primary)] px-5 py-2 text-xs font-bold text-white hover:bg-[#2e3a26] transition shadow"
               >
                 {selectedDepositMethod === "wallet"
                   ? (walletLink ? (isRTL ? "فتح رابط المحفظة" : "Open Wallet App") : (isRTL ? "اتصال بالرقم" : "Dial Number"))

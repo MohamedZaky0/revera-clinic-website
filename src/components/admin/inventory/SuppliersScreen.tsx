@@ -126,25 +126,25 @@ export default function SuppliersScreen({ authHeaders, canManage = true, lang, t
     <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold text-[#1F251A]">{t.heading}</h3>
-          <p className="text-xs text-[#5A6A51]">{t.subtitle}</p>
+          <h3 className="text-xl font-bold text-[var(--cr-dark)]">{t.heading}</h3>
+          <p className="text-xs text-[var(--color-brand-secondary)]">{t.subtitle}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-64">
-            <Search size={16} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+            <Search size={16} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]" />
             <input
               type="text"
               placeholder={t.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2 ps-9 pe-4 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
+              className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2 ps-9 pe-4 text-xs text-[var(--cr-dark)] focus:border-[var(--cr-primary)] focus:outline-none"
             />
           </div>
           <button
             type="button"
             onClick={openAddModal}
-            className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]`}
+            className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[var(--cr-primary)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]`}
           >
             <Plus size={14} /> {t.addSupplierBtn}
           </button>
@@ -160,7 +160,7 @@ export default function SuppliersScreen({ authHeaders, canManage = true, lang, t
       <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
         <table className="w-full min-w-[700px] text-sm">
           <thead>
-            <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+            <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-secondary)]">
               <th className="px-6 py-4 text-start">{t.thSupplier}</th>
               <th className="px-6 py-4 text-start">{t.thContact}</th>
               <th className="px-6 py-4 text-start">{t.thPaymentTerms}</th>
@@ -168,27 +168,27 @@ export default function SuppliersScreen({ authHeaders, canManage = true, lang, t
               <th className="px-6 py-4 text-end">{t.thActions}</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+          <tbody className="divide-y divide-[#E6E9EB] text-[var(--cr-primary)]">
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-[#5A6A51]">{t.loading}</td>
+                <td colSpan={5} className="px-6 py-12 text-center text-[var(--color-brand-secondary)]">{t.loading}</td>
               </tr>
             ) : filteredSuppliers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-[#5A6A51]">
+                <td colSpan={5} className="px-6 py-12 text-center text-[var(--color-brand-secondary)]">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Truck size={32} className="text-[#A3B19B]" />
-                    <p className="font-semibold text-[#1F251A]">{t.emptyTitle}</p>
-                    <p className="text-xs text-[#5A6A51]">{t.emptyDesc}</p>
+                    <p className="font-semibold text-[var(--cr-dark)]">{t.emptyTitle}</p>
+                    <p className="text-xs text-[var(--color-brand-secondary)]">{t.emptyDesc}</p>
                   </div>
                 </td>
               </tr>
             ) : (
               filteredSuppliers.map((s) => (
                 <tr key={s.id} className="transition hover:bg-[#F9F9F7]">
-                  <td className="px-6 py-4 font-semibold text-[#1F251A]">{s.name}</td>
-                  <td className="px-6 py-4 text-[#5A6A51]">{s.contact || "—"}</td>
-                  <td className="px-6 py-4 text-[#5A6A51]">{s.payment_terms || "—"}</td>
+                  <td className="px-6 py-4 font-semibold text-[var(--cr-dark)]">{s.name}</td>
+                  <td className="px-6 py-4 text-[var(--color-brand-secondary)]">{s.contact || "—"}</td>
+                  <td className="px-6 py-4 text-[var(--color-brand-secondary)]">{s.payment_terms || "—"}</td>
                   <td className="px-6 py-4">
                     <span
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
@@ -205,7 +205,7 @@ export default function SuppliersScreen({ authHeaders, canManage = true, lang, t
                       <button
                         type="button"
                         onClick={() => openEditModal(s)}
-                        className={`${canManage ? "inline-flex" : "hidden"} rounded-xl border border-[#E6E9EB] p-2 text-[#5A6A51] transition hover:bg-[#EBF0E6] hover:text-[#414E36]`}
+                        className={`${canManage ? "inline-flex" : "hidden"} rounded-xl border border-[#E6E9EB] p-2 text-[var(--color-brand-secondary)] transition hover:bg-[#EBF0E6] hover:text-[var(--cr-primary)]`}
                         title={t.editTitle}
                       >
                         <Pencil size={15} />
@@ -229,9 +229,9 @@ export default function SuppliersScreen({ authHeaders, canManage = true, lang, t
 
       {modal.open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-[#414E36]/10">
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4 mb-4">
-              <h3 className="text-xl font-bold text-[#1F251A]">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-[var(--cr-primary)]/10">
+            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4 mb-4">
+              <h3 className="text-xl font-bold text-[var(--cr-dark)]">
                 {modal.mode === "add" ? t.addModalTitle : t.editModalTitle}
               </h3>
               <button
@@ -245,45 +245,45 @@ export default function SuppliersScreen({ authHeaders, canManage = true, lang, t
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">{t.nameLabel}</label>
+                <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">{t.nameLabel}</label>
                 <input
                   type="text"
                   required
                   placeholder={t.namePlaceholder}
                   value={modal.form.name}
                   onChange={(e) => setModal((prev) => ({ ...prev, form: { ...prev.form, name: e.target.value } }))}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[var(--cr-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">{t.contactLabel}</label>
+                <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">{t.contactLabel}</label>
                 <input
                   type="text"
                   placeholder={t.contactPlaceholder}
                   value={modal.form.contact}
                   onChange={(e) => setModal((prev) => ({ ...prev, form: { ...prev.form, contact: e.target.value } }))}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[var(--cr-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">{t.paymentTermsLabel}</label>
+                <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">{t.paymentTermsLabel}</label>
                 <input
                   type="text"
                   placeholder={t.paymentTermsPlaceholder}
                   value={modal.form.payment_terms}
                   onChange={(e) => setModal((prev) => ({ ...prev, form: { ...prev.form, payment_terms: e.target.value } }))}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[var(--cr-primary)]"
                 />
               </div>
 
-              <label className="flex items-center gap-2 text-sm text-[#1F251A]">
+              <label className="flex items-center gap-2 text-sm text-[var(--cr-dark)]">
                 <input
                   type="checkbox"
                   checked={modal.form.active}
                   onChange={(e) => setModal((prev) => ({ ...prev, form: { ...prev.form, active: e.target.checked } }))}
-                  className="h-4 w-4 rounded border-[#414E36]/30 text-[#414E36] accent-[#414E36]"
+                  className="h-4 w-4 rounded border-[var(--cr-primary)]/30 text-[var(--cr-primary)] accent-[var(--cr-primary)]"
                 />
                 {t.activeCheckbox}
               </label>
@@ -291,7 +291,7 @@ export default function SuppliersScreen({ authHeaders, canManage = true, lang, t
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full rounded-3xl bg-[#414E36] py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-2"
+                className="w-full rounded-3xl bg-[var(--cr-primary)] py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-2"
               >
                 {saving ? t.savingBtn : modal.mode === "add" ? t.createBtn : t.saveChangesBtn}
               </button>

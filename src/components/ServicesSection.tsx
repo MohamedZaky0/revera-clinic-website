@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Category, ServiceItem, getServicePriceDetails } from "@/lib/services";
+import { CLIENT } from "@/config/client";
 import { 
   getServiceToggles, 
   ServiceToggleState, 
@@ -12,7 +13,7 @@ import {
 } from "@/lib/serviceStore";
 import { prefetchUrl } from "@/lib/fetchCache";
 
-// ── Service categories and items for Revera Clinics
+// ── Service categories and items for the clinic
 
 // ── Flower icon (inline SVG matching original) ─────────────────────────────
 
@@ -20,7 +21,7 @@ function FlowerIcon() {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src="/images/main_logo.png"
+      src={CLIENT.logoPath}
       alt="Clinic Logo"
       width={44}
       height={44}
@@ -44,7 +45,7 @@ function ArrowIcon() {
       flexShrink: 0,
     }}>
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M4 14L14 4M14 4H6M14 4V12" stroke="#414E36" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M4 14L14 4M14 4H6M14 4V12" stroke="var(--cr-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
     </div>
   );
@@ -188,7 +189,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
             transform: `${isRTL ? "scaleX(-1)" : ""} ${hovered ? "rotate(45deg)" : "rotate(0deg)"}`,
           }}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M4 14L14 4M14 4H6M14 4V12" stroke="#414E36" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M4 14L14 4M14 4H6M14 4V12" stroke="var(--cr-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
         </div>
@@ -211,7 +212,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
                   <span style={{
                     fontSize: 16,
                     fontWeight: 700,
-                    color: "#C4AE7C",
+                    color: "var(--cr-accent)",
                   }}>
                     {lang === "ar" 
                       ? `${priceDetails.discountedPrice.toLocaleString()} ج.م` 
@@ -231,7 +232,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
                     fontSize: 10,
                     fontWeight: 700,
                     color: "#FFFFFF",
-                    backgroundColor: "#C4AE7C",
+                    backgroundColor: "var(--cr-accent)",
                     padding: "2px 6px",
                     borderRadius: 6,
                     textTransform: "uppercase",
@@ -244,7 +245,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
                 <span style={{
                   fontSize: 16,
                   fontWeight: 650,
-                  color: "#C4AE7C",
+                  color: "var(--cr-accent)",
                 }}>
                   {lang === "ar" 
                     ? `${priceDetails.basePrice.toLocaleString()} ج.م` 
@@ -323,7 +324,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
             transition: "transform 420ms cubic-bezier(0.2,0.9,0.2,1), opacity 420ms",
             opacity: hovered ? 1 : 0 }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M5 12h14M12 5l7 7-7 7" stroke="#414E36" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M5 12h14M12 5l7 7-7 7" stroke="var(--cr-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
 

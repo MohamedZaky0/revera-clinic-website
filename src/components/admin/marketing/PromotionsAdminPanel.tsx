@@ -205,8 +205,8 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-[#1F251A]">Promotions & Discounts / عروض وخصومات الفروع</h2>
-          <p className="text-xs text-[#5A6A51] mt-1">Manage special pricing, percentage discounts, and fixed discounts across branches</p>
+          <h2 className="text-2xl font-semibold text-[var(--cr-dark)]">Promotions & Discounts / عروض وخصومات الفروع</h2>
+          <p className="text-xs text-[var(--color-brand-secondary)] mt-1">Manage special pricing, percentage discounts, and fixed discounts across branches</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -221,7 +221,7 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
               setPromoEndDate("");
               setShowAddPromoModal(true);
             }}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#C4AE7C] px-4 py-2 text-sm font-semibold text-[#414E36] shadow-sm transition hover:bg-[#b59e6c]"
+            className="inline-flex items-center gap-2 rounded-lg bg-[var(--cr-accent)] px-4 py-2 text-sm font-semibold text-[var(--cr-primary)] shadow-sm transition hover:bg-[#b59e6c]"
           >
             <Plus size={14} /> Add Promotion
           </button>
@@ -229,16 +229,16 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
       </div>
 
       {/* Filters & Search */}
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-4 rounded-xl border border-[#414E36]/10">
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-4 rounded-xl border border-[var(--cr-primary)]/10">
         {/* Search query */}
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]" />
           <input
             type="text"
             value={promoSearchQuery}
             onChange={(e) => setPromoSearchQuery(e.target.value)}
             placeholder="Search by service..."
-            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] pl-9 pr-4 py-2 text-xs outline-none transition focus:border-[#C4AE7C] text-[#1F251A]"
+            className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] pl-9 pr-4 py-2 text-xs outline-none transition focus:border-[var(--cr-accent)] text-[var(--cr-dark)]"
           />
         </div>
 
@@ -247,7 +247,7 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
           <select
             value={promoFilterBranch}
             onChange={(e) => setPromoFilterBranch(e.target.value)}
-            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A]"
+            className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs outline-none focus:border-[var(--cr-accent)] text-[var(--cr-dark)]"
           >
             <option value="All">All Branches</option>
             {Array.from(new Set(promotionsList.map(p => p.branchName))).map(branch => (
@@ -261,7 +261,7 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
           <select
             value={promoFilterStatus}
             onChange={(e) => setPromoFilterStatus(e.target.value)}
-            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A]"
+            className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs outline-none focus:border-[var(--cr-accent)] text-[var(--cr-dark)]"
           >
             <option value="All">All Statuses</option>
             <option value="active">Active</option>
@@ -291,17 +291,17 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
 
         if (filtered.length === 0) {
           return (
-            <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-[#414E36]/10 text-center">
-              <div className="h-12 w-12 rounded-full bg-[#414E36]/5 flex items-center justify-center text-[#C4AE7C] mb-4">
+            <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-[var(--cr-primary)]/10 text-center">
+              <div className="h-12 w-12 rounded-full bg-[var(--cr-primary)]/5 flex items-center justify-center text-[var(--cr-accent)] mb-4">
                 <Tag size={20} />
               </div>
-              <h3 className="text-base font-bold text-[#1F251A]">No promotions found</h3>
-              <p className="text-xs text-[#5A6A51] max-w-sm mt-1">
+              <h3 className="text-base font-bold text-[var(--cr-dark)]">No promotions found</h3>
+              <p className="text-xs text-[var(--color-brand-secondary)] max-w-sm mt-1">
                 Get started by adding branch specific discount rules for your clinic's services.
               </p>
               <button
                 onClick={() => setShowAddPromoModal(true)}
-                className="mt-4 rounded-lg bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                className="mt-4 rounded-lg bg-[var(--cr-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26]"
               >
                 Create Your First Promotion
               </button>
@@ -326,7 +326,7 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
               return (
                 <div
                   key={index}
-                  className="bg-white rounded-2xl border border-[#414E36]/10 p-5 shadow-sm transition hover:shadow-md relative overflow-hidden flex flex-col justify-between"
+                  className="bg-white rounded-2xl border border-[var(--cr-primary)]/10 p-5 shadow-sm transition hover:shadow-md relative overflow-hidden flex flex-col justify-between"
                   style={{
                     filter: status === "disabled" ? "grayscale(100%)" : "none",
                     opacity: status === "disabled" ? 0.6 : 1
@@ -342,7 +342,7 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                   <div>
                     {/* Top badge line */}
                     <div className="flex justify-between items-start gap-2 mb-3 pt-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider bg-[#414E36]/5 text-[#414E36] px-2 py-0.5 rounded-md">
+                      <span className="text-[10px] font-bold uppercase tracking-wider bg-[var(--cr-primary)]/5 text-[var(--cr-primary)] px-2 py-0.5 rounded-md">
                         {item.branchName} Branch
                       </span>
 
@@ -356,27 +356,27 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                     </div>
 
                     {/* Service names */}
-                    <h3 className="font-bold text-[#1F251A] text-sm leading-snug line-clamp-1">{item.serviceNameEn}</h3>
-                    <h4 className="text-xs text-[#5A6A51] font-medium mt-0.5 dir-rtl text-right">{item.serviceNameAr}</h4>
+                    <h3 className="font-bold text-[var(--cr-dark)] text-sm leading-snug line-clamp-1">{item.serviceNameEn}</h3>
+                    <h4 className="text-xs text-[var(--color-brand-secondary)] font-medium mt-0.5 dir-rtl text-right">{item.serviceNameAr}</h4>
 
                     {/* Pricing summary */}
-                    <div className="mt-4 bg-[#FBFBF9] p-3 rounded-xl border border-[#414E36]/5 flex items-center justify-between">
+                    <div className="mt-4 bg-[var(--color-brand-light)] p-3 rounded-xl border border-[var(--cr-primary)]/5 flex items-center justify-between">
                       <div>
-                        <span className="text-[10px] text-[#5A6A51] block font-semibold">Base Price</span>
-                        <span className="text-xs font-semibold text-[#5A6A51]/80 line-through">{basePrice} EGP</span>
+                        <span className="text-[10px] text-[var(--color-brand-secondary)] block font-semibold">Base Price</span>
+                        <span className="text-xs font-semibold text-[var(--color-brand-secondary)]/80 line-through">{basePrice} EGP</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-[10px] text-[#C4AE7C] block font-bold">Offer Price</span>
-                        <span className="text-sm font-extrabold text-[#414E36]">{finalPrice} EGP</span>
+                        <span className="text-[10px] text-[var(--cr-accent)] block font-bold">Offer Price</span>
+                        <span className="text-sm font-extrabold text-[var(--cr-primary)]">{finalPrice} EGP</span>
                       </div>
                     </div>
 
                     {/* Promo value details */}
                     <div className="mt-3 flex items-center gap-2 text-xs">
-                      <span className="bg-[#C4AE7C]/10 text-[#C4AE7C] font-bold px-2 py-0.5 rounded text-[10px]">
+                      <span className="bg-[var(--cr-accent)]/10 text-[var(--cr-accent)] font-bold px-2 py-0.5 rounded text-[10px]">
                         {item.promotion.type === "percentage" ? `${promoVal}% OFF` : `-${promoVal} EGP`}
                       </span>
-                      <span className="text-[#5A6A51] text-[10px] font-medium">
+                      <span className="text-[var(--color-brand-secondary)] text-[10px] font-medium">
                         {item.promotion.startDate || item.promotion.endDate ? (
                           <>
                             {item.promotion.startDate ? item.promotion.startDate : "Start"} to {item.promotion.endDate ? item.promotion.endDate : "End"}
@@ -389,14 +389,14 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                   </div>
 
                   {/* Footer action bar */}
-                  <div className="mt-5 pt-4 border-t border-[#414E36]/5 flex items-center justify-between gap-4">
+                  <div className="mt-5 pt-4 border-t border-[var(--cr-primary)]/5 flex items-center justify-between gap-4">
                     {/* Toggle switch */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-[#5A6A51]">Enabled</span>
+                      <span className="text-[10px] font-bold text-[var(--color-brand-secondary)]">Enabled</span>
                       <button
                         onClick={() => handleTogglePromotion(item.serviceId, item.branchName, item.promotion.enabled)}
                         className="relative h-5 w-9 rounded-full focus:outline-none transition-colors duration-300"
-                        style={{ backgroundColor: item.promotion.enabled ? "#414E36" : "#E2E8F0" }}
+                        style={{ backgroundColor: item.promotion.enabled ? "var(--cr-primary)" : "#E2E8F0" }}
                       >
                         <span
                           className="absolute top-[2px] h-4.5 w-4.5 rounded-full bg-white shadow-md transition-all duration-300"
@@ -409,7 +409,7 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleOpenEditPromo(item)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#E6E9EB] bg-[#F7F7F9] text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-tint)]"
                         title="Edit Promotion"
                       >
                         <Pencil size={12} />
@@ -433,16 +433,16 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
       {/* Add/Edit Promotion Modal */}
       {showAddPromoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 animate-slideUp flex flex-col">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-[var(--cr-primary)]/10 animate-slideUp flex flex-col">
 
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 px-6 py-4">
-              <h3 className="text-base font-bold text-[#1F251A]">
+            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 px-6 py-4">
+              <h3 className="text-base font-bold text-[var(--cr-dark)]">
                 {editingPromo ? "Edit Promotion / تعديل العرض" : "Add Promotion / إضافة عرض"}
               </h3>
               <button
                 onClick={() => setShowAddPromoModal(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#FBFBF9]"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] transition hover:bg-[var(--color-brand-light)]"
               >
                 ✕
               </button>
@@ -453,37 +453,37 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
 
               {/* Services Multi-Select */}
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">
+                <label className="mb-1 block text-xs font-semibold text-[var(--color-brand-secondary)]">
                   Select Services <span className="text-red-500">*</span>
                   {!editingPromo && promoServiceIds.length > 0 && (
-                    <span className="ml-2 text-[10px] font-bold text-[#C4AE7C] bg-[#C4AE7C]/10 px-1.5 py-0.5 rounded-full">
+                    <span className="ml-2 text-[10px] font-bold text-[var(--cr-accent)] bg-[var(--cr-accent)]/10 px-1.5 py-0.5 rounded-full">
                       {promoServiceIds.length} selected
                     </span>
                   )}
                 </label>
                 {editingPromo ? (
-                  <div className="rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] font-medium">
+                  <div className="rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs text-[var(--cr-dark)] font-medium">
                     {localServices.find(s => s.id === editingPromo.serviceId)?.en || "—"}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] overflow-hidden">
+                  <div className="rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] overflow-hidden">
                     {/* Search inside list */}
-                    <div className="relative border-b border-[#414E36]/10">
-                      <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                    <div className="relative border-b border-[var(--cr-primary)]/10">
+                      <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]" />
                       <input
                         type="text"
                         value={promoServiceSearch}
                         onChange={e => setPromoServiceSearch(e.target.value)}
                         placeholder="Search services..."
-                        className="w-full bg-transparent pl-8 pr-3 py-2 text-xs outline-none text-[#1F251A] placeholder-[#5A6A51]/60"
+                        className="w-full bg-transparent pl-8 pr-3 py-2 text-xs outline-none text-[var(--cr-dark)] placeholder-[var(--color-brand-secondary)]/60"
                       />
                     </div>
                     {/* Select All / Clear row */}
-                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#414E36]/10 bg-[#F5F4F0]">
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--cr-primary)]/10 bg-[#F5F4F0]">
                       <button
                         type="button"
                         onClick={() => setPromoServiceIds(localServices.filter(s => s.en.toLowerCase().includes(promoServiceSearch.toLowerCase()) || (s.ar || "").toLowerCase().includes(promoServiceSearch.toLowerCase())).map(s => s.id))}
-                        className="text-[10px] font-bold text-[#414E36] hover:underline"
+                        className="text-[10px] font-bold text-[var(--cr-primary)] hover:underline"
                       >Select All</button>
                       <button
                         type="button"
@@ -501,7 +501,7 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                             <label
                               key={svc.id}
                               className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition ${
-                                checked ? "bg-[#414E36]/5" : "hover:bg-[#414E36]/3"
+                                checked ? "bg-[var(--cr-primary)]/5" : "hover:bg-[var(--cr-primary)]/3"
                               }`}
                             >
                               <input
@@ -513,18 +513,18 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                                   );
                                   setPromoBranchNames([]); // reset branches on change
                                 }}
-                                className="accent-[#414E36] h-3.5 w-3.5 rounded"
+                                className="accent-[var(--cr-primary)] h-3.5 w-3.5 rounded"
                               />
                               <div className="flex-1 min-w-0">
-                                <span className="text-xs font-medium text-[#1F251A] block truncate">{svc.en}</span>
-                                {svc.ar && <span className="text-[10px] text-[#5A6A51] block truncate">{svc.ar}</span>}
+                                <span className="text-xs font-medium text-[var(--cr-dark)] block truncate">{svc.en}</span>
+                                {svc.ar && <span className="text-[10px] text-[var(--color-brand-secondary)] block truncate">{svc.ar}</span>}
                               </div>
                             </label>
                           );
                         })
                       }
                       {localServices.filter(s => s.en.toLowerCase().includes(promoServiceSearch.toLowerCase()) || (s.ar || "").toLowerCase().includes(promoServiceSearch.toLowerCase())).length === 0 && (
-                        <div className="py-4 text-center text-xs text-[#5A6A51]">No services found</div>
+                        <div className="py-4 text-center text-xs text-[var(--color-brand-secondary)]">No services found</div>
                       )}
                     </div>
                   </div>
@@ -534,7 +534,7 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
               {/* Multi-Branch Checkbox List */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-semibold text-[#5A6A51]">
+                  <label className="block text-xs font-semibold text-[var(--color-brand-secondary)]">
                     Select Branches <span className="text-red-500">*</span>
                   </label>
                   {branches.length > 0 && (
@@ -547,13 +547,13 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                           setPromoBranchNames(branches.map(b => b.name_en));
                         }
                       }}
-                      className="text-[10px] font-bold text-[#414E36] underline hover:text-[#C4AE7C] transition"
+                      className="text-[10px] font-bold text-[var(--cr-primary)] underline hover:text-[var(--cr-accent)] transition"
                     >
                       {promoBranchNames.length === branches.length ? 'Deselect All' : 'Select All'}
                     </button>
                   )}
                 </div>
-                <div className="rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] divide-y divide-[#414E36]/10 max-h-40 overflow-y-auto custom-scrollbar">
+                <div className="rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] divide-y divide-[var(--cr-primary)]/10 max-h-40 overflow-y-auto custom-scrollbar">
                   {(() => {
                     const branchList = branches.length > 0
                       ? branches.map(b => b.name_en)
@@ -571,7 +571,7 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                     return branchList.map(name => {
                       const checked = promoBranchNames.includes(name);
                       return (
-                        <label key={name} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-[#EDF1EC]/60 transition">
+                        <label key={name} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-[var(--color-brand-tint)]/60 transition">
                           <input
                             type="checkbox"
                             checked={checked}
@@ -580,30 +580,30 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                                 checked ? prev.filter(n => n !== name) : [...prev, name]
                               );
                             }}
-                            className="h-3.5 w-3.5 rounded accent-[#414E36]"
+                            className="h-3.5 w-3.5 rounded accent-[var(--cr-primary)]"
                           />
-                          <span className="text-xs font-medium text-[#1F251A]">{name}</span>
+                          <span className="text-xs font-medium text-[var(--cr-dark)]">{name}</span>
                         </label>
                       );
                     });
                   })()}
                 </div>
                 {promoBranchNames.length > 0 && (
-                  <p className="mt-1 text-[10px] text-[#5A6A51] font-medium">{promoBranchNames.length} branch{promoBranchNames.length > 1 ? 'es' : ''} selected</p>
+                  <p className="mt-1 text-[10px] text-[var(--color-brand-secondary)] font-medium">{promoBranchNames.length} branch{promoBranchNames.length > 1 ? 'es' : ''} selected</p>
                 )}
               </div>
 
               {/* Discount Type */}
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Discount Type</label>
+                <label className="mb-1 block text-xs font-semibold text-[var(--color-brand-secondary)]">Discount Type</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setPromoType("percentage")}
                     className={`py-2 px-3 text-xs font-bold rounded-lg border transition ${
                       promoType === "percentage"
-                        ? "bg-[#414E36] border-[#414E36] text-white"
-                        : "bg-white border-[#414E36]/15 text-[#5A6A51] hover:bg-[#414E36]/5"
+                        ? "bg-[var(--cr-primary)] border-[var(--cr-primary)] text-white"
+                        : "bg-white border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] hover:bg-[var(--cr-primary)]/5"
                     }`}
                   >
                     Percentage (%)
@@ -613,8 +613,8 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                     onClick={() => setPromoType("fixed")}
                     className={`py-2 px-3 text-xs font-bold rounded-lg border transition ${
                       promoType === "fixed"
-                        ? "bg-[#414E36] border-[#414E36] text-white"
-                        : "bg-white border-[#414E36]/15 text-[#5A6A51] hover:bg-[#414E36]/5"
+                        ? "bg-[var(--cr-primary)] border-[var(--cr-primary)] text-white"
+                        : "bg-white border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] hover:bg-[var(--cr-primary)]/5"
                     }`}
                   >
                     Fixed Amount (EGP)
@@ -624,7 +624,7 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
 
               {/* Discount Value */}
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">
+                <label className="mb-1 block text-xs font-semibold text-[var(--color-brand-secondary)]">
                   Discount Value ({promoType === "percentage" ? "%" : "EGP"}) <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -632,28 +632,28 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                   value={promoValue}
                   onChange={(e) => setPromoValue(Math.max(0, Number(e.target.value) || 0))}
                   placeholder="0"
-                  className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs outline-none transition focus:border-[#C4AE7C] text-[#1F251A] font-medium"
+                  className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs outline-none transition focus:border-[var(--cr-accent)] text-[var(--cr-dark)] font-medium"
                 />
               </div>
 
               {/* Start/End Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">Start Date (Optional)</label>
+                  <label className="mb-1 block text-[10px] font-semibold text-[var(--color-brand-secondary)]">Start Date (Optional)</label>
                   <input
                     type="date"
                     value={promoStartDate}
                     onChange={(e) => setPromoStartDate(e.target.value)}
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-2 py-1.5 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A]"
+                    className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-2 py-1.5 text-xs outline-none focus:border-[var(--cr-accent)] text-[var(--cr-dark)]"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">End Date (Optional)</label>
+                  <label className="mb-1 block text-[10px] font-semibold text-[var(--color-brand-secondary)]">End Date (Optional)</label>
                   <input
                     type="date"
                     value={promoEndDate}
                     onChange={(e) => setPromoEndDate(e.target.value)}
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-2 py-1.5 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A]"
+                    className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-2 py-1.5 text-xs outline-none focus:border-[var(--cr-accent)] text-[var(--cr-dark)]"
                   />
                 </div>
               </div>
@@ -666,8 +666,8 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                   ? branches.map(b => b.name_en)
                   : promoBranchNames;
                 return (
-                  <div className="pt-3 border-t border-[#414E36]/10 space-y-1.5">
-                    <div className="text-xs font-bold text-[#414E36] mb-1">Preview Selling Price by Branch / معاينة السعر حسب الفرع:</div>
+                  <div className="pt-3 border-t border-[var(--cr-primary)]/10 space-y-1.5">
+                    <div className="text-xs font-bold text-[var(--cr-primary)] mb-1">Preview Selling Price by Branch / معاينة السعر حسب الفرع:</div>
                     <div className="max-h-24 overflow-y-auto space-y-1.5 pr-1">
                       {branchesToPreview.map(branchName => {
                         const selectedBp = (Array.isArray(selectedSvc.branchPricing) ? selectedSvc.branchPricing : []).find((bp: any) => bp.name.toLowerCase() === branchName.toLowerCase());
@@ -678,13 +678,13 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
                         const isNegative = calcPrice < 0;
                         const finalDisplayPrice = Math.max(0, Math.round(calcPrice));
                         return (
-                          <div key={branchName} className="flex justify-between items-center text-xs text-[#1F251A] bg-[#FBFBF9] p-1.5 rounded border border-[#414E36]/5">
-                            <span className="font-medium text-[#414E36]">{branchName}</span>
+                          <div key={branchName} className="flex justify-between items-center text-xs text-[var(--cr-dark)] bg-[var(--color-brand-light)] p-1.5 rounded border border-[var(--cr-primary)]/5">
+                            <span className="font-medium text-[var(--cr-primary)]">{branchName}</span>
                             <div className="text-right">
-                              <span className={isNegative ? "text-red-500 font-extrabold" : "text-[#C4AE7C] font-bold"}>
+                              <span className={isNegative ? "text-red-500 font-extrabold" : "text-[var(--cr-accent)] font-bold"}>
                                 {finalDisplayPrice} EGP
                               </span>
-                              <span className="text-[10px] text-[#5A6A51] ml-1.5">(Base: {basePrice} EGP)</span>
+                              <span className="text-[10px] text-[var(--color-brand-secondary)] ml-1.5">(Base: {basePrice} EGP)</span>
                             </div>
                           </div>
                         );
@@ -695,8 +695,8 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
               })()}
 
               {(promoServiceIds.length > 1 || promoBranchNames.length > 1) && (
-                <div className="pt-3 border-t border-[#414E36]/10">
-                  <p className="text-[10px] text-[#5A6A51] font-medium">
+                <div className="pt-3 border-t border-[var(--cr-primary)]/10">
+                  <p className="text-[10px] text-[var(--color-brand-secondary)] font-medium">
                     ℹ This promotion will apply to <strong>{editingPromo ? 1 : promoServiceIds.length} service{(!editingPromo && promoServiceIds.length > 1) ? 's' : ''}</strong> across <strong>{promoBranchNames.length > 0 ? promoBranchNames.join(', ') : 'selected'}</strong> branch{promoBranchNames.length > 1 ? 'es' : ''}.
                   </p>
                 </div>
@@ -705,20 +705,20 @@ export function PromotionsAdminPanel({ localServices, setLocalServices, branches
             </div>
 
             {/* Modal Footer */}
-            <div className="border-t border-[#414E36]/10 px-6 py-4 flex items-center justify-end gap-3 bg-[#FBFBF9] rounded-b-2xl">
+            <div className="border-t border-[var(--cr-primary)]/10 px-6 py-4 flex items-center justify-end gap-3 bg-[var(--color-brand-light)] rounded-b-2xl">
               <button
                 onClick={() => setShowAddPromoModal(false)}
-                className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-xs font-semibold text-[#414E36] transition hover:bg-[#F2EFE9]"
+                className="rounded-lg border border-[var(--cr-primary)]/15 px-4 py-2 text-xs font-semibold text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-sand)]"
               >
                 Cancel
               </button>
               <button
                 disabled={(editingPromo ? false : promoServiceIds.length === 0) || promoBranchNames.length === 0}
                 onClick={handleSavePromotion}
-                className={`rounded-lg px-5 py-2 text-xs font-semibold text-[#FBFBF9] transition ${
+                className={`rounded-lg px-5 py-2 text-xs font-semibold text-[var(--color-brand-light)] transition ${
                   (editingPromo ? false : promoServiceIds.length === 0) || promoBranchNames.length === 0
-                    ? "bg-[#414E36]/50 cursor-not-allowed"
-                    : "bg-[#414E36] hover:bg-[#2e3a26]"
+                    ? "bg-[var(--cr-primary)]/50 cursor-not-allowed"
+                    : "bg-[var(--cr-primary)] hover:bg-[#2e3a26]"
                 }`}
               >
                 {editingPromo ? "Save Changes" : promoServiceIds.length > 1 ? `Apply to ${promoServiceIds.length} Services` : "Save Promotion"}

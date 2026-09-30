@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { DoctorAccountViewProps, DoctorTab, DoctorPatient, UsedProduct } from "./doctor/types";
 import { doctorTranslations } from "./doctor/translations";
 import { adminTranslations } from "./translations";
+import { CLIENT } from "@/config/client";
 import { parseBookingNotes, getAuthHeaders } from "./doctor/utils";
 import DoctorSidebar from "./doctor/DoctorSidebar";
 import DoctorScheduleTab from "./doctor/tabs/DoctorScheduleTab";
@@ -1513,7 +1514,7 @@ export default function DoctorAccountView({
   };
 
   return (
-    <div className="h-screen min-h-[100dvh] w-full bg-[#FBFBF9] text-[#1F251A] font-sans grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)] overflow-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
+    <div className="h-screen min-h-[100dvh] w-full bg-[var(--color-brand-light)] text-[var(--cr-dark)] font-sans grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)] overflow-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
       {/* 1. SIDEBAR NAVIGATION (Desktop Sidebar & Mobile Drawer) */}
       <DoctorSidebar
         activeTab={activeTab}
@@ -1539,7 +1540,7 @@ export default function DoctorAccountView({
       {/* 2. MAIN CONTENT WRAPPER */}
       <div className="flex flex-col min-w-0 w-full h-full min-h-[100dvh] md:h-screen overflow-hidden">
         {/* MOBILE TOP HEADER BAR (< md) */}
-        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[#414E36] text-white shrink-0 sticky top-0 z-30 shadow-md">
+        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[var(--cr-primary)] text-white shrink-0 sticky top-0 z-30 shadow-md">
         <div className="flex items-center gap-2.5 min-w-0">
           <button
             type="button"
@@ -1558,7 +1559,7 @@ export default function DoctorAccountView({
           
           <div className="flex items-center gap-2 min-w-0">
             <div className="relative h-7 w-7 rounded-lg bg-white p-1 overflow-hidden shrink-0">
-              <Image src="/images/main_logo.png" alt="Revera Clinics" fill style={{ objectFit: "contain" }} />
+              <Image src={CLIENT.logoPath} alt={CLIENT.name} fill style={{ objectFit: "contain" }} />
             </div>
             <div className="min-w-0">
               <h1 className="text-xs font-bold leading-tight truncate">{t.portalTitle}</h1>
@@ -1586,7 +1587,7 @@ export default function DoctorAccountView({
             }}
             className={`h-8 w-8 rounded-lg font-bold text-[11px] flex items-center justify-center shadow-xs transition cursor-pointer ${
               activeTab === "profile"
-                ? "bg-white text-[#414E36] ring-2 ring-emerald-400"
+                ? "bg-white text-[var(--cr-primary)] ring-2 ring-emerald-400"
                 : "bg-white/15 text-white hover:bg-white/25"
             }`}
             title="Doctor Profile"
@@ -1626,7 +1627,7 @@ export default function DoctorAccountView({
                 setActiveSessionBooking(receptionistStartedSession);
                 setActiveTab("ongoing");
               }}
-              className="shrink-0 rounded-2xl bg-white text-[#414E36] px-5 py-2.5 text-xs font-black shadow-md hover:bg-[#FBFBF9] active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer"
+              className="shrink-0 rounded-2xl bg-white text-[var(--cr-primary)] px-5 py-2.5 text-xs font-black shadow-md hover:bg-[var(--color-brand-light)] active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <Stethoscope size={16} />
               <span>{t.openActiveSessionBtn}</span>
@@ -1776,7 +1777,7 @@ export default function DoctorAccountView({
       </div>
 
       {/* 3. MOBILE BOTTOM NAVIGATION BAR (< md) */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-[#414E36]/15 px-2 py-1.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] flex items-center justify-around">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-[var(--cr-primary)]/15 px-2 py-1.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] flex items-center justify-around">
         <button
           type="button"
           onClick={() => {
@@ -1785,11 +1786,11 @@ export default function DoctorAccountView({
           }}
           className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
             activeTab === "schedule"
-              ? "text-[#414E36] font-bold"
-              : "text-[#5A6A51]/70 hover:text-[#414E36]"
+              ? "text-[var(--cr-primary)] font-bold"
+              : "text-[var(--color-brand-secondary)]/70 hover:text-[var(--cr-primary)]"
           }`}
         >
-          <div className={`p-1 rounded-lg ${activeTab === "schedule" ? "bg-[#414E36]/10 text-[#414E36]" : ""}`}>
+          <div className={`p-1 rounded-lg ${activeTab === "schedule" ? "bg-[var(--cr-primary)]/10 text-[var(--cr-primary)]" : ""}`}>
             <CalendarDays size={18} />
           </div>
           <span className="text-[10px] mt-0.5">{t.schedule}</span>
@@ -1803,11 +1804,11 @@ export default function DoctorAccountView({
           }}
           className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
             activeTab === "ongoing"
-              ? "text-[#414E36] font-bold"
-              : "text-[#5A6A51]/70 hover:text-[#414E36]"
+              ? "text-[var(--cr-primary)] font-bold"
+              : "text-[var(--color-brand-secondary)]/70 hover:text-[var(--cr-primary)]"
           }`}
         >
-          <div className={`p-1 rounded-lg relative ${activeTab === "ongoing" ? "bg-[#414E36]/10 text-[#414E36]" : ""}`}>
+          <div className={`p-1 rounded-lg relative ${activeTab === "ongoing" ? "bg-[var(--cr-primary)]/10 text-[var(--cr-primary)]" : ""}`}>
             <Stethoscope size={18} />
             {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
               <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
@@ -1827,11 +1828,11 @@ export default function DoctorAccountView({
           }}
           className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
             activeTab === "patients"
-              ? "text-[#414E36] font-bold"
-              : "text-[#5A6A51]/70 hover:text-[#414E36]"
+              ? "text-[var(--cr-primary)] font-bold"
+              : "text-[var(--color-brand-secondary)]/70 hover:text-[var(--cr-primary)]"
           }`}
         >
-          <div className={`p-1 rounded-lg ${activeTab === "patients" ? "bg-[#414E36]/10 text-[#414E36]" : ""}`}>
+          <div className={`p-1 rounded-lg ${activeTab === "patients" ? "bg-[var(--cr-primary)]/10 text-[var(--cr-primary)]" : ""}`}>
             <Users size={18} />
           </div>
           <span className="text-[10px] mt-0.5">{t.patients}</span>
@@ -1845,11 +1846,11 @@ export default function DoctorAccountView({
           }}
           className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
             activeTab === "analytics"
-              ? "text-[#414E36] font-bold"
-              : "text-[#5A6A51]/70 hover:text-[#414E36]"
+              ? "text-[var(--cr-primary)] font-bold"
+              : "text-[var(--color-brand-secondary)]/70 hover:text-[var(--cr-primary)]"
           }`}
         >
-          <div className={`p-1 rounded-lg ${activeTab === "analytics" ? "bg-[#414E36]/10 text-[#414E36]" : ""}`}>
+          <div className={`p-1 rounded-lg ${activeTab === "analytics" ? "bg-[var(--cr-primary)]/10 text-[var(--cr-primary)]" : ""}`}>
             <BarChart3 size={18} />
           </div>
           <span className="text-[10px] mt-0.5">{t.analytics}</span>
@@ -1863,11 +1864,11 @@ export default function DoctorAccountView({
           }}
           className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
             activeTab === "profile"
-              ? "text-[#414E36] font-bold"
-              : "text-[#5A6A51]/70 hover:text-[#414E36]"
+              ? "text-[var(--cr-primary)] font-bold"
+              : "text-[var(--color-brand-secondary)]/70 hover:text-[var(--cr-primary)]"
           }`}
         >
-          <div className={`p-1 rounded-lg ${activeTab === "profile" ? "bg-[#414E36]/10 text-[#414E36]" : ""}`}>
+          <div className={`p-1 rounded-lg ${activeTab === "profile" ? "bg-[var(--cr-primary)]/10 text-[var(--cr-primary)]" : ""}`}>
             <User size={18} />
           </div>
           <span className="text-[10px] mt-0.5">Profile</span>

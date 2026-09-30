@@ -218,16 +218,16 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
           {/* Card 1: Total Devices */}
           <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">
                 {t.totalDevices}
               </span>
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EDF1EC] text-[#414E36]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-brand-tint)] text-[var(--cr-primary)]">
                 <Gauge size={18} />
               </div>
             </div>
             <div className="mt-3 flex items-baseline justify-between">
               <span className="text-3xl font-black text-[#111827]">{devices.length}</span>
-              <span className="text-xs font-semibold text-[#5A6A51]">{t.registered}</span>
+              <span className="text-xs font-semibold text-[var(--color-brand-secondary)]">{t.registered}</span>
             </div>
           </div>
 
@@ -289,13 +289,13 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
         {/* Filters & Search */}
         <div className="mb-5 flex items-center gap-2">
           <div className="relative flex-1 max-w-md">
-            <Search size={15} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+            <Search size={15} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]" />
             <input
               type="text"
               placeholder={t.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2 ps-9 pe-4 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 shadow-2xs"
+              className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white py-2 ps-9 pe-4 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20 shadow-2xs"
             />
           </div>
           <button
@@ -304,26 +304,26 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
             title={t.filterTitle}
             className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs ${
               showFilterPanel || branchFilter !== "all" || statusFilter !== "all"
-                ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
-                : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
+                ? "border-[var(--cr-accent)] bg-[#EDE4C8] text-[var(--cr-primary)]"
+                : "border-[var(--cr-primary)]/15 bg-white text-[var(--cr-primary)] hover:bg-[var(--color-brand-light)]"
             }`}
           >
             <Filter size={15} />
             {(branchFilter !== "all" || statusFilter !== "all") && (
-              <span className="absolute -top-1 -end-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+              <span className="absolute -top-1 -end-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--cr-primary)] text-[9px] font-bold text-white">!</span>
             )}
           </button>
         </div>
 
         {/* Filter Panel Drawer */}
         {showFilterPanel && (
-          <div className="mb-5 grid grid-cols-1 gap-4 rounded-2xl border border-[#414E36]/10 bg-[#F9F9F7] p-4 md:grid-cols-2 items-end shadow-sm animate-fadeIn">
+          <div className="mb-5 grid grid-cols-1 gap-4 rounded-2xl border border-[var(--cr-primary)]/10 bg-[#F9F9F7] p-4 md:grid-cols-2 items-end shadow-sm animate-fadeIn">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">{t.branchFilter}</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">{t.branchFilter}</label>
               <select
                 value={branchFilter}
                 onChange={(e) => setBranchFilter(e.target.value)}
-                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
               >
                 <option value="all">{t.allBranches}</option>
                 {branches.map((b) => (
@@ -335,11 +335,11 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">{t.statusFilter}</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">{t.statusFilter}</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
               >
                 <option value="all">{t.allStatuses}</option>
                 <option value="Optimal">{t.statusOptimal}</option>
@@ -352,11 +352,11 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
         )}
 
         {/* Devices Table */}
-        <div className="rounded-[36px] bg-[#FBFBF9] p-4 sm:p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB]">
+        <div className="rounded-[36px] bg-[var(--color-brand-light)] p-4 sm:p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB]">
           <div className="overflow-x-auto rounded-[28px] border border-[#E6E9EB] bg-white">
             <table className="w-full text-sm min-w-[750px]">
               <thead>
-                <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.15em] text-[#5A6A51]">
+                <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--color-brand-secondary)]">
                   <th className="px-6 py-4 text-start">{t.thDeviceDetails}</th>
                   <th className="px-6 py-4 text-start">{t.thCategoryBranch}</th>
                   <th className="px-6 py-4 text-start">{t.thPulseThresholds}</th>
@@ -365,20 +365,20 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                   <th className="px-6 py-4 text-end">{t.thActions}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+              <tbody className="divide-y divide-[#E6E9EB] text-[var(--cr-primary)]">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-sm text-[#5A6A51]">
+                    <td colSpan={6} className="px-6 py-12 text-center text-sm text-[var(--color-brand-secondary)]">
                       <Loader2 className="inline-block animate-spin me-2" size={18} /> {t.loading}
                     </td>
                   </tr>
                 ) : filteredDevices.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-sm text-[#5A6A51]">
+                    <td colSpan={6} className="px-6 py-12 text-center text-sm text-[var(--color-brand-secondary)]">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <Gauge size={32} className="text-[#A3B19B]" />
-                        <p className="font-semibold text-[#1F251A]">{t.emptyTitle}</p>
-                        <p className="text-xs text-[#5A6A51]">{t.emptyDesc}</p>
+                        <p className="font-semibold text-[var(--cr-dark)]">{t.emptyTitle}</p>
+                        <p className="text-xs text-[var(--color-brand-secondary)]">{t.emptyDesc}</p>
                         <button
                           type="button"
                           onClick={() => {
@@ -394,7 +394,7 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                             setDeviceNotes("");
                             setShowAddModal(true);
                           }}
-                          className={`${canManage ? "inline-flex" : "hidden"} items-center gap-2 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] shadow-sm cursor-pointer`}
+                          className={`${canManage ? "inline-flex" : "hidden"} items-center gap-2 rounded-2xl bg-[var(--cr-primary)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] shadow-sm cursor-pointer`}
                         >
                           <Plus size={14} /> {t.addDeviceBtn}
                         </button>
@@ -414,12 +414,12 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                       <tr key={dev.id} className="transition hover:bg-[#F9F9F7]">
                         {/* Device Name & Serial */}
                         <td className="px-6 py-5">
-                          <div className="font-bold text-[#1F251A] text-base">{dev.name}</div>
+                          <div className="font-bold text-[var(--cr-dark)] text-base">{dev.name}</div>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs font-mono text-[#5A6A51] bg-[#F4F6F4] px-2 py-0.5 rounded-md border border-[#E6E9EB]">
+                            <span className="text-xs font-mono text-[var(--color-brand-secondary)] bg-[#F4F6F4] px-2 py-0.5 rounded-md border border-[#E6E9EB]">
                               {t.modelCellLabel} {dev.model || t.na}
                             </span>
-                            <span className="text-xs font-mono text-[#5A6A51] bg-[#F4F6F4] px-2 py-0.5 rounded-md border border-[#E6E9EB]">
+                            <span className="text-xs font-mono text-[var(--color-brand-secondary)] bg-[#F4F6F4] px-2 py-0.5 rounded-md border border-[#E6E9EB]">
                               {t.snCellLabel} {dev.serial_number || t.na}
                             </span>
                           </div>
@@ -427,8 +427,8 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
 
                         {/* Category & Branch */}
                         <td className="px-6 py-5">
-                          <div className="text-sm font-semibold text-[#1F251A]">{categoryLabel(dev.category)}</div>
-                          <div className="text-xs text-[#5A6A51] mt-0.5">
+                          <div className="text-sm font-semibold text-[var(--cr-dark)]">{categoryLabel(dev.category)}</div>
+                          <div className="text-xs text-[var(--color-brand-secondary)] mt-0.5">
                             {branchObj ? branchObj.name_en : t.allBranches}
                           </div>
                         </td>
@@ -436,10 +436,10 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                         {/* Pulse Counter Progress */}
                         <td className="px-6 py-5 min-w-[220px]">
                           <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
-                            <span className="font-mono text-sm text-[#1F251A] font-bold">
-                              {current.toLocaleString("en-GB")} <span className="text-xs text-[#5A6A51] font-normal">{t.pulses}</span>
+                            <span className="font-mono text-sm text-[var(--cr-dark)] font-bold">
+                              {current.toLocaleString("en-GB")} <span className="text-xs text-[var(--color-brand-secondary)] font-normal">{t.pulses}</span>
                             </span>
-                            <span className="text-[11px] text-[#5A6A51] font-mono">
+                            <span className="text-[11px] text-[var(--color-brand-secondary)] font-mono">
                               {t.maxLabel} {t2.toLocaleString("en-GB")}
                             </span>
                           </div>
@@ -451,7 +451,7 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                                   ? "bg-red-500"
                                   : dev.status === "Warning"
                                   ? "bg-amber-500"
-                                  : "bg-[#414E36]"
+                                  : "bg-[var(--cr-primary)]"
                               }`}
                               style={{ width: `${percent}%` }}
                             />
@@ -487,7 +487,7 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                         </td>
 
                         {/* Last Maintenance Date */}
-                        <td className="px-6 py-5 text-center text-xs font-medium text-[#5A6A51]">
+                        <td className="px-6 py-5 text-center text-xs font-medium text-[var(--color-brand-secondary)]">
                           {dev.last_maintenance_date
                             ? new Date(dev.last_maintenance_date).toLocaleDateString("en-US", {
                                 month: "short",
@@ -516,8 +516,8 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                                   }}
                                   className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border transition cursor-pointer ${
                                     activeRowMenuId === dev.id
-                                      ? "border-[#414E36] bg-[#414E36] text-white"
-                                      : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                      ? "border-[var(--cr-primary)] bg-[var(--cr-primary)] text-white"
+                                      : "border-[var(--cr-primary)]/15 bg-white text-[var(--color-brand-secondary)] hover:border-[var(--cr-accent)] hover:text-[var(--cr-primary)]"
                                   }`}
                                   title={t.actionsTitle}
                                 >
@@ -525,7 +525,7 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                                 </button>
 
                                 {activeRowMenuId === dev.id && (
-                                  <div className="absolute end-0 top-9 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu">
+                                  <div className="absolute end-0 top-9 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-xl border border-[var(--cr-primary)]/15 text-xs text-start dropdown-action-menu">
                                     {canUpdatePulses && (
                                       <button
                                         type="button"
@@ -536,9 +536,9 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                                           setNewPulseCountInput(String(dev.current_pulse_count || 0));
                                           setShowUpdatePulsesModal(true);
                                         }}
-                                        className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                                        className="w-full text-start px-3 py-2 rounded-xl hover:bg-[var(--color-brand-light)] font-semibold text-[var(--cr-dark)] flex items-center gap-2.5 transition cursor-pointer"
                                       >
-                                        <Gauge size={14} className="text-[#414E36]" />
+                                        <Gauge size={14} className="text-[var(--cr-primary)]" />
                                         <span>{t.updatePulses}</span>
                                       </button>
                                     )}
@@ -571,9 +571,9 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                                           setSelectedDeviceForHistory(dev);
                                           setShowHistoryModal(true);
                                         }}
-                                        className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                                        className="w-full text-start px-3 py-2 rounded-xl hover:bg-[var(--color-brand-light)] font-semibold text-[var(--cr-dark)] flex items-center gap-2.5 transition cursor-pointer"
                                       >
-                                        <History size={14} className="text-[#5A6A51]" />
+                                        <History size={14} className="text-[var(--color-brand-secondary)]" />
                                         <span>{t.viewHistory}</span>
                                       </button>
                                     )}
@@ -601,9 +601,9 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                                           setDeviceNotes(dev.notes || "");
                                           setShowAddModal(true);
                                         }}
-                                        className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                                        className="w-full text-start px-3 py-2 rounded-xl hover:bg-[var(--color-brand-light)] font-semibold text-[var(--cr-dark)] flex items-center gap-2.5 transition cursor-pointer"
                                       >
-                                        <Pencil size={14} className="text-[#5A6A51]" />
+                                        <Pencil size={14} className="text-[var(--color-brand-secondary)]" />
                                         <span>{t.editDevice}</span>
                                       </button>
                                     )}
@@ -628,17 +628,17 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
             <div className="w-full max-w-2xl rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
                 <div>
-                  <h3 className="text-2xl font-bold text-[#1F251A]">
+                  <h3 className="text-2xl font-bold text-[var(--cr-dark)]">
                     {editingDevice ? t.editTitle : t.addTitle}
                   </h3>
-                  <p className="text-xs text-[#5A6A51] mt-1">
+                  <p className="text-xs text-[var(--color-brand-secondary)] mt-1">
                     {t.modalSubtitle}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="rounded-full p-2 text-[#5A6A51] hover:bg-gray-100 transition"
+                  className="rounded-full p-2 text-[var(--color-brand-secondary)] hover:bg-gray-100 transition"
                 >
                   <X size={20} />
                 </button>
@@ -694,45 +694,45 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
               >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.nameLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.nameLabel}</label>
                     <input
                       type="text"
                       required
                       placeholder={t.namePlaceholder}
                       value={deviceName}
                       onChange={(e) => setDeviceName(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.modelLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.modelLabel}</label>
                     <input
                       type="text"
                       placeholder={t.modelPlaceholder}
                       value={deviceModel}
                       onChange={(e) => setDeviceModel(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.serialLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.serialLabel}</label>
                     <input
                       type="text"
                       placeholder={t.serialPlaceholder}
                       value={deviceSerial}
                       onChange={(e) => setDeviceSerial(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.categoryLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.categoryLabel}</label>
                     <select
                       value={deviceCategory}
                       onChange={(e) => setDeviceCategory(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     >
                       <option value="Laser Hair Removal">{t.catLaser}</option>
                       <option value="Facial & Skincare">{t.catFacial}</option>
@@ -745,11 +745,11 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.branchLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.branchLabel}</label>
                     <select
                       value={deviceBranchId}
                       onChange={(e) => setDeviceBranchId(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     >
                       <option value="">{t.allBranchesStorage}</option>
                       {branches.map((b) => (
@@ -760,26 +760,26 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.initialPulseLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.initialPulseLabel}</label>
                     <input
                       type="number"
                       min="0"
                       placeholder="0"
                       value={deviceInitialPulses}
                       onChange={(e) => setDeviceInitialPulses(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                   </div>
                 </div>
 
                 {/* Threshold Configuration Box */}
-                <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#E6E9EB] space-y-3">
-                  <div className="flex items-center gap-2 text-[#414E36] font-semibold text-xs uppercase tracking-wider">
+                <div className="rounded-2xl bg-[var(--color-brand-light)] p-4 border border-[#E6E9EB] space-y-3">
+                  <div className="flex items-center gap-2 text-[var(--cr-primary)] font-semibold text-xs uppercase tracking-wider">
                     <AlertTriangle size={14} className="text-amber-600" /> {t.thresholdsTitle}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-[#5A6A51] mb-1">
+                      <label className="block text-xs font-medium text-[var(--color-brand-secondary)] mb-1">
                         {t.threshold1Label}
                       </label>
                       <input
@@ -788,12 +788,12 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                         required
                         value={deviceWarningThreshold1}
                         onChange={(e) => setDeviceWarningThreshold1(e.target.value)}
-                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm font-mono text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                       <p className="text-[10px] text-[#8C9A84] mt-1">{t.threshold1Hint}</p>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-[#5A6A51] mb-1">
+                      <label className="block text-xs font-medium text-[var(--color-brand-secondary)] mb-1">
                         {t.threshold2Label}
                       </label>
                       <input
@@ -802,7 +802,7 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                         required
                         value={deviceMaintenanceThreshold2}
                         onChange={(e) => setDeviceMaintenanceThreshold2(e.target.value)}
-                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm font-mono text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-red-500"
                       />
                       <p className="text-[10px] text-[#8C9A84] mt-1">{t.threshold2Hint}</p>
                     </div>
@@ -810,12 +810,12 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                 </div>
 
                 {/* Lamp/Handpiece Replacement Cost */}
-                <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#E6E9EB] space-y-3">
-                  <div className="flex items-center gap-2 text-[#414E36] font-semibold text-xs uppercase tracking-wider">
-                    <DollarSign size={14} className="text-[#414E36]" /> {t.lampCostTitle}
+                <div className="rounded-2xl bg-[var(--color-brand-light)] p-4 border border-[#E6E9EB] space-y-3">
+                  <div className="flex items-center gap-2 text-[var(--cr-primary)] font-semibold text-xs uppercase tracking-wider">
+                    <DollarSign size={14} className="text-[var(--cr-primary)]" /> {t.lampCostTitle}
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[#5A6A51] mb-1">
+                    <label className="block text-xs font-medium text-[var(--color-brand-secondary)] mb-1">
                       {t.lampCostLabel}
                     </label>
                     <input
@@ -824,7 +824,7 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                       step="any"
                       value={deviceLampReplacementCost}
                       onChange={(e) => setDeviceLampReplacementCost(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm font-mono text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                     <p className="text-[10px] text-[#8C9A84] mt-1">
                       {t.lampCostHint(Number(deviceMaintenanceThreshold2 || 100000))}
@@ -833,13 +833,13 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.notesLabel}</label>
+                  <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.notesLabel}</label>
                   <textarea
                     rows={2}
                     placeholder={t.notesPlaceholder}
                     value={deviceNotes}
                     onChange={(e) => setDeviceNotes(e.target.value)}
-                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                   />
                 </div>
 
@@ -847,13 +847,13 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                   <button
                     type="button"
                     onClick={() => setShowAddModal(false)}
-                    className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] hover:bg-gray-50 transition"
+                    className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[var(--color-brand-secondary)] hover:bg-gray-50 transition"
                   >
                     {t.cancelBtn}
                   </button>
                   <button
                     type="submit"
-                    className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm"
+                    className="rounded-2xl bg-[var(--cr-primary)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm"
                   >
                     {editingDevice ? t.saveChangesBtn : t.createDeviceBtn}
                   </button>
@@ -869,13 +869,13 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
             <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
               <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-[#1F251A]">{t.updatePulseTitle}</h3>
-                  <p className="text-xs text-[#5A6A51] mt-1">{selectedDeviceForPulses.name} ({selectedDeviceForPulses.model})</p>
+                  <h3 className="text-xl font-bold text-[var(--cr-dark)]">{t.updatePulseTitle}</h3>
+                  <p className="text-xs text-[var(--color-brand-secondary)] mt-1">{selectedDeviceForPulses.name} ({selectedDeviceForPulses.model})</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowUpdatePulsesModal(false)}
-                  className="rounded-full p-2 text-[#5A6A51] hover:bg-gray-100 transition"
+                  className="rounded-full p-2 text-[var(--color-brand-secondary)] hover:bg-gray-100 transition"
                 >
                   <X size={20} />
                 </button>
@@ -924,30 +924,30 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                 }}
                 className="space-y-5"
               >
-                <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#E6E9EB] space-y-2 text-xs">
-                  <div className="flex justify-between text-[#5A6A51]">
+                <div className="rounded-2xl bg-[var(--color-brand-light)] p-4 border border-[#E6E9EB] space-y-2 text-xs">
+                  <div className="flex justify-between text-[var(--color-brand-secondary)]">
                     <span>{t.threshold1Display}</span>
-                    <span className="font-mono font-bold text-[#1F251A]">
+                    <span className="font-mono font-bold text-[var(--cr-dark)]">
                       {Number(selectedDeviceForPulses.warning_threshold_1 || 80000).toLocaleString("en-GB")} {t.pulses}
                     </span>
                   </div>
-                  <div className="flex justify-between text-[#5A6A51]">
+                  <div className="flex justify-between text-[var(--color-brand-secondary)]">
                     <span>{t.threshold2Display}</span>
-                    <span className="font-mono font-bold text-[#1F251A]">
+                    <span className="font-mono font-bold text-[var(--cr-dark)]">
                       {Number(selectedDeviceForPulses.maintenance_threshold_2 || 100000).toLocaleString("en-GB")} {t.pulses}
                     </span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.newPulseLabel}</label>
+                  <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.newPulseLabel}</label>
                   <input
                     type="number"
                     min="0"
                     required
                     value={newPulseCountInput}
                     onChange={(e) => setNewPulseCountInput(e.target.value)}
-                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-4 py-3 text-lg font-mono font-bold text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-4 py-3 text-lg font-mono font-bold text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                   />
                 </div>
 
@@ -985,13 +985,13 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                   <button
                     type="button"
                     onClick={() => setShowUpdatePulsesModal(false)}
-                    className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] hover:bg-gray-50 transition"
+                    className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[var(--color-brand-secondary)] hover:bg-gray-50 transition"
                   >
                     {t.cancelBtn}
                   </button>
                   <button
                     type="submit"
-                    className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm"
+                    className="rounded-2xl bg-[var(--cr-primary)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm"
                   >
                     {t.savePulseBtn}
                   </button>
@@ -1007,15 +1007,15 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
             <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
               <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-[#1F251A]">{t.resetTitle}</h3>
-                  <p className="text-xs text-[#5A6A51] mt-1">
+                  <h3 className="text-xl font-bold text-[var(--cr-dark)]">{t.resetTitle}</h3>
+                  <p className="text-xs text-[var(--color-brand-secondary)] mt-1">
                     {t.resetSubtitle(selectedDeviceForReset.name)}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowResetPulsesModal(false)}
-                  className="rounded-full p-2 text-[#5A6A51] hover:bg-gray-100 transition"
+                  className="rounded-full p-2 text-[var(--color-brand-secondary)] hover:bg-gray-100 transition"
                 >
                   <X size={20} />
                 </button>
@@ -1062,11 +1062,11 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.reasonLabel}</label>
+                  <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.reasonLabel}</label>
                   <select
                     value={resetReason}
                     onChange={(e) => setResetReason(e.target.value)}
-                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                   >
                     <option value="Routine Maintenance">{t.reasonRoutine}</option>
                     <option value="Flashlamp Replacement">{t.reasonFlashlamp}</option>
@@ -1078,24 +1078,24 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.technicianLabel}</label>
+                  <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.technicianLabel}</label>
                   <input
                     type="text"
                     placeholder={t.technicianPlaceholder}
                     value={resetPerformedBy}
                     onChange={(e) => setResetPerformedBy(e.target.value)}
-                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.serviceNotesLabel}</label>
+                  <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.serviceNotesLabel}</label>
                   <textarea
                     rows={2}
                     placeholder={t.serviceNotesPlaceholder}
                     value={resetNotes}
                     onChange={(e) => setResetNotes(e.target.value)}
-                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                   />
                 </div>
 
@@ -1103,7 +1103,7 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                   <button
                     type="button"
                     onClick={() => setShowResetPulsesModal(false)}
-                    className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] hover:bg-gray-50 transition"
+                    className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[var(--color-brand-secondary)] hover:bg-gray-50 transition"
                   >
                     {t.cancelBtn}
                   </button>
@@ -1125,13 +1125,13 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
             <div className="w-full max-w-2xl rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
                 <div>
-                  <h3 className="text-2xl font-bold text-[#1F251A]">{t.historyTitle}</h3>
-                  <p className="text-xs text-[#5A6A51] mt-1">{selectedDeviceForHistory.name} ({t.snCellLabel} {selectedDeviceForHistory.serial_number || t.na})</p>
+                  <h3 className="text-2xl font-bold text-[var(--cr-dark)]">{t.historyTitle}</h3>
+                  <p className="text-xs text-[var(--color-brand-secondary)] mt-1">{selectedDeviceForHistory.name} ({t.snCellLabel} {selectedDeviceForHistory.serial_number || t.na})</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowHistoryModal(false)}
-                  className="rounded-full p-2 text-[#5A6A51] hover:bg-gray-100 transition"
+                  className="rounded-full p-2 text-[var(--color-brand-secondary)] hover:bg-gray-100 transition"
                 >
                   <X size={20} />
                 </button>
@@ -1140,17 +1140,17 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
               {/* History Logs List */}
               <div className="space-y-4">
                 {history.filter((h) => h.device_id === selectedDeviceForHistory.id).length === 0 ? (
-                  <div className="text-center py-12 text-sm text-[#5A6A51] bg-[#FBFBF9] rounded-2xl border border-[#E6E9EB]">
+                  <div className="text-center py-12 text-sm text-[var(--color-brand-secondary)] bg-[var(--color-brand-light)] rounded-2xl border border-[#E6E9EB]">
                     {t.historyEmpty}
                   </div>
                 ) : (
                   history
                     .filter((h) => h.device_id === selectedDeviceForHistory.id)
                     .map((log) => (
-                      <div key={log.id} className="rounded-2xl border border-[#E6E9EB] bg-[#FBFBF9] p-4 space-y-2">
+                      <div key={log.id} className="rounded-2xl border border-[#E6E9EB] bg-[var(--color-brand-light)] p-4 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-[#1F251A]">{reasonLabel(log.reason)}</span>
-                          <span className="text-xs text-[#5A6A51] font-mono">
+                          <span className="text-sm font-bold text-[var(--cr-dark)]">{reasonLabel(log.reason)}</span>
+                          <span className="text-xs text-[var(--color-brand-secondary)] font-mono">
                             {new Date(log.reset_date).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
@@ -1161,27 +1161,27 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-[#5A6A51] pt-1">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-[var(--color-brand-secondary)] pt-1">
                           <div>
                             <span className="block text-[10px] uppercase text-[#8C9A84] font-semibold">{t.pulsesDelivered}</span>
-                            <span className="font-mono font-bold text-[#1F251A]">
+                            <span className="font-mono font-bold text-[var(--cr-dark)]">
                               {(log.pulses_delivered || 0).toLocaleString("en-GB")} {t.pulses}
                             </span>
                           </div>
                           <div>
                             <span className="block text-[10px] uppercase text-[#8C9A84] font-semibold">{t.endingCount}</span>
-                            <span className="font-mono text-[#1F251A]">
+                            <span className="font-mono text-[var(--cr-dark)]">
                               {(log.ending_pulse_count || 0).toLocaleString("en-GB")}
                             </span>
                           </div>
                           <div>
                             <span className="block text-[10px] uppercase text-[#8C9A84] font-semibold">{t.technician}</span>
-                            <span className="text-[#1F251A]">{log.performed_by || t.clinicAdmin}</span>
+                            <span className="text-[var(--cr-dark)]">{log.performed_by || t.clinicAdmin}</span>
                           </div>
                         </div>
 
                         {log.notes && (
-                          <p className="text-xs text-[#5A6A51] italic bg-white p-2.5 rounded-xl border border-[#E6E9EB] mt-2">
+                          <p className="text-xs text-[var(--color-brand-secondary)] italic bg-white p-2.5 rounded-xl border border-[#E6E9EB] mt-2">
                             &ldquo;{log.notes}&rdquo;
                           </p>
                         )}
@@ -1194,7 +1194,7 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                 <button
                   type="button"
                   onClick={() => setShowHistoryModal(false)}
-                  className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition"
+                  className="rounded-2xl bg-[var(--cr-primary)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition"
                 >
                   {t.closeBtn}
                 </button>

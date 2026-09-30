@@ -112,7 +112,13 @@ Correctly stored in env vars (`.env.local`):
 
 **This is clean.** Forking for client #2 only requires pointing at a new Supabase project via `.env.local`. No code changes needed for connection config.
 
-**Mitigation:** See `PROPOSALS.md` for the plan to centralize all Revera-specific values into a single `client.config.ts` file.
+**Status (2026-09-30): RESOLVED for executable identity/config and mapped brand colors — PROPOSAL-001 executed; see DEC-099.**
+
+`src/config/client.ts` is now the fork identity source for clinic names, contact/WhatsApp defaults, web presence, assets, and browser-storage prefix. All raw `/images/main_logo.png` consumers use `CLIENT.logoPath`; storage/session/BroadcastChannel keys derive from `CLIENT.storagePrefix`; per-fork seed/default labels use `CLIENT`; and the seven mapped brand literals no longer occur in `src/**/*.ts(x)` outside the CSS source of truth.
+
+Deliberate exclusions are not regressions: public/admin translation catalogs and legal Terms body text remain per-fork content; branch-list/default-branch strings remain open because no approved config field exists. Mobile-wallet number currently reuses `CLIENT.phoneTel`, the printed contact email has no `CLIENT.email` field, and Deposit Settings remain Egypt-specific. These are documented portability gaps, not a return of the original scattered-config pattern.
+
+**Manual verification:** `ai_docs/manual_tests/PROPOSAL_001_CLIENT_CONFIG_MANUAL_TESTS.md`.
 
 ---
 
@@ -4931,6 +4937,100 @@ Supervisor" created a full owner (all permissions, finance, hard deletes). The `
 check uses an exact list (`superadmin, admin, reception, receptionist`). Verified on production 2026-09-29 before
 merge: role names are exactly `superadmin` (3 employees), `receptionist` (7), `doctor` (2), `admin` (0) — nobody
 loses access. **Tests:** `tests/lib/access.test.ts` (+8), `tests/routes/customers-packages-confirm-price.test.ts` (+2).
+
+---
+
+## RISK-110: Multi-Package Previous Bookings Guessed Package Prices, Deleted Pre-Launch Pulse History, Invoiced Packages That Were Never Created, And Accepted Other Patients' Packages (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/PREVIOUS_BOOKING_MULTI_PACKAGE_MANUAL_TESTS.md`
+
+**Severity:** High · **Type:** Financial integrity / data integrity · **Found:** 2026-09-29, review of `origin/dev`
+commits `b299751`, `7daf4f1`, `1a7fc48` (multi-package Add/Edit Previous Booking, saifuldeennaser) before merging.
+**Resolved:** 2026-09-29 in merge commit `ce5e7f6` (dev) / `d1dbc84` (main) — decision recorded as **DEC-098**.
+
+The feature (several packages on one historical booking, `packages: [...]` in the request) was kept and its form left
+unchanged. The route side (`src/app/api/reservations/previous/route.ts`, POST and PATCH) had four defects:
+
+**1. A new package's price was guessed — DEC-088 item 6 regression.** A package created from a historical booking got
+`price_paid = <price the form sent>` (the catalog price) and `price_pending = false`. DEC-088 item 6 forbids guessing a
+historical package's price: the patient may have paid more or less than today's catalog price, and pulse-package revenue
+is recognised from `price_paid` (DEC-088), so every consumed pulse would be recognised at a made-up rate.
+*Example:* catalog 6,000, patient actually paid 5,000 → stored 6,000, revenue per pulse overstated by 20%.
+
+**2. Pre-launch pulse history was deleted — RISK-106 regression.** `syncPreLaunchPulseUsage` keeps one
+`package_pulse_usage` row (`reservation_id IS NULL`, `used_by = 'Pre-launch usage'`) holding the pulses used before the
+clinic used the system. The new code passed it the pulses used **in this session** (default 0); a 0 deletes the row while
+`customer_packages.pulses_used` still counts those pulses, so the usage rows no longer add up to `pulses_used`.
+*Example:* 10,000-pulse package, 3,000 used before the system + 1,000 in a live session → the 3,000 row is deleted, the
+usage history shows 1,000 used, and the deferred-package balance on the P&L reads 9,000 EGP owed instead of 6,000.
+
+**3. A package added while editing was invoiced but never created.** PATCH only updated packages that already existed.
+A package attached during an edit raised the invoice (the form adds its price) but no `customer_packages` row was
+created — the patient carried debt for a package they did not have.
+
+**4. No ownership / duplicate check; write errors ignored.** A `customerPackageId` was never checked against the
+booking's patient (another patient's package could be consumed), the same package could be attached twice, pulse totals
+of an existing package were taken from the request, and `customer_packages` / `customer_package_items` /
+pulse-sync errors were not checked.
+
+Also: the same commits rewrote the PATCH handler RISK-108 had just fixed, so a plain merge would have conflicted with,
+or silently dropped, the RISK-108 safeguards.
+
+**Fix (DEC-098):** new `src/lib/historicalPackages.ts`, the single package writer used by both POST and PATCH:
+- `resolveHistoricalPackages` — before any write: duplicate `customerPackageId` → 400; a `customerPackageId` that is not
+  this patient's (or any for a brand-new patient) → 400; a new package not in the catalog → 400 (`field: 'packages'`).
+  An existing package's pulse total is read from the database.
+- `enteredHistoricalPackagePrice` — the entered invoice value is the price only when exactly one package is attached, it
+  is new, and the booking has no service and no product; otherwise `price_pending = true`. The sent/catalog price is
+  never stored as `price_paid`.
+- `syncHistoricalPulseUsage` — pre-launch row = `(total − remaining) − Σ every other usage row` (owner-approved
+  2026-09-29), so usage rows always add up to `pulses_used`, historical usage is never recognised as revenue
+  (DEC-088 item 10), and a 0-pulse session no longer deletes the history.
+- `applyHistoricalPackage` — updates the patient's package, or creates it (PATCH finds the row this booking created
+  earlier by catalog id + `purchased_at` = booking date, so re-saving never duplicates); every write checks its error and
+  reports it (`warnings` in PATCH, per-package outcome in POST).
+- Patient balances are settled exactly once per request, never per package; the RISK-108 PATCH safeguards and POST's
+  `effectiveInvoiceValue` / `mapTransactionPaymentMethod` are kept.
+
+**Tests:** `tests/routes/reservations-previous-multi-package.test.ts` (13, asserting stored rows). Mutation-checked:
+storing the session pulses instead fails 2 tests; storing the sent price fails 8. Full suite 1271 passed.
+
+**Not done:** removing a package from a booking during an edit leaves that package's row unchanged (no automatic
+reversal of its usage); a phone change on a historical booking is still refused rather than re-linked (RISK-108).
+
+---
+
+## RISK-111: Doctor/Staff Payroll Summary Excluded Today's Revenue And Looked Up The Wrong Month's Payroll Row, In This Clinic's Own Timezone (RESOLVED)
+
+**Severity:** Medium (payroll/revenue display, not a ledger write) · **Type:** Timezone/date-boundary bug
+**Found:** 2026-09-30, while investigating 2 pre-existing `tests/components/UserProfileView.test.tsx`
+failures (introduced by an unrelated color-only refactor, `b6f45eb`, which was not their cause — both
+predate that commit). A third case for the same root cause was already written as `it.fails(...)` in
+the same file, correctly diagnosed in its own comment but never logged here.
+
+**What was wrong:** `UserProfileView.tsx`'s `getDateRange()` built the "This Month"/"Last Month"/"This
+Year" boundaries with `new Date(year, month, day).toISOString().split("T")[0]`. `new Date(year, month,
+day)` constructs **local midnight**; `.toISOString()` converts it to **UTC**. In any timezone ahead of
+UTC — including **Africa/Cairo, this clinic's own timezone (UTC+2/+3)** — local midnight on a given day
+is still the previous day in UTC, so the computed string silently lands one calendar day earlier than
+intended:
+- `monthStr` (`= startStr.slice(0, 7)`) resolved to **last month**, not the current one, so the
+  `doctor_payroll`/`hr_payroll` lookup (`.eq("month", monthStr)`) found the wrong row or no row at all
+  for the current month — a doctor/employee's Payroll Summary card showed stale or zeroed figures.
+- The **end** boundary rolled back a day too, so `.lte("date", endStr)` silently excluded **today's**
+  completed/confirmed/approved/started reservations from the "Target Progress" revenue sum — a doctor
+  who completed a session earlier today saw it uncounted until the next day.
+
+Reproduces on any machine whose local timezone is ahead of UTC (confirmed here on Africa/Cairo);
+invisible on a UTC or behind-UTC machine, which is presumably why it shipped unnoticed.
+
+**Fix:** `toLocalDateStr(d)` formats a `Date`'s own local `getFullYear()/getMonth()/getDate()` directly
+— never round-tripping through `.toISOString()` — and both `start`/`end` in `getDateRange()` now go
+through it. `src/components/admin/UserProfileView.tsx`.
+
+**Tests:** `tests/components/UserProfileView.test.tsx` — the `it.fails` case flipped to a normal
+passing `it` (fully diagnosed the same root cause on its own, just never logged here), and the two
+"target progress" tests now pass. Mutation-checked: reverting to `.toISOString()` fails 3 tests.
 
 ---
 

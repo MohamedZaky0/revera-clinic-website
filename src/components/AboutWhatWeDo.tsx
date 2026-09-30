@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function AboutWhatWeDo() {
   const { t, isRTL } = useLanguage();
@@ -21,7 +22,7 @@ export function AboutWhatWeDo() {
 
           /* ── Before/After card ── */
           .awwd-ba-card {
-            background: var(--cr-secondary, #EDF1EC);
+            background: var(--cr-secondary, var(--color-brand-tint));
             border-radius: 24px;
             overflow: hidden;
             padding: 0;
@@ -37,7 +38,7 @@ export function AboutWhatWeDo() {
             font-size: 10px;
             font-weight: 700;
             letter-spacing: 0.25em;
-            color: var(--cr-primary, #414E36);
+            color: var(--cr-primary, var(--cr-primary));
             text-transform: uppercase;
             z-index: 2;
           }
@@ -73,7 +74,7 @@ export function AboutWhatWeDo() {
           .awwd-ba-side-label.after-label  { left: 10px; }
           .awwd-ba-divider {
             height: 2px;
-            background: var(--color-brand-sand, #F2EFE9);
+            background: var(--color-brand-sand, var(--color-brand-sand));
           }
           .awwd-ba-bottom-url {
             font-size: 9px;
@@ -122,7 +123,7 @@ export function AboutWhatWeDo() {
             gap: 10px;
             padding: 13px 26px;
             border-radius: 30px;
-            background: var(--cr-secondary, #EDF1EC);
+            background: var(--cr-secondary, var(--color-brand-tint));
             border: 1.5px solid rgba(90, 106, 81, 0.4);
             color: var(--cr-primary);
             font-size: 14px;
@@ -211,7 +212,7 @@ export function AboutWhatWeDo() {
           >
             <img
               src={t.aboutPage.whatWeDoImage1 || "/images/clinic/interior.jpg"}
-              alt="Revera care"
+              alt={`${CLIENT.nameShort} care`}
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
           </div>
@@ -231,7 +232,7 @@ export function AboutWhatWeDo() {
               }}
             >
               <img 
-                src="/images/main_logo.png" 
+                src={CLIENT.logoPath} 
                 alt="" 
                 style={{ width: 44, height: 44, objectFit: "contain", flexShrink: 0 }} 
               />
@@ -269,7 +270,7 @@ export function AboutWhatWeDo() {
                 margin: "0 0 24px",
                 fontSize: "14px",
                 lineHeight: 1.75,
-                color: "var(--cr-muted-foreground, #5A6A51)",
+                color: "var(--cr-muted-foreground, var(--color-brand-secondary))",
               }}
             >
               {t.aboutPage.whatWeDoDescription}

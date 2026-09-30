@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function TestimonialsSection() {
   const { t, isRTL } = useLanguage();
@@ -49,7 +50,7 @@ export function TestimonialsSection() {
         <div
           style={{
             position: "relative",
-            backgroundColor: "var(--cr-primary, #414E36)",
+            backgroundColor: "var(--cr-primary, var(--cr-primary))",
             borderRadius: "32px",
             border: "1px solid rgba(196,174,124,0.35)",
             overflow: "hidden",
@@ -307,7 +308,7 @@ export function TestimonialsSection() {
                       }}
                     >
                       <Image
-                        src="/images/main_logo.png"
+                        src={CLIENT.logoPath}
                         alt=""
                         width={20}
                         height={20}

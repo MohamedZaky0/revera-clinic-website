@@ -10,7 +10,70 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 35 — Receptionist checkout owns the pulse deficit; the doctor screen only records pulses
+No brief is currently active — Brief 35 landed and is archived below. The items below are queued but
+not yet written up; write one before handing it to Windsurf.
+
+### Queued, not yet written
+
+- **Brief C — master per-pulse price location** (device vs service vs clinic default). Product decision pending. Briefs 34/34B/35 resolve the rate only through the fallback chain (reservation snapshot → clinic default → error) so they stay valid whichever is chosen.
+- **Brief D — FEFO across active packages.** Under DEC-079 there is only one deficit-resolution path (reception's), so Brief D only extends `POST /api/reservations/laser-deficit` to drain **all** of a patient's active pulses packages, earliest expiry first, calling `consume_package_pulses` once per package in a loop.
+- Translation of the Pages Settings tabs extracted in Brief 27 is also an obvious next brief, not yet written.
+
+### Decisions log for Mohamed
+
+**Decided:**
+- The doctor's screen never sells packages, never shows package pricing, and never chooses how a
+  deficit is paid — reception's checkout is the only place that happens → **DEC-079**, Brief 35.
+- FEFO across active packages, earliest expiry first → **Brief D**, applied to reception's single path.
+- Move the pulse balance off the `page_settings` blob → **Brief 34B**.
+- Package total pulses come from the real `total_pulses` column only; unknown is an error the user resolves in Admin → Packages, never a guess → **Brief 34B** items (4)/(5).
+
+**Still open (do NOT decide these in code):**
+1. Where the master per-pulse price lives (Brief C).
+2. `packages.total_pulses` is `NOT NULL DEFAULT 0`, so "unset" and "zero" are indistinguishable. Brief 34B assumes 0 = unset and refuses. Confirm no legitimate zero-quota pulses package exists.
+3. Whether the doctor screen needs the neutral "reception will resolve this" notice at all, or whether
+   silence is preferable — implemented per DEC-079's spirit ("the doctor should still know to tell the
+   patient"), but Mohamed should confirm this is the right amount of doctor-facing signal.
+
+---
+
+# ARCHIVE — completed briefs
+
+Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
+(RISK-038 … RISK-050), which is the authoritative account.
+
+### Brief 35 — Receptionist checkout owns the pulse deficit; the doctor screen only records pulses (completed 2026-09-25)
+
+Landed in the required order (the Method section's two phases): the server operation
+(`POST /api/reservations/laser-deficit`), `LaserDeficitPrompt.tsx`, and the wiring into the Checkout
+modal and `BookingDetailsModal.tsx`'s end-session flow first (`ffddf8c`, merged into `main` — design
+recorded in **DEC-080**), then the doctor-side removal (`DoctorAccountView.tsx`'s 3A/3B branch and
+`DoctorOngoingSessionTab.tsx`'s choice UI deleted, per **DEC-095**/**DEC-096**).
+
+**Three real bugs found live-verifying the route against the real dev database, not by the automated
+tests — see RISK-099, RISK-100, RISK-101:**
+- **RISK-099** (`c5ddc89`, `bb5f951`) — four separate breaks that kept the real doctor → reception flow
+  from ever reaching the prompt: the doctor's PATCH never persisted `delivered_pulses`; the reception
+  drawer showed "Invoice Settled & Paid" with no way to reopen it; a resolved `PAY_PER_PULSE` deficit
+  never added its charge to `amount_left`; `BookingDetailsModal`'s end-session surface did not gate on
+  the deficit until a later fix.
+- **RISK-100** (`463dc9b`) — a resolved `PAY_PER_PULSE` deficit moved real cash on the booking/customer
+  scalars but wrote nothing to `invoices`/`invoice_lines`/`payments`/`transactions`; fixed by syncing the
+  ledger on resolve and on the checkout payment.
+- **RISK-101** (`829c9d7`) — a `services.name` column that does not exist broke invoice-writing on
+  **every** completed booking, not only laser ones; found while verifying this brief's own completion
+  path.
+
+Evidence log: `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_35_MANUAL_TESTS.md` — most cases verified in the
+real browser (2026-09-24/25); a handful of narrower cases (BUY_NEW_PACKAGE through
+`BookingDetailsModal`'s surface, a few failure-mode refusals) were verified at the API/route level or by
+source review only, left unchecked as an explicit follow-up, same convention as Brief 34B.
+
+**Extended since, not part of this brief's scope:** later `origin/dev` work under DEC-085/086 added a
+separate universal-deficit-detection and in-booking package-purchase path on top of this one — see those
+`DECISIONS.md` entries and RISK-105/RISK-110 for what was found there.
+
+### Brief 35 body (original ask, for reference)
 
 **Brief 34B has landed and been live-verified (2026-09-23) — archived below.** This brief is now
 active; Windsurf may start it.
@@ -202,38 +265,6 @@ the reception-side additions. The migration is unapplied — say so. Plus the st
 Notes block, `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_35_MANUAL_TESTS.md`, a `DECISIONS.md` entry for
 the server-operation + marker design (referencing DEC-079), and a `RISKS.md` entry for anything you
 found and did not fix.
-
-### Queued, not yet written
-
-- **Brief C — master per-pulse price location** (device vs service vs clinic default). Product decision pending. Briefs 34/34B/35 resolve the rate only through the fallback chain (reservation snapshot → clinic default → error) so they stay valid whichever is chosen.
-- **Brief D — FEFO across active packages.** Under DEC-079 there is only one deficit-resolution path (reception's), so Brief D no longer needs to "unify" anything — it only extends Brief 35's server operation to drain **all** of a patient's active pulses packages, earliest expiry first, calling Brief 34B's `consume_package_pulses` once per package in a loop.
-- Translation of the Pages Settings tabs extracted in Brief 27 is also an obvious next brief, not yet written.
-
-### Decisions log for Mohamed
-
-**Decided:**
-- The doctor's screen never sells packages, never shows package pricing, and never chooses how a
-  deficit is paid — reception's checkout is the only place that happens → **DEC-079**, this brief.
-- FEFO across active packages, earliest expiry first → **Brief D**, applied to reception's single path
-  (no longer "doctor and checkout paths together" — there is only one path after this brief).
-- Move the pulse balance off the `page_settings` blob → **Brief 34B**.
-- Package total pulses come from the real `total_pulses` column only; unknown is an error the user resolves in Admin → Packages, never a guess → **Brief 34B** items (4)/(5).
-
-**Still open (do NOT decide these in code):**
-1. Where the master per-pulse price lives (Brief C).
-2. `packages.total_pulses` is `NOT NULL DEFAULT 0`, so "unset" and "zero" are indistinguishable. Brief 34B assumes 0 = unset and refuses. Confirm no legitimate zero-quota pulses package exists.
-3. The live DB cannot be inspected from code: `DB_SCHEMA.md` had a duplicate, wrong `customer_packages` block (columns no migration creates). Brief 34B assumes the migrations are right and the doc was wrong; if the live DB was hand-edited the backfill changes.
-4. Whether the doctor screen needs the neutral "reception will resolve this" notice at all, or whether
-   silence is preferable — implemented here as a notice per DEC-079's spirit ("the doctor should still
-   know to tell the patient"), but Mohamed should confirm this is the right amount of doctor-facing
-   signal, not too little or too much.
----
----
-
-# ARCHIVE — completed briefs
-
-Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
-(RISK-038 … RISK-050), which is the authoritative account.
 
 ### Brief 34B — Laser package pulses: move the balance off the JSON blob (completed 2026-09-23)
 

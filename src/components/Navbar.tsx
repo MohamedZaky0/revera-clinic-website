@@ -55,7 +55,7 @@ export function Navbar() {
     };
 
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === "revera_settings_sync" && e.newValue) {
+      if (e.key === `${CLIENT.storagePrefix}_settings_sync` && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
           if (parsed.showCustomerLogin !== undefined) {
@@ -73,7 +73,7 @@ export function Navbar() {
     let bc: BroadcastChannel | null = null;
     if (typeof BroadcastChannel !== "undefined") {
       try {
-        bc = new BroadcastChannel("revera_channel");
+        bc = new BroadcastChannel(`${CLIENT.storagePrefix}_channel`);
         bc.onmessage = (ev) => {
           if (ev.data?.type === "settings_updated") {
             if (ev.data.showCustomerLogin !== undefined) {
@@ -104,7 +104,7 @@ export function Navbar() {
 
   useEffect(() => {
     const checkUser = () => {
-      const stored = localStorage.getItem("revera_user");
+      const stored = localStorage.getItem(`${CLIENT.storagePrefix}_user`);
       if (stored) {
         try {
           setUser(JSON.parse(stored));
@@ -123,8 +123,8 @@ export function Navbar() {
       supabase.auth.onAuthStateChange(async (event: any, session: any) => {
         if (!session?.user) {
           if (event === "SIGNED_OUT") {
-            localStorage.removeItem("revera_user");
-            sessionStorage.removeItem("revera_profile_prompted");
+            localStorage.removeItem(`${CLIENT.storagePrefix}_user`);
+            sessionStorage.removeItem(`${CLIENT.storagePrefix}_profile_prompted`);
             setUser(null);
             window.dispatchEvent(new CustomEvent("revera-auth-change"));
           }
@@ -168,7 +168,7 @@ export function Navbar() {
   };
 
   const handleLogout = async () => {
-    localStorage.removeItem("revera_user");
+    localStorage.removeItem(`${CLIENT.storagePrefix}_user`);
     setUser(null);
     window.dispatchEvent(new CustomEvent("revera-auth-change"));
     if (supabase) {
@@ -217,7 +217,7 @@ export function Navbar() {
           {/* Logo */}
           <Link href="/" className="shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/main_logo.png" alt="Revera Clinics" className="h-10 lg:h-[72px] w-auto" />
+            <img src={CLIENT.logoPath} alt={CLIENT.name} className="h-10 lg:h-[72px] w-auto" />
           </Link>
 
           {/* Desktop nav links */}
@@ -636,7 +636,7 @@ export function Navbar() {
                           height: "36px",
                           borderRadius: "10px",
                           background: showCustomerLogin ? "#EBF0E6" : "#EBEBEB",
-                          color: showCustomerLogin ? "#414E36" : "#888888",
+                          color: showCustomerLogin ? "var(--cr-primary)" : "#888888",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -647,7 +647,7 @@ export function Navbar() {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
-                          <span style={{ fontSize: "13px", fontWeight: 700, color: "#1F251A" }}>
+                          <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--cr-dark)" }}>
                             {t.nav.customerLogin || "Patient & Customer Login"}
                           </span>
                           {!showCustomerLogin && (
@@ -702,7 +702,7 @@ export function Navbar() {
                           height: "36px",
                           borderRadius: "10px",
                           background: "#FAF0E6",
-                          color: "#C4AE7C",
+                          color: "var(--cr-accent)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -713,7 +713,7 @@ export function Navbar() {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
-                          <span style={{ fontSize: "13px", fontWeight: 700, color: "#1F251A" }}>
+                          <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--cr-dark)" }}>
                             {t.nav.staffLogin || "Clinic Staff & Doctors"}
                           </span>
                           <span
@@ -723,7 +723,7 @@ export function Navbar() {
                               padding: "2px 6px",
                               borderRadius: "6px",
                               background: "rgba(65, 78, 54, 0.1)",
-                              color: "#414E36",
+                              color: "var(--cr-primary)",
                             }}
                           >
                             Portal

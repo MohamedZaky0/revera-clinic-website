@@ -189,14 +189,14 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold text-[#1F251A]">{t.heading}</h2>
+        <h2 className="text-2xl font-semibold text-[var(--cr-dark)]">{t.heading}</h2>
         <div className="flex flex-wrap items-center gap-2">
-          <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/30 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#414E36]/5">
+          <button className="inline-flex items-center gap-2 rounded-lg border border-[var(--cr-primary)]/30 bg-white px-4 py-2 text-sm font-medium text-[var(--cr-primary)] shadow-sm transition hover:bg-[var(--cr-primary)]/5">
             <Upload size={14} /> {t.importBtn}
           </button>
           <button
             onClick={() => setShowAddCategoryModal(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-4 py-2 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer"
+            className="inline-flex items-center gap-2 rounded-xl bg-[var(--cr-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-brand-light)] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer"
           >
             <Plus size={14} /> {t.addCategoryBtn}
           </button>
@@ -208,12 +208,12 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
         <div className="flex flex-wrap items-center gap-3 flex-1">
           <div className="relative max-w-xs flex-1 min-w-[220px] flex items-center gap-2">
             <div className="relative flex-1">
-              <Search size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+              <Search size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]" />
               <input
                 value={serviceSearch}
                 onChange={(e) => { setServiceSearch(e.target.value); }}
                 placeholder={t.searchPlaceholder}
-                className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2 ps-9 pe-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 shadow-2xs"
+                className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white py-2 ps-9 pe-4 text-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20 shadow-2xs"
               />
             </div>
             <button
@@ -222,23 +222,23 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
               title={t.filterTitle}
               className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs ${
                 showServiceFilterPanel || serviceFilterStatus !== "All"
-                  ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
-                  : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
+                  ? "border-[var(--cr-accent)] bg-[#EDE4C8] text-[var(--cr-primary)]"
+                  : "border-[var(--cr-primary)]/15 bg-white text-[var(--cr-primary)] hover:bg-[var(--color-brand-light)]"
               }`}
             >
               <Filter size={15} />
               {serviceFilterStatus !== "All" && (
-                <span className="absolute -top-1 -end-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+                <span className="absolute -top-1 -end-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--cr-primary)] text-[9px] font-bold text-white">!</span>
               )}
             </button>
           </div>
 
           <div className="flex items-center gap-2">
-            <ArrowUpDown size={14} className="text-[#5A6A51]" />
+            <ArrowUpDown size={14} className="text-[var(--color-brand-secondary)]" />
             <select
               value={serviceSortBy}
               onChange={(e) => setServiceSortBy(e.target.value as any)}
-              className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#414E36] outline-none transition focus:border-[#C4AE7C] shadow-2xs cursor-pointer"
+              className="rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[var(--cr-primary)] outline-none transition focus:border-[var(--cr-accent)] shadow-2xs cursor-pointer"
             >
               <option value="custom">{t.sortDefault}</option>
               <option value="name_asc">{t.sortNameAsc}</option>
@@ -257,7 +257,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
             const newStates = Object.fromEntries(localCategories.map(c => [c.key, !allExpanded]));
             setExpandedCategories(newStates);
           }}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#F9F9F7] transition shadow-2xs"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[var(--cr-primary)] hover:bg-[#F9F9F7] transition shadow-2xs"
         >
           {localCategories.every(c => expandedCategories[c.key] ?? true) ? t.collapseAll : t.expandAll}
         </button>
@@ -265,13 +265,13 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
       {/* Dynamic Services Filter Panel */}
       {showServiceFilterPanel && (
-        <div className="mb-5 grid grid-cols-1 gap-4 rounded-2xl border border-[#414E36]/10 bg-[#F9F9F7] p-4 md:grid-cols-3 items-end shadow-sm animate-fadeIn">
+        <div className="mb-5 grid grid-cols-1 gap-4 rounded-2xl border border-[var(--cr-primary)]/10 bg-[#F9F9F7] p-4 md:grid-cols-3 items-end shadow-sm animate-fadeIn">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">{t.statusFilterLabel}</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">{t.statusFilterLabel}</label>
             <select
               value={serviceFilterStatus}
               onChange={(e) => setServiceFilterStatus(e.target.value as any)}
-              className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
             >
               <option value="All">{t.allStatuses}</option>
               <option value="Active">{t.activeOnly}</option>
@@ -374,14 +374,14 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
           if (sortedCategories.length === 0) {
             return (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#414E36]/20 bg-[#F9F9F7] py-16 px-4 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36] mb-3">
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--cr-primary)]/20 bg-[#F9F9F7] py-16 px-4 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-brand-tint)] text-[var(--cr-primary)] mb-3">
                   <Layers size={22} />
                 </div>
-                <h4 className="text-base font-bold text-[#1F251A] mb-1">
+                <h4 className="text-base font-bold text-[var(--cr-dark)] mb-1">
                   {lang === "ar" ? "لا توجد أقسام مسجلة" : "No Categories Created Yet"}
                 </h4>
-                <p className="text-xs text-[#5A6A51] max-w-sm mb-4">
+                <p className="text-xs text-[var(--color-brand-secondary)] max-w-sm mb-4">
                   {lang === "ar"
                     ? "ابدأ بإضافة قسم جديد للخدمات لتنظيم خدمات العيادة والأسعار."
                     : "Get started by adding a service category to organize your clinic's services and pricing."}
@@ -389,7 +389,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 <button
                   type="button"
                   onClick={() => setShowAddCategoryModal(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--cr-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-brand-light)] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer"
                 >
                   <Plus size={14} /> {t.addCategoryBtn}
                 </button>
@@ -451,10 +451,10 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 setDraggedCatKey(null);
                 setDragOverCatKey(null);
               }}
-              className={`overflow-hidden rounded-2xl border border-[#414E36]/10 bg-white shadow-sm transition-all ${
-                draggedCatKey === cat.key ? "opacity-30 bg-[#F2EFE9]" : ""
+              className={`overflow-hidden rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm transition-all ${
+                draggedCatKey === cat.key ? "opacity-30 bg-[var(--color-brand-sand)]" : ""
               } ${
-                dragOverCatKey === cat.key ? "border-t-2 border-t-[#C4AE7C]" : ""
+                dragOverCatKey === cat.key ? "border-t-2 border-t-[var(--cr-accent)]" : ""
               }`}
             >
               {/* Category header row */}
@@ -468,18 +468,18 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     onMouseEnter={() => setCatDraggable(prev => ({ ...prev, [cat.key]: true }))}
                     onMouseLeave={() => setCatDraggable(prev => ({ ...prev, [cat.key]: false }))}
                     onClick={(e) => e.stopPropagation()}
-                    className="cursor-grab active:cursor-grabbing inline-flex h-7 w-7 items-center justify-center rounded border border-[#414E36]/10 bg-white text-[#5A6A51]/60 hover:bg-[#F2EFE9] hover:text-[#414E36] transition"
+                    className="cursor-grab active:cursor-grabbing inline-flex h-7 w-7 items-center justify-center rounded border border-[var(--cr-primary)]/10 bg-white text-[var(--color-brand-secondary)]/60 hover:bg-[var(--color-brand-sand)] hover:text-[var(--cr-primary)] transition"
                     title={t.dragReorderCategory}
                   >
                     <GripVertical size={14} />
                   </div>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EDF1EC]">
-                    <Layers size={16} className="text-[#414E36]" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-brand-tint)]">
+                    <Layers size={16} className="text-[var(--cr-primary)]" />
                   </div>
                   <div className="text-start">
-                    <p className="font-semibold text-[#1F251A]">{cat.en}</p>
+                    <p className="font-semibold text-[var(--cr-dark)]">{cat.en}</p>
                   </div>
-                  <span className="ms-1 inline-flex items-center rounded-full bg-[#414E36]/8 px-2.5 py-0.5 text-xs font-semibold text-[#414E36]">
+                  <span className="ms-1 inline-flex items-center rounded-full bg-[var(--cr-primary)]/8 px-2.5 py-0.5 text-xs font-semibold text-[var(--cr-primary)]">
                     {catServices.length} {catServices.length !== 1 ? t.serviceCountSuffixPlural : t.serviceCountSuffix}
                   </span>
                 </div>
@@ -519,11 +519,11 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       setEditingService(null);
                       setShowAddServiceModal(true);
                     }}
-                    className={`${hasPermission("services.create") ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-xl bg-[#414E36] px-3.5 py-1.5 text-xs font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer`}
+                    className={`${hasPermission("services.create") ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-xl bg-[var(--cr-primary)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-brand-light)] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer`}
                   >
                     <Plus size={12} /> {t.addServiceBtn}
                   </button>
-                  <span className="text-[#5A6A51] transition-transform duration-200" style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
+                  <span className="text-[var(--color-brand-secondary)] transition-transform duration-200" style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
                     <ChevronDown size={18} />
                   </span>
                 </div>
@@ -531,14 +531,14 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
               {/* Services sub-table */}
               {isExpanded && (
-                <div className="border-t border-[#414E36]/8">
+                <div className="border-t border-[var(--cr-primary)]/8">
                   {catServices.length === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#EDF1EC]">
-                        <Layers size={20} className="text-[#5A6A51]" />
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-brand-tint)]">
+                        <Layers size={20} className="text-[var(--color-brand-secondary)]" />
                       </div>
-                      <p className="text-sm font-medium text-[#1F251A]">{t.noServicesYet}</p>
-                      <p className="text-xs text-[#5A6A51]">{t.noServicesHint}</p>
+                      <p className="text-sm font-medium text-[var(--cr-dark)]">{t.noServicesYet}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)]">{t.noServicesHint}</p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
@@ -546,17 +546,17 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                         <thead>
                           <tr className="bg-[#F9F9F7]">
                             <th className="w-10 px-3 py-2.5"></th>
-                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colId}</th>
-                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colName}</th>
-                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colCreatedAt}</th>
-                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colBranchPrice}</th>
-                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colBranches}</th>
-                            <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colSortOrder}</th>
-                            <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colStatus}</th>
+                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colId}</th>
+                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colName}</th>
+                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colCreatedAt}</th>
+                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colBranchPrice}</th>
+                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colBranches}</th>
+                            <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colSortOrder}</th>
+                            <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colStatus}</th>
                             <th className="px-3 py-2.5"></th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#414E36]/6">
+                        <tbody className="divide-y divide-[var(--cr-primary)]/6">
                           {catServices.map((svc) => {
                             const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
                             const isInactive = !toggles.active;
@@ -586,9 +586,9 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                   setDragOverServiceId(null);
                                 }}
                                 className={`transition ${
-                                  draggedServiceId === svc.id ? "opacity-30 bg-[#F2EFE9]" : ""
+                                  draggedServiceId === svc.id ? "opacity-30 bg-[var(--color-brand-sand)]" : ""
                                 } ${
-                                  dragOverServiceId === svc.id ? "border-t-2 border-t-[#C4AE7C]" : ""
+                                  dragOverServiceId === svc.id ? "border-t-2 border-t-[var(--cr-accent)]" : ""
                                 } ${
                                   rowFaded ? "opacity-50 bg-[#F9F9F7]" : "hover:bg-[#F9F9F7]"
                                 }`}
@@ -598,16 +598,16 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                   <div
                                     onMouseEnter={() => setRowDraggable(prev => ({ ...prev, [svc.id]: true }))}
                                     onMouseLeave={() => setRowDraggable(prev => ({ ...prev, [svc.id]: false }))}
-                                    className="cursor-grab active:cursor-grabbing inline-flex h-7 w-7 items-center justify-center rounded border border-[#414E36]/10 bg-white text-[#5A6A51]/60 hover:bg-[#F2EFE9] hover:text-[#414E36] transition"
+                                    className="cursor-grab active:cursor-grabbing inline-flex h-7 w-7 items-center justify-center rounded border border-[var(--cr-primary)]/10 bg-white text-[var(--color-brand-secondary)]/60 hover:bg-[var(--color-brand-sand)] hover:text-[var(--cr-primary)] transition"
                                     title={t.dragReorder}
                                   >
                                     <GripVertical size={14} />
                                   </div>
                                 </td>
-                                <td className="px-5 py-3 font-mono text-xs text-[#5A6A51]">{svc.id}</td>
+                                <td className="px-5 py-3 font-mono text-xs text-[var(--color-brand-secondary)]">{svc.id}</td>
                                 <td className="px-5 py-3">
                                   <div className="flex items-center gap-2">
-                                    <p className={`font-semibold ${ rowFaded ? "line-through text-[#5A6A51]" : "text-[#1F251A]" }`}>{svc.en}</p>
+                                    <p className={`font-semibold ${ rowFaded ? "line-through text-[var(--color-brand-secondary)]" : "text-[var(--cr-dark)]" }`}>{svc.en}</p>
                                     {(svc.islaser || svc.is_laser || checkIsLaserService(svc)) && (
                                       <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
                                         <Sparkles size={11} className="text-emerald-600" />
@@ -619,10 +619,10 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-5 py-3 text-[#5A6A51]">
+                                <td className="px-5 py-3 text-[var(--color-brand-secondary)]">
                                   {svc.createdAt ? (
                                     <>
-                                      <span className="block text-sm font-medium text-[#1F251A]">
+                                      <span className="block text-sm font-medium text-[var(--cr-dark)]">
                                         {svc.createdAt.split(" ").slice(0, 2).join(" ")}
                                       </span>
                                       <span className="text-xs">
@@ -631,33 +631,33 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                     </>
                                   ) : (
                                     <>
-                                      <span className="block text-sm font-medium text-[#1F251A]">30 Apr</span>
+                                      <span className="block text-sm font-medium text-[var(--cr-dark)]">30 Apr</span>
                                       <span className="text-xs">2:01 pm</span>
                                     </>
                                   )}
                                 </td>
                                 <td className="px-5 py-3">
-                                  <span className="font-medium text-[#C4AE7C]">EGP {svc.price ?? 0}</span>
+                                  <span className="font-medium text-[var(--cr-accent)]">EGP {svc.price ?? 0}</span>
                                 </td>
-                                <td className="px-5 py-3 text-xs text-[#5A6A51] max-w-[200px] truncate">
+                                <td className="px-5 py-3 text-xs text-[var(--color-brand-secondary)] max-w-[200px] truncate">
                                   {Array.isArray(svc.branchPricing) && svc.branchPricing.length > 0 ? (
                                     svc.branchPricing.map((bp) => (
                                       <div key={bp.name} className="flex items-center gap-1.5 mb-0.5 text-[11px]">
-                                        <span className="font-medium text-[#1F251A]">{bp.name}:</span>
-                                        <span className="text-[#C4AE7C]">EGP {bp.price}</span>
-                                        {bp.isDefault && <span className="text-[8px] bg-[#414E36]/10 text-[#414E36] px-1 rounded font-bold">Def</span>}
+                                        <span className="font-medium text-[var(--cr-dark)]">{bp.name}:</span>
+                                        <span className="text-[var(--cr-accent)]">EGP {bp.price}</span>
+                                        {bp.isDefault && <span className="text-[8px] bg-[var(--cr-primary)]/10 text-[var(--cr-primary)] px-1 rounded font-bold">Def</span>}
                                       </div>
                                     ))
                                   ) : (
                                     <div className="flex items-center gap-1.5 text-[11px]">
-                                      <span className="font-medium text-[#1F251A]">Zayed:</span>
-                                      <span className="text-[#C4AE7C]">EGP {svc.price ?? 0}</span>
-                                      <span className="text-[8px] bg-[#414E36]/10 text-[#414E36] px-1 rounded font-bold">Def</span>
+                                      <span className="font-medium text-[var(--cr-dark)]">Zayed:</span>
+                                      <span className="text-[var(--cr-accent)]">EGP {svc.price ?? 0}</span>
+                                      <span className="text-[8px] bg-[var(--cr-primary)]/10 text-[var(--cr-primary)] px-1 rounded font-bold">Def</span>
                                     </div>
                                   )}
                                 </td>
                                 <td className="px-5 py-3 text-center">
-                                  <span className="font-medium text-[#1F251A]">{svc.sortOrder ?? 0}</span>
+                                  <span className="font-medium text-[var(--cr-dark)]">{svc.sortOrder ?? 0}</span>
                                 </td>
                                 {/* Status Badge */}
                                 <td className="px-5 py-3 text-center">
@@ -687,8 +687,8 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                           }}
                                           className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
                                             activeServiceRowMenuId === svc.id
-                                              ? "border-[#414E36] bg-[#414E36] text-white"
-                                              : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                              ? "border-[var(--cr-primary)] bg-[var(--cr-primary)] text-white"
+                                              : "border-[var(--cr-primary)]/15 bg-white text-[var(--color-brand-secondary)] hover:border-[var(--cr-accent)] hover:text-[var(--cr-primary)]"
                                           }`}
                                           title={t.actionsTitle}
                                         >
@@ -696,7 +696,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                         </button>
 
                                         {activeServiceRowMenuId === svc.id && (
-                                          <div className="absolute end-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu">
+                                          <div className="absolute end-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[var(--cr-primary)]/15 text-xs text-start dropdown-action-menu">
                                             {canEdit && (
                                               <button
                                                 type="button"
@@ -705,9 +705,9 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                                   setActiveServiceRowMenuId(null);
                                                   handleEditService(svc);
                                                 }}
-                                                className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                                                className="w-full text-start px-3 py-2 rounded-lg hover:bg-[var(--color-brand-light)] font-semibold text-[var(--cr-dark)] flex items-center gap-2 transition cursor-pointer"
                                               >
-                                                <Pencil size={13} className="text-[#5A6A51]" />
+                                                <Pencil size={13} className="text-[var(--color-brand-secondary)]" />
                                                 <span>{t.editService}</span>
                                               </button>
                                             )}
@@ -719,13 +719,13 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                                   e.stopPropagation();
                                                   toggleService(svc.id, "active");
                                                 }}
-                                                className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center justify-between transition cursor-pointer"
+                                                className="w-full text-start px-3 py-2 rounded-lg hover:bg-[var(--color-brand-light)] font-semibold text-[var(--cr-dark)] flex items-center justify-between transition cursor-pointer"
                                               >
                                                 <div className="flex items-center gap-2">
                                                   <span className={`h-2 w-2 rounded-full ${toggles.active ? "bg-emerald-500" : "bg-gray-300"}`} />
                                                   <span>{toggles.active ? t.deactivate : t.activate}</span>
                                                 </div>
-                                                <span className="text-[10px] font-bold text-[#5A6A51] bg-[#F2EFE9] px-1.5 py-0.5 rounded">
+                                                <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] bg-[var(--color-brand-sand)] px-1.5 py-0.5 rounded">
                                                   {toggles.active ? t.statusActive : t.statusOff}
                                                 </span>
                                               </button>
@@ -767,11 +767,11 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
       </div>
 
       {/* Summary bar */}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#414E36]/8 bg-white px-4 py-3 text-sm text-[#5A6A51] shadow-sm">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--cr-primary)]/8 bg-white px-4 py-3 text-sm text-[var(--color-brand-secondary)] shadow-sm">
         <span>{t.summaryTotal(filteredServices.length, localCategories.length)}</span>
         <button
           onClick={() => setExpandedCategories(prev => Object.fromEntries(Object.keys(prev).map(k => [k, true])))}
-          className="text-xs font-medium text-[#414E36] underline-offset-2 hover:underline"
+          className="text-xs font-medium text-[var(--cr-primary)] underline-offset-2 hover:underline"
         >
           {t.expandAll}
         </button>
@@ -780,7 +780,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
       {/* ── DELETE CATEGORY CONFIRMATION MODAL ── */}
       {deleteCategoryTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-[#414E36]/10 animate-fadeIn">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-[var(--cr-primary)]/10 animate-fadeIn">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -789,17 +789,17 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                   <line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-[#1F251A]">{t.deleteCategoryTitle}</h3>
+              <h3 className="text-lg font-bold text-[var(--cr-dark)]">{t.deleteCategoryTitle}</h3>
             </div>
             
-            <p className="text-sm text-[#5A6A51] leading-relaxed mb-6">
+            <p className="text-sm text-[var(--color-brand-secondary)] leading-relaxed mb-6">
               {t.deleteCategoryConfirm(deleteCategoryTarget.en)}
             </p>
 
-            <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/8 pt-4">
+            <div className="flex items-center justify-end gap-3 border-t border-[var(--cr-primary)]/8 pt-4">
               <button
                 onClick={() => setDeleteCategoryTarget(null)}
-                className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
+                className="rounded-lg border border-[var(--cr-primary)]/15 px-4 py-2 text-sm font-medium text-[var(--cr-primary)] transition hover:bg-[#F9F9F7]"
               >
                 {t.cancelBtn}
               </button>
@@ -820,25 +820,25 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
       {/* ── DELETE SERVICE CONFIRMATION MODAL ── */}
       {deleteServiceTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-[#414E36]/10 animate-fadeIn">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-[var(--cr-primary)]/10 animate-fadeIn">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600">
                 <Trash2 size={20} />
               </div>
-              <h3 className="text-lg font-bold text-[#1F251A]">{t.deleteServiceTitle}</h3>
+              <h3 className="text-lg font-bold text-[var(--cr-dark)]">{t.deleteServiceTitle}</h3>
             </div>
             
-            <p className="text-sm text-[#5A6A51] leading-relaxed mb-6">
+            <p className="text-sm text-[var(--color-brand-secondary)] leading-relaxed mb-6">
               {t.deleteServiceConfirm(deleteServiceTarget.en)}
             </p>
 
-            <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/8 pt-4">
+            <div className="flex items-center justify-end gap-3 border-t border-[var(--cr-primary)]/8 pt-4">
               <button
                 onClick={() => {
                   setDeleteServiceTarget(null);
                   setShowAddServiceModal(true);
                 }}
-                className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
+                className="rounded-lg border border-[var(--cr-primary)]/15 px-4 py-2 text-sm font-medium text-[var(--cr-primary)] transition hover:bg-[#F9F9F7]"
               >
                 {t.cancelBtn}
               </button>
@@ -866,33 +866,33 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-lg font-semibold text-[#1F251A]">{t.addNewCategoryTitle}</h3>
-                <p className="text-sm text-[#5A6A51]">{t.addNewCategorySubtitle}</p>
+                <h3 className="text-lg font-semibold text-[var(--cr-dark)]">{t.addNewCategoryTitle}</h3>
+                <p className="text-sm text-[var(--color-brand-secondary)]">{t.addNewCategorySubtitle}</p>
               </div>
               <button
                 onClick={() => setShowAddCategoryModal(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] hover:bg-[#F9F9F7]"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] hover:bg-[#F9F9F7]"
               >
                 ✕
               </button>
             </div>
             <div className="flex flex-col gap-4">
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">{t.categoryNameEnLabel || "Category Name (English)"}</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">{t.categoryNameEnLabel || "Category Name (English)"}</label>
                 <input
                   value={newCategoryNameEn}
                   onChange={(e) => setNewCategoryNameEn(e.target.value)}
                   placeholder={t.categoryNameEnPlaceholder || "e.g. Dermatology & Aesthetic"}
-                  className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                  className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">{(t as any).categoryNameArLabel || "Category Name (Arabic)"}</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">{(t as any).categoryNameArLabel || "Category Name (Arabic)"}</label>
                 <input
                   value={newCategoryNameAr}
                   onChange={(e) => setNewCategoryNameAr(e.target.value)}
                   placeholder={(t as any).categoryNameArPlaceholder || "e.g. الجلدية والتجميل"}
-                  className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                  className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
                   dir="rtl"
                 />
               </div>
@@ -904,7 +904,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                   setNewCategoryNameAr("");
                   setShowAddCategoryModal(false);
                 }}
-                className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
+                className="rounded-lg border border-[var(--cr-primary)]/15 px-4 py-2 text-sm font-medium text-[var(--cr-primary)] transition hover:bg-[#F9F9F7]"
               >
                 {t.cancelBtn}
               </button>
@@ -925,7 +925,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                   setNewCategoryNameAr("");
                   setShowAddCategoryModal(false);
                 }}
-                className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                className="rounded-lg bg-[var(--cr-primary)] px-5 py-2 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26]"
               >
                 {t.createCategoryBtn}
               </button>
@@ -937,17 +937,17 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
       {/* ── REDESIGNED ADD/EDIT SERVICE MODAL ── */}
       {showAddServiceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl my-8 border border-[#414E36]/10 animate-fadeIn flex flex-col max-h-[90vh]">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl my-8 border border-[var(--cr-primary)]/10 animate-fadeIn flex flex-col max-h-[90vh]">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 px-6 py-4">
-              <h3 className="text-lg font-bold text-[#1F251A]">
+            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 px-6 py-4">
+              <h3 className="text-lg font-bold text-[var(--cr-dark)]">
                 {editingService ? t.editServiceTitle : t.addServiceTitle}
               </h3>
               <button
                 type="button"
                 onClick={() => setShowAddServiceModal(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#FBFBF9] hover:text-[#1F251A]"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] transition hover:bg-[var(--color-brand-light)] hover:text-[var(--cr-dark)]"
               >
                 ✕
               </button>
@@ -958,8 +958,8 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
               
               {/* Service Image Section */}
               <div className="flex flex-col items-center justify-center">
-                <span className="text-sm font-semibold text-[#5A6A51] mb-2">{t.serviceImageLabel}</span>
-                <label className="relative flex h-28 w-28 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#414E36]/20 bg-[#FBFBF9] transition hover:bg-[#F2EFE9] overflow-hidden group">
+                <span className="text-sm font-semibold text-[var(--color-brand-secondary)] mb-2">{t.serviceImageLabel}</span>
+                <label className="relative flex h-28 w-28 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--cr-primary)]/20 bg-[var(--color-brand-light)] transition hover:bg-[var(--color-brand-sand)] overflow-hidden group">
                   {serviceImageUrl ? (
                     <>
                       <img src={serviceImageUrl} alt="Service preview" className="h-full w-full object-cover" />
@@ -968,8 +968,8 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       </div>
                     </>
                   ) : (
-                    <div className="flex flex-col items-center justify-center text-[#5A6A51]/60">
-                      <svg className="mb-1 h-8 w-8 text-[#5A6A51]/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex flex-col items-center justify-center text-[var(--color-brand-secondary)]/60">
+                      <svg className="mb-1 h-8 w-8 text-[var(--color-brand-secondary)]/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                     </div>
@@ -996,7 +996,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     }}
                   />
                 </label>
-                <span className="text-[11px] text-[#5A6A51]/75 mt-2">{t.clickToUpload}</span>
+                <span className="text-[11px] text-[var(--color-brand-secondary)]/75 mt-2">{t.clickToUpload}</span>
               </div>
 
               {/* 2-Column fields */}
@@ -1004,7 +1004,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 
                 {/* Service Category */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--color-brand-secondary)]">
                     {t.serviceCategoryLabel} <span className="text-red-500">*</span>
                   </label>
                   <select
@@ -1020,7 +1020,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                         setServiceIsLaser(isLaserCat);
                       }
                     }}
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
+                    className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20 text-[var(--cr-dark)] font-medium"
                   >
                     <option value="" disabled>{t.selectCategory}</option>
                     {localCategories.map(cat => (
@@ -1031,7 +1031,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
                 {/* Duration (minutes) — the single source of truth; the label below is derived from it */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--color-brand-secondary)]">
                     {t.durationMinutesLabel} <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -1044,29 +1044,29 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       setServiceDurationMinutes(minutes);
                       setServiceDuration(getDurationLabel(minutes));
                     }}
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
+                    className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20 text-[var(--cr-dark)] font-medium"
                   />
                 </div>
 
                 {/* Duration — read-only label derived from the minutes value above, never edited independently */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--color-brand-secondary)]">
                     {t.durationLabel}
                   </label>
-                  <div className="w-full rounded-lg border border-[#414E36]/15 bg-[#F1F1ED] px-4 py-2.5 text-sm text-[#5A6A51] font-medium">
+                  <div className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[#F1F1ED] px-4 py-2.5 text-sm text-[var(--color-brand-secondary)] font-medium">
                     {getDurationLabel(serviceDurationMinutes)}
                   </div>
                 </div>
 
                 {/* Session Type */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--color-brand-secondary)]">
                     {t.sessionTypeLabel} <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={serviceUnitType}
                     onChange={(e) => setServiceUnitType(e.target.value)}
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
+                    className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20 text-[var(--cr-dark)] font-medium"
                   >
                     <option value="in_clinic">{t.sessionInClinic}</option>
                     <option value="online">{t.sessionOnline}</option>
@@ -1076,7 +1076,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
                 {/* Service Name EN */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--color-brand-secondary)]">
                     {t.serviceNameEnLabel} <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -1084,13 +1084,13 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     value={serviceNameEn}
                     onChange={(e) => setServiceNameEn(e.target.value)}
                     placeholder={t.serviceNameEnPlaceholder}
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
+                    className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20 text-[var(--cr-dark)] font-medium"
                   />
                 </div>
 
                 {/* Service Name AR */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--color-brand-secondary)]">
                     {t.serviceNameArLabel} <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -1099,59 +1099,59 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     onChange={(e) => setServiceNameAr(e.target.value)}
                     placeholder={t.serviceNameArPlaceholder}
                     dir="rtl"
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
+                    className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20 text-[var(--cr-dark)] font-medium"
                   />
                 </div>
 
                 {/* English Description */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">{t.englishDescLabel}</label>
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--color-brand-secondary)]">{t.englishDescLabel}</label>
                   <textarea
                     value={serviceDescEn}
                     onChange={(e) => setServiceDescEn(e.target.value)}
                     rows={3}
                     placeholder={t.englishDescPlaceholder}
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium resize-none"
+                    className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20 text-[var(--cr-dark)] font-medium resize-none"
                   />
                 </div>
 
                 {/* Arabic Description */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">{t.arabicDescLabel}</label>
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--color-brand-secondary)]">{t.arabicDescLabel}</label>
                   <textarea
                     value={serviceDescAr}
                     onChange={(e) => setServiceDescAr(e.target.value)}
                     rows={3}
                     placeholder={t.arabicDescPlaceholder}
                     dir="rtl"
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium resize-none"
+                    className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20 text-[var(--cr-dark)] font-medium resize-none"
                   />
                 </div>
 
                 {/* Sort Order */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">{t.sortOrderLabel}</label>
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--color-brand-secondary)]">{t.sortOrderLabel}</label>
                   <input
                     type="number"
                     value={serviceSortOrder}
                     onChange={(e) => setServiceSortOrder(Number(e.target.value) || 0)}
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
+                    className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20 text-[var(--cr-dark)] font-medium"
                   />
                 </div>
 
                 {/* Price */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--color-brand-secondary)]">
                     {t.priceLabel} <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative flex rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] overflow-hidden text-sm">
-                    <span className="bg-[#F2EFE9] border-e border-[#414E36]/15 px-3.5 py-2.5 text-[#5A6A51] font-semibold">EGP</span>
+                  <div className="relative flex rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] overflow-hidden text-sm">
+                    <span className="bg-[var(--color-brand-sand)] border-e border-[var(--cr-primary)]/15 px-3.5 py-2.5 text-[var(--color-brand-secondary)] font-semibold">EGP</span>
                     <input
                       type="number"
                       value={servicePrice}
                       onChange={(e) => setServicePrice(Number(e.target.value) || 0)}
                       placeholder="0"
-                      className="w-full px-4 py-2.5 outline-none bg-transparent text-[#1F251A] font-medium"
+                      className="w-full px-4 py-2.5 outline-none bg-transparent text-[var(--cr-dark)] font-medium"
                     />
                   </div>
                 </div>
@@ -1168,10 +1168,10 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     </div>
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-[#1F251A]">{t.isLaserLabel || "Laser Service (Requires Device & Pulse Billing)"}</span>
+                        <span className="text-sm font-bold text-[var(--cr-dark)]">{t.isLaserLabel || "Laser Service (Requires Device & Pulse Billing)"}</span>
                         <span className="rounded-full bg-emerald-100 px-2 py-0.2 text-[10px] font-bold text-emerald-800 border border-emerald-300/60">Laser</span>
                       </div>
-                      <span className="text-xs text-[#5A6A51] mt-0.5">
+                      <span className="text-xs text-[var(--color-brand-secondary)] mt-0.5">
                         {t.isLaserDesc || "Marks this procedure as a laser treatment requiring equipment device connection, pulse counting, and 3 reception payment options (Pay by Service, Pay per Pulse, Pay with Pulses Package)."}
                       </span>
                     </div>
@@ -1192,14 +1192,14 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 {/* Is Shared Toggle */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-[#1F251A]">{t.isSharedLabel}</span>
-                    <span className="text-xs text-[#5A6A51] mt-0.5">{t.isSharedDesc}</span>
+                    <span className="text-sm font-semibold text-[var(--cr-dark)]">{t.isSharedLabel}</span>
+                    <span className="text-xs text-[var(--color-brand-secondary)] mt-0.5">{t.isSharedDesc}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setServiceIsShared(!serviceIsShared)}
                     className="relative h-6 w-11 flex-shrink-0 rounded-full focus:outline-none transition-colors duration-300"
-                    style={{ backgroundColor: serviceIsShared ? "#414E36" : "#E2E8F0" }}
+                    style={{ backgroundColor: serviceIsShared ? "var(--cr-primary)" : "#E2E8F0" }}
                   >
                     <span
                       className="absolute top-[4px] h-4 w-4 rounded-full bg-white shadow-md transition-all duration-300"
@@ -1210,12 +1210,12 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
                 {/* Enable Booking Reminder Toggle */}
                 <div className="flex items-start justify-between gap-4">
-                  <span className="text-sm font-semibold text-[#1F251A]">{t.enableReminderLabel}</span>
+                  <span className="text-sm font-semibold text-[var(--cr-dark)]">{t.enableReminderLabel}</span>
                   <button
                     type="button"
                     onClick={() => setServiceEnableReminder(!serviceEnableReminder)}
                     className="relative h-6 w-11 flex-shrink-0 rounded-full focus:outline-none transition-colors duration-300"
-                    style={{ backgroundColor: serviceEnableReminder ? "#414E36" : "#E2E8F0" }}
+                    style={{ backgroundColor: serviceEnableReminder ? "var(--cr-primary)" : "#E2E8F0" }}
                   >
                     <span
                       className="absolute top-[4px] h-4 w-4 rounded-full bg-white shadow-md transition-all duration-300"
@@ -1235,7 +1235,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
             </div>
 
             {/* Modal Footer */}
-            <div className="border-t border-[#414E36]/10 px-6 py-4 flex items-center justify-between gap-3 bg-[#FBFBF9] rounded-b-2xl">
+            <div className="border-t border-[var(--cr-primary)]/10 px-6 py-4 flex items-center justify-between gap-3 bg-[var(--color-brand-light)] rounded-b-2xl">
               <div>
                 {editingService && hasPermission("services.delete") && (
                   <button
@@ -1256,7 +1256,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 <button
                   type="button"
                   onClick={() => setShowAddServiceModal(false)}
-                  className="rounded-lg border border-[#414E36]/15 px-5 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#F2EFE9]"
+                  className="rounded-lg border border-[var(--cr-primary)]/15 px-5 py-2 text-sm font-semibold text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-sand)]"
                 >
                   {t.cancelBtn}
                 </button>
@@ -1347,7 +1347,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     alert(lang === "ar" ? "فشل حفظ الخدمة. يرجى التأكد من صلاحيات الحساب والمحاولة مرة أخرى." : "Failed to save service. Please check your permissions and try again.");
                   }
                 }}
-                className="rounded-lg bg-[#414E36] px-6 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] cursor-pointer"
+                className="rounded-lg bg-[var(--cr-primary)] px-6 py-2 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] cursor-pointer"
               >
                 {t.saveBtn}
               </button>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function AboutPageIntro() {
   const { t, isRTL } = useLanguage();
@@ -37,7 +38,7 @@ export function AboutPageIntro() {
           className="rounded-[24px] sm:rounded-[60px]"
           style={{
             position: "relative",
-            backgroundColor: "var(--cr-secondary, #EDF1EC)",
+            backgroundColor: "var(--cr-secondary, var(--color-brand-tint))",
             border: "1px solid rgba(196,174,124,0.35)",
             overflow: "hidden",
             padding: "clamp(40px, 6vw, 80px) clamp(24px, 5vw, 72px)",
@@ -214,8 +215,8 @@ export function AboutPageIntro() {
                 {/* Gold rose badge overlay */}
                 <div className="api-rose-badge">
                   <Image
-                    src="/images/main_logo.png"
-                    alt="Revera Clinics"
+                    src={CLIENT.logoPath}
+                    alt={CLIENT.name}
                     width={88}
                     height={88}
                     style={{ objectFit: "contain", width: "auto", height: "auto", transform: "scale(1.7)" }}
@@ -226,7 +227,7 @@ export function AboutPageIntro() {
                 <div className="api-second-img">
                   <Image
                     src="/images/clinic/room.jpg"
-                    alt="Revera Clinics"
+                    alt={CLIENT.name}
                     fill
                     sizes="180px"
                     style={{ objectFit: "cover", objectPosition: "center" }}
@@ -256,7 +257,7 @@ export function AboutPageIntro() {
               >
                 <svg
                   width="40" height="40" viewBox="0 0 24 24" fill="none"
-                  stroke="var(--cr-accent, #C4AE7C)" strokeWidth="2"
+                  stroke="var(--cr-accent, var(--cr-accent))" strokeWidth="2"
                   strokeLinecap="round" strokeLinejoin="round"
                   style={{ flexShrink: 0 }}
                 >
@@ -296,7 +297,7 @@ export function AboutPageIntro() {
                   margin: "0 0 24px 0",
                   fontSize: "14.5px",
                   lineHeight: 1.75,
-                  color: "var(--cr-muted-foreground, #5A6A51)",
+                  color: "var(--cr-muted-foreground, var(--color-brand-secondary))",
                 }}
               >
                 {t.aboutPage.aboutDescription}
@@ -355,7 +356,7 @@ export function AboutPageIntro() {
                         textDecoration: "none",
                         transition: "color 0.2s ease",
                       }}
-                      className="text-[#414E36] hover:text-[#5A6A51]"
+                      className="text-[var(--cr-primary)] hover:text-[var(--color-brand-secondary)]"
                     >
                       <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">{t.aboutPage.phone}</span>
                     </a>
@@ -372,7 +373,7 @@ export function AboutPageIntro() {
                     gap: "10px",
                     padding: "12px 24px",
                     borderRadius: "30px",
-                    backgroundColor: "var(--cr-accent, #C4AE7C)",
+                    backgroundColor: "var(--cr-accent, var(--cr-accent))",
                     color: "#fff",
                     fontSize: "14px",
                     fontWeight: 600,
@@ -382,7 +383,7 @@ export function AboutPageIntro() {
                     letterSpacing: "0.02em",
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#B59E6A"}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--cr-accent, #C4AE7C)"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--cr-accent, var(--cr-accent))"}
                 >
                   {t.nav.makeAppointment}
                   {/* Arrow circle */}

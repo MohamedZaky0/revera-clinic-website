@@ -308,12 +308,12 @@ export default function MedicalRecordsSettingsView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-[#414E36] text-white flex items-center justify-center shadow-sm">
+            <div className="h-10 w-10 rounded-2xl bg-[var(--cr-primary)] text-white flex items-center justify-center shadow-sm">
               <FileSpreadsheet size={20} />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-[#1F251A]">Medical Records Intake Templates</h2>
-              <p className="text-xs text-[#5A6A51] font-medium mt-0.5">
+              <h2 className="text-2xl font-black text-[var(--cr-dark)]">Medical Records Intake Templates</h2>
+              <p className="text-xs text-[var(--color-brand-secondary)] font-medium mt-0.5">
                 Customize clinical questionnaires and assign intake forms to one or more services.
               </p>
             </div>
@@ -323,7 +323,7 @@ export default function MedicalRecordsSettingsView({
         <button
           type="button"
           onClick={openCreateModal}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#414E36] px-5 py-3 text-xs font-bold text-white transition hover:bg-[#323D2A] shadow-sm cursor-pointer shrink-0"
+          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--cr-primary)] px-5 py-3 text-xs font-bold text-white transition hover:bg-[#323D2A] shadow-sm cursor-pointer shrink-0"
         >
           <Plus size={16} />
           <span>Create Intake Template</span>
@@ -332,20 +332,20 @@ export default function MedicalRecordsSettingsView({
 
       {/* Overview Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-3xl bg-white p-5 border border-[#414E36]/10 shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider block">Intake Templates</span>
+        <div className="rounded-3xl bg-white p-5 border border-[var(--cr-primary)]/10 shadow-xs space-y-1">
+          <span className="text-[11px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block">Intake Templates</span>
           <div className="flex items-center justify-between">
-            <span className="text-2xl font-black text-[#1F251A]">{templates.length}</span>
+            <span className="text-2xl font-black text-[var(--cr-dark)]">{templates.length}</span>
             <span className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
               <Layers size={16} />
             </span>
           </div>
         </div>
 
-        <div className="rounded-3xl bg-white p-5 border border-[#414E36]/10 shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider block">Default Template</span>
+        <div className="rounded-3xl bg-white p-5 border border-[var(--cr-primary)]/10 shadow-xs space-y-1">
+          <span className="text-[11px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block">Default Template</span>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-extrabold text-[#414E36] truncate max-w-[200px]">
+            <span className="text-sm font-extrabold text-[var(--cr-primary)] truncate max-w-[200px]">
               {templates.find((t) => t.is_default)?.title || "General Intake"}
             </span>
             <span className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
@@ -354,13 +354,13 @@ export default function MedicalRecordsSettingsView({
           </div>
         </div>
 
-        <div className="rounded-3xl bg-white p-5 border border-[#414E36]/10 shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider block">Assigned Services</span>
+        <div className="rounded-3xl bg-white p-5 border border-[var(--cr-primary)]/10 shadow-xs space-y-1">
+          <span className="text-[11px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block">Assigned Services</span>
           <div className="flex items-center justify-between">
-            <span className="text-2xl font-black text-[#1F251A]">
+            <span className="text-2xl font-black text-[var(--cr-dark)]">
               {templates.reduce((acc, t) => acc + (t.service_ids?.length || 0), 0)} Services
             </span>
-            <span className="h-8 w-8 rounded-xl bg-[#EDF1EC] text-[#414E36] flex items-center justify-center">
+            <span className="h-8 w-8 rounded-xl bg-[var(--color-brand-tint)] text-[var(--cr-primary)] flex items-center justify-center">
               <Tag size={16} />
             </span>
           </div>
@@ -374,31 +374,31 @@ export default function MedicalRecordsSettingsView({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search templates by title or keywords..."
-          className="w-full rounded-2xl border border-[#414E36]/15 bg-white ps-11 pe-4 py-3 text-xs font-semibold text-[#1F251A] outline-none focus:border-emerald-700 shadow-xs"
+          className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white ps-11 pe-4 py-3 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-emerald-700 shadow-xs"
         />
-        <Search size={16} className="absolute start-4 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+        <Search size={16} className="absolute start-4 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]" />
       </div>
 
       {/* Templates List Grid */}
       {loading ? (
-        <div className="bg-white rounded-3xl border border-[#414E36]/10 p-12 text-center text-sm text-[#5A6A51] flex items-center justify-center gap-2">
-          <Loader2 size={18} className="animate-spin text-[#414E36]" /> Loading medical record templates...
+        <div className="bg-white rounded-3xl border border-[var(--cr-primary)]/10 p-12 text-center text-sm text-[var(--color-brand-secondary)] flex items-center justify-center gap-2">
+          <Loader2 size={18} className="animate-spin text-[var(--cr-primary)]" /> Loading medical record templates...
         </div>
       ) : filteredTemplates.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-[#414E36]/10 p-12 text-center space-y-4">
-          <div className="h-16 w-16 mx-auto rounded-3xl bg-[#EDF1EC] text-[#414E36] flex items-center justify-center">
+        <div className="bg-white rounded-3xl border border-[var(--cr-primary)]/10 p-12 text-center space-y-4">
+          <div className="h-16 w-16 mx-auto rounded-3xl bg-[var(--color-brand-tint)] text-[var(--cr-primary)] flex items-center justify-center">
             <FileSpreadsheet size={32} />
           </div>
           <div className="space-y-1">
-            <h4 className="text-base font-extrabold text-[#1F251A]">No intake templates found</h4>
-            <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
+            <h4 className="text-base font-extrabold text-[var(--cr-dark)]">No intake templates found</h4>
+            <p className="text-xs text-[var(--color-brand-secondary)] max-w-sm mx-auto">
               Create customizable medical record intake forms tailored to specific treatments and procedures.
             </p>
           </div>
           <button
             type="button"
             onClick={openCreateModal}
-            className="inline-flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#323D2A] transition"
+            className="inline-flex items-center gap-2 rounded-2xl bg-[var(--cr-primary)] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#323D2A] transition"
           >
             <Plus size={14} /> Create Template
           </button>
@@ -413,14 +413,14 @@ export default function MedicalRecordsSettingsView({
             return (
               <div
                 key={tmpl.id}
-                className="bg-white rounded-3xl border border-[#414E36]/12 p-6 shadow-xs space-y-4 flex flex-col justify-between hover:border-[#414E36]/25 transition"
+                className="bg-white rounded-3xl border border-[var(--cr-primary)]/12 p-6 shadow-xs space-y-4 flex flex-col justify-between hover:border-[var(--cr-primary)]/25 transition"
               >
                 <div className="space-y-3.5">
                   {/* Top Bar */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-base font-black text-[#1F251A]">{tmpl.title}</h3>
+                        <h3 className="text-base font-black text-[var(--cr-dark)]">{tmpl.title}</h3>
                         {tmpl.is_default && (
                           <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 inline-flex items-center gap-1">
                             <CheckCircle2 size={10} /> Default Template
@@ -428,7 +428,7 @@ export default function MedicalRecordsSettingsView({
                         )}
                       </div>
                       {tmpl.description && (
-                        <p className="text-xs text-[#5A6A51] leading-relaxed line-clamp-2">{tmpl.description}</p>
+                        <p className="text-xs text-[var(--color-brand-secondary)] leading-relaxed line-clamp-2">{tmpl.description}</p>
                       )}
                     </div>
 
@@ -436,7 +436,7 @@ export default function MedicalRecordsSettingsView({
                       <button
                         type="button"
                         onClick={() => handleDuplicateTemplate(tmpl)}
-                        className="p-2 text-gray-400 hover:text-[#414E36] hover:bg-[#EDF1EC] rounded-xl transition"
+                        className="p-2 text-gray-400 hover:text-[var(--cr-primary)] hover:bg-[var(--color-brand-tint)] rounded-xl transition"
                         title="Duplicate Template"
                       >
                         <Copy size={15} />
@@ -463,10 +463,10 @@ export default function MedicalRecordsSettingsView({
                   </div>
 
                   {/* Assigned Services Badges */}
-                  <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/8 space-y-2">
+                  <div className="bg-[var(--color-brand-light)] p-3.5 rounded-2xl border border-[var(--cr-primary)]/8 space-y-2">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-[#5A6A51] text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-                        <Tag size={12} className="text-[#414E36]" /> Assigned Services ({assignedServices.length})
+                      <span className="font-bold text-[var(--color-brand-secondary)] text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                        <Tag size={12} className="text-[var(--cr-primary)]" /> Assigned Services ({assignedServices.length})
                       </span>
                       {tmpl.is_default && (
                         <span className="text-[10px] font-semibold text-emerald-700 italic">
@@ -484,7 +484,7 @@ export default function MedicalRecordsSettingsView({
                         assignedServices.map((s) => (
                           <span
                             key={s.id}
-                            className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[11px] font-bold text-[#1F251A] border border-[#414E36]/10 shadow-2xs"
+                            className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[11px] font-bold text-[var(--cr-dark)] border border-[var(--cr-primary)]/10 shadow-2xs"
                           >
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
                             {getServiceName(s)}
@@ -496,23 +496,23 @@ export default function MedicalRecordsSettingsView({
 
                   {/* Intake Fields Summary */}
                   <div className="space-y-1.5">
-                    <span className="text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider block">
+                    <span className="text-[11px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block">
                       Intake Questions & Fields ({tmpl.fields?.length || 0})
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       {(tmpl.fields || []).slice(0, 4).map((f) => (
                         <div
                           key={f.id}
-                          className="bg-[#EDF1EC]/50 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-[#1F251A] flex items-center justify-between truncate"
+                          className="bg-[var(--color-brand-tint)]/50 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--cr-dark)] flex items-center justify-between truncate"
                         >
                           <span className="truncate">{f.label}</span>
-                          <span className="text-[10px] font-bold text-[#5A6A51] uppercase bg-white px-1.5 py-0.5 rounded ml-1 shrink-0">
+                          <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase bg-white px-1.5 py-0.5 rounded ml-1 shrink-0">
                             {f.type}
                           </span>
                         </div>
                       ))}
                       {(tmpl.fields || []).length > 4 && (
-                        <div className="bg-[#F4F5F1] px-2.5 py-1.5 rounded-xl text-xs font-bold text-[#5A6A51] flex items-center justify-center">
+                        <div className="bg-[#F4F5F1] px-2.5 py-1.5 rounded-xl text-xs font-bold text-[var(--color-brand-secondary)] flex items-center justify-center">
                           +{(tmpl.fields?.length || 0) - 4} more fields
                         </div>
                       )}
@@ -520,12 +520,12 @@ export default function MedicalRecordsSettingsView({
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-[#414E36]/8 flex items-center justify-between text-xs text-[#5A6A51]">
+                <div className="pt-3 border-t border-[var(--cr-primary)]/8 flex items-center justify-between text-xs text-[var(--color-brand-secondary)]">
                   <span>Updated {tmpl.updated_at ? new Date(tmpl.updated_at).toLocaleDateString() : "Recently"}</span>
                   <button
                     type="button"
                     onClick={() => openEditModal(tmpl)}
-                    className="font-extrabold text-[#414E36] hover:underline"
+                    className="font-extrabold text-[var(--cr-primary)] hover:underline"
                   >
                     Configure Questions & Services →
                   </button>
@@ -539,18 +539,18 @@ export default function MedicalRecordsSettingsView({
       {/* ── CREATE / EDIT TEMPLATE MODAL ── */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-fadeIn">
-          <div className="relative w-full max-w-4xl rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-[#414E36]/15 space-y-6 my-8 max-h-[90vh] flex flex-col">
+          <div className="relative w-full max-w-4xl rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-[var(--cr-primary)]/15 space-y-6 my-8 max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4 shrink-0">
+            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-[#414E36] text-white flex items-center justify-center shadow-sm">
+                <div className="h-10 w-10 rounded-2xl bg-[var(--cr-primary)] text-white flex items-center justify-center shadow-sm">
                   <FileSpreadsheet size={20} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-[#1F251A]">
+                  <h3 className="text-lg font-black text-[var(--cr-dark)]">
                     {editingTemplateId ? "Edit Medical Intake Template" : "Create Medical Intake Template"}
                   </h3>
-                  <p className="text-xs text-[#5A6A51]">
+                  <p className="text-xs text-[var(--color-brand-secondary)]">
                     Customize the intake questions and select the treatments this intake applies to.
                   </p>
                 </div>
@@ -570,7 +570,7 @@ export default function MedicalRecordsSettingsView({
               {/* Basic Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-[#1F251A]">
+                  <label className="block text-xs font-bold text-[var(--cr-dark)]">
                     Template Title <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -579,12 +579,12 @@ export default function MedicalRecordsSettingsView({
                     value={modalTitle}
                     onChange={(e) => setModalTitle(e.target.value)}
                     placeholder="e.g. Laser Hair Removal Intake Form"
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 text-xs font-bold text-[#1F251A] outline-none focus:border-emerald-700"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 py-2.5 text-xs font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-[#1F251A]">
+                  <label className="block text-xs font-bold text-[var(--cr-dark)]">
                     Default Fallback Template
                   </label>
                   <div className="flex items-center gap-3 pt-2">
@@ -593,16 +593,16 @@ export default function MedicalRecordsSettingsView({
                       id="isDefaultCheckbox"
                       checked={modalIsDefault}
                       onChange={(e) => setModalIsDefault(e.target.checked)}
-                      className="h-4 w-4 rounded accent-[#414E36] cursor-pointer"
+                      className="h-4 w-4 rounded accent-[var(--cr-primary)] cursor-pointer"
                     />
-                    <label htmlFor="isDefaultCheckbox" className="text-xs font-semibold text-[#5A6A51] cursor-pointer">
+                    <label htmlFor="isDefaultCheckbox" className="text-xs font-semibold text-[var(--color-brand-secondary)] cursor-pointer">
                       Use as default intake for all unassigned services
                     </label>
                   </div>
                 </div>
 
                 <div className="col-span-1 md:col-span-2 space-y-1.5">
-                  <label className="block text-xs font-bold text-[#1F251A]">
+                  <label className="block text-xs font-bold text-[var(--cr-dark)]">
                     Description & Purpose (Optional)
                   </label>
                   <textarea
@@ -610,19 +610,19 @@ export default function MedicalRecordsSettingsView({
                     value={modalDescription}
                     onChange={(e) => setModalDescription(e.target.value)}
                     placeholder="Brief description of when this intake form is required..."
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white p-3 text-xs text-[#1F251A] outline-none focus:border-emerald-700"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white p-3 text-xs text-[var(--cr-dark)] outline-none focus:border-emerald-700"
                   />
                 </div>
               </div>
 
               {/* Multi-Service Assignment Section */}
-              <div className="rounded-3xl border border-[#414E36]/12 bg-[#FBFBF9] p-5 space-y-3.5">
+              <div className="rounded-3xl border border-[var(--cr-primary)]/12 bg-[var(--color-brand-light)] p-5 space-y-3.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
-                    <h4 className="text-xs font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
-                      <Tag size={14} className="text-[#414E36]" /> Assign Services ({modalServiceIds.length} Selected)
+                    <h4 className="text-xs font-extrabold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-1.5">
+                      <Tag size={14} className="text-[var(--cr-primary)]" /> Assign Services ({modalServiceIds.length} Selected)
                     </h4>
-                    <p className="text-[11px] text-[#5A6A51]">
+                    <p className="text-[11px] text-[var(--color-brand-secondary)]">
                       Select all services that should trigger this specialized intake form in doctor sessions.
                     </p>
                   </div>
@@ -631,7 +631,7 @@ export default function MedicalRecordsSettingsView({
                     <button
                       type="button"
                       onClick={() => handleSelectAllFilteredServices(filteredModalServices.map((s) => s.id))}
-                      className="text-[11px] font-bold text-[#414E36] hover:underline"
+                      className="text-[11px] font-bold text-[var(--cr-primary)] hover:underline"
                     >
                       Select All Filtered
                     </button>
@@ -653,9 +653,9 @@ export default function MedicalRecordsSettingsView({
                     value={serviceSearch}
                     onChange={(e) => setServiceSearch(e.target.value)}
                     placeholder="Filter services by name or category..."
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white ps-9 pe-3 py-2 text-xs text-[#1F251A] outline-none"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white ps-9 pe-3 py-2 text-xs text-[var(--cr-dark)] outline-none"
                   />
-                  <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                  <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]" />
                 </div>
 
                 {/* Services Checkbox Grid */}
@@ -670,7 +670,7 @@ export default function MedicalRecordsSettingsView({
                         className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition select-none text-left w-full ${
                           isSelected
                             ? "border-emerald-700 bg-emerald-50 font-bold text-emerald-950 shadow-2xs"
-                            : "border-[#414E36]/10 bg-white font-medium text-[#1F251A] hover:bg-[#F4F5F1]"
+                            : "border-[var(--cr-primary)]/10 bg-white font-medium text-[var(--cr-dark)] hover:bg-[#F4F5F1]"
                         }`}
                       >
                         <span className={`h-4 w-4 rounded flex items-center justify-center border transition shrink-0 ${
@@ -686,13 +686,13 @@ export default function MedicalRecordsSettingsView({
               </div>
 
               {/* Dynamic Intake Questions Builder */}
-              <div className="rounded-3xl border border-[#414E36]/12 bg-white p-5 space-y-4">
+              <div className="rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-xs font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles size={14} className="text-[#414E36]" /> Intake Questions & Form Fields ({modalFields.length})
+                    <h4 className="text-xs font-extrabold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-[var(--cr-primary)]" /> Intake Questions & Form Fields ({modalFields.length})
                     </h4>
-                    <p className="text-[11px] text-[#5A6A51]">
+                    <p className="text-[11px] text-[var(--color-brand-secondary)]">
                       Add questions, select answer input types, and configure custom options.
                     </p>
                   </div>
@@ -700,7 +700,7 @@ export default function MedicalRecordsSettingsView({
                   <button
                     type="button"
                     onClick={handleAddField}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#EDF1EC] px-3.5 py-1.5 text-xs font-extrabold text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-brand-tint)] px-3.5 py-1.5 text-xs font-extrabold text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                   >
                     <Plus size={14} /> Add Question
                   </button>
@@ -710,11 +710,11 @@ export default function MedicalRecordsSettingsView({
                   {modalFields.map((field, idx) => (
                     <div
                       key={field.id || idx}
-                      className="p-4 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] space-y-3"
+                      className="p-4 rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] space-y-3"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                         <div className="flex items-center gap-2">
-                          <span className="h-6 w-6 rounded-lg bg-[#414E36] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                          <span className="h-6 w-6 rounded-lg bg-[var(--cr-primary)] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                             {idx + 1}
                           </span>
                           <input
@@ -723,7 +723,7 @@ export default function MedicalRecordsSettingsView({
                             value={field.label}
                             onChange={(e) => handleUpdateField(idx, { label: e.target.value })}
                             placeholder="e.g. Skin Phototype, Laser Tanning History..."
-                            className="flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none min-w-[220px]"
+                            className="flex-1 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none min-w-[220px]"
                           />
                         </div>
 
@@ -731,7 +731,7 @@ export default function MedicalRecordsSettingsView({
                           <select
                             value={field.type}
                             onChange={(e) => handleUpdateField(idx, { type: e.target.value as any })}
-                            className="rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                            className="rounded-xl border border-[var(--cr-primary)]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none"
                           >
                             <option value="text">Short Text</option>
                             <option value="textarea">Long Textarea</option>
@@ -740,12 +740,12 @@ export default function MedicalRecordsSettingsView({
                             <option value="number">Number</option>
                           </select>
 
-                          <label className="flex items-center gap-1.5 text-xs font-semibold text-[#5A6A51] cursor-pointer">
+                          <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-brand-secondary)] cursor-pointer">
                             <input
                               type="checkbox"
                               checked={field.required}
                               onChange={(e) => handleUpdateField(idx, { required: e.target.checked })}
-                              className="h-3.5 w-3.5 rounded accent-[#414E36]"
+                              className="h-3.5 w-3.5 rounded accent-[var(--cr-primary)]"
                             />
                             Required
                           </label>
@@ -784,7 +784,7 @@ export default function MedicalRecordsSettingsView({
                       {/* Dropdown Options Input */}
                       {field.type === "select" && (
                         <div className="space-y-1">
-                          <label className="block text-[10px] font-bold text-[#5A6A51] uppercase">
+                          <label className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase">
                             Dropdown Options (Separate by comma)
                           </label>
                           <input
@@ -799,7 +799,7 @@ export default function MedicalRecordsSettingsView({
                               })
                             }
                             placeholder="e.g. Option 1, Option 2, Option 3"
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                            className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none"
                           />
                         </div>
                       )}
@@ -810,12 +810,12 @@ export default function MedicalRecordsSettingsView({
             </form>
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#414E36]/10 shrink-0">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--cr-primary)]/10 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
                 disabled={saving}
-                className="rounded-2xl border border-[#414E36]/20 bg-white px-5 py-3 text-xs font-bold text-[#5A6A51] hover:bg-[#FBFBF9] transition cursor-pointer"
+                className="rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-5 py-3 text-xs font-bold text-[var(--color-brand-secondary)] hover:bg-[var(--color-brand-light)] transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -823,7 +823,7 @@ export default function MedicalRecordsSettingsView({
                 type="submit"
                 form="templateForm"
                 disabled={saving || !modalTitle.trim() || modalFields.length === 0}
-                className="rounded-2xl bg-[#414E36] px-6 py-3 text-xs font-extrabold text-white hover:bg-[#323D2A] transition disabled:opacity-50 flex items-center gap-2 shadow-sm cursor-pointer"
+                className="rounded-2xl bg-[var(--cr-primary)] px-6 py-3 text-xs font-extrabold text-white hover:bg-[#323D2A] transition disabled:opacity-50 flex items-center gap-2 shadow-sm cursor-pointer"
               >
                 {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
                 <span>{saving ? "Saving Template..." : "Save Template"}</span>
