@@ -13,7 +13,7 @@ import {
 } from "@/lib/serviceStore";
 import { prefetchUrl } from "@/lib/fetchCache";
 
-// ── Service categories and items for Revera Clinics
+// ── Service categories and items for the clinic
 
 // ── Flower icon (inline SVG matching original) ─────────────────────────────
 

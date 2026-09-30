@@ -456,7 +456,7 @@ export function printPrescription(rx: any, booking?: any) {
 
         <div class="footer">
           <div>
-            <p>✨ Revera Clinics wishes you a swift recovery and radiant health.</p>
+            <p>✨ ${CLIENT.name} wishes you a swift recovery and radiant health.</p>
             <p style="font-size: 10px; color: #9CA3AF; margin-top: 4px;">Electronic Medical Record - Valid without physical stamp.</p>
           </div>
           <div class="doctor-sig">

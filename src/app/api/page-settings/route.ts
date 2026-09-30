@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireAdministratorAccess, requireStaffAccess } from '@/lib/access';
+import { CLIENT } from '@/config/client';
 import fs from 'fs';
 import path from 'path';
 
@@ -13,7 +14,7 @@ const DEFAULT_SETTINGS = {
     hero: {
       slides: [
         {
-          welcome: "Welcome to Revera Clinics",
+          welcome: `Welcome to ${CLIENT.name}`,
           heading: "Transform Your Beauty Naturally!",
           description: "Expert dermatology and cosmetic surgery services with personalized care designed to help you achieve your beauty and health goals through advanced medical techniques.",
           bookBtn: "Book Appointment",
@@ -22,7 +23,7 @@ const DEFAULT_SETTINGS = {
           image: "/images/hero/slide-1.jpg"
         },
         {
-          welcome: "Welcome to Revera Clinics",
+          welcome: `Welcome to ${CLIENT.name}`,
           heading: "Advanced Medical Care You Can Trust!",
           description: "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and physical therapy services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
           bookBtn: "Book Appointment",
@@ -31,7 +32,7 @@ const DEFAULT_SETTINGS = {
           image: "/images/hero/slide-2.jpg"
         },
         {
-          welcome: "Welcome to Revera Clinics",
+          welcome: `Welcome to ${CLIENT.name}`,
           heading: "Your Beauty & Health Journey Starts Here!",
           description: "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and physical therapy care for all ages.",
           bookBtn: "Book Appointment",

@@ -469,7 +469,7 @@ function getDoctorFirstReservationDate(docName: string, resList: any[]): string 
 
 const DEFAULT_HERO_SLIDES = [
   {
-    welcome: "Welcome to Revera Clinics",
+    welcome: `Welcome to ${CLIENT.name}`,
     heading: "Transform Your Beauty Naturally!",
     description: "Expert dermatology and cosmetic surgery services with personalized care designed to help you achieve your beauty and health goals through advanced medical techniques.",
     bookBtn: "Book Appointment",
@@ -478,7 +478,7 @@ const DEFAULT_HERO_SLIDES = [
     image: "/images/hero/slide-1.jpg"
   },
   {
-    welcome: "Welcome to Revera Clinics",
+    welcome: `Welcome to ${CLIENT.name}`,
     heading: "Advanced Medical Care You Can Trust!",
     description: "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and physical therapy services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
     bookBtn: "Book Appointment",
@@ -487,7 +487,7 @@ const DEFAULT_HERO_SLIDES = [
     image: "/images/hero/slide-2.jpg"
   },
   {
-    welcome: "Welcome to Revera Clinics",
+    welcome: `Welcome to ${CLIENT.name}`,
     heading: "Your Beauty & Health Journey Starts Here!",
     description: "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and physical therapy care for all ages.",
     bookBtn: "Book Appointment",
@@ -3313,11 +3313,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [savingBookingSettings, setSavingBookingSettings] = useState(false);
   
   // Deposit Settings State
-  const [instapayName, setInstapayName] = useState("Revera Clinic");
+  const [instapayName, setInstapayName] = useState(`${CLIENT.nameShort} Clinic`);
   const [instapayAddress, setInstapayAddress] = useState("revera@instapay");
   const [instapayLink, setInstapayLink] = useState("https://www.instapay.eg");
   const [walletEnabled, setWalletEnabled] = useState(true);
-  const [walletName, setWalletName] = useState("Revera Clinics Cash");
+  const [walletName, setWalletName] = useState(`${CLIENT.name} Cash`);
   const [walletNumber, setWalletNumber] = useState("01012345678");
   const [walletLink, setWalletLink] = useState("");
   const [savingDepositSettings, setSavingDepositSettings] = useState(false);
@@ -3328,7 +3328,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [notifSmsOtp, setNotifSmsOtp] = useState(true);
   const [notifWhatsApp, setNotifWhatsApp] = useState(true);
   const [notifEmailConfirm, setNotifEmailConfirm] = useState(false);
-  const [notifSmsTemplate, setNotifSmsTemplate] = useState("Hello {name}, your appointment for {service} is confirmed on {date} at {time}. See you at Revera Clinics!");
+  const [notifSmsTemplate, setNotifSmsTemplate] = useState(`Hello {name}, your appointment for {service} is confirmed on {date} at {time}. See you at ${CLIENT.name}!`);
   const [notifSmsTemplateAr, setNotifSmsTemplateAr] = useState("مرحباً {name}، تم تأكيد موعدك لخدمة {service} بتاريخ {date} الساعة {time}. نراك في ريفيرا كلينيك!");
   const [notifReminderHours, setNotifReminderHours] = useState(24);
   const [notifStaffEmail, setNotifStaffEmail] = useState("admin@reveraclinics.com");
@@ -4048,20 +4048,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           setFaqImage2(data.aboutPage?.faqImage2 || "");
           setFaqs(data.aboutPage?.faqs || [
             {
-              question: "1. What services does Revera offer?",
-              answer: "Revera is a premium polyclinic specializing in dermatology and aesthetic treatments, gynecology and women's health, physical therapy and rehabilitation, and osteopathy and therapeutic nutrition. Every service is delivered with medical precision and a luxury experience tailored to you."
+              question: `1. What services does ${CLIENT.nameShort} offer?`,
+              answer: `${CLIENT.nameShort} is a premium polyclinic specializing in dermatology and aesthetic treatments, gynecology and women's health, physical therapy and rehabilitation, and osteopathy and therapeutic nutrition. Every service is delivered with medical precision and a luxury experience tailored to you.`
             },
             {
-              question: "2. Who is Revera designed for?",
-              answer: "Revera is designed for women who value elegance, privacy, and visible results. Our clients seek the best — not the cheapest — and expect a medical experience that matches their standards."
+              question: `2. Who is ${CLIENT.nameShort} designed for?`,
+              answer: `${CLIENT.nameShort} is designed for women who value elegance, privacy, and visible results. Our clients seek the best — not the cheapest — and expect a medical experience that matches their standards.`
             },
             {
               question: "3. How does my treatment plan work?",
               answer: "Your journey begins with a comprehensive consultation where we assess your health, aesthetic goals, and lifestyle. From this, our doctors build a fully personalized treatment plan — never a template — that evolves with your progress and needs."
             },
             {
-              question: "4. What makes Revera different from other clinics?",
-              answer: "Revera is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint — from your first appointment to your last follow-up."
+              question: `4. What makes ${CLIENT.nameShort} different from other clinics?`,
+              answer: `${CLIENT.nameShort} is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint — from your first appointment to your last follow-up.`
             }
           ]);
           setFaqsAr(data.aboutPage?.faqsAr || [
@@ -4090,8 +4090,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           // Load Why Choose Us Settings
           setWcuYearsLabel(data.whyChooseUs?.yearsLabel || "15+ years excellence");
           setWcuHeading(data.whyChooseUs?.heading || "Where medical expertise meets a luxury experience");
-          setWcuDescription(data.whyChooseUs?.description || "At Revera, every detail is intentional — from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.");
-          setWcuQuote(data.whyChooseUs?.quote || '"We don\'t treat conditions — we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey."');
+          setWcuDescription(data.whyChooseUs?.description || `At ${CLIENT.nameShort}, every detail is intentional — from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.`);
+          setWcuQuote(data.whyChooseUs?.quote || `"We don't treat conditions — we transform confidence. Every session at ${CLIENT.nameShort} is designed around you: your goals, your skin, your journey."`);
           setWcuContactLabel(data.whyChooseUs?.contactLabel || "Reach us:");
           setWcuPhone(data.whyChooseUs?.phone || CLIENT.phoneDisplay);
 
@@ -4118,22 +4118,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             setBookingDefaultPricePerPulse(data.booking.defaultPricePerPulse ?? 5);
           }
           if (data.deposit) {
-            setInstapayName(data.deposit.instapayName || "Revera Clinic");
+            setInstapayName(data.deposit.instapayName || `${CLIENT.nameShort} Clinic`);
             setInstapayAddress(data.deposit.instapayAddress || "revera@instapay");
             setInstapayLink(data.deposit.instapayLink || "https://www.instapay.eg");
             setWalletEnabled(data.deposit.walletEnabled ?? true);
-            setWalletName(data.deposit.walletName || "Revera Clinics Cash");
+            setWalletName(data.deposit.walletName || `${CLIENT.name} Cash`);
             setWalletNumber(data.deposit.walletNumber || "01012345678");
             setWalletLink(data.deposit.walletLink || "");
             if (data.deposit.depositPercentage !== undefined) {
               setBookingDepositPercentage(Number(data.deposit.depositPercentage));
             }
           } else {
-            setInstapayName("Revera Clinic");
+            setInstapayName(`${CLIENT.nameShort} Clinic`);
             setInstapayAddress("revera@instapay");
             setInstapayLink("https://www.instapay.eg");
             setWalletEnabled(true);
-            setWalletName("Revera Clinics Cash");
+            setWalletName(`${CLIENT.name} Cash`);
             setWalletNumber("01012345678");
             setWalletLink("");
           }
@@ -4703,7 +4703,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
   const handleAddSlide = () => {
     const newEnSlide = {
-      welcome: "Welcome to Revera Clinics",
+      welcome: `Welcome to ${CLIENT.name}`,
       heading: "New Slide Title",
       description: "Expert dermatology and cosmetic surgery services designed for you.",
       bookBtn: "Book Appointment",
@@ -5635,7 +5635,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             />
           </div>
           <p className="text-xs uppercase tracking-[0.3em] text-[#5A6A51]/80 font-bold mb-1">
-            Revera Clinics Staff Portal
+            {CLIENT.name} Staff Portal
           </p>
           <h2 className="text-2xl font-bold text-[#1F251A]">
             Staff Authentication Required
@@ -5743,7 +5743,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               </div>
               <div className="flex flex-col justify-center">
                 <p className="text-[9px] uppercase tracking-[0.2em] text-[#FBFBF9]/60 leading-none mb-0.5">
-                  Revera Clinics
+                  {CLIENT.name}
                 </p>
                 <h1 className="text-base font-bold leading-tight">Admin</h1>
               </div>
@@ -6222,7 +6222,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   </div>
                 )}
               </div>
-              {/* Removed Revera Clinics button */}
+              {/* Removed clinic-name button */}
             </div>
           </div>
 
@@ -10712,7 +10712,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
                     {/* Thank you */}
                     <div className="text-center text-[10px] text-gray-400 pt-2 border-t border-dashed border-gray-200">
-                      <p>Thank you for choosing Revera Clinics!</p>
+                      <p>Thank you for choosing {CLIENT.name}!</p>
                     </div>
                   </div>
 
@@ -11186,7 +11186,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
                   {/* Thank you */}
                   <div className="text-center text-[10px] text-gray-400 pt-2 border-t border-dashed border-gray-200">
-                    <p>Thank you for choosing Revera Clinics!</p>
+                    <p>Thank you for choosing {CLIENT.name}!</p>
                   </div>
                 </div>
 

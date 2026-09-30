@@ -4280,7 +4280,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         onClick={() => {
                           if (booking) {
                             const branchObj = branches.find(br => br.id === booking.branchId);
-                            const bName = branchObj ? (isRTL ? branchObj.name_ar : branchObj.name_en) : "Revera Clinics";
+                            const bName = branchObj ? (isRTL ? branchObj.name_ar : branchObj.name_en) : CLIENT.name;
                             const allInvoiceItems = [
                               ...bookingServices,
                               ...additionalServicesList.map(s => ({ id: s.name, name: s.name, price: s.total })),

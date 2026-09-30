@@ -125,7 +125,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
   const [isWhatsappSame, setIsWhatsappSame] = useState(true);
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [serviceHours, setServiceHours] = useState<any[]>([]);
-  const [instapayName, setInstapayName] = useState("Revera Clinics");
+  const [instapayName, setInstapayName] = useState<string>(CLIENT.name);
   const [instapayAddress, setInstapayAddress] = useState("revera@instapay");
   const [instapayLink, setInstapayLink] = useState("https://www.instapay.eg");
   const [walletEnabled, setWalletEnabled] = useState(true);

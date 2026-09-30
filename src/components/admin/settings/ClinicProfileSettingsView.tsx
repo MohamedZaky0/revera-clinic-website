@@ -8,7 +8,7 @@ interface ClinicProfileSettingsViewProps {
 }
 
 export default function ClinicProfileSettingsView({ authenticatedJsonHeaders }: ClinicProfileSettingsViewProps) {
-  const [clinicName, setClinicName] = useState("Revera Clinics");
+  const [clinicName, setClinicName] = useState<string>(CLIENT.name);
   const [clinicNameAr, setClinicNameAr] = useState("ريفيرا كلينك");
   const [clinicLocation, setClinicLocation] = useState("Sheikh Zayed City, Giza");
   const [clinicLocationAr, setClinicLocationAr] = useState("مدينة الشيخ زايد، الجيزة");

@@ -1,5 +1,5 @@
 /**
- * Utility functions for role mapping and URL routing in Revera Admin.
+ * Utility functions for role mapping and URL routing in the clinic admin.
  */
 
 /**

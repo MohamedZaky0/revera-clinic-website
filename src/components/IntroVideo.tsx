@@ -183,7 +183,7 @@ export function IntroVideo() {
             {/* YouTube iframe */}
             <iframe
               src={`${YOUTUBE_EMBED_URL}?autoplay=1&rel=0`}
-              title="Revera Clinics Introduction"
+              title={`${CLIENT.name} Introduction`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               className="absolute inset-0 h-full w-full rounded-xl"

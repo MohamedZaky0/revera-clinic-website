@@ -89,7 +89,7 @@ export default function DoctorSidebar({
               </div>
               <div className="flex flex-col justify-center min-w-0">
                 <p className="text-[9px] uppercase tracking-[0.2em] text-[#FBFBF9]/60 leading-none mb-0.5">
-                  Revera Clinics
+                  {CLIENT.name}
                 </p>
                 <h1 className="text-base font-bold text-[#FBFBF9] leading-tight truncate">
                   {t.portalTitle}

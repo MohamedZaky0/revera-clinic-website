@@ -290,7 +290,7 @@ export default function HomePageSettingsView({
                         type="text"
                         value={slide.welcome || ""}
                         onChange={(e) => handleUpdateField(index, "welcome", e.target.value)}
-                        placeholder="e.g. Welcome to Revera Clinics"
+                        placeholder={`e.g. Welcome to ${CLIENT.name}`}
                         className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
                       />
                     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { adminTranslations } from "@/components/admin/translations";
+import { CLIENT } from "@/config/client";
 
 interface DepositSettingsViewProps {
   instapayName: string;
@@ -76,7 +77,7 @@ export default function DepositSettingsView({
                 type="text"
                 value={instapayName}
                 onChange={(e) => setInstapayName(e.target.value)}
-                placeholder="Revera Clinics"
+                placeholder={CLIENT.name}
                 className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] placeholder:text-[#B0BCA7] outline-none focus:border-[#414E36] transition"
               />
             </div>

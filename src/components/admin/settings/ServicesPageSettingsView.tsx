@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Upload } from "lucide-react";
 import { compressImage } from "@/lib/image";
+import { CLIENT } from "@/config/client";
 
 interface ServicesPageSettingsViewProps {
   // How It Works
@@ -409,7 +410,7 @@ export default function ServicesPageSettingsView({
                 rows={5}
                 value={wcuDescription}
                 onChange={(e) => setWcuDescription(e.target.value)}
-                placeholder="At Revera, every detail is intentional..."
+                placeholder={`At ${CLIENT.nameShort}, every detail is intentional...`}
                 className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none leading-relaxed"
               />
             </div>

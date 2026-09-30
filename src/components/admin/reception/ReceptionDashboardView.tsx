@@ -418,7 +418,7 @@ export default function ReceptionDashboardView({
     if (currentHour < 12) {
       return {
         title: tr.goodMorning ?? "Good Morning",
-        subtitle: tr.morningSubtitle ?? "Let's make today a great day at Revera Clinics.",
+        subtitle: tr.morningSubtitle ?? `Let's make today a great day at ${CLIENT.name}.`,
         icon: "👋"
       };
     }
