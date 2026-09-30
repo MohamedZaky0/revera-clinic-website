@@ -52,6 +52,7 @@ import type { Req } from "@/app/admin/page";
 import { extractPulsePackageQuota } from "@/lib/laserDeficit";
 import { resolveLaserPulseRate } from "@/lib/laserRate";
 import LaserDeficitPrompt from "./LaserDeficitPrompt";
+import { CLIENT } from "@/config/client";
 
 export interface AdditionalServiceItem {
   id: string | number;
@@ -589,8 +590,8 @@ ${diagnosis ? `🩺 *التشخيص / Diagnosis:* ${diagnosis}\n` : ''}━━━
 ${medsText}
 ━━━━━━━━━━━━━━━━━━━━
 ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n━━━━━━━━━━━━━━━━━━━━\n` : ''}✨ مع تمنياتنا لكم بالشفاء العاجل ودوام الصحة والعافية.
-📍 *Revera Clinics* — Sheikh Zayed & New Cairo
-📞 (+20) 01035595691`;
+📍 *${CLIENT.name}* — Sheikh Zayed & New Cairo
+📞 ${CLIENT.phoneDisplay}`;
 
     const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');

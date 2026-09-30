@@ -16,6 +16,38 @@ export const CLIENT = {
   whatsappGreeting: "Hello Revera, I'd love to schedule a consultation at your New Cairo branch. Please let me know your earliest availability. Thank you.",
   whatsappBookingGreeting: (serviceName: string) =>
     `Hello Revera, I'm interested in booking "${serviceName}". Please let me know your availability at your New Cairo branch. Thank you.`,
+  whatsappDepositReceipt: ({
+    patientName,
+    phone,
+    whatsappNumber,
+    serviceName,
+    date,
+    time,
+    depositAmount,
+    paymentMethod,
+    sender,
+  }: {
+    patientName: string;
+    phone: string;
+    whatsappNumber?: string;
+    serviceName: string;
+    date: string;
+    time: string | null;
+    depositAmount: number;
+    paymentMethod: string;
+    sender: string;
+  }) => `Hello Revera Clinics,
+
+I have paid the reservation deposit for my booking:
+• Patient: ${patientName}
+• Phone: ${phone}${whatsappNumber ? ` (WhatsApp: ${whatsappNumber})` : ""}
+• Service: ${serviceName}
+• Date: ${date} at ${time}
+• Deposit Amount: EGP ${depositAmount}
+• Payment Method: ${paymentMethod}
+• Sent From: ${sender}
+
+Attached is my payment transaction receipt photo.`, 
 
   // Public web presence (used by the ad landing pages: canonical URLs, footer links, review badge)
   siteUrl: "https://www.reveraclinics.com",

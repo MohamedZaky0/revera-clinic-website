@@ -860,18 +860,17 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
     const formattedDate = selectedDate ? formatDate(selectedDate) : "";
     const svcName = allSelectedServices.map((s) => (isRTL ? s.ar : s.en)).join(isRTL ? "، " : ", ");
     
-    const textMessage = `Hello Revera Clinics,
-
-I have paid the reservation deposit for my booking:
-• Patient: ${name}
-• Phone: ${phone}${isWhatsappSame ? "" : ` (WhatsApp: ${whatsappNumber})`}
-• Service: ${svcName}
-• Date: ${formattedDate} at ${selectedTime}
-• Deposit Amount: EGP ${depAmount}
-• Payment Method: ${methodLabel}
-• Sent From: ${customerPaymentSender}
-
-Attached is my payment transaction receipt photo.`;
+    const textMessage = CLIENT.whatsappDepositReceipt({
+      patientName: name,
+      phone,
+      whatsappNumber: isWhatsappSame ? undefined : whatsappNumber,
+      serviceName: svcName,
+      date: formattedDate,
+      time: selectedTime,
+      depositAmount: depAmount,
+      paymentMethod: methodLabel,
+      sender: customerPaymentSender,
+    });
 
     let cleanWhatsapp = (clinicWhatsapp || CLIENT.whatsappNumber || "").replace(/[^0-9]/g, "");
     if (cleanWhatsapp.startsWith("200")) {
