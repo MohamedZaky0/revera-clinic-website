@@ -29,6 +29,7 @@ import {
   Wrench,
   Check
 } from "lucide-react";
+import { CLIENT } from "@/config/client";
 
 interface ReceptionDashboardViewProps {
   receptionistName?: string;
@@ -90,7 +91,7 @@ export default function ReceptionDashboardView({
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const userKey = employeeId || email || "staff_user";
-    return `revera_shift_prompted_${todayStr}_${userKey}`;
+    return `${CLIENT.storagePrefix}_shift_prompted_${todayStr}_${userKey}`;
   };
 
   const handleDismissStartShiftPopup = () => {

@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { AuthModal } from "@/components/AuthModal";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
+import { CLIENT } from "@/config/client";
 
 /**
  * GET/POST /api/customers requires an authenticated caller (staff or the patient's own
@@ -112,7 +113,7 @@ export default function ProfilePage() {
   // Fetch localstorage user or Supabase Auth session on mount
   useEffect(() => {
     let active = true;
-    const stored = localStorage.getItem("revera_user");
+    const stored = localStorage.getItem(`${CLIENT.storagePrefix}_user`);
     if (stored) {
       try {
         const u = JSON.parse(stored);
@@ -141,7 +142,7 @@ export default function ProfilePage() {
           setFullName(authUser.name);
           setEmail(authUser.email || "");
           setMobileAndPreloadData(authUser);
-          localStorage.setItem("revera_user", JSON.stringify(authUser));
+          localStorage.setItem(`${CLIENT.storagePrefix}_user`, JSON.stringify(authUser));
         }
         setLoadingAuth(false);
       }).catch(() => {
@@ -180,8 +181,8 @@ export default function ProfilePage() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("revera_user");
-    sessionStorage.removeItem("revera_profile_prompted");
+    localStorage.removeItem(`${CLIENT.storagePrefix}_user`);
+    sessionStorage.removeItem(`${CLIENT.storagePrefix}_profile_prompted`);
     window.dispatchEvent(new CustomEvent("revera-auth-change"));
     router.push("/");
   };
@@ -225,7 +226,7 @@ export default function ProfilePage() {
         setDbProfile(updated);
         // Sync local storage user details
         const updatedUser = { ...user, name: updated.name, email: updated.email, gender: updated.gender };
-        localStorage.setItem("revera_user", JSON.stringify(updatedUser));
+        localStorage.setItem(`${CLIENT.storagePrefix}_user`, JSON.stringify(updatedUser));
         window.dispatchEvent(new CustomEvent("revera-auth-change"));
         setEditMode(false);
       } else {

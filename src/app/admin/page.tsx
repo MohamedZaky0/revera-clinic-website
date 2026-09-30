@@ -1641,7 +1641,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
     // 1. Initial sessionStorage Session Guard: Log out if browser/tab was closed
     supabase.auth.getSession().then(({ data: { session: cachedSession } }: any) => {
-      const isSessionActive = typeof window !== "undefined" && sessionStorage.getItem("revera_admin_session_active");
+      const isSessionActive = typeof window !== "undefined" && sessionStorage.getItem(`${CLIENT.storagePrefix}_admin_session_active`);
       if (cachedSession && !isSessionActive) {
         console.log("Stale login session detected (tab reopened). Logging out.");
         supabase.auth.signOut().then(() => {
@@ -1672,7 +1672,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, newSession: any) => {
       if (event === "SIGNED_OUT") {
         if (typeof window !== "undefined") {
-          sessionStorage.removeItem("revera_admin_session_active");
+          sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         }
       }
       handleAuthSession(newSession);
@@ -1687,14 +1687,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         setAdminEmployeeId("");
         setAdminDbId("");
         if (typeof window !== "undefined") {
-          sessionStorage.removeItem("revera_admin_session_active");
+          sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         }
         setAuthChecking(false);
         return;
       }
 
       if (typeof window !== "undefined") {
-        sessionStorage.setItem("revera_admin_session_active", "true");
+        sessionStorage.setItem(`${CLIENT.storagePrefix}_admin_session_active`, "true");
       }
       // Reset activity timer upon successful authentication
       lastActivityRef.current = Date.now();
@@ -1722,7 +1722,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             setAdminEmployeeId("");
             setAdminDbId("");
             if (typeof window !== "undefined") {
-              sessionStorage.removeItem("revera_admin_session_active");
+              sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
               window.location.href = "/login";
             }
             setAuthChecking(false);
@@ -1758,7 +1758,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           setAdminEmployeeId("");
           setAdminDbId("");
           if (typeof window !== "undefined") {
-            sessionStorage.removeItem("revera_admin_session_active");
+            sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
             window.location.href = "/login";
           }
         }
@@ -1798,7 +1798,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         clearInterval(interval);
         console.log("Inactivity timeout reached. Logging out.");
         if (typeof window !== "undefined") {
-          sessionStorage.removeItem("revera_admin_session_active");
+          sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         }
         triggerCheckout().finally(() => {
           supabase.auth.signOut().then(() => {
@@ -2176,8 +2176,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       await supabase.auth.signOut();
     }
     if (typeof window !== "undefined") {
-      sessionStorage.removeItem("revera_admin_session_active");
-      localStorage.removeItem("revera_staff_auth");
+      sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
+      localStorage.removeItem(`${CLIENT.storagePrefix}_staff_auth`);
       window.location.href = "/login";
     }
   }
@@ -2186,7 +2186,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   useEffect(() => {
     if (!authChecking && (!session || !adminRole)) {
       if (typeof window !== "undefined") {
-        sessionStorage.removeItem("revera_admin_session_active");
+        sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         window.location.replace("/login");
       }
     }

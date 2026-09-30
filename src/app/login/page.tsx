@@ -37,7 +37,7 @@ export default function UnifiedStaffLoginPage() {
               const targetPath = roleSlug === "admin" ? "/admin" : `/${roleSlug}`;
               setRedirectingTo(getRoleDisplayName(authData.role));
               if (typeof window !== "undefined") {
-                sessionStorage.setItem("revera_admin_session_active", "true");
+                sessionStorage.setItem(`${CLIENT.storagePrefix}_admin_session_active`, "true");
               }
               router.replace(targetPath);
               return;
@@ -124,7 +124,7 @@ export default function UnifiedStaffLoginPage() {
       }
 
       if (typeof window !== "undefined") {
-        sessionStorage.setItem("revera_admin_session_active", "true");
+        sessionStorage.setItem(`${CLIENT.storagePrefix}_admin_session_active`, "true");
       }
 
       // Inspect role via /api/auth/me and redirect to corresponding portal

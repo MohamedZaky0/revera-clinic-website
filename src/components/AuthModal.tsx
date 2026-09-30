@@ -107,7 +107,7 @@ export function AuthModal() {
 
   const handleClose = useCallback(() => {
     if (loadingProfileOnboarding || step === 3) {
-      sessionStorage.setItem("revera_profile_prompted", "true");
+      sessionStorage.setItem(`${CLIENT.storagePrefix}_profile_prompted`, "true");
     }
     setOpen(false);
     resetState();
@@ -157,7 +157,7 @@ export function AuthModal() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any, session: any) => {
       if (event === "SIGNED_IN") {
-        sessionStorage.removeItem("revera_profile_prompted");
+        sessionStorage.removeItem(`${CLIENT.storagePrefix}_profile_prompted`);
       }
       handleSessionCheck(session);
     });
@@ -176,12 +176,12 @@ export function AuthModal() {
               if (loginInProgress) {
                 alert("This email is registered as a clinic staff/employee account and cannot be used for patient access. Please sign in via the Staff Portal at /login.");
                 await supabase.auth.signOut();
-                localStorage.removeItem("revera_user");
+                localStorage.removeItem(`${CLIENT.storagePrefix}_user`);
                 window.dispatchEvent(new CustomEvent("revera-auth-change"));
                 setOpen(false);
                 resetState();
               } else {
-                localStorage.removeItem("revera_user");
+                localStorage.removeItem(`${CLIENT.storagePrefix}_user`);
                 window.dispatchEvent(new CustomEvent("revera-auth-change"));
               }
               if (typeof window !== "undefined") {
@@ -195,7 +195,7 @@ export function AuthModal() {
         }
       }
 
-      const stored = localStorage.getItem("revera_user");
+      const stored = localStorage.getItem(`${CLIENT.storagePrefix}_user`);
       let parsedStored = null;
       if (stored) {
         try {
@@ -206,7 +206,7 @@ export function AuthModal() {
       const isIncompleteStored = !parsedStored || !parsedStored.gender || !parsedStored.mobile || parsedStored.mobile.startsWith("guest_");
 
       if (isIncompleteStored) {
-        const promptedThisSession = sessionStorage.getItem("revera_profile_prompted");
+        const promptedThisSession = sessionStorage.getItem(`${CLIENT.storagePrefix}_profile_prompted`);
         if (!promptedThisSession) {
           const meta = session.user.user_metadata || {};
           const fullName = meta.full_name || meta.name || session.user.email?.split('@')[0] || "";
@@ -257,7 +257,7 @@ export function AuthModal() {
               customer.gender;
 
             if (isDbProfileComplete) {
-              localStorage.setItem("revera_user", JSON.stringify(customer));
+              localStorage.setItem(`${CLIENT.storagePrefix}_user`, JSON.stringify(customer));
               window.dispatchEvent(new CustomEvent("revera-auth-change"));
               setOpen(false);
               resetState();
@@ -395,7 +395,7 @@ export function AuthModal() {
         if (res.ok) {
           const customer = await res.json();
           if (customer) {
-            localStorage.setItem("revera_user", JSON.stringify(customer));
+            localStorage.setItem(`${CLIENT.storagePrefix}_user`, JSON.stringify(customer));
             window.dispatchEvent(new CustomEvent("revera-auth-change"));
             setVerifying(false);
             handleClose();
@@ -504,7 +504,7 @@ export function AuthModal() {
         if (res.ok) {
           const customer = await res.json();
           if (customer) {
-            localStorage.setItem("revera_user", JSON.stringify(customer));
+            localStorage.setItem(`${CLIENT.storagePrefix}_user`, JSON.stringify(customer));
             window.dispatchEvent(new CustomEvent("revera-auth-change"));
             setVerifying(false);
             handleClose();
@@ -588,7 +588,7 @@ export function AuthModal() {
 
       if (res.ok) {
         const customer = await res.json();
-        localStorage.setItem("revera_user", JSON.stringify(customer));
+        localStorage.setItem(`${CLIENT.storagePrefix}_user`, JSON.stringify(customer));
         window.dispatchEvent(new CustomEvent("revera-auth-change"));
         setVerifying(false);
         handleClose();

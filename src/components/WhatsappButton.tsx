@@ -37,7 +37,7 @@ export function WhatsappButton() {
   // Double check session or DOM for staff views
   if (typeof window !== "undefined") {
     if (
-      sessionStorage.getItem("revera_admin_session_active") === "true" ||
+      sessionStorage.getItem(`${CLIENT.storagePrefix}_admin_session_active`) === "true" ||
       document.getElementById("admin-root") ||
       document.querySelector(".admin-view")
     ) {

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Plus, Trash2, Upload, ArrowUp, ArrowDown, User } from "lucide-react";
 import { compressImage } from "@/lib/image";
+import { CLIENT } from "@/config/client";
 
 interface HomePageSettingsViewProps {
   // Hero slides
@@ -109,9 +110,9 @@ export default function HomePageSettingsView({
               if (typeof window !== "undefined") {
                 window.dispatchEvent(new CustomEvent("revera-settings-change", { detail: { showCustomerLogin: nextVal } }));
                 try {
-                  localStorage.setItem("revera_settings_sync", JSON.stringify({ showCustomerLogin: nextVal, ts: Date.now() }));
+                  localStorage.setItem(`${CLIENT.storagePrefix}_settings_sync`, JSON.stringify({ showCustomerLogin: nextVal, ts: Date.now() }));
                   if (typeof BroadcastChannel !== "undefined") {
-                    const bc = new BroadcastChannel("revera_channel");
+                    const bc = new BroadcastChannel(`${CLIENT.storagePrefix}_channel`);
                     bc.postMessage({ type: "settings_updated", showCustomerLogin: nextVal });
                     bc.close();
                   }

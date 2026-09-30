@@ -355,7 +355,7 @@ export default function BookingDetailsModal({
         setIsGlobalEndingSessionActive(e.detail.globalEndingSession);
       } else {
         try {
-          const stored = localStorage.getItem("revera_global_ending_session") || localStorage.getItem("revera_inactivity_settings");
+          const stored = localStorage.getItem(`${CLIENT.storagePrefix}_global_ending_session`) || localStorage.getItem(`${CLIENT.storagePrefix}_inactivity_settings`);
           if (stored) {
             const parsed = JSON.parse(stored);
             if (typeof parsed === "boolean") setIsGlobalEndingSessionActive(parsed);

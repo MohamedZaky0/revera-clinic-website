@@ -55,7 +55,7 @@ export function Navbar() {
     };
 
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === "revera_settings_sync" && e.newValue) {
+      if (e.key === `${CLIENT.storagePrefix}_settings_sync` && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
           if (parsed.showCustomerLogin !== undefined) {
@@ -73,7 +73,7 @@ export function Navbar() {
     let bc: BroadcastChannel | null = null;
     if (typeof BroadcastChannel !== "undefined") {
       try {
-        bc = new BroadcastChannel("revera_channel");
+        bc = new BroadcastChannel(`${CLIENT.storagePrefix}_channel`);
         bc.onmessage = (ev) => {
           if (ev.data?.type === "settings_updated") {
             if (ev.data.showCustomerLogin !== undefined) {
@@ -104,7 +104,7 @@ export function Navbar() {
 
   useEffect(() => {
     const checkUser = () => {
-      const stored = localStorage.getItem("revera_user");
+      const stored = localStorage.getItem(`${CLIENT.storagePrefix}_user`);
       if (stored) {
         try {
           setUser(JSON.parse(stored));
@@ -123,8 +123,8 @@ export function Navbar() {
       supabase.auth.onAuthStateChange(async (event: any, session: any) => {
         if (!session?.user) {
           if (event === "SIGNED_OUT") {
-            localStorage.removeItem("revera_user");
-            sessionStorage.removeItem("revera_profile_prompted");
+            localStorage.removeItem(`${CLIENT.storagePrefix}_user`);
+            sessionStorage.removeItem(`${CLIENT.storagePrefix}_profile_prompted`);
             setUser(null);
             window.dispatchEvent(new CustomEvent("revera-auth-change"));
           }
@@ -168,7 +168,7 @@ export function Navbar() {
   };
 
   const handleLogout = async () => {
-    localStorage.removeItem("revera_user");
+    localStorage.removeItem(`${CLIENT.storagePrefix}_user`);
     setUser(null);
     window.dispatchEvent(new CustomEvent("revera-auth-change"));
     if (supabase) {
