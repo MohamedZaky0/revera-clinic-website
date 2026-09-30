@@ -284,7 +284,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       {/* ── Page Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-[#1F251A]">
+          <h2 className="text-2xl font-bold text-[var(--cr-dark)]">
             {lang === "ar" ? "المعاملات المالية" : "Transactions"}
           </h2>
           <p className="text-xs text-gray-500">
@@ -308,7 +308,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             <button
               type="button"
               onClick={onNewTransaction}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#313A28] hover:bg-[#1F251A] text-[#FBFBF9] font-bold text-xs shadow-sm transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#313A28] hover:bg-[var(--cr-dark)] text-[var(--color-brand-light)] font-bold text-xs shadow-sm transition-all"
             >
               <Plus size={15} />
               <span>{lang === "ar" ? "معاملة جديدة" : "New Transaction"}</span>
@@ -403,7 +403,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               value={filters.search}
               onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value, page: 1 }))}
               placeholder={lang === "ar" ? "ابحث بالمريض أو المعاملة أو الفاتورة أو المرجع..." : "Search patient, transaction, invoice, or reference..."}
-              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 pe-10 text-xs font-medium text-gray-800 placeholder-gray-400 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all shadow-2xs"
+              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 pe-10 text-xs font-medium text-gray-800 placeholder-gray-400 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all shadow-2xs"
             />
             <div className={`absolute top-3 text-gray-400 ${lang === "ar" ? "left-3.5" : "right-3.5"}`}>
               <Search size={15} />
@@ -446,7 +446,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 <select
                   value={filters.dateRange}
                   onChange={(e) => setFilters((prev) => ({ ...prev, dateRange: e.target.value as any, page: 1 }))}
-                  className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
+                  className="w-full rounded-xl border border-gray-200 bg-[var(--color-brand-light)] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
                   <option value="all">{lang === "ar" ? "كل التواريخ" : "All Dates"}</option>
                   <option value="today">{lang === "ar" ? "اليوم" : "Today"}</option>
@@ -462,7 +462,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 <select
                   value={filters.type}
                   onChange={(e) => setFilters((prev) => ({ ...prev, type: e.target.value as any, page: 1 }))}
-                  className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
+                  className="w-full rounded-xl border border-gray-200 bg-[var(--color-brand-light)] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
                   <option value="all">{lang === "ar" ? "كل الأنواع" : "All Types"}</option>
                   <option value="payment">{lang === "ar" ? "دفع (Payment)" : "Payment"}</option>
@@ -482,7 +482,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 <select
                   value={filters.paymentMethod}
                   onChange={(e) => setFilters((prev) => ({ ...prev, paymentMethod: e.target.value as any, page: 1 }))}
-                  className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
+                  className="w-full rounded-xl border border-gray-200 bg-[var(--color-brand-light)] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
                   <option value="all">{lang === "ar" ? "كل الطرق" : "All Methods"}</option>
                   <option value="cash">{lang === "ar" ? "نقدي (Cash)" : "Cash"}</option>
@@ -500,7 +500,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 <select
                   value={filters.status}
                   onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value as any, page: 1 }))}
-                  className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
+                  className="w-full rounded-xl border border-gray-200 bg-[var(--color-brand-light)] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
                   <option value="all">{lang === "ar" ? "كل الحالات" : "All Statuses"}</option>
                   <option value="completed">{lang === "ar" ? "مكتمل (Completed)" : "Completed"}</option>
@@ -517,7 +517,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 <select
                   value={filters.source}
                   onChange={(e) => setFilters((prev) => ({ ...prev, source: e.target.value as any, page: 1 }))}
-                  className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
+                  className="w-full rounded-xl border border-gray-200 bg-[var(--color-brand-light)] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
                   <option value="all">{lang === "ar" ? "كل المصادر" : "All Sources"}</option>
                   <option value="manual">{lang === "ar" ? "يدوي (Manual)" : "Manual"}</option>
@@ -531,7 +531,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 <select
                   value={filters.branchId}
                   onChange={(e) => setFilters((prev) => ({ ...prev, branchId: e.target.value, page: 1 }))}
-                  className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
+                  className="w-full rounded-xl border border-gray-200 bg-[var(--color-brand-light)] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
                   <option value="all">{lang === "ar" ? "كل الفروع" : "All Branches"}</option>
                   {branches.map((b) => (
@@ -546,7 +546,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 <select
                   value={filters.amountRange}
                   onChange={(e) => setFilters((prev) => ({ ...prev, amountRange: e.target.value as any, page: 1 }))}
-                  className="w-full rounded-xl border border-gray-200 bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-gray-800"
+                  className="w-full rounded-xl border border-gray-200 bg-[var(--color-brand-light)] px-3 py-2 text-xs font-semibold text-gray-800"
                 >
                   <option value="all">{lang === "ar" ? "كل المبالغ" : "All Amounts"}</option>
                   <option value="under500">{lang === "ar" ? "أقل من 500 ج.م" : "Under 500 EGP"}</option>
@@ -573,7 +573,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       </div>
 
       {/* ── Transactions Table ── */}
-      <div className="overflow-hidden rounded-3xl border border-[#414E36]/10 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-3xl border border-[var(--cr-primary)]/10 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-start text-xs border-collapse min-w-[850px]">
             <thead>
@@ -655,7 +655,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                       {/* Patient */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2.5">
-                          <div className="h-8 w-8 rounded-full bg-[#EAE8E3] text-[#414E36] font-bold text-xs flex items-center justify-center shrink-0">
+                          <div className="h-8 w-8 rounded-full bg-[#EAE8E3] text-[var(--cr-primary)] font-bold text-xs flex items-center justify-center shrink-0">
                             {patientInitial}
                           </div>
                           <div>

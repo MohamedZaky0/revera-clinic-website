@@ -388,12 +388,12 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
         {/* Stats Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="rounded-[28px] bg-white p-5 border border-[#E6E9EB] shadow-sm flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EBF0E6] text-[#414E36]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EBF0E6] text-[var(--cr-primary)]">
               <ShoppingBag size={22} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">{t.totalProducts}</p>
-              <p className="text-2xl font-bold text-[#1F251A]">{products.length}</p>
+              <p className="text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider">{t.totalProducts}</p>
+              <p className="text-2xl font-bold text-[var(--cr-dark)]">{products.length}</p>
             </div>
           </div>
 
@@ -402,8 +402,8 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               <CheckCircle size={22} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">{t.activeCatalog}</p>
-              <p className="text-2xl font-bold text-[#1F251A]">
+              <p className="text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider">{t.activeCatalog}</p>
+              <p className="text-2xl font-bold text-[var(--cr-dark)]">
                 {products.filter((p) => p.status === "Active").length}
               </p>
             </div>
@@ -414,7 +414,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               <AlertTriangle size={22} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">{t.lowStockAlerts}</p>
+              <p className="text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider">{t.lowStockAlerts}</p>
               <p className="text-2xl font-bold text-amber-700">
                 {products.filter((p) => p.stock_quantity <= p.min_reorder_quantity).length}
               </p>
@@ -426,8 +426,8 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               <Package size={22} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">{t.stockValuation}</p>
-              <p className="text-xl font-bold text-[#1F251A]">
+              <p className="text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider">{t.stockValuation}</p>
+              <p className="text-xl font-bold text-[var(--cr-dark)]">
                 EGP {products.reduce((sum, p) => sum + (p.stock_quantity * p.purchase_price), 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
@@ -435,16 +435,16 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
         </div>
 
         {/* Main Container */}
-        <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB] space-y-6">
+        <div className="rounded-[40px] bg-[var(--color-brand-light)] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB] space-y-6">
           {/* Sub-tabs for Catalog vs Sales History */}
-          <div className="flex items-center gap-1.5 p-1 bg-[#F2EFE9] rounded-xl w-fit mb-6">
+          <div className="flex items-center gap-1.5 p-1 bg-[var(--color-brand-sand)] rounded-xl w-fit mb-6">
             <button
               type="button"
               onClick={() => setProductSubTab("catalog")}
               className={`text-xs font-bold transition px-3.5 py-1.5 rounded-lg ${
                 productSubTab === "catalog"
-                  ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
-                  : "text-[#5A6A51] hover:text-[#414E36]"
+                  ? "bg-[var(--cr-primary)] text-[var(--color-brand-light)] shadow-xs font-bold"
+                  : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)]"
               }`}
             >
               {t.catalogTab(filteredInventoryProducts.length)}
@@ -454,8 +454,8 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               onClick={() => setProductSubTab("sales_history")}
               className={`text-xs font-bold transition px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 ${
                 productSubTab === "sales_history"
-                  ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
-                  : "text-[#5A6A51] hover:text-[#414E36]"
+                  ? "bg-[var(--cr-primary)] text-[var(--color-brand-light)] shadow-xs font-bold"
+                  : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)]"
               }`}
             >
               <Receipt size={14} /> {t.salesHistoryTab(productSalesHistory.length)}
@@ -466,27 +466,27 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
             <>
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-xl font-bold text-[#1F251A]">{t.heading}</h3>
-                  <p className="text-xs text-[#5A6A51]">{t.subtitle}</p>
+                  <h3 className="text-xl font-bold text-[var(--cr-dark)]">{t.heading}</h3>
+                  <p className="text-xs text-[var(--color-brand-secondary)]">{t.subtitle}</p>
                 </div>
 
                 {/* Search & Filter controls */}
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                   <div className="relative flex-1 md:w-64">
-                    <Search size={16} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                    <Search size={16} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]" />
                     <input
                       type="text"
                       placeholder={t.searchPlaceholder}
                       value={productSearchQuery}
                       onChange={(e) => setProductSearchQuery(e.target.value)}
-                      className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2 ps-9 pe-4 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
+                      className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2 ps-9 pe-4 text-xs text-[var(--cr-dark)] focus:border-[var(--cr-primary)] focus:outline-none"
                     />
                   </div>
 
                   <select
                     value={productCategoryFilter}
                     onChange={(e) => setProductCategoryFilter(e.target.value)}
-                    className="rounded-2xl border border-[#E6E9EB] bg-white py-2 px-3 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
+                    className="rounded-2xl border border-[#E6E9EB] bg-white py-2 px-3 text-xs text-[var(--cr-dark)] focus:border-[var(--cr-primary)] focus:outline-none"
                   >
                     <option value="All">{t.allCategories}</option>
                     <option value="Injectables">{t.catInjectables}</option>
@@ -499,7 +499,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                   <select
                     value={productStatusFilter}
                     onChange={(e) => setProductStatusFilter(e.target.value)}
-                    className="rounded-2xl border border-[#E6E9EB] bg-white py-2 px-3 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
+                    className="rounded-2xl border border-[#E6E9EB] bg-white py-2 px-3 text-xs text-[var(--cr-dark)] focus:border-[var(--cr-primary)] focus:outline-none"
                   >
                     <option value="All">{t.allStatuses}</option>
                     <option value="Active">{t.statusActive}</option>
@@ -514,7 +514,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                       resetProductForm();
                       setShowAddProductModal(true);
                     }}
-                    className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]`}
+                    className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[var(--cr-primary)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]`}
                   >
                     <Plus size={14} /> {t.addItemBtn}
                   </button>
@@ -525,7 +525,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               <div className="overflow-x-auto rounded-[32px] border border-[#E6E9EB] bg-white">
                 <table className="w-full min-w-[900px] text-sm">
                   <thead>
-                    <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                    <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-secondary)]">
                       <th className="px-6 py-4 text-start">{t.thProductSku}</th>
                       <th className="px-6 py-4 text-start">{t.thCategoryUnit}</th>
                       <th className="px-6 py-4 text-end">{t.thCostPrice}</th>
@@ -535,21 +535,21 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                       <th className="px-6 py-4 text-end">{t.thActions}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                  <tbody className="divide-y divide-[#E6E9EB] text-[var(--cr-primary)]">
                     {filteredInventoryProducts.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-[#5A6A51]">
+                        <td colSpan={7} className="px-6 py-12 text-center text-[var(--color-brand-secondary)]">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <ShoppingBag size={32} className="text-[#A3B19B]" />
-                            <p className="font-semibold text-[#1F251A]">{t.emptyTitle}</p>
-                            <p className="text-xs text-[#5A6A51]">{t.emptyDesc}</p>
+                            <p className="font-semibold text-[var(--cr-dark)]">{t.emptyTitle}</p>
+                            <p className="text-xs text-[var(--color-brand-secondary)]">{t.emptyDesc}</p>
                             <button
                               type="button"
                               onClick={() => {
                                 resetProductForm();
                                 setShowAddProductModal(true);
                               }}
-                              className={`mt-2 ${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] cursor-pointer`}
+                              className={`mt-2 ${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[var(--cr-primary)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] cursor-pointer`}
                             >
                               <Plus size={14} /> {t.addItemBtn}
                             </button>
@@ -563,13 +563,13 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                           <tr key={prod.id} className="transition hover:bg-[#F9F9F7]">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EBF0E6] text-[#414E36] font-bold">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EBF0E6] text-[var(--cr-primary)] font-bold">
                                   <ShoppingBag size={18} />
                                 </div>
                                 <div>
-                                  <p className="font-semibold text-[#1F251A]">{prod.name}</p>
+                                  <p className="font-semibold text-[var(--cr-dark)]">{prod.name}</p>
                                   {prod.name_ar && (
-                                    <p className="text-xs text-[#5A6A51] dir-rtl font-sans">{prod.name_ar}</p>
+                                    <p className="text-xs text-[var(--color-brand-secondary)] dir-rtl font-sans">{prod.name_ar}</p>
                                   )}
                                   {prod.sku && (
                                     <span className="inline-block mt-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono text-gray-600">
@@ -580,20 +580,20 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                               </div>
                             </td>
                             <td className="px-6 py-4">
-                              <span className="inline-flex items-center rounded-full bg-[#EBF0E6] px-2.5 py-0.5 text-xs font-medium text-[#414E36]">
+                              <span className="inline-flex items-center rounded-full bg-[#EBF0E6] px-2.5 py-0.5 text-xs font-medium text-[var(--cr-primary)]">
                                 {categoryLabel(prod.category)}
                               </span>
-                              <p className="text-xs text-[#5A6A51] mt-1 font-mono">{t.unitLabel} {prod.unit}</p>
+                              <p className="text-xs text-[var(--color-brand-secondary)] mt-1 font-mono">{t.unitLabel} {prod.unit}</p>
                             </td>
-                            <td className="px-6 py-4 text-end font-mono font-semibold text-[#1F251A]">
+                            <td className="px-6 py-4 text-end font-mono font-semibold text-[var(--cr-dark)]">
                               EGP {prod.purchase_price.toFixed(2)}
                             </td>
-                            <td className="px-6 py-4 text-end font-mono font-semibold text-[#414E36]">
+                            <td className="px-6 py-4 text-end font-mono font-semibold text-[var(--cr-primary)]">
                               EGP {prod.selling_price.toFixed(2)}
                             </td>
                             <td className="px-6 py-4 text-center">
                               <div className="inline-flex flex-col items-center">
-                                <span className={`font-mono font-bold ${isLowStock ? "text-amber-700" : "text-[#1F251A]"}`}>
+                                <span className={`font-mono font-bold ${isLowStock ? "text-amber-700" : "text-[var(--cr-dark)]"}`}>
                                   {prod.stock_quantity} {prod.unit}s
                                 </span>
                                 {isLowStock && (
@@ -622,7 +622,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                                   type="button"
                                   onClick={() => handleOpenSellProductModal(prod)}
                                   disabled={prod.stock_quantity <= 0 || prod.role === "consumable"}
-                                  className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1 rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 disabled:cursor-not-allowed`}
+                                  className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1 rounded-xl bg-[var(--cr-primary)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 disabled:cursor-not-allowed`}
                                   title={prod.role === "consumable" ? t.consumableTitle : prod.stock_quantity <= 0 ? t.outOfStockTitle : t.sellProductTitle}
                                 >
                                   <Tag size={13} /> {prod.role === "consumable" ? t.consumableOnly : t.sellProductTitle}
@@ -630,7 +630,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                                 <button
                                   type="button"
                                   onClick={() => openEditProductModal(prod)}
-                                  className={`${canManage ? "inline-flex" : "hidden"} rounded-xl border border-[#E6E9EB] p-2 text-[#5A6A51] transition hover:bg-[#EBF0E6] hover:text-[#414E36]`}
+                                  className={`${canManage ? "inline-flex" : "hidden"} rounded-xl border border-[#E6E9EB] p-2 text-[var(--color-brand-secondary)] transition hover:bg-[#EBF0E6] hover:text-[var(--cr-primary)]`}
                                   title={t.editProductTitle}
                                 >
                                   <Pencil size={15} />
@@ -682,15 +682,15 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-bold text-[#1F251A]">{t.salesHeading}</h3>
-                  <p className="text-xs text-[#5A6A51]">{t.salesSubtitle}</p>
+                  <h3 className="text-xl font-bold text-[var(--cr-dark)]">{t.salesHeading}</h3>
+                  <p className="text-xs text-[var(--color-brand-secondary)]">{t.salesSubtitle}</p>
                 </div>
               </div>
 
               <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
                 <table className="w-full min-w-[800px] text-sm">
                   <thead>
-                    <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                    <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-secondary)]">
                       <th className="px-6 py-4 text-start">{t.thDateTime}</th>
                       <th className="px-6 py-4 text-start">{t.thProduct}</th>
                       <th className="px-6 py-4 text-start">{t.thPatient}</th>
@@ -699,28 +699,28 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                       <th className="px-6 py-4 text-end">{t.thTotalAmount}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                  <tbody className="divide-y divide-[#E6E9EB] text-[var(--cr-primary)]">
                     {productSalesHistory.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-[#5A6A51]">
+                        <td colSpan={6} className="px-6 py-12 text-center text-[var(--color-brand-secondary)]">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <Receipt size={32} className="text-[#A3B19B]" />
-                            <p className="font-semibold text-[#1F251A]">{t.noSalesTitle}</p>
-                            <p className="text-xs text-[#5A6A51]">{t.noSalesDesc}</p>
+                            <p className="font-semibold text-[var(--cr-dark)]">{t.noSalesTitle}</p>
+                            <p className="text-xs text-[var(--color-brand-secondary)]">{t.noSalesDesc}</p>
                           </div>
                         </td>
                       </tr>
                     ) : (
                       productSalesHistory.map((sale) => (
                         <tr key={sale.id} className="transition hover:bg-[#F9F9F7]">
-                          <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">
+                          <td className="px-6 py-4 font-mono text-xs text-[var(--color-brand-secondary)]">
                             {new Date(sale.created_at).toLocaleString("en-GB", {
                               dateStyle: "medium",
                               timeStyle: "short",
                             })}
                           </td>
                           <td className="px-6 py-4">
-                            <p className="font-semibold text-[#1F251A]">{sale.product_name}</p>
+                            <p className="font-semibold text-[var(--cr-dark)]">{sale.product_name}</p>
                             {sale.product_sku && (
                               <span className="inline-block mt-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono text-gray-600">
                                 SKU: {sale.product_sku}
@@ -728,16 +728,16 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                             )}
                           </td>
                           <td className="px-6 py-4">
-                            <p className="font-semibold text-[#1F251A]">{sale.customer_name}</p>
-                            <p className="text-xs text-[#5A6A51] font-mono">{sale.customer_mobile}</p>
+                            <p className="font-semibold text-[var(--cr-dark)]">{sale.customer_name}</p>
+                            <p className="text-xs text-[var(--color-brand-secondary)] font-mono">{sale.customer_mobile}</p>
                           </td>
-                          <td className="px-6 py-4 text-center font-bold font-mono text-[#1F251A]">
+                          <td className="px-6 py-4 text-center font-bold font-mono text-[var(--cr-dark)]">
                             {sale.quantity}
                           </td>
-                          <td className="px-6 py-4 text-end font-mono text-xs text-[#5A6A51]">
+                          <td className="px-6 py-4 text-end font-mono text-xs text-[var(--color-brand-secondary)]">
                             EGP {(sale.unit_price || 0).toFixed(2)}
                           </td>
-                          <td className="px-6 py-4 text-end font-mono font-bold text-[#414E36]">
+                          <td className="px-6 py-4 text-end font-mono font-bold text-[var(--cr-primary)]">
                             EGP {(sale.total_amount || 0).toFixed(2)}
                           </td>
                         </tr>
@@ -756,17 +756,17 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
             <div className="w-full max-w-2xl rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
                 <div>
-                  <h3 className="text-2xl font-bold text-[#1F251A]">
+                  <h3 className="text-2xl font-bold text-[var(--cr-dark)]">
                     {editingProduct ? t.editModalTitle : t.addModalTitle}
                   </h3>
-                  <p className="text-xs text-[#5A6A51] mt-1">
+                  <p className="text-xs text-[var(--color-brand-secondary)] mt-1">
                     {t.modalSubtitle}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowAddProductModal(false)}
-                  className="rounded-full p-2 text-[#5A6A51] hover:bg-gray-100 transition"
+                  className="rounded-full p-2 text-[var(--color-brand-secondary)] hover:bg-gray-100 transition"
                 >
                   <X size={20} />
                 </button>
@@ -775,45 +775,45 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               <form onSubmit={handleSaveProduct} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.nameEnLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.nameEnLabel}</label>
                     <input
                       type="text"
                       required
                       placeholder={t.nameEnPlaceholder}
                       value={prodName}
                       onChange={(e) => setProdName(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.nameArLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.nameArLabel}</label>
                     <input
                       type="text"
                       placeholder={t.nameArPlaceholder}
                       value={prodNameAr}
                       onChange={(e) => setProdNameAr(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36] dir-rtl font-sans"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)] dir-rtl font-sans"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.skuCodeLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.skuCodeLabel}</label>
                     <input
                       type="text"
                       placeholder={t.skuCodePlaceholder}
                       value={prodSku}
                       onChange={(e) => setProdSku(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.categoryLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.categoryLabel}</label>
                     <select
                       value={prodCategory}
                       onChange={(e) => setProdCategory(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     >
                       <option value="Injectables">{t.catInjectables}</option>
                       <option value="Skincare">{t.catSkincare}</option>
@@ -823,20 +823,20 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.unitMeasureLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.unitMeasureLabel}</label>
                     <input
                       type="text"
                       placeholder={t.unitMeasurePlaceholder}
                       value={prodUnit}
                       onChange={(e) => setProdUnit(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.costPriceLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.costPriceLabel}</label>
                     <input
                       type="number"
                       step="0.01"
@@ -845,11 +845,11 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                       placeholder={t.pricePlaceholder}
                       value={prodPurchasePrice}
                       onChange={(e) => setProdPurchasePrice(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.sellingPriceLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.sellingPriceLabel}</label>
                     <input
                       type="number"
                       step="0.01"
@@ -857,40 +857,40 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                       placeholder={t.pricePlaceholder}
                       value={prodSellingPrice}
                       onChange={(e) => setProdSellingPrice(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.stockQtyLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.stockQtyLabel}</label>
                     <input
                       type="number"
                       min="0"
                       placeholder="0"
                       value={prodStockQuantity}
                       onChange={(e) => setProdStockQuantity(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.minReorderLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.minReorderLabel}</label>
                     <input
                       type="number"
                       min="0"
                       placeholder="5"
                       value={prodMinReorder}
                       onChange={(e) => setProdMinReorder(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.statusLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.statusLabel}</label>
                     <select
                       value={prodStatus}
                       onChange={(e) => setProdStatus(e.target.value as any)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     >
                       <option value="Active">{t.statusActive}</option>
                       <option value="Inactive">{t.statusInactive}</option>
@@ -902,11 +902,11 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.branchLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.branchLabel}</label>
                     <select
                       value={prodBranchId}
                       onChange={(e) => setProdBranchId(e.target.value)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     >
                       <option value="">{t.allBranchesWarehouse}</option>
                       {branches.map((b) => (
@@ -917,11 +917,11 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.roleLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.roleLabel}</label>
                     <select
                       value={prodRole}
                       onChange={(e) => setProdRole(e.target.value as any)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     >
                       <option value="retail">{t.roleRetail}</option>
                       <option value="consumable">{t.roleConsumable}</option>
@@ -931,13 +931,13 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.descStorageLabel}</label>
+                  <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.descStorageLabel}</label>
                   <textarea
                     rows={2}
                     placeholder={t.descStoragePlaceholder}
                     value={prodNotes}
                     onChange={(e) => setProdNotes(e.target.value)}
-                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                   />
                 </div>
 
@@ -945,14 +945,14 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                   <button
                     type="button"
                     onClick={() => setShowAddProductModal(false)}
-                    className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] hover:bg-gray-50 transition"
+                    className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[var(--color-brand-secondary)] hover:bg-gray-50 transition"
                   >
                     {t.cancelBtn}
                   </button>
                   <button
                     type="submit"
                     disabled={savingProduct}
-                    className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm disabled:opacity-50"
+                    className="rounded-2xl bg-[var(--cr-primary)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm disabled:opacity-50"
                   >
                     {savingProduct ? t.savingBtn : editingProduct ? t.saveChangesBtn : t.createProductBtn}
                   </button>
@@ -980,10 +980,10 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                   {productPendingDelete.mode === "hard" ? <Trash2 size={22} /> : <Archive size={22} />}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-[#1F251A]">
+                  <h3 className="text-lg font-bold text-[var(--cr-dark)]">
                     {productPendingDelete.mode === "hard" ? t.hardDeleteTitleModal : t.softDeleteTitleModal}
                   </h3>
-                  <p className="mt-1.5 text-sm text-[#5A6A51]">
+                  <p className="mt-1.5 text-sm text-[var(--color-brand-secondary)]">
                     {productPendingDelete.mode === "hard" ? (
                       <>
                         {t.hardDeleteText(productPendingDelete.name)}
@@ -1008,7 +1008,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                   data-testid="product-delete-modal-cancel"
                   onClick={() => setProductPendingDelete(null)}
                   disabled={deletingProduct}
-                  className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] transition hover:bg-gray-50 disabled:opacity-50"
+                  className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[var(--color-brand-secondary)] transition hover:bg-gray-50 disabled:opacity-50"
                 >
                   {t.cancelBtn}
                 </button>
@@ -1018,7 +1018,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                   onClick={confirmProductDelete}
                   disabled={deletingProduct}
                   className={`rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-60 ${
-                    productPendingDelete.mode === "hard" ? "bg-rose-600 hover:bg-rose-700" : "bg-[#414E36] hover:bg-[#2e3a26]"
+                    productPendingDelete.mode === "hard" ? "bg-rose-600 hover:bg-rose-700" : "bg-[var(--cr-primary)] hover:bg-[#2e3a26]"
                   }`}
                 >
                   {deletingProduct ? t.deletingBtn : productPendingDelete.mode === "hard" ? t.permanentlyDeleteBtn : t.deleteSoftBtn}
@@ -1034,8 +1034,8 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
             <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
               <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-[#1F251A]">{t.sellModalTitle}</h3>
-                  <p className="text-xs text-[#5A6A51] mt-1">{t.sellModalSubtitle(selectedSellProduct.name, selectedSellProduct.stock_quantity, selectedSellProduct.unit)}</p>
+                  <h3 className="text-xl font-bold text-[var(--cr-dark)]">{t.sellModalTitle}</h3>
+                  <p className="text-xs text-[var(--color-brand-secondary)] mt-1">{t.sellModalSubtitle(selectedSellProduct.name, selectedSellProduct.stock_quantity, selectedSellProduct.unit)}</p>
                 </div>
                 <button
                   type="button"
@@ -1043,7 +1043,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     setShowSellProductModal(false);
                     setSelectedSellProduct(null);
                   }}
-                  className="rounded-full p-2 text-[#5A6A51] hover:bg-gray-100 transition"
+                  className="rounded-full p-2 text-[var(--color-brand-secondary)] hover:bg-gray-100 transition"
                 >
                   <X size={20} />
                 </button>
@@ -1051,12 +1051,12 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
 
               <form onSubmit={handleConfirmSellProduct} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.selectPatientLabel}</label>
+                  <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.selectPatientLabel}</label>
                   <select
                     required
                     value={sellCustomerId}
                     onChange={(e) => setSellCustomerId(e.target.value)}
-                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                   >
                     <option value="">{t.choosePatientOption}</option>
                     {customers.map((c) => (
@@ -1069,16 +1069,16 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.unitSellingPriceLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.unitSellingPriceLabel}</label>
                     <input
                       type="text"
                       disabled
                       value={`EGP ${selectedSellProduct.selling_price.toFixed(2)}`}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-gray-50 px-3.5 py-2.5 text-sm font-mono font-bold text-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-gray-50 px-3.5 py-2.5 text-sm font-mono font-bold text-[var(--cr-primary)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.quantityLabel}</label>
+                    <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.quantityLabel}</label>
                     <input
                       type="number"
                       min="1"
@@ -1086,27 +1086,27 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                       required
                       value={sellQuantity}
                       onChange={(e) => setSellQuantity(Math.max(1, Number(e.target.value)))}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono font-bold text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono font-bold text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                     />
                   </div>
                 </div>
 
                 <div className="rounded-2xl bg-[#F7F7F9] p-4 border border-[#E6E9EB] flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-[#5A6A51]">{t.totalAmountDueLabel}</p>
-                    <p className="text-xs font-medium text-[#1F251A]">{t.totalAmountDueCalc(sellQuantity, selectedSellProduct.selling_price)}</p>
+                    <p className="text-xs text-[var(--color-brand-secondary)]">{t.totalAmountDueLabel}</p>
+                    <p className="text-xs font-medium text-[var(--cr-dark)]">{t.totalAmountDueCalc(sellQuantity, selectedSellProduct.selling_price)}</p>
                   </div>
-                  <p className="text-xl font-bold font-mono text-[#414E36]">
+                  <p className="text-xl font-bold font-mono text-[var(--cr-primary)]">
                     EGP {(sellQuantity * selectedSellProduct.selling_price).toFixed(2)}
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.paymentMethodLabel}</label>
+                  <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.paymentMethodLabel}</label>
                   <select
                     value={sellPaymentMethod}
                     onChange={(e) => setSellPaymentMethod(e.target.value)}
-                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                   >
                     <option value="Cash">{t.pmCash}</option>
                     <option value="Visa / Card">{t.pmVisa}</option>
@@ -1116,13 +1116,13 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.notesInstructionsLabel}</label>
+                  <label className="block text-xs font-semibold text-[var(--cr-dark)] mb-1">{t.notesInstructionsLabel}</label>
                   <input
                     type="text"
                     placeholder={t.notesInstructionsPlaceholder}
                     value={sellNotes}
                     onChange={(e) => setSellNotes(e.target.value)}
-                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                   />
                 </div>
 
@@ -1133,14 +1133,14 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                       setShowSellProductModal(false);
                       setSelectedSellProduct(null);
                     }}
-                    className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] hover:bg-gray-50 transition"
+                    className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[var(--color-brand-secondary)] hover:bg-gray-50 transition"
                   >
                     {t.cancelBtn}
                   </button>
                   <button
                     type="submit"
                     disabled={submittingSellProduct}
-                    className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm disabled:opacity-50"
+                    className="rounded-2xl bg-[var(--cr-primary)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm disabled:opacity-50"
                   >
                     {submittingSellProduct ? t.recordingSaleBtn : t.confirmSellBtn}
                   </button>

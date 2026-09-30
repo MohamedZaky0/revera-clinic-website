@@ -137,15 +137,15 @@ export function ReportsSection({ accessToken, branches = [], lang = 'en', canVie
             <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--cr-primary, var(--cr-dark))" }}>
               {isAr ? groupLabels[group].ar : groupLabels[group].en}
             </h3>
-            <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar w-full mb-6">
+            <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[var(--cr-primary)]/10 shadow-xs overflow-x-auto no-scrollbar w-full mb-6">
               {groupTabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-150 min-w-max ${
                     activeTab === tab.id
-                      ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
-                      : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
+                      ? "bg-[var(--cr-primary)] text-[var(--color-brand-light)] font-bold shadow-xs"
+                      : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)] hover:bg-[var(--color-brand-sand)]/60"
                   }`}
                 >
                   {tab.icon}

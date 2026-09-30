@@ -64,7 +64,7 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-[#1F251A]">
+                <h3 className="text-lg font-bold text-[var(--cr-dark)]">
                   Transaction Details
                 </h3>
                 <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 font-semibold">
@@ -137,7 +137,7 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
 
             <div className="p-3.5 rounded-xl border border-gray-100 bg-white space-y-1">
               <span className="text-gray-400 font-bold uppercase text-[10px]">Patient</span>
-              <div className="font-bold text-[#1F251A]">
+              <div className="font-bold text-[var(--cr-dark)]">
                 {transaction.customer?.name || "Clinic General Patient"}
               </div>
               {transaction.customer?.phone && (

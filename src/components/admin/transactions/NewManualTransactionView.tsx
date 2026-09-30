@@ -469,7 +469,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
           <ArrowLeft size={18} className={isAr ? "rotate-180" : ""} />
         </button>
         <div>
-          <h2 className="text-2xl font-bold text-[#1F251A]">
+          <h2 className="text-2xl font-bold text-[var(--cr-dark)]">
             {isAr ? "إضافة معاملة يدوية" : "Add Manual Transaction"}
           </h2>
           <p className="text-xs text-gray-500">
@@ -504,7 +504,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
               <Wallet size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-[#1F251A]">
+              <h3 className="text-sm font-bold text-[var(--cr-dark)]">
                 {isAr ? "بيانات المعاملة" : "Transaction Information"}
               </h3>
               <p className="text-xs text-gray-500">
@@ -540,7 +540,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                     setTransactionType(e.target.value as any);
                     setErrorMsg(null);
                   }}
-                  className="w-full appearance-none rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 text-xs font-semibold text-gray-800 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
+                  className="w-full appearance-none rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] px-4 py-3 text-xs font-semibold text-gray-800 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all"
                 >
                   {MANUAL_TRANSACTION_TYPES.map((opt) => (
                     <option key={opt.id} value={opt.id}>
@@ -588,7 +588,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                   }}
                   onFocus={() => setShowCustomerDropdown(true)}
                   placeholder={isAr ? "ابحث بالاسم أو رقم الهاتف..." : "Search patient by name or phone..."}
-                  className="w-full rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 pe-10 text-xs font-semibold text-gray-800 placeholder-gray-400 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
+                  className="w-full rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] px-4 py-3 pe-10 text-xs font-semibold text-gray-800 placeholder-gray-400 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all"
                 />
                 <div className={`absolute top-3.5 text-gray-400 ${isAr ? "left-3.5" : "right-3.5"}`}>
                   {loadingCustomers ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
@@ -661,7 +661,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
 
           {/* ── Type 1: REFUND Specific Section ── */}
           {transactionType === "refund" && (
-            <div className="space-y-4 rounded-2xl bg-[#FBFBF9] p-5 border border-gray-200/80 animate-in fade-in">
+            <div className="space-y-4 rounded-2xl bg-[var(--color-brand-light)] p-5 border border-gray-200/80 animate-in fade-in">
               <div className="flex items-center gap-2 text-xs font-bold text-rose-800 pb-1 border-b border-gray-200">
                 <RotateCcw size={15} />
                 <span>{isAr ? "بيانات الاسترداد" : "Refund Details"}</span>
@@ -680,7 +680,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                         setSelectedOriginalTxnId(e.target.value);
                         setAmount("");
                       }}
-                      className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-800 focus:border-[#414E36] focus:outline-none"
+                      className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-800 focus:border-[var(--cr-primary)] focus:outline-none"
                     >
                       {eligibleCompletedPayments.length === 0 ? (
                         <option value="">
@@ -716,7 +716,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                         onClick={() => setRefundDestination(opt.id)}
                         className={`rounded-xl border px-3 py-2 text-start transition cursor-pointer ${
                           refundDestination === opt.id
-                            ? "border-[#414E36] bg-[#F3F6F1]"
+                            ? "border-[var(--cr-primary)] bg-[#F3F6F1]"
                             : "border-gray-200 bg-white hover:bg-gray-50"
                         }`}
                       >
@@ -764,7 +764,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder={isAr ? "مثال: إلغاء الحجز، عدم الرضا عن الخدمة، خطأ في الحساب..." : "e.g. Appointment cancelled, service dissatisfaction, billing correction..."}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-800 placeholder-gray-400 focus:border-[#414E36] focus:outline-none"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-800 placeholder-gray-400 focus:border-[var(--cr-primary)] focus:outline-none"
                 />
               </div>
             </div>
@@ -772,7 +772,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
 
           {/* ── Type 2: PRODUCT / PACKAGE PURCHASE Specific Section ── */}
           {transactionType === "product_purchase" && (
-            <div className="space-y-4 rounded-2xl bg-[#FBFBF9] p-5 border border-gray-200/80 animate-in fade-in">
+            <div className="space-y-4 rounded-2xl bg-[var(--color-brand-light)] p-5 border border-gray-200/80 animate-in fade-in">
               <div className="flex items-center gap-2 text-xs font-bold text-teal-800 pb-1 border-b border-gray-200">
                 <ShoppingBag size={15} />
                 <span>{isAr ? "تفاصيل شراء المنتج أو الباقة" : "Product / Package Purchase Details"}</span>
@@ -823,7 +823,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                     <select
                       value={selectedItemId}
                       onChange={(e) => handleItemSelect(e.target.value)}
-                      className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-800 focus:border-[#414E36] focus:outline-none"
+                      className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-800 focus:border-[var(--cr-primary)] focus:outline-none"
                     >
                       <option value="">
                         {loadingCatalog
@@ -857,7 +857,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                     step="1"
                     value={quantity}
                     onChange={(e) => handleQuantityChange(parseInt(e.target.value, 10))}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-bold text-gray-800 focus:border-[#414E36] focus:outline-none"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-bold text-gray-800 focus:border-[var(--cr-primary)] focus:outline-none"
                   />
                 </div>
               </div>
@@ -878,7 +878,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="w-full rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 pe-14 text-xs font-extrabold text-gray-900 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
+                  className="w-full rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] px-4 py-3 pe-14 text-xs font-extrabold text-gray-900 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all"
                 />
                 <span className={`pointer-events-none absolute top-3 text-xs font-extrabold text-gray-400 ${isAr ? "left-4" : "right-4"}`}>
                   EGP
@@ -894,7 +894,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                  className="w-full appearance-none rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 text-xs font-semibold text-gray-800 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
+                  className="w-full appearance-none rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] px-4 py-3 text-xs font-semibold text-gray-800 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all"
                 >
                   <option value="cash">{isAr ? "نقدي (Cash)" : "Cash"}</option>
                   <option value="card">{isAr ? "بطاقة بنكية (Visa / Card)" : "Card (Visa / Mastercard)"}</option>
@@ -929,7 +929,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                 value={referenceNo}
                 onChange={(e) => setReferenceNo(e.target.value)}
                 placeholder={isAr ? "مثال: REC-10023 أو INV-002048" : "e.g. REC-10023 or INV-002048"}
-                className="w-full rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 text-xs font-semibold text-gray-800 placeholder-gray-400 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
+                className="w-full rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] px-4 py-3 text-xs font-semibold text-gray-800 placeholder-gray-400 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all"
               />
             </div>
 
@@ -950,7 +950,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                     ? (isAr ? "أدخل وصف رسوم الخدمة (مطلوب)..." : "Enter service charge description (required)...")
                     : (isAr ? "أضف وصفاً لهذه المعاملة..." : "Add a description for this transaction...")
                 }
-                className="w-full rounded-2xl border border-gray-200 bg-[#FBFBF9] p-3 text-xs font-medium text-gray-800 placeholder-gray-400 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all resize-none"
+                className="w-full rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] p-3 text-xs font-medium text-gray-800 placeholder-gray-400 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all resize-none"
               />
             </div>
           </div>
@@ -966,7 +966,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                   type="date"
                   value={txnDate}
                   onChange={(e) => setTxnDate(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 text-xs font-semibold text-gray-800 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
+                  className="w-full rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] px-4 py-3 text-xs font-semibold text-gray-800 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all"
                 />
               </div>
             </div>
@@ -981,7 +981,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                   value={txnTime}
                   onChange={(e) => setTxnTime(e.target.value)}
                   placeholder="11:59 AM"
-                  className="w-full rounded-2xl border border-gray-200 bg-[#FBFBF9] px-4 py-3 text-xs font-semibold text-gray-800 focus:border-[#414E36] focus:outline-none focus:ring-1 focus:ring-[#414E36] transition-all"
+                  className="w-full rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] px-4 py-3 text-xs font-semibold text-gray-800 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all"
                 />
               </div>
             </div>
@@ -995,7 +995,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
               <Info size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-[#1F251A]">
+              <h3 className="text-sm font-bold text-[var(--cr-dark)]">
                 {isAr ? "ملخص المعاملة وبيانات النظام" : "Transaction Summary & System Metadata"}
               </h3>
               <p className="text-xs text-gray-500">
@@ -1089,7 +1089,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
           <button
             type="submit"
             disabled={submitting}
-            className="px-6 py-2.5 rounded-2xl bg-[#313A28] hover:bg-[#1F251A] text-[#FBFBF9] font-bold text-xs flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2.5 rounded-2xl bg-[#313A28] hover:bg-[var(--cr-dark)] text-[var(--color-brand-light)] font-bold text-xs flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? (
               <>

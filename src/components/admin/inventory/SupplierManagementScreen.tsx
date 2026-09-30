@@ -18,14 +18,14 @@ export default function SupplierManagementScreen({ authHeaders, canManage = true
 
   return (
     <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <div className="flex items-center gap-1.5 p-1 bg-[#F2EFE9] rounded-xl w-fit mb-2">
+      <div className="flex items-center gap-1.5 p-1 bg-[var(--color-brand-sand)] rounded-xl w-fit mb-2">
         <button
           type="button"
           onClick={() => setTab("suppliers")}
           className={`flex items-center gap-1.5 text-xs font-bold transition px-3.5 py-1.5 rounded-lg ${
             tab === "suppliers"
-              ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
-              : "text-[#5A6A51] hover:text-[#414E36]"
+              ? "bg-[var(--cr-primary)] text-[var(--color-brand-light)] shadow-xs font-bold"
+              : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)]"
           }`}
         >
           <Truck size={14} /> {t.supplierMgmt.suppliersTab}
@@ -35,8 +35,8 @@ export default function SupplierManagementScreen({ authHeaders, canManage = true
           onClick={() => setTab("purchases")}
           className={`flex items-center gap-1.5 text-xs font-bold transition px-3.5 py-1.5 rounded-lg ${
             tab === "purchases"
-              ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
-              : "text-[#5A6A51] hover:text-[#414E36]"
+              ? "bg-[var(--cr-primary)] text-[var(--color-brand-light)] shadow-xs font-bold"
+              : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)]"
           }`}
         >
           <PackageCheck size={14} /> {t.supplierMgmt.purchasesTab}
