@@ -57,7 +57,7 @@ export function MaterialTimePicker({
     <div
       className="w-full max-w-md rounded-[28px] p-5 shadow-xs transition-all"
       style={{
-        backgroundColor: "#EDF1EC", // Revera secondary brand background
+        backgroundColor: "var(--color-brand-tint)", // Revera secondary brand background
         border: "1px solid rgba(65, 78, 54, 0.18)",
       }}
       dir={isRTL ? "rtl" : "ltr"}
@@ -65,13 +65,13 @@ export function MaterialTimePicker({
       {/* Header Label */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Clock size={16} className="text-[#414E36]" />
-          <h4 className="text-sm font-bold" style={{ color: "#414E36" }}>
+          <Clock size={16} className="text-[var(--cr-primary)]" />
+          <h4 className="text-sm font-bold" style={{ color: "var(--cr-primary)" }}>
             {isRTL ? "اختر الوقت" : "Select time"}
           </h4>
         </div>
         {selectedTime && (
-          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#414E36] text-white flex items-center gap-1">
+          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--cr-primary)] text-white flex items-center gap-1">
             <Check size={12} />
             {selectedTime}
           </span>
@@ -84,7 +84,7 @@ export function MaterialTimePicker({
           {/* Morning Slots */}
           {groupedSlots.morning.length > 0 && (
             <div>
-              <p className="text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">
+              <p className="text-[11px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-2">
                 {isRTL ? "الصباح (قبل الظهر)" : "Morning"}
               </p>
               <div className="grid grid-cols-3 gap-2">
@@ -100,10 +100,10 @@ export function MaterialTimePicker({
                       onClick={() => !isTaken && onSelectTime(slot)}
                       className={`rounded-xl py-2.5 px-2 text-center text-xs font-bold transition-all cursor-pointer ${
                         isSelected
-                          ? "bg-[#414E36] text-white shadow-sm scale-[1.02]"
+                          ? "bg-[var(--cr-primary)] text-white shadow-sm scale-[1.02]"
                           : isTaken
                           ? "bg-gray-200/60 text-gray-400 opacity-40 cursor-not-allowed"
-                          : "bg-white text-[#414E36] border border-[#414E36]/20 hover:border-[#414E36] hover:bg-[#414E36]/10"
+                          : "bg-white text-[var(--cr-primary)] border border-[var(--cr-primary)]/20 hover:border-[var(--cr-primary)] hover:bg-[var(--cr-primary)]/10"
                       }`}
                     >
                       {slot}
@@ -117,7 +117,7 @@ export function MaterialTimePicker({
           {/* Afternoon Slots */}
           {groupedSlots.afternoon.length > 0 && (
             <div>
-              <p className="text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">
+              <p className="text-[11px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-2">
                 {isRTL ? "الظهيرة (بعد الظهر)" : "Afternoon"}
               </p>
               <div className="grid grid-cols-3 gap-2">
@@ -133,10 +133,10 @@ export function MaterialTimePicker({
                       onClick={() => !isTaken && onSelectTime(slot)}
                       className={`rounded-xl py-2.5 px-2 text-center text-xs font-bold transition-all cursor-pointer ${
                         isSelected
-                          ? "bg-[#414E36] text-white shadow-sm scale-[1.02]"
+                          ? "bg-[var(--cr-primary)] text-white shadow-sm scale-[1.02]"
                           : isTaken
                           ? "bg-gray-200/60 text-gray-400 opacity-40 cursor-not-allowed"
-                          : "bg-white text-[#414E36] border border-[#414E36]/20 hover:border-[#414E36] hover:bg-[#414E36]/10"
+                          : "bg-white text-[var(--cr-primary)] border border-[var(--cr-primary)]/20 hover:border-[var(--cr-primary)] hover:bg-[var(--cr-primary)]/10"
                       }`}
                     >
                       {slot}
@@ -150,7 +150,7 @@ export function MaterialTimePicker({
           {/* Evening Slots */}
           {groupedSlots.evening.length > 0 && (
             <div>
-              <p className="text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">
+              <p className="text-[11px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-2">
                 {isRTL ? "المساء" : "Evening"}
               </p>
               <div className="grid grid-cols-3 gap-2">
@@ -166,10 +166,10 @@ export function MaterialTimePicker({
                       onClick={() => !isTaken && onSelectTime(slot)}
                       className={`rounded-xl py-2.5 px-2 text-center text-xs font-bold transition-all cursor-pointer ${
                         isSelected
-                          ? "bg-[#414E36] text-white shadow-sm scale-[1.02]"
+                          ? "bg-[var(--cr-primary)] text-white shadow-sm scale-[1.02]"
                           : isTaken
                           ? "bg-gray-200/60 text-gray-400 opacity-40 cursor-not-allowed"
-                          : "bg-white text-[#414E36] border border-[#414E36]/20 hover:border-[#414E36] hover:bg-[#414E36]/10"
+                          : "bg-white text-[var(--cr-primary)] border border-[var(--cr-primary)]/20 hover:border-[var(--cr-primary)] hover:bg-[var(--cr-primary)]/10"
                       }`}
                     >
                       {slot}
@@ -181,8 +181,8 @@ export function MaterialTimePicker({
           )}
         </div>
       ) : (
-        <div className="py-8 text-center bg-white/60 rounded-2xl border border-[#414E36]/10">
-          <p className="text-xs text-[#5A6A51] font-medium">
+        <div className="py-8 text-center bg-white/60 rounded-2xl border border-[var(--cr-primary)]/10">
+          <p className="text-xs text-[var(--color-brand-secondary)] font-medium">
             {isRTL
               ? "اختر تاريخاً أولاً لرؤية المواعيد المتاحة"
               : "Select a date to view available time slots"}
