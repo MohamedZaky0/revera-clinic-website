@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CLIENT } from "@/config/client";
 import {
   Plus,
   Search,
@@ -957,7 +958,7 @@ export default function AdminEmployeesView({
 
         <div class="footer">
           <div class="clinic-info">
-            <strong>Revera Clinic Cairo</strong><br/>
+            <strong>${CLIENT.nameShort} Clinic Cairo</strong><br/>
             El-Ghad St, Pyramids, Giza<br/>
             Tel: +20 100 000 0000 | info@revera.com
           </div>

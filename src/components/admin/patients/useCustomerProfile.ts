@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { CLIENT } from "@/config/client";
 
 export type Customer = {
   id?: string;
@@ -763,7 +764,7 @@ export function useCustomerProfile({
       </head>
       <body>
         <div class="letterhead">
-          <h1 class="logo">Revera Clinic</h1>
+          <h1 class="logo">${CLIENT.nameShort} Clinic</h1>
           <p class="tagline">Aesthetic & Medical Center</p>
         </div>
 
@@ -798,7 +799,7 @@ export function useCustomerProfile({
 
         <div class="footer">
           <div class="clinic-info">
-            <strong>Revera Clinic Cairo</strong><br/>
+            <strong>${CLIENT.nameShort} Clinic Cairo</strong><br/>
             El-Ghad St, Pyramids, Giza<br/>
             Tel: +20 100 000 0000 | info@revera.com
           </div>

@@ -6,6 +6,8 @@
 
 ## PROPOSAL-001: Centralize Client-Specific Config for Fork-per-Client
 
+**Status:** EXECUTED (Devin, 2026-09-30) — see DEC-099. Pending review/merge; not deployed.
+
 **Problem:**
 Forking this repo for client #2 currently requires finding and replacing Revera-specific values
 scattered across 20+ files. This is error-prone and slow. See `RISKS.md` → RISK-001 for the
@@ -14,7 +16,7 @@ full audit of every hardcoded location.
 **Goal:**
 "Copy repo, edit one file, point at new Supabase project" — that's the entire fork setup.
 
-**Do NOT execute this refactor without review. This is a plan only.**
+**Executed in chunks A–G6 on `feat/proposal-001-client-config`; review before merge.**
 
 ---
 

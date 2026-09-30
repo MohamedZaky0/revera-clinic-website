@@ -112,7 +112,13 @@ Correctly stored in env vars (`.env.local`):
 
 **This is clean.** Forking for client #2 only requires pointing at a new Supabase project via `.env.local`. No code changes needed for connection config.
 
-**Mitigation:** See `PROPOSALS.md` for the plan to centralize all Revera-specific values into a single `client.config.ts` file.
+**Status (2026-09-30): RESOLVED for executable identity/config and mapped brand colors — PROPOSAL-001 executed; see DEC-099.**
+
+`src/config/client.ts` is now the fork identity source for clinic names, contact/WhatsApp defaults, web presence, assets, and browser-storage prefix. All raw `/images/main_logo.png` consumers use `CLIENT.logoPath`; storage/session/BroadcastChannel keys derive from `CLIENT.storagePrefix`; per-fork seed/default labels use `CLIENT`; and the seven mapped brand literals no longer occur in `src/**/*.ts(x)` outside the CSS source of truth.
+
+Deliberate exclusions are not regressions: public/admin translation catalogs and legal Terms body text remain per-fork content; branch-list/default-branch strings remain open because no approved config field exists. Mobile-wallet number currently reuses `CLIENT.phoneTel`, the printed contact email has no `CLIENT.email` field, and Deposit Settings remain Egypt-specific. These are documented portability gaps, not a return of the original scattered-config pattern.
+
+**Manual verification:** `ai_docs/manual_tests/PROPOSAL_001_CLIENT_CONFIG_MANUAL_TESTS.md`.
 
 ---
 
