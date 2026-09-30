@@ -251,7 +251,7 @@ export default function TermsPage() {
 
         {/* Bottom Footer */}
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 pt-4 border-t border-gray-200/60 font-medium">
-          <p>{isAr ? "© 2025 عيادة ريفيرا. جميع الحقوق محفوظة." : "© 2025 Revera Clinic. All rights reserved."}</p>
+          <p>{isAr ? "© 2025 عيادة ريفيرا. جميع الحقوق محفوظة." : `© 2025 ${CLIENT.nameShort} Clinic. All rights reserved.`}</p>
           <div className="flex items-center gap-1.5 text-gray-600 font-semibold">
             <Lock size={14} className="text-[#2D522D]" />
             <span>{isAr ? "آمن ومشفّر" : "Secure & Encrypted"}</span>

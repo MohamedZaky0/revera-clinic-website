@@ -222,7 +222,7 @@ function SetupContent() {
         {/* Header */}
         <div className="bg-gradient-to-br from-[#1F251A] to-[#414E36] px-8 py-10 text-center">
           <img src={CLIENT.logoPath} alt={CLIENT.name} className="mx-auto mb-5 h-14 w-14 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-          <p className="text-xs uppercase tracking-[0.25em] text-[#C4AE7C] font-semibold mb-1">Revera Clinics</p>
+          <p className="text-xs uppercase tracking-[0.25em] text-[#C4AE7C] font-semibold mb-1">{CLIENT.name}</p>
           <h1 className="text-2xl font-bold text-white mb-2">Complete Your Setup</h1>
           {employeeName && (
             <p className="text-sm text-[#C4AE7C]/80">

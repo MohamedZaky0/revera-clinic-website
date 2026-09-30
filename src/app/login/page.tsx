@@ -193,7 +193,7 @@ export default function UnifiedStaffLoginPage() {
               />
             </div>
             <span className="text-[11px] uppercase tracking-[0.25em] font-bold text-[#8B9882]">
-              Revera Clinics
+              {CLIENT.name}
             </span>
             <h1 className="text-2xl font-serif font-bold text-[#1F251A] mt-1">
               Staff &amp; Doctors Portal
@@ -290,7 +290,7 @@ export default function UnifiedStaffLoginPage() {
 
       {/* Footer */}
       <div className="max-w-6xl w-full mx-auto text-center text-xs text-[#8B9882] py-2">
-        &copy; {new Date().getFullYear()} Revera Clinics. All rights reserved. Confidential staff portal.
+        &copy; {new Date().getFullYear()} {CLIENT.name}. All rights reserved. Confidential staff portal.
       </div>
     </div>
   );

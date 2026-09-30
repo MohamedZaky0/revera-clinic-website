@@ -350,7 +350,7 @@ export default function ProfilePage() {
                 {fullName.charAt(0) || "U"}
               </div>
               <div>
-                <span className="text-xs uppercase tracking-widest text-[#C4AE7C] font-bold">Revera Patient Account</span>
+                <span className="text-xs uppercase tracking-widest text-[#C4AE7C] font-bold">{CLIENT.nameShort} Patient Account</span>
                 <h1 className="text-2xl sm:text-3xl font-bold mt-1">{fullName}</h1>
                 <p className="text-xs text-[#FBFBF9]/70 mt-1 flex items-center gap-1.5">
                   <Phone size={12} /> {dbProfile?.mobile || user.mobile}
