@@ -16,7 +16,7 @@ export function OurJourneySection() {
         <div
           style={{
             position: "relative",
-            backgroundColor: "var(--cr-primary, #414E36)",
+            backgroundColor: "var(--cr-primary, var(--cr-primary))",
             borderRadius: "60px",
             overflow: "hidden",
             padding: "clamp(40px, 6vw, 72px) clamp(24px, 5vw, 72px)",

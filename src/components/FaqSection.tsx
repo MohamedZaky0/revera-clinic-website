@@ -236,7 +236,7 @@ export function FaqSection() {
                             paddingBottom: "20px",
                             fontSize: "13.5px",
                             lineHeight: 1.75,
-                            color: "var(--cr-muted-foreground, #5A6A51)",
+                            color: "var(--cr-muted-foreground, var(--color-brand-secondary))",
                           }}
                         >
                           {faq.answer}

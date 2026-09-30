@@ -50,7 +50,7 @@ export function TestimonialsSection() {
         <div
           style={{
             position: "relative",
-            backgroundColor: "var(--cr-primary, #414E36)",
+            backgroundColor: "var(--cr-primary, var(--cr-primary))",
             borderRadius: "32px",
             border: "1px solid rgba(196,174,124,0.35)",
             overflow: "hidden",

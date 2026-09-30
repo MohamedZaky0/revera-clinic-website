@@ -636,7 +636,7 @@ export function Navbar() {
                           height: "36px",
                           borderRadius: "10px",
                           background: showCustomerLogin ? "#EBF0E6" : "#EBEBEB",
-                          color: showCustomerLogin ? "#414E36" : "#888888",
+                          color: showCustomerLogin ? "var(--cr-primary)" : "#888888",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -647,7 +647,7 @@ export function Navbar() {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
-                          <span style={{ fontSize: "13px", fontWeight: 700, color: "#1F251A" }}>
+                          <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--cr-dark)" }}>
                             {t.nav.customerLogin || "Patient & Customer Login"}
                           </span>
                           {!showCustomerLogin && (
@@ -702,7 +702,7 @@ export function Navbar() {
                           height: "36px",
                           borderRadius: "10px",
                           background: "#FAF0E6",
-                          color: "#C4AE7C",
+                          color: "var(--cr-accent)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -713,7 +713,7 @@ export function Navbar() {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
-                          <span style={{ fontSize: "13px", fontWeight: 700, color: "#1F251A" }}>
+                          <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--cr-dark)" }}>
                             {t.nav.staffLogin || "Clinic Staff & Doctors"}
                           </span>
                           <span
@@ -723,7 +723,7 @@ export function Navbar() {
                               padding: "2px 6px",
                               borderRadius: "6px",
                               background: "rgba(65, 78, 54, 0.1)",
-                              color: "#414E36",
+                              color: "var(--cr-primary)",
                             }}
                           >
                             Portal

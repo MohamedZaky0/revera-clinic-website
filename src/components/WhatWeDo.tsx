@@ -306,7 +306,7 @@ export function WhatWeDo() {
                   justifyContent: "center",
                   gap: "2px",
                   boxShadow: "0 8px 24px rgba(90, 61, 52, 0.2)",
-                  border: "4px solid var(--cr-bg, #EDF1EC)",
+                  border: "4px solid var(--cr-bg, var(--color-brand-tint))",
                 }}
               >
                 <span

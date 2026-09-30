@@ -49,7 +49,7 @@ export function OurApproachSection() {
           className="rounded-[24px] sm:rounded-[60px]"
           style={{
             position: "relative",
-            backgroundColor: "var(--cr-secondary, #EDF1EC)",
+            backgroundColor: "var(--cr-secondary, var(--color-brand-tint))",
             border: "1px solid rgba(196,174,124,0.3)",
             overflow: "hidden",
             padding: "clamp(40px, 6vw, 72px) clamp(24px, 5vw, 72px)",
@@ -147,7 +147,7 @@ export function OurApproachSection() {
               position: absolute;
               top: 16px;
               right: 16px;
-              background: var(--cr-primary, #414E36);
+              background: var(--cr-primary, var(--cr-primary));
               border-radius: 14px;
               padding: 12px 18px;
               display: flex;
@@ -241,7 +241,7 @@ export function OurApproachSection() {
                   margin: 0,
                   fontSize: "14px",
                   lineHeight: 1.75,
-                  color: "var(--cr-muted-foreground, #5A6A51)",
+                  color: "var(--cr-muted-foreground, var(--color-brand-secondary))",
                 }}
               >
                 {t.aboutPage.servicesDescription}
@@ -278,7 +278,7 @@ export function OurApproachSection() {
                             margin: 0,
                             fontSize: "13px",
                             lineHeight: 1.7,
-                            color: "var(--cr-muted-foreground, #5A6A51)",
+                            color: "var(--cr-muted-foreground, var(--color-brand-secondary))",
                           }}
                         >
                           {item.description}

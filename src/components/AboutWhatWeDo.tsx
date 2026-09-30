@@ -22,7 +22,7 @@ export function AboutWhatWeDo() {
 
           /* ── Before/After card ── */
           .awwd-ba-card {
-            background: var(--cr-secondary, #EDF1EC);
+            background: var(--cr-secondary, var(--color-brand-tint));
             border-radius: 24px;
             overflow: hidden;
             padding: 0;
@@ -38,7 +38,7 @@ export function AboutWhatWeDo() {
             font-size: 10px;
             font-weight: 700;
             letter-spacing: 0.25em;
-            color: var(--cr-primary, #414E36);
+            color: var(--cr-primary, var(--cr-primary));
             text-transform: uppercase;
             z-index: 2;
           }
@@ -74,7 +74,7 @@ export function AboutWhatWeDo() {
           .awwd-ba-side-label.after-label  { left: 10px; }
           .awwd-ba-divider {
             height: 2px;
-            background: var(--color-brand-sand, #F2EFE9);
+            background: var(--color-brand-sand, var(--color-brand-sand));
           }
           .awwd-ba-bottom-url {
             font-size: 9px;
@@ -123,7 +123,7 @@ export function AboutWhatWeDo() {
             gap: 10px;
             padding: 13px 26px;
             border-radius: 30px;
-            background: var(--cr-secondary, #EDF1EC);
+            background: var(--cr-secondary, var(--color-brand-tint));
             border: 1.5px solid rgba(90, 106, 81, 0.4);
             color: var(--cr-primary);
             font-size: 14px;
@@ -270,7 +270,7 @@ export function AboutWhatWeDo() {
                 margin: "0 0 24px",
                 fontSize: "14px",
                 lineHeight: 1.75,
-                color: "var(--cr-muted-foreground, #5A6A51)",
+                color: "var(--cr-muted-foreground, var(--color-brand-secondary))",
               }}
             >
               {t.aboutPage.whatWeDoDescription}
