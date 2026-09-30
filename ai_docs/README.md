@@ -58,13 +58,14 @@ Every file that exists in this folder is listed below — nothing is left unexpl
 |---|---|---|
 | `API_CONTRACT.md` | All API routes — methods, params, responses | Any API route added, changed, or deleted |
 | `SECURITY.md` | **Current-state snapshot** of the auth model: what `middleware.ts`/`access.ts` actually check, a per-route table of which routes are role-gated vs. open, RLS posture, secrets handling, and a checklist for adding a new route safely. Complements `RISKS.md` — that file is the history of security bugs found and fixed; this file is "what's true right now," so you don't have to reconstruct it from `RISKS.md`'s narrative | Any route's auth changes; a new unauthenticated gap is found (log it in `RISKS.md` too); `middleware.ts`/`access.ts` change; RLS policy changes |
-| `TESTING.md` | The actual testing approach (there is no automated test suite): static checks (`npm run check`), ad hoc `scratch/*.ts` regression scripts, and the `manual_tests/` checklist format — plus what "Done" requires per `CLAUDE.md` | The testing approach itself changes (e.g. a real test framework is introduced) |
+| `TESTING.md` | The actual testing approach — a real **Vitest** suite (~1,270 tests) plus static checks (`npm run check`), ad hoc `scratch/*.ts` regression scripts, and the `manual_tests/` checklist format — plus what "Done" requires per `CLAUDE.md`. **Corrected 2026-09-30** — this row previously repeated TESTING.md's own now-fixed stale claim that no automated test suite exists | A testing layer is added/removed, or its role changes |
 | `PROPOSALS.md` | Proposed refactors awaiting approval — do not execute without review | A new refactor is proposed; an approved proposal is completed (mark it done) |
 | `FINANCE_TRACKER.md` | Execution tracker for `PROPOSALS.md` → PROPOSAL-002 (the Finance & Management Accounting module) — task-by-task status, what's done/blocked, exact requirements per task | Any Finance-module task's status changes; read `PROPOSALS.md` PROPOSAL-002 and `RISKS.md` RISK-010…RISK-020 first, per this file's own header |
 | `AGENTS.md` | Quick-start rules for AI agents specifically | Agent workflow changes; new rules for what agents must/must not do. **Known stale as of 2026-08-03** — written 2026-07-21, predates the auth/RLS hardening work and the fork-per-client framing now in `CLAUDE.md`; treat its security/single-tenant claims as superseded by `CLAUDE.md` and `SECURITY.md`, not as current fact |
 | `WINDSURF_BRIEFS.md` | **The single file for all Windsurf work briefs** — one active brief at the top, completed ones archived at the bottom. Do not create separate brief files. Standing rules it relies on live in `.windsurf/rules/*.md` and `.windsurf/MEMORIES.md` (repo root, loaded automatically by Windsurf), both written from defects actually found in this codebase | A new brief is written, or an active one completes (move it to the archive section) |
-| `ADMIN_REFACTOR_AND_I18N_PLAN.md` | Phased plan to make the admin panel bilingual: test net → componentize `admin/page.tsx` (27.7k lines, 606 `useState`, ~50 sections) → per-component Arabic → broader automated testing. Explains why translation cannot safely come first | A phase completes, or an open decision at the bottom of the file is answered |
+| `ADMIN_REFACTOR_AND_I18N_PLAN.md` | Phased plan to make the admin panel bilingual: test net → componentize `admin/page.tsx` (started at 27.7k lines, 606 `useState`, ~50 sections; **down to 11.3k lines as of 2026-09-30** as sections keep getting extracted, see `ARCHITECTURE.md`) → per-component Arabic → broader automated testing. Explains why translation cannot safely come first | A phase completes, or an open decision at the bottom of the file is answered |
 | `SYSTEM_CORRUPTIONS_AND_AUDIT.md` | Master defect catalog and architectural audit documenting corruptions across User View, Admin View, Doctor View, and Database/API architecture | New corruptions identified, architectural audits performed, or cataloged subsystems remediated |
+| `PRODUCT_SPECS.md` | **External-facing product spec for marketing/sales agents**: positioning, target market, capability map with `LIVE`/`BETA`/`DEMO`/`PLANNED` status per feature, differentiators, known gaps, vision, commercial-model discussion, messaging guardrails. Not an engineering doc | A feature changes status (e.g. `DEMO`→`LIVE`), pricing is decided, the product is named, or a new market is targeted |
 
 ### Manual test evidence (not narrative docs — click-through records)
 
@@ -84,6 +85,15 @@ Every file that exists in this folder is listed below — nothing is left unexpl
 ---
 
 ## Project Status Snapshot (as of 2026-07-20)
+
+> **Not maintained since 2026-07-20 — badly stale, not just in wording.** Real features shipped since
+> then and missing entirely from the list below include the whole **Finance module** (P&L, cash flow,
+> receivables aging, expenses/assets/loans, commission payouts — PROPOSAL-002), the **Reports section**
+> (DEC-097), the **laser pulse deficit engine** (Briefs 34/34B/35, DEC-079/080), **multi-package
+> historical bookings** (DEC-098), and the reception bot's knowledge base. Treat `PRODUCT_SPECS.md`
+> (capability map with `LIVE`/`BETA`/`DEMO`/`PLANNED` tags, kept current) as the real status snapshot;
+> this section is kept only as a historical record of what had shipped by 2026-07-20 and has not been
+> extended since — rewriting it properly is a separate task, not attempted in this pass.
 
 ### What Is Actually Built and Working
 - Public website (homepage, about, services, contact, blog stub)
@@ -156,7 +166,12 @@ Every file that exists in this folder is listed below — nothing is left unexpl
 - Full RBAC enforcement on API routes (selected sensitive routes validate bearer tokens, but coverage is not universal)
 
 ### Critical Gaps (do not assume these work)
-- **API authorization is still incomplete** — most finance/inventory-relevant routes are now role-gated (RISK-018, RISK-021), but `medical-records`, `prescriptions`, and several config/CMS routes (`branches`, `categories`, `providers`, `rooms`, `terms`, `page-settings`, `customer-avatars`, `provider-attendance`) have **no server-side authorization at all** — see `SECURITY.md` §3 and RISK-036 (found 2026-08-03, not yet fixed)
+- **Corrected 2026-09-30 (was stale):** RISK-036 (the routes named below having no server-side
+  authorization) is **resolved** — `medical-records`, `prescriptions`, `branches`, `categories`,
+  `providers`, `rooms`, `terms`, `page-settings`, `customer-avatars` and `provider-attendance` are all
+  role-gated now. See `SECURITY.md` §3 for the current, route-by-route picture, and RISK-078/RISK-107
+  for later rounds of the same kind of gap found and fixed since (granular permissions, then finance
+  record routes)
 - **Patient auth is real, not simulated** — corrected 2026-07-22 (RISK-003). `AuthModal` sends/verifies OTPs through actual Supabase Auth; there is no `123456` demo bypass anymore. Do not trust the older claim that this is UI-only
 - Doctor shifts and availability — not built; derived only from existing bookings
 - Waitlist — not built
@@ -165,7 +180,7 @@ Every file that exists in this folder is listed below — nothing is left unexpl
 
 ## Architecture in One Paragraph
 
-Next.js 15 (App Router) + TypeScript on Vercel. Single app serving both the public Revera website and the `/admin` panel. Supabase (PostgreSQL) as the database, accessed via a service role key from all API routes. **RLS is enabled on every `public` table as of 2026-07-25** (`20260722140000_enable_row_level_security.sql`), though it's a backstop against accidental anon-key access, not an authorization layer — the service role key bypasses it entirely, so per-route authorization in `access.ts`/`middleware.ts` is what actually matters; see `SECURITY.md` for the full current picture. Brand colors centralized in `globals.css` as CSS custom properties — but many components bypass these with raw hex Tailwind JIT classes (see RISK-001 in `RISKS.md`). All UI copy (EN/AR) lives in `src/lib/translations.ts`. The admin panel is a single ~550KB client component at `src/app/admin/page.tsx`.
+Next.js 15 (App Router) + TypeScript on Vercel. Single app serving both the public Revera website and the `/admin` panel. Supabase (PostgreSQL) as the database, accessed via a service role key from all API routes. **RLS is enabled on every `public` table as of 2026-07-25** (`20260722140000_enable_row_level_security.sql`), though it's a backstop against accidental anon-key access, not an authorization layer — the service role key bypasses it entirely, so per-route authorization in `access.ts`/`middleware.ts` is what actually matters; see `SECURITY.md` for the full current picture. Brand colors centralized in `globals.css` as CSS custom properties — but many components bypass these with raw hex Tailwind JIT classes (see RISK-001 in `RISKS.md`). All UI copy (EN/AR) lives in `src/lib/translations.ts`. The admin panel's shell/composer at `src/app/admin/page.tsx` is 11.3k lines as of 2026-09-30 (down from 27.7k) — most sections are now extracted into `src/components/admin/` (DEC-027); do not add new section logic directly into `page.tsx`.
 
 ---
 
