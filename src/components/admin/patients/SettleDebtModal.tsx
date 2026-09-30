@@ -96,12 +96,12 @@ export default function SettleDebtModal({ customer, onClose, onSettled, lang = "
         </button>
 
         <div className="flex items-center gap-3 mb-5">
-          <div className="h-11 w-11 rounded-2xl bg-[#EBF1E8] text-[#414E36] flex items-center justify-center shrink-0">
+          <div className="h-11 w-11 rounded-2xl bg-[#EBF1E8] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
             <Receipt size={20} />
           </div>
           <div>
-            <h3 className="text-base font-bold text-[#1F251A]">Settle Outstanding Balance</h3>
-            <p className="text-xs text-[#5A6A51]">{customer.name}</p>
+            <h3 className="text-base font-bold text-[var(--cr-dark)]">Settle Outstanding Balance</h3>
+            <p className="text-xs text-[var(--color-brand-secondary)]">{customer.name}</p>
           </div>
         </div>
 
@@ -128,15 +128,15 @@ export default function SettleDebtModal({ customer, onClose, onSettled, lang = "
             <button
               type="button"
               onClick={onClose}
-              className="w-full rounded-2xl bg-[#414E36] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#36412D] transition cursor-pointer"
+              className="w-full rounded-2xl bg-[var(--cr-primary)] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#36412D] transition cursor-pointer"
             >
               Done
             </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 p-3.5 flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#5A6A51]">Current Outstanding</span>
+            <div className="rounded-2xl bg-[var(--color-brand-light)] border border-[var(--cr-primary)]/10 p-3.5 flex items-center justify-between">
+              <span className="text-xs font-semibold text-[var(--color-brand-secondary)]">Current Outstanding</span>
               <span className="text-lg font-black text-rose-600">
                 {currency} {outstanding.toLocaleString()}
               </span>
@@ -155,12 +155,12 @@ export default function SettleDebtModal({ customer, onClose, onSettled, lang = "
                 onChange={(e) => { setAmount(e.target.value); setError(null); }}
                 placeholder="0"
                 autoFocus
-                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36] transition"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)] transition"
               />
               <button
                 type="button"
                 onClick={() => setAmount(String(outstanding))}
-                className="text-[11px] font-bold text-[#414E36] hover:underline cursor-pointer"
+                className="text-[11px] font-bold text-[var(--cr-primary)] hover:underline cursor-pointer"
               >
                 Pay full balance
               </button>
@@ -171,7 +171,7 @@ export default function SettleDebtModal({ customer, onClose, onSettled, lang = "
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               >
                 {PAYMENT_METHODS.map((m) => (
                   <option key={m.id} value={m.id}>{m.label}</option>
@@ -186,14 +186,14 @@ export default function SettleDebtModal({ customer, onClose, onSettled, lang = "
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Receipt number, reference..."
-                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               />
             </div>
 
             {numericAmount > 0 && numericAmount <= outstanding && (
-              <div className="rounded-xl bg-[#F3F6F1] border border-[#414E36]/10 p-3 text-xs flex items-center justify-between">
-                <span className="text-[#5A6A51] font-semibold">Balance after payment</span>
-                <span className="font-bold text-[#1F251A]">
+              <div className="rounded-xl bg-[#F3F6F1] border border-[var(--cr-primary)]/10 p-3 text-xs flex items-center justify-between">
+                <span className="text-[var(--color-brand-secondary)] font-semibold">Balance after payment</span>
+                <span className="font-bold text-[var(--cr-dark)]">
                   {currency} {(outstanding - numericAmount).toLocaleString()}
                 </span>
               </div>
@@ -217,7 +217,7 @@ export default function SettleDebtModal({ customer, onClose, onSettled, lang = "
               <button
                 type="submit"
                 disabled={submitting || numericAmount <= 0}
-                className="flex-1 rounded-2xl bg-[#414E36] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#36412D] disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer inline-flex items-center justify-center gap-2"
+                className="flex-1 rounded-2xl bg-[var(--cr-primary)] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#36412D] disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer inline-flex items-center justify-center gap-2"
               >
                 {submitting && <Loader2 size={14} className="animate-spin" />}
                 <span>{submitting ? "Recording..." : "Record Payment"}</span>

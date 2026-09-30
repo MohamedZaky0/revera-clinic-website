@@ -66,23 +66,23 @@ export default function BookingSettingsView({
   return (
     <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="mb-6">
-        <h2 className="text-4xl font-semibold text-[#1F251A]">{t.title}</h2>
-        <p className="mt-2 text-sm text-[#5A6A51]">{t.subtitle}</p>
+        <h2 className="text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
+        <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
       </div>
 
       <div className="max-w-4xl rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-        <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3">{t.bookingRules}</h3>
+        <h3 className="text-xl font-bold text-[var(--cr-dark)] border-b border-gray-100 pb-3">{t.bookingRules}</h3>
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <div className="flex items-center gap-1.5 mb-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">{t.minAdvance}</label>
+                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)]">{t.minAdvance}</label>
                 <button
                   type="button"
                   onClick={() => setActiveInfoFeature({
                     title: t.minAdvance,
                     description: "This setting restricts how close to the appointment time a patient can book. For example, if set to 2 hours, patients cannot book an appointment that starts within the next 2 hours. This prevents last-minute surprise bookings and gives your staff sufficient lead time to prepare for the arriving patient."
                   })}
-                  className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                  className="text-[var(--color-brand-secondary)]/60 hover:text-[var(--cr-primary)] transition-colors p-0.5 rounded-full hover:bg-[var(--color-brand-tint)] flex"
                   title={t.clickForInfo}
                 >
                   <Info size={13} />
@@ -91,7 +91,7 @@ export default function BookingSettingsView({
               <select
                 value={bookingMinAdvance}
                 onChange={(e) => setBookingMinAdvance(Number(e.target.value))}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               >
                 {[1, 2, 4, 6, 12, 24].map(h => <option key={h} value={h}>{h} {h === 1 ? t.hour : t.hours}</option>)}
               </select>
@@ -100,14 +100,14 @@ export default function BookingSettingsView({
 
             <div>
               <div className="flex items-center gap-1.5 mb-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">{t.maxAdvance}</label>
+                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)]">{t.maxAdvance}</label>
                 <button
                   type="button"
                   onClick={() => setActiveInfoFeature({
                     title: t.maxAdvance,
                     description: "This setting defines how far in the future patients are allowed to book appointments. For example, if set to 30 Days, patients can only choose slots within the next 30 days. This keeps your schedule manageable and prevents patients from booking slots too far in advance, which are prone to cancellations."
                   })}
-                  className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                  className="text-[var(--color-brand-secondary)]/60 hover:text-[var(--cr-primary)] transition-colors p-0.5 rounded-full hover:bg-[var(--color-brand-tint)] flex"
                   title={t.clickForInfo}
                 >
                   <Info size={13} />
@@ -116,7 +116,7 @@ export default function BookingSettingsView({
               <select
                 value={bookingMaxAdvance}
                 onChange={(e) => setBookingMaxAdvance(Number(e.target.value))}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               >
                 {[7, 14, 30, 60, 90].map(d => <option key={d} value={d}>{d} {t.days}</option>)}
               </select>
@@ -125,14 +125,14 @@ export default function BookingSettingsView({
 
             <div>
               <div className="flex items-center gap-1.5 mb-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">{t.cancelWindow}</label>
+                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)]">{t.cancelWindow}</label>
                 <button
                   type="button"
                   onClick={() => setActiveInfoFeature({
                     title: t.cancelWindow,
                     description: "This setting defines the minimum hours before an appointment that a patient can cancel or reschedule without penalty. For example, if set to 24 hours, patients must cancel at least 24 hours prior to the slot. Cancellations attempted inside this window may forfeit their deposit or require clinic intervention."
                   })}
-                  className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                  className="text-[var(--color-brand-secondary)]/60 hover:text-[var(--cr-primary)] transition-colors p-0.5 rounded-full hover:bg-[var(--color-brand-tint)] flex"
                   title={t.clickForInfo}
                 >
                   <Info size={13} />
@@ -141,7 +141,7 @@ export default function BookingSettingsView({
               <select
                 value={bookingCancelWindow}
                 onChange={(e) => setBookingCancelWindow(Number(e.target.value))}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               >
                 {[1, 2, 4, 6, 12, 24].map(h => <option key={h} value={h}>{h} {h === 1 ? t.hour : t.hours} {t.before}</option>)}
               </select>
@@ -150,14 +150,14 @@ export default function BookingSettingsView({
 
             <div>
               <div className="flex items-center gap-1.5 mb-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">{t.maxPerSlot}</label>
+                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)]">{t.maxPerSlot}</label>
                 <button
                   type="button"
                   onClick={() => setActiveInfoFeature({
                     title: t.maxPerSlot,
                     description: "This setting defines the maximum number of appointments that can be scheduled concurrently in a single time slot for the clinic. It ensures you do not exceed clinic capacity or overwhelm staff. If the limit is reached, that slot will show as full and unavailable to other patients."
                   })}
-                  className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                  className="text-[var(--color-brand-secondary)]/60 hover:text-[var(--cr-primary)] transition-colors p-0.5 rounded-full hover:bg-[var(--color-brand-tint)] flex"
                   title={t.clickForInfo}
                 >
                   <Info size={13} />
@@ -169,21 +169,21 @@ export default function BookingSettingsView({
                 max={10}
                 value={bookingMaxPerSlot}
                 onChange={(e) => setBookingMaxPerSlot(Number(e.target.value))}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               />
               <span className="text-[11px] text-[#8A9A81] mt-1 block">{t.maxPerSlotHint}</span>
             </div>
 
             <div>
               <div className="flex items-center gap-1.5 mb-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">{t.staleSession}</label>
+                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)]">{t.staleSession}</label>
                 <button
                   type="button"
                   onClick={() => setActiveInfoFeature({
                     title: t.staleSession,
                     description: "If a doctor starts a session and forgets to mark it Completed, it stays 'In Progress' forever, keeping a room, slot and doctor tied up. This setting controls how many hours a session can stay In Progress before it is flagged in the Bookings screen's Needs Attention panel so staff can complete or cancel it."
                   })}
-                  className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                  className="text-[var(--color-brand-secondary)]/60 hover:text-[var(--cr-primary)] transition-colors p-0.5 rounded-full hover:bg-[var(--color-brand-tint)] flex"
                   title={t.clickForInfo}
                 >
                   <Info size={13} />
@@ -192,7 +192,7 @@ export default function BookingSettingsView({
               <select
                 value={bookingStaleSessionHours}
                 onChange={(e) => setBookingStaleSessionHours(Number(e.target.value))}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               >
                 {[1, 2, 3, 4, 6, 8, 12].map(h => <option key={h} value={h}>{h} {h === 1 ? t.hour : t.hours}</option>)}
               </select>
@@ -201,14 +201,14 @@ export default function BookingSettingsView({
 
             <div>
               <div className="flex items-center gap-1.5 mb-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">{t.followUpLeadDays}</label>
+                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)]">{t.followUpLeadDays}</label>
                 <button
                   type="button"
                   onClick={() => setActiveInfoFeature({
                     title: t.followUpLeadDaysInfoTitle || t.followUpLeadDays,
                     description: t.followUpLeadDaysInfoDesc || "Controls how many days before the scheduled follow-up date the reminder notification appears on the receptionist bookings dashboard, giving receptionists time to contact and schedule the patient."
                   })}
-                  className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                  className="text-[var(--color-brand-secondary)]/60 hover:text-[var(--cr-primary)] transition-colors p-0.5 rounded-full hover:bg-[var(--color-brand-tint)] flex"
                   title={t.clickForInfo}
                 >
                   <Info size={13} />
@@ -217,7 +217,7 @@ export default function BookingSettingsView({
               <select
                 value={bookingFollowUpLeadDays}
                 onChange={(e) => setBookingFollowUpLeadDays && setBookingFollowUpLeadDays(Number(e.target.value))}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               >
                 {[1, 2, 3, 4, 5, 7, 14].map(d => (
                   <option key={d} value={d}>
@@ -230,7 +230,7 @@ export default function BookingSettingsView({
 
             <div>
               <div className="flex items-center gap-1.5 mb-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">
+                <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)]">
                   {t.defaultPricePerPulse || "Default Price per Pulse (EGP)"}
                 </label>
                 <button
@@ -239,7 +239,7 @@ export default function BookingSettingsView({
                     title: t.defaultPricePerPulseInfoTitle || t.defaultPricePerPulse || "Default Laser Pulse Price",
                     description: t.defaultPricePerPulseInfoDesc || "This setting defines the standard clinic-wide price per single laser pulse in Egyptian Pounds (EGP). This default price automatically prefills the pulse selling interface and additional pulse calculations in ongoing treatment sessions."
                   })}
-                  className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                  className="text-[var(--color-brand-secondary)]/60 hover:text-[var(--cr-primary)] transition-colors p-0.5 rounded-full hover:bg-[var(--color-brand-tint)] flex"
                   title={t.clickForInfo}
                 >
                   <Info size={13} />
@@ -252,10 +252,10 @@ export default function BookingSettingsView({
                   step={0.5}
                   value={bookingDefaultPricePerPulse ?? 5}
                   onChange={(e) => setBookingDefaultPricePerPulse?.(Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm font-bold text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                  className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm font-bold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
                   placeholder="5"
                 />
-                <span className="absolute end-4 top-1/2 -translate-y-1/2 text-xs font-bold text-[#5A6A51] pointer-events-none">
+                <span className="absolute end-4 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--color-brand-secondary)] pointer-events-none">
                   EGP
                 </span>
               </div>
@@ -266,17 +266,17 @@ export default function BookingSettingsView({
 
           </div>
 
-          <div className="border-t border-[#F2EFE9] pt-6 space-y-4">
+          <div className="border-t border-[var(--color-brand-sand)] pt-6 space-y-4">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={bookingInstantApproval}
                 onChange={(e) => setBookingInstantApproval(e.target.checked)}
-                className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                className="accent-[var(--cr-primary)] w-4 h-4 cursor-pointer"
               />
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-semibold text-[#1F251A]">{t.instantApproval}</span>
+                  <span className="text-sm font-semibold text-[var(--cr-dark)]">{t.instantApproval}</span>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -287,13 +287,13 @@ export default function BookingSettingsView({
                         description: "When enabled, bookings made by patients are automatically marked as Approved and confirmed without requiring manual review by the clinic administrator. When disabled, bookings are marked as Pending and must be manually approved by your admin team."
                       });
                     }}
-                    className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                    className="text-[var(--color-brand-secondary)]/60 hover:text-[var(--cr-primary)] transition-colors p-0.5 rounded-full hover:bg-[var(--color-brand-tint)] flex"
                     title={t.clickForInfo}
                   >
                     <Info size={13} />
                   </button>
                 </div>
-                <span className="text-xs text-[#5A6A51]">{t.instantApprovalHint}</span>
+                <span className="text-xs text-[var(--color-brand-secondary)]">{t.instantApprovalHint}</span>
               </div>
             </label>
 
@@ -302,11 +302,11 @@ export default function BookingSettingsView({
                 type="checkbox"
                 checked={bookingShowDoctorNotes}
                 onChange={(e) => setBookingShowDoctorNotes(e.target.checked)}
-                className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                className="accent-[var(--cr-primary)] w-4 h-4 cursor-pointer"
               />
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-semibold text-[#1F251A]">{t.showDoctorNotes}</span>
+                  <span className="text-sm font-semibold text-[var(--cr-dark)]">{t.showDoctorNotes}</span>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -317,34 +317,34 @@ export default function BookingSettingsView({
                         description: "When enabled, post-visit summary notes written by the provider (e.g. diagnoses, advice, instructions) will be visible to the patient inside their personal profile dashboard. When disabled, notes remain strictly private for internal staff use."
                       });
                     }}
-                    className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                    className="text-[var(--color-brand-secondary)]/60 hover:text-[var(--cr-primary)] transition-colors p-0.5 rounded-full hover:bg-[var(--color-brand-tint)] flex"
                     title={t.clickForInfo}
                   >
                     <Info size={13} />
                   </button>
                 </div>
-                <span className="text-xs text-[#5A6A51]">{t.showDoctorNotesHint}</span>
+                <span className="text-xs text-[var(--color-brand-secondary)]">{t.showDoctorNotesHint}</span>
               </div>
             </label>
           </div>
 
           {/* Futuristic Global Ending Session Control Card */}
-          <div className="relative overflow-hidden rounded-[32px] bg-[#FBFBF9] p-6 sm:p-7 border border-[#414E36]/15 shadow-sm space-y-6">
+          <div className="relative overflow-hidden rounded-[32px] bg-[var(--color-brand-light)] p-6 sm:p-7 border border-[var(--cr-primary)]/15 shadow-sm space-y-6">
             {/* Futuristic Ambient Glow Effect */}
             <div className={`absolute top-0 end-0 -mt-10 -me-10 h-40 w-40 rounded-full blur-3xl pointer-events-none transition-all duration-700 ${globalEndingSession ? 'bg-emerald-400/25' : 'bg-gray-200/20'}`} />
             
-            <div className="relative flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-5">
+            <div className="relative flex flex-wrap items-center justify-between gap-4 border-b border-[var(--cr-primary)]/10 pb-5">
               <div className="flex items-center gap-3.5">
                 <div className={`h-12 w-12 flex items-center justify-center rounded-2xl transition-all duration-500 shadow-sm shrink-0 ${
                   globalEndingSession 
-                    ? 'bg-gradient-to-br from-[#1F251A] via-[#414E36] to-[#0F3826] text-emerald-300 ring-4 ring-emerald-500/20 shadow-emerald-900/10' 
+                    ? 'bg-gradient-to-br from-[var(--cr-dark)] via-[var(--cr-primary)] to-[#0F3826] text-emerald-300 ring-4 ring-emerald-500/20 shadow-emerald-900/10' 
                     : 'bg-white text-gray-400 border border-gray-200'
                 }`}>
                   <Zap size={22} className={globalEndingSession ? 'animate-pulse text-emerald-400 fill-emerald-400/30' : ''} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-lg sm:text-xl font-black text-[#1F251A] tracking-tight">
+                    <h3 className="text-lg sm:text-xl font-black text-[var(--cr-dark)] tracking-tight">
                       {t.globalEndingSession}
                     </h3>
                     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
@@ -366,14 +366,14 @@ export default function BookingSettingsView({
                             description: t.globalEndingSessionInfoDesc
                           });
                         }}
-                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-1 rounded-full hover:bg-[#EDF1EC] flex cursor-pointer"
+                        className="text-[var(--color-brand-secondary)]/60 hover:text-[var(--cr-primary)] transition-colors p-1 rounded-full hover:bg-[var(--color-brand-tint)] flex cursor-pointer"
                         title={t.clickForInfo || "Click for info"}
                       >
                         <Info size={14} />
                       </button>
                     )}
                   </div>
-                  <p className="text-xs text-[#5A6A51] mt-1 font-medium max-w-xl">
+                  <p className="text-xs text-[var(--color-brand-secondary)] mt-1 font-medium max-w-xl">
                     {t.globalEndingSessionHint}
                   </p>
                 </div>
@@ -398,7 +398,7 @@ export default function BookingSettingsView({
                   }}
                   className={`relative inline-flex h-8 w-16 shrink-0 cursor-pointer rounded-full p-1 transition-colors duration-300 ease-in-out focus:outline-none ring-2 ${
                     globalEndingSession 
-                      ? 'bg-gradient-to-r from-[#0F3826] to-[#414E36] ring-emerald-500/40 shadow-inner' 
+                      ? 'bg-gradient-to-r from-[#0F3826] to-[var(--cr-primary)] ring-emerald-500/40 shadow-inner' 
                       : 'bg-gray-200 ring-transparent'
                   }`}
                 >
@@ -435,16 +435,16 @@ export default function BookingSettingsView({
                   {t.globalEndingSessionActiveDesc}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  <span className="inline-block rounded-lg bg-[#EDF1EC] px-2 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
+                  <span className="inline-block rounded-lg bg-[var(--color-brand-tint)] px-2 py-0.5 text-[10px] font-bold text-[var(--cr-primary)] border border-[var(--cr-primary)]/15">
                     ✓ Medical Intake
                   </span>
-                  <span className="inline-block rounded-lg bg-[#EDF1EC] px-2 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
+                  <span className="inline-block rounded-lg bg-[var(--color-brand-tint)] px-2 py-0.5 text-[10px] font-bold text-[var(--cr-primary)] border border-[var(--cr-primary)]/15">
                     ✓ Digital Prescription
                   </span>
-                  <span className="inline-block rounded-lg bg-[#EDF1EC] px-2 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
+                  <span className="inline-block rounded-lg bg-[var(--color-brand-tint)] px-2 py-0.5 text-[10px] font-bold text-[var(--cr-primary)] border border-[var(--cr-primary)]/15">
                     ✓ Consumables &amp; Pulses
                   </span>
-                  <span className="inline-block rounded-lg bg-[#EDF1EC] px-2 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
+                  <span className="inline-block rounded-lg bg-[var(--color-brand-tint)] px-2 py-0.5 text-[10px] font-bold text-[var(--cr-primary)] border border-[var(--cr-primary)]/15">
                     ✓ Doctor Auto-Exit
                   </span>
                 </div>
@@ -480,12 +480,12 @@ export default function BookingSettingsView({
           </div>
 
           {/* Bottom Save Action */}
-          <div className="border-t border-[#F2EFE9] pt-6 flex items-center justify-end">
+          <div className="border-t border-[var(--color-brand-sand)] pt-6 flex items-center justify-end">
             <button
               type="button"
               onClick={handleSaveBookingSettings}
               disabled={savingBookingSettings}
-              className="rounded-3xl bg-[#414E36] px-8 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md cursor-pointer"
+              className="rounded-3xl bg-[var(--cr-primary)] px-8 py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md cursor-pointer"
             >
               {savingBookingSettings ? t.savingBtn : t.saveBtn}
             </button>

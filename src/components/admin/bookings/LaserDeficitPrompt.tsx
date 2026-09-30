@@ -213,7 +213,7 @@ export default function LaserDeficitPrompt({
           <select
             value={selectedPackageId}
             onChange={(e) => setSelectedPackageId(e.target.value)}
-            className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none focus:border-purple-600"
+            className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none focus:border-purple-600"
           >
             <option value="">{isRTL ? "— اختر —" : "— select —"}</option>
             {catalogPackages.map((p) => {
@@ -235,7 +235,7 @@ export default function LaserDeficitPrompt({
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+              className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none"
             >
               <option value="cash">{isRTL ? "نقدي" : "Cash"}</option>
               <option value="card">{isRTL ? "بطاقة" : "Card"}</option>
@@ -253,7 +253,7 @@ export default function LaserDeficitPrompt({
                 value={amountPaid}
                 onChange={(e) => setAmountPaid(e.target.value)}
                 placeholder={String(Number(selectedPkg?.price || 0))}
-                className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none"
               />
             </div>
           )}

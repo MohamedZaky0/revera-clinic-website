@@ -181,7 +181,7 @@ export default function CustomerFormModal({
           <button
             type="button"
             onClick={() => setShowCustomerFormModal(false)}
-            className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider cursor-pointer"
+            className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)] outline-none transition uppercase tracking-wider cursor-pointer"
           >
             <ArrowLeft size={14} className={lang === "ar" ? "rotate-180" : ""} /> {t.backBtn}
           </button>
@@ -189,10 +189,10 @@ export default function CustomerFormModal({
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h3 className="text-2xl font-bold text-[#1F251A] tracking-tight">
+            <h3 className="text-2xl font-bold text-[var(--cr-dark)] tracking-tight">
               {selectedCustomerForEdit ? t.editTitle : t.addTitle}
             </h3>
-            <p className="text-xs text-[#5A6A51] mt-0.5">
+            <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">
               {selectedCustomerForEdit ? t.editSubtitle : t.addSubtitle}
             </p>
           </div>
@@ -225,7 +225,7 @@ export default function CustomerFormModal({
       </div>
 
       {/* Main Form Container */}
-      <div className="w-full bg-white rounded-3xl border border-[#414E36]/10 p-6 sm:p-8 shadow-sm space-y-8">
+      <div className="w-full bg-white rounded-3xl border border-[var(--cr-primary)]/10 p-6 sm:p-8 shadow-sm space-y-8">
         {customerFormError && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             {customerFormError}
@@ -235,12 +235,12 @@ export default function CustomerFormModal({
         {/* ── SECTION 1: Contact Information ── */}
         <div className="space-y-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#EBF1E8] text-[#414E36] flex items-center justify-center shrink-0">
-              <BookUser size={20} className="text-[#414E36]" />
+            <div className="w-10 h-10 rounded-full bg-[#EBF1E8] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
+              <BookUser size={20} className="text-[var(--cr-primary)]" />
             </div>
             <div>
-              <h4 className="text-base font-bold text-[#1F251A]">{t.contactSectionTitle || "Contact Information"}</h4>
-              <p className="text-xs text-[#5A6A51]">{t.contactSectionSubtitle || "Manage the customer's contact details."}</p>
+              <h4 className="text-base font-bold text-[var(--cr-dark)]">{t.contactSectionTitle || "Contact Information"}</h4>
+              <p className="text-xs text-[var(--color-brand-secondary)]">{t.contactSectionSubtitle || "Manage the customer's contact details."}</p>
             </div>
           </div>
 
@@ -254,7 +254,7 @@ export default function CustomerFormModal({
 
           {/* Customer Name */}
           <div>
-            <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">
+            <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">
               {t.nameLabel} {!selectedCustomerForEdit && <span className="text-red-500">*</span>}
             </label>
             <div className="relative">
@@ -271,7 +271,7 @@ export default function CustomerFormModal({
                 className={`w-full rounded-xl border px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm outline-none transition ${
                   selectedCustomerForEdit
                     ? "bg-[#F7F7F6] text-gray-700 border-gray-200 cursor-not-allowed font-medium"
-                    : "bg-white text-[#1F251A] border-[#414E36]/15 focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                    : "bg-white text-[var(--cr-dark)] border-[var(--cr-primary)]/15 focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                 }`}
                 required={!selectedCustomerForEdit}
               />
@@ -281,7 +281,7 @@ export default function CustomerFormModal({
           {/* Mobile Number & Email Address */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">
                 {t.mobileLabel} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
@@ -293,14 +293,14 @@ export default function CustomerFormModal({
                   value={custMobile}
                   onChange={(e) => setCustMobile(e.target.value)}
                   placeholder={t.mobilePlaceholder}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">
                 {t.emailLabel}
               </label>
               <div className="relative">
@@ -312,7 +312,7 @@ export default function CustomerFormModal({
                   value={custEmail}
                   onChange={(e) => setCustEmail(e.target.value)}
                   placeholder={t.emailPlaceholder}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                 />
               </div>
             </div>
@@ -320,7 +320,7 @@ export default function CustomerFormModal({
 
           {/* WhatsApp Same Checkbox & WhatsApp Input */}
           <div className="space-y-2">
-            <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[#414E36] select-none">
+            <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[var(--cr-primary)] select-none">
               <input
                 type="checkbox"
                 checked={isCustomerWhatsappSame}
@@ -331,7 +331,7 @@ export default function CustomerFormModal({
             </label>
             {!isCustomerWhatsappSame && (
               <div className="animate-fadeIn mt-2">
-                <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">
+                <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">
                   {t.whatsappLabel} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -343,7 +343,7 @@ export default function CustomerFormModal({
                     value={customerWhatsapp}
                     onChange={(e) => setCustomerWhatsapp(e.target.value)}
                     placeholder={t.mobilePlaceholder}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                     required
                   />
                 </div>
@@ -354,7 +354,7 @@ export default function CustomerFormModal({
           {/* Demographics & Personal Attributes */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 pt-2">
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.ageLabel}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.ageLabel}</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <Calendar size={16} />
@@ -364,13 +364,13 @@ export default function CustomerFormModal({
                   value={custAge}
                   onChange={(e) => setCustAge(e.target.value)}
                   placeholder={t.agePlaceholder}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.genderLabel}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.genderLabel}</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <User size={16} />
@@ -378,7 +378,7 @@ export default function CustomerFormModal({
                 <select
                   value={custGender}
                   onChange={(e) => setCustGender(e.target.value as any)}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36] cursor-pointer"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)] cursor-pointer"
                 >
                   <option value="">{t.genderSelectPlaceholder}</option>
                   <option value="Male">{t.genderMale}</option>
@@ -388,7 +388,7 @@ export default function CustomerFormModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.nationalIdLabel}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.nationalIdLabel}</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <CreditCard size={16} />
@@ -398,7 +398,7 @@ export default function CustomerFormModal({
                   value={custNationalId}
                   onChange={(e) => setCustNationalId(e.target.value)}
                   placeholder={t.nationalIdPlaceholder}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                 />
               </div>
             </div>
@@ -406,7 +406,7 @@ export default function CustomerFormModal({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.referralLabel}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.referralLabel}</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <Compass size={16} />
@@ -414,7 +414,7 @@ export default function CustomerFormModal({
                 <select
                   value={custReferral}
                   onChange={(e) => setCustReferral(e.target.value)}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36] cursor-pointer"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)] cursor-pointer"
                 >
                   <option value="">{t.referralSelectPlaceholder}</option>
                   <option value="Facebook">{t.referralSources["Facebook"]}</option>
@@ -430,7 +430,7 @@ export default function CustomerFormModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.occupationLabel}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.occupationLabel}</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <Briefcase size={16} />
@@ -440,30 +440,30 @@ export default function CustomerFormModal({
                   value={custOccupation}
                   onChange={(e) => setCustOccupation(e.target.value)}
                   placeholder={t.occupationPlaceholder}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                 />
               </div>
             </div>
           </div>
         </div>
 
-        <hr className="border-[#414E36]/10" />
+        <hr className="border-[var(--cr-primary)]/10" />
 
         {/* ── SECTION 2: Address Information ── */}
         <div className="space-y-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#EBF1E8] text-[#414E36] flex items-center justify-center shrink-0">
-              <MapPin size={20} className="text-[#414E36]" />
+            <div className="w-10 h-10 rounded-full bg-[#EBF1E8] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
+              <MapPin size={20} className="text-[var(--cr-primary)]" />
             </div>
             <div>
-              <h4 className="text-base font-bold text-[#1F251A]">{t.addressSectionTitle || "Address Information"}</h4>
-              <p className="text-xs text-[#5A6A51]">{t.addressSectionSubtitle || "Manage the customer's address details."}</p>
+              <h4 className="text-base font-bold text-[var(--cr-dark)]">{t.addressSectionTitle || "Address Information"}</h4>
+              <p className="text-xs text-[var(--color-brand-secondary)]">{t.addressSectionSubtitle || "Manage the customer's address details."}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.cityLabel}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.cityLabel}</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <Building2 size={16} />
@@ -473,13 +473,13 @@ export default function CustomerFormModal({
                   value={custArea}
                   onChange={(e) => setCustArea(e.target.value)}
                   placeholder={t.cityPlaceholder}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.streetLabel}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.streetLabel}</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <Signpost size={16} />
@@ -489,13 +489,13 @@ export default function CustomerFormModal({
                   value={custStreet}
                   onChange={(e) => setCustStreet(e.target.value)}
                   placeholder={t.streetPlaceholder}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.buildingLabel}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.buildingLabel}</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <Building size={16} />
@@ -505,7 +505,7 @@ export default function CustomerFormModal({
                   value={custBuilding}
                   onChange={(e) => setCustBuilding(e.target.value)}
                   placeholder={t.buildingPlaceholder}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                 />
               </div>
             </div>
@@ -513,17 +513,17 @@ export default function CustomerFormModal({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.floorLabel || "Floor / Apt (Optional)"}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.floorLabel || "Floor / Apt (Optional)"}</label>
               <input
                 type="text"
                 value={custFloor}
                 onChange={(e) => setCustFloor(e.target.value)}
                 placeholder={t.floorPlaceholder || "e.g. Floor 2, Apt 4"}
-                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">
                 {lang === "ar" ? "تفاصيل إضافية للعنوان (اختياري)" : "Additional Address Details (Optional)"}
               </label>
               <input
@@ -531,23 +531,23 @@ export default function CustomerFormModal({
                 value={custAddress}
                 onChange={(e) => setCustAddress(e.target.value)}
                 placeholder={lang === "ar" ? "مثال: بجوار مول التسعين" : "e.g. Near Downtown Mall"}
-                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
               />
             </div>
           </div>
         </div>
 
-        <hr className="border-[#414E36]/10" />
+        <hr className="border-[var(--cr-primary)]/10" />
 
         {/* ── SECTION 3: Financial Balances ── */}
         <div className="space-y-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#EBF1E8] text-[#414E36] flex items-center justify-center shrink-0">
-              <Wallet size={20} className="text-[#414E36]" />
+            <div className="w-10 h-10 rounded-full bg-[#EBF1E8] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
+              <Wallet size={20} className="text-[var(--cr-primary)]" />
             </div>
             <div>
-              <h4 className="text-base font-bold text-[#1F251A]">{t.financialSectionTitle || "Financial Information"}</h4>
-              <p className="text-xs text-[#5A6A51]">
+              <h4 className="text-base font-bold text-[var(--cr-dark)]">{t.financialSectionTitle || "Financial Information"}</h4>
+              <p className="text-xs text-[var(--color-brand-secondary)]">
                 {selectedCustomerForEdit
                   ? (t.financialSectionSubtitle || "View the customer's wallet, total spend, and outstanding balances.")
                   : (t.financialSectionSubtitleAdd || "Set an opening balance if this customer already has wallet credit, prior spend, or an outstanding debt.")}
@@ -557,7 +557,7 @@ export default function CustomerFormModal({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.walletLabel}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.walletLabel}</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <Wallet size={16} />
@@ -573,14 +573,14 @@ export default function CustomerFormModal({
                   className={`w-full rounded-xl border px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm outline-none transition ${
                     selectedCustomerForEdit
                       ? "border-gray-200 bg-[#F7F7F6] font-semibold text-gray-700 cursor-not-allowed select-none"
-                      : "bg-white text-[#1F251A] border-[#414E36]/15 focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                      : "bg-white text-[var(--cr-dark)] border-[var(--cr-primary)]/15 focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                   }`}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.spentLabel}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.spentLabel}</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <Coins size={16} />
@@ -596,14 +596,14 @@ export default function CustomerFormModal({
                   className={`w-full rounded-xl border px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm outline-none transition ${
                     selectedCustomerForEdit
                       ? "border-gray-200 bg-[#F7F7F6] font-semibold text-gray-700 cursor-not-allowed select-none"
-                      : "bg-white text-[#1F251A] border-[#414E36]/15 focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                      : "bg-white text-[var(--cr-dark)] border-[var(--cr-primary)]/15 focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                   }`}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.outstandingLabel}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.outstandingLabel}</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <Receipt size={16} />
@@ -619,7 +619,7 @@ export default function CustomerFormModal({
                   className={`w-full rounded-xl border px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm outline-none transition ${
                     selectedCustomerForEdit
                       ? "border-gray-200 bg-[#F7F7F6] font-semibold text-gray-700 cursor-not-allowed select-none"
-                      : "bg-white text-[#1F251A] border-[#414E36]/15 focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36]"
+                      : "bg-white text-[var(--cr-dark)] border-[var(--cr-primary)]/15 focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                   }`}
                 />
               </div>
@@ -627,17 +627,17 @@ export default function CustomerFormModal({
           </div>
         </div>
 
-        <hr className="border-[#414E36]/10" />
+        <hr className="border-[var(--cr-primary)]/10" />
 
         {/* ── SECTION 4: Status & Internal Notes ── */}
         <div className="space-y-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#EBF1E8] text-[#414E36] flex items-center justify-center shrink-0">
-              <ShieldCheck size={20} className="text-[#414E36]" />
+            <div className="w-10 h-10 rounded-full bg-[#EBF1E8] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
+              <ShieldCheck size={20} className="text-[var(--cr-primary)]" />
             </div>
             <div>
-              <h4 className="text-base font-bold text-[#1F251A]">{t.statusSectionTitle || "Status"}</h4>
-              <p className="text-xs text-[#5A6A51]">{t.statusSectionSubtitle || "Manage the customer account status."}</p>
+              <h4 className="text-base font-bold text-[var(--cr-dark)]">{t.statusSectionTitle || "Status"}</h4>
+              <p className="text-xs text-[var(--color-brand-secondary)]">{t.statusSectionSubtitle || "Manage the customer account status."}</p>
             </div>
           </div>
 
@@ -646,13 +646,13 @@ export default function CustomerFormModal({
               onClick={() => setCustActive(!custActive)}
               className={`flex items-center justify-between p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer select-none ${
                 custActive
-                  ? "border-[#414E36]/20 bg-[#F4F7F2]/80 hover:bg-[#EEF4EC]"
-                  : "border-gray-200 bg-[#FBFBF9] hover:bg-gray-50"
+                  ? "border-[var(--cr-primary)]/20 bg-[#F4F7F2]/80 hover:bg-[#EEF4EC]"
+                  : "border-gray-200 bg-[var(--color-brand-light)] hover:bg-gray-50"
               }`}
             >
               <div className="space-y-1">
                 <div className="flex items-center gap-2.5">
-                  <span className="text-sm font-bold text-[#1F251A]">{t.activeLabel || "Active Profile"}</span>
+                  <span className="text-sm font-bold text-[var(--cr-dark)]">{t.activeLabel || "Active Profile"}</span>
                   <span
                     className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                       custActive
@@ -666,7 +666,7 @@ export default function CustomerFormModal({
                       : (t.activeStatusInactive || (lang === "ar" ? "غير نشط" : "Inactive"))}
                   </span>
                 </div>
-                <p className="text-xs text-[#5A6A51]">
+                <p className="text-xs text-[var(--color-brand-secondary)]">
                   {custActive
                     ? (t.activeProfileActiveDesc || (lang === "ar" ? "ملف المريض نشط حالياً. قم بالتبديل لإلغاء التفعيل." : "Patient profile is currently active. Toggle to deactivate."))
                     : (t.activeProfileInactiveDesc || (lang === "ar" ? "ملف المريض غير نشط حالياً. قم بالتبديل للتفعيل." : "Patient profile is currently inactive. Toggle to activate."))}
@@ -682,7 +682,7 @@ export default function CustomerFormModal({
                   e.stopPropagation();
                   setCustActive(!custActive);
                 }}
-                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#414E36]/30 ${
+                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]/30 ${
                   custActive ? "bg-[#203D20]" : "bg-gray-300"
                 }`}
               >
@@ -699,20 +699,20 @@ export default function CustomerFormModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1.5">{t.notesLabel}</label>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.notesLabel}</label>
               <textarea
                 value={custNote}
                 onChange={(e) => setCustNote(e.target.value)}
                 placeholder={t.notesPlaceholder}
                 rows={3}
-                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36] resize-none"
+                className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)] resize-none"
               />
             </div>
           </div>
         </div>
 
         {/* Bottom Action Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-6">
+        <div className="flex items-center justify-end gap-3 border-t border-[var(--cr-primary)]/10 pt-6">
           <button
             type="button"
             onClick={() => setShowCustomerFormModal(false)}

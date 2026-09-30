@@ -121,8 +121,8 @@ export default function ServiceRecipeEditor({ serviceId, authHeaders }: Props) {
   }
 
   return (
-    <div className="rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 space-y-3">
-      <div className="flex items-center gap-2 text-[#414E36] font-semibold text-xs uppercase tracking-wider">
+    <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] p-4 space-y-3">
+      <div className="flex items-center gap-2 text-[var(--cr-primary)] font-semibold text-xs uppercase tracking-wider">
         <FlaskConical size={14} /> Consumables Recipe
       </div>
       <p className="text-[11px] text-[#8C9A84]">
@@ -137,16 +137,16 @@ export default function ServiceRecipeEditor({ serviceId, authHeaders }: Props) {
       )}
 
       {loading ? (
-        <p className="text-xs text-[#5A6A51]">Loading recipe...</p>
+        <p className="text-xs text-[var(--color-brand-secondary)]">Loading recipe...</p>
       ) : (
         <>
           {items.length === 0 ? (
-            <p className="text-xs text-[#5A6A51] italic">No consumables defined for this service yet.</p>
+            <p className="text-xs text-[var(--color-brand-secondary)] italic">No consumables defined for this service yet.</p>
           ) : (
             <div className="space-y-2">
               {items.map((item) => (
                 <div key={item.product_id} className="flex items-center gap-2">
-                  <span className="flex-1 text-sm text-[#1F251A] font-medium truncate">
+                  <span className="flex-1 text-sm text-[var(--cr-dark)] font-medium truncate">
                     {item.inventory_products?.name || item.product_id}
                   </span>
                   <input
@@ -155,9 +155,9 @@ export default function ServiceRecipeEditor({ serviceId, authHeaders }: Props) {
                     step="any"
                     value={item.standard_qty}
                     onChange={(e) => updateQty(item.product_id, Number(e.target.value) || 0)}
-                    className="w-24 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    className="w-24 rounded-lg border border-[var(--cr-primary)]/15 bg-white px-2.5 py-1.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                   />
-                  <span className="text-xs text-[#5A6A51] w-16">{item.inventory_products?.unit || ""}</span>
+                  <span className="text-xs text-[var(--color-brand-secondary)] w-16">{item.inventory_products?.unit || ""}</span>
                   <button
                     type="button"
                     onClick={() => removeItem(item.product_id)}
@@ -171,11 +171,11 @@ export default function ServiceRecipeEditor({ serviceId, authHeaders }: Props) {
             </div>
           )}
 
-          <div className="flex items-center gap-2 pt-2 border-t border-[#414E36]/10">
+          <div className="flex items-center gap-2 pt-2 border-t border-[var(--cr-primary)]/10">
             <select
               value={newProductId}
               onChange={(e) => setNewProductId(e.target.value)}
-              className="flex-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+              className="flex-1 rounded-lg border border-[var(--cr-primary)]/15 bg-white px-2.5 py-1.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
             >
               <option value="">
                 {pickableProducts.length === 0 ? "No eligible consumable products" : "Select product..."}
@@ -191,13 +191,13 @@ export default function ServiceRecipeEditor({ serviceId, authHeaders }: Props) {
               value={newQty}
               onChange={(e) => setNewQty(e.target.value)}
               placeholder="Qty"
-              className="w-20 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+              className="w-20 rounded-lg border border-[var(--cr-primary)]/15 bg-white px-2.5 py-1.5 text-sm text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
             />
             <button
               type="button"
               onClick={addItem}
               disabled={!newProductId}
-              className="inline-flex items-center gap-1 rounded-lg bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-lg bg-[var(--cr-primary)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40"
             >
               <Plus size={13} /> Add
             </button>
@@ -207,7 +207,7 @@ export default function ServiceRecipeEditor({ serviceId, authHeaders }: Props) {
             type="button"
             onClick={handleSave}
             disabled={saving || !dirty}
-            className="w-full rounded-lg bg-[#414E36] py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40"
+            className="w-full rounded-lg bg-[var(--cr-primary)] py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40"
           >
             {saving ? "Saving Recipe..." : "Save Recipe"}
           </button>

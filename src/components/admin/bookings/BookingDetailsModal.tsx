@@ -2127,31 +2127,31 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 sm:p-5 animate-fadeIn">
-            <div className="w-full max-w-6xl rounded-[32px] bg-[#FBFBF9] p-6 sm:p-8 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[92vh] overflow-y-auto custom-scrollbar border border-[#414E36]/15 space-y-6">
+            <div className="w-full max-w-6xl rounded-[32px] bg-[var(--color-brand-light)] p-6 sm:p-8 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[92vh] overflow-y-auto custom-scrollbar border border-[var(--cr-primary)]/15 space-y-6">
               
               {viewMode === "end_session" ? (
                 /* ── COMPREHENSIVE CLINICAL INTAKE & SESSION FINALIZATION VIEW ── */
                 <div className="space-y-6 w-full animate-fadeIn">
                   {/* TOP BAR WITH BACK BUTTON */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#414E36]/10 pb-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--cr-primary)]/10 pb-5">
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
                         onClick={() => setViewMode("details")}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white hover:bg-[#F4F5F1] text-[#414E36] border border-[#414E36]/20 font-bold text-xs transition shadow-2xs cursor-pointer group"
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white hover:bg-[#F4F5F1] text-[var(--cr-primary)] border border-[var(--cr-primary)]/20 font-bold text-xs transition shadow-2xs cursor-pointer group"
                       >
                         <ChevronLeft size={16} className={`transition-transform group-hover:-translate-x-0.5 ${isRTL ? "rotate-180 group-hover:translate-x-0.5" : ""}`} />
                         <span>{isRTL ? "العودة إلى تفاصيل الحجز" : "Back to Booking Details"}</span>
                       </button>
 
                       <div>
-                        <h2 className="text-xl sm:text-2xl font-black text-[#1F251A] tracking-tight flex items-center gap-2">
+                        <h2 className="text-xl sm:text-2xl font-black text-[var(--cr-dark)] tracking-tight flex items-center gap-2">
                           <span>{isRTL ? "إنهاء الجلسة وتسجيل الفحوصات الطبية" : "Clinical Session Finalization"}</span>
-                          <span className="text-xs font-mono font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full">
+                          <span className="text-xs font-mono font-bold text-[var(--cr-primary)] bg-[var(--color-brand-tint)] px-2.5 py-0.5 rounded-full">
                             #{booking.id}
                           </span>
                         </h2>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">
+                        <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">
                           {isRTL ? "تسجيل الملاحظات والروشتة والأدوية وإنهاء الجلسة فورياً" : "Fill medical intake, write prescriptions, attach extra services/products, and end session."}
                         </p>
                       </div>
@@ -2170,7 +2170,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   </div>
 
                   {/* PATIENT HEADER BANNER */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl bg-gradient-to-r from-emerald-900 via-[#2C3524] to-[#414E36] p-5 sm:p-6 text-white shadow-md">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl bg-gradient-to-r from-emerald-900 via-[#2C3524] to-[var(--cr-primary)] p-5 sm:p-6 text-white shadow-md">
                     <div className="flex items-center gap-4 min-w-0">
                       <div className="flex h-13 w-13 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-md text-white font-black text-xl border border-white/20 shadow-inner">
                         {(booking.name || "P").slice(0, 2).toUpperCase()}
@@ -2202,7 +2202,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   {isLaserPerPulse && (
                     <div className="rounded-3xl border border-amber-300 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-emerald-500/10 p-5 shadow-xs space-y-1.5 animate-fadeIn">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2 font-black text-[#1F251A] text-sm">
+                        <div className="flex items-center gap-2 font-black text-[var(--cr-dark)] text-sm">
                           <Zap size={18} className="text-amber-600 fill-amber-500 animate-pulse" />
                           <span>{isRTL ? "اتفاقية محاسبة خدمات الليزر بنظام حساب النبضات" : "Laser Per-Pulse Settlement Agreement"}</span>
                         </div>
@@ -2210,7 +2210,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           {laserPulseRate} EGP / {isRTL ? "نبضة" : "pulse"}
                         </span>
                       </div>
-                      <p className="text-xs text-[#1F251A] font-semibold leading-relaxed">
+                      <p className="text-xs text-[var(--cr-dark)] font-semibold leading-relaxed">
                         {isRTL
                           ? `تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${totalSessionPulses} نبضة × ${laserPulseRate} ج.م = ${totalSessionPulses * laserPulseRate} ج.م)`
                           : `Settled that laser services in this session are charged per pulse (${totalSessionPulses} pulses × ${laserPulseRate} EGP = ${totalSessionPulses * laserPulseRate} EGP)`}
@@ -2223,15 +2223,15 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     {/* LEFT COLUMN (1/3 Width): Medical Record & Clinical Notes */}
                     <div className="space-y-5">
                       {/* Medical Record Card */}
-                      <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
-                        <div className="flex items-center justify-between gap-2 flex-wrap border-b border-[#414E36]/10 pb-3">
+                      <div className="rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+                        <div className="flex items-center justify-between gap-2 flex-wrap border-b border-[var(--cr-primary)]/10 pb-3">
                           <div className="space-y-0.5">
-                            <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                              <AlertCircle size={16} className="text-[#414E36]" />
+                            <h3 className="text-xs sm:text-sm font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
+                              <AlertCircle size={16} className="text-[var(--cr-primary)]" />
                               <span>{isRTL ? "السجل الطبي للمريض" : "Patient Medical Record"}</span>
                             </h3>
                             {activeTemplate && (
-                              <span className="text-[10px] font-extrabold text-[#414E36] bg-[#EDF1EC] px-2 py-0.5 rounded-md inline-block">
+                              <span className="text-[10px] font-extrabold text-[var(--cr-primary)] bg-[var(--color-brand-tint)] px-2 py-0.5 rounded-md inline-block">
                                 {activeTemplate.title}
                               </span>
                             )}
@@ -2253,13 +2253,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         </div>
 
                         {medicalRecordLoading || loadingTemplate ? (
-                          <p className="text-xs text-[#5A6A51] flex items-center gap-1.5 py-4 justify-center">
-                            <Loader2 size={14} className="animate-spin text-[#414E36]" />
+                          <p className="text-xs text-[var(--color-brand-secondary)] flex items-center gap-1.5 py-4 justify-center">
+                            <Loader2 size={14} className="animate-spin text-[var(--cr-primary)]" />
                             <span>{isRTL ? "جاري تحميل السجل الطبي..." : "Loading medical record..."}</span>
                           </p>
                         ) : medicalRecord && !showMedicalForm ? (
                           /* Display Existing Record */
-                          <div className="space-y-2.5 text-xs bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
+                          <div className="space-y-2.5 text-xs bg-[var(--color-brand-light)] p-3.5 sm:p-4 rounded-2xl border border-[var(--cr-primary)]/10">
                             {(activeTemplate?.fields || []).length > 0 ? (
                               (activeTemplate?.fields || []).map((f: any) => {
                                 const rawVal = medicalRecord.responses?.[f.id] !== undefined
@@ -2276,9 +2276,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                   : (rawVal || "None reported");
 
                                 return (
-                                  <div key={f.id} className="flex justify-between items-start gap-2 border-b border-[#414E36]/10 pb-2 last:border-b-0 last:pb-0">
-                                    <span className="font-bold text-[#5A6A51]">{f.label}:</span>
-                                    <span className={`font-semibold text-right ${f.id === "allergies" || f.id === "laser_contraindications" || f.id === "bleeding_disorders" ? "text-rose-700 font-bold" : "text-[#1F251A]"}`}>
+                                  <div key={f.id} className="flex justify-between items-start gap-2 border-b border-[var(--cr-primary)]/10 pb-2 last:border-b-0 last:pb-0">
+                                    <span className="font-bold text-[var(--color-brand-secondary)]">{f.label}:</span>
+                                    <span className={`font-semibold text-right ${f.id === "allergies" || f.id === "laser_contraindications" || f.id === "bleeding_disorders" ? "text-rose-700 font-bold" : "text-[var(--cr-dark)]"}`}>
                                       {displayVal}
                                     </span>
                                   </div>
@@ -2286,25 +2286,25 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               })
                             ) : (
                               <>
-                                <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                                  <span className="font-bold text-[#5A6A51]">{isRTL ? "نوع البشرة" : "Skin Type"}:</span>
-                                  <span className="font-bold text-[#1F251A]">{medicalRecord.skin_type || "Normal"}</span>
+                                <div className="flex justify-between border-b border-[var(--cr-primary)]/10 pb-2">
+                                  <span className="font-bold text-[var(--color-brand-secondary)]">{isRTL ? "نوع البشرة" : "Skin Type"}:</span>
+                                  <span className="font-bold text-[var(--cr-dark)]">{medicalRecord.skin_type || "Normal"}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                                  <span className="font-bold text-[#5A6A51]">{isRTL ? "الحساسية" : "Allergies"}:</span>
+                                <div className="flex justify-between border-b border-[var(--cr-primary)]/10 pb-2">
+                                  <span className="font-bold text-[var(--color-brand-secondary)]">{isRTL ? "الحساسية" : "Allergies"}:</span>
                                   <span className="font-bold text-rose-700">{medicalRecord.allergies || "None reported"}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                                  <span className="font-bold text-[#5A6A51]">{isRTL ? "الأدوية الحالية" : "Current Medications"}:</span>
-                                  <span className="font-semibold text-[#1F251A]">{medicalRecord.medication_details || "None"}</span>
+                                <div className="flex justify-between border-b border-[var(--cr-primary)]/10 pb-2">
+                                  <span className="font-bold text-[var(--color-brand-secondary)]">{isRTL ? "الأدوية الحالية" : "Current Medications"}:</span>
+                                  <span className="font-semibold text-[var(--cr-dark)]">{medicalRecord.medication_details || "None"}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                                  <span className="font-bold text-[#5A6A51]">{isRTL ? "الحالات المزمنة" : "Medical Conditions"}:</span>
-                                  <span className="font-semibold text-[#1F251A]">{medicalRecord.medical_conditions_details || "None"}</span>
+                                <div className="flex justify-between border-b border-[var(--cr-primary)]/10 pb-2">
+                                  <span className="font-bold text-[var(--color-brand-secondary)]">{isRTL ? "الحالات المزمنة" : "Medical Conditions"}:</span>
+                                  <span className="font-semibold text-[var(--cr-dark)]">{medicalRecord.medical_conditions_details || "None"}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span className="font-bold text-[#5A6A51]">{isRTL ? "علاجات سابقة" : "Previous Treatments"}:</span>
-                                  <span className="font-semibold text-[#1F251A]">{medicalRecord.previous_treatments_details || "None"}</span>
+                                  <span className="font-bold text-[var(--color-brand-secondary)]">{isRTL ? "علاجات سابقة" : "Previous Treatments"}:</span>
+                                  <span className="font-semibold text-[var(--cr-dark)]">{medicalRecord.previous_treatments_details || "None"}</span>
                                 </div>
                               </>
                             )}
@@ -2312,21 +2312,21 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             <button
                               type="button"
                               onClick={() => setShowMedicalForm(true)}
-                              className="mt-2 flex items-center gap-1.5 text-xs font-bold text-[#414E36] hover:underline cursor-pointer"
+                              className="mt-2 flex items-center gap-1.5 text-xs font-bold text-[var(--cr-primary)] hover:underline cursor-pointer"
                             >
                               <Edit size={14} /> {isRTL ? "تعديل بيانات السجل الطبي" : "Update Medical Record"}
                             </button>
                           </div>
                         ) : (
                           /* Medical Intake Form */
-                          <div className="space-y-3 border-t border-[#414E36]/10 pt-3">
+                          <div className="space-y-3 border-t border-[var(--cr-primary)]/10 pt-3">
                             {isFirstVisit ? (
                               <div className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200">
                                 <strong className="block font-bold">{isRTL ? "تم اكتشاف زيارة أولى" : "First Visit Detected"}</strong>
                                 {isRTL ? "تسجيل الفحص الطبي مطلوب إجبارياً لتسجيل المريض لأول مرة." : "Medical intake form is required for first-time patient registration."}
                               </div>
                             ) : !medicalRecord && isReturningPatient ? (
-                              <div className="rounded-2xl bg-[#EDF1EC] p-3 text-xs text-[#414E36] border border-[#414E36]/15">
+                              <div className="rounded-2xl bg-[var(--color-brand-tint)] p-3 text-xs text-[var(--cr-primary)] border border-[var(--cr-primary)]/15">
                                 <strong className="block font-bold">{isRTL ? "مريض سابق" : "Returning Patient"}</strong>
                                 {isRTL ? "سجل المريض الطبي متاح سابقاً. يمكنك تدوين ملاحظات جديدة أو المتابعة مباشرة." : "Previous patient clinical history is on file. You can record specialized intake notes or proceed directly."}
                               </div>
@@ -2335,14 +2335,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             {(activeTemplate?.fields || []).length > 0 ? (
                               (activeTemplate?.fields || []).map((f: any) => (
                                 <div key={f.id}>
-                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                  <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
                                     {f.label} {f.required && <span className="text-red-500">*</span>}
                                   </label>
                                   {f.type === "select" ? (
                                     <select
                                       value={dynamicResponses[f.id] || (f.options?.[0] || "")}
                                       onChange={(e) => setDynamicResponses({ ...dynamicResponses, [f.id]: e.target.value })}
-                                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none"
                                     >
                                       {(f.options || []).map((opt: string) => (
                                         <option key={opt} value={opt}>{opt}</option>
@@ -2354,15 +2354,15 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                       value={dynamicResponses[f.id] || ""}
                                       onChange={(e) => setDynamicResponses({ ...dynamicResponses, [f.id]: e.target.value })}
                                       placeholder={f.placeholder || "Enter details..."}
-                                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 text-xs text-[#1F251A] outline-none"
+                                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-2.5 text-xs text-[var(--cr-dark)] outline-none"
                                     />
                                   ) : f.type === "checkbox" ? (
-                                    <label className="flex items-center gap-2 p-2.5 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-xs font-semibold text-[#1F251A] cursor-pointer">
+                                    <label className="flex items-center gap-2 p-2.5 rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] text-xs font-semibold text-[var(--cr-dark)] cursor-pointer">
                                       <input
                                         type="checkbox"
                                         checked={Boolean(dynamicResponses[f.id])}
                                         onChange={(e) => setDynamicResponses({ ...dynamicResponses, [f.id]: e.target.checked })}
-                                        className="h-4 w-4 rounded accent-[#414E36]"
+                                        className="h-4 w-4 rounded accent-[var(--cr-primary)]"
                                       />
                                       <span>{isRTL ? "نعم / مؤكد" : "Yes / Confirmed"}</span>
                                     </label>
@@ -2372,7 +2372,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                       value={dynamicResponses[f.id] || ""}
                                       onChange={(e) => setDynamicResponses({ ...dynamicResponses, [f.id]: e.target.value })}
                                       placeholder={f.placeholder || "Enter details..."}
-                                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs text-[var(--cr-dark)] outline-none"
                                     />
                                   )}
                                 </div>
@@ -2380,11 +2380,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             ) : (
                               <>
                                 <div>
-                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{isRTL ? "نوع البشرة" : "Skin Type"}</label>
+                                  <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">{isRTL ? "نوع البشرة" : "Skin Type"}</label>
                                   <select
                                     value={formSkinType}
                                     onChange={(e) => setFormSkinType(e.target.value)}
-                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none"
                                   >
                                     <option value="Normal">Normal</option>
                                     <option value="Dry">Dry</option>
@@ -2396,46 +2396,46 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 </div>
 
                                 <div>
-                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{isRTL ? "الحساسية" : "Known Allergies"}</label>
+                                  <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">{isRTL ? "الحساسية" : "Known Allergies"}</label>
                                   <input
                                     type="text"
                                     placeholder="e.g. Latex, Aspirin, None"
                                     value={formAllergies}
                                     onChange={(e) => setFormAllergies(e.target.value)}
-                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs text-[var(--cr-dark)] outline-none"
                                   />
                                 </div>
 
                                 <div>
-                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{isRTL ? "الأدوية الحالية" : "Current Daily Medications"}</label>
+                                  <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">{isRTL ? "الأدوية الحالية" : "Current Daily Medications"}</label>
                                   <input
                                     type="text"
                                     placeholder="e.g. Roaccutane, Blood thinners, None"
                                     value={formMedicationDetails}
                                     onChange={(e) => setFormMedicationDetails(e.target.value)}
-                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs text-[var(--cr-dark)] outline-none"
                                   />
                                 </div>
 
                                 <div>
-                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{isRTL ? "الحالات المزمنة" : "Medical Conditions"}</label>
+                                  <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">{isRTL ? "الحالات المزمنة" : "Medical Conditions"}</label>
                                   <input
                                     type="text"
                                     placeholder="e.g. Diabetes, Eczema, None"
                                     value={formMedicalConditionsDetails}
                                     onChange={(e) => setFormMedicalConditionsDetails(e.target.value)}
-                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs text-[var(--cr-dark)] outline-none"
                                   />
                                 </div>
 
                                 <div>
-                                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{isRTL ? "علاجات سابقة" : "Previous Treatments"}</label>
+                                  <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">{isRTL ? "علاجات سابقة" : "Previous Treatments"}</label>
                                   <input
                                     type="text"
                                     placeholder="e.g. Chemical Peel 3 mos ago, None"
                                     value={formPreviousTreatmentsDetails}
                                     onChange={(e) => setFormPreviousTreatmentsDetails(e.target.value)}
-                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs text-[var(--cr-dark)] outline-none"
                                   />
                                 </div>
                               </>
@@ -2446,7 +2446,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 <button
                                   type="button"
                                   onClick={() => setShowMedicalForm(false)}
-                                  className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#5A6A51] cursor-pointer"
+                                  className="rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs font-bold text-[var(--color-brand-secondary)] cursor-pointer"
                                 >
                                   {isRTL ? "إلغاء" : "Cancel"}
                                 </button>
@@ -2455,7 +2455,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 type="button"
                                 disabled={savingMedicalRecord}
                                 onClick={() => handleSaveMedicalRecordStandalone()}
-                                className="rounded-xl bg-[#414E36] px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                                className="rounded-xl bg-[var(--cr-primary)] px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
                               >
                                 <Save size={14} /> {savingMedicalRecord ? "..." : (isRTL ? "حفظ السجل الطبي" : "Save Medical Record")}
                               </button>
@@ -2464,17 +2464,17 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         )}
 
                         {/* CLINICAL PROCEDURE NOTES */}
-                        <div className="mt-4 border-t border-[#414E36]/10 pt-4 space-y-3">
+                        <div className="mt-4 border-t border-[var(--cr-primary)]/10 pt-4 space-y-3">
                           <div className="flex items-center justify-between">
-                            <label className="block text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
-                              <FileText size={14} className="text-[#414E36]" />
+                            <label className="block text-xs font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-1.5">
+                              <FileText size={14} className="text-[var(--cr-primary)]" />
                               <span>{isRTL ? "ملاحظات الطبيب والإجراءات" : "Doctor / Procedure Notes"}</span>
                             </label>
                             <button
                               type="button"
                               onClick={handleSaveClinicalNoteStandalone}
                               disabled={savingClinicalNote}
-                              className="rounded-xl bg-[#414E36] px-3 py-1 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                              className="rounded-xl bg-[var(--cr-primary)] px-3 py-1 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
                             >
                               <Save size={12} /> {savingClinicalNote ? "..." : (isRTL ? "حفظ الملاحظات" : "Save Notes")}
                             </button>
@@ -2484,14 +2484,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             value={clinicalNote}
                             onChange={(e) => setClinicalNote(e.target.value)}
                             placeholder={isRTL ? "أدخل تفاصيل وملاحظات الجلسة والإرشادات..." : "Enter clinical findings, device settings, observations..."}
-                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                            className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-3 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                           />
                         </div>
 
                         {/* RECEPTION BOOKING NOTES PREVIEW */}
-                        <div className="mt-3 border-t border-[#414E36]/10 pt-3 space-y-1.5">
-                          <span className="text-[11px] font-bold text-[#5A6A51]">{isRTL ? "ملاحظات الاستقبال الأصلية" : "Original Booking Notes"}</span>
-                          <p className="text-xs text-[#1F251A] bg-[#F4F5F1] p-3 rounded-2xl font-mono leading-relaxed">
+                        <div className="mt-3 border-t border-[var(--cr-primary)]/10 pt-3 space-y-1.5">
+                          <span className="text-[11px] font-bold text-[var(--color-brand-secondary)]">{isRTL ? "ملاحظات الاستقبال الأصلية" : "Original Booking Notes"}</span>
+                          <p className="text-xs text-[var(--cr-dark)] bg-[#F4F5F1] p-3 rounded-2xl font-mono leading-relaxed">
                             {(booking.receptionNotes ?? (booking as any).reception_notes) || booking.notes || (isRTL ? "لا توجد ملاحظات سابقة" : "No booking notes")}
                           </p>
                         </div>
@@ -2502,34 +2502,34 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     <div className="lg:col-span-2 space-y-5">
                       
                       {/* 1. DIGITAL PRESCRIPTION WRITER */}
-                      <div className="rounded-3xl border border-[#414E36]/12 bg-white p-5 sm:p-6 shadow-xs space-y-4">
-                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 flex-wrap gap-2">
+                      <div className="rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+                        <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-3 flex-wrap gap-2">
                           <div>
-                            <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                              <Pill size={16} className="text-[#414E36]" />
+                            <h3 className="text-xs sm:text-sm font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
+                              <Pill size={16} className="text-[var(--cr-primary)]" />
                               <span>{isRTL ? "كتابة الروشتة الطبية الإلكترونية" : "Digital Prescription Writer"}</span>
                             </h3>
-                            <p className="text-xs text-[#5A6A51] mt-0.5">
-                              {isRTL ? "المريض" : "Patient"}: <strong className="text-[#414E36]">{booking.name || "Patient"}</strong>
+                            <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">
+                              {isRTL ? "المريض" : "Patient"}: <strong className="text-[var(--cr-primary)]">{booking.name || "Patient"}</strong>
                             </p>
                           </div>
                         </div>
 
                         <form onSubmit={handleSaveInlinePrescription} className="space-y-4">
                           <div>
-                            <label className="block text-xs font-bold text-[#5A6A51] mb-1">{isRTL ? "التشخيص الطبي" : "Clinical Diagnosis"}</label>
+                            <label className="block text-xs font-bold text-[var(--color-brand-secondary)] mb-1">{isRTL ? "التشخيص الطبي" : "Clinical Diagnosis"}</label>
                             <input
                               type="text"
                               placeholder={isRTL ? "مثال: التهاب ما بعد الليزر، حب شباب درجة ثانية" : "e.g. Post-laser erythema, Acne Vulgaris Grade II"}
                               value={rxDiagnosis}
                               onChange={(e) => setRxDiagnosis(e.target.value)}
-                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                              className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                             />
                           </div>
 
                           {/* Medications List */}
                           <div className="space-y-2">
-                            <label className="block text-xs font-bold text-[#5A6A51]">{isRTL ? "الأدوية الموصوفة" : "Prescribed Medications"}</label>
+                            <label className="block text-xs font-bold text-[var(--color-brand-secondary)]">{isRTL ? "الأدوية الموصوفة" : "Prescribed Medications"}</label>
                             {rxMedications.map((med, idx) => (
                               <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                                 <input
@@ -2541,7 +2541,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                     updated[idx].name = e.target.value;
                                     setRxMedications(updated);
                                   }}
-                                  className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                                  className="rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none"
                                 />
                                 <input
                                   type="text"
@@ -2552,7 +2552,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                     updated[idx].dosage = e.target.value;
                                     setRxMedications(updated);
                                   }}
-                                  className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                                  className="rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none"
                                 />
                                 <input
                                   type="text"
@@ -2563,7 +2563,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                     updated[idx].frequency = e.target.value;
                                     setRxMedications(updated);
                                   }}
-                                  className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                                  className="rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none"
                                 />
                                 <input
                                   type="text"
@@ -2574,34 +2574,34 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                     updated[idx].duration = e.target.value;
                                     setRxMedications(updated);
                                   }}
-                                  className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                                  className="rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none"
                                 />
                               </div>
                             ))}
                             <button
                               type="button"
                               onClick={() => setRxMedications([...rxMedications, { name: "", dosage: "", frequency: "", duration: "" }])}
-                              className="text-xs font-bold text-[#414E36] flex items-center gap-1 mt-1 hover:underline cursor-pointer"
+                              className="text-xs font-bold text-[var(--cr-primary)] flex items-center gap-1 mt-1 hover:underline cursor-pointer"
                             >
                               <Plus size={14} /> {isRTL ? "إضافة دواء آخر" : "Add Another Medication"}
                             </button>
                           </div>
 
                           <div>
-                            <label className="block text-xs font-bold text-[#5A6A51] mb-1">{isRTL ? "إرشادات وتعليمات المريض" : "General Patient Instructions"}</label>
+                            <label className="block text-xs font-bold text-[var(--color-brand-secondary)] mb-1">{isRTL ? "إرشادات وتعليمات المريض" : "General Patient Instructions"}</label>
                             <textarea
                               rows={2}
                               placeholder={isRTL ? "مثال: استخدام واقي شمس SPF 50 يومياً، تجنب الشمس المباشرة 48 ساعة..." : "e.g. Apply sunscreen SPF 50 daily, avoid direct sun exposure for 48 hours..."}
                               value={rxGeneralNotes}
                               onChange={(e) => setRxGeneralNotes(e.target.value)}
-                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                              className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-3 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                             />
                           </div>
 
                           {/* Follow-Up Visit Specification */}
-                          <div className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3.5 sm:p-4 space-y-3">
+                          <div className="rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-3.5 sm:p-4 space-y-3">
                             <div className="flex items-center justify-between">
-                              <label className="text-xs font-bold text-[#1F251A] flex items-center gap-2 cursor-pointer select-none">
+                              <label className="text-xs font-bold text-[var(--cr-dark)] flex items-center gap-2 cursor-pointer select-none">
                                 <input
                                   type="checkbox"
                                   checked={rxHasFollowUp}
@@ -2612,9 +2612,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                       setFollowUpPresetDays(7);
                                     }
                                   }}
-                                  className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36] accent-[#414E36]"
+                                  className="h-4 w-4 rounded border-gray-300 text-[var(--cr-primary)] focus:ring-[var(--cr-primary)] accent-[var(--cr-primary)]"
                                 />
-                                <Calendar size={14} className="text-[#414E36]" />
+                                <Calendar size={14} className="text-[var(--cr-primary)]" />
                                 <span>{isRTL ? "تحديد موعد متابعة / استشارة قادمة؟" : "Requires Follow-Up / Consultation?"}</span>
                               </label>
 
@@ -2626,38 +2626,38 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             </div>
 
                             {rxHasFollowUp && (
-                              <div className="space-y-3 pt-2 border-t border-[#414E36]/10 animate-fadeIn">
+                              <div className="space-y-3 pt-2 border-t border-[var(--cr-primary)]/10 animate-fadeIn">
                                 {/* Interval Presets */}
                                 <div>
-                                  <span className="block text-[11px] font-bold text-[#5A6A51] mb-1.5">
+                                  <span className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1.5">
                                     {isRTL ? "فترات زمنية سريعة:" : "Quick Interval Presets:"}
                                   </span>
                                   <div className="flex flex-wrap gap-1.5">
                                     <button
                                       type="button"
                                       onClick={() => setFollowUpPresetDays(3)}
-                                      className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                                      className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[var(--cr-primary)]/20 bg-white text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                                     >
                                       {isRTL ? "+3 أيام" : "+3 Days"}
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setFollowUpPresetDays(7)}
-                                      className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                                      className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[var(--cr-primary)]/20 bg-white text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                                     >
                                       {isRTL ? "+أسبوع" : "+1 Week"}
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setFollowUpPresetDays(14)}
-                                      className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                                      className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[var(--cr-primary)]/20 bg-white text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                                     >
                                       {isRTL ? "+أسبوعين" : "+2 Weeks"}
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setFollowUpPresetDays(30)}
-                                      className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                                      className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[var(--cr-primary)]/20 bg-white text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                                     >
                                       {isRTL ? "+شهر" : "+1 Month"}
                                     </button>
@@ -2667,7 +2667,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 {/* Date Picker & Reason */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                   <div>
-                                    <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                    <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
                                       {isRTL ? "تاريخ المتابعة الموصى به" : "Recommended Follow-Up Date"}
                                     </label>
                                     <input
@@ -2675,11 +2675,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                       value={rxFollowUpDate}
                                       min={new Date().toISOString().slice(0, 10)}
                                       onChange={(e) => setRxFollowUpDate(e.target.value)}
-                                      className="w-full rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] font-bold outline-none focus:border-[#414E36]"
+                                      className="w-full rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs text-[var(--cr-dark)] font-bold outline-none focus:border-[var(--cr-primary)]"
                                     />
                                   </div>
                                   <div>
-                                    <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                                    <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
                                       {isRTL ? "تعليمات أو سبب المتابعة" : "Follow-Up Instructions / Reason"}
                                     </label>
                                     <input
@@ -2687,7 +2687,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                       placeholder={isRTL ? "مثال: فحص تقشير البشرة، مراجعة التحاليل..." : "e.g. Check skin reaction, review lab results..."}
                                       value={rxFollowUpNotes}
                                       onChange={(e) => setRxFollowUpNotes(e.target.value)}
-                                      className="w-full rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                                      className="w-full rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                                     />
                                   </div>
                                 </div>
@@ -2718,7 +2718,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             <button
                               type="submit"
                               disabled={savingRxInline}
-                              className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                              className="rounded-xl bg-[var(--cr-primary)] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                             >
                               <Printer size={14} /> {savingRxInline ? "..." : (isRTL ? "حفظ وطباعة الروشتة" : "Save & Print")}
                             </button>
@@ -2735,9 +2735,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         const totalCalculatedPulses = (isPrimaryLaser ? Number(extraPulsesCount) || 0 : 0) + additionalServices.reduce((sum, s) => sum + Number(s.pulses || 0), 0);
 
                         return (
-                          <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
-                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
-                              <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                          <div className="rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--cr-primary)]/10 pb-3">
+                              <h3 className="text-xs sm:text-sm font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
                                 <Zap size={16} className="text-amber-600" />
                                 <span>{isRTL ? "الخدمات الإضافية ونبضات الليزر" : "Services & Laser Pulses"}</span>
                               </h3>
@@ -2752,10 +2752,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             </div>
 
                             {/* Primary Service Display & Laser Pulse Tracker */}
-                            <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-3">
+                            <div className="rounded-2xl bg-[var(--color-brand-light)] p-4 border border-[var(--cr-primary)]/10 space-y-3">
                               <div className="flex items-center justify-between text-xs">
-                                <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
-                                  <Layers size={14} className="text-[#414E36]" />
+                                <span className="font-bold text-[var(--color-brand-secondary)] flex items-center gap-1.5">
+                                  <Layers size={14} className="text-[var(--cr-primary)]" />
                                   <span>{isRTL ? "الخدمة الأساسية المحجوزة" : "Primary Reserved Service"}</span>
                                   {isPrimaryLaser && (
                                     <span className="rounded-md bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-extrabold">
@@ -2763,14 +2763,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                     </span>
                                   )}
                                 </span>
-                                <span className="font-extrabold text-[#414E36]">
+                                <span className="font-extrabold text-[var(--cr-primary)]">
                                   {baseBookingPrice} EGP {isLaserPerPulse && isPrimaryLaser && Number(primaryPulses) > 0 ? `(${primaryPulses} × ${laserPulseRate} EGP)` : ""}
                                 </span>
                               </div>
 
-                              <div className="bg-white p-3 rounded-xl border border-[#414E36]/10 space-y-3">
+                              <div className="bg-white p-3 rounded-xl border border-[var(--cr-primary)]/10 space-y-3">
                                 <div>
-                                  <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">
+                                  <label className="block text-[10px] font-bold text-[var(--color-brand-secondary)] mb-1">
                                     {isRTL ? "تعديل الخدمة الأساسية للجلسة" : "Selected Patient Service (Changeable)"}
                                   </label>
                                   <select
@@ -2783,7 +2783,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                         setExtraPulsesCount(0);
                                       }
                                     }}
-                                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none"
                                   >
                                     {localServices.map((s) => (
                                       <option key={s.id} value={s.id}>
@@ -2795,8 +2795,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                                 {/* Only show Delivered Pulses intake if Primary Service is a Laser Service */}
                                 {isPrimaryLaser && (
-                                  <div className="pt-2 border-t border-[#414E36]/10">
-                                    <label className="block text-[10px] font-bold text-[#5A6A51] mb-1 flex items-center justify-between">
+                                  <div className="pt-2 border-t border-[var(--cr-primary)]/10">
+                                    <label className="block text-[10px] font-bold text-[var(--color-brand-secondary)] mb-1 flex items-center justify-between">
                                       <span className="flex items-center gap-1">
                                         <Zap size={12} className="text-amber-600" />
                                         <span>{isRTL ? "عدد النبضات المستخدمة" : "Delivered Pulses"}</span>
@@ -2813,7 +2813,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                         min={0}
                                         value={extraPulsesCount || ""}
                                         onChange={(e) => setExtraPulsesCount(Math.max(0, parseInt(e.target.value) || 0))}
-                                        className="flex-1 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                        className="flex-1 rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none"
                                         placeholder={isRTL ? "عدد النبضات (مثال: 500)" : "Pulses (e.g. 500)"}
                                       />
                                       <div className="flex items-center gap-1 shrink-0">
@@ -2824,8 +2824,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                             onClick={() => setExtraPulsesCount(preset)}
                                             className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
                                               extraPulsesCount === preset
-                                                ? "bg-[#414E36] text-white border-[#414E36]"
-                                                : "bg-white text-[#5A6A51] border-[#414E36]/15 hover:bg-[#EDF1EC]"
+                                                ? "bg-[var(--cr-primary)] text-white border-[var(--cr-primary)]"
+                                                : "bg-white text-[var(--color-brand-secondary)] border-[var(--cr-primary)]/15 hover:bg-[var(--color-brand-tint)]"
                                             }`}
                                           >
                                             {preset}
@@ -2839,9 +2839,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             </div>
 
                             {/* Additional Services Manager */}
-                            <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
-                              <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
-                                <Plus size={14} className="text-[#414E36]" />
+                            <div className="space-y-3 bg-[var(--color-brand-light)] p-4 rounded-2xl border border-[var(--cr-primary)]/10">
+                              <h4 className="text-xs font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-1.5">
+                                <Plus size={14} className="text-[var(--cr-primary)]" />
                                 <span>{isRTL ? "إضافة خدمة إضافية للجلسة" : "Add Additional Service"}</span>
                               </h4>
 
@@ -2857,7 +2857,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                         setAdditionalServicePulsesInput(0);
                                       }
                                     }}
-                                    className="flex-1 w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                                    className="flex-1 w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none"
                                   >
                                     <option value="">{isRTL ? "-- اختر الخدمة الإضافية --" : "-- Select Additional Service --"}</option>
                                     {localServices.map((s) => (
@@ -2872,7 +2872,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                       type="button"
                                       onClick={handleAddServiceToSession}
                                       disabled={!selectedServiceIdToAdd}
-                                      className="w-full sm:w-auto px-5 py-2 rounded-xl bg-[#414E36] text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                                      className="w-full sm:w-auto px-5 py-2 rounded-xl bg-[var(--cr-primary)] text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
                                     >
                                       <Plus size={14} /> {isRTL ? "إضافة الخدمة" : "Add Service"}
                                     </button>
@@ -2901,7 +2901,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                           min={0}
                                           value={additionalServicePulsesInput || ""}
                                           onChange={(e) => setAdditionalServicePulsesInput(Math.max(0, parseInt(e.target.value) || 0))}
-                                          className="flex-1 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none focus:ring-2 focus:ring-amber-400"
+                                          className="flex-1 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none focus:ring-2 focus:ring-amber-400"
                                           placeholder={isRTL ? "عدد النبضات (مثال: 500)" : "Pulses (e.g. 500)"}
                                         />
                                         <div className="flex items-center gap-1 shrink-0">
@@ -2926,7 +2926,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                         type="button"
                                         onClick={handleAddServiceToSession}
                                         disabled={!selectedServiceIdToAdd}
-                                        className="w-full sm:w-auto px-5 py-2 rounded-xl bg-[#414E36] text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                                        className="w-full sm:w-auto px-5 py-2 rounded-xl bg-[var(--cr-primary)] text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
                                       >
                                         <Plus size={14} /> {isRTL ? "تسجيل الخدمة الإضافية" : "Record Additional Service"}
                                       </button>
@@ -2937,7 +2937,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                               {/* Added Additional Services List */}
                               {additionalServices.length > 0 && (
-                                <div className="space-y-2 pt-2 border-t border-[#414E36]/10">
+                                <div className="space-y-2 pt-2 border-t border-[var(--cr-primary)]/10">
                                   {additionalServices.map((item) => {
                                     const srvObj = localServices.find((ls) => String(ls.id) === String(item.serviceId));
                                     const isItemLaser = item.isLaser || checkIsLaserService(srvObj);
@@ -2948,9 +2948,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                       : Number(item.price || 0);
 
                                     return (
-                                      <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
+                                      <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[var(--cr-primary)]/10 gap-2">
                                         <div className="min-w-0 flex items-center gap-2">
-                                          <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
+                                          <span className="font-bold text-[var(--cr-dark)] block truncate">{item.name}</span>
                                           {(item.isLaser || Number(item.pulses) > 0) && (
                                             <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-extrabold text-amber-800 shrink-0">
                                               <Zap size={10} className="text-amber-600 fill-amber-500" />
@@ -2959,7 +2959,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                           )}
                                         </div>
                                         <div className="flex items-center gap-3 shrink-0">
-                                          <span className="font-extrabold text-[#414E36]">
+                                          <span className="font-extrabold text-[var(--cr-primary)]">
                                             {isLaserPackage && isItemLaser ? (
                                               <span className="text-purple-700 font-bold">0 EGP (Package Redemption)</span>
                                             ) : (
@@ -2985,20 +2985,20 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       })()}
 
                       {/* 3. PRODUCTS & CONSUMABLES USED */}
-                      <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
-                          <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                            <ShoppingBag size={16} className="text-[#414E36]" />
+                      <div className="rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--cr-primary)]/10 pb-3">
+                          <h3 className="text-xs sm:text-sm font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
+                            <ShoppingBag size={16} className="text-[var(--cr-primary)]" />
                             <span>{isRTL ? "المنتجات والمستهلكات المستخدمة" : "Products & Consumables Used"}</span>
                           </h3>
                         </div>
 
-                        <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                        <div className="space-y-3 bg-[var(--color-brand-light)] p-4 rounded-2xl border border-[var(--cr-primary)]/10">
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                             <select
                               value={selectedSessionProductId}
                               onChange={(e) => setSelectedSessionProductId(e.target.value)}
-                              className="sm:col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                              className="sm:col-span-2 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none"
                             >
                               <option value="">{isRTL ? "-- اختر المنتج --" : "-- Select Product / Consumable --"}</option>
                               {(inventoryProducts || []).map((p: any) => {
@@ -3016,7 +3016,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               min={1}
                               value={selectedSessionProductQty}
                               onChange={(e) => setSelectedSessionProductQty(Math.max(1, parseInt(e.target.value) || 1))}
-                              className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                              className="rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none"
                               placeholder="Qty"
                             />
                           </div>
@@ -3025,21 +3025,21 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             type="button"
                             onClick={handleAddProductToSession}
                             disabled={!selectedSessionProductId}
-                            className="w-full rounded-xl bg-[#414E36] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
+                            className="w-full rounded-xl bg-[var(--cr-primary)] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
                           >
                             <Plus size={14} /> {isRTL ? "إضافة المنتج للفاتورة وخصمه من المخزون" : "Add Product to Invoice & Deduct Stock"}
                           </button>
 
                           {usedProducts.length > 0 && (
-                            <div className="space-y-1.5 pt-2 border-t border-[#414E36]/10">
+                            <div className="space-y-1.5 pt-2 border-t border-[var(--cr-primary)]/10">
                               {usedProducts.map((item, i) => (
-                                <div key={i} className="flex items-center justify-between text-xs bg-white p-2.5 rounded-xl border border-[#414E36]/10 gap-2">
+                                <div key={i} className="flex items-center justify-between text-xs bg-white p-2.5 rounded-xl border border-[var(--cr-primary)]/10 gap-2">
                                   <div className="min-w-0">
-                                    <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
-                                    <span className="text-[10px] text-[#5A6A51] block truncate">Qty: {item.qty} x {item.unitPrice} EGP</span>
+                                    <span className="font-bold text-[var(--cr-dark)] block truncate">{item.name}</span>
+                                    <span className="text-[10px] text-[var(--color-brand-secondary)] block truncate">Qty: {item.qty} x {item.unitPrice} EGP</span>
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0">
-                                    <span className="font-extrabold text-[#414E36]">+{item.total} EGP</span>
+                                    <span className="font-extrabold text-[var(--cr-primary)]">+{item.total} EGP</span>
                                     <button
                                       type="button"
                                       onClick={() => handleRemoveProductFromSession(i)}
@@ -3081,21 +3081,21 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         )}
 
                         {/* FINAL SESSION INVOICE SUMMARY */}
-                        <div className="bg-[#414E36]/05 p-4 rounded-2xl space-y-2 text-xs border border-[#414E36]/10">
-                          <div className="flex flex-wrap items-center justify-between gap-3 text-[#5A6A51]">
-                            <span>{isRTL ? "الخدمة الأساسية:" : "Base Service:"} <strong className="text-[#1F251A]">{baseBookingPrice} EGP</strong></span>
+                        <div className="bg-[var(--cr-primary)]/05 p-4 rounded-2xl space-y-2 text-xs border border-[var(--cr-primary)]/10">
+                          <div className="flex flex-wrap items-center justify-between gap-3 text-[var(--color-brand-secondary)]">
+                            <span>{isRTL ? "الخدمة الأساسية:" : "Base Service:"} <strong className="text-[var(--cr-dark)]">{baseBookingPrice} EGP</strong></span>
                             {additionalServicesSubtotal > 0 && (
-                              <span>{isRTL ? "خدمات إضافية:" : "Extra Services:"} <strong className="text-[#1F251A]">+{additionalServicesSubtotal} EGP</strong></span>
+                              <span>{isRTL ? "خدمات إضافية:" : "Extra Services:"} <strong className="text-[var(--cr-dark)]">+{additionalServicesSubtotal} EGP</strong></span>
                             )}
                             {productsSubtotal > 0 && (
-                              <span>{isRTL ? "منتجات ومستهلكات:" : "Products:"} <strong className="text-[#1F251A]">+{productsSubtotal} EGP</strong></span>
+                              <span>{isRTL ? "منتجات ومستهلكات:" : "Products:"} <strong className="text-[var(--cr-dark)]">+{productsSubtotal} EGP</strong></span>
                             )}
                           </div>
-                          <div className="pt-2 border-t border-[#414E36]/10 flex items-center justify-between text-[#414E36] font-extrabold text-sm sm:text-base">
+                          <div className="pt-2 border-t border-[var(--cr-primary)]/10 flex items-center justify-between text-[var(--cr-primary)] font-extrabold text-sm sm:text-base">
                             <span>{isRTL ? "إجمالي فاتورة الجلسة النهائية:" : "Final Session Invoice:"}</span>
                             <span>{endSessionInvoiceTotal} EGP</span>
                           </div>
-                          <div className="flex items-center justify-between text-xs text-[#5A6A51] pt-1">
+                          <div className="flex items-center justify-between text-xs text-[var(--color-brand-secondary)] pt-1">
                             <span>{isRTL ? "المدفوع مسبقاً:" : "Paid:"} <strong className="text-emerald-700">{sessionPaid} EGP</strong></span>
                             <span>{isRTL ? "المتبقي للتحصيل:" : "Outstanding:"} <strong className={endSessionAmountLeft > 0 ? "text-rose-700 font-bold" : "text-emerald-700 font-bold"}>{endSessionAmountLeft} EGP</strong></span>
                           </div>
@@ -3106,9 +3106,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   </div>
 
                   {/* BOTTOM CONFIRMATION BAR */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-3xl bg-white p-5 border border-[#414E36]/15 shadow-sm">
-                    <div className="space-y-0.5 text-xs text-[#5A6A51]">
-                      <p className="font-bold text-[#1F251A]">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-3xl bg-white p-5 border border-[var(--cr-primary)]/15 shadow-sm">
+                    <div className="space-y-0.5 text-xs text-[var(--color-brand-secondary)]">
+                      <p className="font-bold text-[var(--cr-dark)]">
                         {isRTL ? "تأكيد الإنهاء النهائي للجلسة" : "Confirm Session Termination"}
                       </p>
                       <p>
@@ -3129,7 +3129,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         type="button"
                         disabled={finalizingSession}
                         onClick={() => handleConfirmEndSession(endSessionInvoiceTotal, sessionPaid)}
-                        className="w-full sm:w-auto justify-center flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 via-[#414E36] to-emerald-700 px-7 py-3 text-xs font-black text-white shadow-lg shadow-emerald-900/20 hover:brightness-110 active:scale-[0.99] transition disabled:opacity-50 cursor-pointer"
+                        className="w-full sm:w-auto justify-center flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 via-[var(--cr-primary)] to-emerald-700 px-7 py-3 text-xs font-black text-white shadow-lg shadow-emerald-900/20 hover:brightness-110 active:scale-[0.99] transition disabled:opacity-50 cursor-pointer"
                       >
                         {finalizingSession ? (
                           <>
@@ -3150,15 +3150,15 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 /* ── STANDARD DETAILS VIEW ── */
                 <div className="space-y-6">
                   {/* ── HEADER ── */}
-                  <div className="flex items-start justify-between border-b border-[#414E36]/10 pb-5">
+                  <div className="flex items-start justify-between border-b border-[var(--cr-primary)]/10 pb-5">
                     <div className="space-y-1.5">
-                      <h2 className="text-2xl sm:text-3xl font-black text-[#1F251A] tracking-tight">
+                      <h2 className="text-2xl sm:text-3xl font-black text-[var(--cr-dark)] tracking-tight">
                         Booking Details
                       </h2>
                   <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs">
-                    <span className="font-semibold text-[#5A6A51] flex items-center gap-1.5">
+                    <span className="font-semibold text-[var(--color-brand-secondary)] flex items-center gap-1.5">
                       <span>Reference ID:</span>
-                      <span className="font-mono font-bold text-[#1F251A]">{booking.id}</span>
+                      <span className="font-mono font-bold text-[var(--cr-dark)]">{booking.id}</span>
                       <button
                         type="button"
                         onClick={async () => {
@@ -3195,7 +3195,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           }
                         }}
                         title="Copy Reference ID"
-                        className="text-[#5A6A51] hover:text-[#1F251A] transition p-0.5 rounded cursor-pointer"
+                        className="text-[var(--color-brand-secondary)] hover:text-[var(--cr-dark)] transition p-0.5 rounded cursor-pointer"
                       >
                         {copiedBookingRef ? <Check size={13} className="text-emerald-700 font-bold" /> : <Copy size={13} />}
                       </button>
@@ -3259,7 +3259,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     <span className={`rounded-full px-3 py-0.5 text-[11px] font-extrabold uppercase tracking-wider ${
                       booking.isManual 
                         ? 'bg-[#E8F0FE] text-[#1967D2]' 
-                        : 'bg-[#FAF5EB] text-[#C4AE7C]'
+                        : 'bg-[#FAF5EB] text-[var(--cr-accent)]'
                     }`}>
                       {booking.isManual ? "MANUAL BOOKING" : "WEBSITE BOOKING"}
                     </span>
@@ -3308,7 +3308,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 <div className="lg:col-span-2 space-y-4">
                   
                   {/* 1. PATIENT INFORMATION CARD */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3 shadow-2xs">
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-5 space-y-3 shadow-2xs">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[11px] uppercase tracking-wider">
                         <User size={14} className="text-[#0F3826]" />
@@ -3345,7 +3345,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           setPrescriptionBookingContext(booking.id);
                           setViewingCustomerProfile(targetCustomer);
                         }}
-                        className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                        className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
                       >
                         <Eye size={13} />
                         <span>View Patient</span>
@@ -3353,17 +3353,17 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </div>
 
                     <div>
-                      <h3 className="text-xl font-black text-[#1F251A]">
+                      <h3 className="text-xl font-black text-[var(--cr-dark)]">
                         {booking.name}
                       </h3>
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-[#5A6A51] font-medium mt-1">
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--color-brand-secondary)] font-medium mt-1">
                         <span className="flex items-center gap-1">
-                          <Phone size={13} className="text-[#5A6A51]" />
-                          <span className="font-mono font-bold text-[#1F251A]">{booking.phone}</span>
+                          <Phone size={13} className="text-[var(--color-brand-secondary)]" />
+                          <span className="font-mono font-bold text-[var(--cr-dark)]">{booking.phone}</span>
                         </span>
                         <span>|</span>
                         <span className="flex items-center gap-1">
-                          <FileText size={13} className="text-[#5A6A51]" />
+                          <FileText size={13} className="text-[var(--color-brand-secondary)]" />
                           <span>{booking.email || "No email provided"}</span>
                         </span>
                       </div>
@@ -3480,7 +3480,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   {/* 2. 3-METRICS ROW: SERVICE, DATE & TIME, SESSION TYPE & PAYMENT MODE */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* Card A: SERVICE */}
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
+                    <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 space-y-1 shadow-2xs">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
                           <ShoppingBag size={13} className="text-[#0F3826]" />
@@ -3493,7 +3493,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               setSelectedNewServiceId(String(booking.serviceId || (booking.serviceIds && booking.serviceIds[0]) || ""));
                               setShowChangeServiceModal(true);
                             }}
-                            className="rounded-lg border border-[#414E36]/20 bg-[#414E36]/05 px-2 py-0.5 text-[10px] font-bold text-[#414E36] hover:bg-[#414E36]/15 transition flex items-center gap-1 cursor-pointer"
+                            className="rounded-lg border border-[var(--cr-primary)]/20 bg-[var(--cr-primary)]/05 px-2 py-0.5 text-[10px] font-bold text-[var(--cr-primary)] hover:bg-[var(--cr-primary)]/15 transition flex items-center gap-1 cursor-pointer"
                             title={tr.changeServiceBtn}
                           >
                             <Edit size={10} />
@@ -3501,22 +3501,22 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           </button>
                         )}
                       </div>
-                      <p className="font-black text-sm text-[#1F251A] leading-snug line-clamp-1 pt-0.5" title={serviceNames}>
+                      <p className="font-black text-sm text-[var(--cr-dark)] leading-snug line-clamp-1 pt-0.5" title={serviceNames}>
                         {bookingServices[0]?.name || serviceNames || "Clinic Service"}
                       </p>
-                      <p className="text-xs text-[#5A6A51] font-medium line-clamp-1">
+                      <p className="text-xs text-[var(--color-brand-secondary)] font-medium line-clamp-1">
                         {bookingServices[0]?.name && bookingServices.length > 1 ? `+${bookingServices.length - 1} more service(s)` : "(Standard Procedure)"}
                       </p>
                     </div>
 
                     {/* Card B: DATE & TIME */}
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
+                    <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 space-y-1 shadow-2xs">
                       <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
                         <Calendar size={13} className="text-[#0F3826]" />
                         <span>DATE &amp; TIME</span>
                       </div>
-                      <p className="font-bold text-xs text-[#1F251A] flex items-center gap-1.5 pt-0.5">
-                        <Clock size={12} className="text-[#5A6A51]" />
+                      <p className="font-bold text-xs text-[var(--cr-dark)] flex items-center gap-1.5 pt-0.5">
+                        <Clock size={12} className="text-[var(--color-brand-secondary)]" />
                         <span>
                           {(() => {
                             if (!booking.date) return "—";
@@ -3531,14 +3531,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           })()}
                         </span>
                       </p>
-                      <p className="font-bold text-xs text-[#1F251A] flex items-center gap-1.5">
-                        <Clock size={12} className="text-[#5A6A51]" />
+                      <p className="font-bold text-xs text-[var(--cr-dark)] flex items-center gap-1.5">
+                        <Clock size={12} className="text-[var(--color-brand-secondary)]" />
                         <span>{booking.timeSlot || booking.requestedTime || "09:00 AM"}</span>
                       </p>
                     </div>
 
                     {/* Card C: SESSION TYPE & PAYMENT MODE */}
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
+                    <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 space-y-1 shadow-2xs">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
                           <User size={13} className="text-[#0F3826]" />
@@ -3556,10 +3556,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           </span>
                         ) : null}
                       </div>
-                      <p className="font-black text-xs text-[#1F251A] pt-0.5">
+                      <p className="font-black text-xs text-[var(--cr-dark)] pt-0.5">
                         {booking.sessionType === 'online' ? "Online Consultation" : "In Person"}
                       </p>
-                      <p className="text-xs text-[#5A6A51] font-medium flex items-center gap-1.5">
+                      <p className="text-xs text-[var(--color-brand-secondary)] font-medium flex items-center gap-1.5">
                         <span className={`h-2 w-2 rounded-full ${booking.sessionType === 'online' ? 'bg-blue-500' : isLaserPerPulse ? 'bg-amber-500' : isLaserPackage ? 'bg-purple-500' : 'bg-emerald-500'}`} />
                         <span>
                           {isLaserPerPulse 
@@ -3575,33 +3575,33 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   {/* 3. 2-METRICS ROW: DOCTOR & LOCATION */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Card A: DOCTOR */}
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
+                    <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 space-y-1 shadow-2xs">
                       <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
                         <User size={13} className="text-[#0F3826]" />
                         <span>DOCTOR</span>
                       </div>
-                      <p className="font-black text-sm text-[#1F251A] pt-0.5">
+                      <p className="font-black text-sm text-[var(--cr-dark)] pt-0.5">
                         {booking.doctorName || "Treating Doctor"}
                       </p>
                       <div className="flex items-center gap-1 text-amber-500 text-xs font-bold">
                         {"★".repeat(5)}
-                        <span className="text-[#5A6A51] text-[11px] font-semibold ml-0.5">5.0</span>
+                        <span className="text-[var(--color-brand-secondary)] text-[11px] font-semibold ml-0.5">5.0</span>
                       </div>
                     </div>
 
                     {/* Card B: LOCATION */}
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-1 shadow-2xs">
+                    <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 space-y-1 shadow-2xs">
                       <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
                         <MapPin size={13} className="text-[#0F3826]" />
                         <span>LOCATION</span>
                       </div>
-                      <p className="font-black text-sm text-[#1F251A] pt-0.5">
+                      <p className="font-black text-sm text-[var(--cr-dark)] pt-0.5">
                         {(() => {
                           const r = rooms.find(rm => rm.id === booking.roomId);
                           return r ? r.name : "Clinical Room";
                         })()}
                       </p>
-                      <p className="text-xs text-[#5A6A51] font-medium">
+                      <p className="text-xs text-[var(--color-brand-secondary)] font-medium">
                         {(() => {
                           const r = rooms.find(rm => rm.id === booking.roomId);
                           const b = branches.find(br => br.id === booking.branchId);
@@ -3614,7 +3614,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   </div>
 
                   {/* 4. SERVICE DETAILS CARD */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3 shadow-2xs">
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-5 space-y-3 shadow-2xs">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[11px] uppercase tracking-wider">
                         <Box size={14} className="text-[#0F3826]" />
@@ -3628,7 +3628,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               setSelectedNewServiceId(String(booking.serviceId || (booking.serviceIds && booking.serviceIds[0]) || ""));
                               setShowChangeServiceModal(true);
                             }}
-                            className="rounded-xl border border-[#414E36]/20 bg-[#414E36]/05 px-2.5 py-1 text-xs font-bold text-[#414E36] hover:bg-[#414E36]/15 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            className="rounded-xl border border-[var(--cr-primary)]/20 bg-[var(--cr-primary)]/05 px-2.5 py-1 text-xs font-bold text-[var(--cr-primary)] hover:bg-[var(--cr-primary)]/15 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
                           >
                             <Edit size={12} />
                             <span>{tr.changeServiceBtn}</span>
@@ -3638,7 +3638,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           <button
                             type="button"
                             onClick={() => setIsEditingService(true)}
-                            className="rounded-xl border border-gray-200 bg-white px-3 py-1 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                            className="rounded-xl border border-gray-200 bg-white px-3 py-1 text-xs font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition flex items-center gap-1 shadow-2xs cursor-pointer"
                           >
                             <Plus size={12} />
                             <span>Add Service</span>
@@ -3652,7 +3652,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       {bookingServices.map((bs, index) => (
                         <div key={`bs-${bs.id}-${index}`} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-[#1F251A]">
+                            <span className="font-semibold text-[var(--cr-dark)]">
                               {index + 1}. {bs.rawName || bs.name}
                             </span>
                             {bs.isLaser && isLaserPerPulse && (
@@ -3663,8 +3663,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="font-extrabold text-[#1F251A]">
-                              {bs.price} EGP {bs.pulseDetails && <span className="text-[10px] text-[#5A6A51] font-normal">{bs.pulseDetails}</span>}
+                            <span className="font-extrabold text-[var(--cr-dark)]">
+                              {bs.price} EGP {bs.pulseDetails && <span className="text-[10px] text-[var(--color-brand-secondary)] font-normal">{bs.pulseDetails}</span>}
                             </span>
                             {bookingServices.length > 1 && hasPermission("bookings.edit") && booking.status !== 'completed' && (
                               <button
@@ -3699,10 +3699,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       {/* Additional Services from session */}
                       {additionalServicesList.map((as, asIdx) => (
                         <div key={`as-${asIdx}`} className="flex items-center justify-between py-1 border-b border-gray-50">
-                          <span className="font-semibold text-[#1F251A]">
-                            {bookingServices.length + asIdx + 1}. {as.name} <span className="text-[10px] text-[#5A6A51]">(x{as.qty})</span>
+                          <span className="font-semibold text-[var(--cr-dark)]">
+                            {bookingServices.length + asIdx + 1}. {as.name} <span className="text-[10px] text-[var(--color-brand-secondary)]">(x{as.qty})</span>
                           </span>
-                          <span className="font-extrabold text-[#1F251A]">{as.total} EGP</span>
+                          <span className="font-extrabold text-[var(--cr-dark)]">{as.total} EGP</span>
                         </div>
                       ))}
 
@@ -3731,7 +3731,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 console.error(err);
                               }
                             }}
-                            className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none font-bold"
+                            className="rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none font-bold"
                           >
                             <option value="" disabled>Select service to add...</option>
                             {localServices
@@ -3745,7 +3745,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           <button
                             type="button"
                             onClick={() => setIsEditingService(false)}
-                            className="text-xs font-semibold text-[#5A6A51] hover:underline"
+                            className="text-xs font-semibold text-[var(--color-brand-secondary)] hover:underline"
                           >
                             Cancel
                           </button>
@@ -3754,16 +3754,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </div>
 
                     {/* Total Price Row */}
-                    <div className="pt-3 border-t border-[#414E36]/10 flex items-center justify-between">
-                      <span className="font-black text-sm text-[#1F251A]">Total Price</span>
-                      <span className="font-black text-base text-[#1F251A]">{totalPrice} EGP</span>
+                    <div className="pt-3 border-t border-[var(--cr-primary)]/10 flex items-center justify-between">
+                      <span className="font-black text-sm text-[var(--cr-dark)]">Total Price</span>
+                      <span className="font-black text-base text-[var(--cr-dark)]">{totalPrice} EGP</span>
                     </div>
                   </div>
 
                   {/* 5. 2-METRICS ROW: PRODUCTS & CONSUMABLES and PRESCRIPTION */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Card A: PRODUCTS & CONSUMABLES */}
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2 shadow-2xs">
+                    <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 space-y-2 shadow-2xs">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
                           <Box size={13} className="text-[#0F3826]" />
@@ -3773,7 +3773,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           type="button"
                           disabled={isInvoicePaid}
                           onClick={() => !isInvoicePaid && setShowDrawerProductModal(true)}
-                          className="rounded-xl border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-2xs"
+                          className="rounded-xl border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-2xs"
                         >
                           <Plus size={11} />
                           <span>Add Product</span>
@@ -3784,32 +3784,32 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <div className="space-y-1.5 pt-1">
                           {productsConsumablesList.map((prod, pIdx) => (
                             <div key={pIdx} className="flex items-center justify-between text-xs py-1 border-b border-gray-50 last:border-0">
-                              <span className="font-semibold text-[#1F251A] truncate">{prod.name} (x{prod.qty})</span>
-                              <span className="font-extrabold text-[#1F251A]">{prod.total} EGP</span>
+                              <span className="font-semibold text-[var(--cr-dark)] truncate">{prod.name} (x{prod.qty})</span>
+                              <span className="font-extrabold text-[var(--cr-dark)]">{prod.total} EGP</span>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-[#5A6A51] font-medium pt-1">No products added</p>
+                        <p className="text-xs text-[var(--color-brand-secondary)] font-medium pt-1">No products added</p>
                       )}
                     </div>
 
                     {/* Card B: PRESCRIPTION */}
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2.5 shadow-2xs">
+                    <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 space-y-2.5 shadow-2xs">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
                           <FileText size={13} className="text-[#0F3826]" />
                           <span>PRESCRIPTION</span>
                         </div>
                         {drawerPrescriptions.length > 0 ? (
-                          <span className="text-[10px] font-bold text-[#5A6A51] bg-gray-100 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] bg-gray-100 px-2 py-0.5 rounded-full">
                             {drawerPrescriptions[0].date ? new Date(drawerPrescriptions[0].date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "Recorded"}
                           </span>
                         ) : (
                           <button
                             type="button"
                             onClick={() => setShowDrawerPrescriptionModal(true)}
-                            className="rounded-xl border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                            className="rounded-xl border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition flex items-center gap-1 cursor-pointer shadow-2xs"
                           >
                             <Plus size={11} />
                             <span>Add Prescription</span>
@@ -3830,11 +3830,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           <div className="space-y-2.5">
                             {/* Diagnosis Box */}
                             {rx.diagnosis && (
-                              <div className="rounded-xl bg-[#F4F5F1] p-2.5 border border-[#414E36]/10">
-                                <span className="text-[10px] font-extrabold text-[#5A6A51] uppercase tracking-wider block">
+                              <div className="rounded-xl bg-[#F4F5F1] p-2.5 border border-[var(--cr-primary)]/10">
+                                <span className="text-[10px] font-extrabold text-[var(--color-brand-secondary)] uppercase tracking-wider block">
                                   Diagnosis
                                 </span>
-                                <p className="font-bold text-xs text-[#1F251A] mt-0.5">
+                                <p className="font-bold text-xs text-[var(--cr-dark)] mt-0.5">
                                   {rx.diagnosis}
                                 </p>
                               </div>
@@ -3843,7 +3843,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             {/* Itemized Medications */}
                             {medsList.length > 0 ? (
                               <div className="space-y-1.5">
-                                <span className="text-[10px] font-extrabold text-[#5A6A51] uppercase tracking-wider block">
+                                <span className="text-[10px] font-extrabold text-[var(--color-brand-secondary)] uppercase tracking-wider block">
                                   Prescribed Medications ({medsList.length})
                                 </span>
                                 <div className="space-y-1.5 max-h-40 overflow-y-auto pe-1">
@@ -3853,7 +3853,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                       className="rounded-xl border border-gray-100 bg-[#FAFAFA] p-2 text-xs space-y-1"
                                     >
                                       <div className="flex items-center justify-between gap-1">
-                                        <span className="font-extrabold text-[#1F251A] flex items-center gap-1.5 truncate">
+                                        <span className="font-extrabold text-[var(--cr-dark)] flex items-center gap-1.5 truncate">
                                           <span className="h-4 w-4 rounded-full bg-[#0F3826]/10 text-[#0F3826] flex items-center justify-center text-[10px] font-bold shrink-0">
                                             {mIdx + 1}
                                           </span>
@@ -3867,7 +3867,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                       </div>
 
                                       {(med.frequency || med.duration) && (
-                                        <div className="flex items-center gap-2 text-[11px] text-[#5A6A51] ps-5">
+                                        <div className="flex items-center gap-2 text-[11px] text-[var(--color-brand-secondary)] ps-5">
                                           {med.frequency && <span><strong>Freq:</strong> {med.frequency}</span>}
                                           {med.frequency && med.duration && <span>•</span>}
                                           {med.duration && <span><strong>Duration:</strong> {med.duration}</span>}
@@ -3884,16 +3884,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 </div>
                               </div>
                             ) : !rx.diagnosis && (
-                              <p className="text-xs text-[#1F251A] font-bold">Prescription recorded</p>
+                              <p className="text-xs text-[var(--cr-dark)] font-bold">Prescription recorded</p>
                             )}
 
                             {/* Doctor Clinical Instructions */}
                             {rxNotes && (
-                              <div className="rounded-xl bg-[#FBFBF9] p-2 border border-[#414E36]/10 text-xs">
-                                <span className="text-[10px] font-extrabold text-[#5A6A51] uppercase tracking-wider block">
+                              <div className="rounded-xl bg-[var(--color-brand-light)] p-2 border border-[var(--cr-primary)]/10 text-xs">
+                                <span className="text-[10px] font-extrabold text-[var(--color-brand-secondary)] uppercase tracking-wider block">
                                   Instructions
                                 </span>
-                                <p className="text-[11px] text-[#1F251A] mt-0.5 whitespace-pre-line leading-relaxed">
+                                <p className="text-[11px] text-[var(--cr-dark)] mt-0.5 whitespace-pre-line leading-relaxed">
                                   {rxNotes}
                                 </p>
                               </div>
@@ -3938,15 +3938,15 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         );
                       })() : (
                         <div className="py-2">
-                          <p className="font-bold text-xs text-[#1F251A]">No prescription recorded</p>
-                          <p className="text-[11px] text-[#5A6A51] font-medium mt-0.5">No prescription was written for this session.</p>
+                          <p className="font-bold text-xs text-[var(--cr-dark)]">No prescription recorded</p>
+                          <p className="text-[11px] text-[var(--color-brand-secondary)] font-medium mt-0.5">No prescription was written for this session.</p>
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* 6. BOOKING INFORMATION CARD */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3 shadow-2xs">
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 space-y-3 shadow-2xs">
                     <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[10px] uppercase tracking-wider">
                       <Info size={13} className="text-[#0F3826]" />
                       <span>BOOKING INFORMATION</span>
@@ -3954,8 +3954,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                       <div>
-                        <span className="text-[#5A6A51] font-medium block">Booked By</span>
-                        <span className="font-bold text-[#1F251A] mt-0.5 block">
+                        <span className="text-[var(--color-brand-secondary)] font-medium block">Booked By</span>
+                        <span className="font-bold text-[var(--cr-dark)] mt-0.5 block">
                           {(() => {
                             const creator = employeesList.find(emp => emp.id === booking.createdByEmployeeId);
                             return creator ? creator.name : (booking.isManual ? "Employee" : "Patient");
@@ -3964,15 +3964,15 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       </div>
 
                       <div>
-                        <span className="text-[#5A6A51] font-medium block">Booking Source</span>
-                        <span className="font-bold text-[#1F251A] mt-0.5 block">
+                        <span className="text-[var(--color-brand-secondary)] font-medium block">Booking Source</span>
+                        <span className="font-bold text-[var(--cr-dark)] mt-0.5 block">
                           {booking.isManual ? "Manual Booking" : "Website Booking"}
                         </span>
                       </div>
 
                       <div>
-                        <span className="text-[#5A6A51] font-medium block">Created At</span>
-                        <span className="font-bold text-[#1F251A] mt-0.5 block">
+                        <span className="text-[var(--color-brand-secondary)] font-medium block">Created At</span>
+                        <span className="font-bold text-[var(--cr-dark)] mt-0.5 block">
                           {(() => {
                             const dateVal = (booking as any).created_at || booking.createdAt || booking.date;
                             if (!dateVal) return "—";
@@ -3995,10 +3995,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       if (!bookingNotes) return null;
                       return (
                         <div className="pt-3 border-t border-gray-100">
-                          <span className="text-[#5A6A51] font-bold text-[10px] uppercase tracking-wider block mb-1.5">
+                          <span className="text-[var(--color-brand-secondary)] font-bold text-[10px] uppercase tracking-wider block mb-1.5">
                             {isRTL ? "ملاحظات الحجز / تعليمات الطبيب" : "BOOKING NOTES / CLINICAL INSTRUCTIONS"}
                           </span>
-                          <div className="p-3 bg-amber-50/80 border border-amber-200/70 rounded-xl text-xs text-[#1F251A] whitespace-pre-line leading-relaxed font-medium">
+                          <div className="p-3 bg-amber-50/80 border border-amber-200/70 rounded-xl text-xs text-[var(--cr-dark)] whitespace-pre-line leading-relaxed font-medium">
                             {bookingNotes}
                           </div>
                         </div>
@@ -4012,7 +4012,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 <div className="lg:col-span-1 space-y-4">
                   
                   {/* 1. SESSION FLOW CARD */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-4 shadow-2xs">
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-5 space-y-4 shadow-2xs">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-2xl bg-[#EBF7EE] text-[#1E7E34] flex items-center justify-center shrink-0">
                         <Calendar size={20} />
@@ -4021,7 +4021,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0F3826]">
                           SESSION FLOW
                         </h4>
-                        <p className="text-xs text-[#5A6A51] font-medium leading-tight mt-0.5">
+                        <p className="text-xs text-[var(--color-brand-secondary)] font-medium leading-tight mt-0.5">
                           {booking.status === 'completed'
                             ? (isInvoicePaid ? "Session completed and invoice fully settled." : "Treatment completed. Ready for invoice settlement.")
                             : booking.status === 'started'
@@ -4095,7 +4095,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             <button
                               type="button"
                               onClick={() => setViewMode("end_session")}
-                              className="w-full rounded-2xl bg-gradient-to-r from-emerald-700 via-[#414E36] to-emerald-800 text-white py-3 px-3 text-xs font-black hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-md shadow-[#414E36]/25 cursor-pointer animate-pulse"
+                              className="w-full rounded-2xl bg-gradient-to-r from-emerald-700 via-[var(--cr-primary)] to-emerald-800 text-white py-3 px-3 text-xs font-black hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-md shadow-[var(--cr-primary)]/25 cursor-pointer animate-pulse"
                             >
                               <Check size={16} className="text-emerald-300" />
                               <span>{isRTL ? "إنهاء الجلسة (الاستقبال)" : "End Session"}</span>
@@ -4138,8 +4138,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                   {/* 2. OTHER ACTIONS CARD */}
                   {!['completed', 'cancelled', 'rejected', 'no_show', 'started'].includes(booking.status) && hasPermission("bookings.edit") && (
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3 shadow-2xs">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#5A6A51]">OTHER ACTIONS</p>
+                    <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-5 space-y-3 shadow-2xs">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">OTHER ACTIONS</p>
                       
                       <div className="grid grid-cols-3 gap-2">
                         <button
@@ -4151,9 +4151,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             setPostponeNewTime(booking.timeSlot || "");
                             setPostponeFollowUpDate("");
                           }}
-                          className="rounded-2xl border border-[#414E36]/20 bg-white py-2.5 px-2 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer"
+                          className="rounded-2xl border border-[var(--cr-primary)]/20 bg-white py-2.5 px-2 text-xs font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer"
                         >
-                          <Clock size={13} className="text-[#5A6A51]" />
+                          <Clock size={13} className="text-[var(--color-brand-secondary)]" />
                           <span>Postpone</span>
                         </button>
                         
@@ -4172,9 +4172,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               fetchCustomers();
                             }
                           }}
-                          className="rounded-2xl border border-[#414E36]/20 bg-white py-2.5 px-2 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer"
+                          className="rounded-2xl border border-[var(--cr-primary)]/20 bg-white py-2.5 px-2 text-xs font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer"
                         >
-                          <XCircle size={13} className="text-[#5A6A51]" />
+                          <XCircle size={13} className="text-[var(--color-brand-secondary)]" />
                           <span>Cancel</span>
                         </button>
 
@@ -4203,16 +4203,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   )}
 
                   {/* 3. PAYMENT SUMMARY CARD */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-4 shadow-2xs">
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-5 space-y-4 shadow-2xs">
                     <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[11px] uppercase tracking-wider">
                       <Wallet size={14} className="text-[#0F3826]" />
                       <span>PAYMENT SUMMARY</span>
                     </div>
 
                     <div className="space-y-2.5 text-xs">
-                      <div className="flex justify-between items-center text-[#1F251A]">
-                        <span className="font-semibold text-[#5A6A51]">{isRTL ? "طريقة المحاسبة" : "Payment Mode"}</span>
-                        <span className={`font-bold inline-flex items-center gap-1 ${isLaserPerPulse ? "text-amber-800" : isLaserPackage ? "text-purple-800" : "text-[#1F251A]"}`}>
+                      <div className="flex justify-between items-center text-[var(--cr-dark)]">
+                        <span className="font-semibold text-[var(--color-brand-secondary)]">{isRTL ? "طريقة المحاسبة" : "Payment Mode"}</span>
+                        <span className={`font-bold inline-flex items-center gap-1 ${isLaserPerPulse ? "text-amber-800" : isLaserPackage ? "text-purple-800" : "text-[var(--cr-dark)]"}`}>
                           {isLaserPerPulse ? (
                             <>
                               <Zap size={12} className="text-amber-600 fill-amber-500" />
@@ -4229,25 +4229,25 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         </span>
                       </div>
 
-                      <div className="flex justify-between items-center text-[#1F251A]">
-                        <span className="font-semibold text-[#5A6A51]">Service Price</span>
+                      <div className="flex justify-between items-center text-[var(--cr-dark)]">
+                        <span className="font-semibold text-[var(--color-brand-secondary)]">Service Price</span>
                         <span className="font-bold">{totalPrice} EGP</span>
                       </div>
 
-                      <div className="flex justify-between items-center text-[#1F251A]">
-                        <span className="font-semibold text-[#5A6A51]">Paid Amount</span>
+                      <div className="flex justify-between items-center text-[var(--cr-dark)]">
+                        <span className="font-semibold text-[var(--color-brand-secondary)]">Paid Amount</span>
                         <span className="font-bold text-emerald-700">{sessionPaid} EGP</span>
                       </div>
 
-                      <div className="flex justify-between items-center text-[#1F251A]">
-                        <span className="font-semibold text-[#5A6A51]">Outstanding</span>
+                      <div className="flex justify-between items-center text-[var(--cr-dark)]">
+                        <span className="font-semibold text-[var(--color-brand-secondary)]">Outstanding</span>
                         <span className={`font-bold ${sessionLeft > 0 ? 'text-[#9B1C1C]' : 'text-emerald-700'}`}>
                           {sessionLeft} EGP
                         </span>
                       </div>
 
-                      <div className="pt-2 border-t border-[#414E36]/10 flex justify-between items-center">
-                        <span className="font-semibold text-[#5A6A51]">Payment Status</span>
+                      <div className="pt-2 border-t border-[var(--cr-primary)]/10 flex justify-between items-center">
+                        <span className="font-semibold text-[var(--color-brand-secondary)]">Payment Status</span>
                         <span className={`rounded-full px-3 py-0.5 text-xs font-extrabold ${
                           isInvoicePaid 
                             ? 'bg-[#EBF7EE] text-[#1E7E34]' 
@@ -4269,9 +4269,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           onClose();
                           setInvoiceBooking(b);
                         }}
-                        className="rounded-2xl border border-gray-200 bg-white py-2.5 px-2 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                        className="rounded-2xl border border-gray-200 bg-white py-2.5 px-2 text-xs font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
                       >
-                        <FileText size={13} className="text-[#5A6A51]" />
+                        <FileText size={13} className="text-[var(--color-brand-secondary)]" />
                         <span>View Invoice</span>
                       </button>
 
@@ -4289,9 +4289,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             printInvoice(booking as any, allInvoiceItems, totalPrice, 0, bName);
                           }
                         }}
-                        className="rounded-2xl border border-gray-200 bg-white py-2.5 px-2 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                        className="rounded-2xl border border-gray-200 bg-white py-2.5 px-2 text-xs font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
                       >
-                        <Printer size={13} className="text-[#5A6A51]" />
+                        <Printer size={13} className="text-[var(--color-brand-secondary)]" />
                         <span>Print Invoice</span>
                       </button>
                     </div>
@@ -4319,7 +4319,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     })();
 
                     return (
-                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3 shadow-2xs">
+                      <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-5 space-y-3 shadow-2xs">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5 text-[#0F3826] font-extrabold text-[11px] uppercase tracking-wider">
                             <FileText size={14} className="text-[#0F3826]" />
@@ -4332,7 +4332,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 setNotesDraft(cleanBookingNotes);
                                 setIsEditingNotes(true);
                               }}
-                              className="rounded-xl border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-bold text-[#1F251A] hover:bg-gray-50 transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                              className="rounded-xl border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition flex items-center gap-1 shadow-2xs cursor-pointer"
                             >
                               <Pencil size={11} />
                               <span>{cleanBookingNotes ? "Edit Note" : "+ Add Note"}</span>
@@ -4347,7 +4347,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               value={notesDraft}
                               onChange={(e) => setNotesDraft(e.target.value)}
                               placeholder="Enter notes, observations, or instructions..."
-                              className="w-full rounded-xl border border-[#414E36]/20 bg-[#FBFBF9] p-2.5 text-xs text-[#1F251A] outline-none focus:border-[#0F3826]"
+                              className="w-full rounded-xl border border-[var(--cr-primary)]/20 bg-[var(--color-brand-light)] p-2.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[#0F3826]"
                             />
                             <div className="flex items-center justify-end gap-2">
                               <button
@@ -4372,11 +4372,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             </div>
                           </div>
                         ) : cleanBookingNotes ? (
-                          <div className="rounded-xl bg-[#F7F7F3] border border-[#414E36]/10 p-3 text-xs text-[#1F251A] whitespace-pre-line leading-relaxed">
+                          <div className="rounded-xl bg-[#F7F7F3] border border-[var(--cr-primary)]/10 p-3 text-xs text-[var(--cr-dark)] whitespace-pre-line leading-relaxed">
                             {cleanBookingNotes}
                           </div>
                         ) : (
-                          <p className="text-xs text-[#5A6A51] font-medium pt-0.5">
+                          <p className="text-xs text-[var(--color-brand-secondary)] font-medium pt-0.5">
                             No notes recorded for this booking.
                           </p>
                         )}
@@ -4400,8 +4400,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       {showDrawerProductModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 animate-fadeIn">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-              <h3 className="text-base font-bold text-[#1F251A]">Add Product / Session Consumable</h3>
+            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-3">
+              <h3 className="text-base font-bold text-[var(--cr-dark)]">Add Product / Session Consumable</h3>
               <button
                 onClick={() => {
                   setShowDrawerProductModal(false);
@@ -4416,11 +4416,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-[#1F251A] mb-1">Select Skincare / Medical Product</label>
+                <label className="block font-bold text-[var(--cr-dark)] mb-1">Select Skincare / Medical Product</label>
                 <select
                   value={selectedDrawerProductId}
                   onChange={(e) => setSelectedDrawerProductId(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 p-2.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#414E36]"
+                  className="w-full rounded-xl border border-gray-300 p-2.5 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                 >
                   <option value="">-- Select Product --</option>
                   {(inventoryProducts || [])
@@ -4440,7 +4440,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 const totalCost = unitPrice * selectedDrawerProductQty;
 
                 return (
-                  <div className="rounded-xl bg-[#FBFBF9] p-3 space-y-2 border border-[#414E36]/10">
+                  <div className="rounded-xl bg-[var(--color-brand-light)] p-3 space-y-2 border border-[var(--cr-primary)]/10">
                     <div className="flex justify-between items-center">
                       <span className="font-semibold text-gray-600">Quantity:</span>
                       <div className="flex items-center gap-2">
@@ -4451,7 +4451,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         >
                           -
                         </button>
-                        <span className="font-bold text-[#1F251A] px-2 text-sm">{selectedDrawerProductQty}</span>
+                        <span className="font-bold text-[var(--cr-dark)] px-2 text-sm">{selectedDrawerProductQty}</span>
                         <button
                           type="button"
                           onClick={() => setSelectedDrawerProductQty(selectedDrawerProductQty + 1)}
@@ -4463,9 +4463,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </div>
                     <div className="flex justify-between text-xs border-t border-gray-200 pt-2">
                       <span className="font-semibold text-gray-600">Unit Price:</span>
-                      <span className="font-bold text-[#1F251A]">{unitPrice} EGP</span>
+                      <span className="font-bold text-[var(--cr-dark)]">{unitPrice} EGP</span>
                     </div>
-                    <div className="flex justify-between text-sm font-extrabold border-t border-gray-200 pt-2 text-[#414E36]">
+                    <div className="flex justify-between text-sm font-extrabold border-t border-gray-200 pt-2 text-[var(--cr-primary)]">
                       <span>Added to Invoice:</span>
                       <span>{totalCost} EGP</span>
                     </div>
@@ -4490,7 +4490,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 type="button"
                 disabled={!selectedDrawerProductId}
                 onClick={handleAddProductToBooking}
-                className="w-1/2 rounded-xl bg-[#414E36] py-2.5 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 shadow-sm"
+                className="w-1/2 rounded-xl bg-[var(--cr-primary)] py-2.5 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 shadow-sm"
               >
                 Add to Invoice
               </button>
@@ -4502,11 +4502,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       {/* Add Prescription Modal for Booking Drawer */}
       {showDrawerPrescriptionModal && booking && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn overflow-y-auto">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 my-8 border border-[#414E36]/10">
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 my-8 border border-[var(--cr-primary)]/10">
+            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-3">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Digital Prescription</span>
-                <h3 className="text-base font-bold text-[#1F251A] mt-0.5">Add Prescription for {booking.name}</h3>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--cr-accent)]">Digital Prescription</span>
+                <h3 className="text-base font-bold text-[var(--cr-dark)] mt-0.5">Add Prescription for {booking.name}</h3>
               </div>
               <button
                 onClick={() => {
@@ -4523,24 +4523,24 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
             <form onSubmit={handleSaveDrawerPrescription} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-[#1F251A] mb-1">Clinical Diagnosis / التشخيص</label>
+                <label className="block font-bold text-[var(--cr-dark)] mb-1">Clinical Diagnosis / التشخيص</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Skin rejuvenation, Acne treatment, Post-laser care"
                   value={drawerRxDiagnosis}
                   onChange={(e) => setDrawerRxDiagnosis(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 p-2.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#414E36]"
+                  className="w-full rounded-xl border border-gray-300 p-2.5 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block font-bold text-[#1F251A]">Prescribed Medications / الأدوية</label>
+                  <label className="block font-bold text-[var(--cr-dark)]">Prescribed Medications / الأدوية</label>
                   <button
                     type="button"
                     onClick={() => setDrawerRxMeds(prev => [...prev, { name: "", dosage: "", frequency: "", duration: "" }])}
-                    className="text-[11px] font-bold text-[#414E36] hover:underline"
+                    className="text-[11px] font-bold text-[var(--cr-primary)] hover:underline"
                   >
                     + Add Medication
                   </button>
@@ -4548,9 +4548,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {drawerRxMeds.map((med, mIdx) => (
-                    <div key={mIdx} className="p-2.5 rounded-xl bg-[#FBFBF9] border border-gray-200 space-y-2">
+                    <div key={mIdx} className="p-2.5 rounded-xl bg-[var(--color-brand-light)] border border-gray-200 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-[11px] text-[#5A6A51]">Medication #{mIdx + 1}</span>
+                        <span className="font-bold text-[11px] text-[var(--color-brand-secondary)]">Medication #{mIdx + 1}</span>
                         {drawerRxMeds.length > 1 && (
                           <button
                             type="button"
@@ -4571,7 +4571,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             const val = e.target.value;
                             setDrawerRxMeds(prev => prev.map((item, i) => i === mIdx ? { ...item, name: val } : item));
                           }}
-                          className="rounded-lg border border-gray-300 p-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#414E36]"
+                          className="rounded-lg border border-gray-300 p-2 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                         />
                         <input
                           type="text"
@@ -4581,7 +4581,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             const val = e.target.value;
                             setDrawerRxMeds(prev => prev.map((item, i) => i === mIdx ? { ...item, dosage: val } : item));
                           }}
-                          className="rounded-lg border border-gray-300 p-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                          className="rounded-lg border border-gray-300 p-2 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
@@ -4593,7 +4593,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             const val = e.target.value;
                             setDrawerRxMeds(prev => prev.map((item, i) => i === mIdx ? { ...item, frequency: val } : item));
                           }}
-                          className="rounded-lg border border-gray-300 p-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                          className="rounded-lg border border-gray-300 p-2 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                         />
                         <input
                           type="text"
@@ -4603,7 +4603,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             const val = e.target.value;
                             setDrawerRxMeds(prev => prev.map((item, i) => i === mIdx ? { ...item, duration: val } : item));
                           }}
-                          className="rounded-lg border border-gray-300 p-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                          className="rounded-lg border border-gray-300 p-2 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                         />
                       </div>
                     </div>
@@ -4612,20 +4612,20 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               </div>
 
               <div>
-                <label className="block font-bold text-[#1F251A] mb-1">Doctor Instructions & Advice / تعليمات الطبيب</label>
+                <label className="block font-bold text-[var(--cr-dark)] mb-1">Doctor Instructions & Advice / تعليمات الطبيب</label>
                 <textarea
                   rows={3}
                   placeholder="e.g. Avoid direct sunlight, apply sunscreen every 2 hours, drink plenty of water."
                   value={drawerRxNotes}
                   onChange={(e) => setDrawerRxNotes(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 p-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                  className="w-full rounded-xl border border-gray-300 p-2.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                 />
               </div>
 
               {/* Follow-Up Visit Specification */}
-              <div className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3.5 space-y-3">
+              <div className="rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-[#1F251A] flex items-center gap-2 cursor-pointer select-none">
+                  <label className="text-xs font-bold text-[var(--cr-dark)] flex items-center gap-2 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={drawerRxHasFollowUp}
@@ -4636,9 +4636,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           setDrawerFollowUpPresetDays(7);
                         }
                       }}
-                      className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36] accent-[#414E36]"
+                      className="h-4 w-4 rounded border-gray-300 text-[var(--cr-primary)] focus:ring-[var(--cr-primary)] accent-[var(--cr-primary)]"
                     />
-                    <Calendar size={14} className="text-[#414E36]" />
+                    <Calendar size={14} className="text-[var(--cr-primary)]" />
                     <span>Requires Follow-Up / Consultation? / تحديد موعد متابعة؟</span>
                   </label>
 
@@ -4650,37 +4650,37 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 </div>
 
                 {drawerRxHasFollowUp && (
-                  <div className="space-y-3 pt-2 border-t border-[#414E36]/10 animate-fadeIn">
+                  <div className="space-y-3 pt-2 border-t border-[var(--cr-primary)]/10 animate-fadeIn">
                     <div>
-                      <span className="block text-[11px] font-bold text-[#5A6A51] mb-1.5">
+                      <span className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1.5">
                         Quick Interval Presets:
                       </span>
                       <div className="flex flex-wrap gap-1.5">
                         <button
                           type="button"
                           onClick={() => setDrawerFollowUpPresetDays(3)}
-                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[var(--cr-primary)]/20 bg-white text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                         >
                           +3 Days
                         </button>
                         <button
                           type="button"
                           onClick={() => setDrawerFollowUpPresetDays(7)}
-                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[var(--cr-primary)]/20 bg-white text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                         >
                           +1 Week
                         </button>
                         <button
                           type="button"
                           onClick={() => setDrawerFollowUpPresetDays(14)}
-                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[var(--cr-primary)]/20 bg-white text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                         >
                           +2 Weeks
                         </button>
                         <button
                           type="button"
                           onClick={() => setDrawerFollowUpPresetDays(30)}
-                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[var(--cr-primary)]/20 bg-white text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                         >
                           +1 Month
                         </button>
@@ -4689,7 +4689,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                        <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
                           Recommended Follow-Up Date
                         </label>
                         <input
@@ -4697,11 +4697,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           value={drawerRxFollowUpDate}
                           min={new Date().toISOString().slice(0, 10)}
                           onChange={(e) => setDrawerRxFollowUpDate(e.target.value)}
-                          className="w-full rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] font-bold outline-none focus:border-[#414E36]"
+                          className="w-full rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs text-[var(--cr-dark)] font-bold outline-none focus:border-[var(--cr-primary)]"
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                        <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
                           Follow-Up Instructions / Reason
                         </label>
                         <input
@@ -4709,7 +4709,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           placeholder="e.g. Skin check, evaluation..."
                           value={drawerRxFollowUpNotes}
                           onChange={(e) => setDrawerRxFollowUpNotes(e.target.value)}
-                          className="w-full rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                          className="w-full rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                         />
                       </div>
                     </div>
@@ -4736,7 +4736,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 <button
                   type="submit"
                   disabled={savingDrawerRx}
-                  className="w-1/2 rounded-xl bg-[#414E36] py-2.5 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 shadow-sm"
+                  className="w-1/2 rounded-xl bg-[var(--cr-primary)] py-2.5 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 shadow-sm"
                 >
                   {savingDrawerRx ? "Saving..." : "Save Prescription"}
                 </button>
@@ -4765,22 +4765,22 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
         return (
           <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-5 animate-fadeIn">
-            <div className="w-full max-w-2xl rounded-3xl bg-[#FBFBF9] p-5 sm:p-6 shadow-2xl border border-[#414E36]/15 space-y-4 max-h-[90vh] flex flex-col">
+            <div className="w-full max-w-2xl rounded-3xl bg-[var(--color-brand-light)] p-5 sm:p-6 shadow-2xl border border-[var(--cr-primary)]/15 space-y-4 max-h-[90vh] flex flex-col">
               {/* Header */}
-              <div className="flex items-start justify-between border-b border-[#414E36]/10 pb-3">
+              <div className="flex items-start justify-between border-b border-[var(--cr-primary)]/10 pb-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--cr-primary)] bg-[var(--color-brand-tint)] px-2.5 py-0.5 rounded-full">
                       {isRTL ? "الاستقبال • تعديل الحجز" : "Reception • Booking Update"}
                     </span>
-                    <span className="text-xs font-mono font-bold text-[#5A6A51]">
+                    <span className="text-xs font-mono font-bold text-[var(--color-brand-secondary)]">
                       #{booking.id}
                     </span>
                   </div>
-                  <h3 className="text-lg sm:text-xl font-black text-[#1F251A] mt-1">
+                  <h3 className="text-lg sm:text-xl font-black text-[var(--cr-dark)] mt-1">
                     {tr.editServiceTitle}
                   </h3>
-                  <p className="text-xs text-[#5A6A51] mt-0.5">
+                  <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">
                     {isRTL ? "اختر الخدمة الجديدة ليتم تحديث الحجز وحساب السعر تلقائياً" : "Select a new clinical service to replace the currently booked procedure."}
                   </p>
                 </div>
@@ -4800,13 +4800,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               {/* Search & Category Filter */}
               <div className="space-y-2.5">
                 <div className="relative">
-                  <Search size={15} className={`absolute ${isRTL ? "right-3" : "left-3"} top-1/2 -translate-y-1/2 text-[#5A6A51]`} />
+                  <Search size={15} className={`absolute ${isRTL ? "right-3" : "left-3"} top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]`} />
                   <input
                     type="text"
                     value={serviceSearchTerm}
                     onChange={(e) => setServiceSearchTerm(e.target.value)}
                     placeholder={tr.searchServicePlaceholder}
-                    className={`w-full rounded-2xl border border-[#414E36]/20 bg-white py-2.5 text-xs text-[#1F251A] font-semibold outline-none focus:border-[#414E36] shadow-2xs ${isRTL ? "pr-9 pl-3" : "pl-9 pr-3"}`}
+                    className={`w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white py-2.5 text-xs text-[var(--cr-dark)] font-semibold outline-none focus:border-[var(--cr-primary)] shadow-2xs ${isRTL ? "pr-9 pl-3" : "pl-9 pr-3"}`}
                   />
                 </div>
 
@@ -4819,8 +4819,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       onClick={() => setServiceSelectedCategory(cat)}
                       className={`px-3 py-1 rounded-full text-[11px] font-bold shrink-0 transition cursor-pointer ${
                         serviceSelectedCategory === cat
-                          ? "bg-[#414E36] text-white shadow-2xs"
-                          : "bg-white text-[#5A6A51] border border-[#414E36]/15 hover:bg-gray-50"
+                          ? "bg-[var(--cr-primary)] text-white shadow-2xs"
+                          : "bg-white text-[var(--color-brand-secondary)] border border-[var(--cr-primary)]/15 hover:bg-gray-50"
                       }`}
                     >
                       {cat === "All" ? (isRTL ? "جميع الخدمات" : "All Services") : cat}
@@ -4832,7 +4832,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               {/* Services Grid */}
               <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pe-1 max-h-[42vh]">
                 {filteredServicesList.length === 0 ? (
-                  <div className="text-center py-10 text-xs text-[#5A6A51]">
+                  <div className="text-center py-10 text-xs text-[var(--color-brand-secondary)]">
                     <p className="font-bold">{tr.noServicesFound}</p>
                   </div>
                 ) : (
@@ -4852,16 +4852,16 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             ? "bg-[#EBF7EE] border-[#1E7E34] shadow-xs"
                             : isCurrent
                               ? "bg-amber-50/70 border-amber-200 hover:bg-amber-50"
-                              : "bg-white border-[#414E36]/10 hover:border-[#414E36]/30 hover:bg-[#F4F5F1]"
+                              : "bg-white border-[var(--cr-primary)]/10 hover:border-[var(--cr-primary)]/30 hover:bg-[#F4F5F1]"
                         }`}
                       >
                         <div className="min-w-0 pr-2">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-extrabold text-xs text-[#1F251A]">
+                            <span className="font-extrabold text-xs text-[var(--cr-dark)]">
                               {svcName}
                             </span>
                             {catLabel && (
-                              <span className="text-[10px] font-bold text-[#5A6A51] bg-[#EDF1EC] px-2 py-0.5 rounded-md">
+                              <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] bg-[var(--color-brand-tint)] px-2 py-0.5 rounded-md">
                                 {catLabel}
                               </span>
                             )}
@@ -4872,14 +4872,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             )}
                           </div>
                           {svc.duration && (
-                            <span className="text-[11px] text-[#5A6A51] block mt-0.5">
+                            <span className="text-[11px] text-[var(--color-brand-secondary)] block mt-0.5">
                               ⏱ {svc.duration} {isRTL ? "دقيقة" : "min"}
                             </span>
                           )}
                         </div>
 
                         <div className="flex items-center gap-3 shrink-0">
-                          <span className="font-black text-sm text-[#414E36]">
+                          <span className="font-black text-sm text-[var(--cr-primary)]">
                             {svcPrice} EGP
                           </span>
                           <div className={`h-5 w-5 rounded-full flex items-center justify-center border ${
@@ -4895,7 +4895,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               </div>
 
               {/* Footer Buttons */}
-              <div className="flex items-center justify-between gap-3 pt-3 border-t border-[#414E36]/10">
+              <div className="flex items-center justify-between gap-3 pt-3 border-t border-[var(--cr-primary)]/10">
                 <button
                   type="button"
                   onClick={() => {
@@ -4912,7 +4912,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   type="button"
                   disabled={!selectedNewServiceId || String(selectedNewServiceId) === String(primaryServiceId || booking.serviceId)}
                   onClick={() => setShowPriceConfirmModal(true)}
-                  className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-6 py-2.5 text-xs font-black text-white hover:bg-[#343F2B] transition disabled:opacity-40 cursor-pointer shadow-sm"
+                  className="flex items-center gap-2 rounded-2xl bg-[var(--cr-primary)] px-6 py-2.5 text-xs font-black text-white hover:bg-[#343F2B] transition disabled:opacity-40 cursor-pointer shadow-sm"
                 >
                   <span>{isRTL ? "مراجعة وتأكيد السعر" : "Review & Confirm Price"}</span>
                   <ArrowRight size={14} className={isRTL ? "rotate-180" : ""} />
@@ -4952,17 +4952,17 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
         return (
           <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-5 animate-fadeIn">
-            <div className="w-full max-w-lg rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-[#414E36]/20 space-y-5">
+            <div className="w-full max-w-lg rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-[var(--cr-primary)]/20 space-y-5">
               {/* Top Banner */}
               <div className="flex items-start gap-3">
                 <div className="h-11 w-11 rounded-2xl bg-[#EBF7EE] text-[#1E7E34] flex items-center justify-center shrink-0">
                   <Sparkles size={22} />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-lg font-black text-[#1F251A] tracking-tight">
+                  <h3 className="text-lg font-black text-[var(--cr-dark)] tracking-tight">
                     {tr.confirmServiceChangeTitle}
                   </h3>
-                  <p className="text-xs text-[#5A6A51] mt-1 leading-relaxed">
+                  <p className="text-xs text-[var(--color-brand-secondary)] mt-1 leading-relaxed">
                     {tr.confirmServiceChangeDesc}
                   </p>
                 </div>
@@ -4998,22 +4998,22 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               </div>
 
               {/* Financial Recalculation Summary */}
-              <div className="rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 p-4 space-y-2.5 text-xs">
-                <div className="flex items-center justify-between text-[#5A6A51]">
+              <div className="rounded-2xl bg-[var(--color-brand-light)] border border-[var(--cr-primary)]/10 p-4 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between text-[var(--color-brand-secondary)]">
                   <span>{tr.paidAmountLabel}:</span>
                   <span className="font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">
                     {effectivePaidAmount} EGP (100% {isRTL ? "محفوظ" : "Preserved"})
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-[#5A6A51]">
+                <div className="flex items-center justify-between text-[var(--color-brand-secondary)]">
                   <span>{isRTL ? "إجمالي الفاتورة الجديد:" : "New Total Invoice:"}</span>
-                  <span className="font-bold text-[#1F251A]">
+                  <span className="font-bold text-[var(--cr-dark)]">
                     {projectedNewInvoiceTotal} EGP
                   </span>
                 </div>
 
-                <div className="pt-2 border-t border-[#414E36]/10 flex items-center justify-between text-[#1F251A]">
+                <div className="pt-2 border-t border-[var(--cr-primary)]/10 flex items-center justify-between text-[var(--cr-dark)]">
                   <span className="font-extrabold text-xs sm:text-sm">
                     {tr.remainingDueLabel}:
                   </span>

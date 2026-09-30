@@ -961,7 +961,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#414E36] hover:text-[#283221] transition cursor-pointer"
+          className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--cr-primary)] hover:text-[#283221] transition cursor-pointer"
         >
           <ArrowLeft size={14} className={lang === "ar" ? "rotate-180" : ""} />
           <span>{tr.backToBookings || "BACK TO ONBOARDING"}</span>
@@ -977,7 +977,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
           <h1 className="text-2xl sm:text-3xl font-bold text-[#111827] tracking-tight">
             {isEditMode ? (tr.editTitle || "Edit Previous Booking") : tr.title}
           </h1>
-          <p className="text-xs sm:text-sm text-[#5A6A51] mt-0.5 font-medium">
+          <p className="text-xs sm:text-sm text-[var(--color-brand-secondary)] mt-0.5 font-medium">
             {isEditMode ? (tr.editSubtitle || "Update historical booking details and financial records.") : tr.subtitle}
           </p>
         </div>
@@ -1017,7 +1017,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               )}
             </div>
             <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <Phone size={17} />
               </div>
               <input
@@ -1030,7 +1030,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 className={`w-full rounded-xl border bg-white py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] ${
                   errors.phone
                     ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
-                    : "border-gray-200 focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
+                    : "border-gray-200 focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
                 }`}
               />
             </div>
@@ -1051,7 +1051,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               {tr.patientNameLabel} <span className="text-red-500">*</span>
             </label>
             <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <User size={17} />
               </div>
               <input
@@ -1066,7 +1066,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 className={`w-full rounded-xl border bg-white py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] ${
                   errors.name
                     ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
-                    : "border-gray-200 focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
+                    : "border-gray-200 focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
                 }`}
               />
             </div>
@@ -1083,14 +1083,14 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               {tr.doctorOptional || tr.doctorLabel}
             </label>
             <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <Stethoscope size={17} />
               </div>
               <select
                 id="doctorSelect"
                 value={selectedDoctorId}
                 onChange={(e) => setSelectedDoctorId(e.target.value)}
-                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 cursor-pointer"
+                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10 cursor-pointer"
               >
                 <option value="">{tr.selectDoctorPlaceholder}</option>
                 {providers.map((p) => (
@@ -1155,7 +1155,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                     key={cp.id}
                     className={`rounded-xl border p-3 flex flex-col justify-between gap-2.5 transition ${
                       isSelected
-                        ? "bg-[#E8EFE5] border-[#414E36] ring-2 ring-[#414E36]/20 shadow-xs"
+                        ? "bg-[#E8EFE5] border-[var(--cr-primary)] ring-2 ring-[var(--cr-primary)]/20 shadow-xs"
                         : "bg-white border-gray-200/90 hover:border-emerald-300"
                     }`}
                   >
@@ -1208,7 +1208,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                       }}
                       className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                         isSelected
-                          ? "bg-[#414E36] text-white shadow-xs"
+                          ? "bg-[var(--cr-primary)] text-white shadow-xs"
                           : "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
                       }`}
                     >
@@ -1237,7 +1237,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               {tr.dateLabel} <span className="text-red-500">*</span>
             </label>
             <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <CalendarIcon size={17} />
               </div>
               <input
@@ -1253,7 +1253,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 className={`w-full rounded-xl border bg-white py-3 pl-10 pr-3.5 rtl:pl-3.5 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] cursor-pointer ${
                   errors.date
                     ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
-                    : "border-gray-200 focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
+                    : "border-gray-200 focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
                 }`}
               />
             </div>
@@ -1270,7 +1270,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               {tr.serviceOptional || tr.serviceLabel}
             </label>
             <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <Layers size={17} />
               </div>
               <input
@@ -1289,7 +1289,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 }}
                 onFocus={() => setIsServiceDropdownOpen(true)}
                 placeholder={tr.searchServicePlaceholder || tr.selectServicePlaceholder || "Search service..."}
-                className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
+                className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
               />
               {serviceSearchQuery ? (
                 <button
@@ -1300,7 +1300,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                     setIsServiceDropdownOpen(false);
                     recalculateInvoice("", attachedPackages, selectedProductId);
                   }}
-                  className="absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#9CA3AF] hover:text-[#414E36] transition cursor-pointer z-10"
+                  className="absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#9CA3AF] hover:text-[var(--cr-primary)] transition cursor-pointer z-10"
                   title="Clear service"
                 >
                   <X size={16} />
@@ -1309,7 +1309,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 <button
                   type="button"
                   onClick={() => setIsServiceDropdownOpen((prev) => !prev)}
-                  className="absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] hover:text-[#414E36] transition cursor-pointer z-10"
+                  className="absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] hover:text-[var(--cr-primary)] transition cursor-pointer z-10"
                 >
                   <ChevronDown size={17} className={`transition-transform duration-200 ${isServiceDropdownOpen ? "rotate-180" : ""}`} />
                 </button>
@@ -1339,7 +1339,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                         >
                           <span className="truncate">{getServiceName(s)}</span>
                           {isSelected && (
-                            <Check size={16} className="text-[#414E36] shrink-0 ml-2 rtl:ml-0 rtl:mr-2" />
+                            <Check size={16} className="text-[var(--cr-primary)] shrink-0 ml-2 rtl:ml-0 rtl:mr-2" />
                           )}
                         </button>
                       );
@@ -1367,7 +1367,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               )}
             </div>
             <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <PackageIcon size={17} />
               </div>
               <select
@@ -1377,7 +1377,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                   handleAddPackage(e.target.value);
                   e.target.value = "";
                 }}
-                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 cursor-pointer"
+                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10 cursor-pointer"
               >
                 <option value="">
                   {attachedPackages.length > 0
@@ -1424,7 +1424,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               {tr.productsOptional || tr.productsLabel}
             </label>
             <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <ShoppingBag size={17} />
               </div>
               <select
@@ -1435,7 +1435,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                   setSelectedProductId(prId);
                   recalculateInvoice(selectedServiceId, attachedPackages, prId);
                 }}
-                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 cursor-pointer"
+                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10 cursor-pointer"
               >
                 <option value="">{tr.selectProductPlaceholder}</option>
                 {prodList.map((pr) => (
@@ -1456,9 +1456,9 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
           <div className="space-y-4 animate-fadeIn">
             <div className="flex items-center justify-between">
               <h3 className="text-sm sm:text-base font-bold text-[#1F2937] flex items-center gap-2">
-                <PackageIcon size={18} className="text-[#414E36]" />
+                <PackageIcon size={18} className="text-[var(--cr-primary)]" />
                 {lang === "ar" ? "الباقات المستخدمة في هذه الجلسة" : "Packages Used in This Session"}
-                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-[#414E36]/10 text-[#414E36]">
+                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-[var(--cr-primary)]/10 text-[var(--cr-primary)]">
                   {attachedPackages.length}
                 </span>
               </h3>
@@ -1475,11 +1475,11 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               return (
                 <div
                   key={pkg.id}
-                  className="rounded-2xl border border-[#414E36]/20 bg-gradient-to-br from-[#F4F7F2] via-white to-[#EBF3E7] p-4 sm:p-5 shadow-xs space-y-4 transition-all"
+                  className="rounded-2xl border border-[var(--cr-primary)]/20 bg-gradient-to-br from-[#F4F7F2] via-white to-[#EBF3E7] p-4 sm:p-5 shadow-xs space-y-4 transition-all"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#414E36]/10 pb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--cr-primary)]/10 pb-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-[#414E36] text-white shadow-xs">
+                      <div className="p-2 rounded-xl bg-[var(--cr-primary)] text-white shadow-xs">
                         {isPulse ? <Zap size={18} className="text-amber-300" /> : <PackageIcon size={18} />}
                       </div>
                       <div>
@@ -1497,7 +1497,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">
+                        <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">
                           {isPulse
                             ? (lang === "ar" ? `الرصيد الكلي: ${pkg.totalPulses.toLocaleString()} نبضة · الرصيد الفعلي المتاح: ${pkg.packageLiveRemaining.toLocaleString()} نبضة` : `Total quota: ${pkg.totalPulses.toLocaleString()} pulses · Available: ${pkg.packageLiveRemaining.toLocaleString()} pulses`)
                             : (tr.packageUsageSubtitle || "Specify sessions previously consumed from this package.")}
@@ -1623,7 +1623,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                               onClick={() => handlePackagePulsesPreset(pkg.id, 0)}
                               className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
                                 numUsedPulses === 0
-                                  ? "bg-[#414E36] text-white border-[#414E36]"
+                                  ? "bg-[var(--cr-primary)] text-white border-[var(--cr-primary)]"
                                   : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                               }`}
                             >
@@ -1804,7 +1804,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               {tr.invoiceValueLabel || "Invoice Value (EGP)"}
             </label>
             <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <Receipt size={17} />
               </div>
               <input
@@ -1822,7 +1822,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 }}
                 placeholder={tr.invoiceValuePlaceholder || "0.00"}
                 title={tr.invoiceValueTooltip}
-                className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
+                className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
               />
             </div>
           </div>
@@ -1833,7 +1833,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               {tr.actualSpentLabel || "Actual Spent (EGP)"}
             </label>
             <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <Wallet size={17} />
               </div>
               <input
@@ -1848,7 +1848,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 }}
                 placeholder={tr.actualSpentPlaceholder || "0.00"}
                 title={tr.actualSpentTooltip}
-                className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10"
+                className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
               />
             </div>
           </div>
@@ -1859,14 +1859,14 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               {tr.paymentTypeOptional || tr.paymentTypeLabel}
             </label>
             <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[#5A6A51] z-10">
+              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <CreditCard size={17} />
               </div>
               <select
                 id="paymentTypeSelect"
                 value={selectedPaymentType}
                 onChange={(e) => setSelectedPaymentType(e.target.value)}
-                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 cursor-pointer"
+                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10 cursor-pointer"
               >
                 <option value="">{tr.selectPaymentTypePlaceholder}</option>
                 {Object.entries(tr.paymentTypes || {}).map(([key, label]: [string, any]) => (
@@ -1885,7 +1885,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         {/* ── ROW 4: NOTES (FULL WIDTH) ── */}
         <div className="space-y-1.5">
           <label htmlFor="bookingNotes" className="text-xs sm:text-sm font-bold text-[#111827] flex items-center gap-1.5">
-            <FileText size={15} className="text-[#5A6A51]" />
+            <FileText size={15} className="text-[var(--color-brand-secondary)]" />
             <span>{tr.notesLabel || "Notes (Optional)"}</span>
           </label>
           <div className="relative flex items-start">
@@ -1895,7 +1895,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder={tr.notesPlaceholder || "Enter any notes or remarks regarding this historical booking..."}
-              className="w-full rounded-xl border border-gray-200 bg-white p-3 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/10 resize-y"
+              className="w-full rounded-xl border border-gray-200 bg-white p-3 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10 resize-y"
             />
           </div>
         </div>
@@ -1909,7 +1909,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
           return (
             <div className="rounded-2xl border border-gray-200/80 bg-[#F9FBF8] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
               <div className="flex items-center gap-2 font-semibold text-[#374151]">
-                <Coins size={16} className="text-[#414E36] shrink-0" />
+                <Coins size={16} className="text-[var(--cr-primary)] shrink-0" />
                 <span>{tr.ledgerImpact || "Financial Ledger Preview:"}</span>
                 <span className="text-[#6B7280] font-normal">
                   (Invoice: {numInvoice.toLocaleString()} EGP | Spent: {numSpent.toLocaleString()} EGP)
@@ -1944,16 +1944,16 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               <Info size={16} />
             </div>
             <div>
-              <p className="text-xs sm:text-sm font-bold text-[#1F251A]">
+              <p className="text-xs sm:text-sm font-bold text-[var(--cr-dark)]">
                 {tr.bannerTitle}
               </p>
-              <p className="text-[11px] sm:text-xs text-[#5A6A51] mt-0.5">
+              <p className="text-[11px] sm:text-xs text-[var(--color-brand-secondary)] mt-0.5">
                 {tr.bannerSubtitle}
               </p>
             </div>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2 rounded-xl bg-white/70 px-3 py-2 border border-[#E3ECE0] text-[#5A6A51] shrink-0">
+          <div className="hidden sm:flex items-center gap-2 rounded-xl bg-white/70 px-3 py-2 border border-[#E3ECE0] text-[var(--color-brand-secondary)] shrink-0">
             <CalendarIcon size={18} className="text-[#384E34]" />
             <Clock size={14} className="text-[#6B7280]" />
           </div>
