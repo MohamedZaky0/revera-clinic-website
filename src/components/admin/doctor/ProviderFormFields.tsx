@@ -166,11 +166,11 @@ export default function ProviderFormFields({
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="space-y-6">
       {/* ── TOP DOCTOR SUMMARY HERO CARD ── */}
-      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
+      <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
         {/* Left: Avatar, Name & Status */}
         <div className="flex items-center gap-3.5">
           <div className="relative">
-            <div className="h-12 w-12 rounded-full bg-[#2A3423] text-white flex items-center justify-center text-base font-bold shrink-0 overflow-hidden border border-[#414E36]/15 shadow-2xs">
+            <div className="h-12 w-12 rounded-full bg-[#2A3423] text-white flex items-center justify-center text-base font-bold shrink-0 overflow-hidden border border-[var(--cr-primary)]/15 shadow-2xs">
               {providerFormImage ? (
                 <img src={providerFormImage} alt={doctorName} className="h-full w-full object-cover" />
               ) : (
@@ -184,40 +184,40 @@ export default function ProviderFormFields({
 
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-[#1F251A] text-lg leading-tight">{doctorName}</span>
+              <span className="font-bold text-[var(--cr-dark)] text-lg leading-tight">{doctorName}</span>
               <span
                 className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold border ${getDoctorStatusBadgeClass(doctorActive)}`}
               >
                 {doctorActive ? (lang === "ar" ? "نشط" : "Active") : (lang === "ar" ? "غير نشط" : "Inactive")}
               </span>
             </div>
-            <span className="inline-block text-xs font-semibold text-[#5A6A51] bg-[#F7F9F6] px-2 py-0.5 rounded-md border border-[#414E36]/10">
+            <span className="inline-block text-xs font-semibold text-[var(--color-brand-secondary)] bg-[#F7F9F6] px-2 py-0.5 rounded-md border border-[var(--cr-primary)]/10">
               Employee ID: {doctorEmployeeId}
             </span>
           </div>
         </div>
 
         {/* Right: Meta Info Stats */}
-        <div className="flex flex-wrap items-center gap-4 sm:gap-6 divide-x rtl:divide-x-reverse divide-[#414E36]/10 text-xs">
+        <div className="flex flex-wrap items-center gap-4 sm:gap-6 divide-x rtl:divide-x-reverse divide-[var(--cr-primary)]/10 text-xs">
           <div className="space-y-0.5 ps-2">
-            <span className="block text-[11px] font-medium text-[#5A6A51]">Specialty / Role</span>
-            <span className="block font-bold text-[#1F251A]">{providerFormSpecialty || "Specialist"}</span>
+            <span className="block text-[11px] font-medium text-[var(--color-brand-secondary)]">Specialty / Role</span>
+            <span className="block font-bold text-[var(--cr-dark)]">{providerFormSpecialty || "Specialist"}</span>
           </div>
 
           <div className="space-y-0.5 ps-4 sm:ps-6">
-            <span className="block text-[11px] font-medium text-[#5A6A51]">{t.employmentTypeLabel || "Employment Type"}</span>
-            <span className="block font-bold text-[#1F251A]">{providerFormEmploymentType || "Full Time"}</span>
+            <span className="block text-[11px] font-medium text-[var(--color-brand-secondary)]">{t.employmentTypeLabel || "Employment Type"}</span>
+            <span className="block font-bold text-[var(--cr-dark)]">{providerFormEmploymentType || "Full Time"}</span>
           </div>
 
           <div className="space-y-0.5 ps-4 sm:ps-6">
-            <span className="block text-[11px] font-medium text-[#5A6A51]">{t.languagesLabel || "Languages"}</span>
-            <span className="block font-bold text-[#1F251A]">{providerFormLanguages.join(", ") || "Arabic, English"}</span>
+            <span className="block text-[11px] font-medium text-[var(--color-brand-secondary)]">{t.languagesLabel || "Languages"}</span>
+            <span className="block font-bold text-[var(--cr-dark)]">{providerFormLanguages.join(", ") || "Arabic, English"}</span>
           </div>
 
           <div className="space-y-0.5 ps-4 sm:ps-6">
-            <span className="block text-[11px] font-medium text-[#5A6A51]">{t.ratingLabel || "Rating"}</span>
-            <span className="inline-flex items-center gap-1 font-bold text-[#1F251A]">
-              <Star size={13} className="text-[#C4AE7C] fill-[#C4AE7C]" />
+            <span className="block text-[11px] font-medium text-[var(--color-brand-secondary)]">{t.ratingLabel || "Rating"}</span>
+            <span className="inline-flex items-center gap-1 font-bold text-[var(--cr-dark)]">
+              <Star size={13} className="text-[var(--cr-accent)] fill-[var(--cr-accent)]" />
               {providerFormRating || 5}
             </span>
           </div>
@@ -225,15 +225,15 @@ export default function ProviderFormFields({
       </div>
 
       {/* ── CARD 1: PERSONAL INFORMATION ── */}
-      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-6 shadow-xs space-y-6">
+      <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-6 shadow-xs space-y-6">
         {/* Section Header */}
-        <div className="flex items-center gap-3 border-b border-[#414E36]/8 pb-4">
-          <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] flex items-center justify-center shrink-0">
+        <div className="flex items-center gap-3 border-b border-[var(--cr-primary)]/8 pb-4">
+          <div className="h-8 w-8 rounded-full bg-[var(--color-brand-tint)] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
             <User size={16} />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-[#1F251A]">{t.personalInfoTitle || "Personal Information"}</h3>
-            <p className="text-xs text-[#5A6A51]">{t.personalInfoSubtitle || "Update doctor personal details"}</p>
+            <h3 className="text-sm font-bold text-[var(--cr-dark)]">{t.personalInfoTitle || "Personal Information"}</h3>
+            <p className="text-xs text-[var(--color-brand-secondary)]">{t.personalInfoSubtitle || "Update doctor personal details"}</p>
           </div>
         </div>
 
@@ -241,9 +241,9 @@ export default function ProviderFormFields({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           {/* Profile Photo */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-[#1F251A]">{t.profilePhotoLabel || "Profile Photo"}</label>
+            <label className="text-xs font-bold text-[var(--cr-dark)]">{t.profilePhotoLabel || "Profile Photo"}</label>
             <div className="flex items-center gap-4">
-              <div className="h-16 w-16 rounded-full bg-[#2A3423] text-white flex items-center justify-center text-lg font-bold shrink-0 overflow-hidden border border-[#414E36]/15 shadow-2xs">
+              <div className="h-16 w-16 rounded-full bg-[#2A3423] text-white flex items-center justify-center text-lg font-bold shrink-0 overflow-hidden border border-[var(--cr-primary)]/15 shadow-2xs">
                 {providerFormImage ? (
                   <img src={providerFormImage} alt={doctorName} className="h-full w-full object-cover" />
                 ) : (
@@ -262,9 +262,9 @@ export default function ProviderFormFields({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] hover:bg-gray-50 shadow-2xs transition cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-[var(--cr-dark)] hover:bg-gray-50 shadow-2xs transition cursor-pointer"
                   >
-                    <Upload size={13} className="text-[#5A6A51]" />
+                    <Upload size={13} className="text-[var(--color-brand-secondary)]" />
                     <span>{t.changePhotoBtn || "Change Photo"}</span>
                   </button>
                   {providerFormImage && (
@@ -281,7 +281,7 @@ export default function ProviderFormFields({
                     </button>
                   )}
                 </div>
-                <p className="text-[10px] text-[#5A6A51]">
+                <p className="text-[10px] text-[var(--color-brand-secondary)]">
                   {t.photoLimitNote || "JPG, PNG or WEBP. Max size 2MB"}
                 </p>
               </div>
@@ -291,33 +291,33 @@ export default function ProviderFormFields({
           {/* Email & Phone */}
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-[#1F251A] mb-1.5">
+              <label className="block text-xs font-bold text-[var(--cr-dark)] mb-1.5">
                 {t.emailLabel || "Email"} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Mail size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
+                <Mail size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)] pointer-events-none" />
                 <input
                   type="email"
                   placeholder={t.emailPlaceholder || "doctor@example.com"}
                   value={providerFormEmail}
                   onChange={(e) => setProviderFormEmail(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white py-2.5 ps-9 pe-4 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white py-2.5 ps-9 pe-4 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1F251A] mb-1.5">
+              <label className="block text-xs font-bold text-[var(--cr-dark)] mb-1.5">
                 {t.phoneLabel || "Phone Number"} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Phone size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
+                <Phone size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)] pointer-events-none" />
                 <input
                   type="text"
                   placeholder={t.phonePlaceholder || "010 1234 5678"}
                   value={providerFormPhone}
                   onChange={(e) => setProviderFormPhone(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white py-2.5 ps-9 pe-4 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white py-2.5 ps-9 pe-4 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 />
               </div>
             </div>
@@ -325,8 +325,8 @@ export default function ProviderFormFields({
         </div>
 
         {/* Languages Selection */}
-        <div className="flex flex-col gap-2 pt-1 border-t border-[#414E36]/8">
-          <label className="text-xs font-bold text-[#1F251A]">
+        <div className="flex flex-col gap-2 pt-1 border-t border-[var(--cr-primary)]/8">
+          <label className="text-xs font-bold text-[var(--cr-dark)]">
             {t.languagesLabel || "Languages"} <span className="text-red-500">*</span>
           </label>
           <div className="flex flex-wrap items-center gap-4">
@@ -335,13 +335,13 @@ export default function ProviderFormFields({
                 onClick={() => toggleLanguage("Arabic")}
                 className={`flex h-4.5 w-4.5 items-center justify-center rounded-md border transition ${
                   providerFormLanguages.includes("Arabic")
-                    ? "border-[#414E36] bg-[#414E36] text-white"
+                    ? "border-[var(--cr-primary)] bg-[var(--cr-primary)] text-white"
                     : "border-gray-300 bg-white"
                 }`}
               >
                 {providerFormLanguages.includes("Arabic") && <Check size={12} strokeWidth={3} />}
               </div>
-              <span className="text-xs font-medium text-[#1F251A]">{t.langArabic || "Arabic"}</span>
+              <span className="text-xs font-medium text-[var(--cr-dark)]">{t.langArabic || "Arabic"}</span>
             </label>
 
             <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -349,13 +349,13 @@ export default function ProviderFormFields({
                 onClick={() => toggleLanguage("English")}
                 className={`flex h-4.5 w-4.5 items-center justify-center rounded-md border transition ${
                   providerFormLanguages.includes("English")
-                    ? "border-[#414E36] bg-[#414E36] text-white"
+                    ? "border-[var(--cr-primary)] bg-[var(--cr-primary)] text-white"
                     : "border-gray-300 bg-white"
                 }`}
               >
                 {providerFormLanguages.includes("English") && <Check size={12} strokeWidth={3} />}
               </div>
-              <span className="text-xs font-medium text-[#1F251A]">{t.langEnglish || "English"}</span>
+              <span className="text-xs font-medium text-[var(--cr-dark)]">{t.langEnglish || "English"}</span>
             </label>
 
             <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -363,7 +363,7 @@ export default function ProviderFormFields({
                 onClick={() => toggleLanguage("Both")}
                 className={`flex h-4.5 w-4.5 items-center justify-center rounded-md border transition ${
                   providerFormLanguages.includes("Arabic") && providerFormLanguages.includes("English")
-                    ? "border-[#414E36] bg-[#414E36] text-white"
+                    ? "border-[var(--cr-primary)] bg-[var(--cr-primary)] text-white"
                     : "border-gray-300 bg-white"
                 }`}
               >
@@ -371,7 +371,7 @@ export default function ProviderFormFields({
                   <Check size={12} strokeWidth={3} />
                 )}
               </div>
-              <span className="text-xs font-medium text-[#1F251A]">{t.langBoth || "Both"}</span>
+              <span className="text-xs font-medium text-[var(--cr-dark)]">{t.langBoth || "Both"}</span>
             </label>
           </div>
         </div>
@@ -380,64 +380,64 @@ export default function ProviderFormFields({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
           {/* Doctor Name */}
           <div>
-            <label className="block text-xs font-bold text-[#1F251A] mb-1.5">
+            <label className="block text-xs font-bold text-[var(--cr-dark)] mb-1.5">
               {t.nameLabel} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <User size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
+              <User size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)] pointer-events-none" />
               <input
                 type="text"
                 placeholder={t.namePlaceholder}
                 value={providerFormName}
                 onChange={(e) => setProviderFormName(e.target.value)}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-white py-2.5 ps-9 pe-4 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white py-2.5 ps-9 pe-4 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
               />
             </div>
           </div>
 
           {/* Specialty */}
           <div>
-            <label className="block text-xs font-bold text-[#1F251A] mb-1.5">
+            <label className="block text-xs font-bold text-[var(--cr-dark)] mb-1.5">
               {t.specialtyLabel} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <Stethoscope size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
+              <Stethoscope size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)] pointer-events-none" />
               <input
                 type="text"
                 placeholder={t.specialtyPlaceholder}
                 value={providerFormSpecialty}
                 onChange={(e) => setProviderFormSpecialty(e.target.value)}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-white py-2.5 ps-9 pe-4 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white py-2.5 ps-9 pe-4 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
               />
             </div>
           </div>
 
           {/* National ID */}
           <div>
-            <label className="block text-xs font-bold text-[#1F251A] mb-1.5">
+            <label className="block text-xs font-bold text-[var(--cr-dark)] mb-1.5">
               {t.nationalIdLabel}
             </label>
             <div className="relative">
-              <CreditCard size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
+              <CreditCard size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)] pointer-events-none" />
               <input
                 type="text"
                 placeholder={t.nationalIdPlaceholder}
                 value={providerFormNationalId}
                 onChange={(e) => setProviderFormNationalId(e.target.value)}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-white py-2.5 ps-9 pe-4 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white py-2.5 ps-9 pe-4 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
               />
             </div>
           </div>
 
           {/* Gender */}
           <div>
-            <label className="block text-xs font-bold text-[#1F251A] mb-1.5">
+            <label className="block text-xs font-bold text-[var(--cr-dark)] mb-1.5">
               {t.genderLabel}
             </label>
             <select
               value={providerFormGender}
               onChange={(e) => setProviderFormGender(e.target.value as "Male" | "Female" | "")}
-              className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
             >
               <option value="">{t.genderSelectPlaceholder}</option>
               <option value="Male">{t.genderMale}</option>
@@ -449,37 +449,37 @@ export default function ProviderFormFields({
         {/* Auto-Calculated Age / DOB & Start Date */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-[#1F251A] mb-1.5">{t.ageDobLabel}</label>
+            <label className="block text-xs font-bold text-[var(--cr-dark)] mb-1.5">{t.ageDobLabel}</label>
             {nidCheck.isValid ? (
-              <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC]/70 px-4 py-2 text-xs text-[#1F251A] font-semibold flex items-center justify-between min-h-[42px]">
+              <div className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-tint)]/70 px-4 py-2 text-xs text-[var(--cr-dark)] font-semibold flex items-center justify-between min-h-[42px]">
                 <span>{nidCheck.age} {t.ageYearsSuffix} • {t.dobPrefix} {nidCheck.dobFormatted}</span>
-                <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">{t.nationalIdValidBadge}</span>
+                <span className="text-[10px] text-[var(--cr-primary)] font-bold bg-white px-2 py-0.5 rounded-full border border-[var(--cr-primary)]/10">{t.nationalIdValidBadge}</span>
               </div>
             ) : (
-              <div className="w-full rounded-2xl border border-[#414E36]/15 bg-gray-50 px-4 py-2.5 text-xs text-[#5A6A51] italic min-h-[42px] flex items-center">
+              <div className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-gray-50 px-4 py-2.5 text-xs text-[var(--color-brand-secondary)] italic min-h-[42px] flex items-center">
                 {t.autoCalculatedNote}
               </div>
             )}
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-[#1F251A] mb-1.5">{t.startDateLabel}</label>
-            <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 flex items-center justify-between min-h-[42px]">
+            <label className="block text-xs font-bold text-[var(--cr-dark)] mb-1.5">{t.startDateLabel}</label>
+            <div className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 flex items-center justify-between min-h-[42px]">
               {(() => {
                 const autoDate = getDoctorFirstReservationDate(providerFormName, allReservations);
                 const displayDate = autoDate || providerFormStartDate;
                 if (displayDate) {
                   return (
                     <div className="flex items-center justify-between w-full">
-                      <span className="text-sm font-semibold text-[#1F251A]">{displayDate}</span>
-                      <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full border border-[#414E36]/15 flex items-center gap-1">
+                      <span className="text-sm font-semibold text-[var(--cr-dark)]">{displayDate}</span>
+                      <span className="text-[10px] font-bold text-[var(--cr-primary)] bg-[var(--color-brand-tint)] px-2.5 py-0.5 rounded-full border border-[var(--cr-primary)]/15 flex items-center gap-1">
                         {t.autoFromFirstBooking}
                       </span>
                     </div>
                   );
                 }
                 return (
-                  <span className="text-xs italic text-[#5A6A51]/70">
+                  <span className="text-xs italic text-[var(--color-brand-secondary)]/70">
                     {t.willAutoSetNote}
                   </span>
                 );
@@ -490,15 +490,15 @@ export default function ProviderFormFields({
       </div>
 
       {/* ── CARD 2: WORK INFORMATION ── */}
-      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-6 shadow-xs space-y-6">
+      <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-6 shadow-xs space-y-6">
         {/* Section Header */}
-        <div className="flex items-center gap-3 border-b border-[#414E36]/8 pb-4">
-          <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] flex items-center justify-center shrink-0">
+        <div className="flex items-center gap-3 border-b border-[var(--cr-primary)]/8 pb-4">
+          <div className="h-8 w-8 rounded-full bg-[var(--color-brand-tint)] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
             <Briefcase size={16} />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-[#1F251A]">{t.workInfoTitle || "Work Information"}</h3>
-            <p className="text-xs text-[#5A6A51]">{t.workInfoSubtitle || "Update working details"}</p>
+            <h3 className="text-sm font-bold text-[var(--cr-dark)]">{t.workInfoTitle || "Work Information"}</h3>
+            <p className="text-xs text-[var(--color-brand-secondary)]">{t.workInfoSubtitle || "Update working details"}</p>
           </div>
         </div>
 
@@ -506,13 +506,13 @@ export default function ProviderFormFields({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Employment Type */}
           <div>
-            <label className="block text-xs font-bold text-[#1F251A] mb-1.5">
+            <label className="block text-xs font-bold text-[var(--cr-dark)] mb-1.5">
               {t.employmentTypeLabel || "Employment Type"} <span className="text-red-500">*</span>
             </label>
             <select
               value={providerFormEmploymentType}
               onChange={(e) => setProviderFormEmploymentType(e.target.value)}
-              className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
             >
               <option value="Full Time">{t.empFullTime || "Full Time"}</option>
               <option value="Part Time">{t.empPartTime || "Part Time"}</option>
@@ -523,10 +523,10 @@ export default function ProviderFormFields({
 
           {/* Branches (Multi-select pills) */}
           <div>
-            <label className="block text-xs font-bold text-[#1F251A] mb-1.5">
+            <label className="block text-xs font-bold text-[var(--cr-dark)] mb-1.5">
               {t.branchesLabel} <span className="text-red-500">*</span>
             </label>
-            <div className="flex flex-wrap items-center gap-2 p-2 rounded-2xl border border-[#414E36]/15 bg-white min-h-[44px]">
+            <div className="flex flex-wrap items-center gap-2 p-2 rounded-2xl border border-[var(--cr-primary)]/15 bg-white min-h-[44px]">
               {branches.map((b) => {
                 const isSelected = providerFormBranchIds.includes(b.id);
                 return (
@@ -554,8 +554,8 @@ export default function ProviderFormFields({
                     }}
                     className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition ${
                       isSelected
-                        ? "bg-[#414E36] text-white border-[#414E36]"
-                        : "bg-[#414E36]/5 text-[#414E36] border-transparent hover:bg-[#414E36]/10"
+                        ? "bg-[var(--cr-primary)] text-white border-[var(--cr-primary)]"
+                        : "bg-[var(--cr-primary)]/5 text-[var(--cr-primary)] border-transparent hover:bg-[var(--cr-primary)]/10"
                     }`}
                   >
                     <span>{b.name_en}</span>
@@ -571,7 +571,7 @@ export default function ProviderFormFields({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
           {/* Session Type */}
           <div>
-            <label className="block text-xs font-bold text-[#1F251A] mb-1.5">
+            <label className="block text-xs font-bold text-[var(--cr-dark)] mb-1.5">
               {t.sessionTypeLabel || "Session Type"} <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -585,14 +585,14 @@ export default function ProviderFormFields({
                   onClick={() => setProviderFormSessionType(sess.id as any)}
                   className={`flex items-center justify-center gap-2 rounded-2xl border py-2.5 px-3 cursor-pointer transition select-none ${
                     providerFormSessionType === sess.id
-                      ? "border-[#414E36] bg-[#F2F5F0] text-[#414E36] font-bold ring-1 ring-[#414E36]"
-                      : "border-gray-200 bg-white text-[#5A6A51] hover:border-gray-300 font-medium"
+                      ? "border-[var(--cr-primary)] bg-[#F2F5F0] text-[var(--cr-primary)] font-bold ring-1 ring-[var(--cr-primary)]"
+                      : "border-gray-200 bg-white text-[var(--color-brand-secondary)] hover:border-gray-300 font-medium"
                   }`}
                 >
                   <div className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border ${
-                    providerFormSessionType === sess.id ? "border-[#414E36]" : "border-gray-300"
+                    providerFormSessionType === sess.id ? "border-[var(--cr-primary)]" : "border-gray-300"
                   }`}>
-                    {providerFormSessionType === sess.id && <div className="h-1.5 w-1.5 rounded-full bg-[#414E36]" />}
+                    {providerFormSessionType === sess.id && <div className="h-1.5 w-1.5 rounded-full bg-[var(--cr-primary)]" />}
                   </div>
                   <span className="text-xs">{sess.label}</span>
                 </div>
@@ -602,19 +602,19 @@ export default function ProviderFormFields({
 
           {/* Fixed Salary */}
           <div>
-            <label className="block text-xs font-bold text-[#1F251A] mb-1.5">{t.fixedSalaryLabel}</label>
+            <label className="block text-xs font-bold text-[var(--cr-dark)] mb-1.5">{t.fixedSalaryLabel}</label>
             <input
               type="number"
               placeholder={t.fixedSalaryPlaceholder}
               value={providerFormFixedSalary}
               onChange={(e) => setProviderFormFixedSalary(e.target.value)}
-              className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
             />
           </div>
         </div>
 
         {/* Services & Commission Editor */}
-        <div className="pt-2 border-t border-[#414E36]/8">
+        <div className="pt-2 border-t border-[var(--cr-primary)]/8">
           <DoctorServiceCommissionEditor
             allServices={allServicesList}
             services={providerFormSelectedServices}
@@ -634,27 +634,27 @@ export default function ProviderFormFields({
       </div>
 
       {/* ── CARD 3: WORKING SCHEDULE ── */}
-      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-6 shadow-xs space-y-5">
+      <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-6 shadow-xs space-y-5">
         {/* Section Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/8 pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--cr-primary)]/8 pb-4">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] flex items-center justify-center shrink-0">
+            <div className="h-8 w-8 rounded-full bg-[var(--color-brand-tint)] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
               <Clock size={16} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-[#1F251A]">{t.workingScheduleTitle || "Working Schedule"}</h3>
-              <p className="text-xs text-[#5A6A51]">{t.workingScheduleSubtitle || "Set weekly working days, multiple shifts, and break times"}</p>
+              <h3 className="text-sm font-bold text-[var(--cr-dark)]">{t.workingScheduleTitle || "Working Schedule"}</h3>
+              <p className="text-xs text-[var(--color-brand-secondary)]">{t.workingScheduleSubtitle || "Set weekly working days, multiple shifts, and break times"}</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             {providerFormBranchIds.length > 1 && (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-[#5A6A51]">{t.configureBranchSchedule}</span>
+                <span className="text-xs text-[var(--color-brand-secondary)]">{t.configureBranchSchedule}</span>
                 <select
                   value={providerFormSelectedScheduleBranchId}
                   onChange={(e) => handleScheduleBranchChange(e.target.value)}
-                  className="rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1 text-xs text-[#1F251A] font-semibold outline-none focus:border-[#C4AE7C] shadow-2xs cursor-pointer"
+                  className="rounded-xl border border-[var(--cr-primary)]/15 bg-white px-2.5 py-1 text-xs text-[var(--cr-dark)] font-semibold outline-none focus:border-[var(--cr-accent)] shadow-2xs cursor-pointer"
                 >
                   {providerFormBranchIds.map((bId) => {
                     const br = branches.find((b) => b.id === bId);
@@ -668,14 +668,14 @@ export default function ProviderFormFields({
               </div>
             )}
 
-            <div className="flex rounded-xl border border-[#414E36]/15 p-0.5 bg-[#F9F9F7] text-[11px] font-bold">
+            <div className="flex rounded-xl border border-[var(--cr-primary)]/15 p-0.5 bg-[#F9F9F7] text-[11px] font-bold">
               <button
                 type="button"
                 onClick={() => setProviderFormScheduleTab("in_person")}
                 className={`px-3 py-1 rounded-lg transition ${
                   providerFormScheduleTab === "in_person"
-                    ? "bg-[#414E36] text-white shadow-2xs"
-                    : "text-[#5A6A51] hover:text-[#414E36]"
+                    ? "bg-[var(--cr-primary)] text-white shadow-2xs"
+                    : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)]"
                 }`}
               >
                 {t.inClinicTab}
@@ -685,8 +685,8 @@ export default function ProviderFormFields({
                 onClick={() => setProviderFormScheduleTab("online")}
                 className={`px-3 py-1 rounded-lg transition ${
                   providerFormScheduleTab === "online"
-                    ? "bg-[#414E36] text-white shadow-2xs"
-                    : "text-[#5A6A51] hover:text-[#414E36]"
+                    ? "bg-[var(--cr-primary)] text-white shadow-2xs"
+                    : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)]"
                 }`}
               >
                 {t.onlineTab}
@@ -696,10 +696,10 @@ export default function ProviderFormFields({
         </div>
 
         {/* Schedule Matrix Table */}
-        <div className="overflow-x-auto rounded-2xl border border-[#414E36]/10 bg-white scrollbar-none">
+        <div className="overflow-x-auto rounded-2xl border border-[var(--cr-primary)]/10 bg-white scrollbar-none">
           <table className="w-full min-w-[700px] text-xs">
             <thead>
-              <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7] text-[#5A6A51] uppercase font-bold text-[10px] tracking-wider">
+              <tr className="border-b border-[var(--cr-primary)]/10 bg-[#F9F9F7] text-[var(--color-brand-secondary)] uppercase font-bold text-[10px] tracking-wider">
                 <th className="px-4 py-3 text-start w-[14%]">{t.colDay || "DAY"}</th>
                 <th className="px-4 py-3 text-center w-[12%]">{t.colWorking || "WORKING"}</th>
                 <th className="px-4 py-3 text-start w-[44%]">{t.colShifts || "SHIFTS"}</th>
@@ -707,7 +707,7 @@ export default function ProviderFormFields({
                 <th className="px-4 py-3 text-center w-[10%]">{t.colActions || "ACTIONS"}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#414E36]/8">
+            <tbody className="divide-y divide-[var(--cr-primary)]/8">
               {WEEKDAYS.map((day) => {
                 const sched = activeSched[day] || { isOpen: false, start: "09:00", end: "17:00", shifts: [] };
                 const dayShifts = (sched.shifts && sched.shifts.length > 0)
@@ -715,9 +715,9 @@ export default function ProviderFormFields({
                   : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
 
                 return (
-                  <tr key={day} className="transition hover:bg-[#FBFBF9]/60">
+                  <tr key={day} className="transition hover:bg-[var(--color-brand-light)]/60">
                     {/* Day Name */}
-                    <td className="px-4 py-3.5 font-bold text-[#1F251A]">
+                    <td className="px-4 py-3.5 font-bold text-[var(--cr-dark)]">
                       {(t.dayNames as Record<string, string>)[day] || day}
                     </td>
 
@@ -734,7 +734,7 @@ export default function ProviderFormFields({
                           });
                         }}
                         className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          sched.isOpen ? "bg-[#414E36]" : "bg-gray-200"
+                          sched.isOpen ? "bg-[var(--cr-primary)]" : "bg-gray-200"
                         }`}
                       >
                         <span
@@ -751,7 +751,7 @@ export default function ProviderFormFields({
                         <div className="flex flex-col gap-2">
                           {dayShifts.map((shft: any, shiftIdx: number) => (
                             <div key={shiftIdx} className="flex items-center gap-2">
-                              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[#EDF1EC] text-[10px] font-bold text-[#414E36] shrink-0">
+                              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[var(--color-brand-tint)] text-[10px] font-bold text-[var(--cr-primary)] shrink-0">
                                 {shiftIdx + 1}
                               </span>
                               <input
@@ -770,9 +770,9 @@ export default function ProviderFormFields({
                                     }
                                   });
                                 }}
-                                className="rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                                className="rounded-lg border border-[var(--cr-primary)]/15 bg-white px-2 py-1 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                               />
-                              <span className="text-[#5A6A51] text-xs font-semibold">-</span>
+                              <span className="text-[var(--color-brand-secondary)] text-xs font-semibold">-</span>
                               <input
                                 type="time"
                                 value={shft.end || "17:00"}
@@ -789,7 +789,7 @@ export default function ProviderFormFields({
                                     }
                                   });
                                 }}
-                                className="rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                                className="rounded-lg border border-[var(--cr-primary)]/15 bg-white px-2 py-1 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                               />
                               {dayShifts.length > 1 && (
                                 <button
@@ -828,7 +828,7 @@ export default function ProviderFormFields({
                                   }
                                 });
                               }}
-                              className="self-start inline-flex items-center gap-1 text-[11px] font-bold text-[#414E36] hover:text-[#2e3a26] transition cursor-pointer mt-0.5"
+                              className="self-start inline-flex items-center gap-1 text-[11px] font-bold text-[var(--cr-primary)] hover:text-[#2e3a26] transition cursor-pointer mt-0.5"
                             >
                               <Plus size={12} /> {t.addShiftBtn || "Add Shift"}
                             </button>
@@ -836,7 +836,7 @@ export default function ProviderFormFields({
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <span className="text-[#5A6A51] italic text-xs">{t.notWorkingText || "Not working"}</span>
+                          <span className="text-[var(--color-brand-secondary)] italic text-xs">{t.notWorkingText || "Not working"}</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -845,7 +845,7 @@ export default function ProviderFormFields({
                                 [day]: { ...sched, isOpen: true }
                               });
                             }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-dashed border-[#414E36]/25 px-2 py-0.5 text-[10px] font-bold text-[#414E36] hover:bg-[#EDF1EC]/50 transition cursor-pointer"
+                            className="inline-flex items-center gap-1 rounded-lg border border-dashed border-[var(--cr-primary)]/25 px-2 py-0.5 text-[10px] font-bold text-[var(--cr-primary)] hover:bg-[var(--color-brand-tint)]/50 transition cursor-pointer"
                           >
                             <Plus size={10} /> {t.addShiftBtn || "Add Shift"}
                           </button>
@@ -866,9 +866,9 @@ export default function ProviderFormFields({
                                 [day]: { ...sched, breakStart: e.target.value }
                               });
                             }}
-                            className="rounded-lg border border-[#414E36]/15 bg-white px-1.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] w-20"
+                            className="rounded-lg border border-[var(--cr-primary)]/15 bg-white px-1.5 py-1 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] w-20"
                           />
-                          <span className="text-[#5A6A51] text-xs font-semibold">-</span>
+                          <span className="text-[var(--color-brand-secondary)] text-xs font-semibold">-</span>
                           <input
                             type="time"
                             value={sched.breakEnd || "14:00"}
@@ -878,7 +878,7 @@ export default function ProviderFormFields({
                                 [day]: { ...sched, breakEnd: e.target.value }
                               });
                             }}
-                            className="rounded-lg border border-[#414E36]/15 bg-white px-1.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] w-20"
+                            className="rounded-lg border border-[var(--cr-primary)]/15 bg-white px-1.5 py-1 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] w-20"
                           />
                         </div>
                       ) : (
@@ -914,19 +914,19 @@ export default function ProviderFormFields({
         </div>
 
         {/* Schedule Helper Note */}
-        <div className="flex items-center gap-2 text-[11px] text-[#5A6A51] font-medium pt-1">
-          <AlertCircle size={13} className="text-[#5A6A51] shrink-0" />
+        <div className="flex items-center gap-2 text-[11px] text-[var(--color-brand-secondary)] font-medium pt-1">
+          <AlertCircle size={13} className="text-[var(--color-brand-secondary)] shrink-0" />
           <span>{t.maxShiftsNote || "You can add up to 3 shifts per day."}</span>
         </div>
       </div>
 
       {/* ── BOTTOM ACTION BUTTONS ── */}
-      <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#414E36]/10">
+      <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--cr-primary)]/10">
         <button
           type="button"
           onClick={() => setEditingDoctorInline(null)}
           disabled={savingProvider}
-          className="rounded-xl border border-gray-200 bg-white px-6 py-2.5 text-xs font-bold text-[#1F251A] hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
+          className="rounded-xl border border-gray-200 bg-white px-6 py-2.5 text-xs font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
         >
           {t.cancelBtn || "Cancel"}
         </button>

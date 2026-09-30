@@ -189,21 +189,21 @@ export default function DoctorPatientHistoryDrawer({
   const memberSince = customerFullData?.created_at ? customerFullData.created_at.slice(0, 10) : "N/A";
 
   return (
-    <div className="fixed inset-0 md:[inset-inline-start:220px] z-40 bg-[#FBFBF9] overflow-y-auto flex flex-col h-full text-[#1F251A] isolate">
+    <div className="fixed inset-0 md:[inset-inline-start:220px] z-40 bg-[var(--color-brand-light)] overflow-y-auto flex flex-col h-full text-[var(--cr-dark)] isolate">
       
       {/* Top Sticky Header Bar */}
-      <div className="sticky top-0 z-20 bg-white border-b border-[#414E36]/12 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shadow-xs">
+      <div className="sticky top-0 z-20 bg-white border-b border-[var(--cr-primary)]/12 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shadow-xs">
         <button
           type="button"
           onClick={() => setSelectedPatientHistory(null)}
-          className="flex items-center gap-2 rounded-2xl bg-[#414E36]/10 hover:bg-[#414E36] text-[#414E36] hover:text-white px-3.5 sm:px-4 py-2 font-bold text-xs transition shadow-xs cursor-pointer"
+          className="flex items-center gap-2 rounded-2xl bg-[var(--cr-primary)]/10 hover:bg-[var(--cr-primary)] text-[var(--cr-primary)] hover:text-white px-3.5 sm:px-4 py-2 font-bold text-xs transition shadow-xs cursor-pointer"
         >
           <ArrowLeft size={16} className="rtl:rotate-180" />
           <span>Back to Patients Directory</span>
         </button>
 
         <div className="flex items-center gap-3">
-          <span className="rounded-full bg-[#414E36]/10 px-3 py-1 text-[11px] sm:text-xs font-bold text-[#414E36]">
+          <span className="rounded-full bg-[var(--cr-primary)]/10 px-3 py-1 text-[11px] sm:text-xs font-bold text-[var(--cr-primary)]">
             Patient Profile View
           </span>
         </div>
@@ -213,33 +213,33 @@ export default function DoctorPatientHistoryDrawer({
       <div className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 md:p-8 pb-24 md:pb-8 space-y-4 sm:space-y-6">
         
         {/* Patient Profile Hero Header Banner */}
-        <div className="rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 md:p-8 border border-[#414E36]/12 shadow-sm space-y-4 sm:space-y-6">
+        <div className="rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 md:p-8 border border-[var(--cr-primary)]/12 shadow-sm space-y-4 sm:space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6">
             <div className="flex items-center gap-3.5 sm:gap-5">
-              <div className="relative flex h-14 w-14 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl sm:rounded-3xl bg-[#414E36] text-white font-black text-xl sm:text-3xl shadow-md border-2 border-white">
+              <div className="relative flex h-14 w-14 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl sm:rounded-3xl bg-[var(--cr-primary)] text-white font-black text-xl sm:text-3xl shadow-md border-2 border-white">
                 {(selectedPatientHistory.name || "P").slice(0, 2).toUpperCase()}
               </div>
               <div className="space-y-1 min-w-0">
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                  <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-[#1F251A] truncate">
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-[var(--cr-dark)] truncate">
                     {selectedPatientHistory.name}
                   </h1>
-                  <span className="rounded-full bg-[#414E36]/10 px-2.5 sm:px-3.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-extrabold text-[#414E36]">
+                  <span className="rounded-full bg-[var(--cr-primary)]/10 px-2.5 sm:px-3.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-extrabold text-[var(--cr-primary)]">
                     {selectedPatientHistory.totalVisits} {selectedPatientHistory.totalVisits === 1 ? t.visit : t.visits}
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs md:text-sm text-[#5A6A51] font-medium">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs md:text-sm text-[var(--color-brand-secondary)] font-medium">
                   <span className="flex items-center gap-1.5 font-mono">
-                    <Phone size={14} className="text-[#414E36]" /> {phoneDisplay}
+                    <Phone size={14} className="text-[var(--cr-primary)]" /> {phoneDisplay}
                   </span>
                   {emailDisplay !== "N/A" && (
                     <span className="flex items-center gap-1.5 truncate max-w-[200px] sm:max-w-none">
-                      <Mail size={14} className="text-[#414E36]" /> {emailDisplay}
+                      <Mail size={14} className="text-[var(--cr-primary)]" /> {emailDisplay}
                     </span>
                   )}
                   {addressDisplay !== "Not Specified" && (
                     <span className="flex items-center gap-1.5">
-                      <MapPin size={14} className="text-[#414E36]" /> {addressDisplay}
+                      <MapPin size={14} className="text-[var(--cr-primary)]" /> {addressDisplay}
                     </span>
                   )}
                 </div>
@@ -247,27 +247,27 @@ export default function DoctorPatientHistoryDrawer({
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-              <div className="flex-1 sm:flex-initial rounded-2xl bg-[#F4F5F1] p-2.5 sm:p-3 px-3 sm:px-5 text-center border border-[#414E36]/10">
-                <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-[#5A6A51] block mb-0.5">{t.completedPatientVisits}</span>
-                <span className="text-sm sm:text-lg font-black text-[#1F251A]">{selectedPatientHistory.totalVisits} Sessions</span>
+              <div className="flex-1 sm:flex-initial rounded-2xl bg-[#F4F5F1] p-2.5 sm:p-3 px-3 sm:px-5 text-center border border-[var(--cr-primary)]/10">
+                <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-[var(--color-brand-secondary)] block mb-0.5">{t.completedPatientVisits}</span>
+                <span className="text-sm sm:text-lg font-black text-[var(--cr-dark)]">{selectedPatientHistory.totalVisits} Sessions</span>
               </div>
-              <div className="flex-1 sm:flex-initial rounded-2xl bg-[#F4F5F1] p-2.5 sm:p-3 px-3 sm:px-5 text-center border border-[#414E36]/10">
-                <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-[#5A6A51] block mb-0.5">{t.lastVisitLabel}</span>
-                <span className="text-sm sm:text-lg font-black text-[#414E36]">{selectedPatientHistory.lastVisitDate || "N/A"}</span>
+              <div className="flex-1 sm:flex-initial rounded-2xl bg-[#F4F5F1] p-2.5 sm:p-3 px-3 sm:px-5 text-center border border-[var(--cr-primary)]/10">
+                <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-[var(--color-brand-secondary)] block mb-0.5">{t.lastVisitLabel}</span>
+                <span className="text-sm sm:text-lg font-black text-[var(--cr-primary)]">{selectedPatientHistory.lastVisitDate || "N/A"}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* 5 Sub-Navigation Tabs Bar */}
-        <div className="flex items-center bg-white rounded-2xl sm:rounded-3xl p-1.5 sm:p-2 border border-[#414E36]/12 shadow-xs gap-1 sm:gap-2 overflow-x-auto no-scrollbar w-full">
+        <div className="flex items-center bg-white rounded-2xl sm:rounded-3xl p-1.5 sm:p-2 border border-[var(--cr-primary)]/12 shadow-xs gap-1 sm:gap-2 overflow-x-auto no-scrollbar w-full">
           <button
             type="button"
             onClick={() => setActiveTab("history")}
             className={`flex-1 py-2.5 sm:py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-extrabold rounded-xl sm:rounded-2xl transition flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === "history"
-                ? "bg-[#414E36] text-white shadow-sm"
-                : "text-[#5A6A51] hover:text-[#1F251A] hover:bg-[#F4F5F1]"
+                ? "bg-[var(--cr-primary)] text-white shadow-sm"
+                : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-dark)] hover:bg-[#F4F5F1]"
             }`}
           >
             <Clock size={16} />
@@ -279,8 +279,8 @@ export default function DoctorPatientHistoryDrawer({
             onClick={() => setActiveTab("laser")}
             className={`flex-1 py-2.5 sm:py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-extrabold rounded-xl sm:rounded-2xl transition flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === "laser"
-                ? "bg-[#414E36] text-white shadow-sm"
-                : "text-[#5A6A51] hover:text-[#1F251A] hover:bg-[#F4F5F1]"
+                ? "bg-[var(--cr-primary)] text-white shadow-sm"
+                : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-dark)] hover:bg-[#F4F5F1]"
             }`}
           >
             <Zap size={16} className="text-amber-500" />
@@ -292,8 +292,8 @@ export default function DoctorPatientHistoryDrawer({
             onClick={() => setActiveTab("medical")}
             className={`flex-1 py-2.5 sm:py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-extrabold rounded-xl sm:rounded-2xl transition flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === "medical"
-                ? "bg-[#414E36] text-white shadow-sm"
-                : "text-[#5A6A51] hover:text-[#1F251A] hover:bg-[#F4F5F1]"
+                ? "bg-[var(--cr-primary)] text-white shadow-sm"
+                : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-dark)] hover:bg-[#F4F5F1]"
             }`}
           >
             <ShieldAlert size={16} />
@@ -308,8 +308,8 @@ export default function DoctorPatientHistoryDrawer({
             onClick={() => setActiveTab("reports")}
             className={`flex-1 py-2.5 sm:py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-extrabold rounded-xl sm:rounded-2xl transition flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === "reports"
-                ? "bg-[#414E36] text-white shadow-sm"
-                : "text-[#5A6A51] hover:text-[#1F251A] hover:bg-[#F4F5F1]"
+                ? "bg-[var(--cr-primary)] text-white shadow-sm"
+                : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-dark)] hover:bg-[#F4F5F1]"
             }`}
           >
             <FileText size={16} />
@@ -321,8 +321,8 @@ export default function DoctorPatientHistoryDrawer({
             onClick={() => setActiveTab("personal")}
             className={`flex-1 py-2.5 sm:py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-extrabold rounded-xl sm:rounded-2xl transition flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === "personal"
-                ? "bg-[#414E36] text-white shadow-sm"
-                : "text-[#5A6A51] hover:text-[#1F251A] hover:bg-[#F4F5F1]"
+                ? "bg-[var(--cr-primary)] text-white shadow-sm"
+                : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-dark)] hover:bg-[#F4F5F1]"
             }`}
           >
             <User size={16} />
@@ -333,29 +333,29 @@ export default function DoctorPatientHistoryDrawer({
         {/* Tab: Laser History */}
         {activeTab === "laser" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-[#414E36]/10">
-              <h3 className="text-xs sm:text-sm font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--cr-primary)]/10">
+              <h3 className="text-xs sm:text-sm font-extrabold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
                 <Zap size={16} className="text-amber-600" /> Laser Treatment & Pulse History
               </h3>
-              <span className="text-[11px] sm:text-xs font-bold text-[#414E36] bg-[#414E36]/10 px-2.5 sm:px-3 py-1 rounded-full">
+              <span className="text-[11px] sm:text-xs font-bold text-[var(--cr-primary)] bg-[var(--cr-primary)]/10 px-2.5 sm:px-3 py-1 rounded-full">
                 {laserLogs.length} Laser Sessions
               </span>
             </div>
 
             {/* Lifetime KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="bg-white p-4 rounded-2xl border border-[#414E36]/10 shadow-xs">
-                <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider block">Total Laser Sessions</span>
-                <span className="text-xl font-black text-[#1F251A] mt-1 block">{laserLogs.length}</span>
+              <div className="bg-white p-4 rounded-2xl border border-[var(--cr-primary)]/10 shadow-xs">
+                <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block">Total Laser Sessions</span>
+                <span className="text-xl font-black text-[var(--cr-dark)] mt-1 block">{laserLogs.length}</span>
               </div>
-              <div className="bg-white p-4 rounded-2xl border border-[#414E36]/10 shadow-xs">
-                <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider block">Total Pulses Delivered</span>
-                <span className="text-xl font-black text-[#414E36] mt-1 block">
+              <div className="bg-white p-4 rounded-2xl border border-[var(--cr-primary)]/10 shadow-xs">
+                <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block">Total Pulses Delivered</span>
+                <span className="text-xl font-black text-[var(--cr-primary)] mt-1 block">
                   {laserLogs.reduce((sum, l) => sum + (Number(l.pulses_used || 0) + Number(l.additional_pulses || 0)), 0)} Pulses
                 </span>
               </div>
-              <div className="bg-white p-4 rounded-2xl border border-[#414E36]/10 shadow-xs">
-                <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider block">Total Additional Pulses Billed</span>
+              <div className="bg-white p-4 rounded-2xl border border-[var(--cr-primary)]/10 shadow-xs">
+                <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block">Total Additional Pulses Billed</span>
                 <span className="text-xl font-black text-amber-800 mt-1 block">
                   {laserLogs.reduce((sum, l) => sum + Number(l.additional_charge || 0), 0)} EGP
                 </span>
@@ -364,24 +364,24 @@ export default function DoctorPatientHistoryDrawer({
 
             {/* Laser Logs Feed */}
             {loadingLaserLogs ? (
-              <div className="p-8 text-center text-sm text-[#5A6A51] bg-white rounded-2xl border border-[#414E36]/10 flex items-center justify-center gap-2">
-                <Loader2 size={16} className="animate-spin text-[#414E36]" /> Loading laser pulse history...
+              <div className="p-8 text-center text-sm text-[var(--color-brand-secondary)] bg-white rounded-2xl border border-[var(--cr-primary)]/10 flex items-center justify-center gap-2">
+                <Loader2 size={16} className="animate-spin text-[var(--cr-primary)]" /> Loading laser pulse history...
               </div>
             ) : laserLogs.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 p-6 space-y-2">
+              <div className="text-center py-12 bg-white rounded-2xl border border-[var(--cr-primary)]/10 p-6 space-y-2">
                 <div className="h-12 w-12 mx-auto rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center">
                   <Zap size={22} />
                 </div>
-                <h4 className="font-bold text-sm text-[#1F251A]">No Laser Sessions Recorded Yet</h4>
-                <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
+                <h4 className="font-bold text-sm text-[var(--cr-dark)]">No Laser Sessions Recorded Yet</h4>
+                <p className="text-xs text-[var(--color-brand-secondary)] max-w-sm mx-auto">
                   Laser treatment sessions delivered via Type 1 Service, Type 2 FIFO Retail Pulses, or Type 3 Packages will appear here.
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
                 {laserLogs.map((log) => (
-                  <div key={log.id} className="bg-white rounded-2xl border border-[#414E36]/10 p-4 space-y-3 shadow-xs">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/10 pb-2.5">
+                  <div key={log.id} className="bg-white rounded-2xl border border-[var(--cr-primary)]/10 p-4 space-y-3 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--cr-primary)]/10 pb-2.5">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
                           log.pulse_type === "SERVICE"
@@ -392,36 +392,36 @@ export default function DoctorPatientHistoryDrawer({
                         }`}>
                           {log.pulse_type === "SERVICE" ? "Type 1 · Fixed Service" : log.pulse_type === "PULSE_PURCHASE" ? "Type 2 · Retail Pulses (FIFO)" : "Type 3 · Package Pulses"}
                         </span>
-                        <span className="text-xs font-bold text-[#1F251A]">
-                          Area: <strong className="text-[#414E36]">{log.treatment_area || "General"}</strong>
+                        <span className="text-xs font-bold text-[var(--cr-dark)]">
+                          Area: <strong className="text-[var(--cr-primary)]">{log.treatment_area || "General"}</strong>
                         </span>
                       </div>
-                      <span className="text-[11px] text-[#5A6A51] font-medium">
+                      <span className="text-[11px] text-[var(--color-brand-secondary)] font-medium">
                         {log.created_at ? new Date(log.created_at).toLocaleString() : "Recent Session"}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                      <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#414E36]/10">
-                        <span className="text-[10px] text-[#5A6A51] block">Standard Pulses</span>
-                        <span className="font-extrabold text-[#1F251A]">{log.pulses_used || 0}</span>
+                      <div className="bg-[var(--color-brand-light)] p-2.5 rounded-xl border border-[var(--cr-primary)]/10">
+                        <span className="text-[10px] text-[var(--color-brand-secondary)] block">Standard Pulses</span>
+                        <span className="font-extrabold text-[var(--cr-dark)]">{log.pulses_used || 0}</span>
                       </div>
 
-                      <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#414E36]/10">
-                        <span className="text-[10px] text-[#5A6A51] block">Extra Pulses</span>
-                        <span className={`font-extrabold ${Number(log.additional_pulses) > 0 ? "text-amber-800" : "text-[#5A6A51]"}`}>
+                      <div className="bg-[var(--color-brand-light)] p-2.5 rounded-xl border border-[var(--cr-primary)]/10">
+                        <span className="text-[10px] text-[var(--color-brand-secondary)] block">Extra Pulses</span>
+                        <span className={`font-extrabold ${Number(log.additional_pulses) > 0 ? "text-amber-800" : "text-[var(--color-brand-secondary)]"}`}>
                           {log.additional_pulses || 0} {Number(log.additional_charge) > 0 && `(+${log.additional_charge} EGP)`}
                         </span>
                       </div>
 
-                      <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#414E36]/10">
-                        <span className="text-[10px] text-[#5A6A51] block">Remaining After</span>
-                        <span className="font-extrabold text-[#414E36]">{log.remaining_balance_after ?? "—"}</span>
+                      <div className="bg-[var(--color-brand-light)] p-2.5 rounded-xl border border-[var(--cr-primary)]/10">
+                        <span className="text-[10px] text-[var(--color-brand-secondary)] block">Remaining After</span>
+                        <span className="font-extrabold text-[var(--cr-primary)]">{log.remaining_balance_after ?? "—"}</span>
                       </div>
 
-                      <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#414E36]/10">
-                        <span className="text-[10px] text-[#5A6A51] block">Device / Doctor</span>
-                        <span className="font-bold text-[#1F251A] block truncate">{log.device_name || "Device"} · {log.doctor_name || "Doctor"}</span>
+                      <div className="bg-[var(--color-brand-light)] p-2.5 rounded-xl border border-[var(--cr-primary)]/10">
+                        <span className="text-[10px] text-[var(--color-brand-secondary)] block">Device / Doctor</span>
+                        <span className="font-bold text-[var(--cr-dark)] block truncate">{log.device_name || "Device"} · {log.doctor_name || "Doctor"}</span>
                       </div>
                     </div>
 
@@ -432,7 +432,7 @@ export default function DoctorPatientHistoryDrawer({
                     )}
 
                     {log.notes && (
-                      <div className="text-xs text-[#5A6A51] bg-[#FBFBF9] p-2.5 rounded-xl border border-[#414E36]/10">
+                      <div className="text-xs text-[var(--color-brand-secondary)] bg-[var(--color-brand-light)] p-2.5 rounded-xl border border-[var(--cr-primary)]/10">
                         <strong>Doctor Notes:</strong> {log.notes}
                       </div>
                     )}
@@ -446,11 +446,11 @@ export default function DoctorPatientHistoryDrawer({
         {/* Tab 1: Clinical History & Visits */}
         {activeTab === "history" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-[#414E36]/10">
-              <h3 className="text-xs sm:text-sm font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                <Clock size={16} className="text-[#414E36]" /> {t.patientHistoryDrawerTitle}
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--cr-primary)]/10">
+              <h3 className="text-xs sm:text-sm font-extrabold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
+                <Clock size={16} className="text-[var(--cr-primary)]" /> {t.patientHistoryDrawerTitle}
               </h3>
-              <span className="text-[11px] sm:text-xs font-bold text-[#414E36] bg-[#414E36]/10 px-2.5 sm:px-3 py-1 rounded-full">
+              <span className="text-[11px] sm:text-xs font-bold text-[var(--cr-primary)] bg-[var(--cr-primary)]/10 px-2.5 sm:px-3 py-1 rounded-full">
                 {validBookings.length} {t.totalScheduledCard}
               </span>
             </div>
@@ -473,20 +473,20 @@ export default function DoctorPatientHistoryDrawer({
               return (
                 <div
                   key={booking.id || idx}
-                  className="rounded-2xl sm:rounded-3xl border border-[#414E36]/12 bg-white p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-xs hover:border-[#414E36]/30 transition"
+                  className="rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-xs hover:border-[var(--cr-primary)]/30 transition"
                 >
                   {/* Visit Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3 sm:pb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--cr-primary)]/10 pb-3 sm:pb-4">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-2xl bg-[#414E36] text-white font-black text-xs sm:text-sm shadow-xs shrink-0">
+                      <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-2xl bg-[var(--cr-primary)] text-white font-black text-xs sm:text-sm shadow-xs shrink-0">
                         #{validBookings.length - idx}
                       </span>
                       <div className="min-w-0">
-                        <span className="text-sm sm:text-base font-bold text-[#1F251A] truncate block">
+                        <span className="text-sm sm:text-base font-bold text-[var(--cr-dark)] truncate block">
                           {booking.date || "Date Unspecified"} • {booking.time || booking.time_slot || "Time Unspecified"}
                         </span>
-                        <p className="text-[11px] sm:text-xs text-[#5A6A51] font-semibold mt-0.5 truncate">
-                          {booking.service || booking.service_name || "Clinical Session"} • <span className="text-[#414E36] font-extrabold">{booking.room || booking.room_name || "Treatment Room"}</span>
+                        <p className="text-[11px] sm:text-xs text-[var(--color-brand-secondary)] font-semibold mt-0.5 truncate">
+                          {booking.service || booking.service_name || "Clinical Session"} • <span className="text-[var(--cr-primary)] font-extrabold">{booking.room || booking.room_name || "Treatment Room"}</span>
                         </p>
                       </div>
                     </div>
@@ -513,7 +513,7 @@ export default function DoctorPatientHistoryDrawer({
                         onClick={() => {
                           handleOpenScheduleModal(booking);
                         }}
-                        className="rounded-2xl border border-[#414E36]/20 bg-white px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        className="rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs font-bold text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition shadow-xs flex items-center gap-1.5 cursor-pointer"
                       >
                         <span>{t.inspectBtn}</span>
                         <ChevronRight size={14} className="rtl:rotate-180 transition-transform" />
@@ -523,36 +523,36 @@ export default function DoctorPatientHistoryDrawer({
 
                   {/* Issued Digital Prescription for this visit */}
                   {matchingRx && (
-                    <div className="bg-[#FBFBF9] p-3.5 sm:p-4.5 rounded-2xl border border-[#414E36]/10 space-y-2 text-xs">
+                    <div className="bg-[var(--color-brand-light)] p-3.5 sm:p-4.5 rounded-2xl border border-[var(--cr-primary)]/10 space-y-2 text-xs">
                       <div className="flex items-center justify-between">
-                        <span className="font-extrabold text-[#414E36] flex items-center gap-2 text-xs">
+                        <span className="font-extrabold text-[var(--cr-primary)] flex items-center gap-2 text-xs">
                           <Pill size={15} /> {t.savedPrescriptionTitle}
                         </span>
-                        <span className="text-[10px] font-bold bg-[#414E36]/10 text-[#414E36] px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold bg-[var(--cr-primary)]/10 text-[var(--cr-primary)] px-2 py-0.5 rounded-full">
                           v{matchingRx.version || 1}
                         </span>
                       </div>
                       {matchingRx.diagnosis && (
-                        <p className="text-xs font-bold text-[#1F251A]">
-                          <span className="text-[#5A6A51] font-medium">{t.diagnosisLabel}:</span> {matchingRx.diagnosis}
+                        <p className="text-xs font-bold text-[var(--cr-dark)]">
+                          <span className="text-[var(--color-brand-secondary)] font-medium">{t.diagnosisLabel}:</span> {matchingRx.diagnosis}
                         </p>
                       )}
                       {Array.isArray(matchingRx.medications) && matchingRx.medications.length > 0 && (
                         <div className="space-y-1.5">
                           {matchingRx.medications.map((m: any, mIdx: number) => (
                             <div key={mIdx} className="bg-white p-2.5 sm:p-3 rounded-xl text-xs flex flex-wrap justify-between gap-2 border border-gray-200">
-                              <span className="font-bold text-[#1F251A]">{m.name}</span>
-                              <span className="text-[#5A6A51] font-mono font-medium text-[11px] sm:text-xs">{m.dosage} • {m.frequency} • {m.duration}</span>
+                              <span className="font-bold text-[var(--cr-dark)]">{m.name}</span>
+                              <span className="text-[var(--color-brand-secondary)] font-mono font-medium text-[11px] sm:text-xs">{m.dosage} • {m.frequency} • {m.duration}</span>
                             </div>
                           ))}
                         </div>
                       )}
                       {matchingRx.general_notes && (
-                        <p className="text-xs text-[#5A6A51] italic">{matchingRx.general_notes}</p>
+                        <p className="text-xs text-[var(--color-brand-secondary)] italic">{matchingRx.general_notes}</p>
                       )}
                       {(matchingRx.follow_up_date || booking.follow_up_date || booking.followUpDate) && (
-                        <div className="pt-2 border-t border-[#414E36]/10 flex items-center justify-between flex-wrap gap-2">
-                          <span className="font-bold text-[#5A6A51] text-[11px]">{t.followUpDateBadge || "Follow-Up Due:"}</span>
+                        <div className="pt-2 border-t border-[var(--cr-primary)]/10 flex items-center justify-between flex-wrap gap-2">
+                          <span className="font-bold text-[var(--color-brand-secondary)] text-[11px]">{t.followUpDateBadge || "Follow-Up Due:"}</span>
                           <span className="font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full text-[11px]">
                             {matchingRx.follow_up_date || booking.follow_up_date || booking.followUpDate}
                           </span>
@@ -563,10 +563,10 @@ export default function DoctorPatientHistoryDrawer({
 
                   {/* Doctor Clinical Notes for this specific visit */}
                   <div className="space-y-1">
-                    <span className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-[#5A6A51] flex items-center gap-1.5">
+                    <span className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-[var(--color-brand-secondary)] flex items-center gap-1.5">
                       <FileText size={14} /> {t.doctorNotesTitle}:
                     </span>
-                    <p className="text-xs sm:text-sm text-[#1F251A] bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10 font-sans leading-relaxed">
+                    <p className="text-xs sm:text-sm text-[var(--cr-dark)] bg-[var(--color-brand-light)] p-3.5 sm:p-4 rounded-2xl border border-[var(--cr-primary)]/10 font-sans leading-relaxed">
                       {parsed.cleanDoctorNote || t.noBookingNotes}
                     </p>
                   </div>
@@ -574,7 +574,7 @@ export default function DoctorPatientHistoryDrawer({
                   {/* Session Consumables Log */}
                   {parsed.productsLog && (
                     <div className="text-xs font-medium text-[#374151] bg-[#F7F7F9] p-3 rounded-2xl border border-gray-200 flex items-center gap-2">
-                      <Package size={15} className="text-[#414E36] shrink-0" />
+                      <Package size={15} className="text-[var(--cr-primary)] shrink-0" />
                       <span className="truncate">{parsed.productsLog.replace(/^\[Products Used During Session\]:\s*/i, "Consumables Used: ")}</span>
                     </div>
                   )}
@@ -587,10 +587,10 @@ export default function DoctorPatientHistoryDrawer({
         {/* Tab 2: Medical Record & Intake */}
         {activeTab === "medical" && (
           <div className="space-y-4 sm:space-y-6">
-            <div className="rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 md:p-8 border border-[#414E36]/12 space-y-4 sm:space-y-6 shadow-xs">
-              <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 sm:pb-4 flex-wrap gap-2">
-                <h3 className="text-sm sm:text-base font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2.5">
-                  <ShieldAlert size={18} className="text-[#414E36]" /> {t.patientMedicalRecordTitle}
+            <div className="rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 md:p-8 border border-[var(--cr-primary)]/12 space-y-4 sm:space-y-6 shadow-xs">
+              <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-3 sm:pb-4 flex-wrap gap-2">
+                <h3 className="text-sm sm:text-base font-extrabold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2.5">
+                  <ShieldAlert size={18} className="text-[var(--cr-primary)]" /> {t.patientMedicalRecordTitle}
                 </h3>
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 border border-emerald-200">
                   <CheckCircle2 size={12} /> {t.onFileStatus}
@@ -598,9 +598,9 @@ export default function DoctorPatientHistoryDrawer({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 text-sm">
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10">
-                  <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-1 sm:mb-2">{t.skinTypeLabel}</span>
-                  <span className="font-extrabold text-[#1F251A] text-base sm:text-lg">{medicalRecordData?.skin_type || 'Normal / Unspecified'}</span>
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10">
+                  <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-1 sm:mb-2">{t.skinTypeLabel}</span>
+                  <span className="font-extrabold text-[var(--cr-dark)] text-base sm:text-lg">{medicalRecordData?.skin_type || 'Normal / Unspecified'}</span>
                 </div>
 
                 <div className="bg-rose-50/70 p-4 sm:p-6 rounded-2xl border border-rose-200">
@@ -610,29 +610,29 @@ export default function DoctorPatientHistoryDrawer({
                   <span className="font-extrabold text-rose-800 text-base sm:text-lg">{medicalRecordData?.allergies || 'No known allergies'}</span>
                 </div>
 
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10 col-span-1 md:col-span-2">
-                  <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-1 sm:mb-2">{t.currentMedicationLabel}</span>
-                  <span className="font-semibold text-[#1F251A] text-sm sm:text-base leading-relaxed">{medicalRecordData?.medication_details || 'None reported'}</span>
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10 col-span-1 md:col-span-2">
+                  <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-1 sm:mb-2">{t.currentMedicationLabel}</span>
+                  <span className="font-semibold text-[var(--cr-dark)] text-sm sm:text-base leading-relaxed">{medicalRecordData?.medication_details || 'None reported'}</span>
                 </div>
 
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10 col-span-1 md:col-span-2">
-                  <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-1 sm:mb-2">{t.medicalConditionsLabel}</span>
-                  <span className="font-semibold text-[#1F251A] text-sm sm:text-base leading-relaxed">{medicalRecordData?.medical_conditions_details || 'None reported'}</span>
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10 col-span-1 md:col-span-2">
+                  <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-1 sm:mb-2">{t.medicalConditionsLabel}</span>
+                  <span className="font-semibold text-[var(--cr-dark)] text-sm sm:text-base leading-relaxed">{medicalRecordData?.medical_conditions_details || 'None reported'}</span>
                 </div>
 
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10 col-span-1 md:col-span-2">
-                  <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-1 sm:mb-2">{t.previousTreatmentsLabel || "Previous Treatments & Procedures"}</span>
-                  <span className="font-semibold text-[#1F251A] text-sm sm:text-base leading-relaxed">{medicalRecordData?.previous_treatments_details || 'None reported'}</span>
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10 col-span-1 md:col-span-2">
+                  <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-1 sm:mb-2">{t.previousTreatmentsLabel || "Previous Treatments & Procedures"}</span>
+                  <span className="font-semibold text-[var(--cr-dark)] text-sm sm:text-base leading-relaxed">{medicalRecordData?.previous_treatments_details || 'None reported'}</span>
                 </div>
 
                 {medicalRecordData?.responses && Object.keys(medicalRecordData.responses).length > 0 && (
-                  <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10 col-span-1 md:col-span-2 space-y-3">
-                    <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block">Specialized Intake Questionnaire Responses</span>
+                  <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10 col-span-1 md:col-span-2 space-y-3">
+                    <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block">Specialized Intake Questionnaire Responses</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                       {Object.entries(medicalRecordData.responses).map(([key, val]) => (
-                        <div key={key} className="bg-white p-3 sm:p-3.5 rounded-xl border border-[#414E36]/8 space-y-0.5">
-                          <span className="text-[10px] sm:text-[11px] font-bold text-[#5A6A51] capitalize block">{key.replace(/_/g, ' ')}</span>
-                          <span className="text-xs font-bold text-[#1F251A] block">{typeof val === 'boolean' ? (val ? 'Yes / Confirmed' : 'No') : String(val || 'None')}</span>
+                        <div key={key} className="bg-white p-3 sm:p-3.5 rounded-xl border border-[var(--cr-primary)]/8 space-y-0.5">
+                          <span className="text-[10px] sm:text-[11px] font-bold text-[var(--color-brand-secondary)] capitalize block">{key.replace(/_/g, ' ')}</span>
+                          <span className="text-xs font-bold text-[var(--cr-dark)] block">{typeof val === 'boolean' ? (val ? 'Yes / Confirmed' : 'No') : String(val || 'None')}</span>
                         </div>
                       ))}
                     </div>
@@ -646,78 +646,78 @@ export default function DoctorPatientHistoryDrawer({
         {/* Tab 3: Personal Info */}
         {activeTab === "personal" && (
           <div className="space-y-4 sm:space-y-6">
-            <div className="rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 md:p-8 border border-[#414E36]/12 space-y-4 sm:space-y-6 shadow-xs">
-              <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 sm:pb-4 flex-wrap gap-2">
-                <h3 className="text-sm sm:text-base font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2.5">
-                  <User size={18} className="text-[#414E36]" /> Patient Personal Profile Details
+            <div className="rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 md:p-8 border border-[var(--cr-primary)]/12 space-y-4 sm:space-y-6 shadow-xs">
+              <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-3 sm:pb-4 flex-wrap gap-2">
+                <h3 className="text-sm sm:text-base font-extrabold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2.5">
+                  <User size={18} className="text-[var(--cr-primary)]" /> Patient Personal Profile Details
                 </h3>
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#414E36]/10 px-3 py-1 text-xs font-bold text-[#414E36]">
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--cr-primary)]/10 px-3 py-1 text-xs font-bold text-[var(--cr-primary)]">
                   ID: #{selectedPatientHistory.id}
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 text-sm">
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10">
-                  <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-                    <User size={14} className="text-[#414E36]" /> Full Name
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10">
+                  <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                    <User size={14} className="text-[var(--cr-primary)]" /> Full Name
                   </span>
-                  <span className="font-black text-[#1F251A] text-base sm:text-lg">{selectedPatientHistory.name}</span>
+                  <span className="font-black text-[var(--cr-dark)] text-base sm:text-lg">{selectedPatientHistory.name}</span>
                 </div>
 
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10">
-                  <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-                    <Phone size={14} className="text-[#414E36]" /> Mobile Phone
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10">
+                  <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                    <Phone size={14} className="text-[var(--cr-primary)]" /> Mobile Phone
                   </span>
-                  <span className="font-mono font-black text-[#1F251A] text-base sm:text-lg">{phoneDisplay}</span>
+                  <span className="font-mono font-black text-[var(--cr-dark)] text-base sm:text-lg">{phoneDisplay}</span>
                 </div>
 
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10">
-                  <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-                    <Mail size={14} className="text-[#414E36]" /> Email Address
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10">
+                  <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                    <Mail size={14} className="text-[var(--cr-primary)]" /> Email Address
                   </span>
-                  <span className="font-bold text-[#1F251A] text-sm sm:text-base truncate block">{emailDisplay}</span>
+                  <span className="font-bold text-[var(--cr-dark)] text-sm sm:text-base truncate block">{emailDisplay}</span>
                 </div>
 
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10">
-                  <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-                    <Sparkles size={14} className="text-[#414E36]" /> Gender
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10">
+                  <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-[var(--cr-primary)]" /> Gender
                   </span>
-                  <span className="font-bold text-[#1F251A] text-sm sm:text-base capitalize">{genderDisplay}</span>
+                  <span className="font-bold text-[var(--cr-dark)] text-sm sm:text-base capitalize">{genderDisplay}</span>
                 </div>
 
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10">
-                  <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-                    <Calendar size={14} className="text-[#414E36]" /> Date of Birth / Age
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10">
+                  <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                    <Calendar size={14} className="text-[var(--cr-primary)]" /> Date of Birth / Age
                   </span>
-                  <span className="font-bold text-[#1F251A] text-sm sm:text-base">{dobDisplay}</span>
+                  <span className="font-bold text-[var(--cr-dark)] text-sm sm:text-base">{dobDisplay}</span>
                 </div>
 
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10">
-                  <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-                    <MapPin size={14} className="text-[#414E36]" /> Address / Location
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10">
+                  <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                    <MapPin size={14} className="text-[var(--cr-primary)]" /> Address / Location
                   </span>
-                  <span className="font-bold text-[#1F251A] text-sm sm:text-base">{addressDisplay}</span>
+                  <span className="font-bold text-[var(--cr-dark)] text-sm sm:text-base">{addressDisplay}</span>
                 </div>
 
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10">
-                  <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-                    <Calendar size={14} className="text-[#414E36]" /> Member Since
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10">
+                  <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                    <Calendar size={14} className="text-[var(--cr-primary)]" /> Member Since
                   </span>
-                  <span className="font-bold text-[#1F251A] text-sm sm:text-base">{memberSince}</span>
+                  <span className="font-bold text-[var(--cr-dark)] text-sm sm:text-base">{memberSince}</span>
                 </div>
 
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10 col-span-1 sm:col-span-2">
-                  <span className="text-[11px] sm:text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-                    <Hash size={14} className="text-[#414E36]" /> Total Completed Visits
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10 col-span-1 sm:col-span-2">
+                  <span className="text-[11px] sm:text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                    <Hash size={14} className="text-[var(--cr-primary)]" /> Total Completed Visits
                   </span>
-                  <span className="font-black text-[#414E36] text-base sm:text-lg">{selectedPatientHistory.totalVisits} Completed Clinic Visits</span>
+                  <span className="font-black text-[var(--cr-primary)] text-base sm:text-lg">{selectedPatientHistory.totalVisits} Completed Clinic Visits</span>
                 </div>
               </div>
 
               {customerFullData?.notes && (
-                <div className="bg-[#FBFBF9] p-4 sm:p-6 rounded-2xl border border-[#414E36]/10">
-                  <span className="text-xs font-bold text-[#5A6A51] uppercase tracking-wider block mb-2">Internal Patient Notes</span>
-                  <p className="text-sm sm:text-base text-[#1F251A] leading-relaxed font-sans">{customerFullData.notes}</p>
+                <div className="bg-[var(--color-brand-light)] p-4 sm:p-6 rounded-2xl border border-[var(--cr-primary)]/10">
+                  <span className="text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block mb-2">Internal Patient Notes</span>
+                  <p className="text-sm sm:text-base text-[var(--cr-dark)] leading-relaxed font-sans">{customerFullData.notes}</p>
                 </div>
               )}
             </div>
@@ -728,15 +728,15 @@ export default function DoctorPatientHistoryDrawer({
         {activeTab === "reports" && (
           <div className="space-y-4 sm:space-y-6 animate-fadeIn">
             {/* Header / Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-[#414E36]/12 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/12 shadow-sm">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-sm sm:text-base font-extrabold text-[#1F251A]">Reports & Documents ({medicalReports.length})</h3>
-                  <span className="bg-[#EDF1EC] text-[#414E36] text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                  <h3 className="text-sm sm:text-base font-extrabold text-[var(--cr-dark)]">Reports & Documents ({medicalReports.length})</h3>
+                  <span className="bg-[var(--color-brand-tint)] text-[var(--cr-primary)] text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full">
                     {medicalReports.length} {medicalReports.length === 1 ? "Document" : "Documents"}
                   </span>
                 </div>
-                <p className="text-xs text-[#5A6A51]">
+                <p className="text-xs text-[var(--color-brand-secondary)]">
                   Lab results, diagnostic scan reports, and external clinical documents uploaded by receptionists or doctors.
                 </p>
               </div>
@@ -744,7 +744,7 @@ export default function DoctorPatientHistoryDrawer({
               <button
                 type="button"
                 onClick={() => setShowMedicalReportModal(true)}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2.5 sm:py-3 text-xs font-bold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm shrink-0 cursor-pointer w-full sm:w-auto"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--cr-primary)] px-5 py-2.5 sm:py-3 text-xs font-bold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] shadow-sm shrink-0 cursor-pointer w-full sm:w-auto"
               >
                 <Plus size={16} /> Upload Report
               </button>
@@ -752,24 +752,24 @@ export default function DoctorPatientHistoryDrawer({
 
             {/* Reports List */}
             {loadingReports ? (
-              <div className="p-8 sm:p-12 text-center text-sm text-[#5A6A51] bg-white rounded-2xl sm:rounded-3xl border border-[#414E36]/12 flex items-center justify-center gap-2">
-                <Loader2 size={18} className="animate-spin text-[#414E36]" /> Loading medical reports...
+              <div className="p-8 sm:p-12 text-center text-sm text-[var(--color-brand-secondary)] bg-white rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/12 flex items-center justify-center gap-2">
+                <Loader2 size={18} className="animate-spin text-[var(--cr-primary)]" /> Loading medical reports...
               </div>
             ) : medicalReports.length === 0 ? (
-              <div className="text-center py-12 sm:py-16 bg-white rounded-2xl sm:rounded-3xl border border-[#414E36]/12 shadow-sm space-y-4 p-4 sm:p-6">
-                <div className="h-14 w-14 sm:h-16 sm:w-16 mx-auto rounded-2xl sm:rounded-3xl bg-[#EDF1EC] text-[#414E36] flex items-center justify-center">
+              <div className="text-center py-12 sm:py-16 bg-white rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/12 shadow-sm space-y-4 p-4 sm:p-6">
+                <div className="h-14 w-14 sm:h-16 sm:w-16 mx-auto rounded-2xl sm:rounded-3xl bg-[var(--color-brand-tint)] text-[var(--cr-primary)] flex items-center justify-center">
                   <FileText size={28} />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-sm sm:text-base font-extrabold text-[#1F251A]">No medical reports uploaded yet</h3>
-                  <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
+                  <h3 className="text-sm sm:text-base font-extrabold text-[var(--cr-dark)]">No medical reports uploaded yet</h3>
+                  <p className="text-xs text-[var(--color-brand-secondary)] max-w-sm mx-auto">
                     Upload lab results, scan reports, or external clinical documents for this patient.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowMedicalReportModal(true)}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2.5 sm:py-3 text-xs font-bold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm cursor-pointer"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-[var(--cr-primary)] px-5 py-2.5 sm:py-3 text-xs font-bold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] shadow-sm cursor-pointer"
                 >
                   <Plus size={16} /> Upload Report
                 </button>
@@ -779,19 +779,19 @@ export default function DoctorPatientHistoryDrawer({
                 {medicalReports.map((report) => (
                   <div
                     key={report.id}
-                    className="bg-white rounded-2xl sm:rounded-3xl border border-[#414E36]/12 p-4 sm:p-5 space-y-3.5 relative shadow-xs hover:border-[#414E36]/25 transition flex flex-col justify-between"
+                    className="bg-white rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/12 p-4 sm:p-5 space-y-3.5 relative shadow-xs hover:border-[var(--cr-primary)]/25 transition flex flex-col justify-between"
                   >
                     <div className="space-y-2.5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-2xl bg-[#EDF1EC] text-[#414E36] flex items-center justify-center shrink-0">
+                          <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-2xl bg-[var(--color-brand-tint)] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
                             <FileText size={18} />
                           </div>
                           <div className="min-w-0">
-                            <h5 className="font-extrabold text-[#1F251A] text-xs sm:text-sm truncate">
+                            <h5 className="font-extrabold text-[var(--cr-dark)] text-xs sm:text-sm truncate">
                               {report.title || report.report_title || "Medical Document"}
                             </h5>
-                            <span className="text-[9px] sm:text-[10px] font-bold text-[#5A6A51] uppercase bg-[#F4F5F1] px-2 py-0.5 rounded-md inline-block mt-0.5 truncate">
+                            <span className="text-[9px] sm:text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase bg-[#F4F5F1] px-2 py-0.5 rounded-md inline-block mt-0.5 truncate">
                               {report.doctor_name ? `Uploaded by ${report.doctor_name}` : report.report_type || "Clinical Report"}
                             </span>
                           </div>
@@ -807,13 +807,13 @@ export default function DoctorPatientHistoryDrawer({
                       </div>
 
                       {(report.description || report.notes) && (
-                        <p className="text-xs text-[#5A6A51] bg-[#FBFBF9] p-3 rounded-xl border border-[#414E36]/8 leading-relaxed">
+                        <p className="text-xs text-[var(--color-brand-secondary)] bg-[var(--color-brand-light)] p-3 rounded-xl border border-[var(--cr-primary)]/8 leading-relaxed">
                           {report.description || report.notes}
                         </p>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between pt-2.5 border-t border-[#414E36]/8 text-xs text-[#8A9A81] gap-2 flex-wrap">
+                    <div className="flex items-center justify-between pt-2.5 border-t border-[var(--cr-primary)]/8 text-xs text-[#8A9A81] gap-2 flex-wrap">
                       <span className="font-medium text-[11px] sm:text-xs">
                         {report.date || (report.created_at ? new Date(report.created_at).toLocaleDateString() : "Recent")}
                       </span>
@@ -822,7 +822,7 @@ export default function DoctorPatientHistoryDrawer({
                           href={report.file_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[#414E36] font-bold hover:underline bg-[#EDF1EC] px-3 py-1.5 rounded-xl transition hover:bg-[#414E36] hover:text-white text-[11px] sm:text-xs"
+                          className="inline-flex items-center gap-1 text-[var(--cr-primary)] font-bold hover:underline bg-[var(--color-brand-tint)] px-3 py-1.5 rounded-xl transition hover:bg-[var(--cr-primary)] hover:text-white text-[11px] sm:text-xs"
                         >
                           <span>View Document</span>
                           <ExternalLink size={12} />

@@ -1,19 +1,20 @@
 "use client";
 
 import React, { useState } from "react";
+import { CLIENT } from "@/config/client";
 
 interface ClinicProfileSettingsViewProps {
   authenticatedJsonHeaders: { "Content-Type": string; Authorization: string };
 }
 
 export default function ClinicProfileSettingsView({ authenticatedJsonHeaders }: ClinicProfileSettingsViewProps) {
-  const [clinicName, setClinicName] = useState("Revera Clinics");
+  const [clinicName, setClinicName] = useState<string>(CLIENT.name);
   const [clinicNameAr, setClinicNameAr] = useState("ريفيرا كلينك");
   const [clinicLocation, setClinicLocation] = useState("Sheikh Zayed City, Giza");
   const [clinicLocationAr, setClinicLocationAr] = useState("مدينة الشيخ زايد، الجيزة");
   const [clinicEmail, setClinicEmail] = useState("info@reveraclinics.com");
   const [clinicPhone, setClinicPhone] = useState("+20 2 3796 2200");
-  const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
+  const [clinicWhatsapp, setClinicWhatsapp] = useState<string>(CLIENT.phoneTel);
   const [savingClinicProfile, setSavingClinicProfile] = useState(false);
 
   async function handleSaveClinicProfile(e: React.FormEvent) {
@@ -38,14 +39,14 @@ export default function ClinicProfileSettingsView({ authenticatedJsonHeaders }: 
     <div className="space-y-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-semibold text-[#1F251A]">Clinic Profile Settings</h2>
-          <p className="mt-2 text-sm text-[#5A6A51]">Configure the core identity, contact details, and localization of your clinic.</p>
+          <h2 className="text-4xl font-semibold text-[var(--cr-dark)]">Clinic Profile Settings</h2>
+          <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">Configure the core identity, contact details, and localization of your clinic.</p>
         </div>
         <button
           form="clinic-profile-form"
           type="submit"
           disabled={savingClinicProfile}
-          className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+          className="rounded-3xl bg-[var(--cr-primary)] px-6 py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
         >
           {savingClinicProfile ? "Saving..." : "Save Profile"}
         </button>
@@ -54,68 +55,68 @@ export default function ClinicProfileSettingsView({ authenticatedJsonHeaders }: 
         <form id="clinic-profile-form" className="space-y-6" onSubmit={handleSaveClinicProfile}>
           <div className="grid gap-6 md:grid-cols-2">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Clinic Brand Name (EN)</label>
+              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)] mb-2">Clinic Brand Name (EN)</label>
               <input
                 type="text"
                 value={clinicName}
                 onChange={(e) => setClinicName(e.target.value)}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">اسم العلامة التجارية (AR)</label>
+              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)] mb-2 text-right">اسم العلامة التجارية (AR)</label>
               <input
                 type="text"
                 dir="rtl"
                 value={clinicNameAr}
                 onChange={(e) => setClinicNameAr(e.target.value)}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition text-right"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition text-right"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Primary Location (EN)</label>
+              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)] mb-2">Primary Location (EN)</label>
               <input
                 type="text"
                 value={clinicLocation}
                 onChange={(e) => setClinicLocation(e.target.value)}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">الموقع الرئيسي (AR)</label>
+              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)] mb-2 text-right">الموقع الرئيسي (AR)</label>
               <input
                 type="text"
                 dir="rtl"
                 value={clinicLocationAr}
                 onChange={(e) => setClinicLocationAr(e.target.value)}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition text-right"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition text-right"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Inquiries Email</label>
+              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)] mb-2">Inquiries Email</label>
               <input
                 type="email"
                 value={clinicEmail}
                 onChange={(e) => setClinicEmail(e.target.value)}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Inquiries Phone</label>
+              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)] mb-2">Inquiries Phone</label>
               <input
                 type="text"
                 value={clinicPhone}
                 onChange={(e) => setClinicPhone(e.target.value)}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">WhatsApp Number</label>
+              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)] mb-2">WhatsApp Number</label>
               <input
                 type="text"
                 value={clinicWhatsapp}
                 onChange={(e) => setClinicWhatsapp(e.target.value)}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] transition"
               />
               <span className="text-[11px] text-[#8A9A81] mt-1 block">Used for the WhatsApp floating chat button visible on all public pages.</span>
             </div>

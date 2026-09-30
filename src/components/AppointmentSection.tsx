@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function AppointmentSection() {
   const { t, isRTL } = useLanguage();
@@ -44,7 +45,7 @@ export function AppointmentSection() {
           className="ap-rounded-card rounded-[24px] sm:rounded-[60px]"
           style={{
             position: "relative",
-            backgroundColor: "var(--cr-secondary, #EDF1EC)",
+            backgroundColor: "var(--cr-secondary, var(--color-brand-tint))",
             border: "1px solid rgba(196,174,124,0.35)",
             overflow: "hidden",
             padding: "clamp(40px, 6vw, 80px) clamp(24px, 5vw, 72px)",
@@ -146,7 +147,7 @@ export function AppointmentSection() {
               width: 100%;
               height: 96%;
               border-radius: 200px 200px 0 0;
-              background-color: #EDF1EC;
+              background-color: var(--color-brand-tint);
               z-index: 1;
             }
             .rtl .ap-image-backdrop {
@@ -206,7 +207,7 @@ export function AppointmentSection() {
                 <div className="ap-image-container">
                   <Image
                     src="/images/clinic/support-agent.jpg"
-                    alt="Contact support — Revera Clinics"
+                    alt={`Contact support — ${CLIENT.name}`}
                     fill
                     sizes="(max-width: 768px) 100vw, 400px"
                     style={{ objectFit: "cover", objectPosition: "center top" }}
@@ -271,7 +272,7 @@ export function AppointmentSection() {
                   fontSize: "clamp(26px, 3.5vw, 42px)",
                   lineHeight: 1.15,
                   fontWeight: 400,
-                  color: "var(--cr-primary, #1F251A)",
+                  color: "var(--cr-primary, var(--cr-dark))",
                 }}
               >
                 {t.appointment.heading}

@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { AuthModal } from "@/components/AuthModal";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
+import { CLIENT } from "@/config/client";
 
 /**
  * GET/POST /api/customers requires an authenticated caller (staff or the patient's own
@@ -112,7 +113,7 @@ export default function ProfilePage() {
   // Fetch localstorage user or Supabase Auth session on mount
   useEffect(() => {
     let active = true;
-    const stored = localStorage.getItem("revera_user");
+    const stored = localStorage.getItem(`${CLIENT.storagePrefix}_user`);
     if (stored) {
       try {
         const u = JSON.parse(stored);
@@ -141,7 +142,7 @@ export default function ProfilePage() {
           setFullName(authUser.name);
           setEmail(authUser.email || "");
           setMobileAndPreloadData(authUser);
-          localStorage.setItem("revera_user", JSON.stringify(authUser));
+          localStorage.setItem(`${CLIENT.storagePrefix}_user`, JSON.stringify(authUser));
         }
         setLoadingAuth(false);
       }).catch(() => {
@@ -180,8 +181,8 @@ export default function ProfilePage() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("revera_user");
-    sessionStorage.removeItem("revera_profile_prompted");
+    localStorage.removeItem(`${CLIENT.storagePrefix}_user`);
+    sessionStorage.removeItem(`${CLIENT.storagePrefix}_profile_prompted`);
     window.dispatchEvent(new CustomEvent("revera-auth-change"));
     router.push("/");
   };
@@ -225,7 +226,7 @@ export default function ProfilePage() {
         setDbProfile(updated);
         // Sync local storage user details
         const updatedUser = { ...user, name: updated.name, email: updated.email, gender: updated.gender };
-        localStorage.setItem("revera_user", JSON.stringify(updatedUser));
+        localStorage.setItem(`${CLIENT.storagePrefix}_user`, JSON.stringify(updatedUser));
         window.dispatchEvent(new CustomEvent("revera-auth-change"));
         setEditMode(false);
       } else {
@@ -299,8 +300,8 @@ export default function ProfilePage() {
 
   if (loadingAuth) {
     return (
-      <div className="min-h-screen bg-[#FBFBF9] flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-[#414E36]/20 border-t-[#414E36] rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-[var(--color-brand-light)] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-[var(--cr-primary)]/20 border-t-[var(--cr-primary)] rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -310,18 +311,18 @@ export default function ProfilePage() {
     return (
       <>
         <Navbar />
-        <main className="min-h-screen bg-[#FBFBF9] pt-32 pb-20 flex items-center justify-center px-4">
-          <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-[0_20px_50px_rgba(47,61,41,0.05)] border border-[#414E36]/10 text-center">
-            <div className="mx-auto w-16 h-16 bg-[#EDF1EC] rounded-full flex items-center justify-center text-[#414E36] mb-6">
+        <main className="min-h-screen bg-[var(--color-brand-light)] pt-32 pb-20 flex items-center justify-center px-4">
+          <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-[0_20px_50px_rgba(47,61,41,0.05)] border border-[var(--cr-primary)]/10 text-center">
+            <div className="mx-auto w-16 h-16 bg-[var(--color-brand-tint)] rounded-full flex items-center justify-center text-[var(--cr-primary)] mb-6">
               <Lock size={28} />
             </div>
-            <h2 className="text-2xl font-bold text-[#1F251A]">{profileT.loginRequired}</h2>
-            <p className="text-[#5A6A51] text-sm mt-3 leading-relaxed">
+            <h2 className="text-2xl font-bold text-[var(--cr-dark)]">{profileT.loginRequired}</h2>
+            <p className="text-[var(--color-brand-secondary)] text-sm mt-3 leading-relaxed">
               {profileT.loginDesc}
             </p>
             <button
               onClick={() => router.push("/")}
-              className="mt-8 w-full bg-[#414E36] text-[#FBFBF9] py-3.5 rounded-2xl font-bold hover:bg-[#2e3a26] transition shadow-md"
+              className="mt-8 w-full bg-[var(--cr-primary)] text-[var(--color-brand-light)] py-3.5 rounded-2xl font-bold hover:bg-[#2e3a26] transition shadow-md"
             >
               {profileT.goLogin}
             </button>
@@ -339,19 +340,19 @@ export default function ProfilePage() {
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-[#FBFBF9] pt-32 pb-20" dir={isRTL ? "rtl" : "ltr"}>
+      <main className="min-h-screen bg-[var(--color-brand-light)] pt-32 pb-20" dir={isRTL ? "rtl" : "ltr"}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Cover Header */}
-          <div className="relative rounded-[40px] overflow-hidden bg-gradient-to-br from-[#1F251A] to-[#414E36] p-8 sm:p-12 text-[#FBFBF9] shadow-xl mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+          <div className="relative rounded-[40px] overflow-hidden bg-gradient-to-br from-[var(--cr-dark)] to-[var(--cr-primary)] p-8 sm:p-12 text-[var(--color-brand-light)] shadow-xl mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
             <div className="flex items-center gap-5">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#C4AE7C]/20 ring-4 ring-[#C4AE7C]/40 flex items-center justify-center text-[#C4AE7C] text-2xl font-bold">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[var(--cr-accent)]/20 ring-4 ring-[var(--cr-accent)]/40 flex items-center justify-center text-[var(--cr-accent)] text-2xl font-bold">
                 {fullName.charAt(0) || "U"}
               </div>
               <div>
-                <span className="text-xs uppercase tracking-widest text-[#C4AE7C] font-bold">Revera Patient Account</span>
+                <span className="text-xs uppercase tracking-widest text-[var(--cr-accent)] font-bold">{CLIENT.nameShort} Patient Account</span>
                 <h1 className="text-2xl sm:text-3xl font-bold mt-1">{fullName}</h1>
-                <p className="text-xs text-[#FBFBF9]/70 mt-1 flex items-center gap-1.5">
+                <p className="text-xs text-[var(--color-brand-light)]/70 mt-1 flex items-center gap-1.5">
                   <Phone size={12} /> {dbProfile?.mobile || user.mobile}
                 </p>
               </div>
@@ -360,7 +361,7 @@ export default function ProfilePage() {
             <div className="flex gap-3 w-full sm:w-auto">
               <button
                 onClick={() => setEditMode(!editMode)}
-                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FBFBF9]/20 bg-[#FBFBF9]/10 px-5 py-3 text-sm font-semibold hover:bg-[#FBFBF9]/20 transition"
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--color-brand-light)]/20 bg-[var(--color-brand-light)]/10 px-5 py-3 text-sm font-semibold hover:bg-[var(--color-brand-light)]/20 transition"
               >
                 {editMode ? <ArrowLeft size={16} /> : <Edit size={16} />}
                 {editMode ? profileT.cancelBtn : profileT.editBtn}
@@ -378,20 +379,20 @@ export default function ProfilePage() {
           {/* Financial Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
             {/* Wallet Balance Card */}
-            <div className="bg-white rounded-3xl p-6 shadow-md border border-[#C4AE7C]/30 flex items-center justify-between">
+            <div className="bg-white rounded-3xl p-6 shadow-md border border-[var(--cr-accent)]/30 flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">{profileT.walletBal}</p>
-                <p className="text-2xl font-bold text-[#1F251A] mt-2">EGP {walletVal.toLocaleString()}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">{profileT.walletBal}</p>
+                <p className="text-2xl font-bold text-[var(--cr-dark)] mt-2">EGP {walletVal.toLocaleString()}</p>
               </div>
-              <div className="w-12 h-12 rounded-2xl bg-[#C4AE7C]/10 text-[#C4AE7C] flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--cr-accent)]/10 text-[var(--cr-accent)] flex items-center justify-center">
                 <Wallet size={24} />
               </div>
             </div>
 
             {/* Total Spent Card */}
-            <div className="bg-white rounded-3xl p-6 shadow-md border border-[#414E36]/10 flex items-center justify-between">
+            <div className="bg-white rounded-3xl p-6 shadow-md border border-[var(--cr-primary)]/10 flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">{profileT.totalSpent}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">{profileT.totalSpent}</p>
                 <p className="text-2xl font-bold text-green-600 mt-2">EGP {spentVal.toLocaleString()}</p>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center">
@@ -400,9 +401,9 @@ export default function ProfilePage() {
             </div>
 
             {/* Outstanding Card */}
-            <div className="bg-white rounded-3xl p-6 shadow-md border border-[#414E36]/10 flex items-center justify-between">
+            <div className="bg-white rounded-3xl p-6 shadow-md border border-[var(--cr-primary)]/10 flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">{profileT.outstanding}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">{profileT.outstanding}</p>
                 <p className="text-2xl font-bold text-red-600 mt-2">EGP {outstandingVal.toLocaleString()}</p>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
@@ -416,9 +417,9 @@ export default function ProfilePage() {
             
             {/* Left Column: Profile form */}
             <div className="lg:col-span-1 space-y-6">
-              <div className="bg-white rounded-[32px] p-6 shadow-[0_15px_40px_rgba(47,61,41,0.03)] border border-[#414E36]/10">
-                <h3 className="text-lg font-bold text-[#1F251A] mb-4 pb-3 border-b border-[#414E36]/10 flex items-center gap-2">
-                  <User size={18} className="text-[#C4AE7C]" />
+              <div className="bg-white rounded-[32px] p-6 shadow-[0_15px_40px_rgba(47,61,41,0.03)] border border-[var(--cr-primary)]/10">
+                <h3 className="text-lg font-bold text-[var(--cr-dark)] mb-4 pb-3 border-b border-[var(--cr-primary)]/10 flex items-center gap-2">
+                  <User size={18} className="text-[var(--cr-accent)]" />
                   {isRTL ? "بيانات الملف الشخصي" : "Personal Information"}
                 </h3>
                 
@@ -430,30 +431,30 @@ export default function ProfilePage() {
                       </div>
                     )}
                     <div>
-                      <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{profileT.nameLabel}</label>
+                      <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1">{profileT.nameLabel}</label>
                       <input
                         type="text"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{profileT.emailLabel}</label>
+                      <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1">{profileT.emailLabel}</label>
                       <input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{profileT.genderLabel}</label>
+                      <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1">{profileT.genderLabel}</label>
                       <select
                         value={gender}
                         onChange={(e) => setGender(e.target.value)}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                       >
                         <option value="">Select Gender</option>
                         <option value="Male">{profileT.genderMale}</option>
@@ -461,45 +462,45 @@ export default function ProfilePage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{profileT.ageLabel}</label>
+                      <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1">{profileT.ageLabel}</label>
                       <input
                         type="number"
                         value={age}
                         onChange={(e) => setAge(e.target.value)}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{profileT.occupationLabel}</label>
+                      <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1">{profileT.occupationLabel}</label>
                       <input
                         type="text"
                         value={occupation}
                         onChange={(e) => setOccupation(e.target.value)}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{profileT.nationalIdLabel}</label>
+                      <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1">{profileT.nationalIdLabel}</label>
                       <input
                         type="text"
                         value={nationalId}
                         onChange={(e) => setNationalId(e.target.value)}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{profileT.addressLabel}</label>
+                      <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1">{profileT.addressLabel}</label>
                       <textarea
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
                         rows={2}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                       />
                     </div>
                     <button
                       type="submit"
                       disabled={savingForm}
-                      className="w-full inline-flex items-center justify-center gap-1.5 rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
+                      className="w-full inline-flex items-center justify-center gap-1.5 rounded-2xl bg-[var(--cr-primary)] py-3 text-sm font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition disabled:opacity-50"
                     >
                       <Save size={16} />
                       {savingForm ? "Saving..." : profileT.saveBtn}
@@ -508,38 +509,38 @@ export default function ProfilePage() {
                 ) : (
                   <div className="space-y-4">
                     <div>
-                      <p className="text-xs text-[#5A6A51] font-semibold">{profileT.nameLabel}</p>
-                      <p className="text-sm font-bold text-[#1F251A] mt-0.5">{dbProfile?.name || user.name}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)] font-semibold">{profileT.nameLabel}</p>
+                      <p className="text-sm font-bold text-[var(--cr-dark)] mt-0.5">{dbProfile?.name || user.name}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-[#5A6A51] font-semibold">{profileT.mobileLabel}</p>
-                      <p className="text-sm font-bold text-[#1F251A] mt-0.5">{dbProfile?.mobile || user.mobile}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)] font-semibold">{profileT.mobileLabel}</p>
+                      <p className="text-sm font-bold text-[var(--cr-dark)] mt-0.5">{dbProfile?.mobile || user.mobile}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-[#5A6A51] font-semibold">{profileT.emailLabel}</p>
-                      <p className="text-sm font-bold text-[#1F251A] mt-0.5">{dbProfile?.email || "—"}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)] font-semibold">{profileT.emailLabel}</p>
+                      <p className="text-sm font-bold text-[var(--cr-dark)] mt-0.5">{dbProfile?.email || "—"}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-[#5A6A51] font-semibold">{profileT.genderLabel}</p>
-                      <p className="text-sm font-bold text-[#1F251A] mt-0.5">
+                      <p className="text-xs text-[var(--color-brand-secondary)] font-semibold">{profileT.genderLabel}</p>
+                      <p className="text-sm font-bold text-[var(--cr-dark)] mt-0.5">
                         {dbProfile?.gender === "Male" ? profileT.genderMale : dbProfile?.gender === "Female" ? profileT.genderFemale : "—"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-[#5A6A51] font-semibold">{profileT.ageLabel}</p>
-                      <p className="text-sm font-bold text-[#1F251A] mt-0.5">{dbProfile?.age || "—"}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)] font-semibold">{profileT.ageLabel}</p>
+                      <p className="text-sm font-bold text-[var(--cr-dark)] mt-0.5">{dbProfile?.age || "—"}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-[#5A6A51] font-semibold">{profileT.occupationLabel}</p>
-                      <p className="text-sm font-bold text-[#1F251A] mt-0.5">{dbProfile?.occupation || "—"}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)] font-semibold">{profileT.occupationLabel}</p>
+                      <p className="text-sm font-bold text-[var(--cr-dark)] mt-0.5">{dbProfile?.occupation || "—"}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-[#5A6A51] font-semibold">{profileT.nationalIdLabel}</p>
-                      <p className="text-sm font-bold text-[#1F251A] mt-0.5">{dbProfile?.national_id || "—"}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)] font-semibold">{profileT.nationalIdLabel}</p>
+                      <p className="text-sm font-bold text-[var(--cr-dark)] mt-0.5">{dbProfile?.national_id || "—"}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-[#5A6A51] font-semibold">{profileT.addressLabel}</p>
-                      <p className="text-sm font-bold text-[#1F251A] mt-0.5 leading-relaxed">{dbProfile?.address || "—"}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)] font-semibold">{profileT.addressLabel}</p>
+                      <p className="text-sm font-bold text-[var(--cr-dark)] mt-0.5 leading-relaxed">{dbProfile?.address || "—"}</p>
                     </div>
                   </div>
                 )}
@@ -548,24 +549,24 @@ export default function ProfilePage() {
 
             {/* Right Column: Booking history */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-[32px] p-6 sm:p-8 shadow-[0_15px_40px_rgba(47,61,41,0.03)] border border-[#414E36]/10">
+              <div className="bg-white rounded-[32px] p-6 sm:p-8 shadow-[0_15px_40px_rgba(47,61,41,0.03)] border border-[var(--cr-primary)]/10">
                 <div>
-                  <h2 className="text-xl font-bold text-[#1F251A]">{profileT.bookingsTitle}</h2>
-                  <p className="text-sm text-[#5A6A51] mt-1">{profileT.bookingsDesc}</p>
+                  <h2 className="text-xl font-bold text-[var(--cr-dark)]">{profileT.bookingsTitle}</h2>
+                  <p className="text-sm text-[var(--color-brand-secondary)] mt-1">{profileT.bookingsDesc}</p>
                 </div>
 
                 <div className="mt-8 space-y-4">
                   {loadingBookings ? (
                     <div className="py-12 flex justify-center">
-                      <div className="w-8 h-8 border-4 border-[#414E36]/20 border-t-[#414E36] rounded-full animate-spin"></div>
+                      <div className="w-8 h-8 border-4 border-[var(--cr-primary)]/20 border-t-[var(--cr-primary)] rounded-full animate-spin"></div>
                     </div>
                   ) : bookings.length === 0 ? (
-                    <div className="text-center py-12 rounded-3xl bg-[#F9F9F7] border border-[#414E36]/10 px-4">
-                      <Calendar className="mx-auto text-[#5A6A51]/40 mb-4" size={40} />
-                      <p className="text-[#5A6A51] text-sm font-medium">{profileT.emptyBookings}</p>
+                    <div className="text-center py-12 rounded-3xl bg-[#F9F9F7] border border-[var(--cr-primary)]/10 px-4">
+                      <Calendar className="mx-auto text-[var(--color-brand-secondary)]/40 mb-4" size={40} />
+                      <p className="text-[var(--color-brand-secondary)] text-sm font-medium">{profileT.emptyBookings}</p>
                       <button
                         onClick={() => router.push("/book")}
-                        className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-3 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
+                        className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[var(--cr-primary)] px-5 py-3 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition shadow-md"
                       >
                         {profileT.bookNow}
                       </button>
@@ -588,12 +589,12 @@ export default function ProfilePage() {
                       return (
                         <div
                           key={booking.id}
-                          className="rounded-3xl border border-[#414E36]/10 p-5 hover:border-[#C4AE7C] transition-all bg-[#FBFBF9]/30 hover:bg-white"
+                          className="rounded-3xl border border-[var(--cr-primary)]/10 p-5 hover:border-[var(--cr-accent)] transition-all bg-[var(--color-brand-light)]/30 hover:bg-white"
                         >
-                          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3 mb-3">
+                          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--cr-primary)]/10 pb-3 mb-3">
                             <div>
-                              <p className="text-xs text-[#5A6A51] font-semibold">{profileT.sessionDetails}</p>
-                              <h4 className="font-bold text-[#1F251A] text-base mt-0.5">{serviceNames}</h4>
+                              <p className="text-xs text-[var(--color-brand-secondary)] font-semibold">{profileT.sessionDetails}</p>
+                              <h4 className="font-bold text-[var(--cr-dark)] text-base mt-0.5">{serviceNames}</h4>
                             </div>
                             <span className={`inline-flex items-center px-3 py-1 text-xs font-bold rounded-full border ${getStatusBadgeClass(booking.status)}`}>
                               {isRTL ? (
@@ -611,28 +612,28 @@ export default function ProfilePage() {
 
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                             <div>
-                              <p className="text-[#5A6A51] font-semibold flex items-center gap-1">
+                              <p className="text-[var(--color-brand-secondary)] font-semibold flex items-center gap-1">
                                 <Calendar size={12} /> {profileT.dateLabel}
                               </p>
-                              <p className="font-bold text-[#1F251A] mt-1">{booking.date}</p>
+                              <p className="font-bold text-[var(--cr-dark)] mt-1">{booking.date}</p>
                             </div>
                             <div>
-                              <p className="text-[#5A6A51] font-semibold flex items-center gap-1">
+                              <p className="text-[var(--color-brand-secondary)] font-semibold flex items-center gap-1">
                                 <Clock size={12} /> {profileT.timeLabel}
                               </p>
-                              <p className="font-bold text-[#1F251A] mt-1">{booking.timeSlot || "—"}</p>
+                              <p className="font-bold text-[var(--cr-dark)] mt-1">{booking.timeSlot || "—"}</p>
                             </div>
                             <div>
-                              <p className="text-[#5A6A51] font-semibold flex items-center gap-1">
+                              <p className="text-[var(--color-brand-secondary)] font-semibold flex items-center gap-1">
                                 <User size={12} /> {profileT.doctorLabel}
                               </p>
-                              <p className="font-bold text-[#1F251A] mt-1">{booking.doctorName || "—"}</p>
+                              <p className="font-bold text-[var(--cr-dark)] mt-1">{booking.doctorName || "—"}</p>
                             </div>
                             <div>
-                              <p className="text-[#5A6A51] font-semibold flex items-center gap-1">
+                              <p className="text-[var(--color-brand-secondary)] font-semibold flex items-center gap-1">
                                 <MapPin size={12} /> {profileT.branchLabel}
                               </p>
-                              <p className="font-bold text-[#1F251A] mt-1">{branchName}</p>
+                              <p className="font-bold text-[var(--cr-dark)] mt-1">{branchName}</p>
                             </div>
                           </div>
                         </div>

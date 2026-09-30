@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { CLIENT } from "@/config/client";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -1233,7 +1234,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   };
 
   return (
-    <div dir={lang === "ar" ? "rtl" : "ltr"} className="w-full space-y-6 pb-12 text-[#1F251A] relative">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="w-full space-y-6 pb-12 text-[var(--cr-dark)] relative">
       
       {/* ── TOP HEADER BAR ── */}
       <div className="relative z-10 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1322,14 +1323,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       {/* ── CONTROLS BAR (DIRECTLY ABOVE CALENDAR & TABLE) ── */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
         {/* VIEW MODE TOGGLE */}
-        <div className="inline-flex items-center rounded-2xl bg-[#F2EFE9] border border-[#414E36]/10 p-1 gap-1 shadow-2xs">
+        <div className="inline-flex items-center rounded-2xl bg-[var(--color-brand-sand)] border border-[var(--cr-primary)]/10 p-1 gap-1 shadow-2xs">
           <button
             type="button"
             onClick={() => setViewMode("pending")}
             className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold cursor-pointer ${
               viewMode === "pending"
-                ? "bg-[#C4AE7C] text-[#414E36] shadow-xs"
-                : "text-[#5A6A51] hover:bg-white/80 hover:text-[#1F251A]"
+                ? "bg-[var(--cr-accent)] text-[var(--cr-primary)] shadow-xs"
+                : "text-[var(--color-brand-secondary)] hover:bg-white/80 hover:text-[var(--cr-dark)]"
             }`}
           >
             <Clock size={15} />
@@ -1345,8 +1346,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             onClick={() => setViewMode("calendar")}
             className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold cursor-pointer ${
               viewMode === "calendar"
-                ? "bg-[#C4AE7C] text-[#414E36] shadow-xs"
-                : "text-[#5A6A51] hover:bg-white/80 hover:text-[#1F251A]"
+                ? "bg-[var(--cr-accent)] text-[var(--cr-primary)] shadow-xs"
+                : "text-[var(--color-brand-secondary)] hover:bg-white/80 hover:text-[var(--cr-dark)]"
             }`}
           >
             <CalendarIcon size={15} />
@@ -1504,7 +1505,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               const formattedDocName = cleanDoctorName(fu.doctorName);
               const waMessage = lang === "ar"
                 ? `مرحباً ${fu.patientName}، عيادات ريفيرا تتواصل معك. أوصى ${formattedDocName} بموعد متابعة يوم ${fu.followUpDate}. هل تود تأكيد وحجز الموعد؟`
-                : `Hello ${fu.patientName}, this is Revera Clinics. ${formattedDocName} recommended a follow-up visit on ${fu.followUpDate}. Would you like us to confirm and book your appointment?`;
+                : `Hello ${fu.patientName}, this is ${CLIENT.name}. ${formattedDocName} recommended a follow-up visit on ${fu.followUpDate}. Would you like us to confirm and book your appointment?`;
               const waUrl = `https://wa.me/${intlPhone}?text=${encodeURIComponent(waMessage)}`;
 
               return (
@@ -1759,12 +1760,12 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       </div>
       ) : viewMode === "all" ? (
         /* ── ALL APPOINTMENTS DIRECTORY VIEW ── */
-        <div id="all-appointments-section" className="rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm space-y-5">
+        <div id="all-appointments-section" className="rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-4 sm:p-6 shadow-sm space-y-5">
           {/* Top Header & Search Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
             <div>
               <h2 className="text-xl font-bold text-[#111827]">{tr.allAppointmentsHeading || "All Appointments Directory"}</h2>
-              <p className="text-xs text-[#5A6A51] mt-0.5">
+              <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">
                 {filteredAllAppointments.length} {filteredAllAppointments.length !== 1 ? tr.appointmentsSuffix || "appointments" : tr.bookingSingular || "booking"}
               </p>
             </div>
@@ -1781,7 +1782,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     setAllAppointmentsPage(1);
                   }}
                   placeholder={tr.searchPlaceholder || "Search by name, phone, national ID..."}
-                  className="w-full rounded-2xl border border-gray-200 bg-[#FBFBF9] pl-10 pr-8 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:bg-white transition"
+                  className="w-full rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] pl-10 pr-8 py-2.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] focus:bg-white transition"
                 />
                 {allAppointmentsSearch && (
                   <button
@@ -1799,7 +1800,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 onClick={() => setShowAllAppointmentsFilters(prev => !prev)}
                 className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition shadow-xs cursor-pointer ${
                   showAllAppointmentsFilters || allAppointmentsStatusFilter !== "All" || allAppointmentsDoctorFilter !== "All"
-                    ? "bg-[#414E36] text-white border-[#414E36]"
+                    ? "bg-[var(--cr-primary)] text-white border-[var(--cr-primary)]"
                     : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                 }`}
                 title={tr.filterTitle || "Filter"}
@@ -1811,13 +1812,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
           {/* Expandable Filter Bar */}
           {showAllAppointmentsFilters && (
-            <div className="p-4 rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs animate-fadeIn">
+            <div className="p-4 rounded-2xl bg-[var(--color-brand-light)] border border-[var(--cr-primary)]/10 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs animate-fadeIn">
               <div>
-                <label className="block font-bold text-[#1F251A] mb-1">{tr.colStatus || "Status"}</label>
+                <label className="block font-bold text-[var(--cr-dark)] mb-1">{tr.colStatus || "Status"}</label>
                 <select
                   value={allAppointmentsStatusFilter}
                   onChange={(e) => { setAllAppointmentsStatusFilter(e.target.value); setAllAppointmentsPage(1); }}
-                  className="w-full rounded-xl border border-gray-200 bg-white p-2 text-xs font-semibold text-[#1F251A] outline-none"
+                  className="w-full rounded-xl border border-gray-200 bg-white p-2 text-xs font-semibold text-[var(--cr-dark)] outline-none"
                 >
                   <option value="All">{tr.filterStatusAll || "All Statuses"}</option>
                   <option value="pending">{tr.statusLabels?.pending || "Pending"}</option>
@@ -1831,11 +1832,11 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block font-bold text-[#1F251A] mb-1">{tr.colDoctor || "Doctor"}</label>
+                <label className="block font-bold text-[var(--cr-dark)] mb-1">{tr.colDoctor || "Doctor"}</label>
                 <select
                   value={allAppointmentsDoctorFilter}
                   onChange={(e) => { setAllAppointmentsDoctorFilter(e.target.value); setAllAppointmentsPage(1); }}
-                  className="w-full rounded-xl border border-gray-200 bg-white p-2 text-xs font-semibold text-[#1F251A] outline-none"
+                  className="w-full rounded-xl border border-gray-200 bg-white p-2 text-xs font-semibold text-[var(--cr-dark)] outline-none"
                 >
                   <option value="All">{tr.filterDoctorAll || "All Doctors"}</option>
                   {Array.from(new Set(mergedAppointments.map((r: any) => r.doctor_name).filter(Boolean))).map((doc: any) => (
@@ -1852,7 +1853,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     setAllAppointmentsDoctorFilter("All");
                     setAllAppointmentsPage(1);
                   }}
-                  className="w-full rounded-xl border border-gray-200 bg-white py-2 text-xs font-bold text-[#5A6A51] hover:bg-gray-100 transition"
+                  className="w-full rounded-xl border border-gray-200 bg-white py-2 text-xs font-bold text-[var(--color-brand-secondary)] hover:bg-gray-100 transition"
                 >
                   Reset Filters
                 </button>
@@ -1878,7 +1879,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               <tbody className="divide-y divide-gray-50 bg-white">
                 {paginatedAllAppointments.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-14 text-center text-sm text-[#5A6A51]">
+                    <td colSpan={8} className="py-14 text-center text-sm text-[var(--color-brand-secondary)]">
                       {tr.noAllAppointmentsFound || "No appointments match your search or filter criteria."}
                     </td>
                   </tr>
@@ -1893,12 +1894,12 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       <tr
                         key={item.id}
                         onClick={() => onViewBookingDetails ? onViewBookingDetails(item.raw || item) : null}
-                        className="hover:bg-[#FBFBF9] transition cursor-pointer group"
+                        className="hover:bg-[var(--color-brand-light)] transition cursor-pointer group"
                       >
                         {/* 1. Date & Time */}
                         <td className="py-3 px-2.5">
                           <span className="font-extrabold text-[#111827] text-xs block truncate">{item.date}</span>
-                          <span className="text-[11px] font-bold text-[#414E36] block truncate">{displayTimeStr}</span>
+                          <span className="text-[11px] font-bold text-[var(--cr-primary)] block truncate">{displayTimeStr}</span>
                         </td>
 
                         {/* 2. Patient & Phone */}
@@ -2000,7 +2001,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       onClick={() => setAllAppointmentsPage(pageNum)}
                       className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition ${
                         allAppointmentsPage === pageNum
-                          ? "bg-[#414E36] text-white shadow-xs"
+                          ? "bg-[var(--cr-primary)] text-white shadow-xs"
                           : "border border-gray-200 bg-white text-[#374151] hover:bg-gray-50"
                       }`}
                     >
@@ -2155,13 +2156,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     title={tr.filterTitle || "Filter"}
                     className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs ${
                       showTodayFilters || todayStatusFilter !== "All" || todayDoctorFilter !== "All" || todayServiceFilter !== "All" || todayPaymentFilter !== "All"
-                        ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
+                        ? "border-[var(--cr-accent)] bg-[#EDE4C8] text-[var(--cr-primary)]"
                         : "border-gray-200 bg-white text-[#374151] hover:bg-gray-50 active:scale-95"
                     }`}
                   >
                     <Filter size={15} />
                     {(todayStatusFilter !== "All" || todayDoctorFilter !== "All" || todayServiceFilter !== "All" || todayPaymentFilter !== "All") && (
-                      <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+                      <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--cr-primary)] text-[9px] font-bold text-white">!</span>
                     )}
                   </button>
                 </div>
@@ -2169,10 +2170,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
               {/* Expandable Filter Panel (Inventory style) */}
               {showTodayFilters && (
-                <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 rounded-2xl border border-[#414E36]/10 bg-[#F9F9F7] p-4 shadow-2xs animate-fadeIn">
+                <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 rounded-2xl border border-[var(--cr-primary)]/10 bg-[#F9F9F7] p-4 shadow-2xs animate-fadeIn">
                   {/* Status Filter */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">
                       {tr.colStatus || "Status"}
                     </label>
                     <select
@@ -2181,7 +2182,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                         setTodayStatusFilter(e.target.value);
                         setCurrentPage(1);
                       }}
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
                     >
                       <option value="All">{tr.filterAllStatuses || "All Statuses"}</option>
                       <option value="pending">{tr.statusPending || "Pending"}</option>
@@ -2195,7 +2196,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
                   {/* Doctor Filter */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">
                       {tr.colDoctor || "Doctor / Provider"}
                     </label>
                     <select
@@ -2204,7 +2205,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                         setTodayDoctorFilter(e.target.value);
                         setCurrentPage(1);
                       }}
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
                     >
                       <option value="All">{tr.filterAllDoctors || "All Doctors"}</option>
                       {uniqueDoctors.map(doc => (
@@ -2215,7 +2216,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
                   {/* Service Filter */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">
                       {tr.colService || "Service"}
                     </label>
                     <select
@@ -2224,7 +2225,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                         setTodayServiceFilter(e.target.value);
                         setCurrentPage(1);
                       }}
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
                     >
                       <option value="All">{tr.filterAllServices || "All Services"}</option>
                       {uniqueServices.map(srv => (
@@ -2235,7 +2236,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
                   {/* Payment Filter & Reset */}
                   <div className="flex flex-col gap-1.5 justify-between">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">
                       {tr.colPayment || "Payment"}
                     </label>
                     <div className="flex items-center gap-2">
@@ -2245,7 +2246,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                           setTodayPaymentFilter(e.target.value);
                           setCurrentPage(1);
                         }}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                        className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
                       >
                         <option value="All">All Payments</option>
                         <option value="paid">{tr.paymentPaid || "Paid"}</option>
@@ -2288,7 +2289,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   <tbody className="divide-y divide-gray-50">
                     {loadingDb ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-xs text-[#5A6A51]">
+                        <td colSpan={7} className="py-12 text-center text-xs text-[var(--color-brand-secondary)]">
                           <Loader2 size={20} className="animate-spin mx-auto mb-2 text-[#1E3A2B]" />
                           {tr.loadingAppointments}
                         </td>
@@ -2453,7 +2454,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             </div>
 
             {/* Patient & Doctor Context Card */}
-            <div className="rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 p-4 space-y-2 text-xs">
+            <div className="rounded-2xl bg-[var(--color-brand-light)] border border-[var(--cr-primary)]/10 p-4 space-y-2 text-xs">
               <div className="flex items-center justify-between">
                 <div className="font-bold text-sm text-[#111827]">
                   {managingFollowUp.patientName}

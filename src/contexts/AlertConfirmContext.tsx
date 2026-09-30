@@ -158,19 +158,19 @@ export function AlertConfirmProvider({ children }: { children: React.ReactNode }
           >
             
             {/* Header */}
-            <div className="flex items-center gap-3 border-b border-[#414E36]/10 pb-4 mb-4" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="flex items-center gap-3 border-b border-[var(--cr-primary)]/10 pb-4 mb-4" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                 <span className={`flex h-10 w-10 items-center justify-center rounded-full ${
                   modal.type === 'delete'
                     ? 'bg-rose-50 text-rose-600 border border-rose-200'
                     : modal.type === 'confirm'
                     ? 'bg-amber-50 text-amber-600 border border-amber-200'
-                    : 'bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10'
+                    : 'bg-[var(--color-brand-tint)] text-[var(--cr-primary)] border border-[var(--cr-primary)]/10'
                 }`} style={{ display: "flex", width: "2.5rem", height: "2.5rem", borderRadius: "9999px", alignItems: "center", justifyContent: "center" }}>
                   {modal.type === 'delete' ? <Trash2 size={20} /> : modal.type === 'confirm' ? <HelpCircle size={20} /> : <Info size={20} />}
                 </span>
                 <div>
-                  <h3 className="text-lg font-bold text-[#1F251A]" style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700, color: "#1F251A" }}>{modal.title}</h3>
+                  <h3 className="text-lg font-bold text-[var(--cr-dark)]" style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700, color: "var(--cr-dark)" }}>{modal.title}</h3>
                 </div>
               </div>
               <button
@@ -186,12 +186,12 @@ export function AlertConfirmProvider({ children }: { children: React.ReactNode }
             {modal.type === "delete" && modal.isSuperAdmin ? (
               <div className="space-y-4 mb-4">
                 {modal.message ? (
-                  <p className="text-xs text-[#5A6A51] leading-relaxed">
+                  <p className="text-xs text-[var(--color-brand-secondary)] leading-relaxed">
                     {modal.message}
                   </p>
                 ) : (
-                  <p className="text-xs text-[#5A6A51] leading-relaxed">
-                    As a <strong>Super Admin</strong>, please select the deletion mode for {modal.itemName ? <span className="font-bold text-[#1F251A]">"{modal.itemName}"</span> : "this item"}:
+                  <p className="text-xs text-[var(--color-brand-secondary)] leading-relaxed">
+                    As a <strong>Super Admin</strong>, please select the deletion mode for {modal.itemName ? <span className="font-bold text-[var(--cr-dark)]">"{modal.itemName}"</span> : "this item"}:
                   </p>
                 )}
 
@@ -238,19 +238,19 @@ export function AlertConfirmProvider({ children }: { children: React.ReactNode }
                 </div>
               </div>
             ) : (
-              <div className="flex-1 py-2 text-sm text-[#5A6A51] leading-relaxed mb-6 whitespace-pre-line" style={{ fontSize: "0.875rem", lineHeight: 1.6, color: "#5A6A51", marginBottom: "1.5rem", marginTop: "0.5rem" }}>
+              <div className="flex-1 py-2 text-sm text-[var(--color-brand-secondary)] leading-relaxed mb-6 whitespace-pre-line" style={{ fontSize: "0.875rem", lineHeight: 1.6, color: "var(--color-brand-secondary)", marginBottom: "1.5rem", marginTop: "0.5rem" }}>
                 {modal.message}
               </div>
             )}
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4" style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", borderTop: "1px solid rgba(65, 78, 54, 0.1)", paddingTop: "1rem" }}>
+            <div className="flex items-center justify-end gap-3 border-t border-[var(--cr-primary)]/10 pt-4" style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", borderTop: "1px solid rgba(65, 78, 54, 0.1)", paddingTop: "1rem" }}>
               {modal.type === "delete" ? (
                 modal.isSuperAdmin ? (
                   <button
                     type="button"
                     onClick={() => handleClose(false)}
-                    className="rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#f7f6f2] transition cursor-pointer"
+                    className="rounded-3xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-5 py-2.5 text-xs font-semibold text-[var(--cr-primary)] hover:bg-[#f7f6f2] transition cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -259,7 +259,7 @@ export function AlertConfirmProvider({ children }: { children: React.ReactNode }
                     <button
                       type="button"
                       onClick={() => handleClose(false)}
-                      className="rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#f7f6f2] transition cursor-pointer"
+                      className="rounded-3xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-5 py-2.5 text-xs font-semibold text-[var(--cr-primary)] hover:bg-[#f7f6f2] transition cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -277,14 +277,14 @@ export function AlertConfirmProvider({ children }: { children: React.ReactNode }
                   <button
                     type="button"
                     onClick={() => handleClose(false)}
-                    className="rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#f7f6f2] transition cursor-pointer"
+                    className="rounded-3xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-5 py-2.5 text-xs font-semibold text-[var(--cr-primary)] hover:bg-[#f7f6f2] transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     onClick={() => handleClose(true)}
-                    className="rounded-3xl bg-[#414E36] px-5 py-2.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md cursor-pointer"
+                    className="rounded-3xl bg-[var(--cr-primary)] px-5 py-2.5 text-xs font-semibold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition shadow-md cursor-pointer"
                   >
                     Confirm
                   </button>
@@ -293,7 +293,7 @@ export function AlertConfirmProvider({ children }: { children: React.ReactNode }
                 <button
                   type="button"
                   onClick={() => handleClose(true)}
-                  className="rounded-3xl bg-[#414E36] px-6 py-2.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md cursor-pointer"
+                  className="rounded-3xl bg-[var(--cr-primary)] px-6 py-2.5 text-xs font-semibold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition shadow-md cursor-pointer"
                 >
                   OK
                 </button>

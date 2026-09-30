@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess, hasGranularPermission } from '@/lib/access';
+import { CLIENT } from '@/config/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,7 +82,7 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
     min_reorder_quantity: 8,
     status: 'Active',
     role: 'retail',
-    notes: 'Revera clinical hydrating moisturizer for post-treatment skin.',
+    notes: `${CLIENT.nameShort} clinical hydrating moisturizer for post-treatment skin.`,
     created_at: '2026-01-15T08:00:00.000Z',
     updated_at: '2026-07-20T12:00:00.000Z'
   },

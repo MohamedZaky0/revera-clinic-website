@@ -127,7 +127,7 @@ export function HeroSlider() {
         <h1
           className="mt-0 mb-5"
           style={{
-            color: "#FBFBF9",
+            color: "var(--color-brand-light)",
             fontSize: "clamp(1.85rem, 3.8vw, 3.2rem)",
             fontFamily: "var(--font-marcellus), Georgia, serif",
             fontWeight: 400,

@@ -98,7 +98,7 @@ export function ContactPageContent() {
           >
             <div style={{ textAlign: isRTL ? "right" : "left" }}>
               <h2 className="mb-4">{t.contactPage.reachOutHeading}</h2>
-              <p className="text-sm leading-relaxed" style={{ color: "var(--cr-muted-foreground, #5A6A51)" }}>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--cr-muted-foreground, var(--color-brand-secondary))" }}>
                 {t.contactPage.reachOutDescription}
               </p>
             </div>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function OurJourneySection() {
   const { t, isRTL } = useLanguage();
@@ -15,7 +16,7 @@ export function OurJourneySection() {
         <div
           style={{
             position: "relative",
-            backgroundColor: "var(--cr-primary, #414E36)",
+            backgroundColor: "var(--cr-primary, var(--cr-primary))",
             borderRadius: "60px",
             overflow: "hidden",
             padding: "clamp(40px, 6vw, 72px) clamp(24px, 5vw, 72px)",
@@ -66,7 +67,7 @@ export function OurJourneySection() {
               }}
             >
               <img 
-                src="/images/main_logo.png" 
+                src={CLIENT.logoPath} 
                 alt="" 
                 style={{ width: 44, height: 44, objectFit: "contain", filter: "brightness(0) saturate(0) invert(1) opacity(0.6)", flexShrink: 0 }} 
               />

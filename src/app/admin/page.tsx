@@ -251,10 +251,10 @@ const SIDEBAR_ITEMS = [
 ];
 
 const overviewCards = [
-  { label: "Active bookings", value: "34", accent: "bg-[#C4AE7C]/10", icon: CalendarDays },
-  { label: "New customers", value: "14", accent: "bg-[#C4AE7C]/10", icon: Users },
-  { label: "Revenue", value: "$76K", accent: "bg-[#C4AE7C]/10", icon: DollarSign },
-  { label: "Open requests", value: "9", accent: "bg-[#C4AE7C]/10", icon: FileText },
+  { label: "Active bookings", value: "34", accent: "bg-[var(--cr-accent)]/10", icon: CalendarDays },
+  { label: "New customers", value: "14", accent: "bg-[var(--cr-accent)]/10", icon: Users },
+  { label: "Revenue", value: "$76K", accent: "bg-[var(--cr-accent)]/10", icon: DollarSign },
+  { label: "Open requests", value: "9", accent: "bg-[var(--cr-accent)]/10", icon: FileText },
 ];
 
 const PROVIDERS: any[] = [];
@@ -469,7 +469,7 @@ function getDoctorFirstReservationDate(docName: string, resList: any[]): string 
 
 const DEFAULT_HERO_SLIDES = [
   {
-    welcome: "Welcome to Revera Clinics",
+    welcome: `Welcome to ${CLIENT.name}`,
     heading: "Transform Your Beauty Naturally!",
     description: "Expert dermatology and cosmetic surgery services with personalized care designed to help you achieve your beauty and health goals through advanced medical techniques.",
     bookBtn: "Book Appointment",
@@ -478,7 +478,7 @@ const DEFAULT_HERO_SLIDES = [
     image: "/images/hero/slide-1.jpg"
   },
   {
-    welcome: "Welcome to Revera Clinics",
+    welcome: `Welcome to ${CLIENT.name}`,
     heading: "Advanced Medical Care You Can Trust!",
     description: "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and physical therapy services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
     bookBtn: "Book Appointment",
@@ -487,7 +487,7 @@ const DEFAULT_HERO_SLIDES = [
     image: "/images/hero/slide-2.jpg"
   },
   {
-    welcome: "Welcome to Revera Clinics",
+    welcome: `Welcome to ${CLIENT.name}`,
     heading: "Your Beauty & Health Journey Starts Here!",
     description: "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and physical therapy care for all ages.",
     bookBtn: "Book Appointment",
@@ -550,13 +550,13 @@ function PatientPackagePromoBanner({
   if (activeItems.length === 0 && promotions.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-[#C4AE7C]/30 bg-[#FBF8F0] p-4 space-y-2.5 text-xs">
+    <div className="rounded-2xl border border-[var(--cr-accent)]/30 bg-[#FBF8F0] p-4 space-y-2.5 text-xs">
       {activeItems.length > 0 && (
         <div>
-          <p className="font-bold text-[#414E36] uppercase tracking-wider text-[10px] mb-1.5">Active Packages</p>
+          <p className="font-bold text-[var(--cr-primary)] uppercase tracking-wider text-[10px] mb-1.5">Active Packages</p>
           <div className="flex flex-wrap gap-1.5">
             {activeItems.map((it) => (
-              <span key={it.key} className="inline-flex rounded-full bg-white border border-[#C4AE7C]/40 px-2.5 py-1 font-semibold text-[#414E36]">
+              <span key={it.key} className="inline-flex rounded-full bg-white border border-[var(--cr-accent)]/40 px-2.5 py-1 font-semibold text-[var(--cr-primary)]">
                 {it.packageName}: {it.serviceName} ({it.qtyRemaining} left)
               </span>
             ))}
@@ -565,10 +565,10 @@ function PatientPackagePromoBanner({
       )}
       {promotions.length > 0 && (
         <div>
-          <p className="font-bold text-[#C4AE7C] uppercase tracking-wider text-[10px] mb-1.5">Active Promotion</p>
+          <p className="font-bold text-[var(--cr-accent)] uppercase tracking-wider text-[10px] mb-1.5">Active Promotion</p>
           <div className="flex flex-wrap gap-1.5">
             {promotions.map((p, idx) => (
-              <span key={idx} className="inline-flex rounded-full bg-[#C4AE7C] text-white px-2.5 py-1 font-bold uppercase tracking-wide">
+              <span key={idx} className="inline-flex rounded-full bg-[var(--cr-accent)] text-white px-2.5 py-1 font-bold uppercase tracking-wide">
                 {p.serviceName}: {p.promotionText}
               </span>
             ))}
@@ -1641,7 +1641,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
     // 1. Initial sessionStorage Session Guard: Log out if browser/tab was closed
     supabase.auth.getSession().then(({ data: { session: cachedSession } }: any) => {
-      const isSessionActive = typeof window !== "undefined" && sessionStorage.getItem("revera_admin_session_active");
+      const isSessionActive = typeof window !== "undefined" && sessionStorage.getItem(`${CLIENT.storagePrefix}_admin_session_active`);
       if (cachedSession && !isSessionActive) {
         console.log("Stale login session detected (tab reopened). Logging out.");
         supabase.auth.signOut().then(() => {
@@ -1672,7 +1672,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, newSession: any) => {
       if (event === "SIGNED_OUT") {
         if (typeof window !== "undefined") {
-          sessionStorage.removeItem("revera_admin_session_active");
+          sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         }
       }
       handleAuthSession(newSession);
@@ -1687,14 +1687,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         setAdminEmployeeId("");
         setAdminDbId("");
         if (typeof window !== "undefined") {
-          sessionStorage.removeItem("revera_admin_session_active");
+          sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         }
         setAuthChecking(false);
         return;
       }
 
       if (typeof window !== "undefined") {
-        sessionStorage.setItem("revera_admin_session_active", "true");
+        sessionStorage.setItem(`${CLIENT.storagePrefix}_admin_session_active`, "true");
       }
       // Reset activity timer upon successful authentication
       lastActivityRef.current = Date.now();
@@ -1722,7 +1722,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             setAdminEmployeeId("");
             setAdminDbId("");
             if (typeof window !== "undefined") {
-              sessionStorage.removeItem("revera_admin_session_active");
+              sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
               window.location.href = "/login";
             }
             setAuthChecking(false);
@@ -1758,7 +1758,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           setAdminEmployeeId("");
           setAdminDbId("");
           if (typeof window !== "undefined") {
-            sessionStorage.removeItem("revera_admin_session_active");
+            sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
             window.location.href = "/login";
           }
         }
@@ -1798,7 +1798,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         clearInterval(interval);
         console.log("Inactivity timeout reached. Logging out.");
         if (typeof window !== "undefined") {
-          sessionStorage.removeItem("revera_admin_session_active");
+          sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         }
         triggerCheckout().finally(() => {
           supabase.auth.signOut().then(() => {
@@ -2176,8 +2176,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       await supabase.auth.signOut();
     }
     if (typeof window !== "undefined") {
-      sessionStorage.removeItem("revera_admin_session_active");
-      localStorage.removeItem("revera_staff_auth");
+      sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
+      localStorage.removeItem(`${CLIENT.storagePrefix}_staff_auth`);
       window.location.href = "/login";
     }
   }
@@ -2186,7 +2186,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   useEffect(() => {
     if (!authChecking && (!session || !adminRole)) {
       if (typeof window !== "undefined") {
-        sessionStorage.removeItem("revera_admin_session_active");
+        sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         window.location.replace("/login");
       }
     }
@@ -3313,11 +3313,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [savingBookingSettings, setSavingBookingSettings] = useState(false);
   
   // Deposit Settings State
-  const [instapayName, setInstapayName] = useState("Revera Clinic");
+  const [instapayName, setInstapayName] = useState(`${CLIENT.nameShort} Clinic`);
   const [instapayAddress, setInstapayAddress] = useState("revera@instapay");
   const [instapayLink, setInstapayLink] = useState("https://www.instapay.eg");
   const [walletEnabled, setWalletEnabled] = useState(true);
-  const [walletName, setWalletName] = useState("Revera Clinics Cash");
+  const [walletName, setWalletName] = useState(`${CLIENT.name} Cash`);
   const [walletNumber, setWalletNumber] = useState("01012345678");
   const [walletLink, setWalletLink] = useState("");
   const [savingDepositSettings, setSavingDepositSettings] = useState(false);
@@ -3328,7 +3328,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [notifSmsOtp, setNotifSmsOtp] = useState(true);
   const [notifWhatsApp, setNotifWhatsApp] = useState(true);
   const [notifEmailConfirm, setNotifEmailConfirm] = useState(false);
-  const [notifSmsTemplate, setNotifSmsTemplate] = useState("Hello {name}, your appointment for {service} is confirmed on {date} at {time}. See you at Revera Clinics!");
+  const [notifSmsTemplate, setNotifSmsTemplate] = useState(`Hello {name}, your appointment for {service} is confirmed on {date} at {time}. See you at ${CLIENT.name}!`);
   const [notifSmsTemplateAr, setNotifSmsTemplateAr] = useState("مرحباً {name}، تم تأكيد موعدك لخدمة {service} بتاريخ {date} الساعة {time}. نراك في ريفيرا كلينيك!");
   const [notifReminderHours, setNotifReminderHours] = useState(24);
   const [notifStaffEmail, setNotifStaffEmail] = useState("admin@reveraclinics.com");
@@ -3804,10 +3804,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     }).format(revenueSum);
 
     return [
-      { label: "Active bookings", value: String(activeBookingsCount), accent: "bg-[#C4AE7C]/10", icon: CalendarDays },
-      { label: "New patients", value: String(newCustomersCount), accent: "bg-[#C4AE7C]/10", icon: Users },
-      { label: "Revenue", value: formattedRevenue, accent: "bg-[#C4AE7C]/10", icon: DollarSign },
-      { label: "Open requests", value: String(openRequestsCount), accent: "bg-[#C4AE7C]/10", icon: FileText },
+      { label: "Active bookings", value: String(activeBookingsCount), accent: "bg-[var(--cr-accent)]/10", icon: CalendarDays },
+      { label: "New patients", value: String(newCustomersCount), accent: "bg-[var(--cr-accent)]/10", icon: Users },
+      { label: "Revenue", value: formattedRevenue, accent: "bg-[var(--cr-accent)]/10", icon: DollarSign },
+      { label: "Open requests", value: String(openRequestsCount), accent: "bg-[var(--cr-accent)]/10", icon: FileText },
     ];
   }, [allReservations, customers.length, requests.length]);
 
@@ -4048,20 +4048,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           setFaqImage2(data.aboutPage?.faqImage2 || "");
           setFaqs(data.aboutPage?.faqs || [
             {
-              question: "1. What services does Revera offer?",
-              answer: "Revera is a premium polyclinic specializing in dermatology and aesthetic treatments, gynecology and women's health, physical therapy and rehabilitation, and osteopathy and therapeutic nutrition. Every service is delivered with medical precision and a luxury experience tailored to you."
+              question: `1. What services does ${CLIENT.nameShort} offer?`,
+              answer: `${CLIENT.nameShort} is a premium polyclinic specializing in dermatology and aesthetic treatments, gynecology and women's health, physical therapy and rehabilitation, and osteopathy and therapeutic nutrition. Every service is delivered with medical precision and a luxury experience tailored to you.`
             },
             {
-              question: "2. Who is Revera designed for?",
-              answer: "Revera is designed for women who value elegance, privacy, and visible results. Our clients seek the best — not the cheapest — and expect a medical experience that matches their standards."
+              question: `2. Who is ${CLIENT.nameShort} designed for?`,
+              answer: `${CLIENT.nameShort} is designed for women who value elegance, privacy, and visible results. Our clients seek the best — not the cheapest — and expect a medical experience that matches their standards.`
             },
             {
               question: "3. How does my treatment plan work?",
               answer: "Your journey begins with a comprehensive consultation where we assess your health, aesthetic goals, and lifestyle. From this, our doctors build a fully personalized treatment plan — never a template — that evolves with your progress and needs."
             },
             {
-              question: "4. What makes Revera different from other clinics?",
-              answer: "Revera is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint — from your first appointment to your last follow-up."
+              question: `4. What makes ${CLIENT.nameShort} different from other clinics?`,
+              answer: `${CLIENT.nameShort} is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint — from your first appointment to your last follow-up.`
             }
           ]);
           setFaqsAr(data.aboutPage?.faqsAr || [
@@ -4090,17 +4090,17 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           // Load Why Choose Us Settings
           setWcuYearsLabel(data.whyChooseUs?.yearsLabel || "15+ years excellence");
           setWcuHeading(data.whyChooseUs?.heading || "Where medical expertise meets a luxury experience");
-          setWcuDescription(data.whyChooseUs?.description || "At Revera, every detail is intentional — from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.");
-          setWcuQuote(data.whyChooseUs?.quote || '"We don\'t treat conditions — we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey."');
+          setWcuDescription(data.whyChooseUs?.description || `At ${CLIENT.nameShort}, every detail is intentional — from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.`);
+          setWcuQuote(data.whyChooseUs?.quote || `"We don't treat conditions — we transform confidence. Every session at ${CLIENT.nameShort} is designed around you: your goals, your skin, your journey."`);
           setWcuContactLabel(data.whyChooseUs?.contactLabel || "Reach us:");
-          setWcuPhone(data.whyChooseUs?.phone || "(+20) 01035595691");
+          setWcuPhone(data.whyChooseUs?.phone || CLIENT.phoneDisplay);
 
           setWcuYearsLabelAr(data.whyChooseUs?.yearsLabelAr || "١٥+ عاماً من التميز");
           setWcuHeadingAr(data.whyChooseUs?.headingAr || "حيث تلتقي الخبرة الطبية بتجربة فاخرة");
           setWcuDescriptionAr(data.whyChooseUs?.descriptionAr || "في ريفيرا، كل تفصيل مقصود — بدءاً من استشارتك الأولى وحتى لحظة خروجك متحوّلة. نقدم رعاية مدعومة بالعلم مع الثقة الهادئة لوجهة طبية خاصة.");
           setWcuQuoteAr(data.whyChooseUs?.quoteAr || '"نحن لا نعالج فقط — بل نُحوّل الثقة. كل جلسة في ريفيرا مصممة حولكِ: أهدافكِ، بشرتكِ، رحلتكِ."');
           setWcuContactLabelAr(data.whyChooseUs?.contactLabelAr || "تواصلي معنا:");
-          setWcuPhoneAr(data.whyChooseUs?.phoneAr || "(+20) 01035595691");
+          setWcuPhoneAr(data.whyChooseUs?.phoneAr || CLIENT.phoneDisplay);
 
           setWcuImage1(data.whyChooseUs?.image1 || "");
           setWcuImage2(data.whyChooseUs?.image2 || "");
@@ -4118,22 +4118,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             setBookingDefaultPricePerPulse(data.booking.defaultPricePerPulse ?? 5);
           }
           if (data.deposit) {
-            setInstapayName(data.deposit.instapayName || "Revera Clinic");
+            setInstapayName(data.deposit.instapayName || `${CLIENT.nameShort} Clinic`);
             setInstapayAddress(data.deposit.instapayAddress || "revera@instapay");
             setInstapayLink(data.deposit.instapayLink || "https://www.instapay.eg");
             setWalletEnabled(data.deposit.walletEnabled ?? true);
-            setWalletName(data.deposit.walletName || "Revera Clinics Cash");
+            setWalletName(data.deposit.walletName || `${CLIENT.name} Cash`);
             setWalletNumber(data.deposit.walletNumber || "01012345678");
             setWalletLink(data.deposit.walletLink || "");
             if (data.deposit.depositPercentage !== undefined) {
               setBookingDepositPercentage(Number(data.deposit.depositPercentage));
             }
           } else {
-            setInstapayName("Revera Clinic");
+            setInstapayName(`${CLIENT.nameShort} Clinic`);
             setInstapayAddress("revera@instapay");
             setInstapayLink("https://www.instapay.eg");
             setWalletEnabled(true);
-            setWalletName("Revera Clinics Cash");
+            setWalletName(`${CLIENT.name} Cash`);
             setWalletNumber("01012345678");
             setWalletLink("");
           }
@@ -4703,7 +4703,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
   const handleAddSlide = () => {
     const newEnSlide = {
-      welcome: "Welcome to Revera Clinics",
+      welcome: `Welcome to ${CLIENT.name}`,
       heading: "New Slide Title",
       description: "Expert dermatology and cosmetic surgery services designed for you.",
       bookBtn: "Book Appointment",
@@ -5613,9 +5613,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
   if (authChecking) {
     return (
-      <div id="admin-root" className="admin-view flex min-h-screen items-center justify-center bg-[#F2EFE9] text-[#414E36]">
+      <div id="admin-root" className="admin-view flex min-h-screen items-center justify-center bg-[var(--color-brand-sand)] text-[var(--cr-primary)]">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 rounded-full border-4 border-[#C4AE7C] border-t-transparent"></div>
+          <div className="h-10 w-10 rounded-full border-4 border-[var(--cr-accent)] border-t-transparent"></div>
           <p className="text-sm font-semibold tracking-wider">Verifying administrator session...</p>
         </div>
       </div>
@@ -5624,28 +5624,28 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
   if (!session || !adminRole) {
     return (
-      <div id="admin-root" className="admin-view flex min-h-screen items-center justify-center bg-[#F2EFE9] px-4">
-        <div className="w-full max-w-md rounded-[32px] bg-[#FBFBF9] p-8 shadow-[0_20px_60px_rgba(31,37,26,0.15)] text-center space-y-4">
-          <div className="mx-auto relative h-16 w-16 overflow-hidden rounded-2xl bg-[#414E36] p-2.5 shadow-md">
+      <div id="admin-root" className="admin-view flex min-h-screen items-center justify-center bg-[var(--color-brand-sand)] px-4">
+        <div className="w-full max-w-md rounded-[32px] bg-[var(--color-brand-light)] p-8 shadow-[0_20px_60px_rgba(31,37,26,0.15)] text-center space-y-4">
+          <div className="mx-auto relative h-16 w-16 overflow-hidden rounded-2xl bg-[var(--cr-primary)] p-2.5 shadow-md">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/main_logo.png"
-              alt="Revera Clinics"
+              src={CLIENT.logoPath}
+              alt={CLIENT.name}
               className="w-full h-full object-contain brightness-0 invert"
             />
           </div>
-          <p className="text-xs uppercase tracking-[0.3em] text-[#5A6A51]/80 font-bold mb-1">
-            Revera Clinics Staff Portal
+          <p className="text-xs uppercase tracking-[0.3em] text-[var(--color-brand-secondary)]/80 font-bold mb-1">
+            {CLIENT.name} Staff Portal
           </p>
-          <h2 className="text-2xl font-bold text-[#1F251A]">
+          <h2 className="text-2xl font-bold text-[var(--cr-dark)]">
             Staff Authentication Required
           </h2>
-          <p className="text-xs text-[#5A6A51] font-medium leading-relaxed">
+          <p className="text-xs text-[var(--color-brand-secondary)] font-medium leading-relaxed">
             All staff, doctors, receptionists, and administrators must authenticate through the unified Staff Login portal. Redirecting...
           </p>
           <Link
             href="/login"
-            className="mt-4 inline-flex items-center justify-center w-full rounded-2xl bg-[#414E36] py-3.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
+            className="mt-4 inline-flex items-center justify-center w-full rounded-2xl bg-[var(--cr-primary)] py-3.5 text-sm font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition shadow-md"
           >
             Go to Staff Login
           </Link>
@@ -5712,7 +5712,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }
 
   return (
-    <div id="admin-root" className="admin-view min-h-screen bg-[#F2EFE9] text-[#1F251A]">
+    <div id="admin-root" className="admin-view min-h-screen bg-[var(--color-brand-sand)] text-[var(--cr-dark)]">
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)]" dir={lang === "ar" ? "rtl" : "ltr"}>
         {/* Backdrop for mobile sidebar */}
         {sidebarOpen && (
@@ -5723,7 +5723,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         )}
         <aside
           dir={lang === "ar" ? "rtl" : "ltr"}
-          className={`fixed inset-y-0 start-0 z-50 flex w-[280px] max-w-[85vw] md:w-[220px] h-screen max-h-screen flex-col bg-[#414E36] px-3.5 py-5 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:static md:z-auto md:h-screen md:sticky md:top-0 md:translate-x-0 ${
+          className={`fixed inset-y-0 start-0 z-50 flex w-[280px] max-w-[85vw] md:w-[220px] h-screen max-h-screen flex-col bg-[var(--cr-primary)] px-3.5 py-5 text-[var(--color-brand-light)] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:static md:z-auto md:h-screen md:sticky md:top-0 md:translate-x-0 ${
             sidebarOpen
               ? "translate-x-0"
               : lang === "ar"
@@ -5735,15 +5735,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             <div className="flex items-center gap-2.5">
               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-md p-1.5">
                 <Image
-                  src="/images/main_logo.png"
-                  alt="Revera Clinics"
+                  src={CLIENT.logoPath}
+                  alt={CLIENT.name}
                   fill
                   style={{ objectFit: "contain", padding: "2px" }}
                 />
               </div>
               <div className="flex flex-col justify-center">
-                <p className="text-[9px] uppercase tracking-[0.2em] text-[#FBFBF9]/60 leading-none mb-0.5">
-                  Revera Clinics
+                <p className="text-[9px] uppercase tracking-[0.2em] text-[var(--color-brand-light)]/60 leading-none mb-0.5">
+                  {CLIENT.name}
                 </p>
                 <h1 className="text-base font-bold leading-tight">Admin</h1>
               </div>
@@ -5751,7 +5751,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             <button
               type="button"
               onClick={() => setSidebarOpen(false)}
-              className="md:hidden flex h-7 w-7 items-center justify-center rounded-full hover:bg-white/10 text-[#FBFBF9]/80 hover:text-[#FBFBF9] transition text-lg font-bold"
+              className="md:hidden flex h-7 w-7 items-center justify-center rounded-full hover:bg-white/10 text-[var(--color-brand-light)]/80 hover:text-[var(--color-brand-light)] transition text-lg font-bold"
               title="Close sidebar"
             >
               ×
@@ -5765,8 +5765,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               onClick={() => setLang("en")}
               className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition text-center ${
                 lang === "en"
-                  ? "bg-[#FBFBF9] text-[#414E36] shadow-sm"
-                  : "text-[#FBFBF9]/70 hover:text-white hover:bg-white/10"
+                  ? "bg-[var(--color-brand-light)] text-[var(--cr-primary)] shadow-sm"
+                  : "text-[var(--color-brand-light)]/70 hover:text-white hover:bg-white/10"
               }`}
             >
               English
@@ -5776,8 +5776,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               onClick={() => setLang("ar")}
               className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition text-center ${
                 lang === "ar"
-                  ? "bg-[#FBFBF9] text-[#414E36] shadow-sm"
-                  : "text-[#FBFBF9]/70 hover:text-white hover:bg-white/10"
+                  ? "bg-[var(--color-brand-light)] text-[var(--cr-primary)] shadow-sm"
+                  : "text-[var(--color-brand-light)]/70 hover:text-white hover:bg-white/10"
               }`}
             >
               العربية
@@ -5811,14 +5811,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       }}
                       className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-start text-xs font-semibold transition-all duration-200 ${
                         active
-                          ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
-                          : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
+                          ? "bg-[var(--color-brand-light)] text-[var(--cr-primary)] shadow-lg"
+                          : "text-[var(--color-brand-light)]/80 hover:bg-[var(--color-brand-light)]/10 hover:text-[var(--color-brand-light)]"
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span
                           className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-                            active ? "bg-[#C4AE7C]/20 text-[#414E36]" : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
+                            active ? "bg-[var(--cr-accent)]/20 text-[var(--cr-primary)]" : "bg-[var(--color-brand-light)]/10 text-[var(--color-brand-light)] group-hover:bg-[var(--cr-accent)]/15"
                           }`}
                         >
                           <Icon size={16} />
@@ -5870,11 +5870,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                               }}
                               className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[11px] font-medium transition-all duration-200 ${
                                 subActive
-                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-s-[3px] border-[#C4AE7C] ps-2 rounded-s-none"
-                                  : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
+                                  ? "bg-[var(--color-brand-light)]/10 text-[var(--color-brand-light)] border-s-[3px] border-[var(--cr-accent)] ps-2 rounded-s-none"
+                                  : "text-[var(--color-brand-light)]/70 hover:bg-[var(--color-brand-light)]/5 hover:text-[var(--color-brand-light)]"
                               }`}
                             >
-                              <SubIcon size={13} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
+                              <SubIcon size={13} className={subActive ? "text-[var(--cr-accent)]" : "text-[var(--color-brand-light)]/60"} />
                               <span className="truncate">{adminTranslations[lang].sidebar[sub.label] || sub.label}</span>
                             </button>
                           );
@@ -5899,14 +5899,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       }}
                       className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-start text-xs font-semibold transition-all duration-200 ${
                         active
-                          ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
-                          : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
+                          ? "bg-[var(--color-brand-light)] text-[var(--cr-primary)] shadow-lg"
+                          : "text-[var(--color-brand-light)]/80 hover:bg-[var(--color-brand-light)]/10 hover:text-[var(--color-brand-light)]"
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span
                           className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-                            active ? "bg-[#C4AE7C]/20 text-[#414E36]" : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
+                            active ? "bg-[var(--cr-accent)]/20 text-[var(--cr-primary)]" : "bg-[var(--color-brand-light)]/10 text-[var(--color-brand-light)] group-hover:bg-[var(--cr-accent)]/15"
                           }`}
                         >
                           <Icon size={16} />
@@ -5938,11 +5938,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                               }}
                               className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[11px] font-medium transition-all duration-200 ${
                                 subActive
-                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-s-[3px] border-[#C4AE7C] ps-2 rounded-s-none"
-                                  : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
+                                  ? "bg-[var(--color-brand-light)]/10 text-[var(--color-brand-light)] border-s-[3px] border-[var(--cr-accent)] ps-2 rounded-s-none"
+                                  : "text-[var(--color-brand-light)]/70 hover:bg-[var(--color-brand-light)]/5 hover:text-[var(--color-brand-light)]"
                               }`}
                             >
-                              <SubIcon size={13} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
+                              <SubIcon size={13} className={subActive ? "text-[var(--cr-accent)]" : "text-[var(--color-brand-light)]/60"} />
                               <span className="truncate">{adminTranslations[lang].sidebar[sub.label] || sub.label}</span>
                             </button>
                           );
@@ -5974,20 +5974,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   }}
                   className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-start text-xs font-semibold transition-all duration-200 ${
                     isComingSoon
-                      ? "cursor-not-allowed opacity-50 text-[#FBFBF9]/50"
+                      ? "cursor-not-allowed opacity-50 text-[var(--color-brand-light)]/50"
                       : active
-                      ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
-                      : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
+                      ? "bg-[var(--color-brand-light)] text-[var(--cr-primary)] shadow-lg"
+                      : "text-[var(--color-brand-light)]/80 hover:bg-[var(--color-brand-light)]/10 hover:text-[var(--color-brand-light)]"
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span
                       className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
                         isComingSoon
-                          ? "bg-[#FBFBF9]/5 text-[#FBFBF9]/40"
+                          ? "bg-[var(--color-brand-light)]/5 text-[var(--color-brand-light)]/40"
                           : active
-                          ? "bg-[#C4AE7C]/20 text-[#414E36]"
-                          : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
+                          ? "bg-[var(--cr-accent)]/20 text-[var(--cr-primary)]"
+                          : "bg-[var(--color-brand-light)]/10 text-[var(--color-brand-light)] group-hover:bg-[var(--cr-accent)]/15"
                       }`}
                     >
                       <Icon size={16} />
@@ -5995,7 +5995,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     <span className="truncate">{adminTranslations[lang].sidebar[item.label] || item.label}</span>
                   </div>
                   {isComingSoon || item.submenu ? (
-                    <ChevronRight size={14} className="text-[#FBFBF9]/60" />
+                    <ChevronRight size={14} className="text-[var(--color-brand-light)]/60" />
                   ) : null}
                 </button>
               );
@@ -6005,13 +6005,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
         <main dir={lang === "ar" ? "rtl" : "ltr"} className="flex flex-col min-w-0 w-full px-3 sm:px-4 md:px-8 py-0 overflow-x-hidden">
           {/* Top Navigation Bar */}
-          <div className="sticky top-0 z-40 flex items-center justify-between border-b border-[#414E36]/10 bg-[#F2EFE9]/90 px-2 sm:px-4 py-2.5 sm:py-3 backdrop-blur-md gap-2 sm:gap-3">
+          <div className="sticky top-0 z-40 flex items-center justify-between border-b border-[var(--cr-primary)]/10 bg-[var(--color-brand-sand)]/90 px-2 sm:px-4 py-2.5 sm:py-3 backdrop-blur-md gap-2 sm:gap-3">
             {/* Left: language toggle + branch selector */}
             <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="md:hidden flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-white border border-[#414E36]/15 text-[#414E36] hover:bg-[#F9F9F7] shadow-sm transition"
+                className="md:hidden flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-white border border-[var(--cr-primary)]/15 text-[var(--cr-primary)] hover:bg-[#F9F9F7] shadow-sm transition"
                 title="Open sidebar"
               >
                 <Menu size={16} className="sm:w-[18px] sm:h-[18px]" />
@@ -6021,16 +6021,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   <select
                     value={branch}
                     onChange={(e) => setBranch(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-[#414E36]/15 bg-white py-1.5 sm:py-2 pl-2.5 sm:pl-3 pr-7 sm:pr-8 text-xs sm:text-sm font-medium text-[#1F251A] shadow-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 cursor-pointer truncate"
+                    className="w-full appearance-none rounded-xl border border-[var(--cr-primary)]/15 bg-white py-1.5 sm:py-2 pl-2.5 sm:pl-3 pr-7 sm:pr-8 text-xs sm:text-sm font-medium text-[var(--cr-dark)] shadow-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20 cursor-pointer truncate"
                   >
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>{b.name_en}</option>
                     ))}
                   </select>
-                  <ChevronDown size={13} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                  <ChevronDown size={13} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]" />
                 </div>
               ) : (
-                <div className="rounded-xl border border-[#414E36]/15 bg-white py-1.5 sm:py-2 px-2.5 sm:px-4 text-xs sm:text-sm font-semibold text-[#1F251A] shadow-sm select-none truncate max-w-[130px] sm:max-w-none">
+                <div className="rounded-xl border border-[var(--cr-primary)]/15 bg-white py-1.5 sm:py-2 px-2.5 sm:px-4 text-xs sm:text-sm font-semibold text-[var(--cr-dark)] shadow-sm select-none truncate max-w-[130px] sm:max-w-none">
                   {branches.find((b) => b.id === branch)?.name_en || "Loading..."}
                 </div>
               )}
@@ -6041,8 +6041,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 onClick={() => setActiveNav("Profile")}
                 className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-xl px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold transition shadow-sm border shrink-0 ${
                   activeNav === "Profile"
-                    ? "bg-[#414E36] text-white border-[#414E36]"
-                    : "bg-white text-[#414E36] border-[#414E36]/15 hover:bg-[#414E36]/10"
+                    ? "bg-[var(--cr-primary)] text-white border-[var(--cr-primary)]"
+                    : "bg-white text-[var(--cr-primary)] border-[var(--cr-primary)]/15 hover:bg-[var(--cr-primary)]/10"
                 }`}
                 title="View Personal Profile & Staff Details"
               >
@@ -6066,8 +6066,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     });
                     setShowNotificationMenu(false);
                   }}
-                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-[#FBFBF9] shadow-sm transition ${
-                    showQuickActionMenu ? "bg-[#2e3a26]" : "bg-[#414E36] hover:bg-[#2e3a26]"
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-[var(--color-brand-light)] shadow-sm transition ${
+                    showQuickActionMenu ? "bg-[#2e3a26]" : "bg-[var(--cr-primary)] hover:bg-[#2e3a26]"
                   }`}
                   title="Quick Actions"
                 >
@@ -6075,7 +6075,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 </button>
                 {showQuickActionMenu && (
                   <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-[#E6E9EB] bg-white p-2 shadow-[0_15px_40px_rgba(47,61,41,0.12)] z-50 animate-fadeIn">
-                    <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#E6E9EB] mb-1">
+                    <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] border-b border-[#E6E9EB] mb-1">
                       Quick Creation
                     </div>
                     {hasPermission("bookings.create") && (
@@ -6085,9 +6085,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           setActiveNav("Bookings");
                           setShowFullViewNewBooking(true);
                         }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--cr-primary)] hover:bg-[var(--color-brand-tint)] flex items-center gap-2 transition"
                       >
-                        <Plus size={14} className="text-[#C4AE7C]" /> New Appointment
+                        <Plus size={14} className="text-[var(--cr-accent)]" /> New Appointment
                       </button>
                     )}
                     {hasPermission("customers.create") && (
@@ -6099,9 +6099,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           setPrescriptionBookingContext(null);
                           handleOpenAddCustomer();
                         }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--cr-primary)] hover:bg-[var(--color-brand-tint)] flex items-center gap-2 transition"
                       >
-                        <Plus size={14} className="text-[#C4AE7C]" /> New Patient
+                        <Plus size={14} className="text-[var(--cr-accent)]" /> New Patient
                       </button>
                     )}
                     {(hasPermission("employees.create") || hasPermission("providers.create")) && (
@@ -6113,9 +6113,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           setEditingEmployee(null);
                           setIsEditingEmployeeModalOpen(true);
                         }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--cr-primary)] hover:bg-[var(--color-brand-tint)] flex items-center gap-2 transition"
                       >
-                        <Plus size={14} className="text-[#C4AE7C]" /> New Employee
+                        <Plus size={14} className="text-[var(--cr-accent)]" /> New Employee
                       </button>
                     )}
                     {hasPermission("services.create") && (
@@ -6125,9 +6125,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           setActiveNav("Services");
                           setShowAddCategoryModal(true);
                         }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--cr-primary)] hover:bg-[var(--color-brand-tint)] flex items-center gap-2 transition"
                       >
-                        <Plus size={14} className="text-[#C4AE7C]" /> New Service Category
+                        <Plus size={14} className="text-[var(--cr-accent)]" /> New Service Category
                       </button>
                     )}
                   </div>
@@ -6149,8 +6149,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   }}
                   className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${
                     showNotificationMenu || unreadCount > 0
-                      ? "bg-[#C4AE7C]/20 text-[#414E36]"
-                      : "bg-[#414E36]/8 text-[#414E36] hover:bg-[#414E36]/15"
+                      ? "bg-[var(--cr-accent)]/20 text-[var(--cr-primary)]"
+                      : "bg-[var(--cr-primary)]/8 text-[var(--cr-primary)] hover:bg-[var(--cr-primary)]/15"
                   }`}
                   title="Notifications"
                 >
@@ -6163,12 +6163,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 )}
                 {showNotificationMenu && (
                   <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-[#E6E9EB] bg-white shadow-[0_15px_40px_rgba(47,61,41,0.12)] z-50 animate-fadeIn overflow-hidden">
-                    <div className="flex items-center justify-between border-b border-[#E6E9EB] bg-[#FBFBF9] px-4 py-3">
-                      <span className="text-xs font-bold uppercase tracking-wider text-[#1F251A]">Notifications</span>
+                    <div className="flex items-center justify-between border-b border-[#E6E9EB] bg-[var(--color-brand-light)] px-4 py-3">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[var(--cr-dark)]">Notifications</span>
                       {unreadCount > 0 && (
                         <button
                           onClick={handleMarkAllAsRead}
-                          className="text-[11px] font-semibold text-[#C4AE7C] hover:underline"
+                          className="text-[11px] font-semibold text-[var(--cr-accent)] hover:underline"
                         >
                           Mark all as read
                         </button>
@@ -6182,7 +6182,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           <div
                             key={n.id}
                             onClick={() => handleMarkAsRead(n.id)}
-                            className={`p-3 text-left transition hover:bg-[#EDF1EC]/40 cursor-pointer ${
+                            className={`p-3 text-left transition hover:bg-[var(--color-brand-tint)]/40 cursor-pointer ${
                               !n.read ? "bg-[#EDE4C8]/10" : ""
                             }`}
                           >
@@ -6198,23 +6198,23 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                               }`} />
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="font-semibold text-xs text-[#1F251A]">{n.title}</span>
-                                  <span className="text-[10px] text-[#5A6A51] whitespace-nowrap">{n.time}</span>
+                                  <span className="font-semibold text-xs text-[var(--cr-dark)]">{n.title}</span>
+                                  <span className="text-[10px] text-[var(--color-brand-secondary)] whitespace-nowrap">{n.time}</span>
                                 </div>
-                                <p className="text-[11px] text-[#414E36] leading-relaxed mt-0.5">{n.message}</p>
+                                <p className="text-[11px] text-[var(--cr-primary)] leading-relaxed mt-0.5">{n.message}</p>
                               </div>
                             </div>
                           </div>
                         ))
                       )}
                     </div>
-                    <div className="border-t border-[#E6E9EB] bg-[#FBFBF9] px-4 py-2.5 text-center">
+                    <div className="border-t border-[#E6E9EB] bg-[var(--color-brand-light)] px-4 py-2.5 text-center">
                       <button
                         onClick={() => {
                           setShowNotificationMenu(false);
                           setActiveNav("Bookings");
                         }}
-                        className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26]"
+                        className="text-xs font-semibold text-[var(--cr-primary)] hover:text-[#2e3a26]"
                       >
                         View all bookings
                       </button>
@@ -6222,7 +6222,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   </div>
                 )}
               </div>
-              {/* Removed Revera Clinics button */}
+              {/* Removed clinic-name button */}
             </div>
           </div>
 
@@ -6273,8 +6273,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 <div className="h-16 w-16 flex items-center justify-center rounded-full bg-red-50 text-red-600 border border-red-100">
                   <Shield size={32} />
                 </div>
-                <h3 className="text-2xl font-bold text-[#1F251A]">Access Restrained</h3>
-                <p className="text-sm text-[#5A6A51] max-w-md leading-relaxed">
+                <h3 className="text-2xl font-bold text-[var(--cr-dark)]">Access Restrained</h3>
+                <p className="text-sm text-[var(--color-brand-secondary)] max-w-md leading-relaxed">
                   Your administrator account role does not have authorization to view the <strong>"{activeNav}"</strong> module. Please contact the super admin to request access privileges.
                 </p>
               </div>
@@ -6777,21 +6777,21 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           {activeNav === "Pages Settings" && (
             <div className="space-y-6">
               <div className="mb-2">
-                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80">Settings</p>
-                <h2 className="mt-2 text-4xl font-semibold text-[#1F251A]">Pages Settings</h2>
-                <p className="mt-2 text-sm text-[#5A6A51]">Edit the content displayed on each public-facing page of the website.</p>
+                <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-secondary)]/80">Settings</p>
+                <h2 className="mt-2 text-4xl font-semibold text-[var(--cr-dark)]">Pages Settings</h2>
+                <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">Edit the content displayed on each public-facing page of the website.</p>
               </div>
 
               {/* Page tabs */}
-              <div className="flex items-center gap-1 p-1 w-fit rounded-full border border-[#414E36]/12 bg-white shadow-sm">
+              <div className="flex items-center gap-1 p-1 w-fit rounded-full border border-[var(--cr-primary)]/12 bg-white shadow-sm">
                 {(["Home", "About Us", "Services"] as const).map((page) => (
                   <button
                     key={page}
                     onClick={() => setPagesSettingsTab(page)}
                     className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
                       pagesSettingsTab === page
-                        ? "bg-[#414E36] text-[#FBFBF9] shadow-sm"
-                        : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]"
+                        ? "bg-[var(--cr-primary)] text-[var(--color-brand-light)] shadow-sm"
+                        : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)] hover:bg-[var(--color-brand-sand)]"
                     }`}
                   >
                     {page}
@@ -7241,12 +7241,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
                 <div>
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#414E36]/10 text-[#414E36]">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--cr-primary)]/10 text-[var(--cr-primary)]">
                       <FlaskConical size={22} />
                     </div>
-                    <h2 className="text-3xl font-bold text-[#1F251A]">System Test Suite & Automated Diagnostics</h2>
+                    <h2 className="text-3xl font-bold text-[var(--cr-dark)]">System Test Suite & Automated Diagnostics</h2>
                   </div>
-                  <p className="mt-2 text-sm text-[#5A6A51]">
+                  <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">
                     Automated end-to-end testing suite verifying every API endpoint, database query, HR calculation, and inventory process across the system.
                   </p>
                 </div>
@@ -7256,7 +7256,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     type="button"
                     disabled={runningAllDiagnostics}
                     onClick={runAllDiagnosticTests}
-                    className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-3 text-xs font-bold text-white shadow-lg shadow-[#414E36]/20 transition-all hover:bg-[#343F2B] disabled:opacity-50"
+                    className="flex items-center gap-2 rounded-2xl bg-[var(--cr-primary)] px-5 py-3 text-xs font-bold text-white shadow-lg shadow-[var(--cr-primary)]/20 transition-all hover:bg-[#343F2B] disabled:opacity-50"
                   >
                     {runningAllDiagnostics ? (
                       <>
@@ -7275,9 +7275,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
               {/* Statistics Overview Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] p-5 shadow-sm">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Total Tests</span>
-                  <div className="mt-2 text-3xl font-extrabold text-[#1F251A]">{systemTestSuites.length}</div>
+                <div className="rounded-3xl border border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] p-5 shadow-sm">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">Total Tests</span>
+                  <div className="mt-2 text-3xl font-extrabold text-[var(--cr-dark)]">{systemTestSuites.length}</div>
                 </div>
 
                 <div className="rounded-3xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
@@ -7303,9 +7303,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               </div>
 
               {/* Filter & Search Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] p-4 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold text-[#5A6A51] mr-1">Category:</span>
+                  <span className="text-xs font-semibold text-[var(--color-brand-secondary)] mr-1">Category:</span>
                   {['all', 'Database & Auth', 'Services & Bookings', 'Inventory & Equipment', 'HR & Payroll', 'Medical & Patients', 'Expenses & Assets', 'System & Settings'].map((cat) => (
                     <button
                       key={cat}
@@ -7313,8 +7313,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       onClick={() => setTestCategoryFilter(cat)}
                       className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
                         testCategoryFilter === cat
-                          ? 'bg-[#414E36] text-white shadow-sm'
-                          : 'bg-white text-[#5A6A51] border border-[#E6E9EB] hover:border-[#414E36]'
+                          ? 'bg-[var(--cr-primary)] text-white shadow-sm'
+                          : 'bg-white text-[var(--color-brand-secondary)] border border-[#E6E9EB] hover:border-[var(--cr-primary)]'
                       }`}
                     >
                       {cat === 'all' ? 'All Categories' : cat}
@@ -7323,22 +7323,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 </div>
 
                 <div className="relative w-full max-w-xs">
-                  <Search size={14} className="absolute left-3.5 top-3 text-[#5A6A51]" />
+                  <Search size={14} className="absolute left-3.5 top-3 text-[var(--color-brand-secondary)]" />
                   <input
                     type="text"
                     placeholder="Search test cases or endpoints..."
                     value={testSuiteSearch}
                     onChange={(e) => setTestSuiteSearch(e.target.value)}
-                    className="w-full rounded-2xl border border-[#E6E9EB] bg-white pl-9 pr-4 py-2 text-xs text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    className="w-full rounded-2xl border border-[#E6E9EB] bg-white pl-9 pr-4 py-2 text-xs text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
                   />
                 </div>
               </div>
 
               {/* Test Cases Table */}
-              <div className="overflow-hidden rounded-[32px] border border-[#414E36]/10 bg-white shadow-[0_30px_80px_rgba(47,61,41,0.05)]">
+              <div className="overflow-hidden rounded-[32px] border border-[var(--cr-primary)]/10 bg-white shadow-[0_30px_80px_rgba(47,61,41,0.05)]">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="border-b border-[#414E36]/10 bg-[#FBFBF9] text-xs uppercase tracking-wider text-[#5A6A51]">
+                    <thead className="border-b border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] text-xs uppercase tracking-wider text-[var(--color-brand-secondary)]">
                       <tr>
                         <th className="px-6 py-4 font-bold">ID</th>
                         <th className="px-6 py-4 font-bold">Test Name & Target Endpoint</th>
@@ -7348,7 +7348,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                         <th className="px-6 py-4 font-bold text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#414E36]/05 text-[#1F251A]">
+                    <tbody className="divide-y divide-[var(--cr-primary)]/05 text-[var(--cr-dark)]">
                       {systemTestSuites
                         .filter((tc) => {
                           const matchesCat = testCategoryFilter === 'all' || tc.category === testCategoryFilter;
@@ -7362,19 +7362,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           const isExpanded = expandedDiagnosticId === tc.id;
                           return (
                             <Fragment key={tc.id}>
-                              <tr className="hover:bg-[#FBFBF9]/80 transition">
-                                <td className="px-6 py-4 font-mono font-bold text-[#414E36]">{tc.id}</td>
+                              <tr className="hover:bg-[var(--color-brand-light)]/80 transition">
+                                <td className="px-6 py-4 font-mono font-bold text-[var(--cr-primary)]">{tc.id}</td>
                                 <td className="px-6 py-4">
-                                  <div className="font-bold text-sm text-[#1F251A]">{tc.name}</div>
+                                  <div className="font-bold text-sm text-[var(--cr-dark)]">{tc.name}</div>
                                   <div className="mt-0.5 flex items-center gap-2">
-                                    <span className="font-mono text-[11px] text-[#5A6A51] bg-[#EDF1EC] px-2 py-0.5 rounded-md">
+                                    <span className="font-mono text-[11px] text-[var(--color-brand-secondary)] bg-[var(--color-brand-tint)] px-2 py-0.5 rounded-md">
                                       {tc.endpoint}
                                     </span>
                                     <span className="text-[11px] text-[#8C9A84]">{tc.description}</span>
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <span className="inline-block rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-2.5 py-1 text-[11px] font-semibold text-[#414E36]">
+                                  <span className="inline-block rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-2.5 py-1 text-[11px] font-semibold text-[var(--cr-primary)]">
                                     {tc.category}
                                   </span>
                                 </td>
@@ -7400,7 +7400,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                                     </span>
                                   )}
                                 </td>
-                                <td className="px-6 py-4 text-center font-mono text-xs font-bold text-[#5A6A51]">
+                                <td className="px-6 py-4 text-center font-mono text-xs font-bold text-[var(--color-brand-secondary)]">
                                   {tc.durationMs !== undefined ? `${tc.durationMs}ms` : '—'}
                                 </td>
                                 <td className="px-6 py-4 text-right">
@@ -7409,7 +7409,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                                       type="button"
                                       disabled={tc.status === 'running'}
                                       onClick={() => runSingleDiagnosticTest(tc.id)}
-                                      className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#EDF1EC] transition disabled:opacity-50"
+                                      className="rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs font-bold text-[var(--cr-primary)] hover:bg-[var(--color-brand-tint)] transition disabled:opacity-50"
                                     >
                                       Run Test
                                     </button>
@@ -7417,7 +7417,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                                       <button
                                         type="button"
                                         onClick={() => setExpandedDiagnosticId(isExpanded ? null : tc.id)}
-                                        className="rounded-xl bg-[#EDF1EC] p-1.5 text-[#414E36] hover:bg-[#414E36]/20 transition"
+                                        className="rounded-xl bg-[var(--color-brand-tint)] p-1.5 text-[var(--cr-primary)] hover:bg-[var(--cr-primary)]/20 transition"
                                         title="View Details JSON"
                                       >
                                         <Terminal size={14} />
@@ -7427,9 +7427,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                                 </td>
                               </tr>
                               {isExpanded && (
-                                <tr className="bg-[#1F251A]/03">
+                                <tr className="bg-[var(--cr-dark)]/03">
                                   <td colSpan={6} className="px-6 py-4">
-                                    <div className="rounded-2xl bg-[#1F251A] p-4 text-emerald-400 font-mono text-[11px] overflow-x-auto shadow-inner">
+                                    <div className="rounded-2xl bg-[var(--cr-dark)] p-4 text-emerald-400 font-mono text-[11px] overflow-x-auto shadow-inner">
                                       <div className="mb-2 flex items-center justify-between text-slate-400 border-b border-slate-700 pb-2">
                                         <span>Response Shape Summary ({tc.id}) — field values redacted</span>
                                         <span>Status Code: {tc.statusCode || 'N/A'}</span>
@@ -7614,23 +7614,23 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           {/* Presence Activity Check Overlay Modal */}
           {presenceModalOpen && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-              <div className="w-full max-w-md rounded-[32px] bg-white border border-[#414E36]/10 p-8 shadow-2xl text-center space-y-6 mx-4">
+              <div className="w-full max-w-md rounded-[32px] bg-white border border-[var(--cr-primary)]/10 p-8 shadow-2xl text-center space-y-6 mx-4">
                 <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-600 border border-amber-100">
                   <Clock size={32} />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-2xl font-bold text-[#1F251A]">Activity Verification</h3>
-                  <p className="text-sm text-[#5A6A51] leading-relaxed">
+                  <h3 className="text-2xl font-bold text-[var(--cr-dark)]">Activity Verification</h3>
+                  <p className="text-sm text-[var(--color-brand-secondary)] leading-relaxed">
                     Please verify that you are active at your workstation. If you do not click the button below within the next:
                   </p>
-                  <div className={`text-5xl font-bold ${presenceCountdown <= 3 ? 'text-rose-600' : presenceCountdown <= 6 ? 'text-amber-500' : 'text-[#414E36]'} transition-colors`}>
+                  <div className={`text-5xl font-bold ${presenceCountdown <= 3 ? 'text-rose-600' : presenceCountdown <= 6 ? 'text-amber-500' : 'text-[var(--cr-primary)]'} transition-colors`}>
                     {presenceCountdown}s
                   </div>
-                  <p className="text-xs text-[#5A6A51]">An inactivity alert will be sent to the administrator.</p>
+                  <p className="text-xs text-[var(--color-brand-secondary)]">An inactivity alert will be sent to the administrator.</p>
                 </div>
                 <button
                   onClick={() => setPresenceModalOpen(false)}
-                  className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
+                  className="w-full rounded-2xl bg-[var(--cr-primary)] py-3 text-sm font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition shadow-md"
                 >
                   ✓ I am Present &amp; Working
                 </button>
@@ -7646,8 +7646,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   <MapPin size={32} />
                 </div>
                 <div className="space-y-3">
-                  <h3 className="text-2xl font-bold text-[#1F251A]">Account Access Locked</h3>
-                  <p className="text-sm text-[#5A6A51] leading-relaxed whitespace-pre-line">
+                  <h3 className="text-2xl font-bold text-[var(--cr-dark)]">Account Access Locked</h3>
+                  <p className="text-sm text-[var(--color-brand-secondary)] leading-relaxed whitespace-pre-line">
                     {locationWarningMsg}
                   </p>
                 </div>
@@ -7853,45 +7853,45 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 </div>
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4">
-          <div className="w-full max-w-md rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--cr-dark)]/50 p-4">
+          <div className="w-full max-w-md rounded-[32px] bg-[var(--color-brand-light)] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)]">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80">
+                <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-secondary)]/80">
                   Approve request
                 </p>
-                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">
+                <h3 className="mt-2 text-2xl font-semibold text-[var(--cr-dark)]">
                   {selected.name}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setSelected(null)}
-                className="rounded-full bg-[#F2EFE9] p-3 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                className="rounded-full bg-[var(--color-brand-sand)] p-3 text-[var(--cr-primary)] transition hover:bg-[#e4e0d6]"
               >
                 <X size={20} />
               </button>
             </div>
-            <p className="mb-4 text-sm text-[#5A6A51]">
+            <p className="mb-4 text-sm text-[var(--color-brand-secondary)]">
               Requested for {selected.date}. Confirm the date and time slot below — change the
               date if the requested one isn't available (e.g. a closed day).
             </p>
-            <label className="mb-2 block text-sm font-semibold text-[#414E36]">
+            <label className="mb-2 block text-sm font-semibold text-[var(--cr-primary)]">
               Appointment date
             </label>
             <input
               type="date"
               value={approveDate || selected.date}
               onChange={(e) => handleApproveDateChange(e.target.value)}
-              className="mb-4 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
+              className="mb-4 w-full rounded-3xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-primary)] outline-none transition focus:border-[var(--cr-accent)]"
             />
-            <label className="mb-2 block text-sm font-semibold text-[#414E36]">
+            <label className="mb-2 block text-sm font-semibold text-[var(--cr-primary)]">
               Time slot
             </label>
             <select
               value={slot}
               onChange={(e) => { setSlot(e.target.value); setApproveTimeWarning(""); }}
-              className="mb-4 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
+              className="mb-4 w-full rounded-3xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-primary)] outline-none transition focus:border-[var(--cr-accent)]"
             >
               {(() => {
                 const { start, end } = getDayOperatingHoursApprove({ ...selected, date: approveDate || selected.date });
@@ -7940,13 +7940,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               );
             })()}
 
-            <label className="mb-2 block text-sm font-semibold text-[#414E36]">
+            <label className="mb-2 block text-sm font-semibold text-[var(--cr-primary)]">
               Assign Doctor
             </label>
             <select
               value={doctorName}
               onChange={(e) => setDoctorName(e.target.value)}
-              className="mb-6 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
+              className="mb-6 w-full rounded-3xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-3 text-sm text-[var(--cr-primary)] outline-none transition focus:border-[var(--cr-accent)]"
             >
               {availableDoctorsApprove.map((p) => (
                 <option key={p.id || p.name} value={p.name}>
@@ -7963,14 +7963,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 type="button"
                 onClick={approve}
                 disabled={approveUnavailableSlots.includes(slot) || !slot}
-                className="rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-3xl bg-[var(--cr-primary)] px-5 py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Confirm approve
               </button>
               <button
                 type="button"
                 onClick={() => setSelected(null)}
-                className="rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-5 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#f7f6f2]"
+                className="rounded-3xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-5 py-3 text-sm font-semibold text-[var(--cr-primary)] transition hover:bg-[#f7f6f2]"
               >
                 Cancel
               </button>
@@ -7981,18 +7981,18 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
       {/* Date bookings selector modal */}
       {dayBookingsSelector.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-lg rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] border border-[#414E36]/10">
-            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--cr-dark)]/50 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-lg rounded-[32px] bg-[var(--color-brand-light)] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] border border-[var(--cr-primary)]/10">
+            <div className="mb-5 flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Select Appointment</p>
-                <h3 className="mt-2 text-xl font-semibold text-[#1F251A]">
+                <p className="text-xs uppercase tracking-[0.35em] text-[var(--color-brand-secondary)]/80 font-bold">Select Appointment</p>
+                <h3 className="mt-2 text-xl font-semibold text-[var(--cr-dark)]">
                   Bookings on {new Date(dayBookingsSelector.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
                 </h3>
               </div>
               <button
                 onClick={() => setDayBookingsSelector({ open: false, date: "", bookings: [] })}
-                className="rounded-full bg-white border border-[#414E36]/10 p-2 text-[#414E36] hover:bg-[#EDF1EC] transition"
+                className="rounded-full bg-white border border-[var(--cr-primary)]/10 p-2 text-[var(--cr-primary)] hover:bg-[var(--color-brand-tint)] transition"
               >
                 <X size={16} />
               </button>
@@ -8010,22 +8010,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       setViewingBooking(b);
                       setDayBookingsSelector({ open: false, date: "", bookings: [] });
                     }}
-                    className="flex items-center justify-between gap-4 rounded-2xl border border-[#414E36]/10 bg-white p-4 hover:bg-[#EDF1EC]/30 hover:border-[#414E36]/30 transition cursor-pointer group"
+                    className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 hover:bg-[var(--color-brand-tint)]/30 hover:border-[var(--cr-primary)]/30 transition cursor-pointer group"
                   >
                     <div className="space-y-1">
-                      <p className="font-bold text-[#1F251A] group-hover:text-[#414E36] transition-colors">{b.name}</p>
-                      <p className="text-xs text-[#5A6A51] font-medium">{svc ? svc.en : `Service #${b.serviceId}`}</p>
+                      <p className="font-bold text-[var(--cr-dark)] group-hover:text-[var(--cr-primary)] transition-colors">{b.name}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)] font-medium">{svc ? svc.en : `Service #${b.serviceId}`}</p>
                       {rm && (
-                        <p className="text-[11px] text-[#5A6A51] flex items-center gap-1">
+                        <p className="text-[11px] text-[var(--color-brand-secondary)] flex items-center gap-1">
                           <DoorOpen size={10} /> {rm.name}
                         </p>
                       )}
                     </div>
                     <div className="text-right">
-                      <span className="inline-flex rounded-full bg-[#414E36]/10 text-[#414E36] px-2.5 py-1 text-xs font-semibold">
+                      <span className="inline-flex rounded-full bg-[var(--cr-primary)]/10 text-[var(--cr-primary)] px-2.5 py-1 text-xs font-semibold">
                         {b.timeSlot || b.requestedTime || "N/A"}
                       </span>
-                      <p className="text-[10px] text-[#5A6A51]/80 mt-1 capitalize font-medium">{b.status}</p>
+                      <p className="text-[10px] text-[var(--color-brand-secondary)]/80 mt-1 capitalize font-medium">{b.status}</p>
                     </div>
                   </div>
                 );
@@ -8075,28 +8075,28 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
       {/* 1. Cancellations Modal */}
       {showCancellationsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn">
-          <div className="w-full max-w-4xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[85vh] overflow-y-auto">
-            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--cr-dark)]/50 p-4 animate-fadeIn">
+          <div className="w-full max-w-4xl rounded-[32px] bg-[var(--color-brand-light)] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[85vh] overflow-y-auto">
+            <div className="mb-5 flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
               <div>
-                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Quick actions</p>
-                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">Canceled & Rejected Requests</h3>
+                <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-secondary)]/80 font-bold">Quick actions</p>
+                <h3 className="mt-2 text-2xl font-semibold text-[var(--cr-dark)]">Canceled & Rejected Requests</h3>
               </div>
               <button
                 onClick={() => setShowCancellationsModal(false)}
-                className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                className="rounded-full bg-[var(--color-brand-sand)] p-2.5 text-[var(--cr-primary)] transition hover:bg-[#e4e0d6]"
               >
                 <X size={20} />
               </button>
             </div>
 
             {allReservations.filter(r => r.status === 'rejected').length === 0 ? (
-              <p className="py-12 text-center text-[#5A6A51] font-semibold">No canceled bookings found.</p>
+              <p className="py-12 text-center text-[var(--color-brand-secondary)] font-semibold">No canceled bookings found.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-[#414E36]/10 text-xs font-bold uppercase tracking-wider text-[#5A6A51]">
+                    <tr className="border-b border-[var(--cr-primary)]/10 text-xs font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">
                       <th className="py-3 px-4">Patient</th>
                       <th className="py-3 px-4">Service</th>
                       <th className="py-3 px-4">Original Date</th>
@@ -8108,7 +8108,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     {allReservations.filter(r => r.status === 'rejected').map(r => {
                       const service = localServices.find(s => s.id === r.serviceId);
                       return (
-                        <tr key={r.id} className="border-b border-[#414E36]/5 hover:bg-[#F2EFE9]/20 transition text-sm text-[#1F251A]">
+                        <tr key={r.id} className="border-b border-[var(--cr-primary)]/5 hover:bg-[var(--color-brand-sand)]/20 transition text-sm text-[var(--cr-dark)]">
                           <td className="py-3 px-4 font-semibold">{r.name}</td>
                           <td className="py-3 px-4">{service ? service.en : `Service #${r.serviceId}`}</td>
                           <td className="py-3 px-4">{r.date}</td>
@@ -8125,7 +8125,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                                 fetchAllReservations();
                                 alert(`Restored request for ${r.name}`);
                               }}
-                              className="rounded-3xl border border-[#414E36]/20 bg-white px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                              className="rounded-3xl border border-[var(--cr-primary)]/20 bg-white px-4 py-2 text-xs font-semibold text-[var(--cr-primary)] hover:bg-[#f7f6f2] transition"
                             >
                               Restore Request
                             </button>
@@ -8143,18 +8143,18 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
       {/* 2. Today's Bookings Modal */}
       {showTodayBookingsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn">
-          <div className="w-full max-w-2xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)]">
-            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--cr-dark)]/50 p-4 animate-fadeIn">
+          <div className="w-full max-w-2xl rounded-[32px] bg-[var(--color-brand-light)] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)]">
+            <div className="mb-5 flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
               <div>
-                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Quick actions</p>
-                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">
+                <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-secondary)]/80 font-bold">Quick actions</p>
+                <h3 className="mt-2 text-2xl font-semibold text-[var(--cr-dark)]">
                   Today's Bookings • {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </h3>
               </div>
               <button
                 onClick={() => setShowTodayBookingsModal(false)}
-                className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                className="rounded-full bg-[var(--color-brand-sand)] p-2.5 text-[var(--cr-primary)] transition hover:bg-[#e4e0d6]"
               >
                 <X size={20} />
               </button>
@@ -8175,7 +8175,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
               if (todaysBookings.length === 0) {
                 return (
-                  <p className="py-12 text-center text-[#5A6A51] font-semibold">No bookings scheduled for today.</p>
+                  <p className="py-12 text-center text-[var(--color-brand-secondary)] font-semibold">No bookings scheduled for today.</p>
                 );
               }
 
@@ -8190,15 +8190,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           setShowTodayBookingsModal(false);
                           setViewingBooking(r);
                         }}
-                        className="flex items-center justify-between rounded-2xl border border-[#414E36]/10 bg-white p-4 cursor-pointer hover:border-[#C4AE7C]/30 transition shadow-[0_4px_15px_rgba(0,0,0,0.02)]"
+                        className="flex items-center justify-between rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 cursor-pointer hover:border-[var(--cr-accent)]/30 transition shadow-[0_4px_15px_rgba(0,0,0,0.02)]"
                       >
                         <div>
-                          <p className="font-bold text-[#1F251A]">{r.name}</p>
-                          <p className="text-xs text-[#5A6A51] mt-1">
+                          <p className="font-bold text-[var(--cr-dark)]">{r.name}</p>
+                          <p className="text-xs text-[var(--color-brand-secondary)] mt-1">
                             {service ? service.en : `Service #${r.serviceId}`} • {r.timeSlot ? `@ ${r.timeSlot}` : 'Time not specified'}
                           </p>
                         </div>
-                        <span className="rounded-full bg-[#C4AE7C]/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.1em] text-[#414E36]">
+                        <span className="rounded-full bg-[var(--cr-accent)]/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.1em] text-[var(--cr-primary)]">
                           {r.sessionType === 'online' ? 'Online' : 'In Person'}
                         </span>
                       </div>
@@ -8213,16 +8213,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
       {/* 3. Filter Bookings Modal */}
       {showFilterModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn">
-          <div className="w-full max-w-md rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)]">
-            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--cr-dark)]/50 p-4 animate-fadeIn">
+          <div className="w-full max-w-md rounded-[32px] bg-[var(--color-brand-light)] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)]">
+            <div className="mb-5 flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
               <div>
-                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Quick actions</p>
-                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">Filter Calendar Bookings</h3>
+                <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-secondary)]/80 font-bold">Quick actions</p>
+                <h3 className="mt-2 text-2xl font-semibold text-[var(--cr-dark)]">Filter Calendar Bookings</h3>
               </div>
               <button
                 onClick={() => setShowFilterModal(false)}
-                className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                className="rounded-full bg-[var(--color-brand-sand)] p-2.5 text-[var(--cr-primary)] transition hover:bg-[#e4e0d6]"
               >
                 <X size={20} />
               </button>
@@ -8230,7 +8230,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Status</label>
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-2">Status</label>
                 <div className="grid grid-cols-2 gap-2">
                   {['All', 'approved', 'pending', 'rejected', 'pending_deposit', 'postponed', 'no_show'].map(st => (
                     <button
@@ -8238,8 +8238,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       onClick={() => setStatusFilter(st)}
                       className={`rounded-2xl border px-3 py-2.5 text-xs font-bold transition ${
                         statusFilter === st
-                          ? 'border-[#414E36] bg-[#414E36] text-[#FBFBF9]'
-                          : 'border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#f7f6f2]'
+                          ? 'border-[var(--cr-primary)] bg-[var(--cr-primary)] text-[var(--color-brand-light)]'
+                          : 'border-[var(--cr-primary)]/15 bg-white text-[var(--cr-primary)] hover:bg-[#f7f6f2]'
                       }`}
                     >
                       {st === 'approved' ? 'Approved' : st === 'pending' ? 'Pending' : st === 'rejected' ? 'Rejected' : st === 'pending_deposit' ? 'Pending Deposit' : st === 'postponed' ? 'Postponed' : st === 'no_show' ? 'No Show' : 'All'}
@@ -8249,7 +8249,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               </div>
 
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Session Type</label>
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-2">Session Type</label>
                 <div className="grid grid-cols-3 gap-2">
                   {['All', 'in_person', 'online'].map(ty => (
                     <button
@@ -8257,8 +8257,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       onClick={() => setTypeFilter(ty)}
                       className={`rounded-2xl border px-3 py-2.5 text-xs font-bold transition ${
                         typeFilter === ty
-                          ? 'border-[#414E36] bg-[#414E36] text-[#FBFBF9]'
-                          : 'border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#f7f6f2]'
+                          ? 'border-[var(--cr-primary)] bg-[var(--cr-primary)] text-[var(--color-brand-light)]'
+                          : 'border-[var(--cr-primary)]/15 bg-white text-[var(--cr-primary)] hover:bg-[#f7f6f2]'
                       }`}
                     >
                       {ty === 'in_person' ? 'In Person' : ty === 'online' ? 'Online' : 'All'}
@@ -8268,11 +8268,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               </div>
 
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Doctor / Provider</label>
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-2">Doctor / Provider</label>
                 <select
                   value={docFilter}
                   onChange={(e) => setDocFilter(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C] cursor-pointer font-semibold"
+                  className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-3 text-sm text-[var(--cr-primary)] outline-none transition focus:border-[var(--cr-accent)] cursor-pointer font-semibold"
                 >
                   <option value="All">All Doctors</option>
                   {providers.map(p => (
@@ -8282,18 +8282,18 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               </div>
 
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Date</label>
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-2">Date</label>
                 <div className="flex gap-2">
                   <input
                     type="date"
                     value={dateFilter === "All" ? "" : dateFilter}
                     onChange={(e) => setDateFilter(e.target.value || "All")}
-                    className="flex-1 rounded-2xl border border-[#414E36]/15 bg-white px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C] font-semibold"
+                    className="flex-1 rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-3 text-sm text-[var(--cr-primary)] outline-none transition focus:border-[var(--cr-accent)] font-semibold"
                   />
                   {dateFilter !== "All" && (
                     <button
                       onClick={() => setDateFilter('All')}
-                      className="rounded-2xl border border-[#414E36]/15 bg-white px-4 py-3 text-xs font-bold text-[#5A6A51] transition hover:bg-[#f7f6f2]"
+                      className="rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-3 text-xs font-bold text-[var(--color-brand-secondary)] transition hover:bg-[#f7f6f2]"
                     >
                       Clear
                     </button>
@@ -8301,10 +8301,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 </div>
               </div>
 
-              <div className="border-t border-[#414E36]/10 pt-4 flex gap-3">
+              <div className="border-t border-[var(--cr-primary)]/10 pt-4 flex gap-3">
                 <button
                   onClick={() => setShowFilterModal(false)}
-                  className="flex-1 rounded-3xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition text-center"
+                  className="flex-1 rounded-3xl bg-[var(--cr-primary)] py-3 text-sm font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition text-center"
                 >
                   Apply Filters
                 </button>
@@ -8316,7 +8316,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     setDateFilter('All');
                     setShowFilterModal(false);
                   }}
-                  className="flex-1 rounded-3xl border border-[#414E36]/20 bg-white py-3 text-sm font-bold text-[#414E36] hover:bg-[#f7f6f2] transition text-center"
+                  className="flex-1 rounded-3xl border border-[var(--cr-primary)]/20 bg-white py-3 text-sm font-bold text-[var(--cr-primary)] hover:bg-[#f7f6f2] transition text-center"
                 >
                   Reset Filters
                 </button>
@@ -8328,16 +8328,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
       {/* 4. Actions Menu Modal */}
       {showActionsMenuModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn">
-          <div className="w-full max-w-sm rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)]">
-            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--cr-dark)]/50 p-4 animate-fadeIn">
+          <div className="w-full max-w-sm rounded-[32px] bg-[var(--color-brand-light)] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)]">
+            <div className="mb-5 flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
               <div>
-                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Quick actions</p>
-                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">Actions Menu</h3>
+                <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-secondary)]/80 font-bold">Quick actions</p>
+                <h3 className="mt-2 text-2xl font-semibold text-[var(--cr-dark)]">Actions Menu</h3>
               </div>
               <button
                 onClick={() => setShowActionsMenuModal(false)}
-                className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                className="rounded-full bg-[var(--color-brand-sand)] p-2.5 text-[var(--cr-primary)] transition hover:bg-[#e4e0d6]"
               >
                 <X size={20} />
               </button>
@@ -8349,7 +8349,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   setShowActionsMenuModal(false);
                   setShowAddBookingModal(true);
                 }}
-                className="w-full rounded-2xl bg-[#414E36] py-3.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                className="w-full rounded-2xl bg-[var(--cr-primary)] py-3.5 text-sm font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition"
               >
                 + Add Manual Booking
               </button>
@@ -8384,7 +8384,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   document.body.removeChild(link);
                   setShowActionsMenuModal(false);
                 }}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-white py-3.5 text-sm font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white py-3.5 text-sm font-bold text-[var(--cr-primary)] hover:bg-[#f7f6f2] transition"
               >
                 Export Bookings to CSV
               </button>
@@ -8396,16 +8396,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
       {/* 5. Add Booking Modal */}
       {showAddBookingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4">
-          <div className="w-full max-w-xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[90vh] overflow-y-auto">
-            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--cr-dark)]/50 p-4">
+          <div className="w-full max-w-xl rounded-[32px] bg-[var(--color-brand-light)] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[90vh] overflow-y-auto">
+            <div className="mb-5 flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
               <div>
-                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Quick actions</p>
-                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">Add Manual Reservation</h3>
+                <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-secondary)]/80 font-bold">Quick actions</p>
+                <h3 className="mt-2 text-2xl font-semibold text-[var(--cr-dark)]">Add Manual Reservation</h3>
               </div>
               <button
                 onClick={() => setShowAddBookingModal(false)}
-                className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] hover:bg-[#e4e0d6]"
+                className="rounded-full bg-[var(--color-brand-sand)] p-2.5 text-[var(--cr-primary)] hover:bg-[#e4e0d6]"
               >
                 <X size={20} />
               </button>
@@ -8414,7 +8414,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             <div className="space-y-4">
               {/* 0. Select an existing patient, instead of relying on the phone field to match one */}
               <div className="relative">
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">
                   Select Existing Patient (optional)
                 </label>
                 <input
@@ -8426,7 +8426,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     setShowPatientSearchResults(e.target.value.trim().length > 0);
                   }}
                   onFocus={() => setShowPatientSearchResults(patientSearchQuery.trim().length > 0)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 />
                 {matchedCustomerId && (
                   <p className="mt-1.5 flex items-center gap-2 text-[11px] font-semibold text-emerald-700">
@@ -8434,7 +8434,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     <button
                       type="button"
                       onClick={() => setMatchedCustomerId(null)}
-                      className="text-[#5A6A51] underline hover:text-[#414E36]"
+                      className="text-[var(--color-brand-secondary)] underline hover:text-[var(--cr-primary)]"
                     >
                       Not them?
                     </button>
@@ -8449,7 +8449,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     })
                     .slice(0, 8);
                   return (
-                    <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-2xl border border-[#414E36]/15 bg-white shadow-lg">
+                    <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-2xl border border-[var(--cr-primary)]/15 bg-white shadow-lg">
                       {matches.length === 0 ? (
                         <p className="px-4 py-3 text-xs text-[#8A9A81] italic">No matching patients — filling in the fields below will create a new one.</p>
                       ) : (
@@ -8458,10 +8458,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                             key={c.id}
                             type="button"
                             onClick={() => selectExistingPatientForBooking(c)}
-                            className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-[#EDF1EC] border-b border-[#414E36]/5 last:border-b-0"
+                            className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-[var(--color-brand-tint)] border-b border-[var(--cr-primary)]/5 last:border-b-0"
                           >
-                            <span className="font-semibold text-[#1F251A]">{c.name}</span>
-                            <span className="text-xs text-[#5A6A51]">{c.mobile || c.phone}</span>
+                            <span className="font-semibold text-[var(--cr-dark)]">{c.name}</span>
+                            <span className="text-xs text-[var(--color-brand-secondary)]">{c.mobile || c.phone}</span>
                           </button>
                         ))
                       )}
@@ -8472,36 +8472,36 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
               {/* 1. Phone Number at top */}
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number *</label>
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">Phone Number *</label>
                 <input
                   type="tel"
                   required
                   placeholder="Enter phone (e.g. 01012345678)"
                   value={newPatientPhone}
                   onChange={(e) => handleManualPhoneChange(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] mb-2"
+                  className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] mb-2"
                 />
                 
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#414E36]">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--cr-primary)]">
                     <input
                       type="checkbox"
                       checked={isManualWhatsappSame}
                       onChange={(e) => setIsManualWhatsappSame(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36]"
+                      className="h-4 w-4 rounded border-gray-300 text-[var(--cr-primary)] focus:ring-[var(--cr-primary)]"
                     />
                     <span>This is the WhatsApp number too</span>
                   </label>
                   {!isManualWhatsappSame && (
                     <div className="animate-fadeIn">
-                      <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">WhatsApp Number *</label>
+                      <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">WhatsApp Number *</label>
                       <input
                         type="tel"
                         required
                         placeholder="Enter WhatsApp number"
                         value={newPatientWhatsapp}
                         onChange={(e) => setNewPatientWhatsapp(e.target.value)}
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                       />
                     </div>
                   )}
@@ -8522,24 +8522,24 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               {/* 2. Patient Name and Email side-by-side */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Patient Name *</label>
+                  <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">Patient Name *</label>
                   <input
                     type="text"
                     required
                     placeholder="Enter name"
                     value={newPatientName}
                     onChange={(e) => setNewPatientName(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Email (Optional)</label>
+                  <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">Email (Optional)</label>
                   <input
                     type="email"
                     placeholder="Enter email"
                     value={newPatientEmail}
                     onChange={(e) => setNewPatientEmail(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   />
                 </div>
               </div>
@@ -8547,21 +8547,21 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               {/* 3. Booking Date and Time Slot stacked vertically */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Booking Date *</label>
+                  <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">Booking Date *</label>
                   <input
                     type="date"
                     required
                     value={newPatientDate}
                     onChange={(e) => setNewPatientDate(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Time Slot / Requested Time</label>
+                  <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">Time Slot / Requested Time</label>
                   <select
                     value={newPatientTimeSlot}
                     onChange={(e) => setNewPatientTimeSlot(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                   >
                     {(() => {
                       const { start, end } = getDayOperatingHoursAdmin(newPatientDate);
@@ -8585,11 +8585,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               {/* 4. Service Type and Session Type */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Service Type</label>
+                  <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">Service Type</label>
                   <select
                     value={newPatientService}
                     onChange={(e) => setNewPatientService(Number(e.target.value))}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                   >
                     {localServices.map(s => (
                       <option key={s.id} value={s.id}>{s.en} ({s.cat})</option>
@@ -8597,11 +8597,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Session Type</label>
+                  <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">Session Type</label>
                   <select
                     value={newPatientSessionType}
                     onChange={(e) => setNewPatientSessionType(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                   >
                     {(() => {
                       const selectedSvc = localServices.find(s => s.id === newPatientService);
@@ -8625,11 +8625,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               {/* 5. Branch and Status */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branch</label>
+                  <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">Branch</label>
                   <select
                     value={newPatientBranch}
                     onChange={(e) => setNewPatientBranch(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                   >
                     {branches.map(b => (
                       <option key={b.id} value={b.id}>{b.name_en} / {b.name_ar}</option>
@@ -8637,11 +8637,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Status</label>
+                  <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">Status</label>
                   <select
                     value={newPatientStatus}
                     onChange={(e) => setNewPatientStatus(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                   >
                     <option value="approved">Approved (Active Booking)</option>
                     <option value="pending">Pending (Awaiting Approval)</option>
@@ -8653,11 +8653,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               {/* 6. Doctor Name if Approved */}
               {newPatientStatus === 'approved' && (
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Assign Doctor</label>
+                  <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">Assign Doctor</label>
                   <select
                     value={newPatientDoctor}
                     onChange={(e) => setNewPatientDoctor(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                   >
                     {availableDoctorsNewPatient.map(p => (
                       <option key={p.id || p.name} value={p.name}>{p.name}</option>
@@ -8671,11 +8671,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
               {/* Created By Employee Selector */}
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Created By (Employee Credit) *</label>
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">Created By (Employee Credit) *</label>
                 <select
                   value={newPatientCreatedByEmployeeId}
                   onChange={(e) => setNewPatientCreatedByEmployeeId(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                  className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                 >
                   <option value="">Select Employee...</option>
                   {(employeesList || []).map((emp: any) => (
@@ -8688,25 +8688,25 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
               {/* 7. Notes */}
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Notes (Optional)</label>
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">Notes (Optional)</label>
                 <textarea
                   placeholder="Add details/notes about this appointment"
                   value={newPatientNotes}
                   onChange={(e) => setNewPatientNotes(e.target.value)}
-                  className="w-full min-h-[80px] rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full min-h-[80px] rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 />
               </div>
 
-              <div className="border-t border-[#414E36]/10 pt-4 flex gap-3">
+              <div className="border-t border-[var(--cr-primary)]/10 pt-4 flex gap-3">
                 <button
                   onClick={handleCreateManualBooking}
-                  className="flex-1 rounded-3xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] text-center"
+                  className="flex-1 rounded-3xl bg-[var(--cr-primary)] py-3 text-sm font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] text-center"
                 >
                   Create Booking
                 </button>
                 <button
                   onClick={() => setShowAddBookingModal(false)}
-                  className="flex-1 rounded-3xl border border-[#414E36]/20 bg-[#fff] py-3 text-sm font-bold text-[#414E36] hover:bg-[#f7f6f2] text-center"
+                  className="flex-1 rounded-3xl border border-[var(--cr-primary)]/20 bg-[#fff] py-3 text-sm font-bold text-[var(--cr-primary)] hover:bg-[#f7f6f2] text-center"
                 >
                   Cancel
                 </button>
@@ -8717,19 +8717,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       )}
       {/* Search Modal */}
       {showSearchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn">
-          <div className="w-full max-w-2xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[85vh] overflow-y-auto">
-            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--cr-dark)]/50 p-4 animate-fadeIn">
+          <div className="w-full max-w-2xl rounded-[32px] bg-[var(--color-brand-light)] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[85vh] overflow-y-auto">
+            <div className="mb-5 flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
               <div>
-                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Search</p>
-                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">Search Bookings & Requests</h3>
+                <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-secondary)]/80 font-bold">Search</p>
+                <h3 className="mt-2 text-2xl font-semibold text-[var(--cr-dark)]">Search Bookings & Requests</h3>
               </div>
               <button
                 onClick={() => {
                   setShowSearchModal(false);
                   setSearchQuery("");
                 }}
-                className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                className="rounded-full bg-[var(--color-brand-sand)] p-2.5 text-[var(--cr-primary)] transition hover:bg-[#e4e0d6]"
               >
                 <X size={20} />
               </button>
@@ -8741,7 +8741,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 placeholder="Search by patient name, email, phone, notes, status, doctor name, date..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-3 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-3 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-accent)]"
               />
             </div>
 
@@ -8762,7 +8762,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
               if (filtered.length === 0) {
                 return (
-                  <p className="py-8 text-center text-[#5A6A51] font-semibold">No bookings match your search query.</p>
+                  <p className="py-8 text-center text-[var(--color-brand-secondary)] font-semibold">No bookings match your search query.</p>
                 );
               }
 
@@ -8783,15 +8783,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                             document.getElementById("pending-approvals-section")?.scrollIntoView({ behavior: 'smooth' });
                           }
                         }}
-                        className="flex items-center justify-between rounded-2xl border border-[#414E36]/10 bg-white p-4 cursor-pointer hover:border-[#C4AE7C]/30 transition shadow-[0_4px_15px_rgba(0,0,0,0.02)]"
+                        className="flex items-center justify-between rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 cursor-pointer hover:border-[var(--cr-accent)]/30 transition shadow-[0_4px_15px_rgba(0,0,0,0.02)]"
                       >
                         <div>
-                          <p className="font-bold text-[#1F251A]">{r.name}</p>
-                          <p className="text-xs text-[#5A6A51] mt-1">
-                            {service ? service.en : `Service #${r.serviceId}`} • {r.date} {r.timeSlot ? `@ ${r.timeSlot}` : r.requestedTime ? `@ ${r.requestedTime}` : ""} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === r.branchId)?.name_en || "Default/All"}</span>
+                          <p className="font-bold text-[var(--cr-dark)]">{r.name}</p>
+                          <p className="text-xs text-[var(--color-brand-secondary)] mt-1">
+                            {service ? service.en : `Service #${r.serviceId}`} • {r.date} {r.timeSlot ? `@ ${r.timeSlot}` : r.requestedTime ? `@ ${r.requestedTime}` : ""} • <span className="font-semibold text-[var(--cr-primary)]">{branches.find(b => b.id === r.branchId)?.name_en || "Default/All"}</span>
                           </p>
                           {r.doctorName && (
-                            <p className="text-xs text-[#C4AE7C] mt-0.5 font-semibold">
+                            <p className="text-xs text-[var(--cr-accent)] mt-0.5 font-semibold">
                               Doctor: {r.doctorName}
                             </p>
                           )}
@@ -8842,21 +8842,21 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
           onClick={(e) => { if (e.target === e.currentTarget) setShowExportCustomersModal(false); }}
         >
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 overflow-hidden">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-[var(--cr-primary)]/10 overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--cr-primary)]/10 bg-[#F9F9F7]">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36]">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-brand-tint)] text-[var(--cr-primary)]">
                   <Download size={18} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-[#1F251A]">Export Customers</h3>
-                  <p className="text-xs text-[#5A6A51]">{customers.length} customer{customers.length !== 1 ? "s" : ""} will be exported</p>
+                  <h3 className="text-lg font-semibold text-[var(--cr-dark)]">Export Customers</h3>
+                  <p className="text-xs text-[var(--color-brand-secondary)]">{customers.length} customer{customers.length !== 1 ? "s" : ""} will be exported</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowExportCustomersModal(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] transition hover:bg-[var(--color-brand-tint)] hover:text-[var(--cr-primary)]"
               >
                 <X size={16} />
               </button>
@@ -8864,7 +8864,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
             {/* Modal Body */}
             <div className="px-6 py-5 space-y-4">
-              <p className="text-sm text-[#5A6A51]">
+              <p className="text-sm text-[var(--color-brand-secondary)]">
                 The exported CSV file will contain the following data columns for each customer:
               </p>
 
@@ -8873,48 +8873,48 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 {["ID", "Customer Name", "Mobile", "Gender", "Email", "Number of Bookings", "Registration Date", "Active", "Spent Amount", "Outstanding", "Area", "Location Name", "Street Name", "Building No.", "Floor No.", "Note"].map((col) => (
                   <span
                     key={col}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#414E36]/15 bg-[#EDF1EC] px-3 py-1 text-xs font-medium text-[#414E36]"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--cr-primary)]/15 bg-[var(--color-brand-tint)] px-3 py-1 text-xs font-medium text-[var(--cr-primary)]"
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#C4AE7C] flex-shrink-0" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--cr-accent)] flex-shrink-0" />
                     {col}
                   </span>
                 ))}
               </div>
 
               {/* Stats row */}
-              <div className="grid grid-cols-3 gap-3 rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] p-4">
+              <div className="grid grid-cols-3 gap-3 rounded-xl border border-[var(--cr-primary)]/10 bg-[#F9F9F7] p-4">
                 <div className="text-center">
-                  <p className="text-xl font-bold text-[#1F251A]">{customers.length}</p>
-                  <p className="text-xs text-[#5A6A51] mt-0.5">Total Patients</p>
+                  <p className="text-xl font-bold text-[var(--cr-dark)]">{customers.length}</p>
+                  <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">Total Patients</p>
                 </div>
-                <div className="text-center border-x border-[#414E36]/10">
-                  <p className="text-xl font-bold text-[#1F251A]">16</p>
-                  <p className="text-xs text-[#5A6A51] mt-0.5">Columns</p>
+                <div className="text-center border-x border-[var(--cr-primary)]/10">
+                  <p className="text-xl font-bold text-[var(--cr-dark)]">16</p>
+                  <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">Columns</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-bold text-[#414E36]">CSV</p>
-                  <p className="text-xs text-[#5A6A51] mt-0.5">Format</p>
+                  <p className="text-xl font-bold text-[var(--cr-primary)]">CSV</p>
+                  <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">Format</p>
                 </div>
               </div>
 
-              <p className="text-xs text-[#5A6A51] flex items-center gap-1.5">
-                <FileText size={12} className="text-[#C4AE7C]" />
+              <p className="text-xs text-[var(--color-brand-secondary)] flex items-center gap-1.5">
+                <FileText size={12} className="text-[var(--cr-accent)]" />
                 The file will be UTF-8 encoded (BOM) for full compatibility with Microsoft Excel and Google Sheets.
               </p>
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--cr-primary)]/10 bg-[#F9F9F7]">
               <button
                 onClick={() => setShowExportCustomersModal(false)}
-                className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+                className="rounded-lg border border-[var(--cr-primary)]/15 px-4 py-2 text-sm font-medium text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-tint)]"
               >
                 Cancel
               </button>
               <button
                 onClick={handleExportCustomersCSV}
                 disabled={loadingCustomers}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 rounded-lg bg-[var(--cr-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--color-brand-light)] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Download size={15} />
                 {loadingCustomers ? "Loading..." : "Export CSV"}
@@ -8930,22 +8930,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto"
           onClick={(e) => { if (e.target === e.currentTarget && !importLoading) handleCloseImportModal(); }}
         >
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 overflow-hidden my-8 animate-fadeIn">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[var(--cr-primary)]/10 overflow-hidden my-8 animate-fadeIn">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--cr-primary)]/10 bg-[#F9F9F7]">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36]">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-brand-tint)] text-[var(--cr-primary)]">
                   <Upload size={18} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-[#1F251A]">Import Customers / Patients</h3>
-                  <p className="text-xs text-[#5A6A51]">Upload a CSV file containing patient demographic details</p>
+                  <h3 className="text-lg font-semibold text-[var(--cr-dark)]">Import Customers / Patients</h3>
+                  <p className="text-xs text-[var(--color-brand-secondary)]">Upload a CSV file containing patient demographic details</p>
                 </div>
               </div>
               <button
                 disabled={importLoading}
                 onClick={handleCloseImportModal}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36] disabled:opacity-50"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] transition hover:bg-[var(--color-brand-tint)] hover:text-[var(--cr-primary)] disabled:opacity-50"
               >
                 <X size={16} />
               </button>
@@ -8955,16 +8955,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
               {!importFile ? (
                 // Step 1: Upload File Instructions and Box
-                <div className="flex flex-col items-center justify-center border-2 border-dashed border-[#414E36]/25 rounded-2xl p-8 bg-[#FBFBF9] hover:bg-[#F5F4F0] transition group relative">
+                <div className="flex flex-col items-center justify-center border-2 border-dashed border-[var(--cr-primary)]/25 rounded-2xl p-8 bg-[var(--color-brand-light)] hover:bg-[#F5F4F0] transition group relative">
                   <input
                     type="file"
                     accept=".csv"
                     onChange={handleFileChange}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
-                  <Upload className="h-10 w-10 text-[#C4AE7C] mb-3 transition-transform group-hover:-translate-y-1" />
-                  <span className="text-sm font-semibold text-[#1F251A]">Click to select CSV File</span>
-                  <span className="text-xs text-[#5A6A51] mt-1">Accepts standard .csv comma-separated values</span>
+                  <Upload className="h-10 w-10 text-[var(--cr-accent)] mb-3 transition-transform group-hover:-translate-y-1" />
+                  <span className="text-sm font-semibold text-[var(--cr-dark)]">Click to select CSV File</span>
+                  <span className="text-xs text-[var(--color-brand-secondary)] mt-1">Accepts standard .csv comma-separated values</span>
                   <div className="mt-4 text-[10px] text-gray-400 text-center max-w-sm">
                     For best matching, make sure your CSV contains columns like: <strong>Name, Phone/Mobile, Email, Gender, National ID, Age</strong>.
                   </div>
@@ -8973,12 +8973,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 // Step 2: File Selected and Parsed
                 <div className="space-y-4">
                   {/* File Info Card */}
-                  <div className="flex items-center justify-between rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] p-3">
+                  <div className="flex items-center justify-between rounded-xl border border-[var(--cr-primary)]/10 bg-[#F9F9F7] p-3">
                     <div className="flex items-center gap-3">
-                      <FileText size={24} className="text-[#C4AE7C]" />
+                      <FileText size={24} className="text-[var(--cr-accent)]" />
                       <div>
-                        <p className="text-sm font-semibold text-[#1F251A]">{importFile.name}</p>
-                        <p className="text-xs text-[#5A6A51]">
+                        <p className="text-sm font-semibold text-[var(--cr-dark)]">{importFile.name}</p>
+                        <p className="text-xs text-[var(--color-brand-secondary)]">
                           {(importFile.size / 1024).toFixed(1)} KB • {importRows.length} rows found
                         </p>
                       </div>
@@ -9008,7 +9008,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   {/* CSV Columns Detected */}
                   {!importLoading && importHeaders.length > 0 && (
                     <div className="space-y-1.5">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Headers Detected</h4>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">Headers Detected</h4>
                       <div className="flex flex-wrap gap-1.5">
                         {importHeaders.map(h => (
                           <span key={h} className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600 border border-gray-200">
@@ -9022,16 +9022,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   {/* Rows Preview */}
                   {!importLoading && importRows.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Preview (First 3 Rows Mapping)</h4>
-                      <div className="overflow-x-auto rounded-xl border border-[#414E36]/10 bg-white">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">Preview (First 3 Rows Mapping)</h4>
+                      <div className="overflow-x-auto rounded-xl border border-[var(--cr-primary)]/10 bg-white">
                         <table className="w-full text-xs text-left">
                           <thead className="bg-gray-50 border-b border-gray-100">
                             <tr>
-                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">Name</th>
-                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">Phone</th>
-                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">Email</th>
-                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">National ID</th>
-                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">Gender</th>
+                              <th className="px-3 py-2 font-semibold text-[var(--color-brand-secondary)]">Name</th>
+                              <th className="px-3 py-2 font-semibold text-[var(--color-brand-secondary)]">Phone</th>
+                              <th className="px-3 py-2 font-semibold text-[var(--color-brand-secondary)]">Email</th>
+                              <th className="px-3 py-2 font-semibold text-[var(--color-brand-secondary)]">National ID</th>
+                              <th className="px-3 py-2 font-semibold text-[var(--color-brand-secondary)]">Gender</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
@@ -9039,7 +9039,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                               const m = mapRowToCustomer(row);
                               return (
                                 <tr key={idx} className="hover:bg-gray-50/50">
-                                  <td className="px-3 py-2 font-medium text-[#1F251A]">{m.name || <span className="text-red-400 italic">Missing</span>}</td>
+                                  <td className="px-3 py-2 font-medium text-[var(--cr-dark)]">{m.name || <span className="text-red-400 italic">Missing</span>}</td>
                                   <td className="px-3 py-2 text-gray-600">{m.mobile || <span className="text-red-400 italic">Missing</span>}</td>
                                   <td className="px-3 py-2 text-gray-600">{m.email || "-"}</td>
                                   <td className="px-3 py-2 text-gray-600">{m.national_id || "-"}</td>
@@ -9057,22 +9057,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   {(importLoading || importLog.length > 0) && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-[#1F251A]">
+                        <span className="font-semibold text-[var(--cr-dark)]">
                           {importLoading ? `Importing patients...` : "Import Complete"}
                         </span>
-                        <span className="font-bold text-[#C4AE7C]">{importProgress}%</span>
+                        <span className="font-bold text-[var(--cr-accent)]">{importProgress}%</span>
                       </div>
                       
                       {/* Progress Bar container */}
                       <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-[#414E36] transition-all duration-200"
+                          className="h-full bg-[var(--cr-primary)] transition-all duration-200"
                           style={{ width: `${importProgress}%` }}
                         />
                       </div>
 
                       {/* Log Container */}
-                      <div className="h-40 overflow-y-auto rounded-xl border border-[#414E36]/10 bg-gray-50 p-3 space-y-1 text-[11px] font-mono">
+                      <div className="h-40 overflow-y-auto rounded-xl border border-[var(--cr-primary)]/10 bg-gray-50 p-3 space-y-1 text-[11px] font-mono">
                         {importLog.map((log, idx) => (
                           <div key={idx} className="flex justify-between items-center py-0.5 border-b border-gray-100/50 last:border-0">
                             <span className="font-medium text-gray-700 truncate max-w-sm">{log.name}</span>
@@ -9093,11 +9093,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--cr-primary)]/10 bg-[#F9F9F7]">
               <button
                 disabled={importLoading}
                 onClick={handleCloseImportModal}
-                className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC] disabled:opacity-50"
+                className="rounded-lg border border-[var(--cr-primary)]/15 px-4 py-2 text-sm font-medium text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-tint)] disabled:opacity-50"
               >
                 {importProgress === 100 ? "Close" : "Cancel"}
               </button>
@@ -9105,7 +9105,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 <button
                   onClick={handleStartImport}
                   disabled={importLoading}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-lg bg-[var(--cr-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--color-brand-light)] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60"
                 >
                   {importLoading ? (
                     <>
@@ -9129,23 +9129,23 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       {/* ── DELETE CUSTOMER CONFIRMATION MODAL ── */}
       {deleteCustomerTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-lg rounded-2xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
+          <div className="w-full max-w-lg rounded-2xl bg-[var(--color-brand-light)] p-6 shadow-2xl border border-[var(--cr-primary)]/10">
             <div className="mb-4 flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 border border-red-100">
                 <Trash2 size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-[#1F251A]">Delete Customer?</h3>
-                <p className="mt-1 text-xs text-[#5A6A51] leading-relaxed">
+                <h3 className="text-lg font-bold text-[var(--cr-dark)]">Delete Customer?</h3>
+                <p className="mt-1 text-xs text-[var(--color-brand-secondary)] leading-relaxed">
                   You are deleting the customer profile for{" "}
-                  <span className="font-bold text-[#1F251A]">{deleteCustomerTarget.name}</span>.
+                  <span className="font-bold text-[var(--cr-dark)]">{deleteCustomerTarget.name}</span>.
                 </p>
               </div>
             </div>
 
             {adminRole === 'superadmin' ? (
               <div className="space-y-3 mb-5">
-                <p className="text-xs font-semibold text-[#1F251A]">
+                <p className="text-xs font-semibold text-[var(--cr-dark)]">
                   As a <strong>Super Admin</strong>, select your deletion method:
                 </p>
                 <div className="grid grid-cols-1 gap-2.5">
@@ -9191,16 +9191,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-[#5A6A51] mb-5 leading-relaxed">
+              <p className="text-xs text-[var(--color-brand-secondary)] mb-5 leading-relaxed">
                 This action will permanently delete the customer profile. Linked reservations will be set to guest status.
               </p>
             )}
 
-            <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
+            <div className="flex items-center justify-end gap-3 border-t border-[var(--cr-primary)]/10 pt-4">
               <button
                 type="button"
                 onClick={() => setDeleteCustomerTarget(null)}
-                className="rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-xs font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+                className="rounded-lg border border-[var(--cr-primary)]/15 bg-white px-4 py-2 text-xs font-medium text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-tint)]"
               >
                 Cancel
               </button>
@@ -9225,15 +9225,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="relative w-full max-w-md mx-4 rounded-3xl bg-white shadow-2xl overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-br from-[#1F251A] to-[#414E36] px-8 py-8 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#C4AE7C]/20 ring-2 ring-[#C4AE7C]/40">
-                <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#C4AE7C" strokeWidth={2}>
+            <div className="bg-gradient-to-br from-[var(--cr-dark)] to-[var(--cr-primary)] px-8 py-8 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--cr-accent)]/20 ring-2 ring-[var(--cr-accent)]/40">
+                <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="var(--cr-accent)" strokeWidth={2}>
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
               <h2 className="text-2xl font-bold text-white mb-1">Set Your Password</h2>
-              <p className="text-sm text-[#C4AE7C]/80">
+              <p className="text-sm text-[var(--cr-accent)]/80">
                 Welcome! Please create a secure password to complete your account setup.
               </p>
             </div>
@@ -9248,12 +9248,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     </svg>
                   </div>
                   <p className="text-green-700 font-semibold text-base">{setupSuccess}</p>
-                  <p className="text-sm text-[#5A6A51]">You will be redirected automatically…</p>
+                  <p className="text-sm text-[var(--color-brand-secondary)]">You will be redirected automatically…</p>
                 </div>
               ) : (
                 <form onSubmit={handleSetupPassword} className="space-y-5">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-2">
                       New Password
                     </label>
                     <input
@@ -9261,7 +9261,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       value={setupPassword}
                       onChange={(e) => setSetupPassword(e.target.value)}
                       placeholder="At least 8 characters"
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
                       disabled={setupLoading}
                       autoFocus
                     />
@@ -9291,7 +9291,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 )}
                   </div>
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-2">
                       Confirm Password
                     </label>
                     <input
@@ -9299,7 +9299,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       value={setupConfirmPassword}
                       onChange={(e) => setSetupConfirmPassword(e.target.value)}
                       placeholder="Re-enter your password"
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
                       disabled={setupLoading}
                     />
                   </div>
@@ -9313,7 +9313,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   <button
                     type="submit"
                     disabled={setupLoading}
-                    className="w-full rounded-xl bg-[#414E36] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full rounded-xl bg-[var(--cr-primary)] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {setupLoading ? (
                       <span className="flex items-center justify-center gap-2">
@@ -9335,33 +9335,33 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       {/* ── POSTPONE BOOKING MODAL ── */}
       {postponeBooking && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
-            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+          <div className="w-full max-w-md rounded-3xl bg-[var(--color-brand-light)] p-6 shadow-2xl border border-[var(--cr-primary)]/10">
+            <div className="mb-5 flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Reschedule</p>
-                <h3 className="text-xl font-bold text-[#1F251A] mt-1">Postpone Booking</h3>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--cr-accent)]">Reschedule</p>
+                <h3 className="text-xl font-bold text-[var(--cr-dark)] mt-1">Postpone Booking</h3>
               </div>
               <button
                 onClick={() => setPostponeBooking(null)}
-                className="rounded-full bg-[#F2EFE9] p-2 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                className="rounded-full bg-[var(--color-brand-sand)] p-2 text-[var(--cr-primary)] transition hover:bg-[#e4e0d6]"
               >
                 <X size={18} />
               </button>
             </div>
 
             <div className="space-y-4">
-              <div className="flex gap-2 rounded-2xl border border-[#414E36]/10 bg-white p-1">
+              <div className="flex gap-2 rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-1">
                 <button
                   type="button"
                   onClick={() => setPostponeMode("reschedule")}
-                  className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${postponeMode === "reschedule" ? "bg-[#414E36] text-white" : "text-[#414E36]"}`}
+                  className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${postponeMode === "reschedule" ? "bg-[var(--cr-primary)] text-white" : "text-[var(--cr-primary)]"}`}
                 >
                   I know the new date
                 </button>
                 <button
                   type="button"
                   onClick={() => setPostponeMode("followup")}
-                  className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${postponeMode === "followup" ? "bg-[#414E36] text-white" : "text-[#414E36]"}`}
+                  className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${postponeMode === "followup" ? "bg-[var(--cr-primary)] text-white" : "text-[var(--cr-primary)]"}`}
                 >
                   Not sure yet
                 </button>
@@ -9370,20 +9370,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               {postponeMode === "reschedule" ? (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-[#5A6A51] mb-1">New Date</label>
+                    <label className="block text-xs font-bold text-[var(--color-brand-secondary)] mb-1">New Date</label>
                     <input
                       type="date"
                       value={postponeNewDate}
                       onChange={(e) => setPostponeNewDate(e.target.value)}
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#5A6A51] mb-1">New Time</label>
+                    <label className="block text-xs font-bold text-[var(--color-brand-secondary)] mb-1">New Time</label>
                     <select
                       value={postponeNewTime}
                       onChange={(e) => setPostponeNewTime(e.target.value)}
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                     >
                       <option value="">Select time</option>
                       {ALL_15MIN_SLOTS.map((slot) => (
@@ -9394,12 +9394,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 </div>
               ) : (
                 <div>
-                  <label className="block text-xs font-bold text-[#5A6A51] mb-1">Follow Up Around</label>
+                  <label className="block text-xs font-bold text-[var(--color-brand-secondary)] mb-1">Follow Up Around</label>
                   <input
                     type="date"
                     value={postponeFollowUpDate}
                     onChange={(e) => setPostponeFollowUpDate(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   />
                   <p className="text-[11px] text-[#8A9A81] mt-1.5">
                     The booking will be marked Postponed with no confirmed date until you come back and reschedule it.
@@ -9440,7 +9440,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     setSavingPostpone(false);
                   }
                 }}
-                className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
+                className="w-full rounded-2xl bg-[var(--cr-primary)] py-3 text-sm font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition disabled:opacity-50"
               >
                 {savingPostpone ? "Saving..." : postponeMode === "reschedule" ? "Reschedule Booking" : "Mark as Postponed"}
               </button>
@@ -10109,12 +10109,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
           return (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
-              <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto my-auto rounded-3xl bg-[#FBFBF9] p-6 sm:p-8 shadow-2xl border border-[#414E36]/10 space-y-6">
+              <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto my-auto rounded-3xl bg-[var(--color-brand-light)] p-6 sm:p-8 shadow-2xl border border-[var(--cr-primary)]/10 space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+                <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Invoice Checkout</p>
-                    <h3 className="text-xl font-bold text-[#1F251A] mt-1">Payment Settlement</h3>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--cr-accent)]">Invoice Checkout</p>
+                    <h3 className="text-xl font-bold text-[var(--cr-dark)] mt-1">Payment Settlement</h3>
                   </div>
                   <button
                     onClick={() => {
@@ -10124,19 +10124,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       setDepositChangeToWallet(false);
                       setRedeemedPackageItems({});
                     }}
-                    className="rounded-full bg-[#F2EFE9] p-2 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                    className="rounded-full bg-[var(--color-brand-sand)] p-2 text-[var(--cr-primary)] transition hover:bg-[#e4e0d6]"
                   >
                     <X size={18} />
                   </button>
                 </div>
 
                 {/* Body */}
-                <div className="space-y-4 text-sm text-[#414E36]">
+                <div className="space-y-4 text-sm text-[var(--cr-primary)]">
                   {/* Customer Information */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">Customer / المريض</p>
-                    <p className="font-bold text-[#1F251A]">{checkoutBooking.name}</p>
-                    <p className="text-xs text-[#5A6A51] mt-0.5">{checkoutBooking.phone}</p>
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1">Customer / المريض</p>
+                    <p className="font-bold text-[var(--cr-dark)]">{checkoutBooking.name}</p>
+                    <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">{checkoutBooking.phone}</p>
                   </div>
 
                   {/* Laser Per-Pulse Settlement Agreement Notice */}
@@ -10179,8 +10179,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                         <div className="grid grid-cols-3 gap-2 text-center">
                           <div className="bg-purple-50/70 rounded-lg p-2 border border-purple-100">
                             <p className="text-[10px] uppercase font-semibold text-purple-600">{isRTL ? "رصيد الباقة الحالي" : "Current Balance"}</p>
-                            <p className="font-extrabold text-[#1F251A] text-xs sm:text-sm mt-0.5">
-                              {currentRemainingPulses.toLocaleString()} <span className="text-[10px] font-normal text-[#5A6A51]">{isRTL ? "نبضة" : "pulses"}</span>
+                            <p className="font-extrabold text-[var(--cr-dark)] text-xs sm:text-sm mt-0.5">
+                              {currentRemainingPulses.toLocaleString()} <span className="text-[10px] font-normal text-[var(--color-brand-secondary)]">{isRTL ? "نبضة" : "pulses"}</span>
                             </p>
                           </div>
                           <div className="bg-amber-50/80 rounded-lg p-2 border border-amber-200/80">
@@ -10268,22 +10268,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   )}
 
                   {/* Services Invoice details */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Services List / الخدمات</p>
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">Services List / الخدمات</p>
                     {bookingServicesList.map((svc: any) => {
                       const isRedeemed = !!redeemedPackageItems[svc.serviceId];
                       return (
-                        <div key={svc.serviceId} className="border-b border-[#414E36]/10 pb-2 space-y-1">
+                        <div key={svc.serviceId} className="border-b border-[var(--cr-primary)]/10 pb-2 space-y-1">
                           <div className="flex justify-between items-center text-sm font-semibold">
                             <span className="flex items-center gap-2">
                               <span>{svc.name}</span>
                               {svc.hasPromotion && !isRedeemed && (
-                                <span className="text-[10px] font-bold bg-[#C4AE7C] text-white px-2 py-0.5 rounded-full">
+                                <span className="text-[10px] font-bold bg-[var(--cr-accent)] text-white px-2 py-0.5 rounded-full">
                                   {svc.promotionText || "OFFER"}
                                 </span>
                               )}
                             </span>
-                            <span className={isRedeemed ? "line-through text-[#5A6A51]" : "text-right"}>
+                            <span className={isRedeemed ? "line-through text-[var(--color-brand-secondary)]" : "text-right"}>
                               <span>{svc.price} EGP</span>
                               {svc.pulseDetails && <span className="text-[11px] font-normal text-amber-700 block">{svc.pulseDetails}</span>}
                             </span>
@@ -10317,21 +10317,21 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
                     {/* Additional Services */}
                     {checkoutAdditionalServicesList.length > 0 && (
-                      <div className="mt-2.5 rounded-xl border border-[#C4AE7C]/30 bg-[#FAF5EB]/50 p-3 space-y-2 text-xs">
-                        <div className="flex items-center justify-between border-b border-[#C4AE7C]/20 pb-1.5">
-                          <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <div className="mt-2.5 rounded-xl border border-[var(--cr-accent)]/30 bg-[#FAF5EB]/50 p-3 space-y-2 text-xs">
+                        <div className="flex items-center justify-between border-b border-[var(--cr-accent)]/20 pb-1.5">
+                          <span className="font-bold text-[var(--cr-primary)] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                             <span>✨</span> Additional Services / الخدمات الإضافية
                           </span>
-                          <span className="font-bold text-[#C4AE7C]">+{checkoutAdditionalServicesCost} EGP</span>
+                          <span className="font-bold text-[var(--cr-accent)]">+{checkoutAdditionalServicesCost} EGP</span>
                         </div>
                         <div className="space-y-1.5 pt-0.5">
                           {checkoutAdditionalServicesList.map((item, iIdx) => (
-                            <div key={`chk-as-${iIdx}`} className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#C4AE7C]/20 shadow-2xs">
+                            <div key={`chk-as-${iIdx}`} className="flex items-center justify-between bg-white p-2 rounded-lg border border-[var(--cr-accent)]/20 shadow-2xs">
                               <div>
-                                <p className="font-bold text-[#1F251A]">{item.name}</p>
-                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `× ${item.unitPrice} EGP` : ''}</p>
+                                <p className="font-bold text-[var(--cr-dark)]">{item.name}</p>
+                                <p className="text-[11px] text-[var(--color-brand-secondary)]">Qty: {item.qty} {item.qty > 1 ? `× ${item.unitPrice} EGP` : ''}</p>
                               </div>
-                              <span className="font-extrabold text-[#414E36]">+{item.total} EGP</span>
+                              <span className="font-extrabold text-[var(--cr-primary)]">+{item.total} EGP</span>
                             </div>
                           ))}
                         </div>
@@ -10340,38 +10340,38 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
                     {/* Products & Session Consumables */}
                     {checkoutProductsConsumablesList.length > 0 && (
-                      <div className="mt-2.5 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 space-y-2 text-xs">
-                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-1.5">
-                          <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <div className="mt-2.5 rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-3 space-y-2 text-xs">
+                        <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-1.5">
+                          <span className="font-bold text-[var(--cr-primary)] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                             <span>📦</span> Session Consumables & Products / المستلزمات والمنتجات
                           </span>
-                          <span className="font-bold text-[#414E36]">+{checkoutProductsCost} EGP</span>
+                          <span className="font-bold text-[var(--cr-primary)]">+{checkoutProductsCost} EGP</span>
                         </div>
                         <div className="space-y-1.5 pt-0.5">
                           {checkoutProductsConsumablesList.map((item, iIdx) => (
-                            <div key={`chk-p-${iIdx}`} className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 shadow-2xs">
+                            <div key={`chk-p-${iIdx}`} className="flex items-center justify-between bg-white p-2 rounded-lg border border-[var(--cr-primary)]/10 shadow-2xs">
                               <div>
-                                <p className="font-bold text-[#1F251A]">{item.name}</p>
-                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `× ${item.unitPrice} EGP` : ''}</p>
+                                <p className="font-bold text-[var(--cr-dark)]">{item.name}</p>
+                                <p className="text-[11px] text-[var(--color-brand-secondary)]">Qty: {item.qty} {item.qty > 1 ? `× ${item.unitPrice} EGP` : ''}</p>
                               </div>
-                              <span className="font-extrabold text-[#414E36]">+{item.total} EGP</span>
+                              <span className="font-extrabold text-[var(--cr-primary)]">+{item.total} EGP</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
+                    <div className="border-t border-[var(--cr-primary)]/10 pt-2 flex justify-between font-bold text-[var(--cr-dark)] text-base">
                       <span>Total Cost / الإجمالي</span>
                       <span>{totalCost} EGP</span>
                     </div>
                     {depositAlreadyPaid > 0 && (
                       <>
-                        <div className="flex justify-between text-xs text-[#5A6A51]">
+                        <div className="flex justify-between text-xs text-[var(--color-brand-secondary)]">
                           <span>Deposit already paid / العربون المدفوع</span>
                           <span>-{depositAlreadyPaid} EGP</span>
                         </div>
-                        <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#414E36] text-base">
+                        <div className="border-t border-[var(--cr-primary)]/10 pt-2 flex justify-between font-bold text-[var(--cr-primary)] text-base">
                           <span>Balance Due / المتبقي</span>
                           <span>{balanceDue} EGP</span>
                         </div>
@@ -10381,20 +10381,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
                   {/* Wallet Option */}
                   {walletBalance > 0 && (
-                    <div className="rounded-2xl border border-[#C4AE7C]/20 bg-[#FBFBF9] p-4 flex items-center justify-between">
+                    <div className="rounded-2xl border border-[var(--cr-accent)]/20 bg-[var(--color-brand-light)] p-4 flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-[#1F251A] flex items-center gap-1.5">
-                          <span className="inline-block h-2 w-2 rounded-full bg-[#C4AE7C]"></span>
+                        <p className="font-bold text-[var(--cr-dark)] flex items-center gap-1.5">
+                          <span className="inline-block h-2 w-2 rounded-full bg-[var(--cr-accent)]"></span>
                           Use Customer Wallet / استخدام المحفظة
                         </p>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">Available balance: {walletBalance} EGP</p>
+                        <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">Available balance: {walletBalance} EGP</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={useWalletBalance}
                           onChange={(e) => setUseWalletBalance(e.target.checked)}
-                          className="h-5 w-5 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                          className="h-5 w-5 rounded border-[var(--cr-primary)]/15 text-[var(--cr-primary)] focus:ring-[var(--cr-accent)] cursor-pointer"
                         />
                       </label>
                     </div>
@@ -10403,7 +10403,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   {/* Payment Inputs */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-[#5A6A51] mb-1">
+                      <label className="block text-xs font-bold text-[var(--color-brand-secondary)] mb-1">
                         Net Due / المبلغ المستحق
                       </label>
                       <div className="relative">
@@ -10411,20 +10411,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           type="text"
                           disabled
                           value={`${netDue} EGP`}
-                          className="w-full rounded-xl border border-[#414E36]/10 bg-[#EDF1EC]/30 px-3 py-2.5 text-sm font-bold text-[#1F251A] outline-none"
+                          className="w-full rounded-xl border border-[var(--cr-primary)]/10 bg-[var(--color-brand-tint)]/30 px-3 py-2.5 text-sm font-bold text-[var(--cr-dark)] outline-none"
                         />
                       </div>
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="block text-xs font-bold text-[#5A6A51]">
+                        <label className="block text-xs font-bold text-[var(--color-brand-secondary)]">
                           Amount Paid / المبلغ المدفوع
                         </label>
                         {netDue > 0 && (
                           <button
                             type="button"
                             onClick={() => setCheckoutAmountPaid(String(netDue))}
-                            className="text-[11px] font-bold text-[#414E36] hover:underline cursor-pointer"
+                            className="text-[11px] font-bold text-[var(--cr-primary)] hover:underline cursor-pointer"
                           >
                             {isRTL ? "دفع كامل المبلغ" : "Pay Full"} ({netDue} EGP)
                           </button>
@@ -10437,9 +10437,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           value={checkoutAmountPaid}
                           onChange={(e) => setCheckoutAmountPaid(e.target.value)}
                           placeholder={String(netDue)}
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-10 py-2.5 text-sm font-bold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                          className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white pl-3 pr-10 py-2.5 text-sm font-bold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
                         />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5A6A51]">EGP</span>
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[var(--color-brand-secondary)]">EGP</span>
                       </div>
                     </div>
                   </div>
@@ -10456,9 +10456,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           type="checkbox"
                           checked={depositChangeToWallet}
                           onChange={(e) => setDepositChangeToWallet(e.target.checked)}
-                          className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                          className="h-4 w-4 rounded border-[var(--cr-primary)]/15 text-[var(--cr-primary)] focus:ring-[var(--cr-accent)] cursor-pointer"
                         />
-                        <span className="text-xs font-semibold text-[#1F251A]">
+                        <span className="text-xs font-semibold text-[var(--cr-dark)]">
                           Put change in customer's wallet / أضف الباقي إلى محفظة المريض
                         </span>
                       </label>
@@ -10474,7 +10474,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 </div>
 
                 {/* Footer */}
-                <div className="mt-6 flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
+                <div className="mt-6 flex items-center justify-end gap-3 border-t border-[var(--cr-primary)]/10 pt-4">
                   <button
                     onClick={() => {
                       setCheckoutBooking(null);
@@ -10483,14 +10483,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       setDepositChangeToWallet(false);
                       setRedeemedPackageItems({});
                     }}
-                    className="rounded-xl border border-[#414E36]/15 bg-white px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+                    className="rounded-xl border border-[var(--cr-primary)]/15 bg-white px-5 py-2.5 text-xs font-semibold text-[var(--cr-primary)] hover:bg-[var(--color-brand-tint)] transition"
                   >
                     Cancel
                   </button>
                   <button
                     disabled={savingCheckout}
                     onClick={handleConfirmCheckout}
-                    className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-60 flex items-center gap-1.5 shadow-md"
+                    className="rounded-xl bg-[var(--cr-primary)] px-5 py-2.5 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition disabled:opacity-60 flex items-center gap-1.5 shadow-md"
                   >
                     {savingCheckout ? (
                       <>
@@ -10583,15 +10583,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 onClick={() => setInvoiceBooking(null)}
               >
                 <div 
-                  className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl bg-white p-5 sm:p-6 shadow-2xl border border-[#414E36]/10 my-auto"
+                  className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl bg-white p-5 sm:p-6 shadow-2xl border border-[var(--cr-primary)]/10 my-auto"
                   onClick={(e) => e.stopPropagation()}
                 >
                   
                   {/* Header Actions */}
-                  <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 mb-3 shrink-0">
+                  <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-3 mb-3 shrink-0">
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#C4AE7C]">Invoice Preview</span>
-                      <h3 className="text-base font-bold text-[#1F251A] mt-0.5 font-sans">Booking Invoice Details</h3>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--cr-accent)]">Invoice Preview</span>
+                      <h3 className="text-base font-bold text-[var(--cr-dark)] mt-0.5 font-sans">Booking Invoice Details</h3>
                     </div>
                     <button
                       onClick={() => setInvoiceBooking(null)}
@@ -10602,35 +10602,35 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   </div>
 
                   {/* Printable Invoice Container (Scrollable) */}
-                  <div className="overflow-y-auto pr-1.5 flex-1 border border-gray-100 rounded-2xl p-4 sm:p-5 bg-[#FBFBF9]/40 space-y-4">
+                  <div className="overflow-y-auto pr-1.5 flex-1 border border-gray-100 rounded-2xl p-4 sm:p-5 bg-[var(--color-brand-light)]/40 space-y-4">
                     {/* Top Header */}
-                    <div className="flex justify-between items-start gap-4 pb-3.5 border-b border-[#414E36]/20">
+                    <div className="flex justify-between items-start gap-4 pb-3.5 border-b border-[var(--cr-primary)]/20">
                       <div>
-                        <h1 className="text-lg sm:text-xl font-bold tracking-wider text-[#414E36]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
-                        <p className="text-xs text-[#5A6A51] mt-0.5 font-semibold">Sheikh Zayed / New Cairo</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">Phone: (+20) 01035595691</p>
+                        <h1 className="text-lg sm:text-xl font-bold tracking-wider text-[var(--cr-primary)]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
+                        <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5 font-semibold">Sheikh Zayed / New Cairo</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Phone: {CLIENT.phoneDisplay}</p>
                         <p className="text-[11px] text-gray-400">Email: inquiries@reveraclinics.com</p>
                       </div>
                       <div className="text-right">
-                        <h2 className="text-xl sm:text-2xl font-bold tracking-wide text-[#C4AE7C]" style={{ fontFamily: "Marcellus, serif" }}>INVOICE</h2>
-                        <p className="text-xs text-[#1F251A] mt-1 font-bold">No: {invoiceNo}</p>
-                        <p className="text-[11px] text-[#5A6A51] mt-0.5">Date: {invoiceBooking.date || new Date().toISOString().slice(0, 10)}</p>
+                        <h2 className="text-xl sm:text-2xl font-bold tracking-wide text-[var(--cr-accent)]" style={{ fontFamily: "Marcellus, serif" }}>INVOICE</h2>
+                        <p className="text-xs text-[var(--cr-dark)] mt-1 font-bold">No: {invoiceNo}</p>
+                        <p className="text-[11px] text-[var(--color-brand-secondary)] mt-0.5">Date: {invoiceBooking.date || new Date().toISOString().slice(0, 10)}</p>
                       </div>
                     </div>
 
                     {/* Customer / Billing Info */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs leading-relaxed">
                       <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Billed To</p>
-                        <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name || "Patient"}</p>
-                        <p className="text-[#5A6A51] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone || "—"}</p>
-                        <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5 border-b border-gray-100 pb-1">Billed To</p>
+                        <p className="font-bold text-[var(--cr-dark)] text-sm">{invoiceBooking.name || "Patient"}</p>
+                        <p className="text-[var(--color-brand-secondary)] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone || "—"}</p>
+                        <p className="text-[var(--color-brand-secondary)]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
                       </div>
                       <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Booking Details</p>
-                        <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
-                        <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
-                        <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5 border-b border-gray-100 pb-1">Booking Details</p>
+                        <p className="text-[var(--color-brand-secondary)]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
+                        <p className="text-[var(--color-brand-secondary)] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
+                        <p className="text-[var(--color-brand-secondary)] mt-0.5"><strong>Branch:</strong> {branchName}</p>
                       </div>
                     </div>
 
@@ -10664,7 +10664,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     <div className="overflow-x-auto border border-gray-100 rounded-xl bg-white shadow-sm">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                          <tr className="bg-[#EDF1EC] text-[#414E36] font-bold border-b border-gray-100">
+                          <tr className="bg-[var(--color-brand-tint)] text-[var(--cr-primary)] font-bold border-b border-gray-100">
                             <th className="p-2.5 text-left">Service / Item Rendered</th>
                             <th className="p-2.5 text-center w-14">Qty</th>
                             <th className="p-2.5 text-right w-24">Unit Price</th>
@@ -10674,10 +10674,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                         <tbody className="divide-y divide-gray-100">
                           {allInvoiceItems.map((item: any, idx: number) => (
                             <tr key={idx} className="hover:bg-gray-50/50">
-                              <td className="p-2.5 font-semibold text-[#1F251A]">{item.name}</td>
+                              <td className="p-2.5 font-semibold text-[var(--cr-dark)]">{item.name}</td>
                               <td className="p-2.5 text-center text-gray-500">{item.qty || 1}</td>
                               <td className="p-2.5 text-right text-gray-600">EGP {(Number(item.unitPrice || item.price) || 0).toLocaleString()}</td>
-                              <td className="p-2.5 text-right font-bold text-[#1F251A]">EGP {(Number(item.total) || 0).toLocaleString()}</td>
+                              <td className="p-2.5 text-right font-bold text-[var(--cr-dark)]">EGP {(Number(item.total) || 0).toLocaleString()}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -10689,7 +10689,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       <div className="w-60 space-y-1.5">
                         <div className="flex justify-between text-gray-500">
                           <span>Subtotal:</span>
-                          <span className="font-semibold text-[#1F251A]">EGP {totalCost.toLocaleString()}</span>
+                          <span className="font-semibold text-[var(--cr-dark)]">EGP {totalCost.toLocaleString()}</span>
                         </div>
                         {walletUsed > 0 && (
                           <div className="flex justify-between text-green-700 font-medium">
@@ -10697,7 +10697,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                             <span className="font-bold">- EGP {walletUsed.toLocaleString()}</span>
                           </div>
                         )}
-                        <div className="flex justify-between border-t border-[#414E36] pt-1.5 text-sm font-bold text-[#414E36]">
+                        <div className="flex justify-between border-t border-[var(--cr-primary)] pt-1.5 text-sm font-bold text-[var(--cr-primary)]">
                           <span>Amount Paid:</span>
                           <span>EGP {finalPaid.toLocaleString()}</span>
                         </div>
@@ -10712,7 +10712,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
                     {/* Thank you */}
                     <div className="text-center text-[10px] text-gray-400 pt-2 border-t border-dashed border-gray-200">
-                      <p>Thank you for choosing Revera Clinics!</p>
+                      <p>Thank you for choosing {CLIENT.name}!</p>
                     </div>
                   </div>
 
@@ -10726,7 +10726,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     </button>
                     <button
                       onClick={() => handlePrintInvoice(invoiceBooking, allInvoiceItems, totalCost, walletUsed, branchName)}
-                      className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                      className="rounded-xl bg-[var(--cr-primary)] px-4 py-2 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md cursor-pointer"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="6 9 6 2 18 2 18 9" />
@@ -11057,15 +11057,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               onClick={() => setInvoiceBooking(null)}
             >
               <div 
-                className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl bg-white p-5 sm:p-6 shadow-2xl border border-[#414E36]/10 my-auto"
+                className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl bg-white p-5 sm:p-6 shadow-2xl border border-[var(--cr-primary)]/10 my-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 
                 {/* Header Actions */}
-                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 mb-3 shrink-0">
+                <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-3 mb-3 shrink-0">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#C4AE7C]">Invoice Preview</span>
-                    <h3 className="text-base font-bold text-[#1F251A] mt-0.5 font-sans">Booking Invoice Details</h3>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--cr-accent)]">Invoice Preview</span>
+                    <h3 className="text-base font-bold text-[var(--cr-dark)] mt-0.5 font-sans">Booking Invoice Details</h3>
                   </div>
                   <button
                     onClick={() => setInvoiceBooking(null)}
@@ -11076,35 +11076,35 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 </div>
 
                 {/* Printable Invoice Container (Scrollable) */}
-                <div className="overflow-y-auto pr-1.5 flex-1 border border-gray-100 rounded-2xl p-4 sm:p-5 bg-[#FBFBF9]/40 space-y-4">
+                <div className="overflow-y-auto pr-1.5 flex-1 border border-gray-100 rounded-2xl p-4 sm:p-5 bg-[var(--color-brand-light)]/40 space-y-4">
                   {/* Top Header */}
-                  <div className="flex justify-between items-start gap-4 pb-3.5 border-b border-[#414E36]/20">
+                  <div className="flex justify-between items-start gap-4 pb-3.5 border-b border-[var(--cr-primary)]/20">
                     <div>
-                      <h1 className="text-lg sm:text-xl font-bold tracking-wider text-[#414E36]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
-                      <p className="text-xs text-[#5A6A51] mt-0.5 font-semibold">Sheikh Zayed / New Cairo</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">Phone: (+20) 01035595691</p>
+                      <h1 className="text-lg sm:text-xl font-bold tracking-wider text-[var(--cr-primary)]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
+                      <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5 font-semibold">Sheikh Zayed / New Cairo</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Phone: {CLIENT.phoneDisplay}</p>
                       <p className="text-[11px] text-gray-400">Email: inquiries@reveraclinics.com</p>
                     </div>
                     <div className="text-right">
-                      <h2 className="text-xl sm:text-2xl font-bold tracking-wide text-[#C4AE7C]" style={{ fontFamily: "Marcellus, serif" }}>INVOICE</h2>
-                      <p className="text-xs text-[#1F251A] mt-1 font-bold">No: {invoiceNo}</p>
-                      <p className="text-[11px] text-[#5A6A51] mt-0.5">Date: {invoiceBooking.date || new Date().toISOString().slice(0, 10)}</p>
+                      <h2 className="text-xl sm:text-2xl font-bold tracking-wide text-[var(--cr-accent)]" style={{ fontFamily: "Marcellus, serif" }}>INVOICE</h2>
+                      <p className="text-xs text-[var(--cr-dark)] mt-1 font-bold">No: {invoiceNo}</p>
+                      <p className="text-[11px] text-[var(--color-brand-secondary)] mt-0.5">Date: {invoiceBooking.date || new Date().toISOString().slice(0, 10)}</p>
                     </div>
                   </div>
 
                   {/* Customer / Billing Info */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs leading-relaxed">
                     <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Billed To</p>
-                      <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name || "Patient"}</p>
-                      <p className="text-[#5A6A51] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone || "—"}</p>
-                      <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5 border-b border-gray-100 pb-1">Billed To</p>
+                      <p className="font-bold text-[var(--cr-dark)] text-sm">{invoiceBooking.name || "Patient"}</p>
+                      <p className="text-[var(--color-brand-secondary)] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone || "—"}</p>
+                      <p className="text-[var(--color-brand-secondary)]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
                     </div>
                     <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Booking Details</p>
-                      <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
-                      <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
-                      <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5 border-b border-gray-100 pb-1">Booking Details</p>
+                      <p className="text-[var(--color-brand-secondary)]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
+                      <p className="text-[var(--color-brand-secondary)] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
+                      <p className="text-[var(--color-brand-secondary)] mt-0.5"><strong>Branch:</strong> {branchName}</p>
                     </div>
                   </div>
 
@@ -11138,7 +11138,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   <div className="overflow-x-auto border border-gray-100 rounded-xl bg-white shadow-sm">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="bg-[#EDF1EC] text-[#414E36] font-bold border-b border-gray-100">
+                        <tr className="bg-[var(--color-brand-tint)] text-[var(--cr-primary)] font-bold border-b border-gray-100">
                           <th className="p-2.5 text-left">Service / Item Rendered</th>
                           <th className="p-2.5 text-center w-14">Qty</th>
                           <th className="p-2.5 text-right w-24">Unit Price</th>
@@ -11148,10 +11148,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       <tbody className="divide-y divide-gray-100">
                         {allInvoiceItems.map((item: any, idx: number) => (
                           <tr key={idx} className="hover:bg-gray-50/50">
-                            <td className="p-2.5 font-semibold text-[#1F251A]">{item.name}</td>
+                            <td className="p-2.5 font-semibold text-[var(--cr-dark)]">{item.name}</td>
                             <td className="p-2.5 text-center text-gray-500">{item.qty || 1}</td>
                             <td className="p-2.5 text-right text-gray-600">EGP {(Number(item.unitPrice || item.price) || 0).toLocaleString()}</td>
-                            <td className="p-2.5 text-right font-bold text-[#1F251A]">EGP {(Number(item.total) || 0).toLocaleString()}</td>
+                            <td className="p-2.5 text-right font-bold text-[var(--cr-dark)]">EGP {(Number(item.total) || 0).toLocaleString()}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -11163,7 +11163,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     <div className="w-60 space-y-1.5">
                       <div className="flex justify-between text-gray-500">
                         <span>Subtotal:</span>
-                        <span className="font-semibold text-[#1F251A]">EGP {totalCost.toLocaleString()}</span>
+                        <span className="font-semibold text-[var(--cr-dark)]">EGP {totalCost.toLocaleString()}</span>
                       </div>
                       {walletUsed > 0 && (
                         <div className="flex justify-between text-green-700 font-medium">
@@ -11171,7 +11171,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           <span className="font-bold">- EGP {walletUsed.toLocaleString()}</span>
                         </div>
                       )}
-                      <div className="flex justify-between border-t border-[#414E36] pt-1.5 text-sm font-bold text-[#414E36]">
+                      <div className="flex justify-between border-t border-[var(--cr-primary)] pt-1.5 text-sm font-bold text-[var(--cr-primary)]">
                         <span>Amount Paid:</span>
                         <span>EGP {finalPaid.toLocaleString()}</span>
                       </div>
@@ -11186,7 +11186,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
                   {/* Thank you */}
                   <div className="text-center text-[10px] text-gray-400 pt-2 border-t border-dashed border-gray-200">
-                    <p>Thank you for choosing Revera Clinics!</p>
+                    <p>Thank you for choosing {CLIENT.name}!</p>
                   </div>
                 </div>
 
@@ -11200,7 +11200,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   </button>
                   <button
                     onClick={() => handlePrintInvoice(invoiceBooking, allInvoiceItems, totalCost, walletUsed, branchName)}
-                    className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                    className="rounded-xl bg-[var(--cr-primary)] px-4 py-2 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md cursor-pointer"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="6 9 6 2 18 2 18 9" />
@@ -11219,20 +11219,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
 
       {activeInfoFeature && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/60 backdrop-blur-sm p-4">
-          <div className="bg-[#FBFBF9] rounded-[32px] border border-[#414E36]/10 p-6 max-w-md w-full shadow-2xl relative">
-            <h4 className="text-lg font-bold text-[#1F251A] pr-8 mb-2 flex items-center gap-2">
-              <Info className="text-[#C4AE7C] shrink-0" size={20} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--cr-dark)]/60 backdrop-blur-sm p-4">
+          <div className="bg-[var(--color-brand-light)] rounded-[32px] border border-[var(--cr-primary)]/10 p-6 max-w-md w-full shadow-2xl relative">
+            <h4 className="text-lg font-bold text-[var(--cr-dark)] pr-8 mb-2 flex items-center gap-2">
+              <Info className="text-[var(--cr-accent)] shrink-0" size={20} />
               {activeInfoFeature.title}
             </h4>
-            <div className="text-sm text-[#5A6A51] leading-relaxed space-y-2 font-medium">
+            <div className="text-sm text-[var(--color-brand-secondary)] leading-relaxed space-y-2 font-medium">
               <p>{activeInfoFeature.description}</p>
             </div>
             <div className="mt-6 flex justify-end">
               <button
                 type="button"
                 onClick={() => setActiveInfoFeature(null)}
-                className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
+                className="rounded-2xl bg-[var(--cr-primary)] px-5 py-2.5 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition shadow-md"
               >
                 Got it
               </button>
@@ -11240,7 +11240,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             <button
               type="button"
               onClick={() => setActiveInfoFeature(null)}
-              className="absolute top-5 right-5 text-[#5A6A51]/60 hover:text-[#1F251A] transition-colors hover:bg-gray-100 p-1.5 rounded-full"
+              className="absolute top-5 right-5 text-[var(--color-brand-secondary)]/60 hover:text-[var(--cr-dark)] transition-colors hover:bg-gray-100 p-1.5 rounded-full"
             >
               <X size={18} />
             </button>

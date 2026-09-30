@@ -45,7 +45,7 @@ export function SiteFooter() {
           className="ft-rounded-card rounded-[24px] sm:rounded-[60px]"
           style={{
             position: "relative",
-            backgroundColor: "var(--cr-primary, #414E36)",
+            backgroundColor: "var(--cr-primary, var(--cr-primary))",
             border: "1px solid rgba(196,174,124,0.35)",
             overflow: "hidden",
             padding: "clamp(40px, 6vw, 70px) clamp(24px, 5vw, 64px)",
@@ -131,7 +131,7 @@ export function SiteFooter() {
             .ft-newsletter-wrapper {
               display: flex;
               align-items: center;
-              background-color: #1F251A;
+              background-color: var(--cr-dark);
               border: 1px solid rgba(255, 255, 255, 0.1);
               border-radius: 30px;
               padding: 5px;
@@ -321,7 +321,7 @@ export function SiteFooter() {
                     height: "38px",
                     borderRadius: "50%",
                     backgroundColor: "var(--color-brand-sand)",
-                    color: "var(--color-brand-dark, #1F251A)",
+                    color: "var(--color-brand-dark, var(--cr-dark))",
                     border: "none",
                     cursor: "pointer",
                     transition: "transform 0.25s ease",

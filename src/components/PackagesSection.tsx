@@ -117,7 +117,7 @@ function PackageCard({ pkg, alacarteTotal, isRTL, lang }: PackageCardProps) {
           fontFamily: "var(--font-sora), sans-serif",
         }}
       >
-        <span style={{ fontSize: 18, fontWeight: 700, color: "#C4AE7C" }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: "var(--cr-accent)" }}>
           {pkg.price.toLocaleString()} {currency}
         </span>
         {hasSavings && (
@@ -137,7 +137,7 @@ function PackageCard({ pkg, alacarteTotal, isRTL, lang }: PackageCardProps) {
                 fontSize: 10,
                 fontWeight: 700,
                 color: "#FFFFFF",
-                backgroundColor: "#C4AE7C",
+                backgroundColor: "var(--cr-accent)",
                 padding: "2px 6px",
                 borderRadius: 6,
                 textTransform: "uppercase",

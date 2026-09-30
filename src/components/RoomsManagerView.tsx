@@ -221,60 +221,60 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
       {/* Header and Add Button */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-semibold text-[#1F251A]">Rooms</h2>
-          <p className="mt-2 text-sm text-[#5A6A51]">Manage administrative and clinical rooms, their status, and service compatibility mappings.</p>
+          <h2 className="text-4xl font-semibold text-[var(--cr-dark)]">Rooms</h2>
+          <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">Manage administrative and clinical rooms, their status, and service compatibility mappings.</p>
         </div>
         <button
           onClick={() => setRoomModal({ open: true, mode: "add", room: { status: "available", type: "clinical", branchId: selectedBranchId } })}
-          className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+          className="inline-flex items-center gap-2 rounded-3xl bg-[var(--cr-primary)] px-5 py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26]"
         >
           <Plus size={16} /> Add Room
         </button>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4 bg-[#EDF1EC]/30 p-4 rounded-2xl border border-[#414E36]/10">
+      <div className="flex flex-wrap items-center gap-4 bg-[var(--color-brand-tint)]/30 p-4 rounded-2xl border border-[var(--cr-primary)]/10">
         <div className="relative flex-1 min-w-[240px]">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]" />
           <input
             type="text"
             placeholder="Search room name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-[#414E36]"
+            className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-[var(--cr-primary)]"
           />
         </div>
       </div>
 
       {/* Rooms Table / Grid */}
       {loading ? (
-        <div className="text-center py-16 text-[#5A6A51]">Loading rooms data...</div>
+        <div className="text-center py-16 text-[var(--color-brand-secondary)]">Loading rooms data...</div>
       ) : filteredRooms.length === 0 ? (
-        <div className="text-center py-16 text-[#5A6A51]">
-          <Info size={40} className="mx-auto mb-3 opacity-30 text-[#414E36]" />
+        <div className="text-center py-16 text-[var(--color-brand-secondary)]">
+          <Info size={40} className="mx-auto mb-3 opacity-30 text-[var(--cr-primary)]" />
           <p className="text-sm font-medium">No rooms match your filters.</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-[#414E36]/10 bg-white">
+        <div className="overflow-hidden rounded-2xl border border-[var(--cr-primary)]/10 bg-white">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm border-collapse">
               <thead>
-                <tr className="bg-[#F9F9F7] border-b border-[#414E36]/10">
-                  <th className="px-6 py-4 font-semibold text-[#414E36]">Room Name</th>
-                  <th className="px-6 py-4 font-semibold text-[#414E36]">Branch</th>
-                  <th className="px-6 py-4 font-semibold text-[#414E36]">Type</th>
-                  <th className="px-6 py-4 font-semibold text-[#414E36]">Status</th>
-                  <th className="px-6 py-4 font-semibold text-[#414E36] text-right">Actions</th>
+                <tr className="bg-[#F9F9F7] border-b border-[var(--cr-primary)]/10">
+                  <th className="px-6 py-4 font-semibold text-[var(--cr-primary)]">Room Name</th>
+                  <th className="px-6 py-4 font-semibold text-[var(--cr-primary)]">Branch</th>
+                  <th className="px-6 py-4 font-semibold text-[var(--cr-primary)]">Type</th>
+                  <th className="px-6 py-4 font-semibold text-[var(--cr-primary)]">Status</th>
+                  <th className="px-6 py-4 font-semibold text-[var(--cr-primary)] text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#414E36]/5">
+              <tbody className="divide-y divide-[var(--cr-primary)]/5">
                 {filteredRooms.map(r => (
                   <tr key={r.id} className="hover:bg-[#F9F9F7]/50 transition">
-                    <td className="px-6 py-4 font-medium text-[#1F251A]">{r.name}</td>
-                    <td className="px-6 py-4 text-[#5A6A51]">{r.branchNameEn}</td>
+                    <td className="px-6 py-4 font-medium text-[var(--cr-dark)]">{r.name}</td>
+                    <td className="px-6 py-4 text-[var(--color-brand-secondary)]">{r.branchNameEn}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium border capitalize ${
-                        r.type === 'clinical' ? 'bg-[#EDF1EC] text-[#414E36] border-[#414E36]/20' : 'bg-gray-50 text-gray-600 border-gray-200'
+                        r.type === 'clinical' ? 'bg-[var(--color-brand-tint)] text-[var(--cr-primary)] border-[var(--cr-primary)]/20' : 'bg-gray-50 text-gray-600 border-gray-200'
                       }`}>
                         {r.type}
                       </span>
@@ -285,7 +285,7 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
                         {r.type === 'clinical' && (
                           <button
                             onClick={() => openMappingModal(r)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/20 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+                            className="inline-flex items-center gap-1 rounded-lg border border-[var(--cr-primary)]/20 bg-white px-2.5 py-1.5 text-xs font-semibold text-[var(--cr-primary)] hover:bg-[var(--color-brand-tint)] transition"
                             title="Map services to this room"
                           >
                             <Settings size={13} />
@@ -319,9 +319,9 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
       {/* Room Add/Edit Modal */}
       {roomModal.open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-[#414E36]/10">
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4 mb-4">
-              <h3 className="text-xl font-bold text-[#1F251A]">{roomModal.mode === "add" ? "Add New Room" : "Edit Room"}</h3>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-[var(--cr-primary)]/10">
+            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4 mb-4">
+              <h3 className="text-xl font-bold text-[var(--cr-dark)]">{roomModal.mode === "add" ? "Add New Room" : "Edit Room"}</h3>
               <button
                 onClick={() => setRoomModal({ open: false, mode: "add", room: {} })}
                 className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
@@ -332,24 +332,24 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
 
             <form onSubmit={handleSaveRoom} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">Room Name *</label>
+                <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">Room Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Room 102 / Laser Room B"
                   value={roomModal.room.name || ""}
                   onChange={(e) => setRoomModal(prev => ({ ...prev, room: { ...prev.room, name: e.target.value } }))}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[var(--cr-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">Branch *</label>
+                <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">Branch *</label>
                 <select
                   required
                   value={roomModal.room.branchId || ""}
                   onChange={(e) => setRoomModal(prev => ({ ...prev, room: { ...prev.room, branchId: e.target.value } }))}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#414E36]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[var(--cr-primary)]"
                 >
                   <option value="" disabled>Select Branch</option>
                   {branches.map(b => (
@@ -360,12 +360,12 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">Room Type *</label>
+                  <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">Room Type *</label>
                   <select
                     required
                     value={roomModal.room.type || "clinical"}
                     onChange={(e) => setRoomModal(prev => ({ ...prev, room: { ...prev.room, type: e.target.value as any } }))}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#414E36]"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--cr-primary)]"
                   >
                     <option value="clinical">Clinical</option>
                     <option value="administrative">Administrative</option>
@@ -373,11 +373,11 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">Status</label>
+                  <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">Status</label>
                   <select
                     value={roomModal.room.status || "available"}
                     onChange={(e) => setRoomModal(prev => ({ ...prev, room: { ...prev.room, status: e.target.value as any } }))}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#414E36]"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--cr-primary)]"
                   >
                     <option value="available">Available</option>
                     <option value="on_cleaning">On Cleaning</option>
@@ -390,7 +390,7 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
               <button
                 type="submit"
                 disabled={savingRoom}
-                className="w-full rounded-3xl bg-[#414E36] py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-2"
+                className="w-full rounded-3xl bg-[var(--cr-primary)] py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-2"
               >
                 {savingRoom ? "Saving..." : roomModal.mode === "add" ? "Create Room" : "Save Changes"}
               </button>
@@ -402,11 +402,11 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
       {/* Services-Rooms Mapping Modal */}
       {mappingModal.open && mappingModal.room && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl border border-[#414E36]/10 flex flex-col max-h-[85vh]">
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4 mb-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl border border-[var(--cr-primary)]/10 flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4 mb-4">
               <div>
-                <h3 className="text-xl font-bold text-[#1F251A]">Configure Room Services</h3>
-                <p className="text-xs text-[#5A6A51] mt-0.5">Select which services can be performed inside <strong>{mappingModal.room.name}</strong>.</p>
+                <h3 className="text-xl font-bold text-[var(--cr-dark)]">Configure Room Services</h3>
+                <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">Select which services can be performed inside <strong>{mappingModal.room.name}</strong>.</p>
               </div>
               <button
                 onClick={() => setMappingModal({ open: false, room: null, selectedServiceIds: [] })}
@@ -418,7 +418,7 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
 
             <div className="flex-1 overflow-y-auto pr-1 space-y-2 mb-6">
               {services.length === 0 ? (
-                <p className="text-sm text-center py-6 text-[#5A6A51]">No services found in database.</p>
+                <p className="text-sm text-center py-6 text-[var(--color-brand-secondary)]">No services found in database.</p>
               ) : (
                 services.map(s => {
                   const checked = mappingModal.selectedServiceIds.includes(s.id);
@@ -427,14 +427,14 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
                       key={s.id}
                       className={`flex items-center justify-between p-3.5 rounded-xl border transition cursor-pointer select-none ${
                         checked
-                          ? "border-[#414E36] bg-[#EDF1EC]/20 text-[#1F251A]"
+                          ? "border-[var(--cr-primary)] bg-[var(--color-brand-tint)]/20 text-[var(--cr-dark)]"
                           : "border-gray-100 hover:border-gray-300 bg-white text-gray-700"
                       }`}
                     >
                       <div>
                         <span className="text-sm font-semibold">{s.en}</span>
                         {s.cat && (
-                          <span className="ml-2.5 inline-flex items-center rounded bg-[#414E36]/8 px-1.5 py-0.5 text-[10px] font-medium text-[#414E36] border border-[#414E36]/10 capitalize">
+                          <span className="ml-2.5 inline-flex items-center rounded bg-[var(--cr-primary)]/8 px-1.5 py-0.5 text-[10px] font-medium text-[var(--cr-primary)] border border-[var(--cr-primary)]/10 capitalize">
                             {s.cat}
                           </span>
                         )}
@@ -443,7 +443,7 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggleServiceInMapping(s.id)}
-                        className="h-4.5 w-4.5 rounded border-[#414E36]/30 text-[#414E36] focus:ring-[#414E36] accent-[#414E36] cursor-pointer"
+                        className="h-4.5 w-4.5 rounded border-[var(--cr-primary)]/30 text-[var(--cr-primary)] focus:ring-[var(--cr-primary)] accent-[var(--cr-primary)] cursor-pointer"
                       />
                     </label>
                   );
@@ -454,7 +454,7 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
             <button
               onClick={handleSaveMapping}
               disabled={savingMapping}
-              className="w-full rounded-3xl bg-[#414E36] py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-auto"
+              className="w-full rounded-3xl bg-[var(--cr-primary)] py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-auto"
             >
               {savingMapping ? "Saving Mappings..." : "Save Mappings"}
             </button>

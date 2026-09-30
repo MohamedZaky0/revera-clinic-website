@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { CLIENT } from "@/config/client";
 import { 
   FileText, 
   ShieldCheck, 
@@ -158,22 +159,22 @@ export default function TermsModal({ isOpen, onClose, defaultLang = "en" }: Term
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-3 sm:p-6 backdrop-blur-xs overflow-y-auto animate-fadeIn">
       <div 
-        className={`relative w-full max-w-4xl rounded-3xl bg-[#FAFCFA] p-6 sm:p-10 shadow-2xl border border-[#414E36]/15 my-6 max-h-[92vh] overflow-y-auto text-[#1F251A] ${isAr ? "rtl text-right" : "ltr text-left"}`}
+        className={`relative w-full max-w-4xl rounded-3xl bg-[#FAFCFA] p-6 sm:p-10 shadow-2xl border border-[var(--cr-primary)]/15 my-6 max-h-[92vh] overflow-y-auto text-[var(--cr-dark)] ${isAr ? "rtl text-right" : "ltr text-left"}`}
         dir={isAr ? "rtl" : "ltr"}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className={`absolute top-6 ${isAr ? "left-6" : "right-6"} rounded-full p-2.5 text-gray-400 hover:bg-[#E2EBE2] hover:text-[#1F251A] transition cursor-pointer`}
+          className={`absolute top-6 ${isAr ? "left-6" : "right-6"} rounded-full p-2.5 text-gray-400 hover:bg-[#E2EBE2] hover:text-[var(--cr-dark)] transition cursor-pointer`}
           aria-label="Close"
         >
           <X size={20} />
         </button>
 
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-6 mb-8">
+        <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-6 mb-8">
           <div className="flex items-center gap-3">
-            <img src="/images/main_logo.png" alt="Revera logo" className="h-9 w-auto object-contain" />
+            <img src={CLIENT.logoPath} alt={`${CLIENT.nameShort} logo`} className="h-9 w-auto object-contain" />
           </div>
 
           {/* Language Switcher */}
@@ -195,8 +196,8 @@ export default function TermsModal({ isOpen, onClose, defaultLang = "en" }: Term
 
         {/* Header Title Section */}
         <div className="flex items-start gap-4 mb-8">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#EEF5EE] p-2 border border-[#414E36]/15 shadow-sm">
-            <img src="/images/main_logo.png" alt="Revera logo" className="h-10 w-auto object-contain" />
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#EEF5EE] p-2 border border-[var(--cr-primary)]/15 shadow-sm">
+            <img src={CLIENT.logoPath} alt={`${CLIENT.nameShort} logo`} className="h-10 w-auto object-contain" />
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
@@ -275,7 +276,7 @@ export default function TermsModal({ isOpen, onClose, defaultLang = "en" }: Term
 
         {/* Bottom Footer */}
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 pt-4 border-t border-gray-200/60 font-medium">
-          <p>{isAr ? "© 2025 عيادة ريفيرا. جميع الحقوق محفوظة." : "© 2025 Revera Clinic. All rights reserved."}</p>
+          <p>{isAr ? "© 2025 عيادة ريفيرا. جميع الحقوق محفوظة." : `© 2025 ${CLIENT.nameShort} Clinic. All rights reserved.`}</p>
           <div className="flex items-center gap-1.5 text-gray-600 font-semibold">
             <Lock size={14} className="text-[#2D522D]" />
             <span>{isAr ? "آمن ومشفّر" : "Secure & Encrypted"}</span>

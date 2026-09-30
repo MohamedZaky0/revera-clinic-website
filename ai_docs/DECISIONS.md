@@ -3346,3 +3346,29 @@ fails 2, storing the sent price fails 8). Manual checklist: `ai_docs/manual_test
 "un-consume"); a phone change is still refused rather than re-linked (RISK-108 follow-up).
 
 ---
+
+## DEC-099: PROPOSAL-001 Executed — Fork Identity Lives In `CLIENT`, Brand Colors In CSS Variables
+
+**Date:** 2026-09-30
+**Status:** Decided & implemented on `feat/proposal-001-client-config`; reviewed and merged into `dev` 2026-09-30
+
+**Context:**
+The original PROPOSAL-001/RISK-001 audit was stale: `src/config/client.ts` already existed and many public surfaces already consumed it, but residual clinic identity, contact defaults, logo paths, browser-storage keys, seed defaults, and seven raw brand colors remained spread across the application. The remaining color scope was materially larger than the original four-file estimate.
+
+**Decision:**
+Complete the refactor in independently reviewable chunks A–G6:
+- WhatsApp copy/receipt formatting, contact fallbacks, logos/accessibility names, storage keys, and fork seed/default labels now read from `CLIENT`.
+- Browser storage and BroadcastChannel names derive from `CLIENT.storagePrefix`; this intentionally causes one post-deploy reset of old cached browser state.
+- The seven mapped brand literals (`#414E36`, `#C4AE7C`, `#1F251A`, `#5A6A51`, `#F2EFE9`, `#EDF1EC`, `#FBFBF9`) no longer appear in `src/**/*.ts(x)`; components and generated print markup use the existing CSS custom properties.
+- Translation catalogs and legal body text remain literal, as deliberately excluded per-fork content.
+
+**Trade-offs / open portability gaps:**
+- Mobile-wallet payment currently reuses `CLIENT.phoneTel`; a future clinic may need a separate wallet field.
+- `inquiries@reveraclinics.com` remains literal because the approved config shape has no email field.
+- Deposit Settings remain Egypt-specific (InstaPay/mobile wallet); centralizing labels does not make that payment workflow internationally portable.
+- The prescription receipt's `Sheikh Zayed & New Cairo` branch list and `Revera Zayed Clinic` branch fallbacks remain literal because there is no approved branch-list/default-branch config field.
+
+**Verification:**
+Each chunk ran `npm run check`. The repository baseline still has two pre-existing `react-hooks/purity` lint errors in `AdminAddPreviousBookingView.tsx:498` (a `Math.random()`/`Date.now()` call during render, present on `dev` before this branch) and two pre-existing `UserProfileView.test.tsx` failures (a known `getDateRange()` timezone bug, documented in the test file's own comments, unrelated to this refactor). Both were independently re-verified against the `dev` baseline during code review and left undisturbed as out of this brief's scope — not something Mohamed was asked to approve in advance. Independent TypeScript checks, production builds, and the full test suite (1269 passed / 2 failed [above] / 5 expected-fail) were re-run during review and matched. Manual visual verification remains in `ai_docs/manual_tests/PROPOSAL_001_CLIENT_CONFIG_MANUAL_TESTS.md`.
+
+---

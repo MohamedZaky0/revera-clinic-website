@@ -494,21 +494,21 @@ export default function RoleManagementView({
   return (
     <div className="space-y-8 animate-fadeIn" dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="mb-6">
-        <h2 className="text-4xl font-semibold text-[#1F251A]">{t.title}</h2>
-        <p className="mt-2 text-sm text-[#5A6A51]">{t.subtitle}</p>
+        <h2 className="text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
+        <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
       </div>
 
       {/* Grid for Roles and Employee Accounts */}
       <div className="grid gap-8 lg:grid-cols-1">
         {/* 1. Manage Roles Card */}
-        <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-          <h3 className="text-xl font-bold text-[#1F251A] mb-4">{t.defineRoles.cardTitle}</h3>
+        <div className="rounded-[40px] bg-[var(--color-brand-light)] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+          <h3 className="text-xl font-bold text-[var(--cr-dark)] mb-4">{t.defineRoles.cardTitle}</h3>
           
           {/* Create Role Form */}
-          <form onSubmit={handleCreateRole} className="mb-6 space-y-4 rounded-3xl border border-[#414E36]/10 bg-white p-5">
+          <form onSubmit={handleCreateRole} className="mb-6 space-y-4 rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-5">
             <div className="space-y-4">
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.defineRoles.roleNameLabel}</label>
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">{t.defineRoles.roleNameLabel}</label>
                 <input
                   type="text"
                   required
@@ -518,21 +518,21 @@ export default function RoleManagementView({
                     setNewRoleName(e.target.value);
                     if (roleCreateError) setRoleCreateError("");
                   }}
-                  className="w-full max-w-md rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full max-w-md rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 />
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-3">{t.defineRoles.permissionsLabel}</label>
-                <div className="grid gap-4 md:grid-cols-2 max-h-[550px] overflow-y-auto rounded-3xl border border-[#414E36]/10 p-5 bg-[#FBFBF9]">
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-3">{t.defineRoles.permissionsLabel}</label>
+                <div className="grid gap-4 md:grid-cols-2 max-h-[550px] overflow-y-auto rounded-3xl border border-[var(--cr-primary)]/10 p-5 bg-[var(--color-brand-light)]">
                   {PERMISSION_STRUCTURE.map((group) => {
                     const allChecked = group.items.every(item => newRolePermissions.includes(item.key));
                     const someChecked = group.items.some(item => newRolePermissions.includes(item.key)) && !allChecked;
 
                     return (
-                      <div key={group.category} className="rounded-2xl border border-[#414E36]/10 bg-white p-4 shadow-sm flex flex-col justify-between">
+                      <div key={group.category} className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 shadow-sm flex flex-col justify-between">
                         <div>
-                          <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-2 mb-3">
-                            <label className="flex items-center gap-2 text-xs font-bold text-[#1F251A] cursor-pointer select-none">
+                          <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/5 pb-2 mb-3">
+                            <label className="flex items-center gap-2 text-xs font-bold text-[var(--cr-dark)] cursor-pointer select-none">
                               <input
                                 type="checkbox"
                                 checked={allChecked}
@@ -547,17 +547,17 @@ export default function RoleManagementView({
                                     setNewRolePermissions(prev => prev.filter(p => !keys.includes(p)));
                                   }
                                 }}
-                                className="h-4 w-4 accent-[#414E36] rounded"
+                                className="h-4 w-4 accent-[var(--cr-primary)] rounded"
                               />
                               {t.permissionCategories[group.category as keyof typeof t.permissionCategories] || group.category}
                             </label>
-                            <span className="text-[10px] font-bold text-[#414E36] bg-[#414E36]/5 px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] font-bold text-[var(--cr-primary)] bg-[var(--cr-primary)]/5 px-2 py-0.5 rounded-full">
                               {group.items.filter(item => newRolePermissions.includes(item.key)).length} / {group.items.length}
                             </span>
                           </div>
                           <div className="space-y-2">
                             {group.items.map((item) => (
-                              <label key={item.key} className="flex items-center gap-2.5 text-xs font-semibold text-[#414E36] cursor-pointer select-none hover:text-[#1F251A] transition">
+                              <label key={item.key} className="flex items-center gap-2.5 text-xs font-semibold text-[var(--cr-primary)] cursor-pointer select-none hover:text-[var(--cr-dark)] transition">
                                 <input
                                   type="checkbox"
                                   checked={newRolePermissions.includes(item.key)}
@@ -568,7 +568,7 @@ export default function RoleManagementView({
                                       setNewRolePermissions(prev => prev.filter(p => p !== item.key));
                                     }
                                   }}
-                                  className="h-4 w-4 accent-[#414E36] rounded"
+                                  className="h-4 w-4 accent-[var(--cr-primary)] rounded"
                                 />
                                 {t.permissionLabels[item.key as keyof typeof t.permissionLabels] || item.label}
                               </label>
@@ -587,7 +587,7 @@ export default function RoleManagementView({
 
             <button
               type="submit"
-              className="rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+              className="rounded-2xl bg-[var(--cr-primary)] px-5 py-2 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition"
             >
               {t.defineRoles.saveRoleBtn}
             </button>
@@ -597,13 +597,13 @@ export default function RoleManagementView({
           <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-secondary)]">
                   <th className="px-6 py-4 text-start">{t.defineRoles.tableRoleName}</th>
                   <th className="px-6 py-4 text-start">{t.defineRoles.tableAllowedModules}</th>
                   <th className="px-6 py-4 text-center">{t.defineRoles.tableActions}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
+              <tbody className="divide-y divide-[#E6E9EB] text-[var(--cr-primary)] font-medium">
                 {loadingRolesAndEmployees ? (
                   <tr>
                     <td colSpan={3} className="px-6 py-5 text-center text-xs text-gray-400">{t.defineRoles.loadingRoles}</td>
@@ -614,11 +614,11 @@ export default function RoleManagementView({
                   </tr>
                 ) : rolesList.map((r) => (
                   <tr key={r.id} className="transition hover:bg-[#F9F9F7]">
-                    <td className="px-6 py-4 font-bold text-[#1F251A] capitalize">{r.name}</td>
-                    <td className="px-6 py-4 text-xs font-semibold text-[#5A6A51]">
+                    <td className="px-6 py-4 font-bold text-[var(--cr-dark)] capitalize">{r.name}</td>
+                    <td className="px-6 py-4 text-xs font-semibold text-[var(--color-brand-secondary)]">
                       <div className="flex flex-wrap gap-1.5">
                         {r.permissions.map((p: string) => (
-                          <span key={p} className="rounded-full bg-[#EDF1EC] px-2.5 py-0.5 text-[#414E36] border border-[#414E36]/10">{permissionKeyToLabel[p] || p}</span>
+                          <span key={p} className="rounded-full bg-[var(--color-brand-tint)] px-2.5 py-0.5 text-[var(--cr-primary)] border border-[var(--cr-primary)]/10">{permissionKeyToLabel[p] || p}</span>
                         ))}
                       </div>
                     </td>
@@ -628,7 +628,7 @@ export default function RoleManagementView({
                           <button
                             type="button"
                             onClick={() => handleToggleRoleLock(r.name, Boolean(r.locked))}
-                            className="text-gray-500 hover:text-[#414E36] transition"
+                            className="text-gray-500 hover:text-[var(--cr-primary)] transition"
                             title={r.locked ? t.defineRoles.unlockRoleTitle : t.defineRoles.lockRoleTitle}
                           >
                             {r.locked ? <Lock size={16} /> : <Unlock size={16} />}
@@ -654,14 +654,14 @@ export default function RoleManagementView({
         </div>
 
         {/* 2. Manage Employees / Credentials Provisioning */}
-        <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-          <h3 className="text-xl font-bold text-[#1F251A] mb-4">{t.provisionEmployees.cardTitle}</h3>
+        <div className="rounded-[40px] bg-[var(--color-brand-light)] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+          <h3 className="text-xl font-bold text-[var(--cr-dark)] mb-4">{t.provisionEmployees.cardTitle}</h3>
           
           {/* Create Employee Form — OAuth Invite Flow */}
-          <form onSubmit={handleCreateEmployee} className="mb-6 space-y-4 rounded-3xl border border-[#414E36]/10 bg-white p-5">
+          <form onSubmit={handleCreateEmployee} className="mb-6 space-y-4 rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-5">
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.provisionEmployees.fullNameLabel}</label>
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">{t.provisionEmployees.fullNameLabel}</label>
                 <input
                   type="text"
                   required
@@ -671,11 +671,11 @@ export default function RoleManagementView({
                     setNewEmployeeName(e.target.value);
                     if (employeeCreateError) setEmployeeCreateError("");
                   }}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 />
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.provisionEmployees.emailLabel}</label>
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">{t.provisionEmployees.emailLabel}</label>
                 <input
                   type="email"
                   required
@@ -685,11 +685,11 @@ export default function RoleManagementView({
                     setNewEmployeeEmail(e.target.value);
                     if (employeeCreateError) setEmployeeCreateError("");
                   }}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 />
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.provisionEmployees.assignRoleLabel}</label>
+                <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">{t.provisionEmployees.assignRoleLabel}</label>
                 <select
                   required
                   value={newEmployeeRole}
@@ -697,7 +697,7 @@ export default function RoleManagementView({
                     setNewEmployeeRole(e.target.value);
                     if (employeeCreateError) setEmployeeCreateError("");
                   }}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                  className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                 >
                   <option value="">{t.provisionEmployees.selectRolePlaceholder}</option>
                   {rolesList.map(r => (
@@ -708,9 +708,9 @@ export default function RoleManagementView({
             </div>
 
             {/* Invite info banner */}
-            <div className="flex items-start gap-2.5 rounded-2xl bg-[#EDF5E8] border border-[#414E36]/15 px-4 py-3">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mt-0.5 shrink-0 text-[#414E36]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <p className="text-xs text-[#414E36] font-medium leading-relaxed">
+            <div className="flex items-start gap-2.5 rounded-2xl bg-[#EDF5E8] border border-[var(--cr-primary)]/15 px-4 py-3">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mt-0.5 shrink-0 text-[var(--cr-primary)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <p className="text-xs text-[var(--cr-primary)] font-medium leading-relaxed">
                 {t.provisionEmployees.inviteBanner}
               </p>
             </div>
@@ -720,7 +720,7 @@ export default function RoleManagementView({
 
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+              className="inline-flex items-center gap-2 rounded-2xl bg-[var(--cr-primary)] px-5 py-2 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
               {t.provisionEmployees.sendInvitationBtn}
@@ -731,7 +731,7 @@ export default function RoleManagementView({
           <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-secondary)]">
                   <th className="px-6 py-4 text-start">{t.provisionEmployees.tableFullName}</th>
                   <th className="px-6 py-4 text-start">{t.provisionEmployees.tableAssignedRole}</th>
                   <th className="px-6 py-4 text-start">{t.provisionEmployees.tableLoginEmail}</th>
@@ -740,7 +740,7 @@ export default function RoleManagementView({
                 </tr>
 
               </thead>
-              <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
+              <tbody className="divide-y divide-[#E6E9EB] text-[var(--cr-primary)] font-medium">
                 {loadingRolesAndEmployees ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">{t.provisionEmployees.loadingAccounts}</td>
@@ -751,13 +751,13 @@ export default function RoleManagementView({
                   </tr>
                 ) : employeesList.map((emp) => (
                   <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
-                    <td className="px-6 py-4 font-semibold text-[#1F251A]">{emp.name || emp.employee_id || '—'}</td>
-                    <td className="px-6 py-4 text-xs font-semibold text-[#414E36]">
+                    <td className="px-6 py-4 font-semibold text-[var(--cr-dark)]">{emp.name || emp.employee_id || '—'}</td>
+                    <td className="px-6 py-4 text-xs font-semibold text-[var(--cr-primary)]">
                       {(adminRole === "superadmin" || adminRole === "admin") && emp.employee_id !== "superadmin" ? (
                         <select
                           value={emp.role_name}
                           onChange={(e) => handleUpdateEmployeeRole(emp.id, e.target.value)}
-                          className="rounded-lg border border-[#E6E9EB] bg-[#FBFBF9] px-2 py-1 text-xs font-semibold text-[#414E36] focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36] outline-none"
+                          className="rounded-lg border border-[#E6E9EB] bg-[var(--color-brand-light)] px-2 py-1 text-xs font-semibold text-[var(--cr-primary)] focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)] outline-none"
                         >
                           {rolesList
                             // RISK-069: admin can assign/edit any operational role, but only
@@ -775,7 +775,7 @@ export default function RoleManagementView({
                         <span className="capitalize">{emp.role_name}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">{emp.email}</td>
+                    <td className="px-6 py-4 font-mono text-xs text-[var(--color-brand-secondary)]">{emp.email}</td>
                     <td className="px-6 py-4 text-center">
                       {emp.email_confirmed_at ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">{t.provisionEmployees.active}</span>
@@ -816,9 +816,9 @@ export default function RoleManagementView({
         </div>
 
         {/* 3. Department Management Card */}
-        <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-          <h3 className="text-xl font-bold text-[#1F251A] mb-1">{t.departments.cardTitle}</h3>
-          <p className="text-xs text-[#5A6A51] mb-5">{t.departments.subtitle}</p>
+        <div className="rounded-[40px] bg-[var(--color-brand-light)] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+          <h3 className="text-xl font-bold text-[var(--cr-dark)] mb-1">{t.departments.cardTitle}</h3>
+          <p className="text-xs text-[var(--color-brand-secondary)] mb-5">{t.departments.subtitle}</p>
 
           <form
             onSubmit={(e) => {
@@ -839,11 +839,11 @@ export default function RoleManagementView({
               placeholder={t.departments.inputPlaceholder}
               value={newDeptInput}
               onChange={(e) => setNewDeptInput(e.target.value)}
-              className="w-full max-w-md rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              className="w-full max-w-md rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
             />
             <button
               type="submit"
-              className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#2e3a26] transition flex items-center gap-1.5"
+              className="rounded-2xl bg-[var(--cr-primary)] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#2e3a26] transition flex items-center gap-1.5"
             >
               <Plus size={14} /> {t.departments.addBtn}
             </button>
@@ -851,7 +851,7 @@ export default function RoleManagementView({
 
           <div className="flex flex-wrap gap-2.5">
             {departmentsList.map((dept) => (
-              <div key={dept} className="flex items-center gap-2 rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2 text-xs font-bold text-[#1F251A] shadow-sm">
+              <div key={dept} className="flex items-center gap-2 rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2 text-xs font-bold text-[var(--cr-dark)] shadow-sm">
                 <span>{dept}</span>
                 {dept !== "Doctors" && dept !== "Receptionist" && (
                   <button

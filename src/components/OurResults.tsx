@@ -127,7 +127,7 @@ function StatCounter({ stat, active, isRTL }: StatCounterProps) {
       </div>
       <p
         className="mb-0 text-sm font-medium"
-        style={{ color: "var(--cr-muted-foreground, #5A6A51)" }}
+        style={{ color: "var(--cr-muted-foreground, var(--color-brand-secondary))" }}
       >
         {stat.label}
       </p>

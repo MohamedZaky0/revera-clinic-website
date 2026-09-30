@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess } from '@/lib/access';
+import { CLIENT } from '@/config/client';
 import fs from 'fs';
 import path from 'path';
 
@@ -146,7 +147,7 @@ export async function POST(req: Request) {
         title: reportData.title || 'Medical Report',
         description: reportData.description || '',
         file_url: reportData.file_url || null,
-        doctor_name: reportData.doctor_name || 'Dr. Revera',
+        doctor_name: reportData.doctor_name || `Dr. ${CLIENT.nameShort}`,
         date: new Date().toISOString().slice(0, 10),
         created_at: new Date().toISOString(),
       };

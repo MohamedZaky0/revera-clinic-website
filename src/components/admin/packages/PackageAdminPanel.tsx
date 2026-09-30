@@ -245,47 +245,47 @@ export function PackageAdminPanel({ session }: { session: any }) {
       )}
 
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[#1F251A]">Package Offers</h3>
+        <h3 className="text-lg font-semibold text-[var(--cr-dark)]">Package Offers</h3>
         <button
           onClick={openAdd}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#31382b]"
+          className="inline-flex items-center gap-2 rounded-lg bg-[var(--cr-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#31382b]"
         >
           <Plus size={16} /> Add Package
         </button>
       </div>
 
-      {loading && <div className="text-sm text-[#5A6A51]"><Loader2 className="inline mr-2 h-4 w-4 animate-spin" /> Loading packages…</div>}
+      {loading && <div className="text-sm text-[var(--color-brand-secondary)]"><Loader2 className="inline mr-2 h-4 w-4 animate-spin" /> Loading packages…</div>}
 
       {!loading && packages.length === 0 && (
-        <div className="rounded-2xl border border-[#414E36]/10 bg-white p-8 text-center text-sm text-[#5A6A51]">
+        <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-8 text-center text-sm text-[var(--color-brand-secondary)]">
           No packages yet. Create one to bundle services.
         </div>
       )}
 
       {packages.length > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-[#414E36]/10 bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm">
           <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-[#F9F9F7]">
               <tr>
-                <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Name</th>
-                <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Type</th>
-                <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Branch</th>
-                <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Price</th>
-                <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Tax</th>
-                <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Validity</th>
-                <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">On Expiry</th>
-                <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Items / Quota</th>
-                <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Active</th>
-                <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Website</th>
-                <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Actions</th>
+                <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">Name</th>
+                <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">Type</th>
+                <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">Branch</th>
+                <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">Price</th>
+                <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">Tax</th>
+                <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">Validity</th>
+                <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">On Expiry</th>
+                <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">Items / Quota</th>
+                <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">Active</th>
+                <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">Website</th>
+                <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#414E36]/6">
+            <tbody className="divide-y divide-[var(--cr-primary)]/6">
               {packages.map((pkg) => {
                 const isPulses = pkg.packageType === "pulses" || Number(pkg.totalPulses || 0) > 0;
                 return (
                   <tr key={pkg.id} className="hover:bg-[#F9F9F7]">
-                    <td className="px-5 py-3 font-medium text-[#1F251A]">{pkg.name}</td>
+                    <td className="px-5 py-3 font-medium text-[var(--cr-dark)]">{pkg.name}</td>
                     <td className="px-5 py-3 text-left">
                       {isPulses ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10.5px] font-bold text-amber-900 shadow-2xs whitespace-nowrap">
@@ -293,28 +293,28 @@ export function PackageAdminPanel({ session }: { session: any }) {
                           <span>Laser Pulses</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#EDF1EC] border border-[#414E36]/15 px-2 py-0.5 text-[10.5px] font-bold text-[#414E36] whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-brand-tint)] border border-[var(--cr-primary)]/15 px-2 py-0.5 text-[10.5px] font-bold text-[var(--cr-primary)] whitespace-nowrap">
                           <Package size={10} className="shrink-0" />
                           <span>Services</span>
                         </span>
                       )}
                     </td>
-                    <td className="px-5 py-3 text-[#5A6A51]">
+                    <td className="px-5 py-3 text-[var(--color-brand-secondary)]">
                       {branches.find((b) => b.id === pkg.branchId)?.name_en || branches.find((b) => b.id === pkg.branchId)?.name || "All branches"}
                     </td>
-                    <td className="px-5 py-3 text-right font-medium text-[#C4AE7C]">EGP {Number(pkg.price).toLocaleString()}</td>
-                    <td className="px-5 py-3 text-right text-[#5A6A51]">{Number(pkg.taxRate).toFixed(1)}%</td>
-                    <td className="px-5 py-3 text-right text-[#5A6A51]">{pkg.validityDays}d</td>
-                    <td className="px-5 py-3 text-left text-[#5A6A51]">
+                    <td className="px-5 py-3 text-right font-medium text-[var(--cr-accent)]">EGP {Number(pkg.price).toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right text-[var(--color-brand-secondary)]">{Number(pkg.taxRate).toFixed(1)}%</td>
+                    <td className="px-5 py-3 text-right text-[var(--color-brand-secondary)]">{pkg.validityDays}d</td>
+                    <td className="px-5 py-3 text-left text-[var(--color-brand-secondary)]">
                       {pkg.onExpiry === "extend" ? "Auto-extend" : "Recognise revenue"}
                     </td>
-                    <td className="px-5 py-3 text-center text-[#5A6A51]">
+                    <td className="px-5 py-3 text-center text-[var(--color-brand-secondary)]">
                       {isPulses ? (
                         <span className="font-extrabold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 text-[10.5px] inline-block whitespace-nowrap">
                           {Number(pkg.totalPulses || 0).toLocaleString()} Pulses
                         </span>
                       ) : (
-                        <span className="font-semibold text-[#414E36] text-[10.5px] whitespace-nowrap">
+                        <span className="font-semibold text-[var(--cr-primary)] text-[10.5px] whitespace-nowrap">
                           {pkg.items?.length || 0} services
                         </span>
                       )}
@@ -333,7 +333,7 @@ export function PackageAdminPanel({ session }: { session: any }) {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => openEdit(pkg)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36] cursor-pointer"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] transition hover:border-[var(--cr-accent)] hover:text-[var(--cr-primary)] cursor-pointer"
                           title="Edit"
                         >
                           <Pencil size={14} />
@@ -357,20 +357,20 @@ export function PackageAdminPanel({ session }: { session: any }) {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl border border-[#414E36]/10">
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl border border-[var(--cr-primary)]/10">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EDF1EC]">
-                  <Package size={20} className="text-[#414E36]" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-brand-tint)]">
+                  <Package size={20} className="text-[var(--cr-primary)]" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-[#1F251A]">{editingId ? "Edit Package" : "Add Package"}</h3>
-                  <p className="text-sm text-[#5A6A51]">Bundle services, set laser pulse quota, validity and expiry behaviour.</p>
+                  <h3 className="text-lg font-semibold text-[var(--cr-dark)]">{editingId ? "Edit Package" : "Add Package"}</h3>
+                  <p className="text-sm text-[var(--color-brand-secondary)]">Bundle services, set laser pulse quota, validity and expiry behaviour.</p>
                 </div>
               </div>
               <button
                 onClick={closeModal}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] hover:bg-[#F9F9F7] cursor-pointer"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] hover:bg-[#F9F9F7] cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -379,7 +379,7 @@ export function PackageAdminPanel({ session }: { session: any }) {
             <div className="space-y-5">
               {/* PACKAGE TYPE SELECTOR */}
               <div className="space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">
                   Package Type / نوع الباقة *
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -388,16 +388,16 @@ export function PackageAdminPanel({ session }: { session: any }) {
                     onClick={() => setForm({ ...form, packageType: "services" })}
                     className={`flex items-start gap-3 p-3.5 rounded-2xl border text-left transition cursor-pointer ${
                       form.packageType === "services"
-                        ? "border-[#414E36] bg-[#EDF1EC] ring-2 ring-[#414E36]/20 shadow-xs"
-                        : "border-[#414E36]/15 bg-white hover:bg-[#F9F9F7]"
+                        ? "border-[var(--cr-primary)] bg-[var(--color-brand-tint)] ring-2 ring-[var(--cr-primary)]/20 shadow-xs"
+                        : "border-[var(--cr-primary)]/15 bg-white hover:bg-[#F9F9F7]"
                     }`}
                   >
-                    <div className={`p-2 rounded-xl shrink-0 ${form.packageType === "services" ? "bg-[#414E36] text-white" : "bg-gray-100 text-[#5A6A51]"}`}>
+                    <div className={`p-2 rounded-xl shrink-0 ${form.packageType === "services" ? "bg-[var(--cr-primary)] text-white" : "bg-gray-100 text-[var(--color-brand-secondary)]"}`}>
                       <Package size={18} />
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-[#1F251A]">Services Package</div>
-                      <div className="text-xs text-[#5A6A51] mt-0.5">باقة خدمات — Bundle multiple treatment sessions</div>
+                      <div className="text-sm font-bold text-[var(--cr-dark)]">Services Package</div>
+                      <div className="text-xs text-[var(--color-brand-secondary)] mt-0.5">باقة خدمات — Bundle multiple treatment sessions</div>
                     </div>
                   </button>
 
@@ -407,18 +407,18 @@ export function PackageAdminPanel({ session }: { session: any }) {
                     className={`flex items-start gap-3 p-3.5 rounded-2xl border text-left transition cursor-pointer ${
                       form.packageType === "pulses"
                         ? "border-amber-600 bg-amber-50/70 ring-2 ring-amber-500/20 shadow-xs"
-                        : "border-[#414E36]/15 bg-white hover:bg-[#F9F9F7]"
+                        : "border-[var(--cr-primary)]/15 bg-white hover:bg-[#F9F9F7]"
                     }`}
                   >
-                    <div className={`p-2 rounded-xl shrink-0 ${form.packageType === "pulses" ? "bg-amber-600 text-white" : "bg-gray-100 text-[#5A6A51]"}`}>
+                    <div className={`p-2 rounded-xl shrink-0 ${form.packageType === "pulses" ? "bg-amber-600 text-white" : "bg-gray-100 text-[var(--color-brand-secondary)]"}`}>
                       <Zap size={18} />
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-[#1F251A] flex items-center gap-1.5">
+                      <div className="text-sm font-bold text-[var(--cr-dark)] flex items-center gap-1.5">
                         <span>Laser Pulses Package</span>
                         <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-200 text-amber-800">Laser</span>
                       </div>
-                      <div className="text-xs text-[#5A6A51] mt-0.5">باقة نبضات ليزر — Pre-paid pulse quota</div>
+                      <div className="text-xs text-[var(--color-brand-secondary)] mt-0.5">باقة نبضات ليزر — Pre-paid pulse quota</div>
                     </div>
                   </button>
                 </div>
@@ -426,30 +426,30 @@ export function PackageAdminPanel({ session }: { session: any }) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Package Name *</label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">Package Name *</label>
                   <input
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
                     placeholder="e.g. Summer Glow Bundle"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Package Name (Arabic)</label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">Package Name (Arabic)</label>
                   <input
                     value={form.nameAr}
                     onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
                     dir="rtl"
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
                     placeholder="مثال: باقة صيفية"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Branch</label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">Branch</label>
                   <select
                     value={form.branchId}
                     onChange={(e) => setForm({ ...form, branchId: e.target.value })}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#C4AE7C]"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[var(--cr-accent)]"
                   >
                     <option value="">All branches</option>
                     {branches.map((b) => (
@@ -460,84 +460,84 @@ export function PackageAdminPanel({ session }: { session: any }) {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Price (EGP) *</label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">Price (EGP) *</label>
                   <input
                     type="number"
                     min={0}
                     step="0.01"
                     value={form.price}
                     onChange={(e) => setForm({ ...form, price: e.target.value })}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
                     placeholder="0.00"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Tax Rate (%)</label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">Tax Rate (%)</label>
                   <input
                     type="number"
                     min={0}
                     step="0.1"
                     value={form.taxRate}
                     onChange={(e) => setForm({ ...form, taxRate: e.target.value })}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
                     placeholder="0.0"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Validity Days</label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">Validity Days</label>
                   <input
                     type="number"
                     min={0}
                     value={form.validityDays}
                     onChange={(e) => setForm({ ...form, validityDays: e.target.value })}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
                     placeholder="365"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">On Expiry</label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">On Expiry</label>
                   <select
                     value={form.onExpiry}
                     onChange={(e) => setForm({ ...form, onExpiry: e.target.value as any })}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#C4AE7C]"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[var(--cr-accent)]"
                   >
                     <option value="recognise_revenue">Recognise revenue</option>
                     <option value="extend">Auto-extend</option>
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Extension Days</label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">Extension Days</label>
                   <input
                     type="number"
                     min={0}
                     value={form.extensionDays}
                     onChange={(e) => setForm({ ...form, extensionDays: e.target.value })}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
                     placeholder="0"
                   />
                 </div>
                 <div className="flex items-end pb-2">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[#1F251A]">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--cr-dark)]">
                     <input
                       type="checkbox"
                       checked={form.active}
                       onChange={(e) => setForm({ ...form, active: e.target.checked })}
-                      className="h-4 w-4 rounded border-[#414E36]/20 text-[#414E36] focus:ring-[#C4AE7C]"
+                      className="h-4 w-4 rounded border-[var(--cr-primary)]/20 text-[var(--cr-primary)] focus:ring-[var(--cr-accent)]"
                     />
                     Active
                   </label>
                 </div>
                 <div className="flex flex-col justify-end pb-2">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[#1F251A]">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--cr-dark)]">
                     <input
                       type="checkbox"
                       checked={form.showOnWebsite}
                       onChange={(e) => setForm({ ...form, showOnWebsite: e.target.checked })}
-                      className="h-4 w-4 rounded border-[#414E36]/20 text-[#414E36] focus:ring-[#C4AE7C]"
+                      className="h-4 w-4 rounded border-[var(--cr-primary)]/20 text-[var(--cr-primary)] focus:ring-[var(--cr-accent)]"
                     />
                     Show on Website
                   </label>
-                  <span className="mt-1 text-[11px] text-[#5A6A51]">Separate from Active — controls public visibility only.</span>
+                  <span className="mt-1 text-[11px] text-[var(--color-brand-secondary)]">Separate from Active — controls public visibility only.</span>
                 </div>
               </div>
 
@@ -563,12 +563,12 @@ export function PackageAdminPanel({ session }: { session: any }) {
                       step={1}
                       value={form.totalPulses}
                       onChange={(e) => setForm({ ...form, totalPulses: e.target.value })}
-                      className="w-full rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-bold text-[#1F251A] outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+                      className="w-full rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-bold text-[var(--cr-dark)] outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
                       placeholder="Enter total pulses in package (e.g. 5000)"
                     />
 
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      <span className="text-[11px] font-semibold text-[#5A6A51] mr-1">Quick Presets:</span>
+                      <span className="text-[11px] font-semibold text-[var(--color-brand-secondary)] mr-1">Quick Presets:</span>
                       {[1000, 2500, 5000, 10000, 20000].map((preset) => (
                         <button
                           key={preset}
@@ -591,13 +591,13 @@ export function PackageAdminPanel({ session }: { session: any }) {
                   </p>
                 </div>
               ) : (
-                <div className="rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] p-4">
+                <div className="rounded-xl border border-[var(--cr-primary)]/10 bg-[#F9F9F7] p-4">
                   <div className="mb-3 flex items-center justify-between">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#414E36]">Included Services</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--cr-primary)]">Included Services</h4>
                     <button
                       type="button"
                       onClick={addItem}
-                      className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/20 bg-white px-2.5 py-1.5 text-xs font-medium text-[#414E36] transition hover:bg-[#EDF1EC] cursor-pointer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-[var(--cr-primary)]/20 bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-tint)] cursor-pointer"
                     >
                       <Plus size={12} /> Add Service
                     </button>
@@ -606,11 +606,11 @@ export function PackageAdminPanel({ session }: { session: any }) {
                     {items.map((it, idx) => (
                       <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr,120px,40px] gap-3 items-end">
                         <div>
-                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#5A6A51]">Service</label>
+                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">Service</label>
                           <select
                             value={it.serviceId}
                             onChange={(e) => updateItem(idx, "serviceId", e.target.value)}
-                            className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[#C4AE7C]"
+                            className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--cr-accent)]"
                           >
                             <option value="">Select service</option>
                             {services.map((s) => (
@@ -621,13 +621,13 @@ export function PackageAdminPanel({ session }: { session: any }) {
                           </select>
                         </div>
                         <div>
-                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#5A6A51]">Quantity</label>
+                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">Quantity</label>
                           <input
                             type="number"
                             min={1}
                             value={it.qty}
                             onChange={(e) => updateItem(idx, "qty", e.target.value)}
-                            className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[#C4AE7C]"
+                            className="w-full rounded-lg border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--cr-accent)]"
                           />
                         </div>
                         <button
@@ -643,17 +643,17 @@ export function PackageAdminPanel({ session }: { session: any }) {
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
+              <div className="flex items-center justify-end gap-3 border-t border-[var(--cr-primary)]/10 pt-4">
                 <button
                   onClick={closeModal}
-                  className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
+                  className="rounded-lg border border-[var(--cr-primary)]/15 px-4 py-2 text-sm font-medium text-[var(--cr-primary)] transition hover:bg-[#F9F9F7]"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#31382b] disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-lg bg-[var(--cr-primary)] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#31382b] disabled:opacity-60"
                 >
                   {saving && <Loader2 size={16} className="animate-spin" />}
                   {editingId ? "Save Changes" : "Create Package"}

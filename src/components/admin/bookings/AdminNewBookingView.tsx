@@ -1410,18 +1410,18 @@ export default function AdminNewBookingView({
   };
 
   return (
-    <div dir={lang === "ar" ? "rtl" : "ltr"} className="w-full max-w-6xl mx-auto space-y-6 pb-12 animate-fadeIn text-[#1F251A]">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="w-full max-w-6xl mx-auto space-y-6 pb-12 animate-fadeIn text-[var(--cr-dark)]">
       
       {/* ── TOP PAGE HEADER ── */}
-      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#414E36]/10 shadow-xs flex items-center justify-between">
+      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[var(--cr-primary)]/10 shadow-xs flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-[#1F251A]">{tr.title}</h1>
-          <p className="text-xs md:text-sm font-semibold text-[#5A6A51] mt-0.5">{tr.subtitle}</p>
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-[var(--cr-dark)]">{tr.title}</h1>
+          <p className="text-xs md:text-sm font-semibold text-[var(--color-brand-secondary)] mt-0.5">{tr.subtitle}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="h-10 w-10 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] hover:bg-[#414E36] hover:text-white transition flex items-center justify-center text-[#1F251A]"
+          className="h-10 w-10 rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] hover:bg-[var(--cr-primary)] hover:text-white transition flex items-center justify-center text-[var(--cr-dark)]"
           title={tr.closeTitle}
         >
           <X size={20} />
@@ -1435,8 +1435,8 @@ export default function AdminNewBookingView({
         <div className="space-y-6">
 
           {/* CARD 1: PATIENT INFORMATION */}
-          <div className="bg-white rounded-3xl p-4 sm:p-6 md:p-8 border border-[#414E36]/10 shadow-xs space-y-6 relative z-30">
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 md:p-8 border border-[var(--cr-primary)]/10 shadow-xs space-y-6 relative z-30">
+            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-700 text-white text-xs font-black">
                   1
@@ -1473,7 +1473,7 @@ export default function AdminNewBookingView({
               {/* Phone Input with Country Code & Integrated Patients Dropdown */}
               <div className="relative z-50" ref={phoneDropdownRef}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block font-bold text-[#1F251A]">{tr.phoneLabel}</label>
+                  <label className="block font-bold text-[var(--cr-dark)]">{tr.phoneLabel}</label>
                   <button
                     type="button"
                     onClick={() => {
@@ -1494,9 +1494,9 @@ export default function AdminNewBookingView({
                 </div>
 
                 <div className={`flex items-center rounded-2xl border bg-white overflow-hidden shadow-xs focus-within:border-emerald-700 ${
-                  formErrors.phone ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/20"
+                  formErrors.phone ? "border-red-500 ring-2 ring-red-200" : "border-[var(--cr-primary)]/20"
                 }`}>
-                  <div className="flex items-center gap-1.5 px-3 py-2.5 bg-[#FBFBF9] border-e border-[#414E36]/10 font-bold text-[#1F251A]">
+                  <div className="flex items-center gap-1.5 px-3 py-2.5 bg-[var(--color-brand-light)] border-e border-[var(--cr-primary)]/10 font-bold text-[var(--cr-dark)]">
                     <span className="text-base">🇪🇬</span>
                     <select
                       value={countryCode}
@@ -1507,7 +1507,7 @@ export default function AdminNewBookingView({
                       <option value="+966">+966</option>
                       <option value="+971">+971</option>
                     </select>
-                    <ChevronDown size={14} className="text-[#5A6A51]" />
+                    <ChevronDown size={14} className="text-[var(--color-brand-secondary)]" />
                   </div>
                   <input
                     type="tel"
@@ -1525,7 +1525,7 @@ export default function AdminNewBookingView({
                       setShowCustomerDropdown(true);
                     }}
                     placeholder={tr.phonePlaceholder}
-                    className="w-full px-3.5 py-2.5 font-mono text-[#1F251A] outline-none font-bold placeholder:text-gray-400 placeholder:font-sans"
+                    className="w-full px-3.5 py-2.5 font-mono text-[var(--cr-dark)] outline-none font-bold placeholder:text-gray-400 placeholder:font-sans"
                   />
                   {phone ? (
                     <button
@@ -1536,7 +1536,7 @@ export default function AdminNewBookingView({
                         setPatientFound(null);
                         setShowCustomerDropdown(false);
                       }}
-                      className="pe-3 text-[#5A6A51] hover:text-[#1F251A]"
+                      className="pe-3 text-[var(--color-brand-secondary)] hover:text-[var(--cr-dark)]"
                     >
                       <X size={14} />
                     </button>
@@ -1548,16 +1548,16 @@ export default function AdminNewBookingView({
 
                 {/* Scrollable Floating Customer List Dropdown */}
                 {showCustomerDropdown && (
-                  <div className="absolute start-0 end-0 top-full mt-1.5 z-[100] max-h-80 overflow-y-auto overscroll-contain bg-white rounded-2xl border border-[#414E36]/20 shadow-[0_12px_40px_rgba(0,0,0,0.18)] p-2 space-y-1">
-                    <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#5A6A51] bg-[#FBFBF9] rounded-xl flex justify-between items-center mb-1 sticky top-0 z-10 border border-[#414E36]/5">
+                  <div className="absolute start-0 end-0 top-full mt-1.5 z-[100] max-h-80 overflow-y-auto overscroll-contain bg-white rounded-2xl border border-[var(--cr-primary)]/20 shadow-[0_12px_40px_rgba(0,0,0,0.18)] p-2 space-y-1">
+                    <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] bg-[var(--color-brand-light)] rounded-xl flex justify-between items-center mb-1 sticky top-0 z-10 border border-[var(--cr-primary)]/5">
                       <span>{tr.databasePatientsPrefix} ({customerList.length})</span>
-                      <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[#1F251A] hover:text-red-700 font-bold text-xs cursor-pointer">{tr.closeBtn}</button>
+                      <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[var(--cr-dark)] hover:text-red-700 font-bold text-xs cursor-pointer">{tr.closeBtn}</button>
                     </div>
 
                     {/* Dedicated Patient Search Bar in Dropdown */}
                     <div className="p-1">
                       <div className="relative">
-                        <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                        <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)]" />
                         <input
                           type="text"
                           placeholder={lang === "ar" ? "ابحث بالاسم أو رقم الهاتف أو البريد..." : "Search patients by name, phone, or email..."}
@@ -1579,13 +1579,13 @@ export default function AdminNewBookingView({
                               setCustomerList(filtered);
                             }
                           }}
-                          className="w-full ps-9 pe-3 py-2 text-xs rounded-xl border border-[#414E36]/20 bg-[#FBFBF9] text-[#1F251A] outline-none font-bold focus:border-emerald-700 placeholder:text-gray-400 placeholder:font-normal"
+                          className="w-full ps-9 pe-3 py-2 text-xs rounded-xl border border-[var(--cr-primary)]/20 bg-[var(--color-brand-light)] text-[var(--cr-dark)] outline-none font-bold focus:border-emerald-700 placeholder:text-gray-400 placeholder:font-normal"
                         />
                       </div>
                     </div>
                     
                     {customerList.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-[#5A6A51] font-semibold space-y-2">
+                      <div className="p-4 text-center text-xs text-[var(--color-brand-secondary)] font-semibold space-y-2">
                         <p>{tr.noMatchingPatients}</p>
                         {allCustomers.length === 0 && (
                           <p className="text-[11px] text-amber-700">
@@ -1618,8 +1618,8 @@ export default function AdminNewBookingView({
                             }`}
                           >
                             <div className="min-w-0 flex-1">
-                              <span className="font-extrabold text-[#1F251A] text-xs block truncate">{cName}</span>
-                              <span className="text-[11px] font-mono text-[#5A6A51] block truncate">
+                              <span className="font-extrabold text-[var(--cr-dark)] text-xs block truncate">{cName}</span>
+                              <span className="text-[11px] font-mono text-[var(--color-brand-secondary)] block truncate">
                                 {cPhone} {c.email ? `• ${c.email}` : ""}
                               </span>
                             </div>
@@ -1640,7 +1640,7 @@ export default function AdminNewBookingView({
               {/* First Name & Last Name Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.firstNameLabel}</label>
+                  <label className="block font-bold text-[var(--cr-dark)] mb-1.5">{tr.firstNameLabel}</label>
                   <input
                     type="text"
                     required
@@ -1650,8 +1650,8 @@ export default function AdminNewBookingView({
                       if (e.target.value) setFormErrors((prev) => ({ ...prev, firstName: false }));
                     }}
                     placeholder={tr.firstNamePlaceholder}
-                    className={`w-full rounded-2xl border bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 ${
-                      formErrors.firstName ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/20"
+                    className={`w-full rounded-2xl border bg-white px-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 ${
+                      formErrors.firstName ? "border-red-500 ring-2 ring-red-200" : "border-[var(--cr-primary)]/20"
                     }`}
                   />
                   {formErrors.firstName && (
@@ -1659,14 +1659,14 @@ export default function AdminNewBookingView({
                   )}
                 </div>
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.lastNameLabel}</label>
+                  <label className="block font-bold text-[var(--cr-dark)] mb-1.5">{tr.lastNameLabel}</label>
                   <input
                     type="text"
                     required
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     placeholder={tr.lastNamePlaceholder}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700"
                   />
                 </div>
               </div>
@@ -1674,17 +1674,17 @@ export default function AdminNewBookingView({
               {/* Email & WhatsApp Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.emailLabel}</label>
+                  <label className="block font-bold text-[var(--cr-dark)] mb-1.5">{tr.emailLabel}</label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={tr.emailPlaceholder}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-semibold text-[#1F251A] outline-none focus:border-emerald-700"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 py-2.5 font-semibold text-[var(--cr-dark)] outline-none focus:border-emerald-700"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.whatsappLabel}</label>
+                  <label className="block font-bold text-[var(--cr-dark)] mb-1.5">{tr.whatsappLabel}</label>
                   <div className="space-y-2">
                     <input
                       type="tel"
@@ -1692,9 +1692,9 @@ export default function AdminNewBookingView({
                       value={sameAsPhone ? phone : whatsapp}
                       onChange={(e) => setWhatsapp(e.target.value)}
                       placeholder={tr.whatsappPlaceholder}
-                      className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-mono text-[#1F251A] outline-none disabled:bg-[#FBFBF9]"
+                      className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 py-2.5 font-mono text-[var(--cr-dark)] outline-none disabled:bg-[var(--color-brand-light)]"
                     />
-                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[#5A6A51]">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--color-brand-secondary)]">
                       <input
                         type="checkbox"
                         checked={sameAsPhone}
@@ -1709,34 +1709,34 @@ export default function AdminNewBookingView({
 
               {/* ── ADDITIONAL PATIENT INTAKE DATA (Photos 2 & 3) ── */}
               {showAdditionalPatientFields && (
-                <div className="space-y-4 pt-4 border-t border-[#414E36]/10 animate-fadeIn">
+                <div className="space-y-4 pt-4 border-t border-[var(--cr-primary)]/10 animate-fadeIn">
                   {/* Row 1: Gender & National ID */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">{tr.genderLabel || "Gender"}</label>
+                      <label className="block font-bold text-[var(--cr-dark)] mb-1.5 text-xs">{tr.genderLabel || "Gender"}</label>
                       <div className="relative">
                         <select
                           value={gender}
                           onChange={(e) => setGender(e.target.value)}
-                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 appearance-none text-xs"
+                          className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none cursor-pointer focus:border-emerald-700 appearance-none text-xs"
                         >
                           <option value="">{tr.selectGenderPlaceholder || "Select Gender"}</option>
                           <option value="Female">{tr.genderFemale || "Female"}</option>
                           <option value="Male">{tr.genderMale || "Male"}</option>
                         </select>
-                        <ChevronDown size={14} className="absolute end-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
+                        <ChevronDown size={14} className="absolute end-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)] pointer-events-none" />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">{tr.nationalIdLabel || "National ID"}</label>
+                      <label className="block font-bold text-[var(--cr-dark)] mb-1.5 text-xs">{tr.nationalIdLabel || "National ID"}</label>
                       <input
                         type="text"
                         value={nationalId}
                         onChange={(e) => setNationalId(e.target.value)}
                         placeholder={tr.nationalIdPlaceholder || "Enter 14-digit National ID"}
                         maxLength={14}
-                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 text-xs"
                       />
                     </div>
                   </div>
@@ -1744,12 +1744,12 @@ export default function AdminNewBookingView({
                   {/* Row 2: Referral Source & Occupation */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">{tr.referralLabel || "Referral Source"}</label>
+                      <label className="block font-bold text-[var(--cr-dark)] mb-1.5 text-xs">{tr.referralLabel || "Referral Source"}</label>
                       <div className="relative">
                         <select
                           value={referralSource}
                           onChange={(e) => setReferralSource(e.target.value)}
-                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 appearance-none text-xs"
+                          className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none cursor-pointer focus:border-emerald-700 appearance-none text-xs"
                         >
                           <option value="">{tr.selectReferralPlaceholder || "Select Referral Source..."}</option>
                           <option value="Instagram">{tr.referralInstagram || "Instagram"}</option>
@@ -1761,18 +1761,18 @@ export default function AdminNewBookingView({
                           <option value="Doctor Referral">{tr.referralDoctor || "Doctor Referral"}</option>
                           <option value="Other">{tr.referralOther || "Other"}</option>
                         </select>
-                        <ChevronDown size={14} className="absolute end-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] pointer-events-none" />
+                        <ChevronDown size={14} className="absolute end-3.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-secondary)] pointer-events-none" />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">{tr.occupationLabel || "Occupation"}</label>
+                      <label className="block font-bold text-[var(--cr-dark)] mb-1.5 text-xs">{tr.occupationLabel || "Occupation"}</label>
                       <input
                         type="text"
                         value={occupation}
                         onChange={(e) => setOccupation(e.target.value)}
                         placeholder={tr.occupationPlaceholder || "e.g. Engineer, Doctor"}
-                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 text-xs"
                       />
                     </div>
                   </div>
@@ -1780,13 +1780,13 @@ export default function AdminNewBookingView({
                   {/* Row 3: Age (Photo 3) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-bold text-[#1F251A] mb-1.5 text-xs">{tr.ageLabel || "Age"}</label>
+                      <label className="block font-bold text-[var(--cr-dark)] mb-1.5 text-xs">{tr.ageLabel || "Age"}</label>
                       <input
                         type="number"
                         value={age}
                         onChange={(e) => setAge(e.target.value)}
                         placeholder={tr.agePlaceholder || "e.g. 28"}
-                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                        className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 text-xs"
                       />
                     </div>
                   </div>
@@ -1802,43 +1802,43 @@ export default function AdminNewBookingView({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.cityAreaLabel || "City / Area"}</label>
+                        <label className="block font-bold text-[var(--cr-dark)] mb-1 text-[11px]">{tr.cityAreaLabel || "City / Area"}</label>
                         <input
                           type="text"
                           value={city}
                           onChange={(e) => setCity(e.target.value)}
                           placeholder={tr.cityAreaPlaceholder || "e.g. New Cairo"}
-                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                          className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3 py-2 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 text-xs"
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.streetLabel || "Street"}</label>
+                        <label className="block font-bold text-[var(--cr-dark)] mb-1 text-[11px]">{tr.streetLabel || "Street"}</label>
                         <input
                           type="text"
                           value={street}
                           onChange={(e) => setStreet(e.target.value)}
                           placeholder={tr.streetPlaceholder || "e.g. 90th Street"}
-                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                          className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3 py-2 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 text-xs"
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.buildingLabel || "Building"}</label>
+                        <label className="block font-bold text-[var(--cr-dark)] mb-1 text-[11px]">{tr.buildingLabel || "Building"}</label>
                         <input
                           type="text"
                           value={building}
                           onChange={(e) => setBuilding(e.target.value)}
                           placeholder={tr.buildingPlaceholder || "e.g. Building 14"}
-                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                          className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3 py-2 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 text-xs"
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.floorAptLabel || "Floor / Apt"}</label>
+                        <label className="block font-bold text-[var(--cr-dark)] mb-1 text-[11px]">{tr.floorAptLabel || "Floor / Apt"}</label>
                         <input
                           type="text"
                           value={floorApt}
                           onChange={(e) => setFloorApt(e.target.value)}
                           placeholder={tr.floorAptPlaceholder || "e.g. Floor 3, Apt 6"}
-                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                          className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3 py-2 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 text-xs"
                         />
                       </div>
                     </div>
@@ -1855,33 +1855,33 @@ export default function AdminNewBookingView({
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.walletBalanceLabel || "Wallet Balance (EGP)"}</label>
+                        <label className="block font-bold text-[var(--cr-dark)] mb-1 text-[11px]">{tr.walletBalanceLabel || "Wallet Balance (EGP)"}</label>
                         <input
                           type="number"
                           value={walletBalance}
                           onChange={(e) => setWalletBalance(Number(e.target.value) || 0)}
                           placeholder="0"
-                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                          className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3 py-2 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 text-xs"
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.totalSpentLabel || "Total Spent (EGP)"}</label>
+                        <label className="block font-bold text-[var(--cr-dark)] mb-1 text-[11px]">{tr.totalSpentLabel || "Total Spent (EGP)"}</label>
                         <input
                           type="number"
                           value={totalSpent}
                           onChange={(e) => setTotalSpent(Number(e.target.value) || 0)}
                           placeholder="0"
-                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                          className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3 py-2 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 text-xs"
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-[#1F251A] mb-1 text-[11px]">{tr.outstandingBalanceLabel || "Outstanding Balance (EGP)"}</label>
+                        <label className="block font-bold text-[var(--cr-dark)] mb-1 text-[11px]">{tr.outstandingBalanceLabel || "Outstanding Balance (EGP)"}</label>
                         <input
                           type="number"
                           value={outstandingBalance}
                           onChange={(e) => setOutstandingBalance(Number(e.target.value) || 0)}
                           placeholder="0"
-                          className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2 font-bold text-[#1F251A] outline-none focus:border-emerald-700 text-xs"
+                          className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3 py-2 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 text-xs"
                         />
                       </div>
                     </div>
@@ -1892,8 +1892,8 @@ export default function AdminNewBookingView({
           </div>
 
           {/* CARD 2: APPOINTMENT DETAILS */}
-          <div className="bg-white rounded-3xl p-4 sm:p-6 md:p-8 border border-[#414E36]/10 shadow-xs space-y-6 relative z-10">
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 md:p-8 border border-[var(--cr-primary)]/10 shadow-xs space-y-6 relative z-10">
+            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-700 text-white text-xs font-black">
                   2
@@ -1908,15 +1908,15 @@ export default function AdminNewBookingView({
               {/* Service, Doctor, Date Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.serviceLabel}</label>
+                  <label className="block font-bold text-[var(--cr-dark)] mb-1.5">{tr.serviceLabel}</label>
                   <select
                     value={selectedServiceId}
                     onChange={(e) => {
                       setSelectedServiceId(e.target.value);
                       if (e.target.value) setFormErrors((prev) => ({ ...prev, service: false }));
                     }}
-                    className={`w-full rounded-2xl border bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 ${
-                      formErrors.service ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/20"
+                    className={`w-full rounded-2xl border bg-white px-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none cursor-pointer focus:border-emerald-700 ${
+                      formErrors.service ? "border-red-500 ring-2 ring-red-200" : "border-[var(--cr-primary)]/20"
                     }`}
                   >
                     {dbServices.map(s => (
@@ -1931,15 +1931,15 @@ export default function AdminNewBookingView({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.doctorLabel}</label>
+                  <label className="block font-bold text-[var(--cr-dark)] mb-1.5">{tr.doctorLabel}</label>
                   <select
                     value={selectedDoctorId}
                     onChange={(e) => {
                       setSelectedDoctorId(e.target.value);
                       if (e.target.value) setFormErrors((prev) => ({ ...prev, doctor: false }));
                     }}
-                    className={`w-full rounded-2xl border bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 ${
-                      formErrors.doctor ? "border-red-500 ring-2 ring-red-200" : "border-[#414E36]/20"
+                    className={`w-full rounded-2xl border bg-white px-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none cursor-pointer focus:border-emerald-700 ${
+                      formErrors.doctor ? "border-red-500 ring-2 ring-red-200" : "border-[var(--cr-primary)]/20"
                     }`}
                   >
                     {filteredDoctors.map(d => (
@@ -1952,13 +1952,13 @@ export default function AdminNewBookingView({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.dateLabel}</label>
+                  <label className="block font-bold text-[var(--cr-dark)] mb-1.5">{tr.dateLabel}</label>
                   <input
                     type="date"
                     required
                     value={bookingDate}
                     onChange={(e) => setBookingDate(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 cursor-pointer"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 cursor-pointer"
                   />
                 </div>
               </div>
@@ -1978,7 +1978,7 @@ export default function AdminNewBookingView({
                             Laser Service
                           </span>
                         </h4>
-                        <p className="text-[11px] text-[#5A6A51] font-medium mt-0.5">
+                        <p className="text-[11px] text-[var(--color-brand-secondary)] font-medium mt-0.5">
                           {tr.laserOptionsSub || "Select the agreed payment method for this laser booking:"}
                         </p>
                       </div>
@@ -1996,23 +1996,23 @@ export default function AdminNewBookingView({
                       className={`p-3.5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between ${
                         laserPaymentMode === "SERVICE"
                           ? "border-emerald-700 bg-emerald-50/90 ring-2 ring-emerald-700/20 shadow-xs"
-                          : "border-[#414E36]/15 bg-white hover:border-emerald-600/50 hover:bg-[#FBFBF9]"
+                          : "border-[var(--cr-primary)]/15 bg-white hover:border-emerald-600/50 hover:bg-[var(--color-brand-light)]"
                       }`}
                     >
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-xs text-[#1F251A] flex items-center gap-1.5">
-                            <span className="h-5 w-5 rounded-full bg-[#EDF1EC] text-emerald-800 flex items-center justify-center text-[10px] font-black">1</span>
+                          <span className="font-extrabold text-xs text-[var(--cr-dark)] flex items-center gap-1.5">
+                            <span className="h-5 w-5 rounded-full bg-[var(--color-brand-tint)] text-emerald-800 flex items-center justify-center text-[10px] font-black">1</span>
                             {tr.laserOption1Title || "Option 1: Pay by Service"}
                           </span>
                           {laserPaymentMode === "SERVICE" && <Check size={16} className="text-emerald-700 shrink-0 font-bold" />}
                         </div>
-                        <p className="text-[11px] text-[#5A6A51] leading-relaxed">
+                        <p className="text-[11px] text-[var(--color-brand-secondary)] leading-relaxed">
                           {tr.laserOption1Desc || "Fixed catalog price regardless of pulses delivered."}
                         </p>
                       </div>
-                      <div className="pt-2 mt-2 border-t border-[#414E36]/10 flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase text-[#5A6A51]">{tr.servicePriceLabel || "Price"}:</span>
+                      <div className="pt-2 mt-2 border-t border-[var(--cr-primary)]/10 flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase text-[var(--color-brand-secondary)]">{tr.servicePriceLabel || "Price"}:</span>
                         <span className="text-xs font-black text-emerald-900">{baseServicePrice} {tr.egpLabel || "EGP"}</span>
                       </div>
                     </div>
@@ -2027,23 +2027,23 @@ export default function AdminNewBookingView({
                       className={`p-3.5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between ${
                         laserPaymentMode === "PER_PULSE"
                           ? "border-emerald-700 bg-emerald-50/90 ring-2 ring-emerald-700/20 shadow-xs"
-                          : "border-[#414E36]/15 bg-white hover:border-emerald-600/50 hover:bg-[#FBFBF9]"
+                          : "border-[var(--cr-primary)]/15 bg-white hover:border-emerald-600/50 hover:bg-[var(--color-brand-light)]"
                       }`}
                     >
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-xs text-[#1F251A] flex items-center gap-1.5">
-                            <span className="h-5 w-5 rounded-full bg-[#EDF1EC] text-emerald-800 flex items-center justify-center text-[10px] font-black">2</span>
+                          <span className="font-extrabold text-xs text-[var(--cr-dark)] flex items-center gap-1.5">
+                            <span className="h-5 w-5 rounded-full bg-[var(--color-brand-tint)] text-emerald-800 flex items-center justify-center text-[10px] font-black">2</span>
                             {tr.laserOption2Title || "Option 2: Pay per Pulse"}
                           </span>
                           {laserPaymentMode === "PER_PULSE" && <Check size={16} className="text-emerald-700 shrink-0 font-bold" />}
                         </div>
-                        <p className="text-[11px] text-[#5A6A51] leading-relaxed">
+                        <p className="text-[11px] text-[var(--color-brand-secondary)] leading-relaxed">
                           {tr.laserOption2Desc || "Deal per pulse at reception. Invoiced after session based on actual pulses used."}
                         </p>
                       </div>
-                      <div className="pt-2 mt-2 border-t border-[#414E36]/10 flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
-                        <label className="text-[10px] font-bold text-[#5A6A51] shrink-0">{tr.ratePerPulseLabel || "Rate"}:</label>
+                      <div className="pt-2 mt-2 border-t border-[var(--cr-primary)]/10 flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+                        <label className="text-[10px] font-bold text-[var(--color-brand-secondary)] shrink-0">{tr.ratePerPulseLabel || "Rate"}:</label>
                         <div className="flex items-center gap-1">
                           <input
                             type="number"
@@ -2051,9 +2051,9 @@ export default function AdminNewBookingView({
                             step={0.5}
                             value={laserPerPulsePrice}
                             onChange={(e) => setLaserPerPulsePrice(Math.max(0.1, parseFloat(e.target.value) || 1))}
-                            className="w-16 rounded-lg border border-[#414E36]/20 bg-white px-2 py-0.5 text-xs font-black text-[#1F251A] text-end outline-none focus:border-emerald-700"
+                            className="w-16 rounded-lg border border-[var(--cr-primary)]/20 bg-white px-2 py-0.5 text-xs font-black text-[var(--cr-dark)] text-end outline-none focus:border-emerald-700"
                           />
-                          <span className="text-[10px] font-bold text-[#5A6A51]">{tr.egpLabel || "EGP"}/p</span>
+                          <span className="text-[10px] font-bold text-[var(--color-brand-secondary)]">{tr.egpLabel || "EGP"}/p</span>
                         </div>
                       </div>
                     </div>
@@ -2085,23 +2085,23 @@ export default function AdminNewBookingView({
                       className={`p-3.5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between ${
                         laserPaymentMode === "PACKAGE"
                           ? "border-emerald-700 bg-emerald-50/90 ring-2 ring-emerald-700/20 shadow-xs"
-                          : "border-[#414E36]/15 bg-white hover:border-emerald-600/50 hover:bg-[#FBFBF9]"
+                          : "border-[var(--cr-primary)]/15 bg-white hover:border-emerald-600/50 hover:bg-[var(--color-brand-light)]"
                       }`}
                     >
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-xs text-[#1F251A] flex items-center gap-1.5">
-                            <span className="h-5 w-5 rounded-full bg-[#EDF1EC] text-emerald-800 flex items-center justify-center text-[10px] font-black">3</span>
+                          <span className="font-extrabold text-xs text-[var(--cr-dark)] flex items-center gap-1.5">
+                            <span className="h-5 w-5 rounded-full bg-[var(--color-brand-tint)] text-emerald-800 flex items-center justify-center text-[10px] font-black">3</span>
                             {tr.laserOption3Title || "Option 3: Pulses Package"}
                           </span>
                           {laserPaymentMode === "PACKAGE" && <Check size={16} className="text-emerald-700 shrink-0 font-bold" />}
                         </div>
-                        <p className="text-[11px] text-[#5A6A51] leading-relaxed">
+                        <p className="text-[11px] text-[var(--color-brand-secondary)] leading-relaxed">
                           {tr.laserOption3Desc || "Deduct session pulses from patient package with deficit spillover support."}
                         </p>
                       </div>
-                      <div className="pt-2 mt-2 border-t border-[#414E36]/10 flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase text-[#5A6A51]">{tr.bookingValueLabel || "Booking"}:</span>
+                      <div className="pt-2 mt-2 border-t border-[var(--cr-primary)]/10 flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase text-[var(--color-brand-secondary)]">{tr.bookingValueLabel || "Booking"}:</span>
                         <span className="text-xs font-black text-emerald-900">
                           {customerPulsePackages.length > 0
                             ? `0 ${tr.egpLabel || "EGP"} (${tr.paymentMethodPackage || "Package"})`
@@ -2164,7 +2164,7 @@ export default function AdminNewBookingView({
                                       <span className="text-emerald-800 font-bold">
                                         {remaining.toLocaleString()} {lang === "ar" ? "نبضة متبقية" : (tr.pulsesRemainingBadge || "pulses left")}
                                       </span>
-                                      <span className="text-[10px] text-[#5A6A51]">
+                                      <span className="text-[10px] text-[var(--color-brand-secondary)]">
                                         / {total.toLocaleString()}
                                       </span>
                                     </div>
@@ -2172,7 +2172,7 @@ export default function AdminNewBookingView({
                                       <div className="h-full bg-emerald-600 rounded-full transition-all" style={{ width: `${pct}%` }} />
                                     </div>
                                     {pkg.expiresAt && (
-                                      <span className="text-[10px] text-[#5A6A51] block mt-1">
+                                      <span className="text-[10px] text-[var(--color-brand-secondary)] block mt-1">
                                         {tr.packageExpires || "Expires:"} {new Date(pkg.expiresAt).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                                       </span>
                                     )}
@@ -2284,14 +2284,14 @@ export default function AdminNewBookingView({
               {!isLaserService && (
                 <div className="pt-1 pb-1">
                   {!foundCustomer && !phone ? (
-                    <div className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 text-xs text-[#5A6A51]">
+                    <div className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-[var(--color-brand-light)] border border-[var(--cr-primary)]/10 text-xs text-[var(--color-brand-secondary)]">
                       <Package size={16} className="shrink-0 text-[#8B9882]" />
                       <span className="font-medium">
                         {tr.selectPatientForPackagesHint || "Select or enter a patient above to check available packages and session balances."}
                       </span>
                     </div>
                   ) : loadingPackages ? (
-                    <div className="flex items-center gap-2 p-4 rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 text-xs text-[#5A6A51]">
+                    <div className="flex items-center gap-2 p-4 rounded-2xl bg-[var(--color-brand-light)] border border-[var(--cr-primary)]/10 text-xs text-[var(--color-brand-secondary)]">
                       <Loader2 size={16} className="animate-spin text-emerald-700" />
                       <span>{tr.loading || "Checking patient packages..."}</span>
                     </div>
@@ -2329,13 +2329,13 @@ export default function AdminNewBookingView({
                           );
 
                           return (
-                            <div key={pkg.id} className="rounded-xl border border-[#414E36]/15 bg-white p-3.5 space-y-3 shadow-xs">
+                            <div key={pkg.id} className="rounded-xl border border-[var(--cr-primary)]/15 bg-white p-3.5 space-y-3 shadow-xs">
                               <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div>
-                                  <h5 className="font-black text-xs text-[#1F251A] flex items-center gap-1.5">
+                                  <h5 className="font-black text-xs text-[var(--cr-dark)] flex items-center gap-1.5">
                                     <span>{(lang === "ar" && pkg.packageNameAr) ? pkg.packageNameAr : pkg.packageName}</span>
                                   </h5>
-                                  <p className="text-[10px] text-[#5A6A51] font-semibold mt-0.5">
+                                  <p className="text-[10px] text-[var(--color-brand-secondary)] font-semibold mt-0.5">
                                     {pkg.expiresAt ? `${tr.packageExpires || "Expires:"} ${new Date(pkg.expiresAt).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", { day: "2-digit", month: "short", year: "numeric" })}` : ""}
                                   </p>
                                 </div>
@@ -2346,7 +2346,7 @@ export default function AdminNewBookingView({
 
                               {/* Included Services List */}
                               <div className="space-y-1.5 pt-1">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] block">
                                   {tr.packageServicesCovered || "Included Services & Sessions:"}
                                 </span>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2365,7 +2365,7 @@ export default function AdminNewBookingView({
                                         className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition ${
                                           isSelected
                                             ? "border-emerald-600 bg-emerald-50/80 ring-1 ring-emerald-600 text-emerald-900 font-bold"
-                                            : "border-gray-200 bg-gray-50/50 hover:bg-white text-[#1F251A]"
+                                            : "border-gray-200 bg-gray-50/50 hover:bg-white text-[var(--cr-dark)]"
                                         }`}
                                       >
                                         <div className="flex items-center gap-1.5 truncate">
@@ -2396,7 +2396,7 @@ export default function AdminNewBookingView({
 
                               {/* Pay with Package Checkbox / Option */}
                               {matchingPackageItem && matchingPackageItem.qtyRemaining > 0 && matchingPackage?.id === pkg.id ? (
-                                <div className="pt-2 border-t border-[#414E36]/10">
+                                <div className="pt-2 border-t border-[var(--cr-primary)]/10">
                                   <label
                                     onClick={() => {
                                       const next = !usePackagePayment;
@@ -2416,7 +2416,7 @@ export default function AdminNewBookingView({
                                     className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
                                       usePackagePayment
                                         ? "border-emerald-600 bg-emerald-100/60 ring-1 ring-emerald-600"
-                                        : "border-gray-200 bg-[#FBFBF9] hover:bg-emerald-50/40"
+                                        : "border-gray-200 bg-[var(--color-brand-light)] hover:bg-emerald-50/40"
                                     }`}
                                   >
                                     <input
@@ -2468,7 +2468,7 @@ export default function AdminNewBookingView({
                                       {tr.serviceNotCoveredInPackage || "Selected service is not covered in this package"}
                                     </span>
                                     <div className="mt-1 flex flex-wrap items-center gap-1">
-                                      <span className="text-[10px] text-[#5A6A51] font-semibold">
+                                      <span className="text-[10px] text-[var(--color-brand-secondary)] font-semibold">
                                         {tr.switchToCoveredService || "Switch to a covered service:"}
                                       </span>
                                       {(pkg.items || []).filter((it: any) => it.qtyRemaining > 0).map((it: any) => (
@@ -2496,7 +2496,7 @@ export default function AdminNewBookingView({
 
               {/* ── 1. AVAILABLE TIME (MULTI-SLOT SELECTION) ── */}
               <div>
-                <label className="block font-bold text-[#1F251A] mb-2">{tr.availableTimeLabel}</label>
+                <label className="block font-bold text-[var(--cr-dark)] mb-2">{tr.availableTimeLabel}</label>
                 <div>
                   <button
                     type="button"
@@ -2520,12 +2520,12 @@ export default function AdminNewBookingView({
                       }}
                     >
                       <div
-                        className="relative w-full max-w-2xl rounded-3xl border border-[#414E36]/15 bg-white p-6 shadow-2xl space-y-4 text-start animate-fadeIn"
+                        className="relative w-full max-w-2xl rounded-3xl border border-[var(--cr-primary)]/15 bg-white p-6 shadow-2xl space-y-4 text-start animate-fadeIn"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                        <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-3">
                           <div className="flex items-center gap-2.5">
-                            <div className="h-9 w-9 rounded-full bg-[#EDF1EC] text-emerald-800 flex items-center justify-center shrink-0">
+                            <div className="h-9 w-9 rounded-full bg-[var(--color-brand-tint)] text-emerald-800 flex items-center justify-center shrink-0">
                               <Clock size={18} />
                             </div>
                             <div>
@@ -2535,7 +2535,7 @@ export default function AdminNewBookingView({
                                   ({totalDurationMinutes} {tr.minutesPerSlotLabel})
                                 </span>
                               </div>
-                              <p className="text-xs text-[#5A6A51] mt-0.5">
+                              <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">
                                 {formattedDateStr} • {selectedDoctorName}
                               </p>
                             </div>
@@ -2553,7 +2553,7 @@ export default function AdminNewBookingView({
                             <button
                               type="button"
                               onClick={() => setShowTimeModal(false)}
-                              className="h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-[#1F251A] transition cursor-pointer"
+                              className="h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-[var(--cr-dark)] transition cursor-pointer"
                               title="Close"
                             >
                               <X size={16} />
@@ -2562,7 +2562,7 @@ export default function AdminNewBookingView({
                         </div>
 
                         {loadingSlots ? (
-                          <div className="flex items-center justify-center gap-2 py-10 text-sm font-semibold text-[#5A6A51]">
+                          <div className="flex items-center justify-center gap-2 py-10 text-sm font-semibold text-[var(--color-brand-secondary)]">
                             <Loader2 size={20} className="animate-spin text-emerald-700" /> {tr.fetchingSlotsLabel}
                           </div>
                         ) : allTimeSlots.length > 0 ? (
@@ -2593,7 +2593,7 @@ export default function AdminNewBookingView({
                                         ? "border-[var(--cr-primary)] bg-[#1E3A2B] text-white shadow-sm ring-2 ring-emerald-700/20"
                                         : isDisabled
                                         ? "cursor-not-allowed border-[var(--cr-divider)] bg-[var(--cr-white)] text-[var(--cr-secondary)] opacity-50"
-                                        : "cursor-pointer border-[#414E36]/15 bg-white text-[#1F251A] hover:border-emerald-700 hover:bg-emerald-50/50"
+                                        : "cursor-pointer border-[var(--cr-primary)]/15 bg-white text-[var(--cr-dark)] hover:border-emerald-700 hover:bg-emerald-50/50"
                                     }`}
                                   >
                                     <span>{tSlot}</span>
@@ -2630,14 +2630,14 @@ export default function AdminNewBookingView({
 
               {/* ── 2. SESSION TYPE (IN PERSON VS ONLINE) ── */}
               <div>
-                <label className="block font-bold text-[#1F251A] mb-2">{tr.sessionTypeLabel}</label>
+                <label className="block font-bold text-[var(--cr-dark)] mb-2">{tr.sessionTypeLabel}</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label
                     onClick={() => setSessionType("in_person")}
                     className={`flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition ${
                       sessionType === "in_person"
                         ? "border-emerald-700 bg-emerald-50/50 ring-2 ring-emerald-700/20"
-                        : "border-[#414E36]/15 bg-white hover:bg-[#FBFBF9]"
+                        : "border-[var(--cr-primary)]/15 bg-white hover:bg-[var(--color-brand-light)]"
                     }`}
                   >
                     <input
@@ -2647,7 +2647,7 @@ export default function AdminNewBookingView({
                       onChange={() => setSessionType("in_person")}
                       className="text-emerald-700 focus:ring-emerald-600 cursor-pointer"
                     />
-                    <span className="font-extrabold text-[#1F251A]">{tr.inPersonLabel}</span>
+                    <span className="font-extrabold text-[var(--cr-dark)]">{tr.inPersonLabel}</span>
                   </label>
 
                   <label
@@ -2655,7 +2655,7 @@ export default function AdminNewBookingView({
                     className={`flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition ${
                       sessionType === "online"
                         ? "border-emerald-700 bg-emerald-50/50 ring-2 ring-emerald-700/20"
-                        : "border-[#414E36]/15 bg-white hover:bg-[#FBFBF9]"
+                        : "border-[var(--cr-primary)]/15 bg-white hover:bg-[var(--color-brand-light)]"
                     }`}
                   >
                     <input
@@ -2665,7 +2665,7 @@ export default function AdminNewBookingView({
                       onChange={() => setSessionType("online")}
                       className="text-emerald-700 focus:ring-emerald-600 cursor-pointer"
                     />
-                    <span className="font-extrabold text-[#1F251A]">{tr.onlineLabel}</span>
+                    <span className="font-extrabold text-[var(--cr-dark)]">{tr.onlineLabel}</span>
                   </label>
                 </div>
               </div>
@@ -2673,8 +2673,8 @@ export default function AdminNewBookingView({
               {/* Notes (Optional) */}
               <div>
                 <div className="flex justify-between items-center mb-1.5">
-                  <label className="font-bold text-[#1F251A]">{tr.notesLabel}</label>
-                  <span className="text-[11px] text-[#5A6A51] font-mono">{notes.length} / 200</span>
+                  <label className="font-bold text-[var(--cr-dark)]">{tr.notesLabel}</label>
+                  <span className="text-[11px] text-[var(--color-brand-secondary)] font-mono">{notes.length} / 200</span>
                 </div>
                 <textarea
                   maxLength={200}
@@ -2682,18 +2682,18 @@ export default function AdminNewBookingView({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={tr.notesPlaceholder}
-                  className="w-full rounded-2xl border border-[#414E36]/20 bg-white p-3.5 text-xs text-[#1F251A] outline-none focus:border-emerald-700"
+                  className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white p-3.5 text-xs text-[var(--cr-dark)] outline-none focus:border-emerald-700"
                 />
               </div>
 
               {/* ── 3. FINANCIAL FIELDS (BOOKING VALUE & AMOUNT PAID NOW) ── */}
-              <div className="pt-2 border-t border-[#414E36]/10 space-y-4">
+              <div className="pt-2 border-t border-[var(--cr-primary)]/10 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Booking Value */}
                   <div>
                     <div className="flex justify-between items-center mb-1.5">
-                      <label className="font-bold text-[#1F251A]">{tr.bookingValueLabel || "Booking Value"}</label>
-                      <span className="text-[11px] text-[#5A6A51] font-mono">{tr.egpLabel || "EGP"}</span>
+                      <label className="font-bold text-[var(--cr-dark)]">{tr.bookingValueLabel || "Booking Value"}</label>
+                      <span className="text-[11px] text-[var(--color-brand-secondary)] font-mono">{tr.egpLabel || "EGP"}</span>
                     </div>
                     <div className="relative">
                       <input
@@ -2705,7 +2705,7 @@ export default function AdminNewBookingView({
                           setCustomBookingValue(val === "" ? 0 : Math.max(0, Number(val)));
                         }}
                         placeholder="0"
-                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white p-3.5 text-xs font-bold text-[#1F251A] outline-none focus:border-emerald-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white p-3.5 text-xs font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
                   </div>
@@ -2713,8 +2713,8 @@ export default function AdminNewBookingView({
                   {/* Amount Paid Now */}
                   <div>
                     <div className="flex justify-between items-center mb-1.5">
-                      <label className="font-bold text-[#1F251A]">{tr.amountPaidLabel || "Amount Paid Now"}</label>
-                      <span className="text-[11px] text-[#5A6A51] font-mono">{tr.egpLabel || "EGP"}</span>
+                      <label className="font-bold text-[var(--cr-dark)]">{tr.amountPaidLabel || "Amount Paid Now"}</label>
+                      <span className="text-[11px] text-[var(--color-brand-secondary)] font-mono">{tr.egpLabel || "EGP"}</span>
                     </div>
                     <div className="relative">
                       <input
@@ -2726,17 +2726,17 @@ export default function AdminNewBookingView({
                           setAmountPaidNow(val === "" ? "" : Math.max(0, Number(val)));
                         }}
                         placeholder="0"
-                        className="w-full rounded-2xl border border-[#414E36]/20 bg-white p-3.5 text-xs font-bold text-[#1F251A] outline-none focus:border-emerald-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white p-3.5 text-xs font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Live Remaining Balance Calculation Callout */}
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 text-xs">
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--color-brand-light)] border border-[var(--cr-primary)]/10 text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-[#5A6A51]">{tr.remainingValueLabel || "Remaining Value"}:</span>
-                    <span className="text-[11px] text-[#5A6A51]">({tr.bookingValueLabel || "Booking Value"} - {tr.actualPaidLabel || "Actual Paid"})</span>
+                    <span className="font-bold text-[var(--color-brand-secondary)]">{tr.remainingValueLabel || "Remaining Value"}:</span>
+                    <span className="text-[11px] text-[var(--color-brand-secondary)]">({tr.bookingValueLabel || "Booking Value"} - {tr.actualPaidLabel || "Actual Paid"})</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`font-black text-sm ${remainingValue > 0 ? "text-amber-800" : remainingValue < 0 ? "text-blue-800" : "text-emerald-800"}`}>
@@ -2762,11 +2762,11 @@ export default function AdminNewBookingView({
       </div>
 
       {/* ── BOTTOM ACTIONS BAR ── */}
-      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#414E36]/10 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[var(--cr-primary)]/10 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
         <button
           type="button"
           onClick={onClose}
-          className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-[#414E36]/20 bg-white font-bold text-xs text-[#1F251A] hover:bg-[#FBFBF9] transition"
+          className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-[var(--cr-primary)]/20 bg-white font-bold text-xs text-[var(--cr-dark)] hover:bg-[var(--color-brand-light)] transition"
         >
           {tr.cancelBtn}
         </button>
@@ -2786,16 +2786,16 @@ export default function AdminNewBookingView({
       {/* ── BOOKING SUMMARY CONFIRMATION POPUP MODAL ── */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-[#414E36]/15 space-y-6 relative">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-[var(--cr-primary)]/15 space-y-6 relative">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
               <div className="flex items-center gap-2.5 text-[#1E3A2B]">
                 <div className="h-9 w-9 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-800 shrink-0">
                   <CheckCircle2 size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-[#1F251A]">{tr.confirmModalTitle}</h3>
-                  <p className="text-[11px] text-[#5A6A51] font-medium">{tr.confirmModalSubtitle}</p>
+                  <h3 className="font-extrabold text-base text-[var(--cr-dark)]">{tr.confirmModalTitle}</h3>
+                  <p className="text-[11px] text-[var(--color-brand-secondary)] font-medium">{tr.confirmModalSubtitle}</p>
                 </div>
               </div>
               <button
@@ -2809,21 +2809,21 @@ export default function AdminNewBookingView({
             </div>
 
             {/* Content Details Grid */}
-            <div className="bg-[#FBFBF9] rounded-2xl p-4 border border-[#414E36]/10 space-y-3 text-xs">
-              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">{tr.patientNameLabel}</span>
-                <span className="font-extrabold text-[#1F251A] text-end">{fullPatientName}</span>
+            <div className="bg-[var(--color-brand-light)] rounded-2xl p-4 border border-[var(--cr-primary)]/10 space-y-3 text-xs">
+              <div className="flex justify-between items-center pb-2.5 border-b border-[var(--cr-primary)]/10">
+                <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.patientNameLabel}</span>
+                <span className="font-extrabold text-[var(--cr-dark)] text-end">{fullPatientName}</span>
               </div>
 
-              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">{tr.phoneNumberLabel}</span>
-                <span className="font-mono font-bold text-[#1F251A] text-end">{phone}</span>
+              <div className="flex justify-between items-center pb-2.5 border-b border-[var(--cr-primary)]/10">
+                <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.phoneNumberLabel}</span>
+                <span className="font-mono font-bold text-[var(--cr-dark)] text-end">{phone}</span>
               </div>
 
-              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">{tr.serviceLabel.replace(" *", "")}</span>
+              <div className="flex justify-between items-center pb-2.5 border-b border-[var(--cr-primary)]/10">
+                <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.serviceLabel.replace(" *", "")}</span>
                 <div className="text-end">
-                  <span className="font-extrabold text-[#1F251A] block">{selectedServiceName}</span>
+                  <span className="font-extrabold text-[var(--cr-dark)] block">{selectedServiceName}</span>
                   {isLaserService && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded mt-0.5">
                       <Sparkles size={10} /> Laser Service
@@ -2833,8 +2833,8 @@ export default function AdminNewBookingView({
               </div>
 
               {isLaserService && (
-                <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                  <span className="text-[#5A6A51] font-semibold">{tr.laserPaymentModeLabel || "Laser Payment"}</span>
+                <div className="flex justify-between items-center pb-2.5 border-b border-[var(--cr-primary)]/10">
+                  <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.laserPaymentModeLabel || "Laser Payment"}</span>
                   <span className="font-bold text-emerald-900 text-end text-xs">
                     {laserPaymentMode === "SERVICE"
                       ? (tr.laserOption1Title || "Pay by Service (Fixed Price)")
@@ -2845,54 +2845,54 @@ export default function AdminNewBookingView({
                 </div>
               )}
 
-              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">{tr.doctorLabel.replace(" *", "")}</span>
-                <span className="font-extrabold text-[#1F251A] text-end">{selectedDoctorName}</span>
+              <div className="flex justify-between items-center pb-2.5 border-b border-[var(--cr-primary)]/10">
+                <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.doctorLabel.replace(" *", "")}</span>
+                <span className="font-extrabold text-[var(--cr-dark)] text-end">{selectedDoctorName}</span>
               </div>
 
-              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">{tr.branchLabel ? tr.branchLabel.replace(" *", "") : "Branch"}</span>
-                <span className="font-extrabold text-[#1F251A] text-end">
+              <div className="flex justify-between items-center pb-2.5 border-b border-[var(--cr-primary)]/10">
+                <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.branchLabel ? tr.branchLabel.replace(" *", "") : "Branch"}</span>
+                <span className="font-extrabold text-[var(--cr-dark)] text-end">
                   {selectedBranchName}
                 </span>
               </div>
 
-              <div className="flex justify-between items-start pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">{tr.dateTimeLabel}</span>
+              <div className="flex justify-between items-start pb-2.5 border-b border-[var(--cr-primary)]/10">
+                <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.dateTimeLabel}</span>
                 <div className="text-end">
                   <span className="font-extrabold text-emerald-800 block">
                     {formattedDateStr}
                   </span>
-                  <span className="text-[11px] font-bold text-[#1F251A] block mt-0.5">
+                  <span className="text-[11px] font-bold text-[var(--cr-dark)] block mt-0.5">
                     {selectedTime} ({totalDurationMinutes} {tr.minutesLabel})
                   </span>
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">{tr.sessionTypeLabel.replace(" *", "")}</span>
-                <span className="font-bold text-[#1F251A] text-end">
+              <div className="flex justify-between items-center pb-2.5 border-b border-[var(--cr-primary)]/10">
+                <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.sessionTypeLabel.replace(" *", "")}</span>
+                <span className="font-bold text-[var(--cr-dark)] text-end">
                   {sessionType === "in_person" ? tr.inPersonLabel : tr.onlineLabel}
                 </span>
               </div>
 
               {usePackagePayment || usePackageMode ? (
                 <div className="space-y-2 pt-1">
-                  <div className="flex justify-between items-center font-extrabold text-[#1F251A]">
-                    <span className="text-[#5A6A51] font-semibold">{tr.pricePaymentLabel}</span>
+                  <div className="flex justify-between items-center font-extrabold text-[var(--cr-dark)]">
+                    <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.pricePaymentLabel}</span>
                     <span className="text-emerald-800 font-extrabold flex items-center gap-1.5">
                       <CheckCircle2 size={14} className="text-emerald-700" />
                       <span>0 {tr.egpLabel} ({tr.paymentMethodPackage || "Package Redemption"})</span>
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-[#5A6A51] font-semibold">{tr.activePackageHeading || "Package"}</span>
+                    <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.activePackageHeading || "Package"}</span>
                     <span className="font-bold text-emerald-900">
                       {matchingPackage ? ((lang === "ar" && matchingPackage.packageNameAr) ? matchingPackage.packageNameAr : matchingPackage.packageName) : (activePackage?.name || "Prepaid Package")}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center pt-1 border-t border-[#414E36]/10 font-extrabold">
-                    <span className="text-[#5A6A51] font-semibold">{tr.remainingValueLabel || "Remaining Value"}</span>
+                  <div className="flex justify-between items-center pt-1 border-t border-[var(--cr-primary)]/10 font-extrabold">
+                    <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.remainingValueLabel || "Remaining Value"}</span>
                     <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full">
                       0 {tr.egpLabel} ({tr.fullySettledBadge || "Fully Settled"})
                     </span>
@@ -2900,16 +2900,16 @@ export default function AdminNewBookingView({
                 </div>
               ) : (
                 <div className="space-y-2 pt-1">
-                  <div className="flex justify-between items-center font-extrabold text-[#1F251A]">
-                    <span className="text-[#5A6A51] font-semibold">{tr.bookingValueLabel || "Booking Value"}</span>
-                    <span className="text-[#1F251A] font-extrabold">{bookingValue} {tr.egpLabel}</span>
+                  <div className="flex justify-between items-center font-extrabold text-[var(--cr-dark)]">
+                    <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.bookingValueLabel || "Booking Value"}</span>
+                    <span className="text-[var(--cr-dark)] font-extrabold">{bookingValue} {tr.egpLabel}</span>
                   </div>
-                  <div className="flex justify-between items-center font-extrabold text-[#1F251A]">
-                    <span className="text-[#5A6A51] font-semibold">{tr.actualPaidLabel || tr.amountPaidLabel || "Amount Paid Now"}</span>
+                  <div className="flex justify-between items-center font-extrabold text-[var(--cr-dark)]">
+                    <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.actualPaidLabel || tr.amountPaidLabel || "Amount Paid Now"}</span>
                     <span className="text-emerald-800 font-extrabold">{numAmountPaid} {tr.egpLabel}</span>
                   </div>
-                  <div className="flex justify-between items-center pt-1 border-t border-[#414E36]/10 font-extrabold">
-                    <span className="text-[#5A6A51] font-semibold">{tr.remainingValueLabel || "Remaining Value"}</span>
+                  <div className="flex justify-between items-center pt-1 border-t border-[var(--cr-primary)]/10 font-extrabold">
+                    <span className="text-[var(--color-brand-secondary)] font-semibold">{tr.remainingValueLabel || "Remaining Value"}</span>
                     <div className="flex items-center gap-1.5">
                       <span className={`font-black ${remainingValue > 0 ? "text-amber-800" : "text-emerald-800"}`}>
                         {remainingValue} {tr.egpLabel}
@@ -2925,9 +2925,9 @@ export default function AdminNewBookingView({
               )}
 
               {notes && (
-                <div className="pt-2 border-t border-[#414E36]/10">
-                  <span className="text-[#5A6A51] font-semibold block mb-1">{tr.notesLabel.replace(" (Optional)", "")}</span>
-                  <p className="text-[11px] text-[#1F251A] bg-white p-2.5 rounded-xl border border-[#414E36]/10">{notes}</p>
+                <div className="pt-2 border-t border-[var(--cr-primary)]/10">
+                  <span className="text-[var(--color-brand-secondary)] font-semibold block mb-1">{tr.notesLabel.replace(" (Optional)", "")}</span>
+                  <p className="text-[11px] text-[var(--cr-dark)] bg-white p-2.5 rounded-xl border border-[var(--cr-primary)]/10">{notes}</p>
                 </div>
               )}
             </div>
@@ -2938,7 +2938,7 @@ export default function AdminNewBookingView({
                 type="button"
                 disabled={submitting}
                 onClick={() => setShowConfirmModal(false)}
-                className="px-5 py-3 rounded-2xl border border-[#414E36]/20 bg-white font-bold text-xs text-[#1F251A] hover:bg-[#FBFBF9] transition cursor-pointer"
+                className="px-5 py-3 rounded-2xl border border-[var(--cr-primary)]/20 bg-white font-bold text-xs text-[var(--cr-dark)] hover:bg-[var(--color-brand-light)] transition cursor-pointer"
               >
                 {tr.backToEditBtn}
               </button>
@@ -2962,7 +2962,7 @@ export default function AdminNewBookingView({
       {/* ── PATIENT ACCOUNT AUTO-POPUP MODAL (Photo 1) ── */}
       {showPatientAccountModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-6 animate-scaleIn border border-[#414E36]/15">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-6 animate-scaleIn border border-[var(--cr-primary)]/15">
             {/* Top Avatar Icon */}
             <div className="h-20 w-20 rounded-full bg-[#EBF2EB] mx-auto flex items-center justify-center text-[#1E4D38] shadow-inner">
               <ShieldCheck size={38} className="text-[#0F3826]" />
@@ -2970,8 +2970,8 @@ export default function AdminNewBookingView({
 
             {/* Title & Question */}
             <div className="space-y-2">
-              <h3 className="text-2xl font-black text-[#1F251A]">{tr.patientAccountModalTitle || "Patient Account"}</h3>
-              <p className="text-sm font-medium text-[#5A6A51]">
+              <h3 className="text-2xl font-black text-[var(--cr-dark)]">{tr.patientAccountModalTitle || "Patient Account"}</h3>
+              <p className="text-sm font-medium text-[var(--color-brand-secondary)]">
                 {tr.patientAccountModalQuestion || "Does the patient already have an account?"}
               </p>
             </div>
@@ -2996,7 +2996,7 @@ export default function AdminNewBookingView({
                   setShowAdditionalPatientFields(false);
                   setShowPatientAccountModal(false);
                 }}
-                className="flex-1 py-3 px-5 rounded-2xl border border-[#414E36]/30 text-[#1F251A] font-bold text-sm hover:bg-gray-50 transition cursor-pointer"
+                className="flex-1 py-3 px-5 rounded-2xl border border-[var(--cr-primary)]/30 text-[var(--cr-dark)] font-bold text-sm hover:bg-gray-50 transition cursor-pointer"
               >
                 {tr.patientAccountModalYes || "Yes"}
               </button>

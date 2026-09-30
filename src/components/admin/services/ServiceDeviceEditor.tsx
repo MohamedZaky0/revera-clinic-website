@@ -106,8 +106,8 @@ export default function ServiceDeviceEditor({ serviceId, authHeaders }: Props) {
   }
 
   return (
-    <div className="rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 space-y-3">
-      <div className="flex items-center gap-2 text-[#414E36] font-semibold text-xs uppercase tracking-wider">
+    <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] p-4 space-y-3">
+      <div className="flex items-center gap-2 text-[var(--cr-primary)] font-semibold text-xs uppercase tracking-wider">
         <Cpu size={14} /> Connected Equipment &amp; Devices
       </div>
       <p className="text-[11px] text-[#8C9A84]">
@@ -121,18 +121,18 @@ export default function ServiceDeviceEditor({ serviceId, authHeaders }: Props) {
       )}
 
       {loading ? (
-        <p className="text-xs text-[#5A6A51]">Loading device links...</p>
+        <p className="text-xs text-[var(--color-brand-secondary)]">Loading device links...</p>
       ) : (
         <>
           {links.length === 0 ? (
-            <p className="text-xs text-[#5A6A51] italic">No devices connected to this service yet.</p>
+            <p className="text-xs text-[var(--color-brand-secondary)] italic">No devices connected to this service yet.</p>
           ) : (
             <div className="space-y-2">
               {links.map((link) => (
-                <div key={link.device_id} className="flex items-center justify-between gap-2 bg-white px-3 py-2 rounded-xl border border-[#414E36]/10 shadow-2xs">
+                <div key={link.device_id} className="flex items-center justify-between gap-2 bg-white px-3 py-2 rounded-xl border border-[var(--cr-primary)]/10 shadow-2xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                    <span className="text-sm text-[#1F251A] font-semibold truncate">
+                    <span className="text-sm text-[var(--cr-dark)] font-semibold truncate">
                       {link.inventory_devices?.name || link.device_id}
                     </span>
                   </div>
@@ -149,11 +149,11 @@ export default function ServiceDeviceEditor({ serviceId, authHeaders }: Props) {
             </div>
           )}
 
-          <div className="flex items-center gap-2 pt-2 border-t border-[#414E36]/10">
+          <div className="flex items-center gap-2 pt-2 border-t border-[var(--cr-primary)]/10">
             <select
               value={newDeviceId}
               onChange={(e) => setNewDeviceId(e.target.value)}
-              className="flex-1 rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+              className="flex-1 rounded-lg border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-bold text-[var(--cr-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--cr-primary)]"
             >
               <option value="">
                 {pickableDevices.length === 0 ? "No more devices available" : "Select device to connect..."}
@@ -166,7 +166,7 @@ export default function ServiceDeviceEditor({ serviceId, authHeaders }: Props) {
               type="button"
               onClick={addLink}
               disabled={!newDeviceId}
-              className="inline-flex items-center gap-1 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 cursor-pointer shrink-0 shadow-xs"
+              className="inline-flex items-center gap-1 rounded-lg bg-[var(--cr-primary)] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 cursor-pointer shrink-0 shadow-xs"
             >
               <Plus size={13} /> Connect
             </button>
@@ -176,7 +176,7 @@ export default function ServiceDeviceEditor({ serviceId, authHeaders }: Props) {
             type="button"
             onClick={handleSave}
             disabled={saving || !dirty}
-            className="w-full rounded-xl bg-[#414E36] py-2.5 text-xs font-bold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 cursor-pointer shadow-sm"
+            className="w-full rounded-xl bg-[var(--cr-primary)] py-2.5 text-xs font-bold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 cursor-pointer shadow-sm"
           >
             {saving ? "Saving Changes..." : "Save Connected Devices"}
           </button>

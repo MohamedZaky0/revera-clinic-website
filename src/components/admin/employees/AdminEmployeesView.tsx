@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CLIENT } from "@/config/client";
 import {
   Plus,
   Search,
@@ -649,14 +650,14 @@ export default function AdminEmployeesView({
         <style>
           body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            color: #1F251A;
+            color: var(--cr-dark);
             margin: 0;
             padding: 40px;
             background-color: #fff;
           }
           .letterhead {
             text-align: center;
-            border-bottom: 2px solid #414E36;
+            border-bottom: 2px solid var(--cr-primary);
             padding-bottom: 20px;
             margin-bottom: 30px;
           }
@@ -664,7 +665,7 @@ export default function AdminEmployeesView({
             font-size: 28px;
             font-weight: 700;
             letter-spacing: 0.1em;
-            color: #414E36;
+            color: var(--cr-primary);
             margin: 0;
             text-transform: uppercase;
           }
@@ -684,12 +685,12 @@ export default function AdminEmployeesView({
           .profile-name {
             font-size: 24px;
             font-weight: 700;
-            color: #1F251A;
+            color: var(--cr-dark);
             margin: 0;
           }
           .profile-subtitle {
             font-size: 14px;
-            color: #5A6A51;
+            color: var(--color-brand-secondary);
             margin: 2px 0 0 0;
           }
           .section {
@@ -701,7 +702,7 @@ export default function AdminEmployeesView({
           .section-title {
             font-size: 13px;
             font-weight: bold;
-            color: #414E36;
+            color: var(--cr-primary);
             text-transform: uppercase;
             letter-spacing: 0.1em;
             border-bottom: 1px solid #E6E9EB;
@@ -726,7 +727,7 @@ export default function AdminEmployeesView({
           }
           .label {
             font-weight: bold;
-            color: #5A6A51;
+            color: var(--color-brand-secondary);
             text-transform: uppercase;
             font-size: 10px;
             letter-spacing: 0.08em;
@@ -735,7 +736,7 @@ export default function AdminEmployeesView({
           .value {
             font-size: 14px;
             font-weight: 600;
-            color: #1F251A;
+            color: var(--cr-dark);
           }
           .value.green {
             color: #15803d;
@@ -957,11 +958,11 @@ export default function AdminEmployeesView({
 
         <div class="footer">
           <div class="clinic-info">
-            <strong>Revera Clinic Cairo</strong><br/>
+            <strong>${CLIENT.nameShort} Clinic Cairo</strong><br/>
             El-Ghad St, Pyramids, Giza<br/>
             Tel: +20 100 000 0000 | info@revera.com
           </div>
-          <div style="font-size: 11px; color: #5A6A51;">
+          <div style="font-size: 11px; color: var(--color-brand-secondary);">
             Generated on: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
           </div>
         </div>
@@ -983,8 +984,8 @@ export default function AdminEmployeesView({
           {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-semibold text-[#1F251A]">{t.heading}</h2>
-          <p className="mt-2 text-sm text-[#5A6A51]">{t.subtitle}</p>
+          <h2 className="text-4xl font-semibold text-[var(--cr-dark)]">{t.heading}</h2>
+          <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
         </div>
         <button
           type="button"
@@ -1036,7 +1037,7 @@ export default function AdminEmployeesView({
             setNewEmployeeOnlineWorkingDaysHours(defaultDays);
             setIsEditingEmployeeModalOpen(true);
           }}
-          className={`${(!hasPermission || hasPermission("employees.create")) ? "flex" : "hidden"} rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition items-center gap-2 shadow-md shrink-0`}
+          className={`${(!hasPermission || hasPermission("employees.create")) ? "flex" : "hidden"} rounded-2xl bg-[var(--cr-primary)] px-5 py-3 text-sm font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition items-center gap-2 shadow-md shrink-0`}
         >
           <Plus size={16} />
           {t.addEmployeeBtn}
@@ -1044,7 +1045,7 @@ export default function AdminEmployeesView({
       </div>
     
       {/* Filters & Search */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 bg-white p-5 rounded-3xl border border-[#414E36]/10 shadow-sm">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 bg-white p-5 rounded-3xl border border-[var(--cr-primary)]/10 shadow-sm">
         <div className="relative">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
             <Search size={15} />
@@ -1054,13 +1055,13 @@ export default function AdminEmployeesView({
             placeholder={t.searchPlaceholder}
             value={employeeSearchQuery}
             onChange={(e) => setEmployeeSearchQuery(e.target.value)}
-            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] pl-10 pr-4 py-2.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+            className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] pl-10 pr-4 py-2.5 text-xs font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
           />
         </div>
         <select
           value={employeeFilterDepartment}
           onChange={(e) => setEmployeeFilterDepartment(e.target.value)}
-          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+          className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-xs font-semibold text-[var(--cr-primary)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
         >
           <option value="All">{t.allDepartments}</option>
           {departmentsList.map((dept) => (
@@ -1070,36 +1071,36 @@ export default function AdminEmployeesView({
         <select
           value={employeeFilterShift}
           onChange={(e) => setEmployeeFilterShift(e.target.value)}
-          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+          className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-xs font-semibold text-[var(--cr-primary)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
         >
           <option value="All">{t.allShifts}</option>
           <option value="Day">{t.dayShift}</option>
           <option value="Night">{t.nightShift}</option>
         </select>
-        <div className="flex items-center justify-end text-xs font-semibold text-[#5A6A51] px-2">
+        <div className="flex items-center justify-end text-xs font-semibold text-[var(--color-brand-secondary)] px-2">
           {loadingRolesAndEmployees ? t.loading : t.totalEmployees(employeesList.filter((emp: any) => emp.role_name !== 'superadmin' && emp.employee_id !== 'superadmin').length)}
         </div>
       </div>
     
       {/* Table */}
-      <div className="overflow-x-auto rounded-2xl border border-[#414E36]/10 bg-white shadow-sm scrollbar-none">
+      <div className="overflow-x-auto rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm scrollbar-none">
         <table className="w-full min-w-[800px] text-sm">
           <thead>
-            <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
-              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.employeeInfo}</th>
-              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.phone}</th>
-              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.department}</th>
-              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.branch}</th>
-              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.shift}</th>
-              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.salary}</th>
-              <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.status}</th>
-              <th className="px-5 py-3 text-end text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.table.actions}</th>
+            <tr className="border-b border-[var(--cr-primary)]/10 bg-[#F9F9F7]">
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] whitespace-nowrap">{t.table.employeeInfo}</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] whitespace-nowrap">{t.table.phone}</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] whitespace-nowrap">{t.table.department}</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] whitespace-nowrap">{t.table.branch}</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] whitespace-nowrap">{t.table.shift}</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] whitespace-nowrap">{t.table.salary}</th>
+              <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] whitespace-nowrap">{t.table.status}</th>
+              <th className="px-5 py-3 text-end text-[11px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] whitespace-nowrap">{t.table.actions}</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#414E36]/5">
+          <tbody className="divide-y divide-[var(--cr-primary)]/5">
             {loadingRolesAndEmployees ? (
               <tr>
-                <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                <td colSpan={8} className="px-6 py-16 text-center text-sm text-[var(--color-brand-secondary)] font-medium">
                   {t.table.loadingEmployees}
                 </td>
               </tr>
@@ -1139,7 +1140,7 @@ export default function AdminEmployeesView({
               if (filtered.length === 0) {
                 return (
                   <tr>
-                    <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                    <td colSpan={8} className="px-6 py-16 text-center text-sm text-[var(--color-brand-secondary)] font-medium">
                       {t.table.noMatches}
                     </td>
                   </tr>
@@ -1153,7 +1154,7 @@ export default function AdminEmployeesView({
                   <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
                     <td className="px-5 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-xs font-bold font-serif overflow-hidden shrink-0">
+                        <div className="h-8 w-8 rounded-full bg-[var(--color-brand-tint)] text-[var(--cr-primary)] border border-[var(--cr-primary)]/10 flex items-center justify-center text-xs font-bold font-serif overflow-hidden shrink-0">
                           {customerAvatars[emp.id || emp.employee_id] || emp.photo_url || emp.avatar_url ? (
                             <img src={customerAvatars[emp.id || emp.employee_id] || emp.photo_url || emp.avatar_url} alt={emp.name} className="h-full w-full object-cover" />
                           ) : (
@@ -1161,19 +1162,19 @@ export default function AdminEmployeesView({
                           )}
                         </div>
                         <div>
-                          <div className="font-semibold text-[#1F251A] text-sm">{emp.name || <span className="italic text-gray-400">{t.table.noName}</span>}</div>
-                          <div className="text-xs text-[#5A6A51]">{emp.email}</div>
+                          <div className="font-semibold text-[var(--cr-dark)] text-sm">{emp.name || <span className="italic text-gray-400">{t.table.noName}</span>}</div>
+                          <div className="text-xs text-[var(--color-brand-secondary)]">{emp.email}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-xs font-medium text-[#1F251A]">{emp.phone || t.table.noPhone}</td>
+                    <td className="px-5 py-4 whitespace-nowrap text-xs font-medium text-[var(--cr-dark)]">{emp.phone || t.table.noPhone}</td>
                     <td className="px-5 py-4 whitespace-nowrap">
-                      <span className="inline-block rounded-lg bg-[#C4AE7C]/15 px-2.5 py-1 text-xs font-semibold text-[#8B7544]">
+                      <span className="inline-block rounded-lg bg-[var(--cr-accent)]/15 px-2.5 py-1 text-xs font-semibold text-[#8B7544]">
                         {emp.department || t.table.fallbackDept}
                       </span>
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
-                      <span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-1 text-xs font-semibold text-[#414E36]">
+                      <span className="inline-block rounded-lg bg-[var(--cr-primary)]/10 px-2.5 py-1 text-xs font-semibold text-[var(--cr-primary)]">
                         {branches.find(b => b.id === emp.branch_id)?.name_en || t.table.noBranch}
                       </span>
                     </td>
@@ -1182,7 +1183,7 @@ export default function AdminEmployeesView({
                         {t.profile.shiftLabel(emp.shift)}
                       </span>
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-xs font-bold text-[#1F251A]">
+                    <td className="px-5 py-4 whitespace-nowrap text-xs font-bold text-[var(--cr-dark)]">
                       {Number(effectiveSalary).toLocaleString("en-US") + t.table.salarySuffix}
                     </td>
                     <td className="px-5 py-4 text-center whitespace-nowrap">
@@ -1196,7 +1197,7 @@ export default function AdminEmployeesView({
                           <button
                             type="button"
                             onClick={() => setViewingEmployee(emp)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] transition hover:border-[var(--cr-accent)] hover:text-[var(--cr-primary)]"
                             title={t.actions.viewInfo}
                           >
                             <Info size={14} />
@@ -1270,7 +1271,7 @@ export default function AdminEmployeesView({
                                   setNewEmployeeBranchSchedules(existingBranchSchedules);
                                   setIsEditingEmployeeModalOpen(true);
                                 }}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] transition hover:border-[var(--cr-accent)] hover:text-[var(--cr-primary)]"
                                 title={t.actions.editEmployee}
                               >
                                 <Pencil size={13} />
@@ -1320,16 +1321,16 @@ export default function AdminEmployeesView({
                 setIsEditingEmployeeModalOpen(false);
                 setEditingEmployee(null);
               }}
-              className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider"
+              className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)] outline-none transition uppercase tracking-wider"
             >
               <ArrowLeft size={14} /> {t.modal.backToEmployees}
             </button>
           </div>
-          <div className="w-full bg-white rounded-3xl border border-[#414E36]/10 p-4 sm:p-8 shadow-sm">
-            <h3 className="text-2xl font-bold text-[#1F251A] mb-1">
+          <div className="w-full bg-white rounded-3xl border border-[var(--cr-primary)]/10 p-4 sm:p-8 shadow-sm">
+            <h3 className="text-2xl font-bold text-[var(--cr-dark)] mb-1">
               {editingEmployee ? t.modal.editTitle : t.modal.addTitle}
             </h3>
-            <p className="text-xs text-[#5A6A51] mb-6">
+            <p className="text-xs text-[var(--color-brand-secondary)] mb-6">
               {editingEmployee
                 ? t.modal.editSubtitle
                 : t.modal.addSubtitle}
@@ -1528,18 +1529,18 @@ export default function AdminEmployeesView({
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.fullName} {t.form.required}</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.form.fullName} {t.form.required}</label>
                   <input
                     type="text"
                     required
                     placeholder={t.form.fullNamePlaceholder}
                     value={newEmployeeName}
                     onChange={(e) => setNewEmployeeName(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.emailAddress} {editingEmployee ? "" : t.form.required}</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.form.emailAddress} {editingEmployee ? "" : t.form.required}</label>
                   <input
                     type="email"
                     required={!editingEmployee}
@@ -1547,39 +1548,39 @@ export default function AdminEmployeesView({
                     placeholder={t.form.emailPlaceholder}
                     value={newEmployeeEmail}
                     onChange={(e) => setNewEmployeeEmail(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
 
               {!editingEmployee && (
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.initialPassword}</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.form.initialPassword}</label>
                   <input
                     type="text"
                     autoComplete="off"
                     placeholder={t.form.initialPasswordPlaceholder}
                     value={newEmployeePassword}
                     onChange={(e) => setNewEmployeePassword(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   />
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-[#5A6A51]">{t.form.initialPasswordHint}</p>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--color-brand-secondary)]">{t.form.initialPasswordHint}</p>
                 </div>
               )}
     
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.phoneNumber}</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.form.phoneNumber}</label>
                   <input
                     type="text"
                     placeholder={t.form.phonePlaceholder}
                     value={newEmployeePhone}
                     onChange={(e) => setNewEmployeePhone(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.systemRole} {t.form.required}</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.form.systemRole} {t.form.required}</label>
                   <select
                     required
                     value={newEmployeeRole}
@@ -1600,7 +1601,7 @@ export default function AdminEmployeesView({
                         }
                       }
                     }}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm text-[var(--cr-primary)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                   >
                     <option value="" disabled>{t.form.selectRole}</option>
                     {rolesList.map((role: any) => (
@@ -1609,7 +1610,7 @@ export default function AdminEmployeesView({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.assignedBranch} {t.form.required}</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.form.assignedBranch} {t.form.required}</label>
                   <select
                     required
                     value={newEmployeeBranchId}
@@ -1617,7 +1618,7 @@ export default function AdminEmployeesView({
                       setNewEmployeeBranchId(e.target.value);
                       setNewEmployeeBranchIds([e.target.value]);
                     }}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm text-[var(--cr-primary)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                   >
                     <option value="" disabled>{t.form.selectBranch}</option>
                     {branches.map((b) => (
@@ -1629,7 +1630,7 @@ export default function AdminEmployeesView({
     
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.department}</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.form.department}</label>
                   <select
                     value={newEmployeeDepartment}
                     onChange={(e) => {
@@ -1653,7 +1654,7 @@ export default function AdminEmployeesView({
                         }
                       }
                     }}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm text-[var(--cr-primary)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                   >
                     {departmentsList.map((dept) => (
                       <option key={dept} value={dept}>{dept}</option>
@@ -1662,29 +1663,29 @@ export default function AdminEmployeesView({
                 </div>
     
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.form.salary}</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.form.salary}</label>
                   <input
                     type="number"
                     min="0"
                     value={newEmployeeSalary}
                     onChange={(e) => setNewEmployeeSalary(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   />
                 </div>
               </div>
     
               {/* Doctor / Medical Profile Fields */}
               {(newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc")) && (
-                <div className="rounded-2xl border border-[#C4AE7C]/30 bg-[#FBFBF9] p-5 space-y-5 shadow-sm animate-fadeIn">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#414E36] border-b border-[#C4AE7C]/20 pb-3">
-                    <Stethoscope size={16} className="text-[#C4AE7C]" />
+                <div className="rounded-2xl border border-[var(--cr-accent)]/30 bg-[var(--color-brand-light)] p-5 space-y-5 shadow-sm animate-fadeIn">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--cr-primary)] border-b border-[var(--cr-accent)]/20 pb-3">
+                    <Stethoscope size={16} className="text-[var(--cr-accent)]" />
                     {t.doctorSection.title}
                   </div>
     
                   {/* Row 1: Specialty & Rating */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">
                         Medical Specialty
                       </label>
                       <input
@@ -1692,12 +1693,12 @@ export default function AdminEmployeesView({
                         placeholder={t.doctorSection.specialtyPlaceholder}
                         value={newEmployeeSpecialty}
                         onChange={(e) => setNewEmployeeSpecialty(e.target.value)}
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                       />
                     </div>
     
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">
                         Doctor Rating (1 - 5 Stars)
                       </label>
                       <input
@@ -1707,7 +1708,7 @@ export default function AdminEmployeesView({
                         step="0.1"
                         value={newEmployeeRating}
                         onChange={(e) => setNewEmployeeRating(e.target.value)}
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                       />
                     </div>
                   </div>
@@ -1716,10 +1717,10 @@ export default function AdminEmployeesView({
     
                   {/* Row 3: Assigned Branches */}
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-2">
                       Assigned Branches (Select one or more for Doctor)
                     </label>
-                    <div className="flex flex-wrap gap-2 p-2.5 rounded-2xl border border-[#414E36]/15 bg-white min-h-[42px] items-center">
+                    <div className="flex flex-wrap gap-2 p-2.5 rounded-2xl border border-[var(--cr-primary)]/15 bg-white min-h-[42px] items-center">
                       {branches.map((b) => {
                         const isSelected = newEmployeeBranchIds.includes(b.id);
                         return (
@@ -1745,8 +1746,8 @@ export default function AdminEmployeesView({
                             }}
                             className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
                               isSelected
-                                ? "bg-[#414E36] text-white border-[#414E36]"
-                                : "bg-gray-50 text-[#414E36] border-[#414E36]/15 hover:bg-[#414E36]/10"
+                                ? "bg-[var(--cr-primary)] text-white border-[var(--cr-primary)]"
+                                : "bg-gray-50 text-[var(--cr-primary)] border-[var(--cr-primary)]/15 hover:bg-[var(--cr-primary)]/10"
                             }`}
                           >
                             {b.name_en} {isSelected ? "✓" : "+"}
@@ -1760,8 +1761,8 @@ export default function AdminEmployeesView({
                   <div>
                     {/* Branch Selector Bar when doctor is assigned to multiple branches */}
                     {newEmployeeBranchIds.length > 1 && (
-                      <div className="mb-3 p-3 rounded-2xl bg-[#414E36]/5 border border-[#414E36]/15 space-y-1.5">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                      <div className="mb-3 p-3 rounded-2xl bg-[var(--cr-primary)]/5 border border-[var(--cr-primary)]/15 space-y-1.5">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">
                           Configure Schedule For Specific Branch:
                         </span>
                         <div className="flex flex-wrap gap-2">
@@ -1777,8 +1778,8 @@ export default function AdminEmployeesView({
                                 onClick={() => handleEmployeeBranchScheduleTabChange(bId)}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                                   isCurrentActive
-                                    ? "bg-[#C4AE7C] text-white shadow-sm"
-                                    : "bg-white text-[#414E36] border border-[#414E36]/15 hover:bg-gray-50"
+                                    ? "bg-[var(--cr-accent)] text-white shadow-sm"
+                                    : "bg-white text-[var(--cr-primary)] border border-[var(--cr-primary)]/15 hover:bg-gray-50"
                                 }`}
                               >
                                 <span>{bName}</span>
@@ -1791,7 +1792,7 @@ export default function AdminEmployeesView({
                     )}
     
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">
                         {newEmployeeBranchIds.length > 1 ? (
                           <>Doctor Weekly Shifts ({branches.find(b => b.id === (newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0]))?.name_en || "Active Branch"})</>
                         ) : (
@@ -1800,14 +1801,14 @@ export default function AdminEmployeesView({
                       </label>
     
                       {/* Tab Selector: In-Clinic vs Online Consultations */}
-                      <div className="inline-flex rounded-xl bg-white border border-[#414E36]/15 p-0.5 shadow-sm">
+                      <div className="inline-flex rounded-xl bg-white border border-[var(--cr-primary)]/15 p-0.5 shadow-sm">
                         <button
                           type="button"
                           onClick={() => setNewEmployeeScheduleTab("in_person")}
                           className={`px-3.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                             newEmployeeScheduleTab === "in_person"
-                              ? "bg-[#414E36] text-white shadow-xs"
-                              : "text-[#5A6A51] hover:text-[#1F251A]"
+                              ? "bg-[var(--cr-primary)] text-white shadow-xs"
+                              : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-dark)]"
                           }`}
                         >
                           In-Clinic
@@ -1817,8 +1818,8 @@ export default function AdminEmployeesView({
                           onClick={() => setNewEmployeeScheduleTab("online")}
                           className={`px-3.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                             newEmployeeScheduleTab === "online"
-                              ? "bg-[#414E36] text-white shadow-xs"
-                              : "text-[#5A6A51] hover:text-[#1F251A]"
+                              ? "bg-[var(--cr-primary)] text-white shadow-xs"
+                              : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-dark)]"
                           }`}
                         >
                           Online Consultations
@@ -1826,7 +1827,7 @@ export default function AdminEmployeesView({
                       </div>
                     </div>
     
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                    <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 space-y-3">
                       {(() => {
                         const activeSched = newEmployeeScheduleTab === "in_person" ? newEmployeeWorkingDaysHours : newEmployeeOnlineWorkingDaysHours;
                         const setActiveSched = newEmployeeScheduleTab === "in_person" ? setNewEmployeeWorkingDaysHours : setNewEmployeeOnlineWorkingDaysHours;
@@ -1834,7 +1835,7 @@ export default function AdminEmployeesView({
                         return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => {
                           const sched = activeSched[day] || { isOpen: false, start: "09:00", end: "17:00" };
                           return (
-                            <div key={day} className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
+                            <div key={day} className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-[var(--cr-primary)]/5 pb-2.5 last:border-0 last:pb-0">
                               <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
                                 <input
                                   type="checkbox"
@@ -1845,9 +1846,9 @@ export default function AdminEmployeesView({
                                       [day]: { ...sched, isOpen: e.target.checked }
                                     });
                                   }}
-                                  className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                                  className="h-4 w-4 rounded border-[var(--cr-primary)]/15 text-[var(--cr-primary)] focus:ring-[var(--cr-accent)] cursor-pointer"
                                 />
-                                <span className={`text-xs font-bold w-24 ${sched.isOpen ? "text-[#1F251A]" : "text-gray-400"}`}>
+                                <span className={`text-xs font-bold w-24 ${sched.isOpen ? "text-[var(--cr-dark)]" : "text-gray-400"}`}>
                                   {day}
                                 </span>
                               </label>
@@ -1873,9 +1874,9 @@ export default function AdminEmployeesView({
                                             }
                                           });
                                         }}
-                                        className="rounded-lg border border-[#414E36]/15 px-2.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                                        className="rounded-lg border border-[var(--cr-primary)]/15 px-2.5 py-1 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                                       />
-                                      <span className="text-xs text-[#5A6A51]">to</span>
+                                      <span className="text-xs text-[var(--color-brand-secondary)]">to</span>
                                       <input
                                         type="time"
                                         value={shft.end}
@@ -1892,7 +1893,7 @@ export default function AdminEmployeesView({
                                             }
                                           });
                                         }}
-                                        className="rounded-lg border border-[#414E36]/15 px-2.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                                        className="rounded-lg border border-[var(--cr-primary)]/15 px-2.5 py-1 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                                       />
                                       {shiftIdx > 0 && (
                                         <button
@@ -1930,7 +1931,7 @@ export default function AdminEmployeesView({
                                         }
                                       });
                                     }}
-                                    className="text-xs font-bold text-[#414E36] hover:text-[#2e3a26] transition flex items-center gap-1 mt-0.5 cursor-pointer"
+                                    className="text-xs font-bold text-[var(--cr-primary)] hover:text-[#2e3a26] transition flex items-center gap-1 mt-0.5 cursor-pointer"
                                   >
                                     <Plus size={12} /> Add Shift
                                   </button>
@@ -1990,14 +1991,14 @@ export default function AdminEmployeesView({
     
               {/* Shift & Target for Non-Doctor Employees (e.g. Receptionist) */}
               {!(newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc")) && (
-                <div className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-5 space-y-5 shadow-sm animate-fadeIn">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/10 pb-3">
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#414E36]">
-                      <Clock size={16} className="text-[#C4AE7C]" />
+                <div className="rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-5 space-y-5 shadow-sm animate-fadeIn">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--cr-primary)]/10 pb-3">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--cr-primary)]">
+                      <Clock size={16} className="text-[var(--cr-accent)]" />
                       {t.nonDoctorSection?.weeklyShifts || "Staff Weekly Shifts & Working Days Schedule"}
                     </div>
                     {newEmployeeBranchId && (
-                      <span className="text-[11px] font-bold text-[#5A6A51] bg-white px-2.5 py-1 rounded-lg border border-[#414E36]/15 w-max">
+                      <span className="text-[11px] font-bold text-[var(--color-brand-secondary)] bg-white px-2.5 py-1 rounded-lg border border-[var(--cr-primary)]/15 w-max">
                         {lang === "ar"
                           ? (branches.find(b => b.id === newEmployeeBranchId)?.name_ar || branches.find(b => b.id === newEmployeeBranchId)?.name_en || "الفرع المخصص")
                           : (branches.find(b => b.id === newEmployeeBranchId)?.name_en || branches.find(b => b.id === newEmployeeBranchId)?.name_ar || "Assigned Branch")}
@@ -2006,11 +2007,11 @@ export default function AdminEmployeesView({
                   </div>
 
                   {/* Weekly Shifts Grid */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 space-y-3">
                     {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => {
                       const sched = newEmployeeWorkingDaysHours[day] || { isOpen: false, start: "09:00", end: "17:00" };
                       return (
-                        <div key={day} className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
+                        <div key={day} className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-[var(--cr-primary)]/5 pb-2.5 last:border-0 last:pb-0">
                           <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
                             <input
                               type="checkbox"
@@ -2021,9 +2022,9 @@ export default function AdminEmployeesView({
                                   [day]: { ...sched, isOpen: e.target.checked }
                                 });
                               }}
-                              className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                              className="h-4 w-4 rounded border-[var(--cr-primary)]/15 text-[var(--cr-primary)] focus:ring-[var(--cr-accent)] cursor-pointer"
                             />
-                            <span className={`text-xs font-bold w-24 ${sched.isOpen ? "text-[#1F251A]" : "text-gray-400"}`}>
+                            <span className={`text-xs font-bold w-24 ${sched.isOpen ? "text-[var(--cr-dark)]" : "text-gray-400"}`}>
                               {t.dayNames?.[day as keyof typeof t.dayNames] || day}
                             </span>
                           </label>
@@ -2049,9 +2050,9 @@ export default function AdminEmployeesView({
                                         }
                                       });
                                     }}
-                                    className="rounded-lg border border-[#414E36]/15 px-2.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                                    className="rounded-lg border border-[var(--cr-primary)]/15 px-2.5 py-1 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                                   />
-                                  <span className="text-xs text-[#5A6A51]">{t.doctorSection.shiftTo || "to"}</span>
+                                  <span className="text-xs text-[var(--color-brand-secondary)]">{t.doctorSection.shiftTo || "to"}</span>
                                   <input
                                     type="time"
                                     value={shft.end}
@@ -2068,7 +2069,7 @@ export default function AdminEmployeesView({
                                         }
                                       });
                                     }}
-                                    className="rounded-lg border border-[#414E36]/15 px-2.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                                    className="rounded-lg border border-[var(--cr-primary)]/15 px-2.5 py-1 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                                   />
                                   {shiftIdx > 0 && (
                                     <button
@@ -2106,7 +2107,7 @@ export default function AdminEmployeesView({
                                     }
                                   });
                                 }}
-                                className="text-xs font-bold text-[#414E36] hover:text-[#2e3a26] transition flex items-center gap-1 mt-0.5 cursor-pointer"
+                                className="text-xs font-bold text-[var(--cr-primary)] hover:text-[#2e3a26] transition flex items-center gap-1 mt-0.5 cursor-pointer"
                               >
                                 <Plus size={12} /> {t.doctorSection.addShift || "Add Shift"}
                               </button>
@@ -2145,13 +2146,13 @@ export default function AdminEmployeesView({
                   })()}
 
                   {/* Target & Bonus Configuration */}
-                  <div className="border-t border-[#414E36]/10 pt-4 space-y-4">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">
+                  <div className="border-t border-[var(--cr-primary)]/10 pt-4 space-y-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--cr-accent)]">
                       {t.nonDoctorSection?.targetTitle || "Target & Performance Bonus"}
                     </h4>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">
                           {t.nonDoctorSection?.requiredTarget || "Required Target Amount (EGP)"}
                         </label>
                         <input
@@ -2159,11 +2160,11 @@ export default function AdminEmployeesView({
                           min="0"
                           value={newEmployeeRequiredTargetAmount}
                           onChange={(e) => setNewEmployeeRequiredTargetAmount(e.target.value)}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">
                           {t.nonDoctorSection?.bonusPercentage || "Bonus Percentage (%)"}
                         </label>
                         <input
@@ -2175,7 +2176,7 @@ export default function AdminEmployeesView({
                             const val = Math.min(100, Math.max(0, Number(e.target.value) || 0));
                             setNewEmployeeBonusPercentage(String(val));
                           }}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                         />
                       </div>
                     </div>
@@ -2184,10 +2185,10 @@ export default function AdminEmployeesView({
               )}
     
               {/* --- NEW EMPLOYEE PROFILE FIELDS (National ID, Photo Uploads, Address) --- */}
-              <div className="border-t border-[#414E36]/10 pt-4 space-y-4">
+              <div className="border-t border-[var(--cr-primary)]/10 pt-4 space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.nationalId.label}</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.nationalId.label}</label>
                     <input
                       type="text"
                       maxLength={14}
@@ -2198,19 +2199,19 @@ export default function AdminEmployeesView({
                         const val = e.target.value.replace(/\D/g, "");
                         setNewEmployeeNationalId(val);
                       }}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] font-mono"
+                      className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] font-mono"
                     />
                   </div>
     
                   {/* Structured Address */}
                   <div className="sm:col-span-2">
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 space-y-3">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] flex items-center gap-1.5">
+                    <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] p-4 space-y-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] flex items-center gap-1.5">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
                         Home Address
                       </p>
                       <div>
-                        <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">{t.address.line1} <span className="text-[#C4AE7C]">{t.address.required}</span></label>
+                        <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">{t.address.line1} <span className="text-[var(--cr-accent)]">{t.address.required}</span></label>
                         <input
                           type="text"
                           placeholder={t.address.line1Placeholder}
@@ -2219,7 +2220,7 @@ export default function AdminEmployeesView({
                             setNewEmployeeAddressLine1(e.target.value);
                             commitAddressState(e.target.value, newEmployeeAddressLine2, newEmployeeCity, newEmployeeGovernorateProp, newEmployeePostalCode, newEmployeeCountry);
                           }}
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                          className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
                         />
                       </div>
                       <div>
@@ -2232,7 +2233,7 @@ export default function AdminEmployeesView({
                             setNewEmployeeAddressLine2(e.target.value);
                             commitAddressState(newEmployeeAddressLine1, e.target.value, newEmployeeCity, newEmployeeGovernorateProp, newEmployeePostalCode, newEmployeeCountry);
                           }}
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                          className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
@@ -2246,7 +2247,7 @@ export default function AdminEmployeesView({
                               setNewEmployeeCity(e.target.value);
                               commitAddressState(newEmployeeAddressLine1, newEmployeeAddressLine2, e.target.value, newEmployeeGovernorateProp, newEmployeePostalCode, newEmployeeCountry);
                             }}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                            className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
                           />
                         </div>
                         <div>
@@ -2257,7 +2258,7 @@ export default function AdminEmployeesView({
                               setNewEmployeeGovernorateProp(e.target.value);
                               commitAddressState(newEmployeeAddressLine1, newEmployeeAddressLine2, newEmployeeCity, e.target.value, newEmployeePostalCode, newEmployeeCountry);
                             }}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                            className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
                           >
                             <option value="">{t.address.selectGovernorate}</option>
                             {["Cairo","Giza","Alexandria","Aswan","Asyut","Beheira","Beni Suef","Dakahlia","Damietta","Faiyum","Gharbia","Ismailia","Kafr el-Sheikh","Luxor","Matruh","Minya","Monufia","New Valley","North Sinai","Port Said","Qalyubia","Qena","Red Sea","Sharqia","Sohag","South Sinai","Suez"].map(g => (
@@ -2277,7 +2278,7 @@ export default function AdminEmployeesView({
                               setNewEmployeePostalCode(e.target.value);
                               commitAddressState(newEmployeeAddressLine1, newEmployeeAddressLine2, newEmployeeCity, newEmployeeGovernorateProp, e.target.value, newEmployeeCountry);
                             }}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                            className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
                           />
                         </div>
                         <div>
@@ -2290,7 +2291,7 @@ export default function AdminEmployeesView({
                               setNewEmployeeCountry(e.target.value);
                               commitAddressState(newEmployeeAddressLine1, newEmployeeAddressLine2, newEmployeeCity, newEmployeeGovernorateProp, newEmployeePostalCode, e.target.value);
                             }}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                            className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
                           />
                         </div>
                       </div>
@@ -2338,14 +2339,14 @@ export default function AdminEmployeesView({
                 <div className="grid gap-4 sm:grid-cols-2">
                   {/* ID Front */}
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.nationalId.frontSideLabel}</label>
-                    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-4 text-center">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.nationalId.frontSideLabel}</label>
+                    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--cr-primary)]/20 bg-[var(--color-brand-light)] p-4 text-center">
                       {newEmployeeNationalIdFront ? (
                         <div className="relative w-full group">
                           <img
                             src={newEmployeeNationalIdFront}
                             alt={t.nationalId.frontSideAlt}
-                            className="h-28 w-full object-cover rounded-xl border border-[#414E36]/10"
+                            className="h-28 w-full object-cover rounded-xl border border-[var(--cr-primary)]/10"
                           />
                           <button
                             type="button"
@@ -2357,8 +2358,8 @@ export default function AdminEmployeesView({
                         </div>
                       ) : (
                         <label className="flex flex-col items-center justify-center cursor-pointer py-4 w-full">
-                          <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
-                          <span className="text-[11px] font-semibold text-[#414E36]">{t.nationalId.uploadFront}</span>
+                          <Upload className="h-6 w-6 text-[var(--color-brand-secondary)]/50 mb-1.5" />
+                          <span className="text-[11px] font-semibold text-[var(--cr-primary)]">{t.nationalId.uploadFront}</span>
                           <span className="text-[9px] text-gray-400 mt-0.5">{t.nationalId.fileHint}</span>
                           <input
                             type="file"
@@ -2387,14 +2388,14 @@ export default function AdminEmployeesView({
     
                   {/* ID Back */}
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.nationalId.backSideLabel}</label>
-                    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-4 text-center">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.nationalId.backSideLabel}</label>
+                    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--cr-primary)]/20 bg-[var(--color-brand-light)] p-4 text-center">
                       {newEmployeeNationalIdBack ? (
                         <div className="relative w-full group">
                           <img
                             src={newEmployeeNationalIdBack}
                             alt={t.nationalId.backSideAlt}
-                            className="h-28 w-full object-cover rounded-xl border border-[#414E36]/10"
+                            className="h-28 w-full object-cover rounded-xl border border-[var(--cr-primary)]/10"
                           />
                           <button
                             type="button"
@@ -2406,8 +2407,8 @@ export default function AdminEmployeesView({
                         </div>
                       ) : (
                         <label className="flex flex-col items-center justify-center cursor-pointer py-4 w-full">
-                          <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
-                          <span className="text-[11px] font-semibold text-[#414E36]">{t.nationalId.uploadBack}</span>
+                          <Upload className="h-6 w-6 text-[var(--color-brand-secondary)]/50 mb-1.5" />
+                          <span className="text-[11px] font-semibold text-[var(--cr-primary)]">{t.nationalId.uploadBack}</span>
                           <span className="text-[9px] text-gray-400 mt-0.5">{t.nationalId.fileHint}</span>
                           <input
                             type="file"
@@ -2437,14 +2438,14 @@ export default function AdminEmployeesView({
               </div>
     
               {/* Employment Contract Upload */}
-              <div className="border border-[#414E36]/10 rounded-2xl bg-[#F7F7F5] p-4">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">{t.profile.employmentContract}</label>
-                <div className="rounded-2xl border border-dashed border-[#414E36]/20 bg-white overflow-hidden">
+              <div className="border border-[var(--cr-primary)]/10 rounded-2xl bg-[#F7F7F5] p-4">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-2">{t.profile.employmentContract}</label>
+                <div className="rounded-2xl border border-dashed border-[var(--cr-primary)]/20 bg-white overflow-hidden">
                   {newEmployeeContract ? (
-                    <div className="flex items-center justify-between gap-2 p-3 bg-[#EDF1EC] rounded-2xl">
+                    <div className="flex items-center justify-between gap-2 p-3 bg-[var(--color-brand-tint)] rounded-2xl">
                       <div className="flex items-center gap-2 overflow-hidden">
-                        <FileText className="h-5 w-5 text-[#5A6A51] shrink-0" />
-                        <span className="text-xs font-semibold text-[#414E36] truncate">{newEmployeeContractName || "Contract File"}</span>
+                        <FileText className="h-5 w-5 text-[var(--color-brand-secondary)] shrink-0" />
+                        <span className="text-xs font-semibold text-[var(--cr-primary)] truncate">{newEmployeeContractName || "Contract File"}</span>
                       </div>
                       <button
                         type="button"
@@ -2456,8 +2457,8 @@ export default function AdminEmployeesView({
                     </div>
                   ) : (
                     <label className="flex flex-col items-center justify-center cursor-pointer py-5 w-full">
-                      <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
-                      <span className="text-[11px] font-semibold text-[#414E36]">Upload Contract (PDF, Word, or Image)</span>
+                      <Upload className="h-6 w-6 text-[var(--color-brand-secondary)]/50 mb-1.5" />
+                      <span className="text-[11px] font-semibold text-[var(--cr-primary)]">Upload Contract (PDF, Word, or Image)</span>
                       <span className="text-[9px] text-gray-400 mt-0.5">PDF, DOCX, PNG, JPEG – up to 10MB</span>
                       <input
                         type="file"
@@ -2481,17 +2482,17 @@ export default function AdminEmployeesView({
               </div>
     
               {/* Additional Files Upload */}
-              <div className="border border-[#414E36]/10 rounded-2xl bg-[#F7F7F5] p-4 mt-4">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">{t.profile.additionalFiles}</label>
+              <div className="border border-[var(--cr-primary)]/10 rounded-2xl bg-[#F7F7F5] p-4 mt-4">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-2">{t.profile.additionalFiles}</label>
                 
                 {/* List existing/added additional files */}
                 {newEmployeeAdditionalFiles.length > 0 && (
                   <div className="space-y-2 mb-3">
                     {newEmployeeAdditionalFiles.map((fileItem, idx) => (
-                      <div key={idx} className="flex items-center justify-between gap-2 p-3 bg-white border border-[#414E36]/10 rounded-2xl">
+                      <div key={idx} className="flex items-center justify-between gap-2 p-3 bg-white border border-[var(--cr-primary)]/10 rounded-2xl">
                         <div className="flex items-center gap-2 overflow-hidden col-span-1">
-                          <FileText className="h-5 w-5 text-[#5A6A51] shrink-0" />
-                          <span className="text-xs font-semibold text-[#414E36] truncate">{fileItem.name}</span>
+                          <FileText className="h-5 w-5 text-[var(--color-brand-secondary)] shrink-0" />
+                          <span className="text-xs font-semibold text-[var(--cr-primary)] truncate">{fileItem.name}</span>
                         </div>
                         <button
                           type="button"
@@ -2507,10 +2508,10 @@ export default function AdminEmployeesView({
                   </div>
                 )}
     
-                <div className="rounded-2xl border border-dashed border-[#414E36]/20 bg-white overflow-hidden">
+                <div className="rounded-2xl border border-dashed border-[var(--cr-primary)]/20 bg-white overflow-hidden">
                   <label className="flex flex-col items-center justify-center cursor-pointer py-5 w-full">
-                    <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
-                    <span className="text-[11px] font-semibold text-[#414E36]">{t.profile.uploadAdditionalFiles}</span>
+                    <Upload className="h-6 w-6 text-[var(--color-brand-secondary)]/50 mb-1.5" />
+                    <span className="text-[11px] font-semibold text-[var(--cr-primary)]">{t.profile.uploadAdditionalFiles}</span>
                     <span className="text-[9px] text-gray-400 mt-0.5">{t.profile.additionalFilesHint}</span>
                     <input
                       type="file"
@@ -2541,13 +2542,13 @@ export default function AdminEmployeesView({
                 <button
                   type="button"
                   onClick={() => setIsEditingEmployeeModalOpen(false)}
-                  className="rounded-2xl border border-[#414E36]/15 px-5 py-2.5 text-sm font-semibold text-[#414E36] hover:bg-gray-50 transition"
+                  className="rounded-2xl border border-[var(--cr-primary)]/15 px-5 py-2.5 text-sm font-semibold text-[var(--cr-primary)] hover:bg-gray-50 transition"
                 >
                   {t.modal.cancelBtn}
                 </button>
                 <button
                   type="submit"
-                  className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#2e3a26] transition shadow-md"
+                  className="rounded-2xl bg-[var(--cr-primary)] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#2e3a26] transition shadow-md"
                 >
                   {editingEmployee ? t.modal.saveChangesBtn : t.modal.sendInvitationBtn}
                 </button>
@@ -2564,17 +2565,17 @@ export default function AdminEmployeesView({
           <div className="flex items-center justify-between">
             <button
               onClick={() => setViewingEmployee(null)}
-              className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider"
+              className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)] outline-none transition uppercase tracking-wider"
             >
               <ArrowLeft size={14} /> {t.profile.backToEmployees}
             </button>
           </div>
     
           {/* Profile Header Banner */}
-          <div className="bg-white rounded-3xl border border-[#414E36]/10 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
+          <div className="bg-white rounded-3xl border border-[var(--cr-primary)]/10 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
             <div className="flex items-center gap-4">
               <div className="relative group shrink-0">
-                <div className="h-16 w-16 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl font-bold font-serif overflow-hidden shadow-xs">
+                <div className="h-16 w-16 rounded-full bg-[var(--color-brand-tint)] text-[var(--cr-primary)] border border-[var(--cr-primary)]/10 flex items-center justify-center text-2xl font-bold font-serif overflow-hidden shadow-xs">
                   {customerAvatars[viewingEmployee.id || viewingEmployee.employee_id] || viewingEmployee.photo_url || viewingEmployee.avatar_url ? (
                     <img
                       src={customerAvatars[viewingEmployee.id || viewingEmployee.employee_id] || viewingEmployee.photo_url || viewingEmployee.avatar_url}
@@ -2586,7 +2587,7 @@ export default function AdminEmployeesView({
                   )}
                 </div>
                 <label
-                  className="absolute -bottom-1 -end-1 p-1.5 rounded-full bg-[#414E36] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
+                  className="absolute -bottom-1 -end-1 p-1.5 rounded-full bg-[var(--cr-primary)] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
                   title={t.profile.uploadPhotoTitle}
                 >
                   <Camera size={12} />
@@ -2613,13 +2614,13 @@ export default function AdminEmployeesView({
                 )}
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingEmployee.name || t.profile.staffMemberFallback}</h3>
-                <p className="text-xs text-[#5A6A51] mt-0.5">{viewingEmployee.role_name || t.profile.roleFallback} • {t.profile.staffIdLabel} <span className="font-mono">{viewingEmployee.employee_id || t.table.noPhone}</span></p>
+                <h3 className="text-2xl font-bold text-[var(--cr-dark)] leading-tight">{viewingEmployee.name || t.profile.staffMemberFallback}</h3>
+                <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">{viewingEmployee.role_name || t.profile.roleFallback} • {t.profile.staffIdLabel} <span className="font-mono">{viewingEmployee.employee_id || t.table.noPhone}</span></p>
                 <div className="mt-2">
                   <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                    viewingEmployee.email_confirmed_at ? "bg-[#EDF1EC] text-[#414E36]" : "bg-amber-50 text-amber-700"
+                    viewingEmployee.email_confirmed_at ? "bg-[var(--color-brand-tint)] text-[var(--cr-primary)]" : "bg-amber-50 text-amber-700"
                   }`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-[#414E36]" : "bg-amber-500"}`} />
+                    <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-[var(--cr-primary)]" : "bg-amber-500"}`} />
                     {viewingEmployee.email_confirmed_at ? t.profile.statusActive : t.profile.statusPending}
                   </span>
                 </div>
@@ -2686,7 +2687,7 @@ export default function AdminEmployeesView({
                   setViewingEmployee(null);
                   setIsEditingEmployeeModalOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] transition hover:bg-[#EDF1EC] shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-xs font-bold text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-tint)] shadow-sm"
               >
                 <Pencil size={12} /> {t.profile.editProfileBtn}
               </button>
@@ -2709,7 +2710,7 @@ export default function AdminEmployeesView({
               <button
                 type="button"
                 onClick={() => handlePrintEmployeeProfile(viewingEmployee)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] transition hover:bg-[#EDF1EC] shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-xs font-bold text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-tint)] shadow-sm"
               >
                 <Printer size={12} /> {t.profile.printProfile}
               </button>
@@ -2717,7 +2718,7 @@ export default function AdminEmployeesView({
           </div>
     
           {/* Profile Sub-navigation Tabs */}
-          <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar w-full">
+          <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[var(--cr-primary)]/10 shadow-xs overflow-x-auto no-scrollbar w-full">
             {([
               { id: "basic", label: t.profile.basicInfoTab },
               { id: "work", label: t.profile.workDetailsTab },
@@ -2732,8 +2733,8 @@ export default function AdminEmployeesView({
                 onClick={() => setEmployeeProfileActiveTab(tab.id)}
                 className={`flex-1 flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-semibold capitalize transition-all rounded-xl outline-none whitespace-nowrap min-w-max ${
                   employeeProfileActiveTab === tab.id
-                    ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
-                    : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
+                    ? "bg-[var(--cr-primary)] text-[var(--color-brand-light)] font-bold shadow-xs"
+                    : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)] hover:bg-[var(--color-brand-sand)]/60"
                 }`}
               >
                 {tab.label}
@@ -2742,74 +2743,74 @@ export default function AdminEmployeesView({
           </div>
     
           {/* Tab Contents Container */}
-          <div className="bg-white rounded-3xl border border-[#414E36]/10 p-6 shadow-sm">
+          <div className="bg-white rounded-3xl border border-[var(--cr-primary)]/10 p-6 shadow-sm">
             {employeeProfileActiveTab === "basic" && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
-                  <User size={16} className="text-[#C4AE7C]" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">{t.printProfile.basicInfo}</h4>
+                <div className="flex items-center gap-2 border-b border-[var(--cr-primary)]/5 pb-3">
+                  <User size={16} className="text-[var(--cr-accent)]" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--cr-accent)]">{t.printProfile.basicInfo}</h4>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.employeeId}</span>
-                    <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.employee_id || "—"}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.employeeId}</span>
+                    <span className="font-semibold text-[var(--cr-dark)] font-mono">{viewingEmployee.employee_id || "—"}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.fullName}</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingEmployee.name || "—"}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.fullName}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">{viewingEmployee.name || "—"}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.email}</span>
-                    <span className="font-semibold text-[#1F251A] break-all">{viewingEmployee.email || "—"}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.email}</span>
+                    <span className="font-semibold text-[var(--cr-dark)] break-all">{viewingEmployee.email || "—"}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.phone}</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingEmployee.phone || "—"}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.phone}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">{viewingEmployee.phone || "—"}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.role}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.role}</span>
                     <div>
-                      <span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-0.5 text-xs font-semibold text-[#414E36]">
+                      <span className="inline-block rounded-lg bg-[var(--cr-primary)]/10 px-2.5 py-0.5 text-xs font-semibold text-[var(--cr-primary)]">
                         {viewingEmployee.role_name || "—"}
                       </span>
                     </div>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.table.department}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.table.department}</span>
                     <div>
-                      <span className="inline-block rounded-lg bg-[#C4AE7C]/15 px-2.5 py-0.5 text-xs font-semibold text-[#8B7544]">
+                      <span className="inline-block rounded-lg bg-[var(--cr-accent)]/15 px-2.5 py-0.5 text-xs font-semibold text-[#8B7544]">
                         {viewingEmployee.department || "Reception"}
                       </span>
                     </div>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.nationalId}</span>
-                    <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.national_id || "—"}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.nationalId}</span>
+                    <span className="font-semibold text-[var(--cr-dark)] font-mono">{viewingEmployee.national_id || "—"}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.dateOfBirthAge}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.dateOfBirthAge}</span>
                     {(() => {
                       const check = parseEgyptianNationalId(viewingEmployee.national_id || "");
                       if (check.isValid) {
                         return (
-                          <span className="font-semibold text-[#1F251A]">
+                          <span className="font-semibold text-[var(--cr-dark)]">
                             {check.dobFormatted} ({check.age} yrs)
                           </span>
                         );
                       }
-                      return <span className="font-semibold text-[#5A6A51] italic text-xs">{t.profile.autoExtractedNote}</span>;
+                      return <span className="font-semibold text-[var(--color-brand-secondary)] italic text-xs">{t.profile.autoExtractedNote}</span>;
                     })()}
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.accountStatus}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.accountStatus}</span>
                     <span className={`inline-flex items-center gap-1 text-xs font-bold ${viewingEmployee.email_confirmed_at ? "text-green-700" : "text-amber-700"}`}>
                       <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-green-600" : "bg-amber-500"}`} />
                       {viewingEmployee.email_confirmed_at ? t.profile.statusActive : t.profile.statusPending}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.addedOn}</span>
-                    <span className="font-semibold text-[#1F251A]">
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.addedOn}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">
                       {viewingEmployee.created_at
                         ? new Date(viewingEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
                         : "—"}
@@ -2821,58 +2822,58 @@ export default function AdminEmployeesView({
     
             {employeeProfileActiveTab === "work" && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
-                  <Briefcase size={16} className="text-[#C4AE7C]" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">{t.printProfile.workInfo}</h4>
+                <div className="flex items-center gap-2 border-b border-[var(--cr-primary)]/5 pb-3">
+                  <Briefcase size={16} className="text-[var(--cr-accent)]" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--cr-accent)]">{t.printProfile.workInfo}</h4>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.jobTitle}</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingEmployee.role_name || "Receptionist"}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.jobTitle}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">{viewingEmployee.role_name || "Receptionist"}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.startDate}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.startDate}</span>
                     {(() => {
                       const autoDate = getDoctorFirstReservationDate(viewingEmployee.name, allReservations);
                       if (autoDate) {
                         return (
                           <div className="flex flex-col">
-                            <span className="font-semibold text-[#1F251A]">{autoDate}</span>
-                            <span className="text-[10px] text-[#414E36] font-bold bg-[#EDF1EC] px-2 py-0.5 rounded-full border border-[#414E36]/10 w-max mt-0.5">
+                            <span className="font-semibold text-[var(--cr-dark)]">{autoDate}</span>
+                            <span className="text-[10px] text-[var(--cr-primary)] font-bold bg-[var(--color-brand-tint)] px-2 py-0.5 rounded-full border border-[var(--cr-primary)]/10 w-max mt-0.5">
                               {t.profile.autoSet1stBooking}
                             </span>
                           </div>
                         );
                       }
-                      return <span className="font-semibold text-[#1F251A]">{viewingEmployee.start_date || "—"}</span>;
+                      return <span className="font-semibold text-[var(--cr-dark)]">{viewingEmployee.start_date || "—"}</span>;
                     })()}
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.shiftType}</span>
-                    <span className="font-semibold text-[#1F251A]">{t.profile.shiftLabel(viewingEmployee.shift)}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.shiftType}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">{t.profile.shiftLabel(viewingEmployee.shift)}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.shiftDetails}</span>
-                    <span className="font-semibold text-[#1F251A]">
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.shiftDetails}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">
                       {formatEmployeeShiftTypeDetails(viewingEmployee.shift)}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.workingHours}</span>
-                    <span className="font-semibold text-[#1F251A]">
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.workingHours}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">
                       {formatEmployeeDisplayHours(viewingEmployee.shift)}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.breakTime}</span>
-                    <span className="font-semibold text-[#1F251A]">
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.breakTime}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">
                       {formatEmployeeBreakTime(viewingEmployee.shift)}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.employmentType}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.employmentType}</span>
                     <div>
-                      <span className="inline-block rounded-lg bg-[#F9F9F7] border border-[#414E36]/10 px-2.5 py-0.5 text-xs font-semibold text-[#5A6A51]">
+                      <span className="inline-block rounded-lg bg-[#F9F9F7] border border-[var(--cr-primary)]/10 px-2.5 py-0.5 text-xs font-semibold text-[var(--color-brand-secondary)]">
                         {t.profile.fullTime}
                       </span>
                     </div>
@@ -2883,38 +2884,38 @@ export default function AdminEmployeesView({
     
             {employeeProfileActiveTab === "payroll" && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
-                  <CircleDollarSign size={16} className="text-[#C4AE7C]" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">{t.profile.payrollCompensation}</h4>
+                <div className="flex items-center gap-2 border-b border-[var(--cr-primary)]/5 pb-3">
+                  <CircleDollarSign size={16} className="text-[var(--cr-accent)]" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--cr-accent)]">{t.profile.payrollCompensation}</h4>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.monthlySalary}</span>
-                    <span className="font-semibold text-[#1F251A]">{Number(viewingEmployee.salary || 0).toLocaleString("en-US")}{t.table.salarySuffix}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.monthlySalary}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">{Number(viewingEmployee.salary || 0).toLocaleString("en-US")}{t.table.salarySuffix}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.dailySalary}</span>
-                    <span className="font-semibold text-[#1F251A]">
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.dailySalary}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">
                       {Math.round(Number(viewingEmployee.salary || 0) / 20).toLocaleString("en-US")}{t.table.salarySuffix}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.hourlySalary}</span>
-                    <span className="font-semibold text-[#1F251A]">
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.hourlySalary}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">
                       {(Number(viewingEmployee.salary || 0) / (20 * 8)).toFixed(2)}{t.table.salarySuffix}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.bonuses}</span>
-                    <span className="font-semibold text-[#1F251A]">200{t.table.salarySuffix}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.bonuses}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">200{t.table.salarySuffix}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.deductions}</span>
-                    <span className="font-semibold text-[#1F251A]">150{t.table.salarySuffix}</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.deductions}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">150{t.table.salarySuffix}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.lastPaymentDate}</span>
-                    <span className="font-semibold text-[#1F251A]">May 5, 2026</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.lastPaymentDate}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">May 5, 2026</span>
                   </div>
                 </div>
               </div>
@@ -2939,10 +2940,10 @@ export default function AdminEmployeesView({
     
                   return (
                     <div className="space-y-6">
-                      <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
+                      <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/5 pb-3">
                         <div className="flex items-center gap-2">
-                          <Target size={16} className="text-[#C4AE7C]" />
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">{t.profile.targetPerformanceBonus}</h4>
+                          <Target size={16} className="text-[var(--cr-accent)]" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--cr-accent)]">{t.profile.targetPerformanceBonus}</h4>
                         </div>
                         {hasAchievedTarget && (
                           <span className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200">
@@ -2952,28 +2953,28 @@ export default function AdminEmployeesView({
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-sm">
                         <div>
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.requiredTargetShort}</span>
-                          <span className="font-semibold text-[#1F251A]">{targetAmount} {t.profile.reservationsLabel}</span>
+                          <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.requiredTargetShort}</span>
+                          <span className="font-semibold text-[var(--cr-dark)]">{targetAmount} {t.profile.reservationsLabel}</span>
                         </div>
                         <div>
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.bonusPercentageShort}</span>
-                          <span className="font-semibold text-[#1F251A]">{bonusPct}{t.profile.ofSalary}</span>
+                          <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.bonusPercentageShort}</span>
+                          <span className="font-semibold text-[var(--cr-dark)]">{bonusPct}{t.profile.ofSalary}</span>
                         </div>
                         <div>
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.achievedLabel}</span>
-                          <span className="font-semibold text-[#1F251A]">
+                          <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.achievedLabel}</span>
+                          <span className="font-semibold text-[var(--cr-dark)]">
                             {loadingEmployeeBookings ? (
-                              <span className="text-xs text-[#5A6A51] italic">{t.loading}</span>
+                              <span className="text-xs text-[var(--color-brand-secondary)] italic">{t.loading}</span>
                             ) : (
                               t.profile.reservationsSuffix(achievedCount)
                             )}
                           </span>
                         </div>
                         <div>
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.estimatedBonus}</span>
-                          <span className={`font-bold ${hasAchievedTarget ? "text-green-700" : "text-[#5A6A51]"}`}>
+                          <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.estimatedBonus}</span>
+                          <span className={`font-bold ${hasAchievedTarget ? "text-green-700" : "text-[var(--color-brand-secondary)]"}`}>
                             {loadingEmployeeBookings ? (
-                              <span className="text-xs text-[#5A6A51] italic">{t.loading}</span>
+                              <span className="text-xs text-[var(--color-brand-secondary)] italic">{t.loading}</span>
                             ) : (
                               potentialBonus.toLocaleString("en-US") + t.table.salarySuffix
                             )}
@@ -2983,13 +2984,13 @@ export default function AdminEmployeesView({
                       
                       {targetAmount > 0 && !loadingEmployeeBookings && (
                         <div className="space-y-1.5 pt-2 max-w-xl">
-                          <div className="flex items-center justify-between text-xs font-semibold text-[#5A6A51]">
+                          <div className="flex items-center justify-between text-xs font-semibold text-[var(--color-brand-secondary)]">
                             <span>{t.profile.monthlyTargetProgress}</span>
                             <span>{progressPercent}%</span>
                           </div>
                           <div className="w-full bg-gray-150 h-2.5 rounded-full overflow-hidden">
                             <div 
-                              className={`h-full transition-all duration-500 rounded-full ${hasAchievedTarget ? "bg-green-600" : "bg-[#C4AE7C]"}`}
+                              className={`h-full transition-all duration-500 rounded-full ${hasAchievedTarget ? "bg-green-600" : "bg-[var(--cr-accent)]"}`}
                               style={{ width: `${progressPercent}%` }}
                             />
                           </div>
@@ -3029,12 +3030,12 @@ export default function AdminEmployeesView({
               return (
                 <div className="space-y-6">
                   {/* Top Controls & Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--cr-primary)]/10 pb-4">
                     <div className="flex items-center gap-2">
-                      <Clock size={18} className="text-[#C4AE7C]" />
+                      <Clock size={18} className="text-[var(--cr-accent)]" />
                       <div>
-                        <h4 className="text-sm font-bold uppercase tracking-wider text-[#414E36]">{t.profile.attendanceInsights}</h4>
-                        <p className="text-xs text-[#5A6A51]">{t.profile.attendanceSubtitle}</p>
+                        <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--cr-primary)]">{t.profile.attendanceInsights}</h4>
+                        <p className="text-xs text-[var(--color-brand-secondary)]">{t.profile.attendanceSubtitle}</p>
                       </div>
                     </div>
     
@@ -3043,11 +3044,11 @@ export default function AdminEmployeesView({
                         type="month"
                         value={attendanceInsightMonth}
                         onChange={(e) => setAttendanceInsightMonth(e.target.value)}
-                        className="px-3 py-1.5 text-xs font-semibold text-[#414E36] bg-[#F7F9F6] border border-[#414E36]/20 rounded-lg outline-none focus:border-[#414E36]"
+                        className="px-3 py-1.5 text-xs font-semibold text-[var(--cr-primary)] bg-[#F7F9F6] border border-[var(--cr-primary)]/20 rounded-lg outline-none focus:border-[var(--cr-primary)]"
                       />
                       <button
                         onClick={() => handleExportAttendanceInsights(viewingEmployee, attendanceInsightMonth, empRecords)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[#414E36] rounded-lg hover:bg-[#323D2A] transition-all shadow-xs"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[var(--cr-primary)] rounded-lg hover:bg-[#323D2A] transition-all shadow-xs"
                       >
                         <Download size={14} />
                         {t.profile.exportCsvBtn}
@@ -3057,63 +3058,63 @@ export default function AdminEmployeesView({
     
                   {/* Stat Summary Cards */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                    <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
-                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.profile.totalWorked}</span>
-                      <span className="text-base font-bold text-[#414E36]">{workedHrs}h {workedRMin}m</span>
-                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{t.profile.daysPresent(presentCount)}</span>
+                    <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[var(--cr-primary)]/10">
+                      <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">{t.profile.totalWorked}</span>
+                      <span className="text-base font-bold text-[var(--cr-primary)]">{workedHrs}h {workedRMin}m</span>
+                      <span className="block text-[10px] text-[var(--color-brand-secondary)] mt-0.5">{t.profile.daysPresent(presentCount)}</span>
                     </div>
     
-                    <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
-                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.profile.lateArrival}</span>
-                      <span className={`text-base font-bold ${totalLateMins > 0 ? 'text-amber-600' : 'text-[#414E36]'}`}>{totalLateMins} min</span>
-                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{t.profile.lateIncident(lateCount)}</span>
+                    <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[var(--cr-primary)]/10">
+                      <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">{t.profile.lateArrival}</span>
+                      <span className={`text-base font-bold ${totalLateMins > 0 ? 'text-amber-600' : 'text-[var(--cr-primary)]'}`}>{totalLateMins} min</span>
+                      <span className="block text-[10px] text-[var(--color-brand-secondary)] mt-0.5">{t.profile.lateIncident(lateCount)}</span>
                     </div>
     
-                    <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
-                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.profile.attendanceEarlyLeave}</span>
-                      <span className={`text-base font-bold ${totalEarlyLeaveMins > 0 ? 'text-amber-600' : 'text-[#414E36]'}`}>{totalEarlyLeaveMins} min</span>
-                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{t.profile.earlyDepartures}</span>
+                    <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[var(--cr-primary)]/10">
+                      <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">{t.profile.attendanceEarlyLeave}</span>
+                      <span className={`text-base font-bold ${totalEarlyLeaveMins > 0 ? 'text-amber-600' : 'text-[var(--cr-primary)]'}`}>{totalEarlyLeaveMins} min</span>
+                      <span className="block text-[10px] text-[var(--color-brand-secondary)] mt-0.5">{t.profile.earlyDepartures}</span>
                     </div>
     
-                    <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
-                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.profile.attendanceOvertime}</span>
+                    <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[var(--cr-primary)]/10">
+                      <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">{t.profile.attendanceOvertime}</span>
                       <span className="text-base font-bold text-emerald-700">{totalOvertimeMins} min</span>
-                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{t.profile.extraHoursWorked}</span>
+                      <span className="block text-[10px] text-[var(--color-brand-secondary)] mt-0.5">{t.profile.extraHoursWorked}</span>
                     </div>
 
-                    <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
-                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.profile.midShiftLeave}</span>
-                      <span className={`text-base font-bold ${totalMidShiftLeaveMins > 0 ? 'text-purple-700' : 'text-[#414E36]'}`}>{totalMidShiftLeaveMins} min</span>
-                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{t.profile.permissionDuration}</span>
+                    <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[var(--cr-primary)]/10">
+                      <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">{t.profile.midShiftLeave}</span>
+                      <span className={`text-base font-bold ${totalMidShiftLeaveMins > 0 ? 'text-purple-700' : 'text-[var(--cr-primary)]'}`}>{totalMidShiftLeaveMins} min</span>
+                      <span className="block text-[10px] text-[var(--color-brand-secondary)] mt-0.5">{t.profile.permissionDuration}</span>
                     </div>
 
-                    <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
-                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.profile.absences}</span>
-                      <span className={`text-base font-bold ${absentCount > 0 ? 'text-rose-600' : 'text-[#414E36]'}`}>{absentCount} Days</span>
-                      <span className="block text-[10px] text-[#5A6A51] mt-0.5">{t.profile.unexcusedLeave}</span>
+                    <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[var(--cr-primary)]/10">
+                      <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-1">{t.profile.absences}</span>
+                      <span className={`text-base font-bold ${absentCount > 0 ? 'text-rose-600' : 'text-[var(--cr-primary)]'}`}>{absentCount} Days</span>
+                      <span className="block text-[10px] text-[var(--color-brand-secondary)] mt-0.5">{t.profile.unexcusedLeave}</span>
                     </div>
                   </div>
 
                   {/* Daily Breakdown Table */}
-                  <div className="border border-[#414E36]/10 rounded-xl overflow-hidden bg-white shadow-xs">
-                    <div className="px-4 py-3 bg-[#F7F9F6] border-b border-[#414E36]/10 flex items-center justify-between">
-                      <h5 className="text-xs font-bold text-[#414E36] uppercase tracking-wider">{t.profile.dailyAttendanceBreakdown}</h5>
-                      <span className="text-xs font-semibold text-[#5A6A51]">{t.profile.recordCount(empRecords.length)}</span>
+                  <div className="border border-[var(--cr-primary)]/10 rounded-xl overflow-hidden bg-white shadow-xs">
+                    <div className="px-4 py-3 bg-[#F7F9F6] border-b border-[var(--cr-primary)]/10 flex items-center justify-between">
+                      <h5 className="text-xs font-bold text-[var(--cr-primary)] uppercase tracking-wider">{t.profile.dailyAttendanceBreakdown}</h5>
+                      <span className="text-xs font-semibold text-[var(--color-brand-secondary)]">{t.profile.recordCount(empRecords.length)}</span>
                     </div>
     
                     {loadingAttendance ? (
-                      <div className="p-8 text-center text-xs text-[#5A6A51] flex items-center justify-center gap-2">
-                        <Loader2 size={16} className="animate-spin text-[#414E36]" />
+                      <div className="p-8 text-center text-xs text-[var(--color-brand-secondary)] flex items-center justify-center gap-2">
+                        <Loader2 size={16} className="animate-spin text-[var(--cr-primary)]" />
                         {t.profile.loadingAttendance}
                       </div>
                     ) : empRecords.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-[#5A6A51]">
+                      <div className="p-8 text-center text-xs text-[var(--color-brand-secondary)]">
                         {t.profile.noAttendanceRecords(attendanceInsightMonth)}
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
-                          <thead className="bg-[#F7F9F6]/60 text-[#5A6A51] border-b border-[#414E36]/10 font-bold uppercase tracking-wider text-[10px]">
+                          <thead className="bg-[#F7F9F6]/60 text-[var(--color-brand-secondary)] border-b border-[var(--cr-primary)]/10 font-bold uppercase tracking-wider text-[10px]">
                             <tr>
                               <th className="py-2.5 px-3">{t.profile.dateHeader}</th>
                               <th className="py-2.5 px-3">{t.profile.shiftTimeHeader}</th>
@@ -3127,14 +3128,14 @@ export default function AdminEmployeesView({
                               <th className="py-2.5 px-3 text-right">{t.profile.midShiftLeaveHeader}</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-[#414E36]/5 text-[#1F251A]">
+                          <tbody className="divide-y divide-[var(--cr-primary)]/5 text-[var(--cr-dark)]">
                             {empRecords.map((r: any, idx: number) => {
                               const inStr = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' }) : '—';
                               const outStr = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' }) : '—';
                               return (
                                 <tr key={r.id || idx} className="hover:bg-[#F7F9F6]/50 transition-colors">
-                                  <td className="py-2.5 px-3 font-semibold text-[#414E36] whitespace-nowrap">{r.date}</td>
-                                  <td className="py-2.5 px-3 text-[#5A6A51] whitespace-nowrap">{r.scheduled_in || t.csvExport.fallbackScheduledIn} - {r.scheduled_out || t.csvExport.fallbackScheduledOut}</td>
+                                  <td className="py-2.5 px-3 font-semibold text-[var(--cr-primary)] whitespace-nowrap">{r.date}</td>
+                                  <td className="py-2.5 px-3 text-[var(--color-brand-secondary)] whitespace-nowrap">{r.scheduled_in || t.csvExport.fallbackScheduledIn} - {r.scheduled_out || t.csvExport.fallbackScheduledOut}</td>
                                   <td className="py-2.5 px-3 font-medium whitespace-nowrap">{inStr}</td>
                                   <td className="py-2.5 px-3 font-medium whitespace-nowrap">{outStr}</td>
                                   <td className="py-2.5 px-3 whitespace-nowrap">
@@ -3147,10 +3148,10 @@ export default function AdminEmployeesView({
                                     </span>
                                   </td>
                                   <td className="py-2.5 px-3 text-right font-medium">{Math.floor((r.worked_minutes || 0) / 60)}h {(r.worked_minutes || 0) % 60}m</td>
-                                  <td className={`py-2.5 px-3 text-right font-medium ${r.late_minutes > 0 ? 'text-amber-600' : 'text-[#5A6A51]'}`}>{r.late_minutes || 0} m</td>
-                                  <td className={`py-2.5 px-3 text-right font-medium ${r.early_leave_minutes > 0 ? 'text-amber-600' : 'text-[#5A6A51]'}`}>{r.early_leave_minutes || 0} m</td>
-                                  <td className={`py-2.5 px-3 text-right font-medium ${r.overtime_minutes > 0 ? 'text-emerald-700 font-bold' : 'text-[#5A6A51]'}`}>{r.overtime_minutes || 0} m</td>
-                                  <td className={`py-2.5 px-3 text-right font-medium ${r.combined_mid_shift_duration_minutes > 0 ? 'text-purple-700 font-bold' : 'text-[#5A6A51]'}`}>{r.combined_mid_shift_duration_minutes || 0} m</td>
+                                  <td className={`py-2.5 px-3 text-right font-medium ${r.late_minutes > 0 ? 'text-amber-600' : 'text-[var(--color-brand-secondary)]'}`}>{r.late_minutes || 0} m</td>
+                                  <td className={`py-2.5 px-3 text-right font-medium ${r.early_leave_minutes > 0 ? 'text-amber-600' : 'text-[var(--color-brand-secondary)]'}`}>{r.early_leave_minutes || 0} m</td>
+                                  <td className={`py-2.5 px-3 text-right font-medium ${r.overtime_minutes > 0 ? 'text-emerald-700 font-bold' : 'text-[var(--color-brand-secondary)]'}`}>{r.overtime_minutes || 0} m</td>
+                                  <td className={`py-2.5 px-3 text-right font-medium ${r.combined_mid_shift_duration_minutes > 0 ? 'text-purple-700 font-bold' : 'text-[var(--color-brand-secondary)]'}`}>{r.combined_mid_shift_duration_minutes || 0} m</td>
                                 </tr>
                               );
                             })}
@@ -3165,26 +3166,26 @@ export default function AdminEmployeesView({
     
             {employeeProfileActiveTab === "contact" && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
-                  <Phone size={16} className="text-[#C4AE7C]" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">{t.profile.contactDetailsTitle}</h4>
+                <div className="flex items-center gap-2 border-b border-[var(--cr-primary)]/5 pb-3">
+                  <Phone size={16} className="text-[var(--cr-accent)]" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--cr-accent)]">{t.profile.contactDetailsTitle}</h4>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                   <div className="md:col-span-2">
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.homeAddress}</span>
-                    <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3.5 py-2.5 rounded-xl border border-[#414E36]/5 leading-relaxed max-w-xl">
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.homeAddress}</span>
+                    <span className="font-semibold text-[var(--cr-dark)] block bg-[#F9F9F7] px-3.5 py-2.5 rounded-xl border border-[var(--cr-primary)]/5 leading-relaxed max-w-xl">
                       {viewingEmployee.address || t.profile.noAddress}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.emergencyName}</span>
-                    <span className="font-semibold text-[#1F251A]">
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.emergencyName}</span>
+                    <span className="font-semibold text-[var(--cr-dark)]">
                       {viewingEmployee.name ? `Ahmed ${viewingEmployee.name.split(" ").slice(-1)[0]}` : "Ahmed Ahmed"}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.profile.emergencyPhone}</span>
-                    <span className="font-semibold text-[#1F251A] font-mono">01098765432</span>
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.profile.emergencyPhone}</span>
+                    <span className="font-semibold text-[var(--cr-dark)] font-mono">01098765432</span>
                   </div>
                 </div>
               </div>
@@ -3194,12 +3195,12 @@ export default function AdminEmployeesView({
               <div className="space-y-6">
                 {/* Notes Section */}
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
+                  <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/5 pb-3">
                     <div className="flex items-center gap-2">
-                      <FileText size={16} className="text-[#C4AE7C]" />
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">{t.profile.internalNotesReminders}</h4>
+                      <FileText size={16} className="text-[var(--cr-accent)]" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--cr-accent)]">{t.profile.internalNotesReminders}</h4>
                     </div>
-                    <span className="text-[10px] font-bold text-[#5A6A51] bg-[#F9F9F7] px-2 py-0.5 rounded-full border border-[#414E36]/10">
+                    <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] bg-[#F9F9F7] px-2 py-0.5 rounded-full border border-[var(--cr-primary)]/10">
                       {t.profile.notesCount(viewingEmployeeNotes.length)}
                     </span>
                   </div>
@@ -3207,14 +3208,14 @@ export default function AdminEmployeesView({
                   {/* Notes List */}
                   <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                     {loadingEmployeeNotes ? (
-                      <p className="text-xs text-[#5A6A51] italic py-2">{t.profile.loadingNotes}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)] italic py-2">{t.profile.loadingNotes}</p>
                     ) : viewingEmployeeNotes.length === 0 ? (
-                      <p className="text-xs text-[#5A6A51]/70 italic py-2 text-center">{t.profile.noNotes}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)]/70 italic py-2 text-center">{t.profile.noNotes}</p>
                     ) : (
                       viewingEmployeeNotes.map((note) => (
-                        <div key={note.id} className="text-xs bg-[#FBFBF9] border border-[#414E36]/5 rounded-xl p-3.5 space-y-1.5 relative group transition hover:border-[#C4AE7C]/30">
-                          <p className="text-[#1F251A] font-medium leading-relaxed break-words whitespace-pre-wrap">{note.note}</p>
-                          <div className="flex items-center justify-between text-[9px] text-[#5A6A51]/80 font-semibold pt-1 border-t border-[#414E36]/5">
+                        <div key={note.id} className="text-xs bg-[var(--color-brand-light)] border border-[var(--cr-primary)]/5 rounded-xl p-3.5 space-y-1.5 relative group transition hover:border-[var(--cr-accent)]/30">
+                          <p className="text-[var(--cr-dark)] font-medium leading-relaxed break-words whitespace-pre-wrap">{note.note}</p>
+                          <div className="flex items-center justify-between text-[9px] text-[var(--color-brand-secondary)]/80 font-semibold pt-1 border-t border-[var(--cr-primary)]/5">
                             <span>
                               {t.profile.addedBy} {note.creator?.name || t.printProfile.staffMember} {t.profile.on} {new Date(note.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                             </span>
@@ -3248,13 +3249,13 @@ export default function AdminEmployeesView({
                   </div>
     
                   {/* Note Input */}
-                  <div className="pt-2 border-t border-[#414E36]/5 space-y-2 max-w-xl">
+                  <div className="pt-2 border-t border-[var(--cr-primary)]/5 space-y-2 max-w-xl">
                     <textarea
                       placeholder={t.profile.notesPlaceholder}
                       value={newEmployeeNoteText}
                       onChange={(e) => setNewEmployeeNoteText(e.target.value)}
                       rows={2}
-                      className="w-full text-xs rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-[#1F251A] placeholder-[#5A6A51]/50 outline-none focus:border-[#C4AE7C] resize-none font-medium leading-relaxed"
+                      className="w-full text-xs rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3.5 py-2.5 text-[var(--cr-dark)] placeholder-[var(--color-brand-secondary)]/50 outline-none focus:border-[var(--cr-accent)] resize-none font-medium leading-relaxed"
                     />
                     <div className="flex justify-end">
                       <button
@@ -3286,7 +3287,7 @@ export default function AdminEmployeesView({
                           }
                         }}
                         disabled={!newEmployeeNoteText.trim()}
-                        className="rounded-xl bg-[#414E36] hover:bg-[#2e3a26] disabled:bg-gray-200 text-white disabled:text-gray-400 px-4 py-2 text-[11px] font-bold transition shadow-xs"
+                        className="rounded-xl bg-[var(--cr-primary)] hover:bg-[#2e3a26] disabled:bg-gray-200 text-white disabled:text-gray-400 px-4 py-2 text-[11px] font-bold transition shadow-xs"
                       >
                         {t.profile.addNoteBtn}
                       </button>
@@ -3326,18 +3327,18 @@ export default function AdminEmployeesView({
     
                 {/* Attachments */}
                 {(viewingEmployee.national_id_front || viewingEmployee.national_id_back || viewingEmployee.contract_file) && (
-                  <div className="space-y-3 pt-3 border-t border-[#414E36]/5 max-w-2xl">
-                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{t.profile.attachedDocuments}</span>
+                  <div className="space-y-3 pt-3 border-t border-[var(--cr-primary)]/5 max-w-2xl">
+                    <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider">{t.profile.attachedDocuments}</span>
     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {viewingEmployee.national_id_front && (
                         <div className="space-y-1">
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">{t.profile.idFrontSide}</span>
+                          <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider text-center">{t.profile.idFrontSide}</span>
                           <a
                             href={viewingEmployee.national_id_front}
                             target="_blank"
                             rel="noreferrer"
-                            className="block relative rounded-xl overflow-hidden border border-[#414E36]/15 hover:opacity-90 transition group cursor-zoom-in"
+                            className="block relative rounded-xl overflow-hidden border border-[var(--cr-primary)]/15 hover:opacity-90 transition group cursor-zoom-in"
                             title={t.profile.clickToViewFullSize}
                           >
                             <img
@@ -3353,12 +3354,12 @@ export default function AdminEmployeesView({
                       )}
                       {viewingEmployee.national_id_back && (
                         <div className="space-y-1">
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">{t.profile.idBackSide}</span>
+                          <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider text-center">{t.profile.idBackSide}</span>
                           <a
                             href={viewingEmployee.national_id_back}
                             target="_blank"
                             rel="noreferrer"
-                            className="block relative rounded-xl overflow-hidden border border-[#414E36]/15 hover:opacity-90 transition group cursor-zoom-in"
+                            className="block relative rounded-xl overflow-hidden border border-[var(--cr-primary)]/15 hover:opacity-90 transition group cursor-zoom-in"
                             title={t.profile.clickToViewFullSize}
                           >
                             <img
@@ -3393,29 +3394,29 @@ export default function AdminEmployeesView({
                         <div className="space-y-3 pt-2">
                           {contractUrl && (
                             <div>
-                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{t.profile.employmentContract}</span>
+                              <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-2">{t.profile.employmentContract}</span>
                               <a
                                 href={contractUrl}
                                 download={viewingEmployee.contract_file_name || "contract"}
-                                className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition shadow-xs"
+                                className="inline-flex items-center gap-2 rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-tint)] px-4 py-2.5 text-xs font-semibold text-[var(--cr-primary)] hover:bg-[#d9e0d3] transition shadow-xs"
                               >
-                                <FileText className="h-4 w-4 text-[#5A6A51]" />
+                                <FileText className="h-4 w-4 text-[var(--color-brand-secondary)]" />
                                 {viewingEmployee.contract_file_name || t.profile.downloadContract}
                               </a>
                             </div>
                           )}
                           {additionalList.length > 0 && (
                             <div>
-                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{t.profile.additionalFiles}</span>
+                              <span className="block text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-2">{t.profile.additionalFiles}</span>
                               <div className="flex flex-wrap gap-2">
                                 {additionalList.map((fileItem, idx) => (
                                   <a
                                     key={idx}
                                     href={fileItem.file}
                                     download={fileItem.name}
-                                    className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-semibold text-[#414E36] hover:bg-gray-50 transition shadow-xs"
+                                    className="inline-flex items-center gap-2 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-semibold text-[var(--cr-primary)] hover:bg-gray-50 transition shadow-xs"
                                   >
-                                    <FileText className="h-3.5 w-3.5 text-[#5A6A51]" />
+                                    <FileText className="h-3.5 w-3.5 text-[var(--color-brand-secondary)]" />
                                     {fileItem.name}
                                   </a>
                                 ))}

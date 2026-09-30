@@ -728,28 +728,28 @@ export default function DoctorOngoingSessionTab({
       {activeSessionBooking && activeSessionBooking.status !== "completed" && activeSessionBooking.status !== "done" ? (
         <>
           {/* Active Patient Header Card */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 border border-[#414E36]/10 shadow-sm w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 border border-[var(--cr-primary)]/10 shadow-sm w-full">
             <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
-              <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl bg-[#414E36] text-white font-bold text-lg sm:text-xl shadow-md">
+              <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--cr-primary)] text-white font-bold text-lg sm:text-xl shadow-md">
                 {(activeSessionBooking.name || activeSessionBooking.customer_name || "P").slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-xl sm:text-2xl font-bold text-[#1F251A] truncate">
+                  <h2 className="text-xl sm:text-2xl font-bold text-[var(--cr-dark)] truncate">
                     {activeSessionBooking.name || activeSessionBooking.customer_name || "Patient"}
                   </h2>
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 sm:px-3 py-0.5 text-[11px] sm:text-xs font-bold text-amber-800 animate-pulse">
                     <Play size={11} /> {t.sessionStartedByReception}
                   </span>
                 </div>
-                <p className="text-[11px] sm:text-xs text-[#5A6A51] mt-1 flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                  <strong className="text-[#414E36] font-bold">
+                <p className="text-[11px] sm:text-xs text-[var(--color-brand-secondary)] mt-1 flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <strong className="text-[var(--cr-primary)] font-bold">
                     {resolvedActiveServiceName}
                   </strong>
                   <span>•</span>
                   <span>{activeSessionBooking.time || activeSessionBooking.time_slot || activeSessionBooking.requested_time || activeSessionBooking.requestedTime || "Today"}</span>
                   <span>•</span>
-                  <span className="text-[#414E36] font-bold">{activeSessionBooking.room || activeSessionBooking.room_name || "Treatment Room"}</span>
+                  <span className="text-[var(--cr-primary)] font-bold">{activeSessionBooking.room || activeSessionBooking.room_name || "Treatment Room"}</span>
                 </p>
               </div>
             </div>
@@ -803,7 +803,7 @@ export default function DoctorOngoingSessionTab({
                 className={`w-full sm:w-auto justify-center flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition cursor-pointer shadow-md ${
                   isFirstVisit && !medicalRecord
                     ? "bg-amber-700 hover:bg-amber-800 text-white"
-                    : "bg-[#414E36] hover:bg-[#343F2B] text-white"
+                    : "bg-[var(--cr-primary)] hover:bg-[#343F2B] text-white"
                 }`}
                 title={isFirstVisit && !medicalRecord ? "Medical Intake Required (First Visit)" : "Complete Treatment"}
               >
@@ -817,14 +817,14 @@ export default function DoctorOngoingSessionTab({
             
             {/* LEFT COLUMN (1/3 Width): Patient Medical Record & Clinical Notes Intake */}
             <div className="space-y-4 sm:space-y-6">
-              <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4">
+              <div className="rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="space-y-0.5">
-                    <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                      <AlertCircle size={16} className="text-[#414E36]" /> {t.patientMedicalRecordTitle}
+                    <h3 className="text-xs sm:text-sm font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
+                      <AlertCircle size={16} className="text-[var(--cr-primary)]" /> {t.patientMedicalRecordTitle}
                     </h3>
                     {activeTemplate && (
-                      <span className="text-[10px] font-extrabold text-[#414E36] bg-[#EDF1EC] px-2 py-0.5 rounded-md inline-block">
+                      <span className="text-[10px] font-extrabold text-[var(--cr-primary)] bg-[var(--color-brand-tint)] px-2 py-0.5 rounded-md inline-block">
                         {activeTemplate.title}
                       </span>
                     )}
@@ -846,12 +846,12 @@ export default function DoctorOngoingSessionTab({
                 </div>
 
                 {medicalRecordLoading || loadingTemplate ? (
-                  <p className="text-xs text-[#5A6A51] flex items-center gap-1.5 py-4 justify-center">
-                    <Loader2 size={14} className="animate-spin text-[#414E36]" /> {t.loadingMedicalRecord}
+                  <p className="text-xs text-[var(--color-brand-secondary)] flex items-center gap-1.5 py-4 justify-center">
+                    <Loader2 size={14} className="animate-spin text-[var(--cr-primary)]" /> {t.loadingMedicalRecord}
                   </p>
                 ) : medicalRecord && !showMedicalForm ? (
                   /* Display Existing Medical Record */
-                  <div className="space-y-2.5 text-xs bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
+                  <div className="space-y-2.5 text-xs bg-[var(--color-brand-light)] p-3.5 sm:p-4 rounded-2xl border border-[var(--cr-primary)]/10">
                     {(activeTemplate?.fields || []).length > 0 ? (
                       (activeTemplate?.fields || []).map((f) => {
                         const rawVal = medicalRecord.responses?.[f.id] !== undefined
@@ -868,9 +868,9 @@ export default function DoctorOngoingSessionTab({
                           : (rawVal || "None reported");
 
                         return (
-                          <div key={f.id} className="flex justify-between items-start gap-2 border-b border-[#414E36]/10 pb-2 last:border-b-0 last:pb-0">
-                            <span className="font-bold text-[#5A6A51]">{f.label}:</span>
-                            <span className={`font-semibold text-right ${f.id === "allergies" || f.id === "laser_contraindications" || f.id === "bleeding_disorders" ? "text-rose-700 font-bold" : "text-[#1F251A]"}`}>
+                          <div key={f.id} className="flex justify-between items-start gap-2 border-b border-[var(--cr-primary)]/10 pb-2 last:border-b-0 last:pb-0">
+                            <span className="font-bold text-[var(--color-brand-secondary)]">{f.label}:</span>
+                            <span className={`font-semibold text-right ${f.id === "allergies" || f.id === "laser_contraindications" || f.id === "bleeding_disorders" ? "text-rose-700 font-bold" : "text-[var(--cr-dark)]"}`}>
                               {displayVal}
                             </span>
                           </div>
@@ -878,25 +878,25 @@ export default function DoctorOngoingSessionTab({
                       })
                     ) : (
                       <>
-                        <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                          <span className="font-bold text-[#5A6A51]">{t.skinTypeLabel}:</span>
-                          <span className="font-bold text-[#1F251A]">{medicalRecord.skin_type || "Normal"}</span>
+                        <div className="flex justify-between border-b border-[var(--cr-primary)]/10 pb-2">
+                          <span className="font-bold text-[var(--color-brand-secondary)]">{t.skinTypeLabel}:</span>
+                          <span className="font-bold text-[var(--cr-dark)]">{medicalRecord.skin_type || "Normal"}</span>
                         </div>
-                        <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                          <span className="font-bold text-[#5A6A51]">{t.allergiesLabel}:</span>
+                        <div className="flex justify-between border-b border-[var(--cr-primary)]/10 pb-2">
+                          <span className="font-bold text-[var(--color-brand-secondary)]">{t.allergiesLabel}:</span>
                           <span className="font-bold text-rose-700">{medicalRecord.allergies || "None reported"}</span>
                         </div>
-                        <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                          <span className="font-bold text-[#5A6A51]">{t.currentMedicationLabel}:</span>
-                          <span className="font-semibold text-[#1F251A]">{medicalRecord.medication_details || "None"}</span>
+                        <div className="flex justify-between border-b border-[var(--cr-primary)]/10 pb-2">
+                          <span className="font-bold text-[var(--color-brand-secondary)]">{t.currentMedicationLabel}:</span>
+                          <span className="font-semibold text-[var(--cr-dark)]">{medicalRecord.medication_details || "None"}</span>
                         </div>
-                        <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                          <span className="font-bold text-[#5A6A51]">{t.medicalConditionsLabel}:</span>
-                          <span className="font-semibold text-[#1F251A]">{medicalRecord.medical_conditions_details || "None"}</span>
+                        <div className="flex justify-between border-b border-[var(--cr-primary)]/10 pb-2">
+                          <span className="font-bold text-[var(--color-brand-secondary)]">{t.medicalConditionsLabel}:</span>
+                          <span className="font-semibold text-[var(--cr-dark)]">{medicalRecord.medical_conditions_details || "None"}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="font-bold text-[#5A6A51]">{t.previousTreatmentsLabel}:</span>
-                          <span className="font-semibold text-[#1F251A]">{medicalRecord.previous_treatments_details || "None"}</span>
+                          <span className="font-bold text-[var(--color-brand-secondary)]">{t.previousTreatmentsLabel}:</span>
+                          <span className="font-semibold text-[var(--cr-dark)]">{medicalRecord.previous_treatments_details || "None"}</span>
                         </div>
                       </>
                     )}
@@ -904,21 +904,21 @@ export default function DoctorOngoingSessionTab({
                     <button
                       type="button"
                       onClick={() => setShowMedicalForm(true)}
-                      className="mt-2 flex items-center gap-1.5 text-xs font-bold text-[#414E36] hover:underline cursor-pointer"
+                      className="mt-2 flex items-center gap-1.5 text-xs font-bold text-[var(--cr-primary)] hover:underline cursor-pointer"
                     >
                       <Edit size={14} /> {t.updateMedicalRecordBtn}
                     </button>
                   </div>
                 ) : (
                   /* Medical Intake Form */
-                  <div className="space-y-3 border-t border-[#414E36]/10 pt-3">
+                  <div className="space-y-3 border-t border-[var(--cr-primary)]/10 pt-3">
                     {isFirstVisit ? (
                       <div className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200">
                         <strong className="block font-bold">{t.firstVisitDetected || "First Visit Detected"}</strong>
                         {t.firstVisitNotice || "Medical intake form is required for first-time patient registration."}
                       </div>
                     ) : !medicalRecord && isReturningPatient ? (
-                      <div className="rounded-2xl bg-[#EDF1EC] p-3 text-xs text-[#414E36] border border-[#414E36]/15">
+                      <div className="rounded-2xl bg-[var(--color-brand-tint)] p-3 text-xs text-[var(--cr-primary)] border border-[var(--cr-primary)]/15">
                         <strong className="block font-bold">Returning Patient ({patientPastCompletedVisits.length} past visits)</strong>
                         Previous patient clinical history is on file. You can record specialized intake notes or proceed directly with treatment.
                       </div>
@@ -927,14 +927,14 @@ export default function DoctorOngoingSessionTab({
                     {(activeTemplate?.fields || []).length > 0 ? (
                       (activeTemplate?.fields || []).map((f) => (
                         <div key={f.id}>
-                          <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                          <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
                             {f.label} {f.required && <span className="text-red-500">*</span>}
                           </label>
                           {f.type === "select" ? (
                             <select
                               value={dynamicResponses[f.id] || (f.options?.[0] || "")}
                               onChange={(e) => setDynamicResponses({ ...dynamicResponses, [f.id]: e.target.value })}
-                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                              className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none"
                             >
                               {(f.options || []).map((opt) => (
                                 <option key={opt} value={opt}>{opt}</option>
@@ -946,15 +946,15 @@ export default function DoctorOngoingSessionTab({
                               value={dynamicResponses[f.id] || ""}
                               onChange={(e) => setDynamicResponses({ ...dynamicResponses, [f.id]: e.target.value })}
                               placeholder={f.placeholder || "Enter details..."}
-                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 text-xs text-[#1F251A] outline-none"
+                              className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-2.5 text-xs text-[var(--cr-dark)] outline-none"
                             />
                           ) : f.type === "checkbox" ? (
-                            <label className="flex items-center gap-2 p-2.5 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-xs font-semibold text-[#1F251A] cursor-pointer">
+                            <label className="flex items-center gap-2 p-2.5 rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] text-xs font-semibold text-[var(--cr-dark)] cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={Boolean(dynamicResponses[f.id])}
                                 onChange={(e) => setDynamicResponses({ ...dynamicResponses, [f.id]: e.target.checked })}
-                                className="h-4 w-4 rounded accent-[#414E36]"
+                                className="h-4 w-4 rounded accent-[var(--cr-primary)]"
                               />
                               <span>Yes / Confirmed</span>
                             </label>
@@ -964,7 +964,7 @@ export default function DoctorOngoingSessionTab({
                               value={dynamicResponses[f.id] || ""}
                               onChange={(e) => setDynamicResponses({ ...dynamicResponses, [f.id]: e.target.value })}
                               placeholder={f.placeholder || "Enter details..."}
-                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                              className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs text-[var(--cr-dark)] outline-none"
                             />
                           )}
                         </div>
@@ -972,11 +972,11 @@ export default function DoctorOngoingSessionTab({
                     ) : (
                       <>
                         <div>
-                          <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.skinTypeLabel}</label>
+                          <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">{t.skinTypeLabel}</label>
                           <select
                             value={formSkinType}
                             onChange={(e) => setFormSkinType(e.target.value)}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                            className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none"
                           >
                             <option value="Normal">Normal</option>
                             <option value="Dry">Dry</option>
@@ -988,46 +988,46 @@ export default function DoctorOngoingSessionTab({
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.allergiesLabel}</label>
+                          <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">{t.allergiesLabel}</label>
                           <input
                             type="text"
                             placeholder="e.g. Latex, Aspirin, None"
                             value={formAllergies}
                             onChange={(e) => setFormAllergies(e.target.value)}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                            className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs text-[var(--cr-dark)] outline-none"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.currentMedicationLabel}</label>
+                          <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">{t.currentMedicationLabel}</label>
                           <input
                             type="text"
                             placeholder="e.g. Roaccutane, Blood thinners, None"
                             value={formMedicationDetails}
                             onChange={(e) => setFormMedicationDetails(e.target.value)}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                            className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs text-[var(--cr-dark)] outline-none"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.medicalConditionsLabel}</label>
+                          <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">{t.medicalConditionsLabel}</label>
                           <input
                             type="text"
                             placeholder="e.g. Diabetes, Eczema, None"
                             value={formMedicalConditionsDetails}
                             onChange={(e) => setFormMedicalConditionsDetails(e.target.value)}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                            className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs text-[var(--cr-dark)] outline-none"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.previousTreatmentsLabel}</label>
+                          <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">{t.previousTreatmentsLabel}</label>
                           <input
                             type="text"
                             placeholder="e.g. Chemical Peel 3 mos ago, None"
                             value={formPreviousTreatmentsDetails}
                             onChange={(e) => setFormPreviousTreatmentsDetails(e.target.value)}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                            className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-xs text-[var(--cr-dark)] outline-none"
                           />
                         </div>
                       </>
@@ -1038,7 +1038,7 @@ export default function DoctorOngoingSessionTab({
                         <button
                           type="button"
                           onClick={() => setShowMedicalForm(false)}
-                          className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#5A6A51] cursor-pointer"
+                          className="rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs font-bold text-[var(--color-brand-secondary)] cursor-pointer"
                         >
                           {t.cancelBtn}
                         </button>
@@ -1059,7 +1059,7 @@ export default function DoctorOngoingSessionTab({
                             previous_treatments_details: dynamicResponses.previous_treatments || dynamicResponses.previous_injectables || formPreviousTreatmentsDetails
                           });
                         }}
-                        className="rounded-xl bg-[#414E36] px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                        className="rounded-xl bg-[var(--cr-primary)] px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
                       >
                         <Save size={14} /> {savingMedicalRecord ? "..." : t.saveMedicalRecordBtn}
                       </button>
@@ -1068,16 +1068,16 @@ export default function DoctorOngoingSessionTab({
                 )}
 
                 {/* DOCTOR PROCEDURE OBSERVATIONS & MEDICAL NOTES (NOW INTEGRATED IN INTAKE CARD) */}
-                <div className="mt-4 sm:mt-6 border-t border-[#414E36]/10 pt-4 space-y-3">
+                <div className="mt-4 sm:mt-6 border-t border-[var(--cr-primary)]/10 pt-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-[#1F251A] uppercase tracking-wider">
+                    <label className="block text-xs font-bold text-[var(--cr-dark)] uppercase tracking-wider">
                       {t.doctorNotesTitle}
                     </label>
                     <button
                       type="button"
                       onClick={() => handleSaveClinicalNote(activeSessionBooking)}
                       disabled={savingNote}
-                      className="rounded-xl bg-[#414E36] px-3 py-1 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1"
+                      className="rounded-xl bg-[var(--cr-primary)] px-3 py-1 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1"
                     >
                       <Save size={12} /> {savingNote ? "..." : t.saveDoctorNotesBtn}
                     </button>
@@ -1087,13 +1087,13 @@ export default function DoctorOngoingSessionTab({
                     value={clinicalNote}
                     onChange={(e) => setClinicalNote(e.target.value)}
                     placeholder={t.doctorNotesPlaceholder}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans leading-relaxed"
+                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-3 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/20 font-sans leading-relaxed"
                   />
                 </div>
 
-                <div className="mt-4 border-t border-[#414E36]/10 pt-4 space-y-2">
-                  <span className="text-xs font-bold text-[#5A6A51]">{t.bookingNotesTitle}</span>
-                  <p className="text-xs text-[#1F251A] leading-relaxed bg-[#F4F5F1] p-3 rounded-2xl font-mono">
+                <div className="mt-4 border-t border-[var(--cr-primary)]/10 pt-4 space-y-2">
+                  <span className="text-xs font-bold text-[var(--color-brand-secondary)]">{t.bookingNotesTitle}</span>
+                  <p className="text-xs text-[var(--cr-dark)] leading-relaxed bg-[#F4F5F1] p-3 rounded-2xl font-mono">
                     {(activeSessionBooking.receptionNotes ?? activeSessionBooking.reception_notes) || activeSessionBooking.notes || t.noBookingNotes}
                   </p>
                 </div>
@@ -1104,33 +1104,33 @@ export default function DoctorOngoingSessionTab({
             <div className="lg:col-span-2 space-y-4 sm:space-y-6">
 
               {/* 1. DIGITAL PRESCRIPTION WRITER CARD (POSITIONED ABOVE PRODUCTS & SERVICES) */}
-              <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/12 bg-white p-4 sm:p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 flex-wrap gap-2">
+              <div className="rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-4 sm:p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-3 flex-wrap gap-2">
                   <div>
-                    <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                      <FileText size={16} className="text-[#414E36]" /> {t.digitalPrescriptionTitle}
+                    <h3 className="text-xs sm:text-sm font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
+                      <FileText size={16} className="text-[var(--cr-primary)]" /> {t.digitalPrescriptionTitle}
                     </h3>
-                    <p className="text-xs text-[#5A6A51] mt-0.5">
-                      {t.patientNameHeader}: <strong className="text-[#414E36]">{activeSessionBooking.name || activeSessionBooking.customer_name}</strong>
+                    <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">
+                      {t.patientNameHeader}: <strong className="text-[var(--cr-primary)]">{activeSessionBooking.name || activeSessionBooking.customer_name}</strong>
                     </p>
                   </div>
                 </div>
 
                 <form onSubmit={handleSaveInlinePrescription} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-[#5A6A51] mb-1">{t.clinicalDiagnosisLabel}</label>
+                    <label className="block text-xs font-bold text-[var(--color-brand-secondary)] mb-1">{t.clinicalDiagnosisLabel}</label>
                     <input
                       type="text"
                       placeholder="e.g. Post-laser inflammation, Acne Vulgaris Grade II"
                       value={rxDiagnosis}
                       onChange={(e) => setRxDiagnosis(e.target.value)}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                      className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                     />
                   </div>
 
                   {/* Medications List */}
                   <div className="space-y-2">
-                    <label className="block text-xs font-bold text-[#5A6A51]">{t.prescribedMedicationsLabel}</label>
+                    <label className="block text-xs font-bold text-[var(--color-brand-secondary)]">{t.prescribedMedicationsLabel}</label>
                     {rxMedications.map((med, idx) => (
                       <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                         <input
@@ -1142,7 +1142,7 @@ export default function DoctorOngoingSessionTab({
                             updated[idx].name = e.target.value;
                             setRxMedications(updated);
                           }}
-                          className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                          className="rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none"
                         />
                         <input
                           type="text"
@@ -1153,7 +1153,7 @@ export default function DoctorOngoingSessionTab({
                             updated[idx].dosage = e.target.value;
                             setRxMedications(updated);
                           }}
-                          className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                          className="rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none"
                         />
                         <input
                           type="text"
@@ -1164,7 +1164,7 @@ export default function DoctorOngoingSessionTab({
                             updated[idx].frequency = e.target.value;
                             setRxMedications(updated);
                           }}
-                          className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                          className="rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none"
                         />
                         <input
                           type="text"
@@ -1175,34 +1175,34 @@ export default function DoctorOngoingSessionTab({
                             updated[idx].duration = e.target.value;
                             setRxMedications(updated);
                           }}
-                          className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                          className="rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none"
                         />
                       </div>
                     ))}
                     <button
                       type="button"
                       onClick={() => setRxMedications([...rxMedications, { name: "", dosage: "", frequency: "", duration: "" }])}
-                      className="text-xs font-bold text-[#414E36] flex items-center gap-1 mt-1 hover:underline cursor-pointer"
+                      className="text-xs font-bold text-[var(--cr-primary)] flex items-center gap-1 mt-1 hover:underline cursor-pointer"
                     >
                       <Plus size={14} /> {t.addAnotherMedicationBtn}
                     </button>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-[#5A6A51] mb-1">{t.generalInstructionsLabel}</label>
+                    <label className="block text-xs font-bold text-[var(--color-brand-secondary)] mb-1">{t.generalInstructionsLabel}</label>
                     <textarea
                       rows={2}
                       placeholder="e.g. Apply sunscreen SPF 50 daily, avoid direct sun exposure for 48 hours..."
                       value={rxGeneralNotes}
                       onChange={(e) => setRxGeneralNotes(e.target.value)}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                      className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-3 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                     />
                   </div>
 
                   {/* Follow-Up Visit Specification */}
-                  <div className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3.5 sm:p-4 space-y-3">
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-3.5 sm:p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-[#1F251A] flex items-center gap-2 cursor-pointer select-none">
+                      <label className="text-xs font-bold text-[var(--cr-dark)] flex items-center gap-2 cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={rxHasFollowUp}
@@ -1213,9 +1213,9 @@ export default function DoctorOngoingSessionTab({
                               setFollowUpPresetDays(7);
                             }
                           }}
-                          className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36] accent-[#414E36]"
+                          className="h-4 w-4 rounded border-gray-300 text-[var(--cr-primary)] focus:ring-[var(--cr-primary)] accent-[var(--cr-primary)]"
                         />
-                        <Calendar size={14} className="text-[#414E36]" />
+                        <Calendar size={14} className="text-[var(--cr-primary)]" />
                         <span>{t.requiresFollowUpLabel || "Requires Follow-Up / Consultation?"}</span>
                       </label>
                       {rxHasFollowUp && (
@@ -1226,38 +1226,38 @@ export default function DoctorOngoingSessionTab({
                     </div>
 
                     {rxHasFollowUp && (
-                      <div className="space-y-3 pt-2 border-t border-[#414E36]/10 animate-fadeIn">
+                      <div className="space-y-3 pt-2 border-t border-[var(--cr-primary)]/10 animate-fadeIn">
                         {/* Interval Presets */}
                         <div>
-                          <span className="block text-[11px] font-bold text-[#5A6A51] mb-1.5">
+                          <span className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1.5">
                             Quick Interval Presets:
                           </span>
                           <div className="flex flex-wrap gap-1.5">
                             <button
                               type="button"
                               onClick={() => setFollowUpPresetDays(3)}
-                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[var(--cr-primary)]/20 bg-white text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                             >
                               {t.preset3Days || "+3 Days"}
                             </button>
                             <button
                               type="button"
                               onClick={() => setFollowUpPresetDays(7)}
-                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[var(--cr-primary)]/20 bg-white text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                             >
                               {t.preset1Week || "+1 Week"}
                             </button>
                             <button
                               type="button"
                               onClick={() => setFollowUpPresetDays(14)}
-                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[var(--cr-primary)]/20 bg-white text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                             >
                               {t.preset2Weeks || "+2 Weeks"}
                             </button>
                             <button
                               type="button"
                               onClick={() => setFollowUpPresetDays(30)}
-                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[#414E36]/20 bg-white text-[#414E36] hover:bg-[#414E36] hover:text-white transition cursor-pointer"
+                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold border border-[var(--cr-primary)]/20 bg-white text-[var(--cr-primary)] hover:bg-[var(--cr-primary)] hover:text-white transition cursor-pointer"
                             >
                               {t.preset1Month || "+1 Month"}
                             </button>
@@ -1267,7 +1267,7 @@ export default function DoctorOngoingSessionTab({
                         {/* Date Picker & Reason */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                            <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
                               {t.followUpDateLabel || "Recommended Follow-Up Date"}
                             </label>
                             <input
@@ -1275,11 +1275,11 @@ export default function DoctorOngoingSessionTab({
                               value={rxFollowUpDate}
                               min={new Date().toISOString().slice(0, 10)}
                               onChange={(e) => setRxFollowUpDate(e.target.value)}
-                              className="w-full rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] font-bold outline-none focus:border-[#414E36]"
+                              className="w-full rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs text-[var(--cr-dark)] font-bold outline-none focus:border-[var(--cr-primary)]"
                             />
                           </div>
                           <div>
-                            <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                            <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
                               {t.followUpNotesLabel || "Follow-Up Instructions / Reason"}
                             </label>
                             <input
@@ -1287,7 +1287,7 @@ export default function DoctorOngoingSessionTab({
                               value={rxFollowUpNotes}
                               onChange={(e) => setRxFollowUpNotes(e.target.value)}
                               placeholder={t.followUpNotesPlaceholder || "e.g. Check skin peeling, review lab results..."}
-                              className="w-full rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                              className="w-full rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                             />
                           </div>
                         </div>
@@ -1299,7 +1299,7 @@ export default function DoctorOngoingSessionTab({
                     <button
                       type="submit"
                       disabled={savingRxInline}
-                      className="w-full sm:w-auto justify-center rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                      className="w-full sm:w-auto justify-center rounded-xl bg-[var(--cr-primary)] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                     >
                       <Printer size={14} /> {savingRxInline ? "..." : t.saveAndPrintRxBtn}
                     </button>
@@ -1308,13 +1308,13 @@ export default function DoctorOngoingSessionTab({
               </div>
 
               {/* 2. LASER PULSE COUNTER & ACCOUNTING ENGINE */}
-              <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
+              <div className="rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--cr-primary)]/10 pb-3">
                   <div>
-                    <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                    <h3 className="text-xs sm:text-sm font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
                       <Zap size={16} className="text-amber-600" /> {t.laserTreatmentTitle || "Laser Treatment & Pulse Counter Engine"}
                     </h3>
-                    <p className="text-[11px] text-[#5A6A51] mt-0.5">
+                    <p className="text-[11px] text-[var(--color-brand-secondary)] mt-0.5">
                       {laserMode === "SERVICE"
                         ? (t.laserModeServiceDesc || "Option 1: Fixed catalog price with hardware pulse tracking.")
                         : laserMode === "PER_PULSE"
@@ -1324,12 +1324,12 @@ export default function DoctorOngoingSessionTab({
                   </div>
 
                   {/* Mode Selector Tabs */}
-                  <div className="flex bg-[#F2EFE9] p-1 rounded-xl gap-1 text-xs font-bold">
+                  <div className="flex bg-[var(--color-brand-sand)] p-1 rounded-xl gap-1 text-xs font-bold">
                     <button
                       type="button"
                       onClick={() => setLaserMode("SERVICE")}
                       className={`px-3 py-1.5 rounded-lg transition ${
-                        laserMode === "SERVICE" ? "bg-[#414E36] text-white shadow-xs" : "text-[#5A6A51] hover:text-[#414E36]"
+                        laserMode === "SERVICE" ? "bg-[var(--cr-primary)] text-white shadow-xs" : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)]"
                       }`}
                     >
                       {t.type1Service || "Option 1: Service"}
@@ -1338,7 +1338,7 @@ export default function DoctorOngoingSessionTab({
                       type="button"
                       onClick={() => setLaserMode("PER_PULSE")}
                       className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
-                        laserMode === "PER_PULSE" ? "bg-[#414E36] text-white shadow-xs" : "text-[#5A6A51] hover:text-[#414E36]"
+                        laserMode === "PER_PULSE" ? "bg-[var(--cr-primary)] text-white shadow-xs" : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)]"
                       }`}
                     >
                       <span>{t.type2Pulse || "Option 2: Pay per Pulse"}</span>
@@ -1347,7 +1347,7 @@ export default function DoctorOngoingSessionTab({
                       type="button"
                       onClick={() => setLaserMode("PACKAGE")}
                       className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
-                        laserMode === "PACKAGE" ? "bg-[#414E36] text-white shadow-xs" : "text-[#5A6A51] hover:text-[#414E36]"
+                        laserMode === "PACKAGE" ? "bg-[var(--cr-primary)] text-white shadow-xs" : "text-[var(--color-brand-secondary)] hover:text-[var(--cr-primary)]"
                       }`}
                     >
                       <span>{t.type3Package || "Option 3: Package"}</span>
@@ -1361,13 +1361,13 @@ export default function DoctorOngoingSessionTab({
                 </div>
 
                 {/* Common Laser Settings: Treatment Area & Device */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[var(--color-brand-light)] p-3.5 sm:p-4 rounded-2xl border border-[var(--cr-primary)]/10">
                   <div>
-                    <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.treatmentAreaLabel || "Treatment Area"}</label>
+                    <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">{t.treatmentAreaLabel || "Treatment Area"}</label>
                     <select
                       value={treatmentArea}
                       onChange={(e) => setTreatmentArea(e.target.value)}
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none"
                     >
                       {TREATMENT_AREAS.map((area) => (
                         <option key={area} value={area}>{area}</option>
@@ -1379,19 +1379,19 @@ export default function DoctorOngoingSessionTab({
                         placeholder="Specify custom area..."
                         value={customTreatmentArea}
                         onChange={(e) => setCustomTreatmentArea(e.target.value)}
-                        className="mt-2 w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                        className="mt-2 w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none"
                       />
                     )}
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                    <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
                       {t.deviceUsedLabel || "Laser Device (Hardware Counter)"}
                     </label>
                     <select
                       value={selectedDeviceId}
                       onChange={(e) => setSelectedDeviceId(e.target.value)}
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none"
                     >
                       <option value="">Select Laser Device...</option>
                       {devicesList.map((d) => (
@@ -1405,29 +1405,29 @@ export default function DoctorOngoingSessionTab({
 
                 {/* OPTION 1: PAY BY SERVICE (FIXED PRICE) */}
                 {laserMode === "SERVICE" && (
-                  <div className="space-y-4 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
+                  <div className="space-y-4 bg-[var(--color-brand-light)] p-4 rounded-2xl border border-[var(--cr-primary)]/10">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--cr-primary)]/10 pb-3">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="inline-flex items-center gap-1 rounded-md bg-[#414E36] text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-[var(--cr-primary)] text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                             {t.primaryBookingService || "Primary Booked Service"}
                           </span>
-                          <span className="font-extrabold text-xs sm:text-sm text-[#1F251A]">
+                          <span className="font-extrabold text-xs sm:text-sm text-[var(--cr-dark)]">
                             {resolvedActiveServiceName}
                           </span>
                         </div>
-                        <p className="text-[11px] text-[#5A6A51] mt-1">
-                          Fixed Service Price: <strong className="text-[#414E36]">{baseBookingPrice} EGP</strong> (Standard pulses recorded for clinical tracking; 0 EGP price change).
+                        <p className="text-[11px] text-[var(--color-brand-secondary)] mt-1">
+                          Fixed Service Price: <strong className="text-[var(--cr-primary)]">{baseBookingPrice} EGP</strong> (Standard pulses recorded for clinical tracking; 0 EGP price change).
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <label className="text-xs font-bold text-[#5A6A51]">{t.standardPulsesLabel || "Standard Pulses:"}</label>
+                        <label className="text-xs font-bold text-[var(--color-brand-secondary)]">{t.standardPulsesLabel || "Standard Pulses:"}</label>
                         <input
                           type="number"
                           min={0}
                           value={standardPulsesDelivered}
                           onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
-                          className="w-28 rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
+                          className="w-28 rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                           placeholder="Pulses"
                         />
                       </div>
@@ -1435,12 +1435,12 @@ export default function DoctorOngoingSessionTab({
 
                     {/* Additional Pulses Toggle */}
                     <div className="space-y-3 pt-1">
-                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[#1F251A]">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--cr-dark)]">
                         <input
                           type="checkbox"
                           checked={hasAdditionalPulses}
                           onChange={(e) => setHasAdditionalPulses(e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-[#414E36] accent-[#414E36]"
+                          className="h-4 w-4 rounded border-gray-300 text-[var(--cr-primary)] accent-[var(--cr-primary)]"
                         />
                         <Plus size={14} className="text-amber-700" />
                         <span>Add Additional Charged Pulses (Special Case)</span>
@@ -1450,32 +1450,32 @@ export default function DoctorOngoingSessionTab({
                         <div className="space-y-3 bg-white p-3.5 rounded-xl border border-amber-200">
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
-                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Additional Pulses Qty</label>
+                              <label className="block text-[10px] font-bold text-[var(--color-brand-secondary)] mb-1">Additional Pulses Qty</label>
                               <input
                                 type="number"
                                 min={1}
                                 value={additionalPulsesQty}
                                 onChange={(e) => setAdditionalPulsesQty(Math.max(0, parseInt(e.target.value) || 0))}
-                                className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none"
                                 placeholder="e.g. 100"
                               />
                             </div>
 
                             <div>
-                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Price Per Pulse (EGP)</label>
+                              <label className="block text-[10px] font-bold text-[var(--color-brand-secondary)] mb-1">Price Per Pulse (EGP)</label>
                               <input
                                 type="number"
                                 min={0}
                                 step={0.5}
                                 value={additionalPulseUnitPrice}
                                 onChange={(e) => setAdditionalPulseUnitPrice(Math.max(0, parseFloat(e.target.value) || 0))}
-                                className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none"
                                 placeholder="5"
                               />
                             </div>
 
                             <div>
-                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Additional Charge</label>
+                              <label className="block text-[10px] font-bold text-[var(--color-brand-secondary)] mb-1">Additional Charge</label>
                               <div className="w-full rounded-xl bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-black text-amber-900">
                                 +{additionalPulsesQty * additionalPulseUnitPrice} EGP
                               </div>
@@ -1483,7 +1483,7 @@ export default function DoctorOngoingSessionTab({
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">
+                            <label className="block text-[10px] font-bold text-[var(--color-brand-secondary)] mb-1">
                               Reason for Additional Pulses <span className="text-rose-600 font-bold">* (Mandatory)</span>
                             </label>
                             <input
@@ -1491,7 +1491,7 @@ export default function DoctorOngoingSessionTab({
                               value={additionalPulsesReason}
                               onChange={(e) => setAdditionalPulsesReason(e.target.value)}
                               placeholder="e.g. Extended session for high hair density..."
-                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                              className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                             />
                           </div>
                         </div>
@@ -1502,7 +1502,7 @@ export default function DoctorOngoingSessionTab({
 
                 {/* OPTION 2: PAY PER PULSE (POST-SESSION ACTUALS) */}
                 {laserMode === "PER_PULSE" && (
-                  <div className="space-y-4 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 animate-fadeIn">
+                  <div className="space-y-4 bg-[var(--color-brand-light)] p-4 rounded-2xl border border-[var(--cr-primary)]/10 animate-fadeIn">
                     <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <span className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider block">
@@ -1522,9 +1522,9 @@ export default function DoctorOngoingSessionTab({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-[#414E36]/10">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-[var(--cr-primary)]/10">
                       <div>
-                        <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                        <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
                           Actual Pulses Delivered in This Session <span className="text-emerald-700 font-black">*</span>
                         </label>
                         <input
@@ -1532,13 +1532,13 @@ export default function DoctorOngoingSessionTab({
                           min={1}
                           value={standardPulsesDelivered}
                           onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
-                          className="w-full rounded-xl border border-[#414E36]/20 bg-[#FBFBF9] px-3.5 py-2 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
+                          className="w-full rounded-xl border border-[var(--cr-primary)]/20 bg-[var(--color-brand-light)] px-3.5 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                           placeholder="e.g. 1000"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                        <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
                           Agreed Rate per Pulse (EGP)
                         </label>
                         <input
@@ -1547,7 +1547,7 @@ export default function DoctorOngoingSessionTab({
                           step={0.5}
                           value={additionalPulseUnitPrice}
                           onChange={(e) => setAdditionalPulseUnitPrice(Math.max(0.1, parseFloat(e.target.value) || 1))}
-                          className="w-full rounded-xl border border-[#414E36]/20 bg-[#FBFBF9] px-3.5 py-2 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
+                          className="w-full rounded-xl border border-[var(--cr-primary)]/20 bg-[var(--color-brand-light)] px-3.5 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                           placeholder="5"
                         />
                       </div>
@@ -1557,12 +1557,12 @@ export default function DoctorOngoingSessionTab({
 
                 {/* OPTION 3: PAY WITH PULSE PACKAGE (REDEMPTION + DEFICIT SPILLOVER) */}
                 {laserMode === "PACKAGE" && (
-                  <div className="space-y-4 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 animate-fadeIn">
+                  <div className="space-y-4 bg-[var(--color-brand-light)] p-4 rounded-2xl border border-[var(--cr-primary)]/10 animate-fadeIn">
                     {/* DEC-079: the doctor records delivered pulses only — no package name,
                         balance, price, or deficit choice lives on this screen. Reception
                         resolves any deficit at checkout via /api/reservations/laser-deficit. */}
                     <div className="max-w-sm">
-                      <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">
+                      <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
                         Pulses Used in This Session <span className="text-purple-700 font-black">*</span>
                       </label>
                       <input
@@ -1570,7 +1570,7 @@ export default function DoctorOngoingSessionTab({
                         min={1}
                         value={standardPulsesDelivered || ""}
                         onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
+                        className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
                         placeholder="Pulses"
                       />
                     </div>
@@ -1580,7 +1580,7 @@ export default function DoctorOngoingSessionTab({
                           key={preset}
                           type="button"
                           onClick={() => setStandardPulsesDelivered(preset)}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-[#414E36]/15 text-[11px] font-bold text-[#414E36] hover:border-[#414E36]/40 transition"
+                          className="px-2.5 py-1 rounded-lg bg-white border border-[var(--cr-primary)]/15 text-[11px] font-bold text-[var(--cr-primary)] hover:border-[var(--cr-primary)]/40 transition"
                         >
                           {preset.toLocaleString()}
                         </button>
@@ -1596,16 +1596,16 @@ export default function DoctorOngoingSessionTab({
                 )}
 
                 {/* Additional Clinical Services Section */}
-                <div className="space-y-3 bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
-                  <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
-                    <Plus size={14} className="text-[#414E36]" /> {t.addAdditionalServiceBtn}
+                <div className="space-y-3 bg-[var(--color-brand-light)] p-3.5 sm:p-4 rounded-2xl border border-[var(--cr-primary)]/10">
+                  <h4 className="text-xs font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-1.5">
+                    <Plus size={14} className="text-[var(--cr-primary)]" /> {t.addAdditionalServiceBtn}
                   </h4>
 
                   <div className="flex flex-col sm:flex-row items-center gap-2">
                     <select
                       value={selectedServiceIdToAdd}
                       onChange={(e) => setSelectedServiceIdToAdd(e.target.value)}
-                      className="w-full sm:flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                      className="w-full sm:flex-1 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none"
                     >
                       <option value="">{t.selectServicePlaceholder}</option>
                       {servicesList.map((s) => (
@@ -1619,7 +1619,7 @@ export default function DoctorOngoingSessionTab({
                       type="button"
                       onClick={handleAddServiceToSession}
                       disabled={!selectedServiceIdToAdd}
-                      className="w-full sm:w-auto rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer shrink-0 shadow-xs"
+                      className="w-full sm:w-auto rounded-xl bg-[var(--cr-primary)] px-5 py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer shrink-0 shadow-xs"
                     >
                       <Plus size={14} /> {t.addAdditionalServiceBtn}
                     </button>
@@ -1627,11 +1627,11 @@ export default function DoctorOngoingSessionTab({
 
                   {/* Added Additional Services List */}
                   {additionalServices.length > 0 && (
-                    <div className="space-y-2 pt-2 border-t border-[#414E36]/10">
+                    <div className="space-y-2 pt-2 border-t border-[var(--cr-primary)]/10">
                       {additionalServices.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
+                        <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[var(--cr-primary)]/10 gap-2">
                           <div className="min-w-0">
-                            <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
+                            <span className="font-bold text-[var(--cr-dark)] block truncate">{item.name}</span>
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
                             {(() => {
@@ -1640,7 +1640,7 @@ export default function DoctorOngoingSessionTab({
                               if (laserMode === "PACKAGE" && isLaser) {
                                 return <span className="font-extrabold text-purple-700">0 EGP (Package Redemption)</span>;
                               }
-                              return <span className="font-extrabold text-[#414E36]">+{item.price} EGP</span>;
+                              return <span className="font-extrabold text-[var(--cr-primary)]">+{item.price} EGP</span>;
                             })()}
                             <button
                               type="button"
@@ -1659,19 +1659,19 @@ export default function DoctorOngoingSessionTab({
               </div>
 
               {/* 3. PRODUCTS / CONSUMABLES USED SECTION */}
-              <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
-                  <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                    <ShoppingBag size={16} className="text-[#414E36]" /> {t.productsUsedTitle}
+              <div className="rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--cr-primary)]/10 pb-3">
+                  <h3 className="text-xs sm:text-sm font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
+                    <ShoppingBag size={16} className="text-[var(--cr-primary)]" /> {t.productsUsedTitle}
                   </h3>
                 </div>
 
-                <div className="space-y-3 bg-[#FBFBF9] p-3.5 sm:p-4 rounded-2xl border border-[#414E36]/10">
+                <div className="space-y-3 bg-[var(--color-brand-light)] p-3.5 sm:p-4 rounded-2xl border border-[var(--cr-primary)]/10">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <select
                       value={selectedProductId}
                       onChange={(e) => setSelectedProductId(e.target.value)}
-                      className="sm:col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                      className="sm:col-span-2 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none"
                     >
                       <option value="">{t.selectProductPlaceholder}</option>
                       {productsList.map((p) => {
@@ -1689,7 +1689,7 @@ export default function DoctorOngoingSessionTab({
                       min={1}
                       value={selectedProductQty}
                       onChange={(e) => setSelectedProductQty(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                      className="rounded-xl border border-[var(--cr-primary)]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none"
                       placeholder="Qty"
                     />
                   </div>
@@ -1697,21 +1697,21 @@ export default function DoctorOngoingSessionTab({
                   <button
                     type="button"
                     onClick={handleAddProductToSession}
-                    className="w-full rounded-xl bg-[#414E36] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition cursor-pointer"
+                    className="w-full rounded-xl bg-[var(--cr-primary)] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition cursor-pointer"
                   >
                     {t.addProductToInvoiceBtn}
                   </button>
 
                   {usedProducts.length > 0 && (
-                    <div className="space-y-1.5 pt-2 border-t border-[#414E36]/10">
+                    <div className="space-y-1.5 pt-2 border-t border-[var(--cr-primary)]/10">
                       {usedProducts.map((item, i) => (
-                        <div key={i} className="flex items-center justify-between text-xs bg-white p-2 rounded-xl border border-[#414E36]/10 gap-2">
+                        <div key={i} className="flex items-center justify-between text-xs bg-white p-2 rounded-xl border border-[var(--cr-primary)]/10 gap-2">
                           <div className="min-w-0">
-                            <span className="font-bold text-[#1F251A] block truncate">{item.name}</span>
-                            <span className="text-[10px] text-[#5A6A51] block truncate">Qty: {item.qty} x {item.unitPrice} EGP</span>
+                            <span className="font-bold text-[var(--cr-dark)] block truncate">{item.name}</span>
+                            <span className="text-[10px] text-[var(--color-brand-secondary)] block truncate">Qty: {item.qty} x {item.unitPrice} EGP</span>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className="font-extrabold text-[#414E36]">{item.total} EGP</span>
+                            <span className="font-extrabold text-[var(--cr-primary)]">{item.total} EGP</span>
                             <button
                               type="button"
                               onClick={() => handleRemoveProductFromSession(i)}
@@ -1727,11 +1727,11 @@ export default function DoctorOngoingSessionTab({
                 </div>
 
                 {/* Final Session Invoice Breakdown Summary */}
-                <div className="bg-[#414E36]/05 p-3.5 sm:p-4 rounded-2xl space-y-2 text-xs">
-                  <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 text-[#5A6A51]">
+                <div className="bg-[var(--cr-primary)]/05 p-3.5 sm:p-4 rounded-2xl space-y-2 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 text-[var(--color-brand-secondary)]">
                     <span>
                       {t.baseServiceLabel}{" "}
-                      <strong className="text-[#1F251A]">
+                      <strong className="text-[var(--cr-dark)]">
                         {laserMode === "SERVICE" ? `${baseBookingPrice} EGP` : "0 EGP (Prepaid / Package Pulses)"}
                       </strong>
                     </span>
@@ -1741,13 +1741,13 @@ export default function DoctorOngoingSessionTab({
                       </span>
                     )}
                     {additionalServicesSubtotal > 0 && (
-                      <span>{t.additionalServicesSubtotal} <strong className="text-[#1F251A]">+{additionalServicesSubtotal} EGP</strong></span>
+                      <span>{t.additionalServicesSubtotal} <strong className="text-[var(--cr-dark)]">+{additionalServicesSubtotal} EGP</strong></span>
                     )}
                     {productsSubtotal > 0 && (
-                      <span>{t.productsAddonsLabel} <strong className="text-[#1F251A]">+{productsSubtotal} EGP</strong></span>
+                      <span>{t.productsAddonsLabel} <strong className="text-[var(--cr-dark)]">+{productsSubtotal} EGP</strong></span>
                     )}
                   </div>
-                  <div className="pt-2 border-t border-[#414E36]/10 flex items-center justify-between text-[#414E36] font-extrabold text-sm sm:text-base">
+                  <div className="pt-2 border-t border-[var(--cr-primary)]/10 flex items-center justify-between text-[var(--cr-primary)] font-extrabold text-sm sm:text-base">
                     <span>{t.finalInvoiceLabel}</span>
                     <span>{finalSessionTotal} EGP</span>
                   </div>
@@ -1777,7 +1777,7 @@ export default function DoctorOngoingSessionTab({
                 <button
                   type="button"
                   onClick={() => setActiveSessionBooking?.(activeSessionsList[0])}
-                  className="w-full sm:w-auto justify-center rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition flex items-center gap-2 cursor-pointer"
+                  className="w-full sm:w-auto justify-center rounded-2xl bg-[var(--cr-primary)] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition flex items-center gap-2 cursor-pointer"
                 >
                   <UserCheck size={16} /> {t.openActiveSessionBtn}
                 </button>
@@ -1786,12 +1786,12 @@ export default function DoctorOngoingSessionTab({
           )}
 
           {/* Standard Waiting Screen */}
-          <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-6 sm:p-8 text-center text-[#5A6A51] space-y-3 shadow-sm">
+          <div className="rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-6 sm:p-8 text-center text-[var(--color-brand-secondary)] space-y-3 shadow-sm">
             <div className="h-12 w-12 sm:h-14 sm:w-14 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
               <Play size={22} />
             </div>
-            <h3 className="text-base sm:text-lg font-bold text-[#1F251A]">{t.waitingForReceptionistTitle}</h3>
-            <p className="text-xs text-[#5A6A51] max-w-md mx-auto leading-relaxed">
+            <h3 className="text-base sm:text-lg font-bold text-[var(--cr-dark)]">{t.waitingForReceptionistTitle}</h3>
+            <p className="text-xs text-[var(--color-brand-secondary)] max-w-md mx-auto leading-relaxed">
               {t.waitingForReceptionistDesc}
             </p>
           </div>
@@ -1800,15 +1800,15 @@ export default function DoctorOngoingSessionTab({
           {queueBookings.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                  <Calendar size={15} className="text-[#414E36]" /> {t.todayAvailableBookings || "Today's Patient Queue"} ({queueBookings.length})
+                <h3 className="text-xs sm:text-sm font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
+                  <Calendar size={15} className="text-[var(--cr-primary)]" /> {t.todayAvailableBookings || "Today's Patient Queue"} ({queueBookings.length})
                 </h3>
               </div>
 
-              <div className="overflow-hidden rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 bg-white shadow-sm">
                 <div className="overflow-x-auto w-full">
                   <table className="w-full text-left text-xs">
-                    <thead className="border-b border-[#414E36]/10 bg-[#FBFBF9] text-[11px] uppercase tracking-wider text-[#5A6A51]">
+                    <thead className="border-b border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] text-[11px] uppercase tracking-wider text-[var(--color-brand-secondary)]">
                       <tr>
                         <th className="px-4 py-3 font-bold">{t.timeSlotHeader || "Time"}</th>
                         <th className="px-4 py-3 font-bold">{t.patientNameHeader || "Patient"}</th>
@@ -1818,23 +1818,23 @@ export default function DoctorOngoingSessionTab({
                         <th className="px-4 py-3 font-bold text-right">{t.actionHeader || "Action"}</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#414E36]/05 text-[#1F251A]">
+                    <tbody className="divide-y divide-[var(--cr-primary)]/05 text-[var(--cr-dark)]">
                       {queueBookings.map((item) => {
                         const st = String(item.status || "").toLowerCase().trim();
                         const isStarted = st === "started" || st === "in-progress" || st === "in_progress" || st === "active";
                         return (
-                          <tr key={item.id} className="hover:bg-[#FBFBF9]/80 transition">
-                            <td className="px-4 py-3 font-bold text-[#414E36]">
+                          <tr key={item.id} className="hover:bg-[var(--color-brand-light)]/80 transition">
+                            <td className="px-4 py-3 font-bold text-[var(--cr-primary)]">
                               {item.time || item.time_slot || item.requested_time || "Today"}
                             </td>
                             <td className="px-4 py-3">
-                              <div className="font-bold text-xs text-[#1F251A]">{item.name || item.customer_name || "Patient"}</div>
-                              {item.phone && <div className="text-[10px] text-[#5A6A51] font-mono">{item.phone}</div>}
+                              <div className="font-bold text-xs text-[var(--cr-dark)]">{item.name || item.customer_name || "Patient"}</div>
+                              {item.phone && <div className="text-[10px] text-[var(--color-brand-secondary)] font-mono">{item.phone}</div>}
                             </td>
-                            <td className="px-4 py-3 font-medium text-[#5A6A51]">
+                            <td className="px-4 py-3 font-medium text-[var(--color-brand-secondary)]">
                               {item.service || item.service_name || "Clinical Session"}
                             </td>
-                            <td className="px-4 py-3 font-semibold text-[#414E36]">
+                            <td className="px-4 py-3 font-semibold text-[var(--cr-primary)]">
                               {item.room || item.room_name || "Treatment Room"}
                             </td>
                             <td className="px-4 py-3 text-center">
@@ -1862,7 +1862,7 @@ export default function DoctorOngoingSessionTab({
                                     setActiveSessionBooking?.(item);
                                   }
                                 }}
-                                className="inline-flex items-center gap-1 rounded-xl bg-[#414E36] text-white px-3 py-1.5 text-xs font-bold shadow-sm hover:bg-[#343F2B] active:scale-95 transition cursor-pointer"
+                                className="inline-flex items-center gap-1 rounded-xl bg-[var(--cr-primary)] text-white px-3 py-1.5 text-xs font-bold shadow-sm hover:bg-[#343F2B] active:scale-95 transition cursor-pointer"
                               >
                                 <Play size={12} />
                                 <span>{isStarted ? (t.openSessionBtn || "Open") : (t.startOngoingSessionBtn || "Start Session")}</span>

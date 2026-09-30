@@ -84,11 +84,11 @@ export default function MedicalReportModal({
 
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
-      <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-[#414E36]/15 space-y-5 my-8">
-        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+      <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-[var(--cr-primary)]/15 space-y-5 my-8">
+        <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
           <div>
-            <h3 className="text-xl font-bold text-[#1F251A]">{t.title}</h3>
-            <p className="text-xs text-[#5A6A51] mt-0.5">{t.subtitle}</p>
+            <h3 className="text-xl font-bold text-[var(--cr-dark)]">{t.title}</h3>
+            <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">{t.subtitle}</p>
           </div>
           <button
             type="button"
@@ -101,56 +101,56 @@ export default function MedicalReportModal({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.reportTitleLabel} <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1">{t.reportTitleLabel} <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={reportTitle}
               onChange={(e) => setReportTitle(e.target.value)}
               placeholder={t.reportTitlePlaceholder}
-              className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
               required
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.descriptionLabel}</label>
+            <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1">{t.descriptionLabel}</label>
             <textarea
               rows={3}
               value={reportDescription}
               onChange={(e) => setReportDescription(e.target.value)}
               placeholder={t.descriptionPlaceholder}
-              className="w-full rounded-xl border border-[#414E36]/15 bg-white p-3 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white p-3 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.fileUrlLabel}</label>
+            <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1">{t.fileUrlLabel}</label>
             <input
               type="url"
               value={reportFileUrl}
               onChange={(e) => setReportFileUrl(e.target.value)}
               placeholder="https://..."
-              className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.staffNameLabel}</label>
+            <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1">{t.staffNameLabel}</label>
             <input
               type="text"
               value={reportDoctorName}
               onChange={(e) => setReportDoctorName(e.target.value)}
               placeholder={t.staffNamePlaceholder}
-              className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#414E36]/10">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--cr-primary)]/10">
           <button
             type="button"
             onClick={() => setShowMedicalReportModal(false)}
-            className="rounded-xl border border-[#414E36]/15 px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+            className="rounded-xl border border-[var(--cr-primary)]/15 px-5 py-2.5 text-xs font-semibold text-[var(--cr-primary)] hover:bg-[var(--color-brand-tint)] transition"
           >
             {t.cancelBtn}
           </button>
@@ -158,7 +158,7 @@ export default function MedicalReportModal({
             type="button"
             onClick={handleSaveMedicalReport}
             disabled={savingMedicalReport || !reportTitle.trim()}
-            className="rounded-xl bg-[#414E36] px-6 py-2.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
+            className="rounded-xl bg-[var(--cr-primary)] px-6 py-2.5 text-xs font-semibold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition disabled:opacity-50"
           >
             {savingMedicalReport ? t.savingBtn : t.saveBtn}
           </button>

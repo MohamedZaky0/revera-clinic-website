@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function OurApproachSection() {
   const { t, isRTL } = useLanguage();
@@ -48,7 +49,7 @@ export function OurApproachSection() {
           className="rounded-[24px] sm:rounded-[60px]"
           style={{
             position: "relative",
-            backgroundColor: "var(--cr-secondary, #EDF1EC)",
+            backgroundColor: "var(--cr-secondary, var(--color-brand-tint))",
             border: "1px solid rgba(196,174,124,0.3)",
             overflow: "hidden",
             padding: "clamp(40px, 6vw, 72px) clamp(24px, 5vw, 72px)",
@@ -146,7 +147,7 @@ export function OurApproachSection() {
               position: absolute;
               top: 16px;
               right: 16px;
-              background: var(--cr-primary, #414E36);
+              background: var(--cr-primary, var(--cr-primary));
               border-radius: 14px;
               padding: 12px 18px;
               display: flex;
@@ -202,7 +203,7 @@ export function OurApproachSection() {
                 }}
               >
                 <img 
-                  src="/images/main_logo.png" 
+                  src={CLIENT.logoPath} 
                   alt="" 
                   style={{ width: 44, height: 44, objectFit: "contain", flexShrink: 0 }} 
                 />
@@ -240,7 +241,7 @@ export function OurApproachSection() {
                   margin: 0,
                   fontSize: "14px",
                   lineHeight: 1.75,
-                  color: "var(--cr-muted-foreground, #5A6A51)",
+                  color: "var(--cr-muted-foreground, var(--color-brand-secondary))",
                 }}
               >
                 {t.aboutPage.servicesDescription}
@@ -277,7 +278,7 @@ export function OurApproachSection() {
                             margin: 0,
                             fontSize: "13px",
                             lineHeight: 1.7,
-                            color: "var(--cr-muted-foreground, #5A6A51)",
+                            color: "var(--cr-muted-foreground, var(--color-brand-secondary))",
                           }}
                         >
                           {item.description}
@@ -295,7 +296,7 @@ export function OurApproachSection() {
               <div className="oas2-clinic-img">
                 <Image
                   src="/images/clinic/room.jpg"
-                  alt="Revera Clinic"
+                  alt={`${CLIENT.nameShort} Clinic`}
                   fill
                   sizes="(max-width: 1024px) 100vw, 480px"
                   style={{ objectFit: "cover", objectPosition: "center" }}

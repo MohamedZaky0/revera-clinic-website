@@ -27,22 +27,22 @@ export default function DoctorProfileTab({
   return (
     <div className="w-full space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-[#1F251A]">{t.profileTitle}</h2>
-        <p className="text-xs text-[#5A6A51] mt-0.5">
+        <h2 className="text-xl sm:text-2xl font-bold text-[var(--cr-dark)]">{t.profileTitle}</h2>
+        <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">
           {t.profileSubtitle}
         </p>
       </div>
 
       {/* Profile Card */}
-      <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
+      <div className="rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-4 sm:p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
         <div className="flex items-center gap-3.5 sm:gap-4">
-          <div className="flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-[#414E36] text-white font-extrabold text-lg sm:text-xl shadow-md shrink-0">
+          <div className="flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-[var(--cr-primary)] text-white font-extrabold text-lg sm:text-xl shadow-md shrink-0">
             {(doctorName.replace(/^Dr\.?\s*/i, '') || "D").slice(0, 2).toUpperCase()}
           </div>
           <div>
-            <h3 className="text-base sm:text-lg font-bold text-[#1F251A]">{doctorName}</h3>
-            <p className="text-xs text-[#5A6A51]">{doctorEmail}</p>
-            <span className="mt-1.5 sm:mt-2 inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-bold text-[#414E36]">
+            <h3 className="text-base sm:text-lg font-bold text-[var(--cr-dark)]">{doctorName}</h3>
+            <p className="text-xs text-[var(--color-brand-secondary)]">{doctorEmail}</p>
+            <span className="mt-1.5 sm:mt-2 inline-block rounded-xl bg-[var(--cr-primary)]/10 px-3 py-1 text-xs font-bold text-[var(--cr-primary)]">
               {t.assignedBranch} {resolvedBranchName}
             </span>
           </div>
@@ -50,30 +50,30 @@ export default function DoctorProfileTab({
       </div>
 
       {/* Password Update Form */}
-      <div className="rounded-2xl sm:rounded-3xl border border-[#414E36]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4 w-full">
-        <h3 className="text-xs sm:text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-          <Lock size={16} className="text-[#414E36]" /> {t.securityPasswordTitle}
+      <div className="rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-4 sm:p-6 shadow-sm space-y-4 w-full">
+        <h3 className="text-xs sm:text-sm font-bold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
+          <Lock size={16} className="text-[var(--cr-primary)]" /> {t.securityPasswordTitle}
         </h3>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div>
-            <label className="block text-xs font-bold text-[#5A6A51] mb-1">{t.newPasswordLabel}</label>
+            <label className="block text-xs font-bold text-[var(--color-brand-secondary)] mb-1">{t.newPasswordLabel}</label>
             <input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder={t.newPasswordPlaceholder}
-              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+              className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-[#5A6A51] mb-1">{t.confirmPasswordLabel}</label>
+            <label className="block text-xs font-bold text-[var(--color-brand-secondary)] mb-1">{t.confirmPasswordLabel}</label>
             <input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder={t.confirmPasswordPlaceholder}
-              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+              className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
             />
           </div>
         </div>
@@ -89,7 +89,7 @@ export default function DoctorProfileTab({
             setNewPassword("");
             setConfirmPassword("");
           }}
-          className="w-full sm:w-auto rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition cursor-pointer"
+          className="w-full sm:w-auto rounded-xl bg-[var(--cr-primary)] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition cursor-pointer"
         >
           {t.updatePasswordBtn}
         </button>
