@@ -44,16 +44,15 @@ const BASE_USER: UserProfileData = {
 };
 
 describe('doctor payroll — net salary math', () => {
-  // KNOWN BUG, not previously logged in ai_docs/RISKS.md (surfaced by this test pass — see the
-  // batch report). `getDateRange()` in UserProfileView.tsx builds `monthStr` from
-  // `new Date(year, month, 1).toISOString().split("T")[0]`. `new Date(year, month, 1)` is
-  // LOCAL midnight; `.toISOString()` converts to UTC. In any timezone ahead of UTC — including
-  // Africa/Cairo, this clinic's own timezone — local midnight on the 1st is still the previous day
-  // in UTC, so `monthStr` resolves to LAST month, not this one. `doctor_payroll` is looked up with
-  // `.eq("month", monthStr)`, so a doctor's current-month payroll row is silently never found (or
-  // the wrong month's row is matched) for the whole clinic's timezone. Reproduced directly against
-  // this sandbox's Europe/Berlin (UTC+2) clock.
-  it.fails('sums fixed salary + commission - deductions from the doctor_payroll row for the actual current month', async () => {
+  // RISK-111, fixed 2026-09-30: getDateRange() used to build start/end strings via
+  // `new Date(year, month, day).toISOString().split("T")[0]` — local midnight converted through
+  // UTC, which rolls back a day in any timezone ahead of UTC (including Africa/Cairo, this clinic's
+  // own timezone). `monthStr = startStr.slice(0, 7)` therefore resolved to last month, so
+  // `doctor_payroll` was looked up under the wrong month and a doctor's current-month row was never
+  // found. Fixed by formatting from the Date's own local getters (`toLocalDateStr`) instead of
+  // round-tripping through UTC. This also fixed the two "target progress" tests below, which had the
+  // same root cause (today's reservations falling just outside the UTC-shifted end boundary).
+  it('sums fixed salary + commission - deductions from the doctor_payroll row for the actual current month', async () => {
     const now = new Date();
     const realCurrentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     fake.seed('branches', []);

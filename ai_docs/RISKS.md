@@ -5000,6 +5000,40 @@ reversal of its usage); a phone change on a historical booking is still refused 
 
 ---
 
+## RISK-111: Doctor/Staff Payroll Summary Excluded Today's Revenue And Looked Up The Wrong Month's Payroll Row, In This Clinic's Own Timezone (RESOLVED)
+
+**Severity:** Medium (payroll/revenue display, not a ledger write) · **Type:** Timezone/date-boundary bug
+**Found:** 2026-09-30, while investigating 2 pre-existing `tests/components/UserProfileView.test.tsx`
+failures (introduced by an unrelated color-only refactor, `b6f45eb`, which was not their cause — both
+predate that commit). A third case for the same root cause was already written as `it.fails(...)` in
+the same file, correctly diagnosed in its own comment but never logged here.
+
+**What was wrong:** `UserProfileView.tsx`'s `getDateRange()` built the "This Month"/"Last Month"/"This
+Year" boundaries with `new Date(year, month, day).toISOString().split("T")[0]`. `new Date(year, month,
+day)` constructs **local midnight**; `.toISOString()` converts it to **UTC**. In any timezone ahead of
+UTC — including **Africa/Cairo, this clinic's own timezone (UTC+2/+3)** — local midnight on a given day
+is still the previous day in UTC, so the computed string silently lands one calendar day earlier than
+intended:
+- `monthStr` (`= startStr.slice(0, 7)`) resolved to **last month**, not the current one, so the
+  `doctor_payroll`/`hr_payroll` lookup (`.eq("month", monthStr)`) found the wrong row or no row at all
+  for the current month — a doctor/employee's Payroll Summary card showed stale or zeroed figures.
+- The **end** boundary rolled back a day too, so `.lte("date", endStr)` silently excluded **today's**
+  completed/confirmed/approved/started reservations from the "Target Progress" revenue sum — a doctor
+  who completed a session earlier today saw it uncounted until the next day.
+
+Reproduces on any machine whose local timezone is ahead of UTC (confirmed here on Africa/Cairo);
+invisible on a UTC or behind-UTC machine, which is presumably why it shipped unnoticed.
+
+**Fix:** `toLocalDateStr(d)` formats a `Date`'s own local `getFullYear()/getMonth()/getDate()` directly
+— never round-tripping through `.toISOString()` — and both `start`/`end` in `getDateRange()` now go
+through it. `src/components/admin/UserProfileView.tsx`.
+
+**Tests:** `tests/components/UserProfileView.test.tsx` — the `it.fails` case flipped to a normal
+passing `it` (fully diagnosed the same root cause on its own, just never logged here), and the two
+"target progress" tests now pass. Mutation-checked: reverting to `.toISOString()` fails 3 tests.
+
+---
+
 ## PROPOSALS.md Reference
 
 

@@ -713,6 +713,14 @@ export default function UserProfileView({
     };
   }, [user.workingDaysHours, user.shiftType, fetchedEmployee, fetchedProvider, selectedScheduleBranch, lang, tr]);
 
+  // Formats a Date's own local calendar day as "YYYY-MM-DD" — never via .toISOString(), which
+  // converts through UTC and silently shifts the boundary by a day in any timezone ahead of UTC
+  // (e.g. Africa/Cairo, UTC+2/+3): local midnight on the 1st of the month becomes 22:00/21:00 the
+  // day before in UTC, so the *last* day of the range came out one day short and quietly excluded
+  // "today"'s reservations from every period's revenue sum.
+  const toLocalDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
   // Helper to get date ranges based on selected period
   const getDateRange = (periodStr: string) => {
     const now = new Date();
@@ -730,8 +738,8 @@ export default function UserProfileView({
       end = new Date(now.getFullYear(), 11, 31);
     }
 
-    const startStr = start.toISOString().split("T")[0];
-    const endStr = end.toISOString().split("T")[0];
+    const startStr = toLocalDateStr(start);
+    const endStr = toLocalDateStr(end);
     return { startStr, endStr };
   };
 
