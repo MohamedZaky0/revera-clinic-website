@@ -144,10 +144,10 @@ export default function TermsPage() {
   const contactWeb = "www.reveraclinic.com";
 
   return (
-    <div className="min-h-screen bg-[#F6F8F6] text-[#1F251A] py-8 px-4 sm:px-8 font-sans" dir={isAr ? "rtl" : "ltr"}>
-      <div className="mx-auto max-w-4xl rounded-3xl bg-[#FAFCFA] p-6 sm:p-10 shadow-xl border border-[#414E36]/15">
+    <div className="min-h-screen bg-[#F6F8F6] text-[var(--cr-dark)] py-8 px-4 sm:px-8 font-sans" dir={isAr ? "rtl" : "ltr"}>
+      <div className="mx-auto max-w-4xl rounded-3xl bg-[#FAFCFA] p-6 sm:p-10 shadow-xl border border-[var(--cr-primary)]/15">
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-6 mb-8">
+        <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-6 mb-8">
           <Link href="/" className="flex items-center gap-3 group">
             <img src={CLIENT.logoPath} alt={`${CLIENT.nameShort} logo`} className="h-9 w-auto object-contain group-hover:scale-105 transition" />
           </Link>
@@ -171,7 +171,7 @@ export default function TermsPage() {
 
         {/* Header Title Section */}
         <div className="flex items-start gap-4 mb-8">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#EEF5EE] p-2 border border-[#414E36]/15 shadow-sm">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#EEF5EE] p-2 border border-[var(--cr-primary)]/15 shadow-sm">
             <img src={CLIENT.logoPath} alt={`${CLIENT.nameShort} logo`} className="h-10 w-auto object-contain" />
           </div>
           <div>

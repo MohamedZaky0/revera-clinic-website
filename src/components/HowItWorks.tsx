@@ -74,7 +74,7 @@ export function HowItWorks() {
             width: 56px;
             height: 56px;
             border-radius: 50%;
-            background-color: var(--cr-primary, #1F251A);
+            background-color: var(--cr-primary, var(--cr-dark));
             display: flex;
             align-items: center;
             justify-content: center;
@@ -195,7 +195,7 @@ export function HowItWorks() {
                 fontSize: "clamp(26px, 3.5vw, 42px)",
                 lineHeight: 1.15,
                 fontWeight: 400,
-                color: "var(--cr-primary, #1F251A)",
+                color: "var(--cr-primary, var(--cr-dark))",
               }}
             >
               {t.howItWorks.heading}
@@ -207,7 +207,7 @@ export function HowItWorks() {
                 margin: "0 0 32px 0",
                 fontSize: "15px",
                 lineHeight: 1.7,
-                color: "var(--cr-primary, #1F251A)",
+                color: "var(--cr-primary, var(--cr-dark))",
                 opacity: 0.75,
               }}
             >
@@ -333,7 +333,7 @@ export function HowItWorks() {
                         margin: 0,
                         fontSize: "18px",
                         fontWeight: 500,
-                        color: "var(--cr-primary, #1F251A)",
+                        color: "var(--cr-primary, var(--cr-dark))",
                         lineHeight: 1.3,
                       }}
                     >
@@ -344,7 +344,7 @@ export function HowItWorks() {
                         margin: 0,
                         fontSize: "14px",
                         lineHeight: 1.6,
-                        color: "var(--cr-primary, #1F251A)",
+                        color: "var(--cr-primary, var(--cr-dark))",
                         opacity: 0.7,
                       }}
                     >

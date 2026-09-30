@@ -149,12 +149,12 @@ export function printInvoice(
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            border-bottom: 2px solid #414E36;
+            border-bottom: 2px solid var(--cr-primary);
             padding-bottom: 20px;
             margin-bottom: 24px;
           }
           .logo-area h1 {
-            color: #414E36;
+            color: var(--cr-primary);
             margin: 0;
             font-size: 24px;
             font-weight: 700;
@@ -171,7 +171,7 @@ export function printInvoice(
           }
           .invoice-title-area h2 {
             margin: 0;
-            color: #C4AE7C;
+            color: var(--cr-accent);
             font-size: 28px;
             font-weight: 700;
             letter-spacing: 0.05em;
@@ -191,7 +191,7 @@ export function printInvoice(
             width: 48%;
           }
           .billing-info h3 {
-            color: #414E36;
+            color: var(--cr-primary);
             font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -231,8 +231,8 @@ export function printInvoice(
           .summary-table tr.total-row {
             font-weight: bold;
             font-size: 15px;
-            color: #414E36;
-            border-top: 2px solid #414E36;
+            color: var(--cr-primary);
+            border-top: 2px solid var(--cr-primary);
           }
           .footer {
             margin-top: 40px;
@@ -303,7 +303,7 @@ export function printInvoice(
               ? `
           <tr>
             <td style="color: #4B5563;">Paid from Wallet:</td>
-            <td style="text-align: right; font-weight: 600; color: #414E36;">- EGP ${walletUsed.toLocaleString()}</td>
+            <td style="text-align: right; font-weight: 600; color: var(--cr-primary);">- EGP ${walletUsed.toLocaleString()}</td>
           </tr>
           `
               : ''
@@ -365,10 +365,10 @@ export function printPrescription(rx: any, booking?: any) {
     .map(
       (it: any, idx: number) => `
     <tr>
-      <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: center; color: #5A6A51; font-weight: bold; width: 40px;">${idx + 1}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: center; color: var(--color-brand-secondary); font-weight: bold; width: 40px;">${idx + 1}</td>
       <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: left; color: #111827; font-weight: 700; font-size: 14px;">
         ${it.name || it.medicine_name || it.medicine || 'Medication'}
-        ${it.dosage ? `<span style="color: #414E36; font-size: 12px; font-weight: 600; display: block; margin-top: 2px;">(${it.dosage})</span>` : ''}
+        ${it.dosage ? `<span style="color: var(--cr-primary); font-size: 12px; font-weight: 600; display: block; margin-top: 2px;">(${it.dosage})</span>` : ''}
       </td>
       <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: left; color: #374151; font-weight: 500;">${it.frequency || 'As directed'}</td>
       <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: left; color: #374151; font-weight: 500;">${it.duration || 'As needed'}</td>
@@ -387,20 +387,20 @@ export function printPrescription(rx: any, booking?: any) {
           @page { size: A4 portrait; margin: 15mm; }
           * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; color: #111827; background: #fff; line-height: 1.5; }
-          .header { border-bottom: 2px solid #414E36; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
-          .logo-title { color: #414E36; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
-          .subtitle { margin: 2px 0 0 0; font-size: 12px; color: #5A6A51; font-weight: 600; }
+          .header { border-bottom: 2px solid var(--cr-primary); padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+          .logo-title { color: var(--cr-primary); margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+          .subtitle { margin: 2px 0 0 0; font-size: 12px; color: var(--color-brand-secondary); font-weight: 600; }
           .contact { font-size: 11px; color: #6B7280; margin-top: 2px; }
           .rx-badge { text-align: right; }
-          .rx-badge h2 { margin: 0; color: #C4AE7C; font-size: 26px; font-weight: 800; letter-spacing: 0.05em; }
+          .rx-badge h2 { margin: 0; color: var(--cr-accent); font-size: 26px; font-weight: 800; letter-spacing: 0.05em; }
           .rx-badge p { margin: 2px 0 0 0; font-size: 12px; color: #4B5563; }
           .patient-card { display: flex; justify-content: space-between; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-size: 13px; }
           .patient-card p { margin: 3px 0; }
-          .rx-symbol { font-family: serif; font-size: 32px; font-weight: bold; color: #414E36; margin-bottom: 8px; line-height: 1; }
+          .rx-symbol { font-family: serif; font-size: 32px; font-weight: bold; color: var(--cr-primary); margin-bottom: 8px; line-height: 1; }
           table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; }
-          th { background: #EDF1EC; color: #414E36; font-weight: 700; padding: 10px 12px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; border-bottom: 1px solid #E5E7EB; }
-          .instructions-box { margin-top: 20px; font-size: 12px; background: #FAF5EB; border: 1px solid #C4AE7C; padding: 14px 18px; border-radius: 10px; color: #414E36; }
-          .instructions-box strong { color: #1F251A; display: block; margin-bottom: 4px; font-size: 13px; }
+          th { background: var(--color-brand-tint); color: var(--cr-primary); font-weight: 700; padding: 10px 12px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; border-bottom: 1px solid #E5E7EB; }
+          .instructions-box { margin-top: 20px; font-size: 12px; background: #FAF5EB; border: 1px solid var(--cr-accent); padding: 14px 18px; border-radius: 10px; color: var(--cr-primary); }
+          .instructions-box strong { color: var(--cr-dark); display: block; margin-bottom: 4px; font-size: 13px; }
           .footer { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px dashed #D1D5DB; padding-top: 20px; font-size: 12px; color: #6B7280; }
           .doctor-sig { text-align: right; width: 200px; }
           .sig-line { border-bottom: 1px solid #374151; margin-bottom: 6px; height: 40px; }
@@ -461,7 +461,7 @@ export function printPrescription(rx: any, booking?: any) {
           </div>
           <div class="doctor-sig">
             <div class="sig-line"></div>
-            <p style="margin: 0; font-weight: 700; color: #1F251A;">${doctorName}</p>
+            <p style="margin: 0; font-weight: 700; color: var(--cr-dark);">${doctorName}</p>
             <p style="margin: 0; font-size: 11px;">Specialist Physician</p>
           </div>
         </div>
@@ -496,8 +496,8 @@ export function printEmployeeProfile(emp: any) {
           @page { size: A4 portrait; margin: 15mm; }
           * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           body { font-family: sans-serif; padding: 20px; color: #111827; line-height: 1.5; }
-          .header { border-bottom: 2px solid #414E36; padding-bottom: 12px; margin-bottom: 20px; }
-          h1 { color: #414E36; margin: 0; font-size: 22px; }
+          .header { border-bottom: 2px solid var(--cr-primary); padding-bottom: 12px; margin-bottom: 20px; }
+          h1 { color: var(--cr-primary); margin: 0; font-size: 22px; }
           .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 13px; }
           .card { border: 1px solid #E5E7EB; padding: 12px; border-radius: 6px; }
         </style>

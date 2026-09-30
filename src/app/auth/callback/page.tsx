@@ -71,7 +71,7 @@ function AuthCallbackContent() {
           <img src={CLIENT.logoPath} alt="logo" className="preloader-logo" />
         </div>
         <div style={{ textAlign: "center", color: "#FFFFFF", fontFamily: "var(--font-primary, sans-serif)", zIndex: 10, marginTop: "10px" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 500, color: "#C4AE7C", marginBottom: "0.5rem", letterSpacing: "1px" }}>Authenticating...</h2>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 500, color: "var(--cr-accent)", marginBottom: "0.5rem", letterSpacing: "1px" }}>Authenticating...</h2>
           <p style={{ fontSize: "0.875rem", opacity: 0.8, color: "#E0E0E0" }}>Setting up your secure session.</p>
         </div>
       </div>
