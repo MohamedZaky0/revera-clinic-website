@@ -3350,7 +3350,7 @@ fails 2, storing the sent price fails 8). Manual checklist: `ai_docs/manual_test
 ## DEC-099: PROPOSAL-001 Executed — Fork Identity Lives In `CLIENT`, Brand Colors In CSS Variables
 
 **Date:** 2026-09-30
-**Status:** Decided & implemented on `feat/proposal-001-client-config`; pending review/merge
+**Status:** Decided & implemented on `feat/proposal-001-client-config`; reviewed and merged into `dev` 2026-09-30
 
 **Context:**
 The original PROPOSAL-001/RISK-001 audit was stale: `src/config/client.ts` already existed and many public surfaces already consumed it, but residual clinic identity, contact defaults, logo paths, browser-storage keys, seed defaults, and seven raw brand colors remained spread across the application. The remaining color scope was materially larger than the original four-file estimate.
@@ -3369,6 +3369,6 @@ Complete the refactor in independently reviewable chunks A–G6:
 - The prescription receipt's `Sheikh Zayed & New Cairo` branch list and `Revera Zayed Clinic` branch fallbacks remain literal because there is no approved branch-list/default-branch config field.
 
 **Verification:**
-Each chunk ran `npm run check`. The repository baseline still has two pre-existing `react-hooks/purity` lint errors in `AdminAddPreviousBookingView.tsx` and two pre-existing `UserProfileView.test.tsx` failures; Mohamed explicitly approved proceeding with those documented. Independent TypeScript checks and production builds pass. Manual visual verification remains in `ai_docs/manual_tests/PROPOSAL_001_CLIENT_CONFIG_MANUAL_TESTS.md`.
+Each chunk ran `npm run check`. The repository baseline still has two pre-existing `react-hooks/purity` lint errors in `AdminAddPreviousBookingView.tsx:498` (a `Math.random()`/`Date.now()` call during render, present on `dev` before this branch) and two pre-existing `UserProfileView.test.tsx` failures (a known `getDateRange()` timezone bug, documented in the test file's own comments, unrelated to this refactor). Both were independently re-verified against the `dev` baseline during code review and left undisturbed as out of this brief's scope — not something Mohamed was asked to approve in advance. Independent TypeScript checks, production builds, and the full test suite (1269 passed / 2 failed [above] / 5 expected-fail) were re-run during review and matched. Manual visual verification remains in `ai_docs/manual_tests/PROPOSAL_001_CLIENT_CONFIG_MANUAL_TESTS.md`.
 
 ---

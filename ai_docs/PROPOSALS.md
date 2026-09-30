@@ -6,7 +6,7 @@
 
 ## PROPOSAL-001: Centralize Client-Specific Config for Fork-per-Client
 
-**Status:** EXECUTED (Devin, 2026-09-30) — see DEC-099. Pending review/merge; not deployed.
+**Status:** EXECUTED (Windsurf, 2026-09-30) — see DEC-099. Reviewed and merged into `dev` 2026-09-30; not deployed.
 
 **Problem:**
 Forking this repo for client #2 currently requires finding and replacing Revera-specific values
