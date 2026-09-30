@@ -1,7 +1,13 @@
 # ARCHITECTURE.md — Revera Clinics System Architecture
 
-> **Last Updated:** 2026-08-03
+> **Last Updated:** 2026-08-03; auth row and the note below corrected 2026-09-30.
 > **Audited from:** live source code, cross-checked against `supabase/migrations/` (all previous content was for a different project — discarded)
+> **Known gap as of 2026-09-30:** the "Supabase Tables" summary below was written before the Finance
+> module (invoices, invoice_lines, payments, wallet_txns, expenses, fixed_assets, loans, budget_lines,
+> packages/customer_packages/package_pulse_usage, transactions, and the reception bot's
+> `kb_reception_documents`/`kb_reception_chat_memory`) and is missing all of it. Treat
+> `ai_docs/DB_SCHEMA.md` as the current, complete table list; this section is a purpose summary of the
+> *original* tables only, not re-audited since.
 
 ---
 
@@ -13,8 +19,8 @@
 | Styling | Tailwind CSS v4 + shadcn/ui + CSS custom properties |
 | Database | Supabase (PostgreSQL) |
 | Storage | Supabase primary; local JSON fallback (`data/`) for providers + page_settings |
-| Auth (admin) | Supabase Auth (email + password). Login form rendered in-page; session checked on mount via `supabase.auth.getSession()`. Employee role + permissions fetched from `employee_accounts` + `roles` tables via `/api/auth/me`. Hardcoded bypass: `superadmin@revera.com` → full permissions, no DB lookup. **Note:** selected sensitive mutation routes validate bearer tokens server-side, but authorization coverage is not yet universal; the browser gate alone is not sufficient. |
-| Auth (patient) | Phone/OTP modal — UI-only; OTP is `setTimeout`-simulated, no real SMS |
+| Auth (admin) | Supabase Auth (email + password). Login form rendered in-page; session checked on mount via `supabase.auth.getSession()`. Employee role + permissions fetched from `employee_accounts` + `roles` tables via `/api/auth/me`. **Corrected 2026-09-30:** the `superadmin@revera.com` hardcoded bypass no longer exists in the code. Most sensitive routes now validate bearer tokens server-side with a real role/permission check (`requireStaffAccess`/`requireAdministratorAccess`/`requireSuperadminAccess`/`requireFinanceAccess`/`hasGranularPermission`) — see `SECURITY.md` for the current per-route table, which is the authoritative source for this, not this line. |
+| Auth (patient) | Phone/OTP modal — **real**, not simulated, since 2026-07-22 (RISK-003 resolved): sends/verifies OTPs through actual Supabase Auth |
 | i18n | Custom `LanguageContext` (EN/AR, RTL/LTR) |
 | Icons | lucide-react |
 | Fonts | Google Fonts via next/font (Marcellus heading, Sora body) |
