@@ -4093,14 +4093,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           setWcuDescription(data.whyChooseUs?.description || "At Revera, every detail is intentional — from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.");
           setWcuQuote(data.whyChooseUs?.quote || '"We don\'t treat conditions — we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey."');
           setWcuContactLabel(data.whyChooseUs?.contactLabel || "Reach us:");
-          setWcuPhone(data.whyChooseUs?.phone || "(+20) 01035595691");
+          setWcuPhone(data.whyChooseUs?.phone || CLIENT.phoneDisplay);
 
           setWcuYearsLabelAr(data.whyChooseUs?.yearsLabelAr || "١٥+ عاماً من التميز");
           setWcuHeadingAr(data.whyChooseUs?.headingAr || "حيث تلتقي الخبرة الطبية بتجربة فاخرة");
           setWcuDescriptionAr(data.whyChooseUs?.descriptionAr || "في ريفيرا، كل تفصيل مقصود — بدءاً من استشارتك الأولى وحتى لحظة خروجك متحوّلة. نقدم رعاية مدعومة بالعلم مع الثقة الهادئة لوجهة طبية خاصة.");
           setWcuQuoteAr(data.whyChooseUs?.quoteAr || '"نحن لا نعالج فقط — بل نُحوّل الثقة. كل جلسة في ريفيرا مصممة حولكِ: أهدافكِ، بشرتكِ، رحلتكِ."');
           setWcuContactLabelAr(data.whyChooseUs?.contactLabelAr || "تواصلي معنا:");
-          setWcuPhoneAr(data.whyChooseUs?.phoneAr || "(+20) 01035595691");
+          setWcuPhoneAr(data.whyChooseUs?.phoneAr || CLIENT.phoneDisplay);
 
           setWcuImage1(data.whyChooseUs?.image1 || "");
           setWcuImage2(data.whyChooseUs?.image2 || "");
@@ -10608,7 +10608,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       <div>
                         <h1 className="text-lg sm:text-xl font-bold tracking-wider text-[#414E36]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
                         <p className="text-xs text-[#5A6A51] mt-0.5 font-semibold">Sheikh Zayed / New Cairo</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">Phone: (+20) 01035595691</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Phone: {CLIENT.phoneDisplay}</p>
                         <p className="text-[11px] text-gray-400">Email: inquiries@reveraclinics.com</p>
                       </div>
                       <div className="text-right">
@@ -11082,7 +11082,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     <div>
                       <h1 className="text-lg sm:text-xl font-bold tracking-wider text-[#414E36]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
                       <p className="text-xs text-[#5A6A51] mt-0.5 font-semibold">Sheikh Zayed / New Cairo</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">Phone: (+20) 01035595691</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Phone: {CLIENT.phoneDisplay}</p>
                       <p className="text-[11px] text-gray-400">Email: inquiries@reveraclinics.com</p>
                     </div>
                     <div className="text-right">

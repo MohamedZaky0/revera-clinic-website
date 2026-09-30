@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { CLIENT } from "@/config/client";
 
 interface ClinicProfileSettingsViewProps {
   authenticatedJsonHeaders: { "Content-Type": string; Authorization: string };
@@ -13,7 +14,7 @@ export default function ClinicProfileSettingsView({ authenticatedJsonHeaders }: 
   const [clinicLocationAr, setClinicLocationAr] = useState("مدينة الشيخ زايد، الجيزة");
   const [clinicEmail, setClinicEmail] = useState("info@reveraclinics.com");
   const [clinicPhone, setClinicPhone] = useState("+20 2 3796 2200");
-  const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
+  const [clinicWhatsapp, setClinicWhatsapp] = useState<string>(CLIENT.phoneTel);
   const [savingClinicProfile, setSavingClinicProfile] = useState(false);
 
   async function handleSaveClinicProfile(e: React.FormEvent) {

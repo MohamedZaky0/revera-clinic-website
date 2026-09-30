@@ -4,6 +4,7 @@ import { Plus, X, MapIcon } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { Branch } from "@/types";
 import { adminTranslations } from "@/components/admin/translations";
+import { CLIENT } from "@/config/client";
 
 type BranchModalState = { open: boolean; mode: "add" | "edit"; branch: Partial<Branch> };
 
@@ -119,7 +120,7 @@ export default function BranchesView({
                 { field: "name_ar", label: t.fields.nameAr, placeholder: "مثال: فرع القاهرة الجديدة", required: true, dir: "rtl" },
                 { field: "address_en", label: t.fields.addressEn, placeholder: "e.g. 5th Settlement, New Cairo", required: true },
                 { field: "address_ar", label: t.fields.addressAr, placeholder: "مثال: التجمع الخامس، القاهرة الجديدة", required: true, dir: "rtl" },
-                { field: "phone", label: t.fields.phone, placeholder: "e.g. +201035595691" },
+                { field: "phone", label: t.fields.phone, placeholder: `e.g. ${CLIENT.phoneTel}` },
                 { field: "maps_embed", label: t.fields.mapsEmbed, placeholder: "https://www.google.com/maps/embed?pb=…" },
                 { field: "maps_link", label: t.fields.mapsLink, placeholder: "https://maps.app.goo.gl/…" },
               ] as Array<{ field: keyof Branch; label: string; placeholder: string; required?: boolean; dir?: string }>).map(({ field, label, placeholder, required, dir }) => (

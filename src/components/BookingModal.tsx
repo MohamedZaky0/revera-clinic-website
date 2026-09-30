@@ -130,7 +130,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
   const [instapayLink, setInstapayLink] = useState("https://www.instapay.eg");
   const [walletEnabled, setWalletEnabled] = useState(true);
   const [walletName, setWalletName] = useState("Vodafone Cash / Mobile Wallet");
-  const [walletNumber, setWalletNumber] = useState("01035595691");
+  const [walletNumber, setWalletNumber] = useState(CLIENT.phoneTel);
   const [walletLink, setWalletLink] = useState("");
   const [selectedDepositMethod, setSelectedDepositMethod] = useState<"instapay" | "wallet">("instapay");
   const [customerPaymentSender, setCustomerPaymentSender] = useState("");
@@ -407,7 +407,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
           if (data.deposit.walletNumber) {
             setWalletNumber(data.deposit.walletNumber);
           } else {
-            setWalletNumber("01035595691");
+            setWalletNumber(CLIENT.phoneTel);
           }
           if (data.deposit.walletLink) {
             setWalletLink(data.deposit.walletLink);
@@ -976,10 +976,10 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
 
   const walletQrUrl = walletLink 
     ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(walletLink)}`
-    : `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(walletNumber || "01035595691")}`;
+    : `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(walletNumber || CLIENT.phoneTel)}`;
 
   const currentQrUrl = selectedDepositMethod === "wallet" ? walletQrUrl : instapayQrUrl;
-  const currentPaymentLink = selectedDepositMethod === "wallet" ? (walletLink || `tel:${walletNumber || "01035595691"}`) : instapayLink;
+  const currentPaymentLink = selectedDepositMethod === "wallet" ? (walletLink || `tel:${walletNumber || CLIENT.phoneTel}`) : instapayLink;
 
   const handleDonePage = useCallback(() => {
     resetState();
