@@ -42,6 +42,308 @@ not yet written up; write one before handing it to Windsurf.
 Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
 (RISK-038 … RISK-050), which is the authoritative account.
 
+### PROPOSAL-001 — Centralize client-specific config in `CLIENT` (completed 2026-09-30)
+
+Executed by Windsurf on `feat/proposal-001-client-config`, 13 commits across chunks A-G6, reviewed
+and merged into `dev` (then into `main` the same day). Full decision record: **DEC-099**. Current
+scope status: `RISKS.md` RISK-001. Evidence: `ai_docs/manual_tests/PROPOSAL_001_CLIENT_CONFIG_MANUAL_TESTS.md`.
+
+Fork identity (name, contact, WhatsApp copy, logo, storage prefix) and the seven mapped brand colors
+now read from `src/config/client.ts`/CSS custom properties instead of scattered "Revera" literals
+and raw hex (found in ~85 files, not the 4 the original PROPOSAL-001 draft estimated). Independent
+review re-ran typecheck/build/full test suite/lint and spot-checked the largest diffs line by line —
+no migrations/API routes/middleware/tests touched, no behavior change, remaining literal survivors
+matched exactly what the report flagged.
+
+**Left open, not silently decided (see DEC-099):** mobile-wallet number reuses `CLIENT.phoneTel`
+rather than its own field; the printed contact email has no `CLIENT.email` field; Deposit Settings
+InstaPay/mobile-wallet flow is Egypt-specific and was not made portable; the prescription receipt's
+branch list and "Revera Zayed Clinic" fallback have no config field yet. Manual browser/screenshot
+verification was outstanding at merge time — check the manual-test file's evidence log for whether it
+has since been completed.
+
+### PROPOSAL-001 body (original ask, for reference)
+**Mohamed approved executing PROPOSAL-001 on 2026-09-30.** Windsurf implements; do not merge or
+deploy — Mohamed decides after Claude Code reviews the diff (Step C of the working agreement).
+
+### Read first — the docs are stale, read the code instead
+
+`ai_docs/PROPOSALS.md` → PROPOSAL-001 and `ai_docs/RISKS.md` → RISK-001 describe a refactor that
+has **already partly happened** and undercount what's left. Re-verified against the code on
+2026-09-30:
+
+- `src/config/client.ts` **already exists** with the full shape RISK-001/PROPOSAL-001 proposed
+  (`name`, `nameShort`, `tagline`, `metaDescription`, `phoneDisplay`, `phoneTel`,
+  `whatsappNumber`, `whatsappGreeting`, `whatsappBookingGreeting`, `siteUrl`, `googleMapsUrl`,
+  `instagramUrl`, `addressAr`, `gtmId`, `laserDevice`, `googleRating`, `logoPath`,
+  `logoMarkPath`, `faviconPath`, `storagePrefix`) — plus a few fields RISK-001 never mentioned
+  (the ad-landing-page fields). Do not recreate it or change its shape unless a chunk below says
+  so.
+- 21 files already `import { CLIENT } from "@/config/client"` (grep `from "@/config/client"` to
+  re-list them) — the public marketing pages, `Navbar`, `BookingModal`, `AuthModal`,
+  `SiteFooter`, `WhatsappButton`, `PackagesSection`, the landing pages, `serviceStore.ts`. This
+  work is done; **do not touch these files' existing `CLIENT.*` usages.**
+- What's actually left is bigger than RISK-001's old list in three ways it never covered:
+  hardcoded `localStorage`/`sessionStorage` key literals (`"revera_user"`,
+  `"revera_admin_session_active"`, etc. — RISK-001 only flagged `serviceStore.ts`'s three keys,
+  which are already fixed), and raw brand-hex colors are in **~85 files**, not the 4 RISK-001
+  named. Chunk G below is materially the biggest chunk in this brief.
+- `git fetch`, confirm no unmerged branch already touches the files this brief lists (`git log
+  --all --oneline -- <file>` for a sample if unsure), then create branch
+  `feat/proposal-001-client-config` from the latest `dev`. Never touch `main` or production.
+
+### Ground rule for every chunk
+
+**Zero visible or behavior change for Revera.** Every edit replaces a literal that already equals
+a `CLIENT.*` field's current value with a reference to that field — copy, layout, and computed
+strings must render identically before and after. If a literal doesn't cleanly match an existing
+`CLIENT` field's value, stop and ask Mohamed rather than guessing a new field into existence
+(chunk E has two flagged cases like this).
+
+Run `npm run check` after every chunk, not just at the end. Commit each chunk separately so a
+regression is bisectable.
+
+---
+
+### Chunk A — WhatsApp greeting text not yet reading `CLIENT.whatsappGreeting`/`whatsappBookingGreeting`
+
+`CLIENT.whatsappNumber` is already used in these files; the greeting *text* is still a second,
+separately hardcoded copy of the same string that's already in `client.ts`:
+
+- `src/components/BookingModal.tsx:863` — inline template literal starting `` `Hello Revera
+  Clinics,` ``. Replace with `CLIENT.whatsappBookingGreeting(serviceName)` if the surrounding
+  message is the booking variant, else `CLIENT.whatsappGreeting` — read the surrounding lines to
+  tell which, the two strings in `client.ts` are worded differently on purpose.
+- `src/components/admin/bookings/AdminBookingsView.tsx:1507` — follow-up WhatsApp message
+  ("Hello ${fu.patientName}, this is Revera Clinics…"). This is a *different* message shape (staff
+  → patient follow-up, not the public greeting) — do not force it into
+  `whatsappGreeting`/`whatsappBookingGreeting`; just replace the literal `"Revera Clinics"` inside
+  it with `CLIENT.name`.
+- `src/components/admin/bookings/BookingDetailsModal.tsx:592-595` — receipt-style WhatsApp message
+  with `📍 *Revera Clinics* — Sheikh Zayed & New Cairo` and `📞 (+20) 01035595691`. Same treatment:
+  `CLIENT.name` for the name, `CLIENT.phoneDisplay` for the phone. The branch list
+  ("Sheikh Zayed & New Cairo") is not in `client.ts` — leave it as a literal, flag it in your
+  report (see Chunk E's second flagged case, same underlying gap).
+
+### Chunk B — Phone number fallback defaults not yet reading `CLIENT.phoneDisplay`/`CLIENT.phoneTel`
+
+- `src/app/admin/page.tsx:4096,4103` — `data.whyChooseUs?.phone || "(+20) 01035595691"` (and the
+  `phoneAr` twin) → `|| CLIENT.phoneDisplay`.
+- `src/app/admin/page.tsx:10611,11085` — `Phone: (+20) 01035595691` display strings → template
+  with `CLIENT.phoneDisplay`.
+- `src/components/admin/settings/BranchesView.tsx:122` — placeholder text `"e.g.
+  +201035595691"` → `` `e.g. ${CLIENT.phoneTel}` ``. Add `import { CLIENT } from
+  "@/config/client";` — this file doesn't import it yet.
+- `src/components/admin/settings/ClinicProfileSettingsView.tsx:16` — already imports nothing
+  useful; add the `CLIENT` import, change `useState("+201035595691")` → `useState(CLIENT.phoneTel)`
+  (same pattern this file already uses at line 10 for `clinicWhatsapp` — no, check: verify whether
+  `clinicWhatsapp` here is actually `CLIENT.phoneTel` already or a separate literal; re-grep before
+  editing).
+- `src/components/BookingModal.tsx:133,410,980,983` — `walletNumber` default/fallback
+  `"01035595691"` (four occurrences). This is the Egyptian mobile-wallet payment number, not the
+  clinic's contact phone — confirm with Mohamed whether it should read `CLIENT.phoneTel` (same
+  number today) or needs its own `CLIENT` field, since a future clinic's wallet number will not
+  necessarily equal its contact phone. Default to `CLIENT.phoneTel` for now (matches today's
+  value, zero visible change) and log it as an open question in your report — see Chunk E.
+- `src/lib/printUtils.ts:414` — `Phone: (+20) 01035595691 | Email: inquiries@reveraclinics.com` →
+  `CLIENT.phoneDisplay` for the phone. The email isn't in `client.ts` either — same treatment as
+  the wallet number: use the literal for now, flag it (there is no `CLIENT.email` field to add
+  without confirming the shape with Mohamed first).
+
+### Chunk C — Logo path and alt text not yet reading `CLIENT.logoPath`/`CLIENT.name`
+
+Every remaining raw `"/images/main_logo.png"` string and every `alt="Revera…"` / `alt="…Revera
+Clinics"` attribute outside files already on `CLIENT`. Re-grep to get current line numbers (files
+shift as earlier chunks land), starting set as of 2026-09-30:
+
+`src/app/admin/page.tsx`, `src/app/auth/callback/page.tsx`, `src/app/auth/setup/page.tsx`,
+`src/app/login/page.tsx`, `src/app/terms/page.tsx`, `src/components/AboutPageIntro.tsx`,
+`src/components/AboutSection.tsx`, `src/components/AboutWhatWeDo.tsx`,
+`src/components/AppointmentSection.tsx`, `src/components/FaqSection.tsx`,
+`src/components/HomeServicesSection.tsx`, `src/components/IntroVideo.tsx`,
+`src/components/Navbar.tsx`, `src/components/OurApproachSection.tsx`,
+`src/components/OurJourneySection.tsx`, `src/components/Preloader.tsx`,
+`src/components/ServicesSection.tsx`, `src/components/TermsModal.tsx`,
+`src/components/TestimonialsSection.tsx`, `src/components/WhatWeDo.tsx`,
+`src/components/WhyChooseUs.tsx`, `src/components/admin/doctor/DoctorSidebar.tsx`,
+`src/components/admin/DoctorAccountView.tsx`.
+
+For each: `src="/images/main_logo.png"` → `src={CLIENT.logoPath}`; `alt="Revera…"` variants
+(`"Revera Clinics"`, `"Revera logo"`, `"Revera Clinic"`, and the longer ones like `"Physical
+therapy clinic — Revera Clinics"`) → substitute `CLIENT.name` for the "Revera Clinics"/"Revera"
+part only, keep the rest of the descriptive alt text as-is (it's accessibility content, not
+identity). Add `import { CLIENT } from "@/config/client";` to any file in this list that doesn't
+already have it.
+
+### Chunk D — `localStorage`/`sessionStorage` key literals not yet using `CLIENT.storagePrefix`
+
+`serviceStore.ts` already does this correctly (`` `${CLIENT.storagePrefix}_service_toggles` ``,
+etc.) — that's the pattern to copy. These keys are still raw `"revera_…"` literals:
+
+| Key | Files (re-grep for exact lines) |
+|---|---|
+| `revera_admin_session_active` | `src/app/admin/page.tsx` (8 occurrences), `src/app/login/page.tsx` (2), `src/components/WhatsappButton.tsx` (1) |
+| `revera_staff_auth` | `src/app/admin/page.tsx` (1) |
+| `revera_user` | `src/app/admin/page.tsx`? (re-check), `src/app/profile/page.tsx` (3), `src/components/AuthModal.tsx` (5), `src/components/BookingModal.tsx` (1), `src/components/Navbar.tsx` (2) |
+| `revera_profile_prompted` | `src/app/profile/page.tsx` (1), `src/components/AuthModal.tsx` (3), `src/components/Navbar.tsx` (1) |
+| `revera_global_ending_session`, `revera_inactivity_settings` | `src/components/admin/bookings/BookingDetailsModal.tsx` (1 line, both) |
+| `revera_settings_sync` | `src/components/admin/settings/HomePageSettingsView.tsx` (1), `src/components/Navbar.tsx` (1, as a `storage` event key comparison — must match exactly or the cross-tab sync silently breaks) |
+| `revera_channel` (BroadcastChannel name) | `src/components/admin/settings/HomePageSettingsView.tsx` (1), `src/components/Navbar.tsx` (1) |
+
+Replace every one with a template using `CLIENT.storagePrefix`
+(`` `${CLIENT.storagePrefix}_user` `` etc.), **matching the exact same derived string on both the
+writer and every reader of that key** — `revera_settings_sync` and `revera_channel` are read in a
+different file than they're written in HomePageSettingsView.tsx/Navbar.tsx, so a typo here breaks
+cross-tab sync silently (no error, just stale UI). After this chunk, grep the derived key strings
+across the whole `src/` tree to confirm every reader and writer agrees.
+
+**Behavior note, not a defect:** existing browser sessions with the old `revera_*` keys will not
+match the new derived keys once this ships, so patients' cached `revera_user` profile cache and
+staff's `revera_admin_session_active` flag reset once on first load after deploy (staff must log
+in again; patients see the login-prompt state instead of their cached profile once). This is a
+one-time, expected effect of a key rename, not a regression — say so explicitly in the PR so it
+isn't mistaken for a bug during review.
+
+### Chunk E — Per-fork default/seed values that should read `CLIENT.name`/`CLIENT.nameShort`
+
+- `src/app/admin/page.tsx:472,481,490,4706` and `src/app/api/page-settings/route.ts:16,25,34` —
+  `welcome: "Welcome to Revera Clinics"` seed/default strings (admin-editable Home page setting
+  defaults) → `` `Welcome to ${CLIENT.name}` ``. These three admin/page.tsx occurrences and the
+  three page-settings/route.ts ones must stay textually identical to each other (they're the same
+  default mirrored client- and server-side) — verify after editing.
+- `src/app/admin/page.tsx:3316,3320,4121,4125,4132,4136` — `instapayName`/`walletName` defaults
+  (`"Revera Clinic"` / `"Revera Clinics Cash"`). **Flag, don't silently generalize:** InstaPay is
+  an Egypt-specific payment rail; a non-Egyptian clinic fork won't use it at all. Changing the
+  *label* to `CLIENT.nameShort` is safe (zero visible change today) but do not imply the deposit
+  feature itself is portable — note in your report that Deposit Settings' InstaPay/wallet UI is
+  Egypt-specific and out of this brief's scope to genericize.
+- `src/components/admin/settings/ClinicProfileSettingsView.tsx:10` — `useState("Revera Clinics")`
+  → `useState(CLIENT.name)`.
+- `src/components/admin/settings/DepositSettingsView.tsx:79` — placeholder `"Revera Clinics"` →
+  `CLIENT.name`.
+- `src/components/admin/settings/HomePageSettingsView.tsx:292` — placeholder `"e.g. Welcome to
+  Revera Clinics"` → `` `e.g. Welcome to ${CLIENT.name}` ``.
+- `src/components/admin/settings/ServicesPageSettingsView.tsx:412` — placeholder `"At Revera,
+  every detail is intentional..."` → `` `At ${CLIENT.nameShort}, every detail is intentional...` ``.
+- `src/app/admin/page.tsx:4051-4064,4093-4094` — FAQ default Q&A copy ("What services does Revera
+  offer?", "Revera is a premium polyclinic…") — these are admin-editable seed defaults, not fixed
+  UI copy. Replace only the literal `"Revera"` token inside each with `CLIENT.nameShort`; leave the
+  surrounding sentence content as-is (it's marketing copy, same category as `translations.ts` —
+  see "Out of scope" below for where the line is).
+- `src/app/api/inventory/products/route.ts:84` — seed product note `'Revera clinical hydrating
+  moisturizer…'` → use `CLIENT.nameShort`. This is demo/seed data for a fresh install, low risk.
+- `src/app/api/medical-records/route.ts:149` — `doctor_name: reportData.doctor_name || 'Dr.
+  Revera'` → `` `Dr. ${CLIENT.nameShort}` ``. Confirm this fallback is actually reachable
+  (placeholder doctor name when none provided) and not dead code before touching it.
+- `src/components/admin/reception/ReceptionDashboardView.tsx:420` — default subtitle `"Let's make
+  today a great day at Revera Clinics."` → template with `CLIENT.name`.
+- `src/lib/printUtils.ts:459` — `✨ Revera Clinics wishes you a swift recovery…` → `CLIENT.name`.
+- `src/lib/roleUtils.ts:2` — a comment, not runtime copy (`"Utility functions for role mapping and
+  URL routing in Revera Admin."`). Fine to reword to be client-neutral, but this is cosmetic and
+  lowest priority — do it last if there's time, skip it if not.
+
+### Chunk F — Pages not yet importing `CLIENT` at all
+
+`src/app/login/page.tsx`, `src/app/auth/setup/page.tsx`, `src/app/profile/page.tsx`,
+`src/app/terms/page.tsx` (metadata/header/footer chrome only — the legal body text on the terms
+page is explicitly out of scope, see below). Add the `CLIENT` import, then apply Chunks B/C/D/E's
+matching replacements inside these specific files (their line numbers are already listed in the
+chunks above — this entry is just the import-statement bookkeeping, do it as part of the chunk
+that touches each file, not as a separate pass).
+
+### Chunk G — Raw brand-hex colors bypassing the CSS custom properties (the big one)
+
+`src/app/globals.css` already centralizes the brand palette as `--color-brand-*` /
+`--cr-*` custom properties (`--cr-primary`, `--cr-accent`, `--cr-dark`, `--cr-secondary`,
+`--cr-white`, `--cr-divider`, plus the raw `--color-brand-*` set). ~85 files still bypass it with
+literal hex — Tailwind arbitrary-value classes (`bg-[#414E36]`, `text-[#C4AE7C]`,
+`border-[#414E36]/20`, etc.) and inline `style={{ color: "#414E36" }}` / `backgroundColor:
+"#EDF1EC"`. Project rule (`CLAUDE.md` #1): no new raw hex, and existing ones get replaced with
+`var(--cr-*)` here.
+
+This is too large and too easy to get subtly wrong (a `/20` opacity suffix, a wrong token
+mapping) to do as one commit. Split into ordered sub-chunks, `npm run check` + a visual spot-check
+of 2-3 touched screens after each, one commit per sub-chunk:
+
+- **G1 — Public marketing site components** (`src/components/AboutPageIntro.tsx`,
+  `AboutSection.tsx`, `AboutWhatWeDo.tsx`, `Navbar.tsx`, `OurApproachSection.tsx`,
+  `OurJourneySection.tsx`, `PageHeader.tsx`, `HomeServicesSection.tsx`, `ServicesSection.tsx`,
+  `SiteFooter.tsx`, `TestimonialsSection.tsx`, `TermsModal.tsx`, `TermsManagerView.tsx`,
+  `WhatsappButton.tsx`, `WhyChooseUs.tsx`, `BookingModal.tsx`, `PackagesSection.tsx`,
+  `RoomsManagerView.tsx`).
+- **G2 — Shared UI + contexts** (`src/components/ui/MaterialDatePicker.tsx`,
+  `MaterialTimePicker.tsx`, `src/contexts/AlertConfirmContext.tsx`,
+  `src/contexts/LanguageContext.tsx` — check whether the hex hit here is even color data or a
+  false-positive grep match before editing).
+- **G3 — Admin doctor module** (everything under `src/components/admin/doctor/`, plus
+  `DoctorAccountView.tsx`, `UserProfileView.tsx`).
+- **G4 — Admin inventory, Finance, reports** (`src/components/admin/inventory/*`,
+  `src/components/admin/Finance/FinanceSection.tsx`, `src/components/admin/reports/*`,
+  `src/components/admin/transactions/*`).
+- **G5 — Admin patients, bookings, employees, hr, services, packages, settings, support, marketing**
+  (everything else under `src/components/admin/` not already covered — this is the largest
+  sub-chunk; if it's still too big when you get here, split it further by subfolder and say so in
+  your report rather than forcing one commit).
+- **G6 — `src/app/admin/page.tsx` itself**, and the remaining top-level pages
+  (`src/app/auth/callback/page.tsx`, `src/app/auth/setup/page.tsx`, `src/app/login/page.tsx`,
+  `src/app/profile/page.tsx`, `src/app/terms/page.tsx`).
+
+Mapping: `#414E36` → `var(--cr-primary)`, `#C4AE7C` → `var(--cr-accent)`, `#1F251A` →
+`var(--cr-dark)`, `#5A6A51` → `--color-brand-secondary` (no `--cr-` alias exists for this one —
+check `globals.css`; add a `--cr-*` alias only if you find yourself needing it in 3+ places, don't
+invent one for a single call site), `#F2EFE9`/`#EDF1EC` → `--color-brand-sand`/`--color-brand-tint`
+respectively, `#FBFBF9` → `--color-brand-light`. Preserve any opacity suffix (`bg-[#414E36]/10` →
+`bg-[var(--cr-primary)]/10` — Tailwind v4 supports the CSS-var-with-opacity-modifier form; verify
+this renders identically before relying on it broadly, on the very first file you touch in G1).
+
+### Explicitly out of scope — do not touch
+
+- `src/lib/translations.ts` and `src/components/admin/translations.ts` — UI copy, not config, by
+  the original PROPOSAL-001 decision. Contains "Revera" and the phone number dozens of times; this
+  is expected and correct to leave as literal content for now.
+- The legal body text in `src/app/terms/page.tsx`, `TermsModal.tsx`, `TermsManagerView.tsx`
+  (`content_en`/`content_ar` Terms & Conditions paragraphs) — same reasoning, this is contract
+  content a lawyer should review per fork, not template it blind. Only the page chrome (logo, nav,
+  footer copyright line) around it is in scope (Chunk C/F).
+- `src/lib/services.ts` `CATEGORY_LABELS` and the service catalog content — per-fork content by
+  design, not this brief.
+- Supabase env vars — already clean per RISK-001, no change needed.
+- Any raw hex inside `src/app/globals.css` itself — that file is the source of truth, not a bypass.
+- `.env.local`, `data/*.json` seed files' actual data values (only code that *writes* a hardcoded
+  fallback string is in scope, not the JSON content itself).
+
+### Verification / Done
+
+- `grep -rn "Revera" src --include=*.tsx --include=*.ts | grep -v -e config/client.ts -e
+  lib/translations.ts -e components/admin/translations.ts -e app/terms/page.tsx -e
+  TermsModal.tsx -e TermsManagerView.tsx` returns nothing (or only entries you explicitly flagged
+  as out of scope above — list them in your report, don't silently leave extras).
+- `grep -rn "#414E36\|#C4AE7C\|#1F251A\|#5A6A51\|#F2EFE9\|#EDF1EC\|#FBFBF9" src --include=*.tsx
+  --include=*.ts | grep -v globals.css` returns nothing.
+- `grep -rn "\"revera_\|'revera_" src` returns nothing outside `config/client.ts`/comments.
+- `npm run check` (lint, typecheck, test, build) green, no new test failures.
+- Public site and admin panel look pixel-identical to before for Revera — screenshot the 5-6
+  screens you touched most (home, about, a booking modal step, admin Settings → Clinic Profile,
+  admin Settings → Deposit, one doctor-portal screen) before and after, side by side, in your
+  report.
+- No other refactors, no renames beyond what's specified above, no new features, no dependency
+  changes, no merge into `dev` — Mohamed decides after Claude Code reviews.
+
+### Report back
+
+Per file per chunk, line-counted diff. Every flagged open question from Chunks A/B/E collected in
+one place (the wallet-number field, the email field, the InstaPay Egypt-specific note, the branch
+list in the WhatsApp receipt message). The `git diff --stat` full summary. Then, standing
+convention: Dev Notes block; `ai_docs/manual_tests/PROPOSAL_001_CLIENT_CONFIG_MANUAL_TESTS.md`
+(click through the 5-6 screens above plus one full booking flow and one admin login, checking
+against a fresh browser profile that the storage-key rename in Chunk D behaves as documented, not
+as a bug); a `DECISIONS.md` entry (next number after DEC-098) marking PROPOSAL-001 executed, with
+which chunks landed if not all of them; update `RISKS.md` RISK-001 to reflect what's now resolved
+vs. still open; update `PROPOSALS.md` PROPOSAL-001's status line from `PROPOSED` to `EXECUTED
+(Windsurf, <date>) — see DEC-0XX` or `PARTIALLY EXECUTED` if some chunks were deferred.
+
+---
+
 ### Brief 35 — Receptionist checkout owns the pulse deficit; the doctor screen only records pulses (completed 2026-09-25)
 
 Landed in the required order (the Method section's two phases): the server operation
