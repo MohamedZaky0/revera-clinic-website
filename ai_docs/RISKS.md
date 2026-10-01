@@ -390,6 +390,14 @@ per RISK-069, not the any-staff gap this fix closes. 16 unit tests for `hasGranu
 entry opened with — now reject a role with no matching permission and accept one with the coarse
 category or exact granular key.
 
+**Addendum 2026-09-30:** since commit `0976a72` (2026-09-10) `DELETE /api/providers` and `DELETE
+/api/customers` (soft and hard) are `requireSuperadminAccess`-only, so the "accepts a role with the
+coarse category or granular key" statement above no longer holds for those two DELETE routes —
+`SECURITY.md` and `API_CONTRACT.md` already reflect this (see also RISK-107's `requireFinanceAccess`
+follow-up). `tests/routes/rbac-enforcement.test.ts` asserts the new behaviour. `POST`/`PATCH` on
+`providers` and every verb on `services`/`inventory`/`customers/products` keep the staff + granular
+check described above.
+
 ---
 
 ## RISK-081: `SYSTEM_CORRUPTIONS_AND_AUDIT.md` Marks 10 Of Its 30 Cataloged Defects "Fixed" When They Are Not
