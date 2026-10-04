@@ -675,7 +675,8 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                         </div>
                                       ));
                                     }
-                                    const fallbackBranchName = branches.length === 1 ? (branches[0].name_en || branches[0].name_ar) : null;
+                                    const activeBranches = branches.filter((b) => b.status === "active");
+                                    const fallbackBranchName = activeBranches.length === 1 ? (activeBranches[0].name_en || activeBranches[0].name_ar) : null;
                                     return (
                                       <div className="flex items-center gap-1.5 text-[11px]">
                                         {fallbackBranchName && <span className="font-medium text-[var(--cr-dark)]">{fallbackBranchName}:</span>}
