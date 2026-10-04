@@ -34,6 +34,7 @@ export type Customer = {
   created_at?: string;
   updated_at?: string;
   age?: number | null;
+  date_of_birth?: string | null;
   national_id?: string | null;
   address?: string | null;
   referral?: string | null;

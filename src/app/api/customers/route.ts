@@ -144,6 +144,7 @@ export async function POST(req: Request) {
     floor_no,
     note,
     age,
+    date_of_birth,
     national_id,
     address,
     referral,
@@ -152,6 +153,15 @@ export async function POST(req: Request) {
 
   if (!name || !mobile) {
     return NextResponse.json({ error: 'Name and Mobile number are required' }, { status: 400 });
+  }
+
+  let cleanDob: string | null = null;
+  if (date_of_birth) {
+    const parsed = /^\d{4}-\d{2}-\d{2}$/.test(date_of_birth) ? new Date(`${date_of_birth}T00:00:00Z`) : null;
+    if (!parsed || Number.isNaN(parsed.getTime()) || parsed.getTime() > Date.now()) {
+      return NextResponse.json({ error: 'Date of birth must be a valid date, not in the future' }, { status: 400 });
+    }
+    cleanDob = date_of_birth;
   }
 
   let existing: { id: string; auth_user_id: string | null; mobile: string | null; email: string | null } | null = null;
@@ -209,7 +219,10 @@ export async function POST(req: Request) {
     building_no: building_no || null,
     floor_no: floor_no || null,
     note: note || null,
-    age: age ? Number(age) : null,
+    // A real date_of_birth supersedes the legacy free-entry age snapshot (DEC-041) — once one
+    // exists, age is always derived from it (never re-stored as a stale integer).
+    age: cleanDob ? null : (age ? Number(age) : null),
+    date_of_birth: cleanDob,
     national_id: national_id || null,
     address: address || null,
     referral: referral || null,
