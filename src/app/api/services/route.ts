@@ -77,7 +77,7 @@ function mapServiceToDb(s: any) {
     duration_minutes: durationMinutes,
     description_en: s.descriptionEn ?? s.description_en ?? '',
     description_ar: s.descriptionAr ?? s.description_ar ?? '',
-    is_shared: Boolean(s.isShared ?? s.is_shared ?? false),
+    is_shared: Boolean(s.isShared ?? s.is_shared ?? true),
     islaser: isLaserVal,
     is_laser: isLaserVal,
     enable_reminder: s.enableReminder !== undefined ? Boolean(s.enableReminder) : (s.enable_reminder !== undefined ? Boolean(s.enable_reminder) : true),

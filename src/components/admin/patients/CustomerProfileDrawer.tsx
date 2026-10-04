@@ -23,6 +23,7 @@ import {
   Info,
   Zap,
 } from "lucide-react";
+import { calculateAge } from "@/lib/age";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
 import ConfirmPackagePriceModal from "@/components/admin/patients/ConfirmPackagePriceModal";
@@ -748,8 +749,20 @@ export default function CustomerProfileDrawer({
                 <span className="font-semibold text-[var(--cr-dark)] break-all">{viewingCustomerProfile.email || "—"}</span>
               </div>
               <div>
+                <span className="block text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.dobLabel}</span>
+                <span className="font-semibold text-[var(--cr-dark)]">
+                  {viewingCustomerProfile.date_of_birth
+                    ? new Date(viewingCustomerProfile.date_of_birth).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                    : "—"}
+                </span>
+              </div>
+              <div>
                 <span className="block text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.ageLabel}</span>
-                <span className="font-semibold text-[var(--cr-dark)]">{viewingCustomerProfile.age || "—"}</span>
+                <span className="font-semibold text-[var(--cr-dark)]">
+                  {viewingCustomerProfile.date_of_birth
+                    ? calculateAge(viewingCustomerProfile.date_of_birth) ?? "—"
+                    : (viewingCustomerProfile.age || "—")}
+                </span>
               </div>
               <div>
                 <span className="block text-xs font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider mb-0.5">{t.genderLabel}</span>

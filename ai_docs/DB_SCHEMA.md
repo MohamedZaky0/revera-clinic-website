@@ -149,8 +149,8 @@ no application code reads or writes it; do not use it until its purpose is decid
 | `building_no` | text | Building number, nullable |
 | `floor_no` | text | Floor number, nullable |
 | `note` | text | Administrative customer notes, nullable |
-| `age` | integer | Customer age, nullable. Legacy/free-entry field — a static snapshot at whatever moment it was entered, not derived from `date_of_birth`. Kept for old records where only age (not a real birth date) was ever collected; new intake should prefer `date_of_birth`. |
-| `date_of_birth` | date | Nullable. **Added 2026-08-13** by `20260813120000_add_date_of_birth_to_customers.sql` (DEC-041) — the durable field for birthday-based re-targeting (packages/offers around a patient's birthday). `NULL` doubles as "incomplete" for that campaign; no separate flag column — deliberately, to avoid a second field that can drift out of sync with the real data. |
+| `age` | integer | Customer age, nullable. Legacy/free-entry field — a static snapshot at whatever moment it was entered, not derived from `date_of_birth`. Kept for old records where only age (not a real birth date) was ever collected. **`POST /api/customers` now nulls this column whenever `date_of_birth` is provided** (2026-10-04) — the two are never both a live source of truth for the same customer. |
+| `date_of_birth` | date | Nullable. **Added 2026-08-13** by `20260813120000_add_date_of_birth_to_customers.sql` (DEC-041) — the durable field for birthday-based re-targeting (packages/offers around a patient's birthday). `NULL` doubles as "incomplete" for that campaign; no separate flag column — deliberately, to avoid a second field that can drift out of sync with the real data. **Wired into the admin UI 2026-10-04** (optional field on `CustomerFormModal.tsx`; `CustomerProfileDrawer.tsx` and the form both display age computed from this via `src/lib/age.ts`'s `calculateAge`, never a stored value, once it's set). |
 | `national_id` | text | National ID card number, unique, nullable |
 | `address` | text | Detailed address string, nullable |
 | `referral` | text | Referral source, nullable |

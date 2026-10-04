@@ -9,6 +9,7 @@ import {
   Phone,
   Mail,
   Calendar,
+  Cake,
   CreditCard,
   Briefcase,
   Compass,
@@ -23,6 +24,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { adminTranslations } from "@/components/admin/translations";
+import { calculateAge } from "@/lib/age";
 
 interface CustomerFormModalProps {
   setShowCustomerFormModal: (v: boolean) => void;
@@ -61,6 +63,8 @@ export default function CustomerFormModal({
   const [isCustomerWhatsappSame, setIsCustomerWhatsappSame] = useState(true);
   const [customerWhatsapp, setCustomerWhatsapp] = useState("");
   const [custAge, setCustAge] = useState(c.age !== undefined && c.age !== null ? String(c.age) : "");
+  const [custDob, setCustDob] = useState(c.date_of_birth || "");
+  const ageFromDob = calculateAge(custDob);
   const [custNationalId, setCustNationalId] = useState(c.national_id || "");
   const [custAddress, setCustAddress] = useState(c.address || "");
   const [custReferral, setCustReferral] = useState(c.referral || "");
@@ -141,7 +145,8 @@ export default function CustomerFormModal({
       floor_no: custFloor.trim() || null,
       note: finalNote || null,
       // demographic fields
-      age: custAge ? parseInt(custAge) : null,
+      age: custDob ? null : (custAge ? parseInt(custAge) : null),
+      date_of_birth: custDob || null,
       national_id: custNationalId.trim() || null,
       address: custAddress.trim() || null,
       referral: custReferral.trim() || null,
@@ -352,7 +357,23 @@ export default function CustomerFormModal({
           </div>
 
           {/* Demographics & Personal Attributes */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 pt-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 pt-2">
+            <div>
+              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.dobLabel}</label>
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
+                  <Cake size={16} />
+                </div>
+                <input
+                  type="date"
+                  value={custDob}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setCustDob(e.target.value)}
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
+                />
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.ageLabel}</label>
               <div className="relative">
@@ -360,13 +381,22 @@ export default function CustomerFormModal({
                   <Calendar size={16} />
                 </div>
                 <input
-                  type="number"
-                  value={custAge}
+                  type={custDob ? "text" : "number"}
+                  value={custDob ? (ageFromDob ?? "") : custAge}
+                  readOnly={Boolean(custDob)}
+                  disabled={Boolean(custDob)}
                   onChange={(e) => setCustAge(e.target.value)}
                   placeholder={t.agePlaceholder}
-                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
+                  className={`w-full rounded-xl border px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm outline-none transition ${
+                    custDob
+                      ? "border-gray-200 bg-[#F7F7F6] font-semibold text-gray-700 cursor-not-allowed select-none"
+                      : "bg-white text-[var(--cr-dark)] border-[var(--cr-primary)]/15 focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
+                  }`}
                 />
               </div>
+              {custDob && (
+                <p className="mt-1 text-[11px] text-[var(--color-brand-secondary)]">{t.ageFromDobNote}</p>
+              )}
             </div>
 
             <div>

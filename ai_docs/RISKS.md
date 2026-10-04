@@ -390,6 +390,14 @@ per RISK-069, not the any-staff gap this fix closes. 16 unit tests for `hasGranu
 entry opened with — now reject a role with no matching permission and accept one with the coarse
 category or exact granular key.
 
+**Addendum 2026-09-30:** since commit `0976a72` (2026-09-10) `DELETE /api/providers` and `DELETE
+/api/customers` (soft and hard) are `requireSuperadminAccess`-only, so the "accepts a role with the
+coarse category or granular key" statement above no longer holds for those two DELETE routes —
+`SECURITY.md` and `API_CONTRACT.md` already reflect this (see also RISK-107's `requireFinanceAccess`
+follow-up). `tests/routes/rbac-enforcement.test.ts` asserts the new behaviour. `POST`/`PATCH` on
+`providers` and every verb on `services`/`inventory`/`customers/products` keep the staff + granular
+check described above.
+
 ---
 
 ## RISK-081: `SYSTEM_CORRUPTIONS_AND_AUDIT.md` Marks 10 Of Its 30 Cataloged Defects "Fixed" When They Are Not
@@ -5031,6 +5039,45 @@ through it. `src/components/admin/UserProfileView.tsx`.
 **Tests:** `tests/components/UserProfileView.test.tsx` — the `it.fails` case flipped to a normal
 passing `it` (fully diagnosed the same root cause on its own, just never logged here), and the two
 "target progress" tests now pass. Mutation-checked: reverting to `.toISOString()` fails 3 tests.
+
+---
+
+## RISK-112: Services Screen Shows Every Historical Branch's Price Forever — Deleting Or Deactivating A Branch Never Prunes `branch_pricing` (RESOLVED, admin display only)
+
+**Severity:** Low (display/data-hygiene, not money-moving) · **Type:** Stale denormalized data
+**Found:** 2026-10-04, reported by Mohamed — both in dev (after deleting branches down to one) and
+on the live system (a service carried pricing for a branch that had since been set Inactive).
+
+**What was wrong:** `services.branch_pricing` is a JSON array of `{ name, price, isDefault, ... }`
+entries keyed by branch **name**, not id — written once per service and never reconciled against
+the `branches` table afterward. `DELETE /api/branches` (`src/app/api/branches/route.ts`) only
+removes the branch row; it never touches any service's `branch_pricing`. `AdminServicesView.tsx`'s
+"Branches" column and `admin/page.tsx`'s `editService()` both read the raw stored array unfiltered,
+so a deleted or deactivated branch's price row stayed visible in the Services screen indefinitely —
+and because `editService()` fed that same raw array back into the save payload unchanged (just
+overwriting every entry's price), re-saving a service did not clean it up either; it reinforced it.
+
+**Fix (display/edit-load only, no data migration):** `AdminServicesView.tsx` now takes a `branches`
+prop and filters `branchPricing` down to entries whose name matches a branch with `status ===
+"active"` before rendering the table's "Branches" column. `admin/page.tsx`'s `editService()`
+applies the same filter before loading `serviceBranchPricing` into the edit form, so stale entries
+also stop being re-saved going forward. The "Add Service" and edit-modal fallback that previously
+hardcoded `name: "Zayed"` for a brand-new service's default branch entry now uses the real active
+branch's name instead. Existing `branch_pricing` rows in the database are not bulk-pruned — they
+shrink naturally as each service is individually edited and saved.
+
+**Explicitly not covered by this fix — flag if ever reported:** `getEffectiveServicePrice()` /
+`getEffectiveServicePriceWithPromotion()` in `src/lib/services.ts` (the public booking site's price
+resolution) fall back to whichever `branchPricing` entry has `isDefault: true` when no specific
+branch matches, **without checking that branch is still active**. If a since-deactivated branch's
+entry is the one carrying `isDefault: true`, the public price would still resolve from it. Mohamed
+confirmed the reported symptom was admin-display-only (not a wrong public price), so this fallback
+was deliberately left untouched here rather than changed un-asked on a revenue-facing code path.
+
+**Tests:** No new automated test — this is UI-display/edit-form filtering with no money or auth
+logic, consistent with other admin-component changes in this codebase that rely on Layer 3 (manual
+browser) coverage instead. Verified manually: see
+`ai_docs/manual_tests/SERVICES_DELETED_BRANCH_PRICING_MANUAL_TESTS.md`.
 
 ---
 

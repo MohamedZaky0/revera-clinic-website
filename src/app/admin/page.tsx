@@ -1382,7 +1382,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [serviceDescEn, setServiceDescEn] = useState("");
   const [serviceDescAr, setServiceDescAr] = useState("");
   const [serviceSortOrder, setServiceSortOrder] = useState(0);
-  const [serviceIsShared, setServiceIsShared] = useState(false);
+  const [serviceIsShared, setServiceIsShared] = useState(true);
   const [serviceIsLaser, setServiceIsLaser] = useState(false);
   const [serviceEnableReminder, setServiceEnableReminder] = useState(true);
   const [serviceImageUrl, setServiceImageUrl] = useState("");
@@ -1418,12 +1418,34 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     setServiceImageUrl(svc.img || "");
     setServicePrice(svc.price ?? 0);
     
-    if (Array.isArray(svc.branchPricing) && svc.branchPricing.length > 0) {
-      setServiceBranchPricing(svc.branchPricing);
+    // Deleting a branch only removes it from `branches` — nothing prunes the matching entry out
+    // of a service's `branchPricing[]` (it's a denormalized JSON array keyed by branch name, not
+    // id). Loading the raw stored array here would both show and re-save stale branches on every
+    // edit, so filter down to currently-active branches before this form ever sees them.
+    const activeBranchNames = new Set(
+      branches
+        .filter((b) => b.status === "active")
+        .flatMap((b) => [b.name_en, b.name_ar])
+        .filter((n): n is string => Boolean(n))
+        .map((n) => n.toLowerCase())
+    );
+    const liveBranchPricing = Array.isArray(svc.branchPricing)
+      ? svc.branchPricing.filter((bp: any) => bp?.name && activeBranchNames.has(String(bp.name).toLowerCase()))
+      : [];
+
+    if (liveBranchPricing.length > 0) {
+      setServiceBranchPricing(liveBranchPricing);
     } else {
       const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
+      const fallbackBranch = branches.find((b) => b.status === "active") || branches[0];
       setServiceBranchPricing([
-        { name: "Zayed", price: svc.price ?? 0, visible: toggles.visible, status: toggles.active, isDefault: true }
+        {
+          name: (fallbackBranch?.name_en || fallbackBranch?.name_ar || "Zayed"),
+          price: svc.price ?? 0,
+          visible: toggles.visible,
+          status: toggles.active,
+          isDefault: true,
+        },
       ]);
     }
     
@@ -6309,6 +6331,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           {/* ── SERVICES VIEW ── */}
           {activeNav === "Services" && (
             <AdminServicesView
+              branches={branches}
               localServices={localServices}
               setLocalServices={setLocalServices}
               localCategories={localCategories}
