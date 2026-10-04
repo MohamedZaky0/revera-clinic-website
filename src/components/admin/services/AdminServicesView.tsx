@@ -26,9 +26,11 @@ import ServiceRecipeEditor from "@/components/admin/services/ServiceRecipeEditor
 import ServiceDeviceEditor from "@/components/admin/services/ServiceDeviceEditor";
 import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
 import { adminTranslations } from "@/components/admin/translations";
+import type { Branch } from "@/types";
 
 interface AdminServicesViewProps {
   // State
+  branches: Branch[];
   localServices: ServiceItem[];
   setLocalServices: React.Dispatch<React.SetStateAction<ServiceItem[]>>;
   localCategories: LocalCategory[];
@@ -136,6 +138,7 @@ interface AdminServicesViewProps {
 
 export default function AdminServicesView(props: AdminServicesViewProps) {
   const {
+    branches,
     localServices, setLocalServices,
     localCategories, setLocalCategories,
     expandedCategories, setExpandedCategories,
@@ -305,6 +308,22 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
             }
             return 0;
           };
+
+          // A branch's own delete only removes it from `branches` — nothing prunes the matching
+          // entry out of every service's `branchPricing[]` (it's a denormalized JSON array keyed
+          // by branch name, not id). Without this filter, a deleted or deactivated branch's price
+          // row stays visible here forever.
+          const activeBranchNames = new Set(
+            (branches || [])
+              .filter((b) => b.status === "active")
+              .flatMap((b) => [b.name_en, b.name_ar])
+              .filter((n): n is string => Boolean(n))
+              .map((n) => n.toLowerCase())
+          );
+          const getActiveBranchPricing = (s: ServiceItem) =>
+            Array.isArray(s.branchPricing)
+              ? s.branchPricing.filter((bp: any) => bp && bp.name && activeBranchNames.has(String(bp.name).toLowerCase()))
+              : [];
 
           const getServiceName = (s: ServiceItem): string => {
             if (isRTL) {
@@ -506,7 +525,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       setServiceDescEn("");
                       setServiceDescAr("");
                       setServiceSortOrder(0);
-                      setServiceIsShared(false);
+                      setServiceIsShared(true);
                       setServiceIsLaser(
                         cat.key.toLowerCase().includes("laser") ||
                         (cat.en ? cat.en.toLowerCase().includes("laser") : false) ||
@@ -515,7 +534,12 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       setServiceEnableReminder(true);
                       setServiceImageUrl("");
                       setServicePrice(0);
-                      setServiceBranchPricing([{ name: "Zayed", price: 0, visible: true, status: true, isDefault: true }]);
+                      {
+                        const defaultBranch = branches.find((b) => b.status === "active") || branches[0];
+                        setServiceBranchPricing([
+                          { name: (defaultBranch?.name_en || defaultBranch?.name_ar || "Zayed"), price: 0, visible: true, status: true, isDefault: true },
+                        ]);
+                      }
                       setEditingService(null);
                       setShowAddServiceModal(true);
                     }}
@@ -640,21 +664,25 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                   <span className="font-medium text-[var(--cr-accent)]">EGP {svc.price ?? 0}</span>
                                 </td>
                                 <td className="px-5 py-3 text-xs text-[var(--color-brand-secondary)] max-w-[200px] truncate">
-                                  {Array.isArray(svc.branchPricing) && svc.branchPricing.length > 0 ? (
-                                    svc.branchPricing.map((bp) => (
-                                      <div key={bp.name} className="flex items-center gap-1.5 mb-0.5 text-[11px]">
-                                        <span className="font-medium text-[var(--cr-dark)]">{bp.name}:</span>
-                                        <span className="text-[var(--cr-accent)]">EGP {bp.price}</span>
-                                        {bp.isDefault && <span className="text-[8px] bg-[var(--cr-primary)]/10 text-[var(--cr-primary)] px-1 rounded font-bold">Def</span>}
+                                  {(() => {
+                                    const activeBp = getActiveBranchPricing(svc);
+                                    if (activeBp.length > 0) {
+                                      return activeBp.map((bp) => (
+                                        <div key={bp.name} className="flex items-center gap-1.5 mb-0.5 text-[11px]">
+                                          <span className="font-medium text-[var(--cr-dark)]">{bp.name}:</span>
+                                          <span className="text-[var(--cr-accent)]">EGP {bp.price}</span>
+                                          {bp.isDefault && <span className="text-[8px] bg-[var(--cr-primary)]/10 text-[var(--cr-primary)] px-1 rounded font-bold">Def</span>}
+                                        </div>
+                                      ));
+                                    }
+                                    const fallbackBranchName = branches.length === 1 ? (branches[0].name_en || branches[0].name_ar) : null;
+                                    return (
+                                      <div className="flex items-center gap-1.5 text-[11px]">
+                                        {fallbackBranchName && <span className="font-medium text-[var(--cr-dark)]">{fallbackBranchName}:</span>}
+                                        <span className="text-[var(--cr-accent)]">EGP {svc.price ?? 0}</span>
                                       </div>
-                                    ))
-                                  ) : (
-                                    <div className="flex items-center gap-1.5 text-[11px]">
-                                      <span className="font-medium text-[var(--cr-dark)]">Zayed:</span>
-                                      <span className="text-[var(--cr-accent)]">EGP {svc.price ?? 0}</span>
-                                      <span className="text-[8px] bg-[var(--cr-primary)]/10 text-[var(--cr-primary)] px-1 rounded font-bold">Def</span>
-                                    </div>
-                                  )}
+                                    );
+                                  })()}
                                 </td>
                                 <td className="px-5 py-3 text-center">
                                   <span className="font-medium text-[var(--cr-dark)]">{svc.sortOrder ?? 0}</span>
