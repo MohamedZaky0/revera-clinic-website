@@ -1009,6 +1009,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             <div className="flex items-center justify-between">
               <label htmlFor="patientPhone" className="text-xs sm:text-sm font-bold text-[#111827] flex items-center gap-1">
                 {tr.patientPhoneLabel} <span className="text-red-500">*</span>
+                {isEditMode && <Lock size={12} className="text-[#6B7280]" />}
               </label>
               {matchedCustomer && (
                 <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1">
@@ -1025,12 +1026,16 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 type="tel"
                 value={patientPhone}
                 onChange={handlePhoneChange}
+                readOnly={isEditMode}
+                disabled={isEditMode}
                 placeholder={tr.patientPhonePlaceholder}
-                title={tr.patientPhoneTooltip}
-                className={`w-full rounded-xl border bg-white py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] ${
-                  errors.phone
-                    ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
-                    : "border-gray-200 focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
+                title={isEditMode ? tr.patientPhoneLockedHint : tr.patientPhoneTooltip}
+                className={`w-full rounded-xl border py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium outline-none transition placeholder:text-[#9CA3AF] ${
+                  isEditMode
+                    ? "border-gray-200 bg-[#F7F7F6] text-gray-700 cursor-not-allowed"
+                    : errors.phone
+                    ? "border-rose-400 bg-white text-[#111827] focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                    : "border-gray-200 bg-white text-[#111827] focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
                 }`}
               />
             </div>
@@ -1040,7 +1045,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               </p>
             ) : (
               <p className="text-[11px] text-[#6B7280] font-normal leading-normal">
-                {tr.patientPhoneHelp}
+                {isEditMode ? tr.patientPhoneLockedHint : tr.patientPhoneHelp}
               </p>
             )}
           </div>
