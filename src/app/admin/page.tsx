@@ -4944,7 +4944,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     if (session?.access_token) {
       headers["Authorization"] = `Bearer ${session.access_token}`;
     }
-    fetch("/api/customers", { headers })
+    fetch("/api/customers", { headers, cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         return res.json();

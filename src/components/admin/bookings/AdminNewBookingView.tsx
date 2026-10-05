@@ -361,7 +361,7 @@ export default function AdminNewBookingView({
           if (authData?.session?.access_token) {
             authHeaders["Authorization"] = `Bearer ${authData.session.access_token}`;
           }
-          const cRes = await fetch("/api/customers", { headers: authHeaders });
+          const cRes = await fetch("/api/customers", { headers: authHeaders, cache: "no-store" });
           if (cRes.ok) {
             const apiCustomers = await cRes.json();
             if (Array.isArray(apiCustomers) && apiCustomers.length > 0) {
