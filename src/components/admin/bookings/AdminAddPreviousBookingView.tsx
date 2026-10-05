@@ -263,9 +263,9 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     }
   }, [initialCustomer, initialPatientPhone, initialPatientName, targetBooking]);
 
-  // Row 2 State: Date *, Service (Optional), Package (Optional), Products (Optional)
+  // Row 2 State: Date *, Services (Optional), Package (Optional), Products (Optional)
   const [bookingDate, setBookingDate] = useState("");
-  const [selectedServiceId, setSelectedServiceId] = useState("");
+  const [selectedServices, setSelectedServices] = useState<ServiceItem[]>([]);
   const [serviceSearchQuery, setServiceSearchQuery] = useState("");
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
   const serviceDropdownRef = useRef<HTMLDivElement>(null);
@@ -297,12 +297,19 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     if (packages && packages.length > 0) {
       setPkgList(packages);
     } else {
-      fetch("/api/packages")
-        .then(res => (res.ok ? res.json() : []))
-        .then((data: any) => {
-          if (Array.isArray(data)) setPkgList(data);
-        })
-        .catch(() => {});
+      (async () => {
+        try {
+          const headers = await getAuthHeaders();
+          const res = await fetch("/api/packages", { headers });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) setPkgList(data);
+            else if (data && Array.isArray(data.packages)) setPkgList(data.packages);
+          }
+        } catch (err) {
+          console.error("Error fetching packages in previous booking:", err);
+        }
+      })();
     }
   }, [packages]);
 
@@ -310,13 +317,19 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     if (products && products.length > 0) {
       setProdList(products);
     } else {
-      fetch("/api/inventory/products")
-        .then(res => (res.ok ? res.json() : null))
-        .then((data: any) => {
-          if (data && Array.isArray(data.products)) setProdList(data.products);
-          else if (Array.isArray(data)) setProdList(data);
-        })
-        .catch(() => {});
+      (async () => {
+        try {
+          const headers = await getAuthHeaders();
+          const res = await fetch("/api/inventory/products", { headers });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && Array.isArray(data.products)) setProdList(data.products);
+            else if (Array.isArray(data)) setProdList(data);
+          }
+        } catch (err) {
+          console.error("Error fetching inventory products in previous booking:", err);
+        }
+      })();
     }
   }, [products]);
 
@@ -446,22 +459,16 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     });
   }, [services, serviceSearchQuery]);
 
-  // Click outside to close service dropdown & sync display text
+  // Click outside to close service dropdown
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(e.target as Node)) {
         setIsServiceDropdownOpen(false);
-        if (selectedServiceId) {
-          const found = services.find((s) => String(s.id) === String(selectedServiceId));
-          if (found) {
-            setServiceSearchQuery(getServiceName(found));
-          }
-        }
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [selectedServiceId, services, lang]);
+  }, []);
 
   // Helper to extract package name cleanly
   const getPackageName = (p: PackageItem | any) => {
@@ -475,16 +482,15 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     return pr.name || `Product #${pr.id}`;
   };
 
-  // Recalculate invoice value when Service, Packages, or Product changes
+  // Recalculate invoice value when Services, Packages, or Product changes
   const recalculateInvoice = (
-    nextSrvId: string,
+    nextServices: ServiceItem[],
     currentPkgs: AttachedPackageItem[],
     nextProdId: string
   ) => {
-    const srv = services.find((s) => String(s.id) === String(nextSrvId));
     const prod = prodList.find((pr) => String(pr.id) === String(nextProdId));
 
-    const srvPrice = Number(srv?.price || 0);
+    const srvPrice = nextServices.reduce((sum, s) => sum + Number(s.price || 0), 0);
     const pkgsPrice = currentPkgs.reduce(
       (sum, p) => sum + (p.source === "catalog" ? Number(p.price || 0) : 0),
       0
@@ -498,6 +504,23 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     if (!hasManuallyEditedSpent) {
       setActualSpent(totalStr);
     }
+  };
+
+  // Handle adding a service
+  const handleAddService = (s: ServiceItem) => {
+    if (selectedServices.some((existing) => String(existing.id) === String(s.id))) return;
+    const nextList = [...selectedServices, s];
+    setSelectedServices(nextList);
+    setServiceSearchQuery("");
+    setIsServiceDropdownOpen(false);
+    recalculateInvoice(nextList, attachedPackages, selectedProductId);
+  };
+
+  // Handle removing a service
+  const handleRemoveService = (serviceId: string | number) => {
+    const nextList = selectedServices.filter((s) => String(s.id) !== String(serviceId));
+    setSelectedServices(nextList);
+    recalculateInvoice(nextList, attachedPackages, selectedProductId);
   };
 
   // Handle adding a package (supports both "existing:ID" and "catalog:ID")
@@ -565,7 +588,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
       const nextList = [...attachedPackages, newPkg];
       setAttachedPackages(nextList);
-      recalculateInvoice(selectedServiceId, nextList, selectedProductId);
+      recalculateInvoice(selectedServices, nextList, selectedProductId);
     } else {
       const pId = val.replace("catalog:", "");
       const pkg = pkgList.find((p) => String(p.id) === String(pId));
@@ -613,7 +636,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
       const nextList = [...attachedPackages, newPkg];
       setAttachedPackages(nextList);
-      recalculateInvoice(selectedServiceId, nextList, selectedProductId);
+      recalculateInvoice(selectedServices, nextList, selectedProductId);
     }
   };
 
@@ -621,7 +644,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
   const handleRemovePackage = (pkgEntryId: string) => {
     const nextList = attachedPackages.filter((p) => p.id !== pkgEntryId);
     setAttachedPackages(nextList);
-    recalculateInvoice(selectedServiceId, nextList, selectedProductId);
+    recalculateInvoice(selectedServices, nextList, selectedProductId);
   };
 
   // Pulses input handlers per package (Pulses Used drives Pulses Left automatically)
@@ -773,7 +796,6 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     const spentMatch = rawNotes.match(/Actual Spent:\s*(\d+(?:\.\d+)?)/i);
     const payMethodMatch = rawNotes.match(/Payment Method:\s*([^\.\n]+)/i);
 
-    const sId = String(targetBooking.service_id || targetBooking.serviceId || (targetBooking.serviceIds && targetBooking.serviceIds[0]) || "");
     const dId = String(targetBooking.provider_id || targetBooking.doctorId || targetBooking.doctor_id || "");
     const pPhone = targetBooking.phone || targetBooking.customer_phone || targetBooking.patientPhone || "";
     const pName = targetBooking.name || targetBooking.customer_name || targetBooking.patientName || "";
@@ -794,17 +816,46 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     if (pName) setPatientName(pName);
     if (bDate) setBookingDate(bDate);
     if (dId) setSelectedDoctorId(dId);
-    if (sId) setSelectedServiceId(sId);
     if (invVal !== undefined && invVal !== null && invVal !== "") setInvoiceValue(String(invVal));
     if (actSpent !== undefined && actSpent !== null && actSpent !== "") setActualSpent(String(actSpent));
     if (payType) setSelectedPaymentType(payType);
     if (cleanNotes) setNotes(cleanNotes);
 
-    if (sId && services.length > 0) {
-      const foundSvc = services.find((s) => String(s.id) === sId);
-      if (foundSvc) {
-        setServiceSearchQuery(getServiceName(foundSvc));
+    // Multi-service extraction in edit mode
+    const rawSvcIds: any[] = Array.isArray(targetBooking.service_ids)
+      ? targetBooking.service_ids
+      : Array.isArray(targetBooking.serviceIds)
+      ? targetBooking.serviceIds
+      : (targetBooking.service_id || targetBooking.serviceId)
+      ? [targetBooking.service_id || targetBooking.serviceId]
+      : [];
+
+    const matchedInitialSvcs: ServiceItem[] = [];
+    if (rawSvcIds.length > 0 && services.length > 0) {
+      rawSvcIds.forEach((id: any) => {
+        const found = services.find((s) => String(s.id) === String(id));
+        if (found && !matchedInitialSvcs.some((m) => String(m.id) === String(found.id))) {
+          matchedInitialSvcs.push(found);
+        }
+      });
+    } else if (services.length > 0) {
+      const svcsMatch = rawNotes.match(/Services?:\s*([^\.\n]+)/i);
+      if (svcsMatch) {
+        const names = svcsMatch[1].split(",").map((n: string) => n.trim().toLowerCase());
+        services.forEach((s) => {
+          const nEn = (s.en || s.name || s.title || "").toLowerCase();
+          const nAr = (s.ar || "").toLowerCase();
+          if (names.some((name: string) => name && (nEn === name || nAr === name || nEn.includes(name) || nAr.includes(name)))) {
+            if (!matchedInitialSvcs.some((m) => String(m.id) === String(s.id))) {
+              matchedInitialSvcs.push(s);
+            }
+          }
+        });
       }
+    }
+
+    if (matchedInitialSvcs.length > 0) {
+      setSelectedServices(matchedInitialSvcs);
     }
 
     // Product extraction in edit mode
@@ -958,8 +1009,11 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
     try {
       const selectedDoc = providers.find((p) => String(p.id) === String(selectedDoctorId));
-      const selectedSrv = services.find((s) => String(s.id) === String(selectedServiceId));
       const selectedProd = prodList.find((pr) => String(pr.id) === String(selectedProductId));
+
+      const selectedServiceIds = selectedServices.map((s) => Number(s.id)).filter((n) => !isNaN(n) && n > 0);
+      const primaryService = selectedServices[0] || null;
+      const allServiceNames = selectedServices.map((s) => getServiceName(s)).join(", ");
 
       const parsedInvoiceVal = invoiceValue !== "" ? parseFloat(invoiceValue) : 0;
       const parsedSpentVal = actualSpent !== "" ? parseFloat(actualSpent) : 0;
@@ -973,8 +1027,14 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         date: bookingDate,
         doctorId: selectedDoctorId || null,
         doctorName: selectedDoc?.name || null,
-        serviceId: selectedServiceId ? Number(selectedServiceId) : null,
-        serviceName: selectedSrv ? getServiceName(selectedSrv) : null,
+        serviceId: primaryService ? Number(primaryService.id) : null,
+        serviceIds: selectedServiceIds,
+        services: selectedServices.map((s) => ({
+          id: Number(s.id),
+          name: getServiceName(s),
+          price: Number(s.price || 0)
+        })),
+        serviceName: allServiceNames || null,
         productId: selectedProductId || null,
         productName: selectedProd ? getProductName(selectedProd) : null,
         packageId: firstPkg?.packageId || null,
@@ -1407,11 +1467,18 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             )}
           </div>
 
-          {/* FIELD 5: SERVICE (OPTIONAL) - Searchable autocomplete input */}
+          {/* FIELD 5: SERVICES (OPTIONAL - MULTI-SERVICE SUPPORT) */}
           <div className="space-y-1.5 relative" ref={serviceDropdownRef}>
-            <label htmlFor="serviceSearchInput" className="text-xs sm:text-sm font-bold text-[#111827]">
-              {tr.serviceOptional || tr.serviceLabel}
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="serviceSearchInput" className="text-xs sm:text-sm font-bold text-[#111827]">
+                {tr.servicesOptional || tr.serviceOptional || (lang === "ar" ? "الخدمات (اختياري)" : "Services (Optional)")}
+              </label>
+              {selectedServices.length > 0 && (
+                <span className="text-[10px] font-bold text-[#344E41] bg-[#E8EFE5] px-2 py-0.5 rounded-full">
+                  {selectedServices.length} {lang === "ar" ? "خدمات مضافة" : "selected"}
+                </span>
+              )}
+            </div>
             <div className="relative flex items-center">
               <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <Layers size={17} />
@@ -1422,29 +1489,26 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 autoComplete="off"
                 value={serviceSearchQuery}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  setServiceSearchQuery(val);
+                  setServiceSearchQuery(e.target.value);
                   setIsServiceDropdownOpen(true);
-                  if (!val) {
-                    setSelectedServiceId("");
-                    recalculateInvoice("", attachedPackages, selectedProductId);
-                  }
                 }}
                 onFocus={() => setIsServiceDropdownOpen(true)}
-                placeholder={tr.searchServicePlaceholder || tr.selectServicePlaceholder || "Search service..."}
+                placeholder={
+                  selectedServices.length > 0
+                    ? (lang === "ar" ? "+ إضافة خدمة أخرى..." : "+ Add another service...")
+                    : (tr.searchServicePlaceholder || tr.selectServicePlaceholder || "Search service...")
+                }
                 className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
               />
               {serviceSearchQuery ? (
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedServiceId("");
                     setServiceSearchQuery("");
                     setIsServiceDropdownOpen(false);
-                    recalculateInvoice("", attachedPackages, selectedProductId);
                   }}
                   className="absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#9CA3AF] hover:text-[var(--cr-primary)] transition cursor-pointer z-10"
-                  title="Clear service"
+                  title="Clear search"
                 >
                   <X size={16} />
                 </button>
@@ -1463,16 +1527,17 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 <div className="absolute top-full left-0 right-0 mt-1.5 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl z-50 py-1 divide-y divide-gray-50">
                   {filteredServices.length > 0 ? (
                     filteredServices.map((s) => {
-                      const isSelected = String(selectedServiceId) === String(s.id);
+                      const isSelected = selectedServices.some((sel) => String(sel.id) === String(s.id));
                       return (
                         <button
                           key={s.id}
                           type="button"
                           onClick={() => {
-                            setSelectedServiceId(String(s.id));
-                            setServiceSearchQuery(getServiceName(s));
-                            setIsServiceDropdownOpen(false);
-                            recalculateInvoice(String(s.id), attachedPackages, selectedProductId);
+                            if (isSelected) {
+                              handleRemoveService(s.id);
+                            } else {
+                              handleAddService(s);
+                            }
                           }}
                           className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs sm:text-sm text-start font-medium transition cursor-pointer ${
                             isSelected
@@ -1480,9 +1545,18 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                               : "text-[#111827] hover:bg-[#F4F7F2] hover:text-[#344E41]"
                           }`}
                         >
-                          <span className="truncate">{getServiceName(s)}</span>
-                          {isSelected && (
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="truncate">{getServiceName(s)}</span>
+                            {Number(s.price || 0) > 0 && (
+                              <span className="text-[11px] text-gray-500 font-semibold shrink-0">
+                                ({Number(s.price).toLocaleString()} EGP)
+                              </span>
+                            )}
+                          </div>
+                          {isSelected ? (
                             <Check size={16} className="text-[var(--cr-primary)] shrink-0 ml-2 rtl:ml-0 rtl:mr-2" />
+                          ) : (
+                            <Plus size={15} className="text-gray-400 shrink-0 ml-2 rtl:ml-0 rtl:mr-2" />
                           )}
                         </button>
                       );
@@ -1495,6 +1569,33 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 </div>
               )}
             </div>
+
+            {/* Selected Services Badges */}
+            {selectedServices.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {selectedServices.map((s) => (
+                  <span
+                    key={s.id}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#E8EFE5] text-[#344E41] text-xs font-semibold border border-[#344E41]/20 shadow-2xs"
+                  >
+                    <span className="truncate max-w-[150px]">{getServiceName(s)}</span>
+                    {Number(s.price || 0) > 0 && (
+                      <span className="text-[10px] text-emerald-800 font-bold">
+                        {Number(s.price).toLocaleString()} EGP
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveService(s.id)}
+                      className="text-[#344E41]/70 hover:text-red-600 transition cursor-pointer p-0.5"
+                      title="Remove service"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* FIELD 6: PACKAGE (OPTIONAL - MULTI-PACKAGE SUPPORT) */}
@@ -1576,16 +1677,19 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 onChange={(e) => {
                   const prId = e.target.value;
                   setSelectedProductId(prId);
-                  recalculateInvoice(selectedServiceId, attachedPackages, prId);
+                  recalculateInvoice(selectedServices, attachedPackages, prId);
                 }}
                 className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10 cursor-pointer"
               >
-                <option value="">{tr.selectProductPlaceholder}</option>
-                {prodList.map((pr) => (
-                  <option key={pr.id} value={pr.id}>
-                    {getProductName(pr)}
-                  </option>
-                ))}
+                <option value="">{tr.selectProductPlaceholder || (lang === "ar" ? "اختر منتج..." : "Select product...")}</option>
+                {prodList.map((pr) => {
+                  const price = Number(pr.selling_price ?? pr.price ?? 0);
+                  return (
+                    <option key={pr.id} value={pr.id}>
+                      {getProductName(pr)} {price > 0 ? `(${price.toLocaleString()} EGP)` : ""}
+                    </option>
+                  );
+                })}
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] z-10">
                 <ChevronDown size={17} />

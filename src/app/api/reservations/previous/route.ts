@@ -212,19 +212,38 @@ export async function POST(req: Request) {
     const incomingPackages = normalizeIncomingPackages(body);
     const packageOutcomes: HistoricalPackageOutcome[] = [];
 
-    // Resolve service metadata
-    let resolvedServiceId = serviceId ? Number(serviceId) : null;
-    if (isNaN(resolvedServiceId as number)) resolvedServiceId = null;
-    let resolvedServiceName = serviceName || null;
-    if (resolvedServiceId) {
-      const { data: srvRow } = await supabaseServer
+    // Resolve service metadata (supports multiple services via serviceIds or legacy serviceId)
+    const incomingServiceIds: number[] = Array.isArray(body.serviceIds)
+      ? body.serviceIds.map((id: any) => Number(id)).filter((id: number) => !isNaN(id) && id > 0)
+      : Array.isArray(body.services)
+      ? body.services.map((s: any) => Number(s.id || s.serviceId)).filter((id: number) => !isNaN(id) && id > 0)
+      : serviceId
+      ? [Number(serviceId)].filter((id) => !isNaN(id) && id > 0)
+      : [];
+
+    let resolvedServiceIds: number[] = incomingServiceIds;
+    let resolvedServiceId = resolvedServiceIds.length > 0 ? resolvedServiceIds[0] : null;
+    let resolvedServiceNames: string[] = [];
+    let resolvedServicesList: Array<{ id: number; name: string; price: number }> = [];
+
+    if (resolvedServiceIds.length > 0) {
+      const { data: srvRows } = await supabaseServer
         .from('services')
         .select('id, en, ar, price')
-        .eq('id', resolvedServiceId)
-        .maybeSingle();
-      if (srvRow) {
-        if (!resolvedServiceName) resolvedServiceName = srvRow.en || srvRow.ar;
+        .in('id', resolvedServiceIds);
+
+      if (srvRows && srvRows.length > 0) {
+        resolvedServicesList = srvRows.map((r: any) => ({
+          id: r.id,
+          name: r.en || r.ar || `Service #${r.id}`,
+          price: Number(r.price || 0),
+        }));
+        resolvedServiceNames = resolvedServicesList.map((s) => s.name);
       }
+    }
+
+    if (resolvedServiceNames.length === 0 && serviceName) {
+      resolvedServiceNames = [serviceName];
     }
 
     // 4. Patient Matching & Financial Ledger Reconciliation
@@ -363,7 +382,7 @@ export async function POST(req: Request) {
 
     // 6. Prepare historical reservation payload
     const historicalTag = '[Historical Booking]';
-    const srvNote = resolvedServiceName ? ` Service: ${resolvedServiceName}.` : '';
+    const srvNote = resolvedServiceNames.length > 0 ? ` Services: ${resolvedServiceNames.join(', ')}.` : '';
     const pkgNotes = historicalPackageNotes(incomingPackages);
 
     const prodNote = resolvedProductName ? ` Product: ${resolvedProductName}.` : '';
@@ -383,7 +402,7 @@ export async function POST(req: Request) {
       status: 'completed',
       is_manual: true,
       service_id: resolvedServiceId,
-      service_ids: resolvedServiceId ? [resolvedServiceId] : [],
+      service_ids: resolvedServiceIds,
       provider_id: resolvedDoctorId,
       doctor_name: resolvedDoctorName || '—',
       branch_id: branchId || null,
@@ -429,7 +448,29 @@ export async function POST(req: Request) {
     const staffEmployeeId = (access as any).access?.employee?.id || null;
     const staffEmployeeName = (access as any).access?.employee?.name || (access as any).access?.employee?.email?.split('@')[0] || 'Receptionist';
 
-    // 7a. Insert product into reservation_products
+    // 7a. Insert services into reservation_products
+    if (resolvedServicesList.length > 0) {
+      for (let i = 0; i < resolvedServicesList.length; i++) {
+        const s = resolvedServicesList[i];
+        try {
+          await supabaseServer.from('reservation_products').insert({
+            reservation_id: newReservation.id,
+            line_type: i === 0 ? 'service' : 'additional_service',
+            service_id: s.id,
+            description: s.name,
+            qty: 1,
+            unit_price: s.price,
+            total: s.price,
+            added_by_employee_id: staffEmployeeId,
+            added_by_role: 'receptionist'
+          });
+        } catch (sErr: any) {
+          console.warn('Could not insert reservation_products for service (non-fatal):', sErr?.message);
+        }
+      }
+    }
+
+    // 7b. Insert product into reservation_products
     if (productId || resolvedProductName) {
       try {
         await supabaseServer.from('reservation_products').insert({
@@ -502,7 +543,7 @@ export async function POST(req: Request) {
     // 8. Record Financial Transaction (RISK-076) in `transactions` table
     if (parsedPaid > 0 && customerId) {
       const descItems: string[] = [];
-      if (resolvedServiceName) descItems.push(`Service: ${resolvedServiceName}`);
+      if (resolvedServiceNames.length > 0) descItems.push(`Services: ${resolvedServiceNames.join(', ')}`);
       if (resolvedPackageName) descItems.push(`Package: ${resolvedPackageName}`);
       if (resolvedProductName) descItems.push(`Product: ${resolvedProductName}`);
       const itemsDesc = descItems.length > 0 ? ` (${descItems.join(', ')})` : '';
@@ -538,7 +579,7 @@ export async function POST(req: Request) {
         occurredAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
         invoiceValue: parsedValue,
         amountPaid: parsedPaid,
-        serviceName: resolvedServiceName,
+        serviceName: resolvedServiceNames.join(', ') || null,
         packageName: resolvedPackageName,
         productName: resolvedProductName,
         paymentType: paymentType || null,
@@ -702,11 +743,35 @@ export async function PATCH(req: Request) {
       if (prov?.name) resolvedDoctorName = prov.name;
     }
 
-    const resolvedServiceId = serviceId ? Number(serviceId) : (existing.service_id ? Number(existing.service_id) : null);
-    let resolvedServiceName = serviceName || null;
-    if (resolvedServiceId && !resolvedServiceName) {
-      const { data: svc } = await supabaseServer.from('services').select('id, en, ar').eq('id', resolvedServiceId).maybeSingle();
-      if (svc) resolvedServiceName = svc.en || svc.ar || `Service #${svc.id}`;
+    // Resolve service metadata (supports multiple services via serviceIds or legacy serviceId)
+    const incomingServiceIds: number[] = Array.isArray(body.serviceIds)
+      ? body.serviceIds.map((id: any) => Number(id)).filter((id: number) => !isNaN(id) && id > 0)
+      : Array.isArray(body.services)
+      ? body.services.map((s: any) => Number(s.id || s.serviceId)).filter((id: number) => !isNaN(id) && id > 0)
+      : serviceId
+      ? [Number(serviceId)].filter((id) => !isNaN(id) && id > 0)
+      : Array.isArray(existing.service_ids) && existing.service_ids.length > 0
+      ? existing.service_ids.map(Number)
+      : existing.service_id
+      ? [Number(existing.service_id)]
+      : [];
+
+    let resolvedServiceIds: number[] = incomingServiceIds;
+    let resolvedServiceId = resolvedServiceIds.length > 0 ? resolvedServiceIds[0] : null;
+    let resolvedServiceNames: string[] = [];
+
+    if (resolvedServiceIds.length > 0) {
+      const { data: srvRows } = await supabaseServer
+        .from('services')
+        .select('id, en, ar')
+        .in('id', resolvedServiceIds);
+      if (srvRows && srvRows.length > 0) {
+        resolvedServiceNames = srvRows.map((r: any) => r.en || r.ar || `Service #${r.id}`);
+      }
+    }
+
+    if (resolvedServiceNames.length === 0 && serviceName) {
+      resolvedServiceNames = [serviceName];
     }
 
     // DEC-098: every attached package, validated against this booking's patient before any write.
@@ -729,7 +794,7 @@ export async function PATCH(req: Request) {
 
     // 8. Reconstruct reception notes with preserved markers
     const historicalTag = '[Historical Booking]';
-    const srvNote = resolvedServiceName ? ` Service: ${resolvedServiceName}.` : '';
+    const srvNote = resolvedServiceNames.length > 0 ? ` Services: ${resolvedServiceNames.join(', ')}.` : '';
     const prodNote = productName ? ` Product: ${productName}.` : '';
     const valNote = ` [Invoice Total]: ${parsedValue} EGP.`;
     const spentNote = ` Actual Spent: ${parsedPaid} EGP.`;
@@ -771,7 +836,7 @@ export async function PATCH(req: Request) {
       phone: cleanMobile,
       date: rawDate.slice(0, 10),
       service_id: resolvedServiceId,
-      service_ids: resolvedServiceId ? [resolvedServiceId] : [],
+      service_ids: resolvedServiceIds,
       provider_id: resolvedDoctorId,
       doctor_name: resolvedDoctorName || '—',
       branch_id: branchId || existing.branch_id || null,
@@ -899,7 +964,7 @@ export async function PATCH(req: Request) {
             .update({
               unit_price: newTotal,
               line_total: newTotal,
-              description: `${resolvedServiceName || 'Historical booking'} [historical backfill]`,
+              description: `${resolvedServiceNames.join(', ') || 'Historical booking'} [historical backfill]`,
               service_id: resolvedServiceId || null
             })
             .eq('invoice_id', existingInv.id);
@@ -982,7 +1047,7 @@ export async function PATCH(req: Request) {
           occurredAt: `${rawDate.slice(0, 10)}T12:00:00Z`,
           invoiceValue: parsedValue,
           amountPaid: parsedPaid,
-          serviceName: resolvedServiceName,
+          serviceName: resolvedServiceNames.join(', ') || null,
           packageName: resolvedPackageName,
           productName: productName,
           paymentType,
@@ -1050,7 +1115,7 @@ export async function PATCH(req: Request) {
         const staffEmployeeName = (access as any).access?.employee?.email || 'Superadmin';
 
         const descItems: string[] = [];
-        if (resolvedServiceName) descItems.push(`Service: ${resolvedServiceName}`);
+        if (resolvedServiceNames.length > 0) descItems.push(`Services: ${resolvedServiceNames.join(', ')}`);
         if (resolvedPackageName) descItems.push(`Package: ${resolvedPackageName}`);
         if (productName) descItems.push(`Product: ${productName}`);
         const itemsDesc = descItems.length > 0 ? ` (${descItems.join(', ')})` : '';

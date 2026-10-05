@@ -1237,3 +1237,20 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
   - Automatically parses incoming raw numbers with country prefix detection.
   - Formats local Egyptian numbers to `01XXXXXXXXX` and international numbers to `+<countryCode><digits>`.
   - Performs country-aware validation (`01[0125]\d{8}` for Egypt `+20`, 6–15 digits for international).
+
+### 6. Multi-Service Booking & Intake Session Engine
+**Enforced in:** `AdminNewBookingView.tsx`, `AdminAddPreviousBookingView.tsx`, `POST /api/reservations`, `POST /api/reservations/previous`, `PATCH /api/reservations/previous`
+- **Multi-Service Selection in New Bookings**:
+  - Staff can attach multiple services to an appointment session.
+  - The primary service is designated as `serviceId`, and additional services are tracked in `additionalServiceIds`.
+  - The appointment duration is automatically aggregated across all selected services: `totalDurationMinutes = sum(service.duration_minutes)`.
+  - Cumulative base pricing is automatically summed: `baseServicePrice = sum(service.price)`.
+  - Selected services are formatted cleanly as interactive badge chips with durations, prices, and remove buttons.
+- **Multi-Service Selection in Previous / Historical Bookings**:
+  - Staff can search and select multiple services using searchable autocomplete.
+  - Selected services are rendered as removable badge chips with individual pricing.
+  - Session invoice calculation sums all attached services + catalog packages + products: `invoiceValue = sum(services.price) + sum(catalogPackages.price) + product.price`.
+  - `POST` / `PATCH` `/api/reservations/previous` records all selected services in `reservation.service_ids` and writes corresponding `reservation_products` line items (`service` and `additional_service`).
+- **Product and Package Catalog Retrieval**:
+  - `AdminAddPreviousBookingView` fetches `/api/inventory/products` and `/api/packages` with authenticated staff headers (`getAuthHeaders()`), populating the catalog dropdowns with live prices and stock.
+

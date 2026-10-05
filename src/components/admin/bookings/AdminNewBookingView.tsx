@@ -24,7 +24,8 @@ import {
   Wallet,
   ShieldCheck,
   Sparkles,
-  Zap
+  Zap,
+  Layers
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { adminTranslations } from "@/components/admin/translations";
@@ -285,6 +286,7 @@ export default function AdminNewBookingView({
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+  const [additionalServiceIds, setAdditionalServiceIds] = useState<string[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
   const [bookingDate, setBookingDate] = useState<string>(() => {
     const now = new Date();
@@ -1106,7 +1108,23 @@ export default function AdminNewBookingView({
     setSelectedTimes([]);
   };
 
-  const selectedServiceName = getServiceName(selectedServiceObj, lang);
+  const allSelectedServiceIds = useMemo(() => {
+    return [selectedServiceId, ...additionalServiceIds].filter(Boolean);
+  }, [selectedServiceId, additionalServiceIds]);
+
+  const allSelectedServices = useMemo(() => {
+    return allSelectedServiceIds
+      .map((id) => dbServices.find((s) => String(s.id) === String(id)))
+      .filter(Boolean) as ServiceItem[];
+  }, [allSelectedServiceIds, dbServices]);
+
+  const selectedServiceName = useMemo(() => {
+    if (allSelectedServices.length > 0) {
+      return allSelectedServices.map((s) => getServiceName(s, lang)).join(" + ");
+    }
+    return getServiceName(selectedServiceObj, lang);
+  }, [allSelectedServices, selectedServiceObj, lang]);
+
   const selectedDoctorName = selectedDoctorObj?.name || "Doctor";
   const selectedBranchName = selectedBranchObj?.name_en || selectedBranchObj?.name || selectedBranchObj?.name_ar || "Clinic Branch";
   const selectedRoomName = dbRooms.length > 0 ? (dbRooms[0]?.name || "Room 1 (Auto)") : "Room 1 (Auto)";
@@ -1121,7 +1139,13 @@ export default function AdminNewBookingView({
     !customerActivePulsePkg &&
     selectedCatalogPulsePkg
   );
-  const baseServicePrice = Number(selectedServiceObj?.price || 0);
+  const baseServicePrice = useMemo(() => {
+    if (allSelectedServices.length > 0) {
+      return allSelectedServices.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    }
+    return Number(selectedServiceObj?.price || 0);
+  }, [allSelectedServices, selectedServiceObj]);
+
   const autoBookingValue = isNewPackagePurchase
     ? Number(selectedCatalogPulsePkg?.price || 0)
     : isPackageCovered || isPerPulseMode
@@ -1143,7 +1167,12 @@ export default function AdminNewBookingView({
     ? 0
     : Math.max(0, bookingValue - numAmountPaid);
   const selectedTime = selectedTimes[0] || "";
-  const totalDurationMinutes = getServiceDurationMinutes(selectedServiceObj);
+  const totalDurationMinutes = useMemo(() => {
+    if (allSelectedServices.length > 0) {
+      return allSelectedServices.reduce((sum, s) => sum + getServiceDurationMinutes(s), 0);
+    }
+    return getServiceDurationMinutes(selectedServiceObj);
+  }, [allSelectedServices, selectedServiceObj]);
   const requiredSlotCount = Math.max(1, Math.ceil(totalDurationMinutes / 15));
 
   // Formatted date string (e.g. 03 Aug 2026 (Mon))
@@ -1351,6 +1380,7 @@ export default function AdminNewBookingView({
         phone: phone,
         email: email.trim() || null,
         serviceId: selectedServiceObj?.id,
+        additionalServiceIds: additionalServiceIds.map(Number).filter((n) => !isNaN(n) && n > 0),
         doctorId: selectedDoctorObj?.id,
         branchId: selectedBranchObj?.id || null,
         roomId: selectedRoomId || null,
@@ -1961,6 +1991,88 @@ export default function AdminNewBookingView({
                     className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 cursor-pointer"
                   />
                 </div>
+              </div>
+
+              {/* ── ADDITIONAL SERVICES SECTION (MULTI-SERVICE SUPPORT) ── */}
+              <div className="space-y-2.5 rounded-2xl border border-[var(--cr-primary)]/15 bg-[#F8FAF7] p-3.5 sm:p-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Layers size={16} className="text-emerald-800 shrink-0" />
+                    <span className="font-bold text-xs text-[var(--cr-dark)]">
+                      {lang === "ar" ? "خدمات إضافية لنفس الجلسة" : "Additional Services in Same Session"}
+                    </span>
+                    {additionalServiceIds.length > 0 && (
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        +{additionalServiceIds.length} {lang === "ar" ? "إضافية" : "added"}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Add service dropdown */}
+                  <div className="w-full sm:w-auto min-w-[220px]">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val && !additionalServiceIds.includes(val) && val !== selectedServiceId) {
+                          setAdditionalServiceIds((prev) => [...prev, val]);
+                        }
+                        e.target.value = "";
+                      }}
+                      className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-900 outline-none cursor-pointer focus:border-emerald-700 shadow-2xs"
+                    >
+                      <option value="">{lang === "ar" ? "+ إضافة خدمة أخرى للجلسة..." : "+ Add another service..."}</option>
+                      {dbServices
+                        .filter((s) => String(s.id) !== String(selectedServiceId) && !additionalServiceIds.includes(String(s.id)))
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {getServiceName(s, lang)} {Number(s.price || 0) > 0 ? `(${Number(s.price).toLocaleString()} EGP)` : ""}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Additional services badge list */}
+                {additionalServiceIds.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {additionalServiceIds.map((id) => {
+                      const svc = dbServices.find((s) => String(s.id) === String(id));
+                      if (!svc) return null;
+                      const svcDuration = getServiceDurationMinutes(svc);
+                      return (
+                        <span
+                          key={id}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white text-emerald-950 text-xs font-bold border border-emerald-300/80 shadow-2xs"
+                        >
+                          <span>{getServiceName(svc, lang)}</span>
+                          <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">
+                            {svcDuration} min
+                          </span>
+                          {Number(svc.price || 0) > 0 && (
+                            <span className="text-[11px] text-emerald-800 font-extrabold">
+                              {Number(svc.price).toLocaleString()} EGP
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setAdditionalServiceIds((prev) => prev.filter((item) => item !== id))}
+                            className="text-gray-400 hover:text-red-600 transition cursor-pointer p-0.5"
+                            title="Remove service"
+                          >
+                            <X size={13} />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-[var(--color-brand-secondary)] font-medium">
+                    {lang === "ar"
+                      ? "يمكنك إضافة أكثر من خدمة لنفس الموعد. سيتم تجميع مدة الجلسة وحساب الإجمالي تلقائياً."
+                      : "You can add multiple services to the same appointment. Session duration and total pricing will automatically aggregate."}
+                  </p>
+                )}
               </div>
 
               {/* ── LASER SERVICE PAYMENT MODE SELECTOR (When Service is Laser) ── */}
