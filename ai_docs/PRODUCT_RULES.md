@@ -237,13 +237,20 @@ These keys will need changing when forking for client #2.
 
 ---
 
-## Customer Wallet Rules
-**Enforced in:** `PATCH /api/reservations` (checkout/settlement action)
+## Customer Wallet & Financial Overrides Rules
+**Enforced in:** `PATCH /api/reservations`, `POST /api/customers`, `AdjustWalletModal.tsx`, `CustomerProfileDrawer.tsx`, `CustomerFormModal.tsx`
 
 When completing a reservation, the receptionist processes a payment settlement. If the reservation's status is updated to `'completed'`, the linked customer's profile is updated:
 - **Wallet Balance**: Decreased by any `walletWithdrawal` amount used for payment and increased by any `walletDeposit` (overpayment change saved to wallet).
 - **Total Spent**: Increased by the amount paid plus any wallet balance used to offset the cost. Customer's lifetime total spent (`spent_amount`) only increases when payment is actually settled.
 - **Outstanding Debt**: Increased by any unpaid session remainder (`effectiveAmountLeft = totalCost - amountPaid`). When a session treatment is completed without payment, the unpaid session amount is added to `customer.outstanding`. Upon invoice settlement, `customer.outstanding` is reduced and `customer.spent_amount` is increased.
+
+### Superadmin Financial Overrides (Wallet, Outstanding Debt, Total Spend):
+- **Role Gating:** Only `superadmin` role users are authorized to directly adjust/override existing patient financial figures (`wallet_balance`, `outstanding`, `spent_amount`).
+- **Profile Drawer Access:** Superadmins see dedicated edit triggers on all 3 metric cards (**Total Spend**, **Wallet Balance**, **Outstanding Debt**) within `CustomerProfileDrawer.tsx`, opening the unified `AdjustWalletModal.tsx` (supporting Exact and Delta +/- modes with real-time preview and reason logging).
+- **Customer Form Modal:** In `CustomerFormModal.tsx`, opening balances can be set by staff on new patient creation. For existing patients, `wallet_balance`, `spent_amount`, and `outstanding` fields are strictly read-only for standard staff and editable only by superadmins with clear visual badge indicators.
+- **Backend Protection:** `POST /api/customers` strictly verifies superadmin privileges before updating `wallet_balance` (with `wallet_txns` ledger tracking), `spent_amount`, or `outstanding` on existing patient profiles. Standard staff profile edits leave financial metrics untouched.
+- **System Test Suite:** Diagnostic Test Case `TC-093` verifies the Superadmin Patient Financial Overrides & Ledger Security Engine.
 
 ---
 
