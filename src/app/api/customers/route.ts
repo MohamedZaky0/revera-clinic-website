@@ -4,6 +4,9 @@ import { requireAdministratorAccess, requireAuthenticatedUser, requireStaffAcces
 import { isOwnIdentity, normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordWalletMovement, setAbsoluteWalletBalance } from '@/lib/wallet';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * This route has two legitimate caller populations: staff (reception/admin, full access)
  * and patients (self-lookup / self-registration during OTP login — AuthModal.tsx,
@@ -107,7 +110,11 @@ export async function GET(req: Request) {
     const { data: rows, error } = await listQuery;
 
     if (error) throw error;
-    return NextResponse.json(rows || []);
+    return NextResponse.json(rows || [], {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      },
+    });
   } catch (err) {
     console.error('GET /api/customers error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
