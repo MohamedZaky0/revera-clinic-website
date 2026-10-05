@@ -124,6 +124,40 @@ interface AdminAddPreviousBookingViewProps {
   t?: any;
 }
 
+interface CountryOption {
+  code: string;
+  flag: string;
+  nameEn: string;
+  nameAr: string;
+}
+
+const COUNTRY_OPTIONS: CountryOption[] = [
+  { code: "+20", flag: "🇪🇬", nameEn: "Egypt", nameAr: "مصر" },
+  { code: "+966", flag: "🇸🇦", nameEn: "Saudi Arabia", nameAr: "المملكة العربية السعودية" },
+  { code: "+971", flag: "🇦🇪", nameEn: "UAE", nameAr: "الإمارات العربية المتحدة" },
+  { code: "+965", flag: "🇰🇼", nameEn: "Kuwait", nameAr: "الكويت" },
+  { code: "+974", flag: "🇶🇦", nameEn: "Qatar", nameAr: "قطر" },
+  { code: "+968", flag: "🇴🇲", nameEn: "Oman", nameAr: "عُمان" },
+  { code: "+973", flag: "🇧🇭", nameEn: "Bahrain", nameAr: "البحرين" },
+  { code: "+962", flag: "🇯🇴", nameEn: "Jordan", nameAr: "الأردن" },
+  { code: "+964", flag: "🇮🇶", nameEn: "Iraq", nameAr: "العراق" },
+  { code: "+961", flag: "🇱🇧", nameEn: "Lebanon", nameAr: "لبنان" },
+  { code: "+218", flag: "🇱🇾", nameEn: "Libya", nameAr: "ليبيا" },
+  { code: "+249", flag: "🇸🇩", nameEn: "Sudan", nameAr: "السودان" },
+  { code: "+963", flag: "🇸🇾", nameEn: "Syria", nameAr: "سوريا" },
+  { code: "+967", flag: "🇾🇪", nameEn: "Yemen", nameAr: "اليمن" },
+  { code: "+970", flag: "🇵🇸", nameEn: "Palestine", nameAr: "فلسطين" },
+  { code: "+216", flag: "🇹🇳", nameEn: "Tunisia", nameAr: "تونس" },
+  { code: "+212", flag: "🇲🇦", nameEn: "Morocco", nameAr: "المغرب" },
+  { code: "+213", flag: "🇩🇿", nameEn: "Algeria", nameAr: "الجزائر" },
+  { code: "+1", flag: "🇺🇸", nameEn: "USA / Canada", nameAr: "أمريكا / كندا" },
+  { code: "+44", flag: "🇬🇧", nameEn: "United Kingdom", nameAr: "المملكة المتحدة" },
+  { code: "+49", flag: "🇩🇪", nameEn: "Germany", nameAr: "ألمانيا" },
+  { code: "+33", flag: "🇫🇷", nameEn: "France", nameAr: "فرنسا" },
+  { code: "+39", flag: "🇮🇹", nameEn: "Italy", nameAr: "إيطاليا" },
+  { code: "+90", flag: "🇹🇷", nameEn: "Turkey", nameAr: "تركيا" },
+];
+
 function cleanPhone(raw: string): string {
   let p = raw.trim();
   if (p.startsWith("+20")) {
@@ -136,14 +170,46 @@ function cleanPhone(raw: string): string {
   return p;
 }
 
-function isValidPhone(raw: string): boolean {
+function parsePhoneWithCountry(raw: string): { code: string; number: string } {
+  if (!raw) return { code: "+20", number: "" };
+  const trimmed = raw.trim();
+  for (const c of COUNTRY_OPTIONS) {
+    if (trimmed.startsWith(c.code)) {
+      return { code: c.code, number: trimmed.slice(c.code.length).replace(/^0+/, "") };
+    }
+    const noPlus = c.code.replace("+", "");
+    if (trimmed.startsWith(`00${noPlus}`)) {
+      return { code: c.code, number: trimmed.slice(2 + noPlus.length).replace(/^0+/, "") };
+    }
+  }
+  return { code: "+20", number: cleanPhone(trimmed) };
+}
+
+function formatFullPhone(number: string, countryCode: string = "+20"): string {
+  const trimmed = number.trim();
+  if (!trimmed) return "";
+  if (countryCode === "+20") {
+    let p = cleanPhone(trimmed);
+    if (!p.startsWith("0") && p.length === 10) p = "0" + p;
+    return p;
+  }
+  const cleanDigits = trimmed.replace(/\D/g, "").replace(/^0+/, "");
+  return `${countryCode}${cleanDigits}`;
+}
+
+function isValidPhone(raw: string, countryCode: string = "+20"): boolean {
   if (!raw) return false;
-  const p = cleanPhone(raw);
-  // Egyptian mobile format: 010, 011, 012, 015 followed by 8 digits
-  if (/^01[0125]\d{8}$/.test(p)) return true;
-  // Generic international format (8-15 digits)
-  if (/^\+?\d{8,15}$/.test(raw.trim())) return true;
-  return false;
+  const digits = raw.replace(/\D/g, "");
+  if (countryCode === "+20") {
+    let p = cleanPhone(raw);
+    if (!p.startsWith("0") && p.length === 10) p = "0" + p;
+    // Egyptian mobile format: 010, 011, 012, 015 followed by 8 digits
+    if (/^01[0125]\d{8}$/.test(p)) return true;
+    if (/^(\+?20)?01[0125]\d{8}$/.test(raw.trim())) return true;
+    return digits.length >= 10 && digits.length <= 12;
+  }
+  // Generic international format (6-15 digits)
+  return digits.length >= 6 && digits.length <= 15;
 }
 
 export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewProps> = ({
@@ -172,17 +238,27 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
   const initPhone = initialPatientPhone || initialCustomer?.mobile || initialCustomer?.phone || "";
   const initName = initialPatientName || initialCustomer?.name || "";
+  const parsedInit = parsePhoneWithCountry(initPhone);
 
   // Row 1 State: Patient Phone *, Patient Name *, Doctor (Optional)
-  const [patientPhone, setPatientPhone] = useState(initPhone);
+  const [countryCode, setCountryCode] = useState(parsedInit.code);
+  const [patientPhone, setPatientPhone] = useState(parsedInit.number);
   const [patientName, setPatientName] = useState(initName);
   const [selectedDoctorId, setSelectedDoctorId] = useState("");
+
+  const selectedCountry = useMemo(() => {
+    return COUNTRY_OPTIONS.find((c) => c.code === countryCode) || COUNTRY_OPTIONS[0];
+  }, [countryCode]);
 
   useEffect(() => {
     if (!targetBooking) {
       const nextPhone = initialPatientPhone || initialCustomer?.mobile || initialCustomer?.phone;
       const nextName = initialPatientName || initialCustomer?.name;
-      if (nextPhone) setPatientPhone(nextPhone);
+      if (nextPhone) {
+        const parsed = parsePhoneWithCountry(nextPhone);
+        setCountryCode(parsed.code);
+        setPatientPhone(parsed.number);
+      }
       if (nextName) setPatientName(nextName);
     }
   }, [initialCustomer, initialPatientPhone, initialPatientName, targetBooking]);
@@ -256,11 +332,23 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
   // Live match patient against customers array
   const matchedCustomer = useMemo(() => {
-    if (patientPhone && patientPhone.trim().length >= 8) {
+    if (patientPhone && patientPhone.trim().length >= 6) {
       const cleanInput = cleanPhone(patientPhone);
+      const digitsInput = patientPhone.replace(/\D/g, "");
+      const fullPhone = formatFullPhone(patientPhone, countryCode);
+      const fullDigits = fullPhone.replace(/\D/g, "");
+
       const found = customers.find(c => {
-        const cMobile = cleanPhone(c.mobile || c.phone || "");
-        return cMobile && cMobile === cleanInput;
+        const rawCustMobile = c.mobile || c.phone || "";
+        if (!rawCustMobile) return false;
+        const cClean = cleanPhone(rawCustMobile);
+        const cDigits = rawCustMobile.replace(/\D/g, "");
+
+        return (
+          (cleanInput && cClean && cClean === cleanInput) ||
+          (fullDigits && cDigits && (cDigits === fullDigits || cDigits.endsWith(digitsInput) || digitsInput.endsWith(cDigits))) ||
+          (rawCustMobile.trim() === fullPhone || rawCustMobile.trim() === patientPhone.trim())
+        );
       });
       if (found) return found;
     }
@@ -268,13 +356,14 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       return initialCustomer;
     }
     return null;
-  }, [patientPhone, customers, initialCustomer]);
+  }, [patientPhone, countryCode, customers, initialCustomer]);
 
   // Reactive fetch for patient's existing packages
   useEffect(() => {
-    const cleanP = cleanPhone(patientPhone);
+    const fullP = formatFullPhone(patientPhone, countryCode);
+    const cleanP = cleanPhone(fullP);
     const targetCustId = matchedCustomer?.id;
-    if ((!cleanP || cleanP.length < 8) && !targetCustId) {
+    if ((!cleanP || cleanP.length < 6) && !targetCustId) {
       setPatientExistingPackages([]);
       return;
     }
@@ -287,7 +376,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         const headers = await getAuthHeaders();
         const param = targetCustId
           ? `customerId=${encodeURIComponent(String(targetCustId))}`
-          : `mobile=${encodeURIComponent(cleanP)}`;
+          : `mobile=${encodeURIComponent(fullP || cleanP)}`;
         const res = await fetch(`/api/customers/packages?${param}`, { headers });
         if (res.ok && isMounted) {
           const data = await res.json();
@@ -307,7 +396,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     return () => {
       isMounted = false;
     };
-  }, [patientPhone, matchedCustomer?.id]);
+  }, [patientPhone, countryCode, matchedCustomer?.id]);
 
   // Handle phone change & auto-populate name if patient matched
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -317,11 +406,22 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       setErrors(prev => ({ ...prev, phone: undefined }));
     }
 
-    if (val.trim().length >= 8) {
+    if (val.trim().length >= 6) {
       const cleanVal = cleanPhone(val);
+      const digitsVal = val.replace(/\D/g, "");
+      const fullVal = formatFullPhone(val, countryCode);
+      const fullDigits = fullVal.replace(/\D/g, "");
+
       const match = customers.find(c => {
-        const cMobile = cleanPhone(c.mobile || c.phone || "");
-        return cMobile && cMobile === cleanVal;
+        const rawCustMobile = c.mobile || c.phone || "";
+        if (!rawCustMobile) return false;
+        const cClean = cleanPhone(rawCustMobile);
+        const cDigits = rawCustMobile.replace(/\D/g, "");
+        return (
+          (cleanVal && cClean && cClean === cleanVal) ||
+          (fullDigits && cDigits && (cDigits === fullDigits || cDigits.endsWith(digitsVal) || digitsVal.endsWith(cDigits))) ||
+          (rawCustMobile.trim() === fullVal || rawCustMobile.trim() === val.trim())
+        );
       });
       if (match && match.name && !patientName) {
         setPatientName(match.name);
@@ -686,7 +786,11 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       : (spentMatch ? spentMatch[1] : (targetBooking.amountPaid != null ? String(targetBooking.amountPaid) : ""));
     const payType = targetBooking.payment_type || targetBooking.payment_method || (payMethodMatch ? payMethodMatch[1].trim() : "");
 
-    if (pPhone) setPatientPhone(pPhone);
+    if (pPhone) {
+      const parsed = parsePhoneWithCountry(pPhone);
+      setCountryCode(parsed.code);
+      setPatientPhone(parsed.number);
+    }
     if (pName) setPatientName(pName);
     if (bDate) setBookingDate(bDate);
     if (dId) setSelectedDoctorId(dId);
@@ -828,7 +932,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     const trimmedPhone = patientPhone.trim();
     if (!trimmedPhone) {
       newErrors.phone = tr.requiredField;
-    } else if (!isValidPhone(trimmedPhone)) {
+    } else if (!isValidPhone(trimmedPhone, countryCode)) {
       newErrors.phone = tr.invalidPhone;
     }
 
@@ -861,9 +965,10 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       const parsedSpentVal = actualSpent !== "" ? parseFloat(actualSpent) : 0;
 
       const firstPkg = attachedPackages[0];
+      const fullFormattedPhone = formatFullPhone(trimmedPhone, countryCode);
 
       const payload: Record<string, any> = {
-        patientPhone: trimmedPhone,
+        patientPhone: fullFormattedPhone,
         patientName: trimmedName,
         date: bookingDate,
         doctorId: selectedDoctorId || null,
@@ -1016,23 +1121,58 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 </span>
               )}
             </div>
-            <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
-                <Phone size={17} />
+            <div
+              className={`flex items-center rounded-xl border bg-white overflow-hidden transition shadow-2xs ${
+                errors.phone
+                  ? "border-rose-400 focus-within:border-rose-500 focus-within:ring-2 focus-within:ring-rose-200"
+                  : "border-gray-200 focus-within:border-[var(--cr-primary)] focus-within:ring-2 focus-within:ring-[var(--cr-primary)]/10"
+              }`}
+            >
+              {/* Country Code Dropdown */}
+              <div className="flex items-center gap-1.5 px-3 py-3 bg-[#FBFBF9] border-e border-gray-200 font-bold text-[#1F251A] shrink-0">
+                <span className="text-base select-none">{selectedCountry.flag}</span>
+                <select
+                  value={countryCode}
+                  onChange={(e) => {
+                    setCountryCode(e.target.value);
+                    if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
+                  }}
+                  className="bg-transparent text-xs sm:text-sm font-semibold text-[#111827] outline-none cursor-pointer"
+                  title="Select Country"
+                >
+                  {COUNTRY_OPTIONS.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {lang === "ar" ? c.nameAr : c.nameEn} ({c.code})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="text-[var(--color-brand-secondary)] pointer-events-none" />
               </div>
-              <input
-                id="patientPhone"
-                type="tel"
-                value={patientPhone}
-                onChange={handlePhoneChange}
-                placeholder={tr.patientPhonePlaceholder}
-                title={tr.patientPhoneTooltip}
-                className={`w-full rounded-xl border bg-white py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] ${
-                  errors.phone
-                    ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
-                    : "border-gray-200 focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
-                }`}
-              />
+
+              {/* Phone Input */}
+              <div className="relative flex-1 flex items-center">
+                <input
+                  id="patientPhone"
+                  type="tel"
+                  value={patientPhone}
+                  onChange={handlePhoneChange}
+                  placeholder={countryCode === "+20" ? (tr.patientPhonePlaceholder || "01X XXXX XXXX") : "XXXXXXXXX"}
+                  title={tr.patientPhoneTooltip}
+                  className="w-full bg-transparent py-3 px-3.5 text-sm font-medium text-[#111827] outline-none placeholder:text-[#9CA3AF]"
+                />
+                {patientPhone ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPatientPhone("");
+                      if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
+                    }}
+                    className="pe-3 text-[var(--color-brand-secondary)] hover:text-[#1F251A] transition cursor-pointer"
+                  >
+                    <X size={15} />
+                  </button>
+                ) : null}
+              </div>
             </div>
             {errors.phone ? (
               <p className="text-xs font-semibold text-rose-600 flex items-center gap-1 mt-1">

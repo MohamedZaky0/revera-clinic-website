@@ -348,7 +348,8 @@ The following are **not currently enforced in code**:
 4. **Original Historical Date Preservation**:
    - The user-specified historical date (even years prior to system deployment) is preserved verbatim in `reservations.date` and `reservations.completed_at`.
 5. **Patient Matching & Automatic Profile Creation**:
-   - Matches existing patients by phone number (normalizing Egyptian formats `+201...`, `00201...`, `201...` to `01...`).
+   - Matches existing patients by phone number (normalizing Egyptian formats `+201...`, `00201...`, `201...` to `01...` and supporting international country codes e.g. `+966`, `+971`, `+965`, etc.).
+   - Provides an integrated country selector dropdown with flags and dialing codes in the previous booking intake interface.
    - If matched, links the historical reservation to `customer_id` and increments `number_of_bookings`.
    - If no patient matches the phone number, a new patient record is automatically created in `customers` (`active = true`, `number_of_bookings = 1`) and linked.
 6. **Field Optionality**:
