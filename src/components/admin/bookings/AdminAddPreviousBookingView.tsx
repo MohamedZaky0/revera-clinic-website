@@ -1128,29 +1128,32 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                   : "border-gray-200 focus-within:border-[var(--cr-primary)] focus-within:ring-2 focus-within:ring-[var(--cr-primary)]/10"
               }`}
             >
-              {/* Country Code Dropdown */}
-              <div className="flex items-center gap-1.5 px-3 py-3 bg-[#FBFBF9] border-e border-gray-200 font-bold text-[#1F251A] shrink-0">
-                <span className="text-base select-none">{selectedCountry.flag}</span>
+              {/* Compact Country Code Dropdown with overlay trigger */}
+              <div className="relative flex items-center justify-center bg-[#F9FAF8] border-e border-gray-200 px-3 py-3 shrink-0 hover:bg-[#F0F4EE] transition cursor-pointer">
+                <div className="flex items-center gap-1.5 pointer-events-none text-xs sm:text-sm font-bold text-[#111827]">
+                  <span className="text-base leading-none select-none">{selectedCountry.flag}</span>
+                  <span className="font-mono text-xs sm:text-sm">{countryCode}</span>
+                  <ChevronDown size={13} className="text-[var(--color-brand-secondary)]" />
+                </div>
                 <select
                   value={countryCode}
                   onChange={(e) => {
                     setCountryCode(e.target.value);
                     if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
                   }}
-                  className="bg-transparent text-xs sm:text-sm font-semibold text-[#111827] outline-none cursor-pointer"
-                  title="Select Country"
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer text-sm"
+                  title={lang === "ar" ? "اختر الدولة" : "Select Country"}
                 >
                   {COUNTRY_OPTIONS.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.flag} {lang === "ar" ? c.nameAr : c.nameEn} ({c.code})
+                    <option key={c.code} value={c.code} className="text-[#111827] py-1">
+                      {c.flag} {c.code} ({lang === "ar" ? c.nameAr : c.nameEn})
                     </option>
                   ))}
                 </select>
-                <ChevronDown size={14} className="text-[var(--color-brand-secondary)] pointer-events-none" />
               </div>
 
               {/* Phone Input */}
-              <div className="relative flex-1 flex items-center">
+              <div className="relative flex-1 flex items-center min-w-0">
                 <input
                   id="patientPhone"
                   type="tel"
@@ -1158,7 +1161,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                   onChange={handlePhoneChange}
                   placeholder={countryCode === "+20" ? (tr.patientPhonePlaceholder || "01X XXXX XXXX") : "XXXXXXXXX"}
                   title={tr.patientPhoneTooltip}
-                  className="w-full bg-transparent py-3 px-3.5 text-sm font-medium text-[#111827] outline-none placeholder:text-[#9CA3AF]"
+                  className="w-full bg-transparent py-3 px-3.5 text-xs sm:text-sm font-medium text-[#111827] outline-none placeholder:text-[#9CA3AF]"
                 />
                 {patientPhone ? (
                   <button
@@ -1167,7 +1170,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                       setPatientPhone("");
                       if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
                     }}
-                    className="pe-3 text-[var(--color-brand-secondary)] hover:text-[#1F251A] transition cursor-pointer"
+                    className="pe-3 text-[var(--color-brand-secondary)] hover:text-[#111827] transition cursor-pointer"
                   >
                     <X size={15} />
                   </button>
