@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ArrowLeft,
   BookUser,
@@ -22,9 +22,99 @@ import {
   ShieldCheck,
   Receipt,
   Loader2,
+  ChevronDown,
+  X,
 } from "lucide-react";
 import { adminTranslations } from "@/components/admin/translations";
 import { calculateAge } from "@/lib/age";
+
+interface CountryOption {
+  code: string;
+  flag: string;
+  nameEn: string;
+  nameAr: string;
+}
+
+const COUNTRY_OPTIONS: CountryOption[] = [
+  { code: "+20", flag: "🇪🇬", nameEn: "Egypt", nameAr: "مصر" },
+  { code: "+966", flag: "🇸🇦", nameEn: "Saudi Arabia", nameAr: "المملكة العربية السعودية" },
+  { code: "+971", flag: "🇦🇪", nameEn: "UAE", nameAr: "الإمارات العربية المتحدة" },
+  { code: "+965", flag: "🇰🇼", nameEn: "Kuwait", nameAr: "الكويت" },
+  { code: "+974", flag: "🇶🇦", nameEn: "Qatar", nameAr: "قطر" },
+  { code: "+968", flag: "🇴🇲", nameEn: "Oman", nameAr: "عُمان" },
+  { code: "+973", flag: "🇧🇭", nameEn: "Bahrain", nameAr: "البحرين" },
+  { code: "+962", flag: "🇯🇴", nameEn: "Jordan", nameAr: "الأردن" },
+  { code: "+964", flag: "🇮🇶", nameEn: "Iraq", nameAr: "العراق" },
+  { code: "+961", flag: "🇱🇧", nameEn: "Lebanon", nameAr: "لبنان" },
+  { code: "+218", flag: "🇱🇾", nameEn: "Libya", nameAr: "ليبيا" },
+  { code: "+249", flag: "🇸🇩", nameEn: "Sudan", nameAr: "السودان" },
+  { code: "+963", flag: "🇸🇾", nameEn: "Syria", nameAr: "سوريا" },
+  { code: "+967", flag: "🇾🇪", nameEn: "Yemen", nameAr: "اليمن" },
+  { code: "+970", flag: "🇵🇸", nameEn: "Palestine", nameAr: "فلسطين" },
+  { code: "+216", flag: "🇹🇳", nameEn: "Tunisia", nameAr: "تونس" },
+  { code: "+212", flag: "🇲🇦", nameEn: "Morocco", nameAr: "المغرب" },
+  { code: "+213", flag: "🇩🇿", nameEn: "Algeria", nameAr: "الجزائر" },
+  { code: "+1", flag: "🇺🇸", nameEn: "USA / Canada", nameAr: "أمريكا / كندا" },
+  { code: "+44", flag: "🇬🇧", nameEn: "United Kingdom", nameAr: "المملكة المتحدة" },
+  { code: "+49", flag: "🇩🇪", nameEn: "Germany", nameAr: "ألمانيا" },
+  { code: "+33", flag: "🇫🇷", nameEn: "France", nameAr: "فرنسا" },
+  { code: "+39", flag: "🇮🇹", nameEn: "Italy", nameAr: "إيطاليا" },
+  { code: "+90", flag: "🇹🇷", nameEn: "Turkey", nameAr: "تركيا" },
+];
+
+function cleanPhone(raw: string): string {
+  let p = raw.trim();
+  if (p.startsWith("+20")) {
+    p = "0" + p.slice(3);
+  } else if (p.startsWith("0020")) {
+    p = "0" + p.slice(4);
+  } else if (p.startsWith("20") && p.length === 12) {
+    p = "0" + p.slice(2);
+  }
+  return p;
+}
+
+function parsePhoneWithCountry(raw: string): { code: string; number: string } {
+  if (!raw) return { code: "+20", number: "" };
+  const trimmed = raw.trim();
+  for (const c of COUNTRY_OPTIONS) {
+    if (trimmed.startsWith(c.code)) {
+      return { code: c.code, number: trimmed.slice(c.code.length).replace(/^0+/, "") };
+    }
+    const noPlus = c.code.replace("+", "");
+    if (trimmed.startsWith(`00${noPlus}`)) {
+      return { code: c.code, number: trimmed.slice(2 + noPlus.length).replace(/^0+/, "") };
+    }
+  }
+  return { code: "+20", number: cleanPhone(trimmed) };
+}
+
+function formatFullPhone(number: string, countryCode: string = "+20"): string {
+  const trimmed = number.trim();
+  if (!trimmed) return "";
+  if (countryCode === "+20") {
+    let p = cleanPhone(trimmed);
+    if (!p.startsWith("0") && p.length === 10) p = "0" + p;
+    return p;
+  }
+  const cleanDigits = trimmed.replace(/\D/g, "").replace(/^0+/, "");
+  return `${countryCode}${cleanDigits}`;
+}
+
+function isValidPhone(raw: string, countryCode: string = "+20"): boolean {
+  if (!raw) return false;
+  const digits = raw.replace(/\D/g, "");
+  if (countryCode === "+20") {
+    let p = cleanPhone(raw);
+    if (!p.startsWith("0") && p.length === 10) p = "0" + p;
+    // Egyptian mobile format: 010, 011, 012, 015 followed by 8 digits
+    if (/^01[0125]\d{8}$/.test(p)) return true;
+    if (/^(\+?20)?01[0125]\d{8}$/.test(raw.trim())) return true;
+    return digits.length >= 10 && digits.length <= 12;
+  }
+  // Generic international format (6-15 digits)
+  return digits.length >= 6 && digits.length <= 15;
+}
 
 interface CustomerFormModalProps {
   setShowCustomerFormModal: (v: boolean) => void;
@@ -49,10 +139,12 @@ export default function CustomerFormModal({
   const isWalletEditable = !selectedCustomerForEdit || isSuperAdmin;
 
   const c = selectedCustomerForEdit || {};
+  const parsedInitMobile = parsePhoneWithCountry(c.mobile || c.phone || "");
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [customerFormError, setCustomerFormError] = useState("");
   const [custName, setCustName] = useState(c.name || "");
-  const [custMobile, setCustMobile] = useState(c.mobile || c.phone || "");
+  const [custMobileCountryCode, setCustMobileCountryCode] = useState(parsedInitMobile.code);
+  const [custMobile, setCustMobile] = useState(parsedInitMobile.number);
   const [custEmail, setCustEmail] = useState(c.email || "");
   const [custGender, setCustGender] = useState<"Male" | "Female" | "">((c.gender as any) || "");
   const [custActive, setCustActive] = useState(c.active !== undefined ? c.active : true);
@@ -66,6 +158,7 @@ export default function CustomerFormModal({
   const [custFloor, setCustFloor] = useState(c.floor_no || "");
   const [custNote, setCustNote] = useState("");
   const [isCustomerWhatsappSame, setIsCustomerWhatsappSame] = useState(true);
+  const [custWaCountryCode, setCustWaCountryCode] = useState("+20");
   const [customerWhatsapp, setCustomerWhatsapp] = useState("");
   const [custAge, setCustAge] = useState(c.age !== undefined && c.age !== null ? String(c.age) : "");
   const [custDob, setCustDob] = useState(c.date_of_birth || "");
@@ -75,17 +168,32 @@ export default function CustomerFormModal({
   const [custReferral, setCustReferral] = useState(c.referral || "");
   const [custOccupation, setCustOccupation] = useState(c.occupation || "");
 
+  const selectedMobileCountry = useMemo(() => {
+    return COUNTRY_OPTIONS.find((co) => co.code === custMobileCountryCode) || COUNTRY_OPTIONS[0];
+  }, [custMobileCountryCode]);
+
+  const selectedWaCountry = useMemo(() => {
+    return COUNTRY_OPTIONS.find((co) => co.code === custWaCountryCode) || COUNTRY_OPTIONS[0];
+  }, [custWaCountryCode]);
+
   // Initialize WhatsApp/note parsing for edit mode
   React.useEffect(() => {
     if (selectedCustomerForEdit) {
+      const parsedMob = parsePhoneWithCountry(selectedCustomerForEdit.mobile || selectedCustomerForEdit.phone || "");
+      setCustMobileCountryCode(parsedMob.code);
+      setCustMobile(parsedMob.number);
+
       const rawNote = selectedCustomerForEdit.note || "";
       const waMatch = rawNote.match(/\[WhatsApp:\s*([^\]]+)\]/);
       if (waMatch) {
         setIsCustomerWhatsappSame(false);
-        setCustomerWhatsapp(waMatch[1].trim());
+        const parsedWA = parsePhoneWithCountry(waMatch[1].trim());
+        setCustWaCountryCode(parsedWA.code);
+        setCustomerWhatsapp(parsedWA.number);
         setCustNote(rawNote.replace(/\[WhatsApp:\s*([^\]]+)\]\n?/, "").trim());
       } else {
         setIsCustomerWhatsappSame(true);
+        setCustWaCountryCode("+20");
         setCustomerWhatsapp("");
         setCustNote(rawNote);
       }
@@ -102,26 +210,18 @@ export default function CustomerFormModal({
       return;
     }
 
-    // Validate Egyptian mobile number format
-    let cleanedMobile = custMobile.trim();
-    if (cleanedMobile.startsWith("+20")) {
-      cleanedMobile = "0" + cleanedMobile.slice(3);
-    } else if (cleanedMobile.startsWith("0020")) {
-      cleanedMobile = "0" + cleanedMobile.slice(4);
-    }
-    if (!/^01[0125]\d{8}$/.test(cleanedMobile)) {
-      setCustomerFormError(t.mobileFormatErr);
+    // Validate mobile number format
+    if (!isValidPhone(custMobile, custMobileCountryCode)) {
+      setCustomerFormError(t.mobileFormatErr || (lang === "ar" ? "رقم الهاتف غير صالح" : "Invalid phone number format"));
       return;
     }
     if (!isCustomerWhatsappSame) {
-      let cleanedWA = customerWhatsapp.trim();
-      if (cleanedWA.startsWith("+20")) {
-        cleanedWA = "0" + cleanedWA.slice(3);
-      } else if (cleanedWA.startsWith("0020")) {
-        cleanedWA = "0" + cleanedWA.slice(4);
+      if (!customerWhatsapp.trim()) {
+        setCustomerFormError(lang === "ar" ? "رقم الواتساب مطلوب." : "WhatsApp number is required.");
+        return;
       }
-      if (!/^01[0125]\d{8}$/.test(cleanedWA)) {
-        setCustomerFormError(t.whatsappFormatErr);
+      if (!isValidPhone(customerWhatsapp, custWaCountryCode)) {
+        setCustomerFormError(t.whatsappFormatErr || (lang === "ar" ? "رقم الواتساب غير صالح" : "Invalid WhatsApp number format"));
         return;
       }
     }
@@ -129,9 +229,12 @@ export default function CustomerFormModal({
     setSavingCustomer(true);
     setCustomerFormError("");
 
+    const cleanedMobile = formatFullPhone(custMobile, custMobileCountryCode);
+    const cleanedWA = !isCustomerWhatsappSame ? formatFullPhone(customerWhatsapp, custWaCountryCode) : "";
+
     const finalNote = isCustomerWhatsappSame
       ? custNote.trim()
-      : `[WhatsApp: ${customerWhatsapp.trim()}]${custNote.trim() ? "\n" : ""}${custNote.trim()}`;
+      : `[WhatsApp: ${cleanedWA}]${custNote.trim() ? "\n" : ""}${custNote.trim()}`;
 
     const payload = {
       id: selectedCustomerForEdit?.id || undefined,
@@ -294,18 +397,48 @@ export default function CustomerFormModal({
               <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">
                 {t.mobileLabel} <span className="text-red-500">*</span>
               </label>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
-                  <Phone size={16} />
+              <div className="flex items-center rounded-xl border border-[var(--cr-primary)]/15 bg-white overflow-hidden transition focus-within:border-[var(--cr-primary)] focus-within:ring-1 focus-within:ring-[var(--cr-primary)]">
+                {/* Compact Country Code Dropdown */}
+                <div className="relative flex items-center justify-center bg-[#F9FAF8] border-e border-gray-200 px-3 py-2.5 shrink-0 hover:bg-[#F0F4EE] transition cursor-pointer">
+                  <div className="flex items-center gap-1.5 pointer-events-none text-xs sm:text-sm font-bold text-[#111827]">
+                    <span className="text-base leading-none select-none">{selectedMobileCountry.flag}</span>
+                    <span className="font-mono text-xs sm:text-sm">{custMobileCountryCode}</span>
+                    <ChevronDown size={13} className="text-[var(--color-brand-secondary)]" />
+                  </div>
+                  <select
+                    value={custMobileCountryCode}
+                    onChange={(e) => setCustMobileCountryCode(e.target.value)}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer text-sm"
+                    title={lang === "ar" ? "اختر الدولة" : "Select Country"}
+                  >
+                    {COUNTRY_OPTIONS.map((co) => (
+                      <option key={co.code} value={co.code} className="text-[#111827] py-1">
+                        {co.flag} {co.code} ({lang === "ar" ? co.nameAr : co.nameEn})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <input
-                  type="text"
-                  value={custMobile}
-                  onChange={(e) => setCustMobile(e.target.value)}
-                  placeholder={t.mobilePlaceholder}
-                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
-                  required
-                />
+
+                {/* Phone Input */}
+                <div className="relative flex-1 flex items-center min-w-0">
+                  <input
+                    type="tel"
+                    value={custMobile}
+                    onChange={(e) => setCustMobile(e.target.value)}
+                    placeholder={custMobileCountryCode === "+20" ? (t.mobilePlaceholder || "01X XXXX XXXX") : "XXXXXXXXX"}
+                    className="w-full bg-transparent px-3.5 py-2.5 text-sm text-[var(--cr-dark)] outline-none placeholder:text-gray-400 font-medium"
+                    required
+                  />
+                  {custMobile ? (
+                    <button
+                      type="button"
+                      onClick={() => setCustMobile("")}
+                      className="pe-3 text-gray-400 hover:text-[var(--cr-dark)] transition cursor-pointer"
+                    >
+                      <X size={15} />
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
 
@@ -344,18 +477,48 @@ export default function CustomerFormModal({
                 <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">
                   {t.whatsappLabel} <span className="text-red-500">*</span>
                 </label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
-                    <Phone size={16} />
+                <div className="flex items-center rounded-xl border border-[var(--cr-primary)]/15 bg-white overflow-hidden transition focus-within:border-[var(--cr-primary)] focus-within:ring-1 focus-within:ring-[var(--cr-primary)]">
+                  {/* Compact Country Code Dropdown */}
+                  <div className="relative flex items-center justify-center bg-[#F9FAF8] border-e border-gray-200 px-3 py-2.5 shrink-0 hover:bg-[#F0F4EE] transition cursor-pointer">
+                    <div className="flex items-center gap-1.5 pointer-events-none text-xs sm:text-sm font-bold text-[#111827]">
+                      <span className="text-base leading-none select-none">{selectedWaCountry.flag}</span>
+                      <span className="font-mono text-xs sm:text-sm">{custWaCountryCode}</span>
+                      <ChevronDown size={13} className="text-[var(--color-brand-secondary)]" />
+                    </div>
+                    <select
+                      value={custWaCountryCode}
+                      onChange={(e) => setCustWaCountryCode(e.target.value)}
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer text-sm"
+                      title={lang === "ar" ? "اختر الدولة" : "Select Country"}
+                    >
+                      {COUNTRY_OPTIONS.map((co) => (
+                        <option key={co.code} value={co.code} className="text-[#111827] py-1">
+                          {co.flag} {co.code} ({lang === "ar" ? co.nameAr : co.nameEn})
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <input
-                    type="text"
-                    value={customerWhatsapp}
-                    onChange={(e) => setCustomerWhatsapp(e.target.value)}
-                    placeholder={t.mobilePlaceholder}
-                    className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
-                    required
-                  />
+
+                  {/* Phone Input */}
+                  <div className="relative flex-1 flex items-center min-w-0">
+                    <input
+                      type="tel"
+                      value={customerWhatsapp}
+                      onChange={(e) => setCustomerWhatsapp(e.target.value)}
+                      placeholder={custWaCountryCode === "+20" ? (t.mobilePlaceholder || "01X XXXX XXXX") : "XXXXXXXXX"}
+                      className="w-full bg-transparent px-3.5 py-2.5 text-sm text-[var(--cr-dark)] outline-none placeholder:text-gray-400 font-medium"
+                      required
+                    />
+                    {customerWhatsapp ? (
+                      <button
+                        type="button"
+                        onClick={() => setCustomerWhatsapp("")}
+                        className="pe-3 text-gray-400 hover:text-[var(--cr-dark)] transition cursor-pointer"
+                      >
+                        <X size={15} />
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             )}
