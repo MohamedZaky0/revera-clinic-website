@@ -136,7 +136,7 @@ export default function CustomerFormModal({
   adminRole,
 }: CustomerFormModalProps) {
   const isSuperAdmin = adminRole === "superadmin";
-  const isWalletEditable = !selectedCustomerForEdit || isSuperAdmin;
+  const isFinancialsEditable = !selectedCustomerForEdit || isSuperAdmin;
 
   const c = selectedCustomerForEdit || {};
   const parsedInitMobile = parsePhoneWithCountry(c.mobile || c.phone || "");
@@ -754,6 +754,7 @@ export default function CustomerFormModal({
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {/* Wallet Balance */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold text-[var(--color-brand-secondary)]">{t.walletLabel}</label>
@@ -769,16 +770,16 @@ export default function CustomerFormModal({
                   <Wallet size={16} />
                 </div>
                 <input
-                  type={isWalletEditable ? "number" : "text"}
-                  step={isWalletEditable ? "any" : undefined}
-                  min={isWalletEditable ? "0" : undefined}
-                  readOnly={!isWalletEditable}
-                  disabled={!isWalletEditable}
-                  value={isWalletEditable ? custWallet : (Number(custWallet || 0).toLocaleString("en-US"))}
+                  type={isFinancialsEditable ? "number" : "text"}
+                  step={isFinancialsEditable ? "any" : undefined}
+                  min={isFinancialsEditable ? "0" : undefined}
+                  readOnly={!isFinancialsEditable}
+                  disabled={!isFinancialsEditable}
+                  value={isFinancialsEditable ? custWallet : (Number(custWallet || 0).toLocaleString("en-US"))}
                   onChange={(e) => setCustWallet(e.target.value)}
                   placeholder="0"
                   className={`w-full rounded-xl border px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm outline-none transition ${
-                    !isWalletEditable
+                    !isFinancialsEditable
                       ? "border-gray-200 bg-[#F7F7F6] font-semibold text-gray-700 cursor-not-allowed select-none"
                       : isSuperAdmin && selectedCustomerForEdit
                         ? "border-amber-300 bg-amber-50/20 text-[var(--cr-dark)] font-bold focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
@@ -788,47 +789,71 @@ export default function CustomerFormModal({
               </div>
             </div>
 
+            {/* Total Spent */}
             <div>
-              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.spentLabel}</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-[var(--color-brand-secondary)]">{t.spentLabel}</label>
+                {selectedCustomerForEdit && isSuperAdmin && (
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                    <ShieldCheck size={11} className="text-amber-600" />
+                    {lang === "ar" ? "تعديل السوبر أدمن" : "Superadmin Override"}
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <Coins size={16} />
                 </div>
                 <input
-                  type={selectedCustomerForEdit ? "text" : "number"}
-                  min={selectedCustomerForEdit ? undefined : "0"}
-                  readOnly={Boolean(selectedCustomerForEdit)}
-                  disabled={Boolean(selectedCustomerForEdit)}
-                  value={selectedCustomerForEdit ? Number(custSpent || 0).toLocaleString("en-US") : custSpent}
+                  type={isFinancialsEditable ? "number" : "text"}
+                  step={isFinancialsEditable ? "any" : undefined}
+                  min={isFinancialsEditable ? "0" : undefined}
+                  readOnly={!isFinancialsEditable}
+                  disabled={!isFinancialsEditable}
+                  value={isFinancialsEditable ? custSpent : (Number(custSpent || 0).toLocaleString("en-US"))}
                   onChange={(e) => setCustSpent(e.target.value)}
                   placeholder="0"
                   className={`w-full rounded-xl border px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm outline-none transition ${
-                    selectedCustomerForEdit
+                    !isFinancialsEditable
                       ? "border-gray-200 bg-[#F7F7F6] font-semibold text-gray-700 cursor-not-allowed select-none"
-                      : "bg-white text-[var(--cr-dark)] border-[var(--cr-primary)]/15 focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
+                      : isSuperAdmin && selectedCustomerForEdit
+                        ? "border-amber-300 bg-amber-50/20 text-[var(--cr-dark)] font-bold focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                        : "bg-white text-[var(--cr-dark)] border-[var(--cr-primary)]/15 focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                   }`}
                 />
               </div>
             </div>
 
+            {/* Outstanding Balance */}
             <div>
-              <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">{t.outstandingLabel}</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-[var(--color-brand-secondary)]">{t.outstandingLabel}</label>
+                {selectedCustomerForEdit && isSuperAdmin && (
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                    <ShieldCheck size={11} className="text-amber-600" />
+                    {lang === "ar" ? "تعديل السوبر أدمن" : "Superadmin Override"}
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
                   <Receipt size={16} />
                 </div>
                 <input
-                  type={selectedCustomerForEdit ? "text" : "number"}
-                  min={selectedCustomerForEdit ? undefined : "0"}
-                  readOnly={Boolean(selectedCustomerForEdit)}
-                  disabled={Boolean(selectedCustomerForEdit)}
-                  value={selectedCustomerForEdit ? Number(custOutstanding || 0).toLocaleString("en-US") : custOutstanding}
+                  type={isFinancialsEditable ? "number" : "text"}
+                  step={isFinancialsEditable ? "any" : undefined}
+                  min={isFinancialsEditable ? "0" : undefined}
+                  readOnly={!isFinancialsEditable}
+                  disabled={!isFinancialsEditable}
+                  value={isFinancialsEditable ? custOutstanding : (Number(custOutstanding || 0).toLocaleString("en-US"))}
                   onChange={(e) => setCustOutstanding(e.target.value)}
                   placeholder="0"
                   className={`w-full rounded-xl border px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm outline-none transition ${
-                    selectedCustomerForEdit
+                    !isFinancialsEditable
                       ? "border-gray-200 bg-[#F7F7F6] font-semibold text-gray-700 cursor-not-allowed select-none"
-                      : "bg-white text-[var(--cr-dark)] border-[var(--cr-primary)]/15 focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
+                      : isSuperAdmin && selectedCustomerForEdit
+                        ? "border-amber-300 bg-amber-50/20 text-[var(--cr-dark)] font-bold focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                        : "bg-white text-[var(--cr-dark)] border-[var(--cr-primary)]/15 focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                   }`}
                 />
               </div>
