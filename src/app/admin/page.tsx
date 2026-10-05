@@ -2621,7 +2621,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-077', name: 'In-Booking Package Selling & Integrated Patient Search Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies selling catalog packages directly during new booking creation with customer_packages persistence and instant patient profile appearance, as well as integrated patient search dropdown rendering.', status: 'idle' },
     { id: 'TC-080', name: 'Laser Pulses Package Excess Deficit & Dual Interactive Settlement Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies package deficit detection when delivered pulses exceed remaining balance, automatic payment status transition to Partially Paid, and dual interactive settlement choices (Option 1: Buy New Package with deficit deduction vs Option 2: Pay per Pulse with customizable rate) at checkout.', status: 'idle' },
     { id: 'TC-092', name: 'Historical Patient Packages Intake & Multi-Session Tracking Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies detection of patient existing packages in historical booking intake, auto-fetching active/historical quota, 1-click package linking, 0 EGP default pricing on session consumption, and updating customer_packages usage balances.', status: 'idle' },
-    { id: 'TC-093', name: 'Superadmin Patient Wallet Adjustment & Ledger Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies superadmin authority to adjust patient wallet balances with automatic wallet_txns ledger delta generation and in-profile modal.', status: 'idle' }
+    { id: 'TC-093', name: 'Superadmin Patient Wallet Adjustment & Ledger Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies superadmin authority to adjust patient wallet balances with automatic wallet_txns ledger delta generation and in-profile modal.', status: 'idle' },
+    { id: 'TC-094', name: 'Multi-Service Booking & Intake Session Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies multi-service selection, duration aggregation, cumulative pricing, and reservation line items generation across new and previous booking intake.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -6500,6 +6501,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 services={localServices}
                 providers={providers}
                 customers={dbCustomers}
+                products={inventoryProducts}
                 branches={branches}
                 activeBranchId={branch}
                 lang={lang}
@@ -6605,6 +6607,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 services={localServices}
                 providers={providers}
                 customers={dbCustomers}
+                products={inventoryProducts}
                 branches={branches}
                 activeBranchId={branch}
                 lang={lang}
@@ -7783,6 +7786,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 services={localServices}
                 providers={providers}
                 customers={customers}
+                products={inventoryProducts}
                 branches={branches}
                 activeBranchId={branch}
                 lang={lang}
