@@ -1230,6 +1230,10 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
   2. *Add / Deduct (+/-)*: Applies an incremental or decremental delta to the existing balance (`newBalance = currentBalance + delta`).
 - **Ledger Invariant**: Any direct staff adjustment calls `setAbsoluteWalletBalance` which writes an atomic delta record to `wallet_txns` with transaction type `admin_adjustment` or `manual_correction`, keeping `customers.wallet_balance` and `wallet_txns` ledger history perfectly synchronized.
 
-
-
-
+### 5. Patient Phone Number & WhatsApp Country Code Engine
+**Enforced in:** `CustomerFormModal.tsx`, `AdminAddPreviousBookingView.tsx`, `POST /api/customers`
+- **Country Code Selector**: Patient mobile and WhatsApp number inputs feature compact country code dropdown selectors with flags, dialing codes (e.g., `+20` Egypt, `+966` Saudi Arabia, `+971` UAE, `+965` Kuwait, `+1` USA, etc.), and clean clear-button triggers.
+- **Dynamic Formatting & Normalization**:
+  - Automatically parses incoming raw numbers with country prefix detection.
+  - Formats local Egyptian numbers to `01XXXXXXXXX` and international numbers to `+<countryCode><digits>`.
+  - Performs country-aware validation (`01[0125]\d{8}` for Egypt `+20`, 6–15 digits for international).
