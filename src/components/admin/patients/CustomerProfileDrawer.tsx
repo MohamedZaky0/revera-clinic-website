@@ -27,11 +27,13 @@ import { calculateAge } from "@/lib/age";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
 import ConfirmPackagePriceModal from "@/components/admin/patients/ConfirmPackagePriceModal";
+import AdjustWalletModal from "@/components/admin/patients/AdjustWalletModal";
 import { PatientTransactionsHistoryTab } from "@/components/admin/patients/PatientTransactionsHistoryTab";
 import { NewManualTransactionView } from "@/components/admin/transactions/NewManualTransactionView";
 import type { Customer } from "@/components/admin/patients/useCustomerProfile";
 
 interface CustomerProfileDrawerProps {
+  fetchCustomers?: () => void;
   onNavigateToNewTransaction?: (patientId: string, patientName: string) => void;
   onAddPreviousBooking?: (patient: Customer) => void;
   // Hook state
@@ -152,6 +154,7 @@ interface CustomerProfileDrawerProps {
 }
 
 export default function CustomerProfileDrawer({
+  fetchCustomers,
   onNavigateToNewTransaction,
   onAddPreviousBooking,
   viewingCustomerProfile,
@@ -268,6 +271,7 @@ export default function CustomerProfileDrawer({
   if (!viewingCustomerProfile) return null;
 
   const [showInlineManualTxnModal, setShowInlineManualTxnModal] = React.useState(false);
+  const [showAdjustWalletModal, setShowAdjustWalletModal] = React.useState(false);
   // DEC-088 item 6: the historical package whose invoice value is being entered (null = modal closed).
   const [confirmPriceFor, setConfirmPriceFor] = React.useState<any>(null);
 
@@ -613,9 +617,22 @@ export default function CustomerProfileDrawer({
                     <Wallet size={14} className="text-sky-600 shrink-0" />
                     <span>{t.wallet || "Wallet"}</span>
                   </span>
-                  <span title={t.wallet || "Wallet"}>
-                    <Info size={12} className="text-sky-500 opacity-60" />
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {adminRole === "superadmin" && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAdjustWalletModal(true)}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 border border-sky-300/60 px-2 py-0.5 rounded-md transition cursor-pointer"
+                        title={lang === "ar" ? "تعديل رصيد المحفظة" : "Adjust Wallet Balance"}
+                      >
+                        <Pencil size={10} />
+                        <span>{lang === "ar" ? "تعديل" : "Edit"}</span>
+                      </button>
+                    )}
+                    <span title={t.wallet || "Wallet"}>
+                      <Info size={12} className="text-sky-500 opacity-60" />
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-2 text-lg sm:text-xl font-black text-sky-700 tracking-tight">
                   {Number(viewingCustomerProfile.wallet_balance !== undefined ? viewingCustomerProfile.wallet_balance : viewingCustomerProfile.wallet || 0).toLocaleString()} <span className="text-xs font-bold text-sky-600">{t.egp || "EGP"}</span>
@@ -2496,6 +2513,25 @@ export default function CustomerProfileDrawer({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Modal: Adjust Wallet Balance (Superadmin) ── */}
+      {showAdjustWalletModal && viewingCustomerProfile && (
+        <AdjustWalletModal
+          customer={viewingCustomerProfile}
+          onClose={() => setShowAdjustWalletModal(false)}
+          onUpdated={(newBal) => {
+            setViewingCustomerProfile({
+              ...viewingCustomerProfile,
+              wallet_balance: newBal,
+              wallet: newBal,
+            });
+            if (typeof fetchCustomers === "function") {
+              fetchCustomers();
+            }
+          }}
+          lang={lang}
+        />
       )}
 
       {/* ── Modal: Sell Laser Pulses to Patient (FIFO Active Balance) ── */}

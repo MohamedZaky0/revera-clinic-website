@@ -1222,7 +1222,13 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
   - `POST` / `PATCH` `/api/reservations/previous` processes `packages: Array<AttachedPackageItem>`.
   - Line items are created in `reservation_products` for each package attached.
   - Formatted reception notes capture usage for every attached package: `Package: <Name>. [Package Usage]: <Used> / <Total> pulses used (<Remaining> pulses remaining).`
-  - Cumulative `pulses_remaining`, `pulses_used`, and `status` (`fully_used` vs `active`) are synced across all affected `customer_packages` records and pre-launch audit logs.
+### 4. Superadmin Patient Wallet Balance Adjustment & Ledger Invariant
+**Enforced in:** `AdjustWalletModal.tsx`, `CustomerFormModal.tsx`, `CustomerProfileDrawer.tsx`, `POST /api/customers`, `src/lib/wallet.ts`
+- **Role Gating**: Only `superadmin` role is authorized to manually adjust or override a patient's existing stored wallet balance. Non-superadmin roles have the wallet field disabled (read-only) in customer edit forms and do not have access to adjustment modal triggers.
+- **Adjustment Modes**:
+  1. *Set Exact Balance*: Directly assigns a new balance target and automatically calculates the delta (`newBalance - currentBalance`).
+  2. *Add / Deduct (+/-)*: Applies an incremental or decremental delta to the existing balance (`newBalance = currentBalance + delta`).
+- **Ledger Invariant**: Any direct staff adjustment calls `setAbsoluteWalletBalance` which writes an atomic delta record to `wallet_txns` with transaction type `admin_adjustment` or `manual_correction`, keeping `customers.wallet_balance` and `wallet_txns` ledger history perfectly synchronized.
 
 
 
