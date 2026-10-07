@@ -27,11 +27,13 @@ import { calculateAge } from "@/lib/age";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
 import ConfirmPackagePriceModal from "@/components/admin/patients/ConfirmPackagePriceModal";
+import AdjustWalletModal, { FinancialMetric } from "@/components/admin/patients/AdjustWalletModal";
 import { PatientTransactionsHistoryTab } from "@/components/admin/patients/PatientTransactionsHistoryTab";
 import { NewManualTransactionView } from "@/components/admin/transactions/NewManualTransactionView";
 import type { Customer } from "@/components/admin/patients/useCustomerProfile";
 
 interface CustomerProfileDrawerProps {
+  fetchCustomers?: () => void;
   onNavigateToNewTransaction?: (patientId: string, patientName: string) => void;
   onAddPreviousBooking?: (patient: Customer) => void;
   // Hook state
@@ -152,6 +154,7 @@ interface CustomerProfileDrawerProps {
 }
 
 export default function CustomerProfileDrawer({
+  fetchCustomers,
   onNavigateToNewTransaction,
   onAddPreviousBooking,
   viewingCustomerProfile,
@@ -268,6 +271,10 @@ export default function CustomerProfileDrawer({
   if (!viewingCustomerProfile) return null;
 
   const [showInlineManualTxnModal, setShowInlineManualTxnModal] = React.useState(false);
+  const [adjustFinancialModal, setAdjustFinancialModal] = React.useState<{
+    isOpen: boolean;
+    initialMetric: FinancialMetric;
+  }>({ isOpen: false, initialMetric: "wallet" });
   // DEC-088 item 6: the historical package whose invoice value is being entered (null = modal closed).
   const [confirmPriceFor, setConfirmPriceFor] = React.useState<any>(null);
 
@@ -594,9 +601,22 @@ export default function CustomerProfileDrawer({
                     <Wallet size={14} className="text-emerald-600 shrink-0" />
                     <span>{t.totalSpend || "Total Spend"}</span>
                   </span>
-                  <span title={t.totalSpend || "Total Spend"}>
-                    <Info size={12} className="text-emerald-500 opacity-60" />
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {adminRole === "superadmin" && (
+                      <button
+                        type="button"
+                        onClick={() => setAdjustFinancialModal({ isOpen: true, initialMetric: "spent" })}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300/60 px-2 py-0.5 rounded-md transition cursor-pointer"
+                        title={lang === "ar" ? "تعديل إجمالي الإنفاق" : "Adjust Total Spend"}
+                      >
+                        <Pencil size={10} />
+                        <span>{lang === "ar" ? "تعديل" : "Edit"}</span>
+                      </button>
+                    )}
+                    <span title={t.totalSpend || "Total Spend"}>
+                      <Info size={12} className="text-emerald-500 opacity-60" />
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-2 text-lg sm:text-xl font-black text-[var(--cr-dark)] tracking-tight">
                   {Number(viewingCustomerProfile.spent_amount !== undefined ? viewingCustomerProfile.spent_amount : viewingCustomerProfile.spent || 0).toLocaleString()} <span className="text-xs font-bold text-[var(--color-brand-secondary)]">{t.egp || "EGP"}</span>
@@ -613,9 +633,22 @@ export default function CustomerProfileDrawer({
                     <Wallet size={14} className="text-sky-600 shrink-0" />
                     <span>{t.wallet || "Wallet"}</span>
                   </span>
-                  <span title={t.wallet || "Wallet"}>
-                    <Info size={12} className="text-sky-500 opacity-60" />
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {adminRole === "superadmin" && (
+                      <button
+                        type="button"
+                        onClick={() => setAdjustFinancialModal({ isOpen: true, initialMetric: "wallet" })}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 border border-sky-300/60 px-2 py-0.5 rounded-md transition cursor-pointer"
+                        title={lang === "ar" ? "تعديل رصيد المحفظة" : "Adjust Wallet Balance"}
+                      >
+                        <Pencil size={10} />
+                        <span>{lang === "ar" ? "تعديل" : "Edit"}</span>
+                      </button>
+                    )}
+                    <span title={t.wallet || "Wallet"}>
+                      <Info size={12} className="text-sky-500 opacity-60" />
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-2 text-lg sm:text-xl font-black text-sky-700 tracking-tight">
                   {Number(viewingCustomerProfile.wallet_balance !== undefined ? viewingCustomerProfile.wallet_balance : viewingCustomerProfile.wallet || 0).toLocaleString()} <span className="text-xs font-bold text-sky-600">{t.egp || "EGP"}</span>
@@ -632,9 +665,22 @@ export default function CustomerProfileDrawer({
                     <CreditCard size={14} className="text-amber-600 shrink-0" />
                     <span>{t.outstanding || "Outstanding"}</span>
                   </span>
-                  <span title={t.outstanding || "Outstanding"}>
-                    <Info size={12} className="text-amber-500 opacity-60" />
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {adminRole === "superadmin" && (
+                      <button
+                        type="button"
+                        onClick={() => setAdjustFinancialModal({ isOpen: true, initialMetric: "outstanding" })}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300/60 px-2 py-0.5 rounded-md transition cursor-pointer"
+                        title={lang === "ar" ? "تعديل المديونية المستحقة" : "Adjust Outstanding Debt"}
+                      >
+                        <Pencil size={10} />
+                        <span>{lang === "ar" ? "تعديل" : "Edit"}</span>
+                      </button>
+                    )}
+                    <span title={t.outstanding || "Outstanding"}>
+                      <Info size={12} className="text-amber-500 opacity-60" />
+                    </span>
+                  </div>
                 </div>
                 <div className={`mt-2 text-lg sm:text-xl font-black tracking-tight ${
                   Number(viewingCustomerProfile.outstanding || 0) > 0 ? "text-rose-600" : "text-[var(--cr-dark)]"
@@ -2496,6 +2542,32 @@ export default function CustomerProfileDrawer({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Modal: Adjust Financials (Wallet / Spent / Outstanding) (Superadmin) ── */}
+      {adjustFinancialModal.isOpen && viewingCustomerProfile && (
+        <AdjustWalletModal
+          customer={viewingCustomerProfile}
+          initialMetric={adjustFinancialModal.initialMetric}
+          onClose={() => setAdjustFinancialModal({ isOpen: false, initialMetric: "wallet" })}
+          onUpdated={(updates: any) => {
+            const updatedCustomer: Customer = {
+              ...viewingCustomerProfile,
+              ...(typeof updates === "number"
+                ? { wallet_balance: updates, wallet: updates }
+                : {
+                    ...(updates.wallet_balance !== undefined ? { wallet_balance: updates.wallet_balance, wallet: updates.wallet_balance } : {}),
+                    ...(updates.spent_amount !== undefined ? { spent_amount: updates.spent_amount, spent: updates.spent_amount } : {}),
+                    ...(updates.outstanding !== undefined ? { outstanding: updates.outstanding } : {}),
+                  }),
+            };
+            setViewingCustomerProfile(updatedCustomer);
+            if (typeof fetchCustomers === "function") {
+              fetchCustomers();
+            }
+          }}
+          lang={lang}
+        />
       )}
 
       {/* ── Modal: Sell Laser Pulses to Patient (FIFO Active Balance) ── */}

@@ -237,13 +237,20 @@ These keys will need changing when forking for client #2.
 
 ---
 
-## Customer Wallet Rules
-**Enforced in:** `PATCH /api/reservations` (checkout/settlement action)
+## Customer Wallet & Financial Overrides Rules
+**Enforced in:** `PATCH /api/reservations`, `POST /api/customers`, `AdjustWalletModal.tsx`, `CustomerProfileDrawer.tsx`, `CustomerFormModal.tsx`
 
 When completing a reservation, the receptionist processes a payment settlement. If the reservation's status is updated to `'completed'`, the linked customer's profile is updated:
 - **Wallet Balance**: Decreased by any `walletWithdrawal` amount used for payment and increased by any `walletDeposit` (overpayment change saved to wallet).
 - **Total Spent**: Increased by the amount paid plus any wallet balance used to offset the cost. Customer's lifetime total spent (`spent_amount`) only increases when payment is actually settled.
 - **Outstanding Debt**: Increased by any unpaid session remainder (`effectiveAmountLeft = totalCost - amountPaid`). When a session treatment is completed without payment, the unpaid session amount is added to `customer.outstanding`. Upon invoice settlement, `customer.outstanding` is reduced and `customer.spent_amount` is increased.
+
+### Superadmin Financial Overrides (Wallet, Outstanding Debt, Total Spend):
+- **Role Gating:** Only `superadmin` role users are authorized to directly adjust/override existing patient financial figures (`wallet_balance`, `outstanding`, `spent_amount`).
+- **Profile Drawer Access:** Superadmins see dedicated edit triggers on all 3 metric cards (**Total Spend**, **Wallet Balance**, **Outstanding Debt**) within `CustomerProfileDrawer.tsx`, opening the unified `AdjustWalletModal.tsx` (supporting Exact and Delta +/- modes with real-time preview and reason logging).
+- **Customer Form Modal:** In `CustomerFormModal.tsx`, opening balances can be set by staff on new patient creation. For existing patients, `wallet_balance`, `spent_amount`, and `outstanding` fields are strictly read-only for standard staff and editable only by superadmins with clear visual badge indicators.
+- **Backend Protection:** `POST /api/customers` strictly verifies superadmin privileges before updating `wallet_balance` (with `wallet_txns` ledger tracking), `spent_amount`, or `outstanding` on existing patient profiles. Standard staff profile edits leave financial metrics untouched.
+- **System Test Suite:** Diagnostic Test Case `TC-093` verifies the Superadmin Patient Financial Overrides & Ledger Security Engine.
 
 ---
 
@@ -348,7 +355,8 @@ The following are **not currently enforced in code**:
 4. **Original Historical Date Preservation**:
    - The user-specified historical date (even years prior to system deployment) is preserved verbatim in `reservations.date` and `reservations.completed_at`.
 5. **Patient Matching & Automatic Profile Creation**:
-   - Matches existing patients by phone number (normalizing Egyptian formats `+201...`, `00201...`, `201...` to `01...`).
+   - Matches existing patients by phone number (normalizing Egyptian formats `+201...`, `00201...`, `201...` to `01...` and supporting international country codes e.g. `+966`, `+971`, `+965`, etc.).
+   - Provides an integrated country selector dropdown with flags and dialing codes in the previous booking intake interface.
    - If matched, links the historical reservation to `customer_id` and increments `number_of_bookings`.
    - If no patient matches the phone number, a new patient record is automatically created in `customers` (`active = true`, `number_of_bookings = 1`) and linked.
 6. **Field Optionality**:
@@ -1221,8 +1229,35 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
   - `POST` / `PATCH` `/api/reservations/previous` processes `packages: Array<AttachedPackageItem>`.
   - Line items are created in `reservation_products` for each package attached.
   - Formatted reception notes capture usage for every attached package: `Package: <Name>. [Package Usage]: <Used> / <Total> pulses used (<Remaining> pulses remaining).`
-  - Cumulative `pulses_remaining`, `pulses_used`, and `status` (`fully_used` vs `active`) are synced across all affected `customer_packages` records and pre-launch audit logs.
+### 4. Superadmin Patient Wallet Balance Adjustment & Ledger Invariant
+**Enforced in:** `AdjustWalletModal.tsx`, `CustomerFormModal.tsx`, `CustomerProfileDrawer.tsx`, `POST /api/customers`, `src/lib/wallet.ts`
+- **Role Gating**: Only `superadmin` role is authorized to manually adjust or override a patient's existing stored wallet balance. Non-superadmin roles have the wallet field disabled (read-only) in customer edit forms and do not have access to adjustment modal triggers.
+- **Adjustment Modes**:
+  1. *Set Exact Balance*: Directly assigns a new balance target and automatically calculates the delta (`newBalance - currentBalance`).
+  2. *Add / Deduct (+/-)*: Applies an incremental or decremental delta to the existing balance (`newBalance = currentBalance + delta`).
+- **Ledger Invariant**: Any direct staff adjustment calls `setAbsoluteWalletBalance` which writes an atomic delta record to `wallet_txns` with transaction type `admin_adjustment` or `manual_correction`, keeping `customers.wallet_balance` and `wallet_txns` ledger history perfectly synchronized.
 
+### 5. Patient Phone Number & WhatsApp Country Code Engine
+**Enforced in:** `CustomerFormModal.tsx`, `AdminAddPreviousBookingView.tsx`, `POST /api/customers`
+- **Country Code Selector**: Patient mobile and WhatsApp number inputs feature compact country code dropdown selectors with flags, dialing codes (e.g., `+20` Egypt, `+966` Saudi Arabia, `+971` UAE, `+965` Kuwait, `+1` USA, etc.), and clean clear-button triggers.
+- **Dynamic Formatting & Normalization**:
+  - Automatically parses incoming raw numbers with country prefix detection.
+  - Formats local Egyptian numbers to `01XXXXXXXXX` and international numbers to `+<countryCode><digits>`.
+  - Performs country-aware validation (`01[0125]\d{8}` for Egypt `+20`, 6–15 digits for international).
 
-
+### 6. Multi-Service Booking & Intake Session Engine
+**Enforced in:** `AdminNewBookingView.tsx`, `AdminAddPreviousBookingView.tsx`, `POST /api/reservations`, `POST /api/reservations/previous`, `PATCH /api/reservations/previous`
+- **Multi-Service Selection in New Bookings**:
+  - Staff can attach multiple services to an appointment session.
+  - The primary service is designated as `serviceId`, and additional services are tracked in `additionalServiceIds`.
+  - The appointment duration is automatically aggregated across all selected services: `totalDurationMinutes = sum(service.duration_minutes)`.
+  - Cumulative base pricing is automatically summed: `baseServicePrice = sum(service.price)`.
+  - Selected services are formatted cleanly as interactive badge chips with durations, prices, and remove buttons.
+- **Multi-Service Selection in Previous / Historical Bookings**:
+  - Staff can search and select multiple services using searchable autocomplete.
+  - Selected services are rendered as removable badge chips with individual pricing.
+  - Session invoice calculation sums all attached services + catalog packages + products: `invoiceValue = sum(services.price) + sum(catalogPackages.price) + product.price`.
+  - `POST` / `PATCH` `/api/reservations/previous` records all selected services in `reservation.service_ids` and writes corresponding `reservation_products` line items (`service` and `additional_service`).
+- **Product and Package Catalog Retrieval**:
+  - `AdminAddPreviousBookingView` fetches `/api/inventory/products` and `/api/packages` with authenticated staff headers (`getAuthHeaders()`), populating the catalog dropdowns with live prices and stock.
 

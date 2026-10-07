@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { requireAdministratorAccess, requireAuthenticatedUser, requireStaffAccess, requireSuperadminAccess } from '@/lib/access';
+import { requireAdministratorAccess, requireAuthenticatedUser, requireStaffAccess, requireSuperadminAccess, type StaffAccess } from '@/lib/access';
 import { isOwnIdentity, normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordWalletMovement, setAbsoluteWalletBalance } from '@/lib/wallet';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 /**
  * This route has two legitimate caller populations: staff (reception/admin, full access)
@@ -12,7 +15,7 @@ import { recordWalletMovement, setAbsoluteWalletBalance } from '@/lib/wallet';
  * requireStaffAccess check would 403 every patient. See RISK-018 / FINANCE_TRACKER 0.10.
  */
 export type Caller =
-  | { kind: 'staff' }
+  | { kind: 'staff'; access: StaffAccess }
   | { kind: 'patient'; user: { id: string; email?: string | null; phone?: string | null } }
   | { kind: 'unauthenticated'; error: string; status: 401 | 403 | 500 };
 
@@ -20,7 +23,7 @@ export type Caller =
  *  exact classification instead of re-implementing the staff-then-patient fallback. */
 export async function classifyCaller(req: Request): Promise<Caller> {
   const staffResult = await requireStaffAccess(req);
-  if (!('error' in staffResult)) return { kind: 'staff' };
+  if (!('error' in staffResult)) return { kind: 'staff', access: staffResult.access };
   if (staffResult.status === 401) {
     return { kind: 'unauthenticated', error: staffResult.error, status: staffResult.status };
   }
@@ -107,7 +110,11 @@ export async function GET(req: Request) {
     const { data: rows, error } = await listQuery;
 
     if (error) throw error;
-    return NextResponse.json(rows || []);
+    return NextResponse.json(rows || [], {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      },
+    });
   } catch (err) {
     console.error('GET /api/customers error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
@@ -230,6 +237,8 @@ export async function POST(req: Request) {
     updated_at: new Date().toISOString()
   };
 
+  const isStaff = caller.kind === 'staff';
+  const isSuperadmin = isStaff && caller.access?.role === 'superadmin';
   const staffWalletValue = Number(wallet_balance || 0);
 
   if (caller.kind === 'patient') {
@@ -237,11 +246,13 @@ export async function POST(req: Request) {
     // contains — a patient must not be able to set their own wallet_balance or erase
     // outstanding debt by POSTing arbitrary values. Keep whatever is already stored.
     customerData.auth_user_id = caller.user.id;
-  } else {
-    // Staff path — unchanged from before this endpoint required authentication.
-    customerData.spent_amount = Number(spent_amount || 0);
-    customerData.outstanding = Number(outstanding || 0);
-    // wallet_balance is handled via the ledger helper below, not as a bare scalar write
+  } else if (id) {
+    // Editing existing customer: Only superadmins are allowed to directly override financial metrics.
+    // Standard staff edits (e.g. updating phone/notes) preserve existing financial balances.
+    if (isSuperadmin) {
+      if (spent_amount !== undefined) customerData.spent_amount = Number(spent_amount || 0);
+      if (outstanding !== undefined) customerData.outstanding = Number(outstanding || 0);
+    }
   }
 
   try {
@@ -257,8 +268,8 @@ export async function POST(req: Request) {
       if (error) throw error;
       result = data;
 
-      // Write a wallet_txns ledger row when staff sets wallet_balance on an existing customer
-      if (caller.kind === 'staff') {
+      // Write a wallet_txns ledger row when superadmin adjusts wallet_balance on an existing customer
+      if (isSuperadmin && wallet_balance !== undefined) {
         await setAbsoluteWalletBalance({ customerId: id, newBalance: staffWalletValue });
       }
     } else {

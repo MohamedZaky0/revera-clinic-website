@@ -124,6 +124,40 @@ interface AdminAddPreviousBookingViewProps {
   t?: any;
 }
 
+interface CountryOption {
+  code: string;
+  flag: string;
+  nameEn: string;
+  nameAr: string;
+}
+
+const COUNTRY_OPTIONS: CountryOption[] = [
+  { code: "+20", flag: "🇪🇬", nameEn: "Egypt", nameAr: "مصر" },
+  { code: "+966", flag: "🇸🇦", nameEn: "Saudi Arabia", nameAr: "المملكة العربية السعودية" },
+  { code: "+971", flag: "🇦🇪", nameEn: "UAE", nameAr: "الإمارات العربية المتحدة" },
+  { code: "+965", flag: "🇰🇼", nameEn: "Kuwait", nameAr: "الكويت" },
+  { code: "+974", flag: "🇶🇦", nameEn: "Qatar", nameAr: "قطر" },
+  { code: "+968", flag: "🇴🇲", nameEn: "Oman", nameAr: "عُمان" },
+  { code: "+973", flag: "🇧🇭", nameEn: "Bahrain", nameAr: "البحرين" },
+  { code: "+962", flag: "🇯🇴", nameEn: "Jordan", nameAr: "الأردن" },
+  { code: "+964", flag: "🇮🇶", nameEn: "Iraq", nameAr: "العراق" },
+  { code: "+961", flag: "🇱🇧", nameEn: "Lebanon", nameAr: "لبنان" },
+  { code: "+218", flag: "🇱🇾", nameEn: "Libya", nameAr: "ليبيا" },
+  { code: "+249", flag: "🇸🇩", nameEn: "Sudan", nameAr: "السودان" },
+  { code: "+963", flag: "🇸🇾", nameEn: "Syria", nameAr: "سوريا" },
+  { code: "+967", flag: "🇾🇪", nameEn: "Yemen", nameAr: "اليمن" },
+  { code: "+970", flag: "🇵🇸", nameEn: "Palestine", nameAr: "فلسطين" },
+  { code: "+216", flag: "🇹🇳", nameEn: "Tunisia", nameAr: "تونس" },
+  { code: "+212", flag: "🇲🇦", nameEn: "Morocco", nameAr: "المغرب" },
+  { code: "+213", flag: "🇩🇿", nameEn: "Algeria", nameAr: "الجزائر" },
+  { code: "+1", flag: "🇺🇸", nameEn: "USA / Canada", nameAr: "أمريكا / كندا" },
+  { code: "+44", flag: "🇬🇧", nameEn: "United Kingdom", nameAr: "المملكة المتحدة" },
+  { code: "+49", flag: "🇩🇪", nameEn: "Germany", nameAr: "ألمانيا" },
+  { code: "+33", flag: "🇫🇷", nameEn: "France", nameAr: "فرنسا" },
+  { code: "+39", flag: "🇮🇹", nameEn: "Italy", nameAr: "إيطاليا" },
+  { code: "+90", flag: "🇹🇷", nameEn: "Turkey", nameAr: "تركيا" },
+];
+
 function cleanPhone(raw: string): string {
   let p = raw.trim();
   if (p.startsWith("+20")) {
@@ -136,14 +170,46 @@ function cleanPhone(raw: string): string {
   return p;
 }
 
-function isValidPhone(raw: string): boolean {
+function parsePhoneWithCountry(raw: string): { code: string; number: string } {
+  if (!raw) return { code: "+20", number: "" };
+  const trimmed = raw.trim();
+  for (const c of COUNTRY_OPTIONS) {
+    if (trimmed.startsWith(c.code)) {
+      return { code: c.code, number: trimmed.slice(c.code.length).replace(/^0+/, "") };
+    }
+    const noPlus = c.code.replace("+", "");
+    if (trimmed.startsWith(`00${noPlus}`)) {
+      return { code: c.code, number: trimmed.slice(2 + noPlus.length).replace(/^0+/, "") };
+    }
+  }
+  return { code: "+20", number: cleanPhone(trimmed) };
+}
+
+function formatFullPhone(number: string, countryCode: string = "+20"): string {
+  const trimmed = number.trim();
+  if (!trimmed) return "";
+  if (countryCode === "+20") {
+    let p = cleanPhone(trimmed);
+    if (!p.startsWith("0") && p.length === 10) p = "0" + p;
+    return p;
+  }
+  const cleanDigits = trimmed.replace(/\D/g, "").replace(/^0+/, "");
+  return `${countryCode}${cleanDigits}`;
+}
+
+function isValidPhone(raw: string, countryCode: string = "+20"): boolean {
   if (!raw) return false;
-  const p = cleanPhone(raw);
-  // Egyptian mobile format: 010, 011, 012, 015 followed by 8 digits
-  if (/^01[0125]\d{8}$/.test(p)) return true;
-  // Generic international format (8-15 digits)
-  if (/^\+?\d{8,15}$/.test(raw.trim())) return true;
-  return false;
+  const digits = raw.replace(/\D/g, "");
+  if (countryCode === "+20") {
+    let p = cleanPhone(raw);
+    if (!p.startsWith("0") && p.length === 10) p = "0" + p;
+    // Egyptian mobile format: 010, 011, 012, 015 followed by 8 digits
+    if (/^01[0125]\d{8}$/.test(p)) return true;
+    if (/^(\+?20)?01[0125]\d{8}$/.test(raw.trim())) return true;
+    return digits.length >= 10 && digits.length <= 12;
+  }
+  // Generic international format (6-15 digits)
+  return digits.length >= 6 && digits.length <= 15;
 }
 
 export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewProps> = ({
@@ -172,24 +238,34 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
   const initPhone = initialPatientPhone || initialCustomer?.mobile || initialCustomer?.phone || "";
   const initName = initialPatientName || initialCustomer?.name || "";
+  const parsedInit = parsePhoneWithCountry(initPhone);
 
   // Row 1 State: Patient Phone *, Patient Name *, Doctor (Optional)
-  const [patientPhone, setPatientPhone] = useState(initPhone);
+  const [countryCode, setCountryCode] = useState(parsedInit.code);
+  const [patientPhone, setPatientPhone] = useState(parsedInit.number);
   const [patientName, setPatientName] = useState(initName);
   const [selectedDoctorId, setSelectedDoctorId] = useState("");
+
+  const selectedCountry = useMemo(() => {
+    return COUNTRY_OPTIONS.find((c) => c.code === countryCode) || COUNTRY_OPTIONS[0];
+  }, [countryCode]);
 
   useEffect(() => {
     if (!targetBooking) {
       const nextPhone = initialPatientPhone || initialCustomer?.mobile || initialCustomer?.phone;
       const nextName = initialPatientName || initialCustomer?.name;
-      if (nextPhone) setPatientPhone(nextPhone);
+      if (nextPhone) {
+        const parsed = parsePhoneWithCountry(nextPhone);
+        setCountryCode(parsed.code);
+        setPatientPhone(parsed.number);
+      }
       if (nextName) setPatientName(nextName);
     }
   }, [initialCustomer, initialPatientPhone, initialPatientName, targetBooking]);
 
-  // Row 2 State: Date *, Service (Optional), Package (Optional), Products (Optional)
+  // Row 2 State: Date *, Services (Optional), Package (Optional), Products (Optional)
   const [bookingDate, setBookingDate] = useState("");
-  const [selectedServiceId, setSelectedServiceId] = useState("");
+  const [selectedServices, setSelectedServices] = useState<ServiceItem[]>([]);
   const [serviceSearchQuery, setServiceSearchQuery] = useState("");
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
   const serviceDropdownRef = useRef<HTMLDivElement>(null);
@@ -221,12 +297,19 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     if (packages && packages.length > 0) {
       setPkgList(packages);
     } else {
-      fetch("/api/packages")
-        .then(res => (res.ok ? res.json() : []))
-        .then((data: any) => {
-          if (Array.isArray(data)) setPkgList(data);
-        })
-        .catch(() => {});
+      (async () => {
+        try {
+          const headers = await getAuthHeaders();
+          const res = await fetch("/api/packages", { headers });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) setPkgList(data);
+            else if (data && Array.isArray(data.packages)) setPkgList(data.packages);
+          }
+        } catch (err) {
+          console.error("Error fetching packages in previous booking:", err);
+        }
+      })();
     }
   }, [packages]);
 
@@ -234,13 +317,19 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     if (products && products.length > 0) {
       setProdList(products);
     } else {
-      fetch("/api/inventory/products")
-        .then(res => (res.ok ? res.json() : null))
-        .then((data: any) => {
-          if (data && Array.isArray(data.products)) setProdList(data.products);
-          else if (Array.isArray(data)) setProdList(data);
-        })
-        .catch(() => {});
+      (async () => {
+        try {
+          const headers = await getAuthHeaders();
+          const res = await fetch("/api/inventory/products", { headers });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && Array.isArray(data.products)) setProdList(data.products);
+            else if (Array.isArray(data)) setProdList(data);
+          }
+        } catch (err) {
+          console.error("Error fetching inventory products in previous booking:", err);
+        }
+      })();
     }
   }, [products]);
 
@@ -256,11 +345,23 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
   // Live match patient against customers array
   const matchedCustomer = useMemo(() => {
-    if (patientPhone && patientPhone.trim().length >= 8) {
+    if (patientPhone && patientPhone.trim().length >= 6) {
       const cleanInput = cleanPhone(patientPhone);
+      const digitsInput = patientPhone.replace(/\D/g, "");
+      const fullPhone = formatFullPhone(patientPhone, countryCode);
+      const fullDigits = fullPhone.replace(/\D/g, "");
+
       const found = customers.find(c => {
-        const cMobile = cleanPhone(c.mobile || c.phone || "");
-        return cMobile && cMobile === cleanInput;
+        const rawCustMobile = c.mobile || c.phone || "";
+        if (!rawCustMobile) return false;
+        const cClean = cleanPhone(rawCustMobile);
+        const cDigits = rawCustMobile.replace(/\D/g, "");
+
+        return (
+          (cleanInput && cClean && cClean === cleanInput) ||
+          (fullDigits && cDigits && (cDigits === fullDigits || cDigits.endsWith(digitsInput) || digitsInput.endsWith(cDigits))) ||
+          (rawCustMobile.trim() === fullPhone || rawCustMobile.trim() === patientPhone.trim())
+        );
       });
       if (found) return found;
     }
@@ -268,13 +369,14 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       return initialCustomer;
     }
     return null;
-  }, [patientPhone, customers, initialCustomer]);
+  }, [patientPhone, countryCode, customers, initialCustomer]);
 
   // Reactive fetch for patient's existing packages
   useEffect(() => {
-    const cleanP = cleanPhone(patientPhone);
+    const fullP = formatFullPhone(patientPhone, countryCode);
+    const cleanP = cleanPhone(fullP);
     const targetCustId = matchedCustomer?.id;
-    if ((!cleanP || cleanP.length < 8) && !targetCustId) {
+    if ((!cleanP || cleanP.length < 6) && !targetCustId) {
       setPatientExistingPackages([]);
       return;
     }
@@ -287,7 +389,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         const headers = await getAuthHeaders();
         const param = targetCustId
           ? `customerId=${encodeURIComponent(String(targetCustId))}`
-          : `mobile=${encodeURIComponent(cleanP)}`;
+          : `mobile=${encodeURIComponent(fullP || cleanP)}`;
         const res = await fetch(`/api/customers/packages?${param}`, { headers });
         if (res.ok && isMounted) {
           const data = await res.json();
@@ -307,7 +409,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     return () => {
       isMounted = false;
     };
-  }, [patientPhone, matchedCustomer?.id]);
+  }, [patientPhone, countryCode, matchedCustomer?.id]);
 
   // Handle phone change & auto-populate name if patient matched
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -317,11 +419,22 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       setErrors(prev => ({ ...prev, phone: undefined }));
     }
 
-    if (val.trim().length >= 8) {
+    if (val.trim().length >= 6) {
       const cleanVal = cleanPhone(val);
+      const digitsVal = val.replace(/\D/g, "");
+      const fullVal = formatFullPhone(val, countryCode);
+      const fullDigits = fullVal.replace(/\D/g, "");
+
       const match = customers.find(c => {
-        const cMobile = cleanPhone(c.mobile || c.phone || "");
-        return cMobile && cMobile === cleanVal;
+        const rawCustMobile = c.mobile || c.phone || "";
+        if (!rawCustMobile) return false;
+        const cClean = cleanPhone(rawCustMobile);
+        const cDigits = rawCustMobile.replace(/\D/g, "");
+        return (
+          (cleanVal && cClean && cClean === cleanVal) ||
+          (fullDigits && cDigits && (cDigits === fullDigits || cDigits.endsWith(digitsVal) || digitsVal.endsWith(cDigits))) ||
+          (rawCustMobile.trim() === fullVal || rawCustMobile.trim() === val.trim())
+        );
       });
       if (match && match.name && !patientName) {
         setPatientName(match.name);
@@ -346,22 +459,16 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     });
   }, [services, serviceSearchQuery]);
 
-  // Click outside to close service dropdown & sync display text
+  // Click outside to close service dropdown
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(e.target as Node)) {
         setIsServiceDropdownOpen(false);
-        if (selectedServiceId) {
-          const found = services.find((s) => String(s.id) === String(selectedServiceId));
-          if (found) {
-            setServiceSearchQuery(getServiceName(found));
-          }
-        }
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [selectedServiceId, services, lang]);
+  }, []);
 
   // Helper to extract package name cleanly
   const getPackageName = (p: PackageItem | any) => {
@@ -375,16 +482,15 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     return pr.name || `Product #${pr.id}`;
   };
 
-  // Recalculate invoice value when Service, Packages, or Product changes
+  // Recalculate invoice value when Services, Packages, or Product changes
   const recalculateInvoice = (
-    nextSrvId: string,
+    nextServices: ServiceItem[],
     currentPkgs: AttachedPackageItem[],
     nextProdId: string
   ) => {
-    const srv = services.find((s) => String(s.id) === String(nextSrvId));
     const prod = prodList.find((pr) => String(pr.id) === String(nextProdId));
 
-    const srvPrice = Number(srv?.price || 0);
+    const srvPrice = nextServices.reduce((sum, s) => sum + Number(s.price || 0), 0);
     const pkgsPrice = currentPkgs.reduce(
       (sum, p) => sum + (p.source === "catalog" ? Number(p.price || 0) : 0),
       0
@@ -398,6 +504,23 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     if (!hasManuallyEditedSpent) {
       setActualSpent(totalStr);
     }
+  };
+
+  // Handle adding a service
+  const handleAddService = (s: ServiceItem) => {
+    if (selectedServices.some((existing) => String(existing.id) === String(s.id))) return;
+    const nextList = [...selectedServices, s];
+    setSelectedServices(nextList);
+    setServiceSearchQuery("");
+    setIsServiceDropdownOpen(false);
+    recalculateInvoice(nextList, attachedPackages, selectedProductId);
+  };
+
+  // Handle removing a service
+  const handleRemoveService = (serviceId: string | number) => {
+    const nextList = selectedServices.filter((s) => String(s.id) !== String(serviceId));
+    setSelectedServices(nextList);
+    recalculateInvoice(nextList, attachedPackages, selectedProductId);
   };
 
   // Handle adding a package (supports both "existing:ID" and "catalog:ID")
@@ -465,7 +588,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
       const nextList = [...attachedPackages, newPkg];
       setAttachedPackages(nextList);
-      recalculateInvoice(selectedServiceId, nextList, selectedProductId);
+      recalculateInvoice(selectedServices, nextList, selectedProductId);
     } else {
       const pId = val.replace("catalog:", "");
       const pkg = pkgList.find((p) => String(p.id) === String(pId));
@@ -513,7 +636,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
       const nextList = [...attachedPackages, newPkg];
       setAttachedPackages(nextList);
-      recalculateInvoice(selectedServiceId, nextList, selectedProductId);
+      recalculateInvoice(selectedServices, nextList, selectedProductId);
     }
   };
 
@@ -521,7 +644,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
   const handleRemovePackage = (pkgEntryId: string) => {
     const nextList = attachedPackages.filter((p) => p.id !== pkgEntryId);
     setAttachedPackages(nextList);
-    recalculateInvoice(selectedServiceId, nextList, selectedProductId);
+    recalculateInvoice(selectedServices, nextList, selectedProductId);
   };
 
   // Pulses input handlers per package (Pulses Used drives Pulses Left automatically)
@@ -673,7 +796,6 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     const spentMatch = rawNotes.match(/Actual Spent:\s*(\d+(?:\.\d+)?)/i);
     const payMethodMatch = rawNotes.match(/Payment Method:\s*([^\.\n]+)/i);
 
-    const sId = String(targetBooking.service_id || targetBooking.serviceId || (targetBooking.serviceIds && targetBooking.serviceIds[0]) || "");
     const dId = String(targetBooking.provider_id || targetBooking.doctorId || targetBooking.doctor_id || "");
     const pPhone = targetBooking.phone || targetBooking.customer_phone || targetBooking.patientPhone || "";
     const pName = targetBooking.name || targetBooking.customer_name || targetBooking.patientName || "";
@@ -686,21 +808,54 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       : (spentMatch ? spentMatch[1] : (targetBooking.amountPaid != null ? String(targetBooking.amountPaid) : ""));
     const payType = targetBooking.payment_type || targetBooking.payment_method || (payMethodMatch ? payMethodMatch[1].trim() : "");
 
-    if (pPhone) setPatientPhone(pPhone);
+    if (pPhone) {
+      const parsed = parsePhoneWithCountry(pPhone);
+      setCountryCode(parsed.code);
+      setPatientPhone(parsed.number);
+    }
     if (pName) setPatientName(pName);
     if (bDate) setBookingDate(bDate);
     if (dId) setSelectedDoctorId(dId);
-    if (sId) setSelectedServiceId(sId);
     if (invVal !== undefined && invVal !== null && invVal !== "") setInvoiceValue(String(invVal));
     if (actSpent !== undefined && actSpent !== null && actSpent !== "") setActualSpent(String(actSpent));
     if (payType) setSelectedPaymentType(payType);
     if (cleanNotes) setNotes(cleanNotes);
 
-    if (sId && services.length > 0) {
-      const foundSvc = services.find((s) => String(s.id) === sId);
-      if (foundSvc) {
-        setServiceSearchQuery(getServiceName(foundSvc));
+    // Multi-service extraction in edit mode
+    const rawSvcIds: any[] = Array.isArray(targetBooking.service_ids)
+      ? targetBooking.service_ids
+      : Array.isArray(targetBooking.serviceIds)
+      ? targetBooking.serviceIds
+      : (targetBooking.service_id || targetBooking.serviceId)
+      ? [targetBooking.service_id || targetBooking.serviceId]
+      : [];
+
+    const matchedInitialSvcs: ServiceItem[] = [];
+    if (rawSvcIds.length > 0 && services.length > 0) {
+      rawSvcIds.forEach((id: any) => {
+        const found = services.find((s) => String(s.id) === String(id));
+        if (found && !matchedInitialSvcs.some((m) => String(m.id) === String(found.id))) {
+          matchedInitialSvcs.push(found);
+        }
+      });
+    } else if (services.length > 0) {
+      const svcsMatch = rawNotes.match(/Services?:\s*([^\.\n]+)/i);
+      if (svcsMatch) {
+        const names = svcsMatch[1].split(",").map((n: string) => n.trim().toLowerCase());
+        services.forEach((s) => {
+          const nEn = (s.en || s.name || s.title || "").toLowerCase();
+          const nAr = (s.ar || "").toLowerCase();
+          if (names.some((name: string) => name && (nEn === name || nAr === name || nEn.includes(name) || nAr.includes(name)))) {
+            if (!matchedInitialSvcs.some((m) => String(m.id) === String(s.id))) {
+              matchedInitialSvcs.push(s);
+            }
+          }
+        });
       }
+    }
+
+    if (matchedInitialSvcs.length > 0) {
+      setSelectedServices(matchedInitialSvcs);
     }
 
     // Product extraction in edit mode
@@ -828,7 +983,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     const trimmedPhone = patientPhone.trim();
     if (!trimmedPhone) {
       newErrors.phone = tr.requiredField;
-    } else if (!isValidPhone(trimmedPhone)) {
+    } else if (!isValidPhone(trimmedPhone, countryCode)) {
       newErrors.phone = tr.invalidPhone;
     }
 
@@ -854,22 +1009,32 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
     try {
       const selectedDoc = providers.find((p) => String(p.id) === String(selectedDoctorId));
-      const selectedSrv = services.find((s) => String(s.id) === String(selectedServiceId));
       const selectedProd = prodList.find((pr) => String(pr.id) === String(selectedProductId));
+
+      const selectedServiceIds = selectedServices.map((s) => Number(s.id)).filter((n) => !isNaN(n) && n > 0);
+      const primaryService = selectedServices[0] || null;
+      const allServiceNames = selectedServices.map((s) => getServiceName(s)).join(", ");
 
       const parsedInvoiceVal = invoiceValue !== "" ? parseFloat(invoiceValue) : 0;
       const parsedSpentVal = actualSpent !== "" ? parseFloat(actualSpent) : 0;
 
       const firstPkg = attachedPackages[0];
+      const fullFormattedPhone = formatFullPhone(trimmedPhone, countryCode);
 
       const payload: Record<string, any> = {
-        patientPhone: trimmedPhone,
+        patientPhone: fullFormattedPhone,
         patientName: trimmedName,
         date: bookingDate,
         doctorId: selectedDoctorId || null,
         doctorName: selectedDoc?.name || null,
-        serviceId: selectedServiceId ? Number(selectedServiceId) : null,
-        serviceName: selectedSrv ? getServiceName(selectedSrv) : null,
+        serviceId: primaryService ? Number(primaryService.id) : null,
+        serviceIds: selectedServiceIds,
+        services: selectedServices.map((s) => ({
+          id: Number(s.id),
+          name: getServiceName(s),
+          price: Number(s.price || 0)
+        })),
+        serviceName: allServiceNames || null,
         productId: selectedProductId || null,
         productName: selectedProd ? getProductName(selectedProd) : null,
         packageId: firstPkg?.packageId || null,
@@ -1017,27 +1182,67 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 </span>
               )}
             </div>
-            <div className="relative flex items-center">
-              <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
-                <Phone size={17} />
+            <div
+              className={`flex items-center rounded-xl border overflow-hidden transition shadow-2xs ${
+                isEditMode
+                  ? "border-gray-200 bg-[#F7F7F6]"
+                  : errors.phone
+                  ? "border-rose-400 bg-white focus-within:border-rose-500 focus-within:ring-2 focus-within:ring-rose-200"
+                  : "border-gray-200 bg-white focus-within:border-[var(--cr-primary)] focus-within:ring-2 focus-within:ring-[var(--cr-primary)]/10"
+              }`}
+            >
+              {/* Compact Country Code Dropdown with overlay trigger */}
+              <div className={`relative flex items-center justify-center bg-[#F9FAF8] border-e border-gray-200 px-3 py-3 shrink-0 transition ${isEditMode ? "cursor-not-allowed" : "hover:bg-[#F0F4EE] cursor-pointer"}`}>
+                <div className="flex items-center gap-1.5 pointer-events-none text-xs sm:text-sm font-bold text-[#111827]">
+                  <span className="text-base leading-none select-none">{selectedCountry.flag}</span>
+                  <span className="font-mono text-xs sm:text-sm">{countryCode}</span>
+                  {!isEditMode && <ChevronDown size={13} className="text-[var(--color-brand-secondary)]" />}
+                </div>
+                {!isEditMode && (
+                  <select
+                    value={countryCode}
+                    onChange={(e) => {
+                      setCountryCode(e.target.value);
+                      if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
+                    }}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer text-sm"
+                    title={lang === "ar" ? "اختر الدولة" : "Select Country"}
+                  >
+                    {COUNTRY_OPTIONS.map((c) => (
+                      <option key={c.code} value={c.code} className="text-[#111827] py-1">
+                        {c.flag} {c.code} ({lang === "ar" ? c.nameAr : c.nameEn})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
-              <input
-                id="patientPhone"
-                type="tel"
-                value={patientPhone}
-                onChange={handlePhoneChange}
-                readOnly={isEditMode}
-                disabled={isEditMode}
-                placeholder={tr.patientPhonePlaceholder}
-                title={isEditMode ? tr.patientPhoneLockedHint : tr.patientPhoneTooltip}
-                className={`w-full rounded-xl border py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm font-medium outline-none transition placeholder:text-[#9CA3AF] ${
-                  isEditMode
-                    ? "border-gray-200 bg-[#F7F7F6] text-gray-700 cursor-not-allowed"
-                    : errors.phone
-                    ? "border-rose-400 bg-white text-[#111827] focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
-                    : "border-gray-200 bg-white text-[#111827] focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
-                }`}
-              />
+
+              {/* Phone Input */}
+              <div className="relative flex-1 flex items-center min-w-0">
+                <input
+                  id="patientPhone"
+                  type="tel"
+                  value={patientPhone}
+                  onChange={handlePhoneChange}
+                  readOnly={isEditMode}
+                  disabled={isEditMode}
+                  placeholder={countryCode === "+20" ? (tr.patientPhonePlaceholder || "01X XXXX XXXX") : "XXXXXXXXX"}
+                  title={isEditMode ? tr.patientPhoneLockedHint : tr.patientPhoneTooltip}
+                  className={`w-full bg-transparent py-3 px-3.5 text-xs sm:text-sm font-medium outline-none placeholder:text-[#9CA3AF] ${isEditMode ? "text-gray-700 cursor-not-allowed" : "text-[#111827]"}`}
+                />
+                {patientPhone && !isEditMode ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPatientPhone("");
+                      if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
+                    }}
+                    className="pe-3 text-[var(--color-brand-secondary)] hover:text-[#111827] transition cursor-pointer"
+                  >
+                    <X size={15} />
+                  </button>
+                ) : null}
+              </div>
             </div>
             {errors.phone ? (
               <p className="text-xs font-semibold text-rose-600 flex items-center gap-1 mt-1">
@@ -1269,11 +1474,18 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             )}
           </div>
 
-          {/* FIELD 5: SERVICE (OPTIONAL) - Searchable autocomplete input */}
+          {/* FIELD 5: SERVICES (OPTIONAL - MULTI-SERVICE SUPPORT) */}
           <div className="space-y-1.5 relative" ref={serviceDropdownRef}>
-            <label htmlFor="serviceSearchInput" className="text-xs sm:text-sm font-bold text-[#111827]">
-              {tr.serviceOptional || tr.serviceLabel}
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="serviceSearchInput" className="text-xs sm:text-sm font-bold text-[#111827]">
+                {tr.servicesOptional || tr.serviceOptional || (lang === "ar" ? "الخدمات (اختياري)" : "Services (Optional)")}
+              </label>
+              {selectedServices.length > 0 && (
+                <span className="text-[10px] font-bold text-[#344E41] bg-[#E8EFE5] px-2 py-0.5 rounded-full">
+                  {selectedServices.length} {lang === "ar" ? "خدمات مضافة" : "selected"}
+                </span>
+              )}
+            </div>
             <div className="relative flex items-center">
               <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <Layers size={17} />
@@ -1284,29 +1496,26 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 autoComplete="off"
                 value={serviceSearchQuery}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  setServiceSearchQuery(val);
+                  setServiceSearchQuery(e.target.value);
                   setIsServiceDropdownOpen(true);
-                  if (!val) {
-                    setSelectedServiceId("");
-                    recalculateInvoice("", attachedPackages, selectedProductId);
-                  }
                 }}
                 onFocus={() => setIsServiceDropdownOpen(true)}
-                placeholder={tr.searchServicePlaceholder || tr.selectServicePlaceholder || "Search service..."}
+                placeholder={
+                  selectedServices.length > 0
+                    ? (lang === "ar" ? "+ إضافة خدمة أخرى..." : "+ Add another service...")
+                    : (tr.searchServicePlaceholder || tr.selectServicePlaceholder || "Search service...")
+                }
                 className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
               />
               {serviceSearchQuery ? (
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedServiceId("");
                     setServiceSearchQuery("");
                     setIsServiceDropdownOpen(false);
-                    recalculateInvoice("", attachedPackages, selectedProductId);
                   }}
                   className="absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#9CA3AF] hover:text-[var(--cr-primary)] transition cursor-pointer z-10"
-                  title="Clear service"
+                  title="Clear search"
                 >
                   <X size={16} />
                 </button>
@@ -1325,16 +1534,17 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 <div className="absolute top-full left-0 right-0 mt-1.5 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl z-50 py-1 divide-y divide-gray-50">
                   {filteredServices.length > 0 ? (
                     filteredServices.map((s) => {
-                      const isSelected = String(selectedServiceId) === String(s.id);
+                      const isSelected = selectedServices.some((sel) => String(sel.id) === String(s.id));
                       return (
                         <button
                           key={s.id}
                           type="button"
                           onClick={() => {
-                            setSelectedServiceId(String(s.id));
-                            setServiceSearchQuery(getServiceName(s));
-                            setIsServiceDropdownOpen(false);
-                            recalculateInvoice(String(s.id), attachedPackages, selectedProductId);
+                            if (isSelected) {
+                              handleRemoveService(s.id);
+                            } else {
+                              handleAddService(s);
+                            }
                           }}
                           className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs sm:text-sm text-start font-medium transition cursor-pointer ${
                             isSelected
@@ -1342,9 +1552,18 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                               : "text-[#111827] hover:bg-[#F4F7F2] hover:text-[#344E41]"
                           }`}
                         >
-                          <span className="truncate">{getServiceName(s)}</span>
-                          {isSelected && (
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="truncate">{getServiceName(s)}</span>
+                            {Number(s.price || 0) > 0 && (
+                              <span className="text-[11px] text-gray-500 font-semibold shrink-0">
+                                ({Number(s.price).toLocaleString()} EGP)
+                              </span>
+                            )}
+                          </div>
+                          {isSelected ? (
                             <Check size={16} className="text-[var(--cr-primary)] shrink-0 ml-2 rtl:ml-0 rtl:mr-2" />
+                          ) : (
+                            <Plus size={15} className="text-gray-400 shrink-0 ml-2 rtl:ml-0 rtl:mr-2" />
                           )}
                         </button>
                       );
@@ -1357,6 +1576,33 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 </div>
               )}
             </div>
+
+            {/* Selected Services Badges */}
+            {selectedServices.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {selectedServices.map((s) => (
+                  <span
+                    key={s.id}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#E8EFE5] text-[#344E41] text-xs font-semibold border border-[#344E41]/20 shadow-2xs"
+                  >
+                    <span className="truncate max-w-[150px]">{getServiceName(s)}</span>
+                    {Number(s.price || 0) > 0 && (
+                      <span className="text-[10px] text-emerald-800 font-bold">
+                        {Number(s.price).toLocaleString()} EGP
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveService(s.id)}
+                      className="text-[#344E41]/70 hover:text-red-600 transition cursor-pointer p-0.5"
+                      title="Remove service"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* FIELD 6: PACKAGE (OPTIONAL - MULTI-PACKAGE SUPPORT) */}
@@ -1438,16 +1684,19 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                 onChange={(e) => {
                   const prId = e.target.value;
                   setSelectedProductId(prId);
-                  recalculateInvoice(selectedServiceId, attachedPackages, prId);
+                  recalculateInvoice(selectedServices, attachedPackages, prId);
                 }}
                 className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10 cursor-pointer"
               >
-                <option value="">{tr.selectProductPlaceholder}</option>
-                {prodList.map((pr) => (
-                  <option key={pr.id} value={pr.id}>
-                    {getProductName(pr)}
-                  </option>
-                ))}
+                <option value="">{tr.selectProductPlaceholder || (lang === "ar" ? "اختر منتج..." : "Select product...")}</option>
+                {prodList.map((pr) => {
+                  const price = Number(pr.selling_price ?? pr.price ?? 0);
+                  return (
+                    <option key={pr.id} value={pr.id}>
+                      {getProductName(pr)} {price > 0 ? `(${price.toLocaleString()} EGP)` : ""}
+                    </option>
+                  );
+                })}
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] z-10">
                 <ChevronDown size={17} />

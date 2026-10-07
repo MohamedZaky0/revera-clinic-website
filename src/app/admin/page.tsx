@@ -2620,7 +2620,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-076', name: 'Laser Package Pulses Deduction & Cross-Workflow Synchronization Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies accurate deduction of delivered laser pulses from customer pulses packages across doctor portal session finalization, reception session completion, and checkout settlement workflows with DB synchronization and idempotency.', status: 'idle' },
     { id: 'TC-077', name: 'In-Booking Package Selling & Integrated Patient Search Engine', category: 'Services & Bookings', endpoint: '/api/packages/sell', description: 'Verifies selling catalog packages directly during new booking creation with customer_packages persistence and instant patient profile appearance, as well as integrated patient search dropdown rendering.', status: 'idle' },
     { id: 'TC-080', name: 'Laser Pulses Package Excess Deficit & Dual Interactive Settlement Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies package deficit detection when delivered pulses exceed remaining balance, automatic payment status transition to Partially Paid, and dual interactive settlement choices (Option 1: Buy New Package with deficit deduction vs Option 2: Pay per Pulse with customizable rate) at checkout.', status: 'idle' },
-    { id: 'TC-092', name: 'Historical Patient Packages Intake & Multi-Session Tracking Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies detection of patient existing packages in historical booking intake, auto-fetching active/historical quota, 1-click package linking, 0 EGP default pricing on session consumption, and updating customer_packages usage balances.', status: 'idle' }
+    { id: 'TC-092', name: 'Historical Patient Packages Intake & Multi-Session Tracking Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies detection of patient existing packages in historical booking intake, auto-fetching active/historical quota, 1-click package linking, 0 EGP default pricing on session consumption, and updating customer_packages usage balances.', status: 'idle' },
+    { id: 'TC-093', name: 'Superadmin Patient Financial Overrides & Ledger Security Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies superadmin authority to adjust patient wallet balances, outstanding debt balances, and lifetime total spent with automatic ledger logging, role-gated input protection, and in-profile multi-metric adjustment modal.', status: 'idle' },
+    { id: 'TC-094', name: 'Multi-Service Booking & Intake Session Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies multi-service selection, duration aggregation, cumulative pricing, and reservation line items generation across new and previous booking intake.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -4942,7 +4944,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     if (session?.access_token) {
       headers["Authorization"] = `Bearer ${session.access_token}`;
     }
-    fetch("/api/customers", { headers })
+    fetch("/api/customers", { headers, cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         return res.json();
@@ -6499,6 +6501,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 services={localServices}
                 providers={providers}
                 customers={dbCustomers}
+                products={inventoryProducts}
                 branches={branches}
                 activeBranchId={branch}
                 lang={lang}
@@ -6604,6 +6607,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 services={localServices}
                 providers={providers}
                 customers={dbCustomers}
+                products={inventoryProducts}
                 branches={branches}
                 activeBranchId={branch}
                 lang={lang}
@@ -6734,6 +6738,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   adminTranslations={adminTranslations}
                   defaultPricePerPulse={bookingDefaultPricePerPulse}
                   MOCK_MEDICINES={MOCK_MEDICINES}
+                  fetchCustomers={fetchCustomers}
                 />
               )}
 
@@ -6746,6 +6751,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   fetchCustomers={fetchCustomers}
                   lang={lang}
                   t={adminTranslations[lang].patients.customerFormModal}
+                  adminRole={adminRole}
                 />
               )}
 
@@ -7780,6 +7786,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 services={localServices}
                 providers={providers}
                 customers={customers}
+                products={inventoryProducts}
                 branches={branches}
                 activeBranchId={branch}
                 lang={lang}

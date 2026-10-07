@@ -185,7 +185,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
         const headers = await getAuthHeaders();
         const res = await fetch(
           `/api/customers?search=${encodeURIComponent(patientSearch)}&limit=8`,
-          { headers }
+          { headers, cache: "no-store" }
         );
         const data = await res.json();
         const list: CustomerOption[] = Array.isArray(data) ? data : [];
