@@ -173,6 +173,7 @@ export const adminTranslations = {
         colCustomer: "Customer",
         colLastBookingDate: "Last Booking Date",
         colBookings: "Bookings",
+        colTotalSpend: "Total Spend",
         colWallet: "Wallet",
         colOutstanding: "Outstanding",
         colActive: "Active",
@@ -189,6 +190,8 @@ export const adminTranslations = {
         oldestToNewest: "Oldest to Newest",
         highToLow: "High to Low",
         lowToHigh: "Low to High",
+        nameAtoZ: "Name (A to Z)",
+        nameZtoA: "Name (Z to A)",
       },
       customerProfileDrawer: {
         backBtn: "Back to Patients",
@@ -3007,6 +3010,7 @@ export const adminTranslations = {
         colCustomer: "المريض",
         colLastBookingDate: "تاريخ آخر حجز",
         colBookings: "الحجوزات",
+        colTotalSpend: "إجمالي الإنفاق",
         colWallet: "المحفظة",
         colOutstanding: "المستحقات",
         colActive: "نشط",
@@ -3023,6 +3027,8 @@ export const adminTranslations = {
         oldestToNewest: "من الأقدم إلى الأحدث",
         highToLow: "من الأعلى إلى الأقل",
         lowToHigh: "من الأقل إلى الأعلى",
+        nameAtoZ: "الاسم (أ إلى ي)",
+        nameZtoA: "الاسم (ي إلى أ)",
       },
       customerProfileDrawer: {
         backBtn: "العودة للمرضى",

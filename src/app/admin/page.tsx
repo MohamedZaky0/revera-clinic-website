@@ -1661,29 +1661,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       return;
     }
 
-    // 1. Initial sessionStorage Session Guard: Log out if browser/tab was closed
+    // 1. Initial Auth Session Check
     supabase.auth.getSession().then(({ data: { session: cachedSession } }: any) => {
-      const isSessionActive = typeof window !== "undefined" && sessionStorage.getItem(`${CLIENT.storagePrefix}_admin_session_active`);
-      if (cachedSession && !isSessionActive) {
-        console.log("Stale login session detected (tab reopened). Logging out.");
-        supabase.auth.signOut().then(() => {
-          setAuthChecking(false);
-          if (typeof window !== "undefined") {
-            window.location.href = "/login";
-          }
-        }).catch((err: any) => {
-          console.warn("signOut error:", err);
-          setAuthChecking(false);
-          if (typeof window !== "undefined") {
-            window.location.href = "/login";
-          }
-        });
-      } else {
-        if (cachedSession) {
-          handleAuthSession(cachedSession);
-        } else {
-          setAuthChecking(false);
+      if (cachedSession) {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(`${CLIENT.storagePrefix}_admin_session_active`, "true");
         }
+        handleAuthSession(cachedSession);
+      } else {
+        setAuthChecking(false);
       }
     }).catch((err: any) => {
       console.warn("getSession error:", err);
@@ -1770,8 +1756,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
           // Pre-fetch employee accounts list so doctor role is known immediately before rendering
           await fetchRolesAndEmployees();
-        } else {
-          console.warn("Unregistered employee session. Logging out.");
+        } else if (res.status === 401 || res.status === 403) {
+          console.warn("Unregistered or unauthorized employee session. Logging out.");
           await supabase.auth.signOut();
           setAdminRole(null);
           setAdminDepartment("");
@@ -1783,6 +1769,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
             window.location.href = "/login";
           }
+        } else {
+          console.warn(`Temporary /api/auth/me response status: ${res.status}. Preserving current session.`);
         }
       } catch (err) {
         console.error("Error retrieving admin permissions:", err);
@@ -2622,7 +2610,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-080', name: 'Laser Pulses Package Excess Deficit & Dual Interactive Settlement Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies package deficit detection when delivered pulses exceed remaining balance, automatic payment status transition to Partially Paid, and dual interactive settlement choices (Option 1: Buy New Package with deficit deduction vs Option 2: Pay per Pulse with customizable rate) at checkout.', status: 'idle' },
     { id: 'TC-092', name: 'Historical Patient Packages Intake & Multi-Session Tracking Engine', category: 'Services & Bookings', endpoint: '/api/customers/packages', description: 'Verifies detection of patient existing packages in historical booking intake, auto-fetching active/historical quota, 1-click package linking, 0 EGP default pricing on session consumption, and updating customer_packages usage balances.', status: 'idle' },
     { id: 'TC-093', name: 'Superadmin Patient Financial Overrides & Ledger Security Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies superadmin authority to adjust patient wallet balances, outstanding debt balances, and lifetime total spent with automatic ledger logging, role-gated input protection, and in-profile multi-metric adjustment modal.', status: 'idle' },
-    { id: 'TC-094', name: 'Multi-Service Booking & Intake Session Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies multi-service selection, duration aggregation, cumulative pricing, and reservation line items generation across new and previous booking intake.', status: 'idle' }
+    { id: 'TC-094', name: 'Multi-Service Booking & Intake Session Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies multi-service selection, duration aggregation, cumulative pricing, and reservation line items generation across new and previous booking intake.', status: 'idle' },
+    { id: 'TC-095', name: 'Previous Booking Multi-Product Selection & Inventory Sales Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies selecting multiple retail products in previous bookings, invoice value auto-calculation, itemized reservation line items, and product sales recording.', status: 'idle' },
+    { id: 'TC-096', name: 'Patient Directory Total Spend & Name Sorting Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies the Total Spend column in the patients directory table, alphabetical A-Z / Z-A name sorting, and dynamic financial spend sorting.', status: 'idle' },
+    { id: 'TC-097', name: 'Resilient Staff Auth & Mobile Context Preservation Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies resilient staff session resolution, email fallback auto-linking, and prevention of unexpected logouts during native mobile date picker interactions.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);

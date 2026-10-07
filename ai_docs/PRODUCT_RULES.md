@@ -1261,3 +1261,45 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
 - **Product and Package Catalog Retrieval**:
   - `AdminAddPreviousBookingView` fetches `/api/inventory/products` and `/api/packages` with authenticated staff headers (`getAuthHeaders()`), populating the catalog dropdowns with live prices and stock.
 
+### 7. Multi-Product Previous Booking & Inventory Sales Engine
+**Enforced in:** `AdminAddPreviousBookingView.tsx`, `POST /api/reservations/previous`, `PATCH /api/reservations/previous`, `src/lib/historicalInvoice.ts`
+- **Multi-Product Selection Interface**:
+  - Staff can select one or more retail inventory products (`selectedProducts: ProductItem[]`) sold during a historical session.
+  - Searchable dropdown supports instantaneous product searching, filtering out out-of-stock or deleted items while preserving already-selected items.
+  - Selected products appear as interactive badge chips with name, unit price, and 1-click removal (`X`).
+  - Invoice total automatically recalculates: `invoiceValue = sum(services.price) + sum(catalogPackages.price) + sum(products.selling_price)`.
+- **Backend Itemization & Inventory Integration**:
+  - Accepts `products: ProductItem[]`, `productIds: string[]`, or legacy single `productId`/`productName`.
+  - Batch resolves products from `inventory_products`.
+  - Inserts distinct row for each attached product into `reservation_products` with `product_type: 'product'`, storing unit price and product ID.
+  - Records individual sale rows in `product_sales` table linked to the customer and historical date.
+  - Formats clinical notes and ledger invoices with `Products: <Product 1> (<Price 1> EGP), <Product 2> (<Price 2> EGP)`.
+- **System Test Suite**:
+  - Verified under `TC-095` in the Admin Settings System Test Suite.
+
+### 8. Patient Directory Total Spend & Name Sorting Engine
+**Enforced in:** `src/components/admin/patients/PatientsDirectoryView.tsx`, `src/app/admin/page.tsx`
+- **Total Spend Column**:
+  - Positioned between `Bookings` and `Wallet`, establishing the unified 3-metric financial sequence (`Total Spend` -> `Wallet` -> `Outstanding`).
+  - Renders the lifetime total spent amount (`c.spent` / `c.spent_amount`) formatted in currency (`EGP` / `ج.م`).
+  - Supports sorting by Total Spend with `High to Low` and `Low to High` options.
+- **Customer Name Sorting**:
+  - `CUSTOMER` column header features an interactive sort droplist.
+  - Supports sorting by Name (`Name (A to Z)` / `الاسم (أ إلى ي)` and `Name (Z to A)` / `الاسم (ي إلى أ)`) using locale-aware comparison.
+- **System Test Suite**:
+  - Verified under `TC-096` in the Admin Settings System Test Suite.
+
+### 9. Resilient Staff Auth & Mobile Context Preservation Engine
+**Enforced in:** `src/app/admin/page.tsx`, `src/app/api/auth/me/route.ts`
+- **Context Switch & Native Picker Resilience**:
+  - Opening native mobile OS date pickers (or switching browser tabs/apps) does not wipe active Supabase authentication sessions.
+  - Session hydration automatically restores `sessionStorage` flag when valid cached Supabase credentials exist.
+- **Resilient `/api/auth/me` Account Resolution**:
+  - Automatically verifies staff by `auth_user_id` or email fallback with auto-linking of `auth_user_id`.
+  - Only explicit `401` / `403` status responses initiate sign-out; transient network hiccups (500, network timeouts) do not destroy authenticated sessions.
+- **System Test Suite**:
+  - Verified under `TC-097` in the Admin Settings System Test Suite.
+
+
+
+

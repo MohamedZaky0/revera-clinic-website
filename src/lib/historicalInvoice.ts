@@ -68,7 +68,7 @@ export async function writeHistoricalBookingInvoice(input: HistoricalInvoiceInpu
   const parts = [
     input.serviceName,
     input.packageName ? `Package: ${input.packageName}` : null,
-    input.productName ? `Product: ${input.productName}` : null,
+    input.productName ? (input.productName.includes(',') ? `Products: ${input.productName}` : `Product: ${input.productName}`) : null,
   ].filter(Boolean);
   const description = `${parts.length ? parts.join(', ') : 'Historical booking'} [historical backfill]`;
 
