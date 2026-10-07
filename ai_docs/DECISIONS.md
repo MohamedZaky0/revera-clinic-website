@@ -3372,3 +3372,78 @@ Complete the refactor in independently reviewable chunks A–G6:
 Each chunk ran `npm run check`. The repository baseline still has two pre-existing `react-hooks/purity` lint errors in `AdminAddPreviousBookingView.tsx:498` (a `Math.random()`/`Date.now()` call during render, present on `dev` before this branch) and two pre-existing `UserProfileView.test.tsx` failures (a known `getDateRange()` timezone bug, documented in the test file's own comments, unrelated to this refactor). Both were independently re-verified against the `dev` baseline during code review and left undisturbed as out of this brief's scope — not something Mohamed was asked to approve in advance. Independent TypeScript checks, production builds, and the full test suite (1269 passed / 2 failed [above] / 5 expected-fail) were re-run during review and matched. Manual visual verification remains in `ai_docs/manual_tests/PROPOSAL_001_CLIENT_CONFIG_MANUAL_TESTS.md`.
 
 ---
+
+## DEC-100: Multi-Product Selection & Inventory Sales Recording in Previous Bookings
+
+**Date:** 2026-10-06
+**Status:** Decided & implemented
+
+**Context:**
+Previously, the Add/Edit Previous Booking view (`AdminAddPreviousBookingView.tsx`) only supported selecting a single retail product (`selectedProductId`). Real historical clinic sessions frequently involve selling multiple skincare or medical products (e.g. Cleanser + Sunscreen + Serum) in a single visit.
+
+**Decision:**
+1. **Multi-Product Selection Interface (`AdminAddPreviousBookingView.tsx`):**
+   - Transformed single product selection state to an array: `selectedProducts: ProductItem[]`.
+   - Added searchable product dropdown with live search query filtering, click-outside dismissal, and badge counter in the label (`Products Sold (X)`).
+   - Displayed selected products as itemized badge pills showing product name, unit price, and an `X` removal button.
+   - Automatically recomputed `totalInvoice` to sum all attached product prices alongside services and packages.
+   - Preserved full edit-mode parsing (`booking.reservationProducts` / comma-delimited `productName` / `productId`).
+2. **Backend Payload Normalization & Dual Compatibility (`/api/reservations/previous` POST & PATCH):**
+   - Supported multiple payload shapes: `products` (array of full item objects), `productIds` (array of UUIDs), `productId` (single string), and `productName`.
+   - Resolved product records, prices, and stock against `inventory_products` in a single query.
+   - Itemized every product into `reservation_products` (`product_type: 'product'`, storing `unit_price` and `product_id`).
+   - Recorded individual sales in `product_sales` table and updated historical notes/reception notes (`Products: Item1 (X EGP), Item2 (Y EGP)`).
+   - Formatted historical ledger invoices and transaction line items via `historicalInvoice.ts` (`Products: <names>`).
+3. **Automated Diagnostic Suite (`TC-095`):**
+   - Added `TC-095: Previous Booking Multi-Product Selection & Inventory Sales Engine` to the Admin Settings System Test Suite (`src/app/admin/page.tsx`).
+   - Built comprehensive Vitest test suite (`tests/routes/reservations-previous-products.test.ts`).
+
+## DEC-101: Patient Directory Total Spend Column & Name Sorting Engine
+
+**Date:** 2026-10-06
+**Status:** Decided & implemented
+
+**Context:**
+The admin and reception patients directory (`PatientsDirectoryView.tsx`) listed customer name, last booking date, bookings count, wallet, outstanding debt, and account status. Staff needed visibility into the lifetime Total Spend (`spent_amount`) directly in the main directory table, as well as alphabetical sorting by Customer Name (A-Z, Z-A).
+
+**Decision:**
+1. **Total Spend Column (`PatientsDirectoryView.tsx`):**
+   - Added a dedicated `Total Spend` (`t.colTotalSpend`) column positioned between `Bookings` and `Wallet`, matching the 3-metric financial summary card order (Total Spend -> Wallet -> Outstanding).
+   - Formats values using locale-aware currency formatting (`${totalSpendAmount.toLocaleString("en-US")} ${currency}`).
+   - Added sort droplist trigger with options: `High to Low` and `Low to High`.
+2. **Customer Name Sorting:**
+   - Added interactive sort droplist button on the `CUSTOMER` column header.
+   - Provides two explicit alphabetical sorting options: `Name (A to Z)` and `Name (Z to A)` (`الاسم (أ إلى ي)` / `الاسم (ي إلى أ)` in Arabic).
+   - Utilizes locale-sensitive comparison `nameA.localeCompare(nameB, lang === "ar" ? "ar" : "en", { sensitivity: "base" })`.
+3. **Bilingual Translations & Diagnostics (`TC-096`):**
+   - Added translation keys (`colTotalSpend`, `nameAtoZ`, `nameZtoA`) across English and Arabic dictionaries in `src/components/admin/translations.ts`.
+   - Added `TC-096: Patient Directory Total Spend & Name Sorting Engine` to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
+   - Created Vitest test suite (`tests/components/patients/PatientsDirectoryView.test.tsx`).
+
+---
+
+## DEC-102: Resilient Staff Auth & Mobile Context Preservation Engine
+
+**Date:** 2026-10-06
+**Status:** Decided & implemented
+
+**Context:**
+Users on specific devices (especially iOS Safari, Android Chrome, and low-memory mobile/tablet browsers) reported being unexpectedly logged out when opening Previous Booking and selecting a date. Investigation revealed two compounding causes:
+1. When native `<input type="date">` triggers an OS-level modal or picker sheet, the browser backgrounded the tab. Upon return, `sessionStorage` was empty or delayed while `localStorage` retained the Supabase auth token. In `src/app/admin/page.tsx`, a stale session check (`cachedSession && !isSessionActive`) aggressively called `supabase.auth.signOut()`, destroying the valid session and redirecting to `/login`.
+2. In `src/app/api/auth/me`, employee account resolution only queried `auth_user_id` without email fallback or auto-linking (unlike `src/lib/access.ts`), causing 403 rejections on token refresh which in turn triggered an immediate `supabase.auth.signOut()`.
+
+**Decision:**
+1. **Resilient Session Initialization (`src/app/admin/page.tsx`):**
+   - Removed aggressive `supabase.auth.signOut()` on missing `sessionStorage` in `getSession()`.
+   - When a valid Supabase cached session exists, automatically hydrate `sessionStorage.setItem(\`${CLIENT.storagePrefix}_admin_session_active\`, "true")` and process authentication seamlessly.
+   - In `handleAuthSession`, only perform sign-out on explicit `401` or `403` status from `/api/auth/me`; transient network errors and 500 status codes no longer wipe active sessions.
+2. **Resilient `/api/auth/me` Employee Resolution (`src/app/api/auth/me/route.ts`):**
+   - Synchronized lookup logic with `src/lib/access.ts`: query `employee_accounts` by `auth_user_id`, with fallback to `ilike('email', user.email)`.
+   - Automatically link `auth_user_id` upon successful email match.
+   - Normalize role name (`superadmin`, `admin`, etc.) and query permissions via `ilike('name', employee.role_name)`.
+3. **Automated Diagnostics (`TC-097`):**
+   - Added `TC-097: Resilient Staff Auth & Mobile Context Preservation Engine` to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
+   - Created Vitest test suite `tests/routes/auth-me-resilience.test.ts`.
+
+---
+

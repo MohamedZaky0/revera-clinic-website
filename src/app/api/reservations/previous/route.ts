@@ -192,19 +192,49 @@ export async function POST(req: Request) {
     const rawPaid = actualSpent ?? amountPaid ?? payment ?? 0;
     const parsedPaid = Math.max(0, isNaN(Number(rawPaid)) ? 0 : Number(rawPaid));
 
-    // Resolve product metadata & prices
-    let productPrice = 0;
-    let resolvedProductName = productName || null;
-    if (productId) {
-      const { data: prodRow } = await supabaseServer
-        .from('products')
-        .select('id, name, selling_price, price, arabic_name')
-        .eq('id', productId)
-        .maybeSingle();
-      if (prodRow) {
-        productPrice = Number(prodRow.selling_price ?? prodRow.price ?? 0);
-        if (!resolvedProductName) resolvedProductName = prodRow.name || prodRow.arabic_name;
+    // Resolve product metadata & prices (supports multiple products via products array, productIds, or legacy single productId/productName)
+    const incomingProductList: Array<{ id?: string | number; name?: string; price?: number; selling_price?: number; qty?: number }> = Array.isArray(body.products)
+      ? body.products
+      : Array.isArray(body.productIds)
+      ? body.productIds.map((id: any) => ({ id }))
+      : (productId || productName)
+      ? [{ id: productId, name: productName }]
+      : [];
+
+    let resolvedProductsList: Array<{ id: string | null; name: string; price: number; qty: number; total: number }> = [];
+    let resolvedProductNames: string[] = [];
+
+    if (incomingProductList.length > 0) {
+      const incomingIds = incomingProductList
+        .map((p) => (p.id != null ? String(p.id) : ''))
+        .filter((id) => id && id !== 'undefined' && id !== 'null');
+
+      let dbProducts: any[] = [];
+      if (incomingIds.length > 0) {
+        const { data: prodRows } = await supabaseServer
+          .from('products')
+          .select('id, name, selling_price, price, arabic_name')
+          .in('id', incomingIds);
+        if (prodRows) dbProducts = prodRows;
       }
+
+      resolvedProductsList = incomingProductList.map((p) => {
+        const pIdStr = p.id != null ? String(p.id) : null;
+        const dbMatch = dbProducts.find((row) => String(row.id) === pIdStr);
+        const resolvedName = p.name || dbMatch?.name || dbMatch?.arabic_name || (pIdStr ? `Product #${pIdStr}` : 'Product');
+        const unitPrice = Number(p.price ?? p.selling_price ?? dbMatch?.selling_price ?? dbMatch?.price ?? 0);
+        const qty = Math.max(1, Number(p.qty || 1));
+        const total = unitPrice * qty;
+        return {
+          id: pIdStr,
+          name: resolvedName,
+          price: unitPrice,
+          qty,
+          total
+        };
+      });
+
+      resolvedProductNames = resolvedProductsList.map((p) => p.name);
     }
 
     // DEC-098: every attached package — the multi-package form (`packages`) or the legacy single fields.
@@ -385,7 +415,9 @@ export async function POST(req: Request) {
     const srvNote = resolvedServiceNames.length > 0 ? ` Services: ${resolvedServiceNames.join(', ')}.` : '';
     const pkgNotes = historicalPackageNotes(incomingPackages);
 
-    const prodNote = resolvedProductName ? ` Product: ${resolvedProductName}.` : '';
+    const prodNote = resolvedProductNames.length > 0
+      ? ` ${resolvedProductNames.length > 1 ? 'Products' : 'Product'}: ${resolvedProductNames.join(', ')}.`
+      : '';
     const valNote = ` [Invoice Total]: ${parsedValue} EGP.`;
     const spentNote = ` Actual Spent: ${parsedPaid} EGP.`;
     const paymentNote = paymentType ? ` Payment Method: ${paymentType}.` : '';
@@ -470,51 +502,53 @@ export async function POST(req: Request) {
       }
     }
 
-    // 7b. Insert product into reservation_products
-    if (productId || resolvedProductName) {
-      try {
-        await supabaseServer.from('reservation_products').insert({
-          reservation_id: newReservation.id,
-          line_type: 'product',
-          product_id: productId || null,
-          description: resolvedProductName || 'Product',
-          qty: 1,
-          unit_price: productPrice,
-          total: productPrice,
-          added_by_employee_id: staffEmployeeId,
-          added_by_role: 'receptionist'
-        });
-      } catch (rpErr: any) {
-        console.warn('Could not insert reservation_products for product (non-fatal):', rpErr?.message);
-      }
-
-      // Also record in product_sales table for inventory sales history
-      if (customerId) {
+    // 7b. Insert products into reservation_products & product_sales
+    if (resolvedProductsList.length > 0) {
+      for (const pr of resolvedProductsList) {
         try {
-          await supabaseServer.from('product_sales').insert({
-            product_id: productId || null,
-            product_name: resolvedProductName || 'Product',
-            quantity: 1,
-            unit_price: productPrice,
-            total_price: productPrice,
-            customer_id: customerId,
-            customer_name: rawName,
-            customer_phone: cleanMobile,
-            cashier_name: staffEmployeeName,
-            payment_method: paymentType || 'cash',
-            notes: `[Historical Booking on ${rawDate.slice(0, 10)}]`,
-            sale_date: `${rawDate.slice(0, 10)}T12:00:00Z`
+          await supabaseServer.from('reservation_products').insert({
+            reservation_id: newReservation.id,
+            line_type: 'product',
+            product_id: pr.id || null,
+            description: pr.name,
+            qty: pr.qty,
+            unit_price: pr.price,
+            total: pr.total,
+            added_by_employee_id: staffEmployeeId,
+            added_by_role: 'receptionist'
           });
-        } catch (psErr: any) {
-          console.warn('Could not insert product_sales record (non-fatal):', psErr?.message);
+        } catch (rpErr: any) {
+          console.warn('Could not insert reservation_products for product (non-fatal):', rpErr?.message);
+        }
+
+        // Also record in product_sales table for inventory sales history
+        if (customerId) {
+          try {
+            await supabaseServer.from('product_sales').insert({
+              product_id: pr.id || null,
+              product_name: pr.name,
+              quantity: pr.qty,
+              unit_price: pr.price,
+              total_price: pr.total,
+              customer_id: customerId,
+              customer_name: rawName,
+              customer_phone: cleanMobile,
+              cashier_name: staffEmployeeName,
+              payment_method: paymentType || 'cash',
+              notes: `[Historical Booking on ${rawDate.slice(0, 10)}]`,
+              sale_date: `${rawDate.slice(0, 10)}T12:00:00Z`
+            });
+          } catch (psErr: any) {
+            console.warn('Could not insert product_sales record (non-fatal):', psErr?.message);
+          }
         }
       }
     }
 
-    // 7b. Packages (DEC-098): one display line each in reservation_products, then the patient's package rows.
+    // 7c. Packages (DEC-098): one display line each in reservation_products, then the patient's package rows.
     const enteredPackagePrice = enteredHistoricalPackagePrice(incomingPackages, {
       hasService: Boolean(resolvedServiceId),
-      hasProduct: Boolean(productId || resolvedProductName),
+      hasProduct: resolvedProductsList.length > 0,
       invoiceValue: parsedValue,
     });
     for (const p of incomingPackages) {
@@ -545,7 +579,9 @@ export async function POST(req: Request) {
       const descItems: string[] = [];
       if (resolvedServiceNames.length > 0) descItems.push(`Services: ${resolvedServiceNames.join(', ')}`);
       if (resolvedPackageName) descItems.push(`Package: ${resolvedPackageName}`);
-      if (resolvedProductName) descItems.push(`Product: ${resolvedProductName}`);
+      if (resolvedProductNames.length > 0) {
+        descItems.push(`${resolvedProductNames.length > 1 ? 'Products' : 'Product'}: ${resolvedProductNames.join(', ')}`);
+      }
       const itemsDesc = descItems.length > 0 ? ` (${descItems.join(', ')})` : '';
 
       await recordTransaction({
@@ -581,7 +617,7 @@ export async function POST(req: Request) {
         amountPaid: parsedPaid,
         serviceName: resolvedServiceNames.join(', ') || null,
         packageName: resolvedPackageName,
-        productName: resolvedProductName,
+        productName: resolvedProductNames.join(', ') || null,
         paymentType: paymentType || null,
         employeeId: staffEmployeeId,
       });
@@ -783,6 +819,22 @@ export async function PATCH(req: Request) {
     const pkgNotes = historicalPackageNotes(incomingPackages);
     const resolvedPackageName = incomingPackages.map((pk) => pk.packageName).filter(Boolean).join(', ') || null;
 
+    // Resolve products for PATCH
+    const incomingProductList: Array<{ id?: string | number; name?: string; price?: number }> = Array.isArray(body.products)
+      ? body.products
+      : Array.isArray(body.productIds)
+      ? body.productIds.map((id: any) => ({ id }))
+      : (productId || productName)
+      ? [{ id: productId, name: productName }]
+      : [];
+
+    let resolvedProductNames: string[] = [];
+    if (incomingProductList.length > 0) {
+      resolvedProductNames = incomingProductList.map((p) => p.name || (p.id ? `Product #${p.id}` : 'Product')).filter(Boolean);
+    } else if (productName) {
+      resolvedProductNames = [productName];
+    }
+
     // 7. Preserve machine markers in the notes
     function preservedMarkerLines(previous: string | null): string[] {
       if (!previous) return [];
@@ -795,7 +847,9 @@ export async function PATCH(req: Request) {
     // 8. Reconstruct reception notes with preserved markers
     const historicalTag = '[Historical Booking]';
     const srvNote = resolvedServiceNames.length > 0 ? ` Services: ${resolvedServiceNames.join(', ')}.` : '';
-    const prodNote = productName ? ` Product: ${productName}.` : '';
+    const prodNote = resolvedProductNames.length > 0
+      ? ` ${resolvedProductNames.length > 1 ? 'Products' : 'Product'}: ${resolvedProductNames.join(', ')}.`
+      : '';
     const valNote = ` [Invoice Total]: ${parsedValue} EGP.`;
     const spentNote = ` Actual Spent: ${parsedPaid} EGP.`;
     const paymentNote = paymentType ? ` Payment Method: ${paymentType}.` : '';
@@ -1049,7 +1103,7 @@ export async function PATCH(req: Request) {
           amountPaid: parsedPaid,
           serviceName: resolvedServiceNames.join(', ') || null,
           packageName: resolvedPackageName,
-          productName: productName,
+          productName: resolvedProductNames.join(', ') || null,
           paymentType,
           employeeId: staffEmployeeId,
         });
@@ -1117,7 +1171,9 @@ export async function PATCH(req: Request) {
         const descItems: string[] = [];
         if (resolvedServiceNames.length > 0) descItems.push(`Services: ${resolvedServiceNames.join(', ')}`);
         if (resolvedPackageName) descItems.push(`Package: ${resolvedPackageName}`);
-        if (productName) descItems.push(`Product: ${productName}`);
+        if (resolvedProductNames.length > 0) {
+          descItems.push(`${resolvedProductNames.length > 1 ? 'Products' : 'Product'}: ${resolvedProductNames.join(', ')}`);
+        }
         const itemsDesc = descItems.length > 0 ? ` (${descItems.join(', ')})` : '';
 
         await recordTransaction({

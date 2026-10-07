@@ -318,14 +318,26 @@ Health & diagnostic endpoint for historical bookings and System Test Suite (`TC-
 
 Creates a historical/previous booking that occurred before joining Revera Clinics. Does not create an upcoming active appointment, schedule conflict, or doctor slot reservation.
 
-**Body:** `{ patientPhone: string, patientName: string, date: string, doctorId?: string, doctorName?: string, serviceId?: number, serviceName?: string, paymentType?: string, branchId?: string, notes?: string, amountPaid?: number }`
+**Body:** `{ patientPhone: string, patientName: string, date: string, doctorId?: string, doctorName?: string, serviceId?: number, serviceIds?: number[], serviceName?: string, paymentType?: string, branchId?: string, notes?: string, amountPaid?: number, invoiceValue?: number, products?: Array<{ id: string, name?: string, price?: number }>, productIds?: string[], productId?: string, productName?: string, packages?: Array<{ packageId: string, customerPackageId?: string, isNewPackage?: boolean, pulsesUsed?: number, pulsesRemaining?: number, price?: number }> }`
 
 - Required: `patientPhone`, `patientName`, `date`.
+- Multi-Product Support: Accepts `products` (array of product objects), `productIds` (array of UUIDs), or legacy single `productId`/`productName`. Each product is itemized in `reservation_products` and recorded in `product_sales`.
 - Phone validation: Validates Egyptian (`01[0125]XXXXXXXX`) or international mobile format. Returns 400 with `"Please enter a valid phone number."` on invalid phone.
 - Patient matching: Looks up `customers` by phone. If matched, links `customer_id` and increments `number_of_bookings`. If not matched, auto-creates a new patient in `customers` (`active = true`, `number_of_bookings = 1`) and links the new ID.
 - Booking status: Saved with `status = 'completed'`, `is_manual = true`, `is_historical = true`, and preserving original historical `date`.
 
 **Response:** `{ success: true, message: string, booking: object, customer: object, isNewPatient: boolean }`
+
+---
+
+## PATCH /api/reservations/previous
+
+Requires `requireSuperadminAccess`. Edits an existing historical/previous booking. Recomputes financial ledgers, updates attached services, multi-product line items in `reservation_products` and `product_sales`, and syncs patient packages and notes.
+
+**Body:** `{ id: string, patientPhone: string, patientName: string, date: string, doctorId?: string, doctorName?: string, serviceId?: number, serviceIds?: number[], paymentType?: string, branchId?: string, notes?: string, amountPaid?: number, invoiceValue?: number, products?: Array<{ id: string, name?: string, price?: number }>, productIds?: string[], productId?: string, productName?: string, packages?: Array<any> }`
+
+**Response:** `{ success: true, message: string, booking: object }`
+
 
 ---
 

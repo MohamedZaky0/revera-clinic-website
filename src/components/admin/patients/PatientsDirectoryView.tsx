@@ -110,9 +110,9 @@ export default function PatientsDirectoryView({
   t,
 }: PatientsDirectoryViewProps) {
   const [settlingCustomer, setSettlingCustomer] = useState<any | null>(null);
-  const [sortField, setSortField] = useState<"lastBooking" | "bookings" | "wallet" | "outstanding" | "name" | "status" | null>("lastBooking");
+  const [sortField, setSortField] = useState<"name" | "lastBooking" | "bookings" | "totalSpend" | "wallet" | "outstanding" | "status" | null>("lastBooking");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [openSortDropdown, setOpenSortDropdown] = useState<"lastBooking" | "wallet" | "outstanding" | null>(null);
+  const [openSortDropdown, setOpenSortDropdown] = useState<"name" | "lastBooking" | "totalSpend" | "wallet" | "outstanding" | null>(null);
 
   // Close sort dropdown when clicking outside
   React.useEffect(() => {
@@ -140,18 +140,26 @@ export default function PatientsDirectoryView({
         comparison = timeA - timeB;
       } else if (sortField === "bookings") {
         comparison = (Number(a.bookings) || 0) - (Number(b.bookings) || 0);
+      } else if (sortField === "totalSpend") {
+        const spendA = Number(a.spent !== undefined ? a.spent : a.spent_amount) || 0;
+        const spendB = Number(b.spent !== undefined ? b.spent : b.spent_amount) || 0;
+        comparison = spendA - spendB;
       } else if (sortField === "wallet") {
-        comparison = (Number(a.wallet) || 0) - (Number(b.wallet) || 0);
+        const walletA = Number(a.wallet !== undefined ? a.wallet : a.wallet_balance) || 0;
+        const walletB = Number(b.wallet !== undefined ? b.wallet : b.wallet_balance) || 0;
+        comparison = walletA - walletB;
       } else if (sortField === "outstanding") {
         comparison = (Number(a.outstanding) || 0) - (Number(b.outstanding) || 0);
       } else if (sortField === "name") {
-        comparison = (a.name || "").localeCompare(b.name || "");
+        const nameA = (a.name || "").trim();
+        const nameB = (b.name || "").trim();
+        comparison = nameA.localeCompare(nameB, lang === "ar" ? "ar" : "en", { sensitivity: "base" });
       } else if (sortField === "status") {
         comparison = (a.active !== false ? 1 : 0) - (b.active !== false ? 1 : 0);
       }
       return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [filteredCustomers, sortField, sortDirection]);
+  }, [filteredCustomers, sortField, sortDirection, lang]);
 
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"}>
@@ -341,9 +349,70 @@ export default function PatientsDirectoryView({
         <table className="w-full min-w-[750px] text-sm">
           <thead>
             <tr className="border-b border-[var(--cr-primary)]/10 bg-[#F9F9F7]">
-              {/* Customer Column */}
-              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] whitespace-nowrap select-none">
-                <span>{t.colCustomer}</span>
+              {/* Customer Column with Sort Droplist */}
+              <th className="relative px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] whitespace-nowrap select-none sort-dropdown-container">
+                <div className="inline-flex items-center gap-2">
+                  <span>{t.colCustomer}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenSortDropdown(prev => prev === "name" ? null : "name");
+                    }}
+                    className={`inline-flex items-center justify-center h-6 w-6 rounded-lg transition cursor-pointer ${
+                      sortField === "name"
+                        ? "bg-[#E6EDE4] text-[#2E5233]"
+                        : "bg-[#F3EFE6] text-[var(--color-brand-secondary)] hover:bg-[#EBE5D8]"
+                    }`}
+                    title={t.sortBy || "Sort by"}
+                  >
+                    <ArrowUpDown size={12} />
+                  </button>
+                </div>
+
+                {openSortDropdown === "name" && (
+                  <div className="absolute start-5 top-full mt-1.5 z-50 w-48 rounded-2xl bg-white p-2 shadow-2xl border border-[var(--cr-primary)]/15 text-xs animate-fadeIn dropdown-action-menu normal-case font-normal text-start">
+                    <div className="px-3 py-1.5 text-[11px] font-semibold text-[#8A9A81] tracking-normal">
+                      {t.sortBy || "Sort by"}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSortField("name");
+                        setSortDirection("asc");
+                        setOpenSortDropdown(null);
+                      }}
+                      className={`w-full text-start px-3 py-2 rounded-xl flex items-center justify-between transition cursor-pointer text-xs ${
+                        sortField === "name" && sortDirection === "asc"
+                          ? "bg-[#E7EFE6] font-semibold text-[#2E5233]"
+                          : "font-medium text-[var(--cr-dark)] hover:bg-[#F9F9F7]"
+                      }`}
+                    >
+                      <span>{t.nameAtoZ || "Name (A to Z)"}</span>
+                      <ArrowUp size={14} className={sortField === "name" && sortDirection === "asc" ? "text-[#2E5233]" : "text-[#8A9A81]"} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSortField("name");
+                        setSortDirection("desc");
+                        setOpenSortDropdown(null);
+                      }}
+                      className={`w-full text-start px-3 py-2 rounded-xl flex items-center justify-between transition cursor-pointer text-xs ${
+                        sortField === "name" && sortDirection === "desc"
+                          ? "bg-[#E7EFE6] font-semibold text-[#2E5233]"
+                          : "font-medium text-[var(--cr-dark)] hover:bg-[#F9F9F7]"
+                      }`}
+                    >
+                      <span>{t.nameZtoA || "Name (Z to A)"}</span>
+                      <ArrowDown size={14} className={sortField === "name" && sortDirection === "desc" ? "text-[#2E5233]" : "text-[#8A9A81]"} />
+                    </button>
+                  </div>
+                )}
               </th>
 
               {/* Last Booking Date Column with Sort Droplist */}
@@ -415,6 +484,72 @@ export default function PatientsDirectoryView({
               {/* Bookings Count Column */}
               <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] whitespace-nowrap select-none">
                 <span>{t.colBookings}</span>
+              </th>
+
+              {/* Total Spend Column with Sort Droplist */}
+              <th className="relative px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] whitespace-nowrap select-none sort-dropdown-container">
+                <div className="inline-flex items-center gap-2">
+                  <span>{t.colTotalSpend || "Total Spend"}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenSortDropdown(prev => prev === "totalSpend" ? null : "totalSpend");
+                    }}
+                    className={`inline-flex items-center justify-center h-6 w-6 rounded-lg transition cursor-pointer ${
+                      sortField === "totalSpend"
+                        ? "bg-[#E6EDE4] text-[#2E5233]"
+                        : "bg-[#F3EFE6] text-[var(--color-brand-secondary)] hover:bg-[#EBE5D8]"
+                    }`}
+                    title={t.sortBy || "Sort by"}
+                  >
+                    <ArrowUpDown size={12} />
+                  </button>
+                </div>
+
+                {openSortDropdown === "totalSpend" && (
+                  <div className="absolute start-5 top-full mt-1.5 z-50 w-44 rounded-2xl bg-white p-2 shadow-2xl border border-[var(--cr-primary)]/15 text-xs animate-fadeIn dropdown-action-menu normal-case font-normal text-start">
+                    <div className="px-3 py-1.5 text-[11px] font-semibold text-[#8A9A81] tracking-normal">
+                      {t.sortBy || "Sort by"}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSortField("totalSpend");
+                        setSortDirection("desc");
+                        setOpenSortDropdown(null);
+                      }}
+                      className={`w-full text-start px-3 py-2 rounded-xl flex items-center justify-between transition cursor-pointer text-xs ${
+                        sortField === "totalSpend" && sortDirection === "desc"
+                          ? "bg-[#E7EFE6] font-semibold text-[#2E5233]"
+                          : "font-medium text-[var(--cr-dark)] hover:bg-[#F9F9F7]"
+                      }`}
+                    >
+                      <span>{t.highToLow || "High to Low"}</span>
+                      <ArrowDown size={14} className={sortField === "totalSpend" && sortDirection === "desc" ? "text-[#2E5233]" : "text-[#8A9A81]"} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSortField("totalSpend");
+                        setSortDirection("asc");
+                        setOpenSortDropdown(null);
+                      }}
+                      className={`w-full text-start px-3 py-2 rounded-xl flex items-center justify-between transition cursor-pointer text-xs ${
+                        sortField === "totalSpend" && sortDirection === "asc"
+                          ? "bg-[#E7EFE6] font-semibold text-[#2E5233]"
+                          : "font-medium text-[var(--cr-dark)] hover:bg-[#F9F9F7]"
+                      }`}
+                    >
+                      <span>{t.lowToHigh || "Low to High"}</span>
+                      <ArrowUp size={14} className={sortField === "totalSpend" && sortDirection === "asc" ? "text-[#2E5233]" : "text-[#8A9A81]"} />
+                    </button>
+                  </div>
+                )}
               </th>
 
               {/* Wallet Column with Sort Droplist */}
@@ -556,7 +691,7 @@ export default function PatientsDirectoryView({
           <tbody className="divide-y divide-[var(--cr-primary)]/8">
             {sortedCustomers.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-[var(--color-brand-secondary)]">
+                <td colSpan={8} className="px-5 py-8 text-center text-[var(--color-brand-secondary)]">
                   {t.noCustomers}
                 </td>
               </tr>
@@ -566,8 +701,9 @@ export default function PatientsDirectoryView({
               const uniqueKey = c.id || c.email || c.phone;
               const displayPhone = c.mobile || c.phone || "—";
               const displayEmail = c.email || "—";
+              const totalSpendAmount = Number(c.spent !== undefined ? c.spent : (c.spent_amount || 0)) || 0;
               const outstandingAmount = Number(c.outstanding) || 0;
-              const walletAmount = Number(c.wallet) || 0;
+              const walletAmount = Number(c.wallet !== undefined ? c.wallet : (c.wallet_balance || 0)) || 0;
               const currency = lang === "ar" ? "ج.م" : "EGP";
               const isNearBottom = index >= sortedCustomers.length - 2 && sortedCustomers.length > 2;
 
@@ -604,6 +740,13 @@ export default function PatientsDirectoryView({
                   {/* Bookings Count */}
                   <td className="px-5 py-4 text-center text-sm font-bold text-[var(--cr-dark)]">
                     {c.bookings || 0}
+                  </td>
+
+                  {/* Total Spend */}
+                  <td className="px-5 py-4 text-start font-semibold text-sm">
+                    <span className="text-[var(--cr-dark)] font-bold">
+                      {totalSpendAmount.toLocaleString("en-US")} {currency}
+                    </span>
                   </td>
 
                   {/* Wallet Balance */}
