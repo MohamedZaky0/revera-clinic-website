@@ -1245,6 +1245,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             <div className="flex items-center justify-between">
               <label htmlFor="patientPhone" className="text-xs sm:text-sm font-bold text-[#111827] flex items-center gap-1">
                 {tr.patientPhoneLabel} <span className="text-red-500">*</span>
+                {isEditMode && <Lock size={12} className="text-[#6B7280]" />}
               </label>
               {matchedCustomer && (
                 <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1">
@@ -1253,34 +1254,38 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               )}
             </div>
             <div
-              className={`flex items-center rounded-xl border bg-white overflow-hidden transition shadow-2xs ${
-                errors.phone
-                  ? "border-rose-400 focus-within:border-rose-500 focus-within:ring-2 focus-within:ring-rose-200"
-                  : "border-gray-200 focus-within:border-[var(--cr-primary)] focus-within:ring-2 focus-within:ring-[var(--cr-primary)]/10"
+              className={`flex items-center rounded-xl border overflow-hidden transition shadow-2xs ${
+                isEditMode
+                  ? "border-gray-200 bg-[#F7F7F6]"
+                  : errors.phone
+                  ? "border-rose-400 bg-white focus-within:border-rose-500 focus-within:ring-2 focus-within:ring-rose-200"
+                  : "border-gray-200 bg-white focus-within:border-[var(--cr-primary)] focus-within:ring-2 focus-within:ring-[var(--cr-primary)]/10"
               }`}
             >
               {/* Compact Country Code Dropdown with overlay trigger */}
-              <div className="relative flex items-center justify-center bg-[#F9FAF8] border-e border-gray-200 px-3 py-3 shrink-0 hover:bg-[#F0F4EE] transition cursor-pointer">
+              <div className={`relative flex items-center justify-center bg-[#F9FAF8] border-e border-gray-200 px-3 py-3 shrink-0 transition ${isEditMode ? "cursor-not-allowed" : "hover:bg-[#F0F4EE] cursor-pointer"}`}>
                 <div className="flex items-center gap-1.5 pointer-events-none text-xs sm:text-sm font-bold text-[#111827]">
                   <span className="text-base leading-none select-none">{selectedCountry.flag}</span>
                   <span className="font-mono text-xs sm:text-sm">{countryCode}</span>
-                  <ChevronDown size={13} className="text-[var(--color-brand-secondary)]" />
+                  {!isEditMode && <ChevronDown size={13} className="text-[var(--color-brand-secondary)]" />}
                 </div>
-                <select
-                  value={countryCode}
-                  onChange={(e) => {
-                    setCountryCode(e.target.value);
-                    if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
-                  }}
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer text-sm"
-                  title={lang === "ar" ? "اختر الدولة" : "Select Country"}
-                >
-                  {COUNTRY_OPTIONS.map((c) => (
-                    <option key={c.code} value={c.code} className="text-[#111827] py-1">
-                      {c.flag} {c.code} ({lang === "ar" ? c.nameAr : c.nameEn})
-                    </option>
-                  ))}
-                </select>
+                {!isEditMode && (
+                  <select
+                    value={countryCode}
+                    onChange={(e) => {
+                      setCountryCode(e.target.value);
+                      if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
+                    }}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer text-sm"
+                    title={lang === "ar" ? "اختر الدولة" : "Select Country"}
+                  >
+                    {COUNTRY_OPTIONS.map((c) => (
+                      <option key={c.code} value={c.code} className="text-[#111827] py-1">
+                        {c.flag} {c.code} ({lang === "ar" ? c.nameAr : c.nameEn})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Phone Input */}
@@ -1290,11 +1295,13 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                   type="tel"
                   value={patientPhone}
                   onChange={handlePhoneChange}
+                  readOnly={isEditMode}
+                  disabled={isEditMode}
                   placeholder={countryCode === "+20" ? (tr.patientPhonePlaceholder || "01X XXXX XXXX") : "XXXXXXXXX"}
-                  title={tr.patientPhoneTooltip}
-                  className="w-full bg-transparent py-3 px-3.5 text-xs sm:text-sm font-medium text-[#111827] outline-none placeholder:text-[#9CA3AF]"
+                  title={isEditMode ? tr.patientPhoneLockedHint : tr.patientPhoneTooltip}
+                  className={`w-full bg-transparent py-3 px-3.5 text-xs sm:text-sm font-medium outline-none placeholder:text-[#9CA3AF] ${isEditMode ? "text-gray-700 cursor-not-allowed" : "text-[#111827]"}`}
                 />
-                {patientPhone ? (
+                {patientPhone && !isEditMode ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -1314,7 +1321,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
               </p>
             ) : (
               <p className="text-[11px] text-[#6B7280] font-normal leading-normal">
-                {tr.patientPhoneHelp}
+                {isEditMode ? tr.patientPhoneLockedHint : tr.patientPhoneHelp}
               </p>
             )}
           </div>
