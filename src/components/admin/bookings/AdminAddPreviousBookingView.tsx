@@ -269,7 +269,11 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
   const [serviceSearchQuery, setServiceSearchQuery] = useState("");
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
   const serviceDropdownRef = useRef<HTMLDivElement>(null);
-  const [selectedProductId, setSelectedProductId] = useState("");
+
+  const [selectedProducts, setSelectedProducts] = useState<ProductItem[]>([]);
+  const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+  const productDropdownRef = useRef<HTMLDivElement>(null);
 
   // Attached Packages State (supports multiple packages in the same session)
   const [attachedPackages, setAttachedPackages] = useState<AttachedPackageItem[]>([]);
@@ -459,16 +463,30 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     });
   }, [services, serviceSearchQuery]);
 
-  // Click outside to close service dropdown
+  // Click outside to close service & product dropdowns
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(e.target as Node)) {
         setIsServiceDropdownOpen(false);
       }
+      if (productDropdownRef.current && !productDropdownRef.current.contains(e.target as Node)) {
+        setIsProductDropdownOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Filter products dynamically by typed query
+  const filteredProducts = useMemo(() => {
+    const q = productSearchQuery.trim().toLowerCase();
+    if (!q) return prodList;
+    return prodList.filter((pr) => {
+      const nameEn = (pr.name || "").toLowerCase();
+      const nameAr = (pr.arabic_name || "").toLowerCase();
+      return nameEn.includes(q) || nameAr.includes(q);
+    });
+  }, [prodList, productSearchQuery]);
 
   // Helper to extract package name cleanly
   const getPackageName = (p: PackageItem | any) => {
@@ -482,20 +500,21 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     return pr.name || `Product #${pr.id}`;
   };
 
-  // Recalculate invoice value when Services, Packages, or Product changes
+  // Recalculate invoice value when Services, Packages, or Products change
   const recalculateInvoice = (
     nextServices: ServiceItem[],
     currentPkgs: AttachedPackageItem[],
-    nextProdId: string
+    nextProducts: ProductItem[]
   ) => {
-    const prod = prodList.find((pr) => String(pr.id) === String(nextProdId));
-
     const srvPrice = nextServices.reduce((sum, s) => sum + Number(s.price || 0), 0);
     const pkgsPrice = currentPkgs.reduce(
       (sum, p) => sum + (p.source === "catalog" ? Number(p.price || 0) : 0),
       0
     );
-    const prodPrice = Number(prod?.selling_price ?? prod?.price ?? 0);
+    const prodPrice = nextProducts.reduce(
+      (sum, pr) => sum + Number(pr.selling_price ?? pr.price ?? 0),
+      0
+    );
 
     const total = srvPrice + pkgsPrice + prodPrice;
     const totalStr = total > 0 ? String(total) : "";
@@ -513,14 +532,31 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     setSelectedServices(nextList);
     setServiceSearchQuery("");
     setIsServiceDropdownOpen(false);
-    recalculateInvoice(nextList, attachedPackages, selectedProductId);
+    recalculateInvoice(nextList, attachedPackages, selectedProducts);
   };
 
   // Handle removing a service
   const handleRemoveService = (serviceId: string | number) => {
     const nextList = selectedServices.filter((s) => String(s.id) !== String(serviceId));
     setSelectedServices(nextList);
-    recalculateInvoice(nextList, attachedPackages, selectedProductId);
+    recalculateInvoice(nextList, attachedPackages, selectedProducts);
+  };
+
+  // Handle adding a product
+  const handleAddProduct = (pr: ProductItem) => {
+    if (selectedProducts.some((existing) => String(existing.id) === String(pr.id))) return;
+    const nextList = [...selectedProducts, pr];
+    setSelectedProducts(nextList);
+    setProductSearchQuery("");
+    setIsProductDropdownOpen(false);
+    recalculateInvoice(selectedServices, attachedPackages, nextList);
+  };
+
+  // Handle removing a product
+  const handleRemoveProduct = (productId: string | number) => {
+    const nextList = selectedProducts.filter((pr) => String(pr.id) !== String(productId));
+    setSelectedProducts(nextList);
+    recalculateInvoice(selectedServices, attachedPackages, nextList);
   };
 
   // Handle adding a package (supports both "existing:ID" and "catalog:ID")
@@ -588,7 +624,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
       const nextList = [...attachedPackages, newPkg];
       setAttachedPackages(nextList);
-      recalculateInvoice(selectedServices, nextList, selectedProductId);
+      recalculateInvoice(selectedServices, nextList, selectedProducts);
     } else {
       const pId = val.replace("catalog:", "");
       const pkg = pkgList.find((p) => String(p.id) === String(pId));
@@ -636,7 +672,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
       const nextList = [...attachedPackages, newPkg];
       setAttachedPackages(nextList);
-      recalculateInvoice(selectedServices, nextList, selectedProductId);
+      recalculateInvoice(selectedServices, nextList, selectedProducts);
     }
   };
 
@@ -644,7 +680,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
   const handleRemovePackage = (pkgEntryId: string) => {
     const nextList = attachedPackages.filter((p) => p.id !== pkgEntryId);
     setAttachedPackages(nextList);
-    recalculateInvoice(selectedServices, nextList, selectedProductId);
+    recalculateInvoice(selectedServices, nextList, selectedProducts);
   };
 
   // Pulses input handlers per package (Pulses Used drives Pulses Left automatically)
@@ -783,10 +819,10 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     const rawNotes = String(targetBooking.notes || targetBooking.reception_notes || "");
     const cleanNotes = rawNotes
       .replace(/\[Historical Booking\]\s*Added manually for historical records\./gi, "")
-      .replace(/Service:\s*[^\.\n]+\./gi, "")
+      .replace(/Services?:\s*[^\.\n]+\./gi, "")
       .replace(/Package:\s*[^\.\n]+\./gi, "")
       .replace(/\[Package Usage\]:\s*[^\.\n]+(?:\.|$)/gi, "")
-      .replace(/Product:\s*[^\.\n]+\./gi, "")
+      .replace(/Products?:\s*[^\.\n]+\./gi, "")
       .replace(/\[Invoice Total\]:\s*\d+(?:\.\d+)?\s*EGP\./gi, "")
       .replace(/Actual Spent:\s*\d+(?:\.\d+)?\s*EGP\./gi, "")
       .replace(/Payment Method:\s*[^\.\n]+\./gi, "")
@@ -858,17 +894,43 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       setSelectedServices(matchedInitialSvcs);
     }
 
-    // Product extraction in edit mode
-    const prodMatch = rawNotes.match(/Product:\s*([^\.\n]+)/i);
-    const rawProdId = targetBooking.product_id || targetBooking.productId;
-    if (rawProdId) {
-      setSelectedProductId(String(rawProdId));
-    } else if (prodMatch && prodList.length > 0) {
-      const matchedProdName = prodMatch[1].trim();
-      const foundProd = prodList.find((pr) => pr.name === matchedProdName || pr.arabic_name === matchedProdName);
-      if (foundProd) {
-        setSelectedProductId(String(foundProd.id));
+    // Multi-product extraction in edit mode
+    const rawProdIds: any[] = Array.isArray(targetBooking.product_ids)
+      ? targetBooking.product_ids
+      : Array.isArray(targetBooking.productIds)
+      ? targetBooking.productIds
+      : Array.isArray(targetBooking.products)
+      ? targetBooking.products.map((p: any) => p.id || p.product_id)
+      : (targetBooking.product_id || targetBooking.productId)
+      ? [targetBooking.product_id || targetBooking.productId]
+      : [];
+
+    const matchedInitialProds: ProductItem[] = [];
+    if (rawProdIds.length > 0 && prodList.length > 0) {
+      rawProdIds.forEach((id: any) => {
+        const found = prodList.find((pr) => String(pr.id) === String(id));
+        if (found && !matchedInitialProds.some((m) => String(m.id) === String(found.id))) {
+          matchedInitialProds.push(found);
+        }
+      });
+    } else if (prodList.length > 0) {
+      const prodMatch = rawNotes.match(/Products?:\s*([^\.\n]+)/i);
+      if (prodMatch) {
+        const names = prodMatch[1].split(",").map((n: string) => n.trim().toLowerCase());
+        prodList.forEach((pr) => {
+          const nEn = (pr.name || "").toLowerCase();
+          const nAr = (pr.arabic_name || "").toLowerCase();
+          if (names.some((name: string) => name && (nEn === name || nAr === name || nEn.includes(name) || nAr.includes(name)))) {
+            if (!matchedInitialProds.some((m) => String(m.id) === String(pr.id))) {
+              matchedInitialProds.push(pr);
+            }
+          }
+        });
       }
+    }
+
+    if (matchedInitialProds.length > 0) {
+      setSelectedProducts(matchedInitialProds);
     }
 
     // Multi-package extraction from historical notes
@@ -1009,11 +1071,14 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
 
     try {
       const selectedDoc = providers.find((p) => String(p.id) === String(selectedDoctorId));
-      const selectedProd = prodList.find((pr) => String(pr.id) === String(selectedProductId));
 
       const selectedServiceIds = selectedServices.map((s) => Number(s.id)).filter((n) => !isNaN(n) && n > 0);
       const primaryService = selectedServices[0] || null;
       const allServiceNames = selectedServices.map((s) => getServiceName(s)).join(", ");
+
+      const selectedProductIds = selectedProducts.map((p) => p.id);
+      const primaryProduct = selectedProducts[0] || null;
+      const allProductNames = selectedProducts.map((p) => getProductName(p)).join(", ");
 
       const parsedInvoiceVal = invoiceValue !== "" ? parseFloat(invoiceValue) : 0;
       const parsedSpentVal = actualSpent !== "" ? parseFloat(actualSpent) : 0;
@@ -1035,8 +1100,14 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
           price: Number(s.price || 0)
         })),
         serviceName: allServiceNames || null,
-        productId: selectedProductId || null,
-        productName: selectedProd ? getProductName(selectedProd) : null,
+        productId: primaryProduct ? primaryProduct.id : null,
+        productName: allProductNames || null,
+        productIds: selectedProductIds,
+        products: selectedProducts.map((p) => ({
+          id: p.id,
+          name: getProductName(p),
+          price: Number(p.selling_price ?? p.price ?? 0)
+        })),
         packageId: firstPkg?.packageId || null,
         packageName: firstPkg?.name || null,
         customerPackageId: firstPkg?.customerPackageId || null,
@@ -1669,39 +1740,139 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
             </div>
           </div>
 
-          {/* FIELD 7: PRODUCTS (OPTIONAL) */}
-          <div className="space-y-1.5">
-            <label htmlFor="productSelect" className="text-xs sm:text-sm font-bold text-[#111827]">
-              {tr.productsOptional || tr.productsLabel}
-            </label>
+          {/* FIELD 7: PRODUCTS (OPTIONAL - MULTI-PRODUCT SUPPORT) */}
+          <div className="space-y-1.5 relative" ref={productDropdownRef}>
+            <div className="flex items-center justify-between">
+              <label htmlFor="productSearchInput" className="text-xs sm:text-sm font-bold text-[#111827]">
+                {tr.productsOptional || tr.productsLabel || (lang === "ar" ? "المنتجات (اختياري)" : "Products (Optional)")}
+              </label>
+              {selectedProducts.length > 0 && (
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                  {selectedProducts.length} {lang === "ar" ? "منتجات مضافة" : "selected"}
+                </span>
+              )}
+            </div>
             <div className="relative flex items-center">
               <div className="pointer-events-none absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 flex items-center pl-3.5 rtl:pl-0 rtl:pr-3.5 text-[var(--color-brand-secondary)] z-10">
                 <ShoppingBag size={17} />
               </div>
-              <select
-                id="productSelect"
-                value={selectedProductId}
+              <input
+                id="productSearchInput"
+                type="text"
+                autoComplete="off"
+                value={productSearchQuery}
                 onChange={(e) => {
-                  const prId = e.target.value;
-                  setSelectedProductId(prId);
-                  recalculateInvoice(selectedServices, attachedPackages, prId);
+                  setProductSearchQuery(e.target.value);
+                  setIsProductDropdownOpen(true);
                 }}
-                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10 cursor-pointer"
-              >
-                <option value="">{tr.selectProductPlaceholder || (lang === "ar" ? "اختر منتج..." : "Select product...")}</option>
-                {prodList.map((pr) => {
+                onFocus={() => setIsProductDropdownOpen(true)}
+                placeholder={
+                  selectedProducts.length > 0
+                    ? (lang === "ar" ? "+ إضافة منتج آخر..." : "+ Add another product...")
+                    : (tr.selectProductPlaceholder || (lang === "ar" ? "بحث عن منتج..." : "Search product..."))
+                }
+                className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-10 rtl:pl-10 rtl:pr-10 text-sm font-medium text-[#111827] outline-none transition placeholder:text-[#9CA3AF] focus:border-[var(--cr-primary)] focus:ring-2 focus:ring-[var(--cr-primary)]/10"
+              />
+              {productSearchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductSearchQuery("");
+                    setIsProductDropdownOpen(false);
+                  }}
+                  className="absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#9CA3AF] hover:text-[var(--cr-primary)] transition cursor-pointer z-10"
+                  title="Clear search"
+                >
+                  <X size={16} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsProductDropdownOpen((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] hover:text-[var(--cr-primary)] transition cursor-pointer z-10"
+                >
+                  <ChevronDown size={17} className={`transition-transform duration-200 ${isProductDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+              )}
+
+              {/* Dropdown Results */}
+              {isProductDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1.5 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl z-50 py-1 divide-y divide-gray-50">
+                  {filteredProducts.length > 0 ? (
+                    filteredProducts.map((pr) => {
+                      const isSelected = selectedProducts.some((sel) => String(sel.id) === String(pr.id));
+                      const price = Number(pr.selling_price ?? pr.price ?? 0);
+                      return (
+                        <button
+                          key={pr.id}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              handleRemoveProduct(pr.id);
+                            } else {
+                              handleAddProduct(pr);
+                            }
+                          }}
+                          className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs sm:text-sm text-start font-medium transition cursor-pointer ${
+                            isSelected
+                              ? "bg-emerald-50 text-emerald-900 font-bold"
+                              : "text-[#111827] hover:bg-[#F4F7F2] hover:text-[#344E41]"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="truncate">{getProductName(pr)}</span>
+                            {price > 0 && (
+                              <span className="text-[11px] text-gray-500 font-semibold shrink-0">
+                                ({price.toLocaleString()} EGP)
+                              </span>
+                            )}
+                          </div>
+                          {isSelected ? (
+                            <Check size={16} className="text-emerald-700 shrink-0 ml-2 rtl:ml-0 rtl:mr-2" />
+                          ) : (
+                            <Plus size={15} className="text-gray-400 shrink-0 ml-2 rtl:ml-0 rtl:mr-2" />
+                          )}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="px-3.5 py-3 text-xs sm:text-sm text-center text-gray-500 font-medium">
+                      {tr.noProductsFound || (lang === "ar" ? "لم يتم العثور على منتجات" : "No products found")}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Selected Products Badges */}
+            {selectedProducts.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {selectedProducts.map((pr) => {
                   const price = Number(pr.selling_price ?? pr.price ?? 0);
                   return (
-                    <option key={pr.id} value={pr.id}>
-                      {getProductName(pr)} {price > 0 ? `(${price.toLocaleString()} EGP)` : ""}
-                    </option>
+                    <span
+                      key={pr.id}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-900 text-xs font-semibold border border-emerald-200 shadow-2xs"
+                    >
+                      <span className="truncate max-w-[150px]">{getProductName(pr)}</span>
+                      {price > 0 && (
+                        <span className="text-[10px] text-emerald-700 font-bold">
+                          {price.toLocaleString()} EGP
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveProduct(pr.id)}
+                        className="text-emerald-800/70 hover:text-red-600 transition cursor-pointer p-0.5"
+                        title="Remove product"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
                   );
                 })}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 rtl:right-auto rtl:left-0 flex items-center pr-3.5 rtl:pr-0 rtl:pl-3.5 text-[#6B7280] z-10">
-                <ChevronDown size={17} />
               </div>
-            </div>
+            )}
           </div>
         </div>
 
