@@ -851,7 +851,7 @@ export default function ReceptionDashboardView({
               </button>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto [scrollbar-width:thin]">
               <table className="w-full text-start text-xs border-collapse min-w-[700px]">
                 <thead>
                   <tr className="border-b border-[#F0EEE6] text-[#8C9686] uppercase text-[10px] font-extrabold tracking-wider">

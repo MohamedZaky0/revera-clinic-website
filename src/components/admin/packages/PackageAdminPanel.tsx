@@ -263,7 +263,7 @@ export function PackageAdminPanel({ session }: { session: any }) {
       )}
 
       {packages.length > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm">
+        <div className="overflow-x-auto [scrollbar-width:thin] rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm">
           <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-[#F9F9F7]">
               <tr>

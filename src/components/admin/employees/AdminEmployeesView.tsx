@@ -977,6 +977,105 @@ export default function AdminEmployeesView({
     `);
     printWindow.document.close();
   }
+
+  const handleOpenEditEmployee = (emp: any) => {
+    const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
+    const effectiveSalary = matchProv ? (matchProv.fixedSalary ?? matchProv.fixed_salary ?? emp.salary ?? 0) : (emp.salary || 0);
+    setEditingEmployee(emp);
+    setNewEmployeeName(emp.name || "");
+    setNewEmployeeEmail(emp.email || "");
+    setNewEmployeeRole(emp.role_name || "");
+    setNewEmployeePhone(emp.phone || "");
+    setNewEmployeeDepartment(emp.department || "Reception");
+    updateShiftState(emp.shift || "Day");
+    setNewEmployeeSalary(String(effectiveSalary));
+    setNewEmployeeNationalId(emp.national_id || "");
+    setNewEmployeeNationalIdFront(emp.national_id_front || "");
+    setNewEmployeeNationalIdBack(emp.national_id_back || "");
+    applyAddressToState(emp.address || "");
+    setNewEmployeeBranchId(emp.branch_id || "");
+    const rawContract = emp.contract_file || "";
+    let contractUrl = "";
+    let additionalList: any[] = [];
+    try {
+      if (rawContract.startsWith('{')) {
+        const parsed = JSON.parse(rawContract);
+        contractUrl = parsed.contract || "";
+        additionalList = parsed.additional || [];
+      } else {
+        contractUrl = rawContract;
+      }
+    } catch (e) {
+      contractUrl = rawContract;
+    }
+    setNewEmployeeContract(contractUrl);
+    setNewEmployeeContractName(emp.contract_file_name || "");
+    setNewEmployeeAdditionalFiles(additionalList);
+    setNewEmployeeRequiredTargetAmount(String(emp.requiredTargetAmount || 0));
+    setNewEmployeeBonusPercentage(String(emp.bonusPercentage || 0));
+    setNewEmployeeSpecialty(matchProv?.specialty || "");
+    setNewEmployeeSelectedServices(matchProv?.services || []);
+    setNewEmployeeRating(String(matchProv?.rating || 5));
+    setNewEmployeeCommissionType(matchProv?.commissionType || "none");
+    setNewEmployeeCommissionValue(String(matchProv?.commissionValue || 0));
+    setNewEmployeeCommissionBase((matchProv?.commissionBase as "gross" | "net_of_materials") || "gross");
+    setNewEmployeeCommissionFixedComponent(String(matchProv?.commissionFixedComponent || 0));
+    setNewEmployeeServiceCommissions(Array.isArray(matchProv?.serviceCommissions) ? matchProv.serviceCommissions : []);
+    let bIds: string[] = [];
+    if (matchProv?.workingDaysHours?.branch_ids && Array.isArray(matchProv.workingDaysHours.branch_ids)) {
+      bIds = matchProv.workingDaysHours.branch_ids;
+    } else if (emp.branch_id) {
+      bIds = [emp.branch_id];
+    } else if (branches.length > 0) {
+      bIds = [branches[0].id];
+    }
+    setNewEmployeeBranchIds(bIds);
+    setNewEmployeeSelectedScheduleBranchId(bIds[0] || "");
+    const sched = loadEmployeeWorkingSchedule(emp, matchProv, bIds[0]);
+    setNewEmployeeWorkingDaysHours(sched);
+    const onlineSched = (bIds[0] && matchProv?.workingDaysHours?.branch_schedules?.[bIds[0]]?.online) || matchProv?.workingDaysHours?.online || sched;
+    setNewEmployeeOnlineWorkingDaysHours(onlineSched);
+    const existingBranchSchedules = emp?.working_days_hours?.branch_schedules
+      || emp?.workingDaysHours?.branch_schedules
+      || matchProv?.workingDaysHours?.branch_schedules
+      || (bIds[0] ? { [bIds[0]]: { in_person: sched, online: onlineSched } } : {});
+    setNewEmployeeBranchSchedules(existingBranchSchedules);
+    setIsEditingEmployeeModalOpen(true);
+  };
+
+  const filteredEmployees = employeesList.filter((emp: any) => {
+    const isSuperadmin =
+      emp.role_name === 'superadmin' ||
+      emp.employee_id === 'superadmin';
+    if (isSuperadmin) return false;
+    if (employeeFilterDepartment !== "All" && emp.department !== employeeFilterDepartment) return false;
+    if (employeeFilterShift !== "All") {
+      const empShift = (emp.shift || "").toLowerCase();
+      const filterVal = employeeFilterShift.toLowerCase();
+      if (filterVal === "day") {
+        if (!empShift.includes("day") && !empShift.includes("am") && (empShift.includes("night") || empShift.includes("pm"))) {
+          return false;
+        }
+      } else if (filterVal === "night") {
+        if (!empShift.includes("night") && !empShift.includes("pm")) {
+          return false;
+        }
+      } else if (emp.shift !== employeeFilterShift) {
+        return false;
+      }
+    }
+    if (employeeSearchQuery.trim()) {
+      const q = employeeSearchQuery.toLowerCase();
+      if (
+        !emp.name?.toLowerCase().includes(q) &&
+        !emp.email?.toLowerCase().includes(q) &&
+        !emp.phone?.toLowerCase().includes(q) &&
+        !emp.employee_id?.toLowerCase().includes(q)
+      ) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6 animate-fadeIn" dir={lang === "ar" ? "rtl" : "ltr"}>
       {!viewingEmployee && !isEditingEmployeeModalOpen && (
@@ -1082,8 +1181,8 @@ export default function AdminEmployeesView({
         </div>
       </div>
     
-      {/* Table */}
-      <div className="overflow-x-auto rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm scrollbar-none">
+      {/* Desktop Table */}
+      <div className="hidden md:block overflow-x-auto rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm [scrollbar-width:thin]">
         <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b border-[var(--cr-primary)]/10 bg-[#F9F9F7]">
@@ -1104,49 +1203,14 @@ export default function AdminEmployeesView({
                   {t.table.loadingEmployees}
                 </td>
               </tr>
-            ) : (() => {
-              const filtered = employeesList.filter((emp: any) => {
-                const isSuperadmin =
-                  emp.role_name === 'superadmin' ||
-                  emp.employee_id === 'superadmin';
-                if (isSuperadmin) return false;
-                if (employeeFilterDepartment !== "All" && emp.department !== employeeFilterDepartment) return false;
-                if (employeeFilterShift !== "All") {
-                  const empShift = (emp.shift || "").toLowerCase();
-                  const filterVal = employeeFilterShift.toLowerCase();
-                  if (filterVal === "day") {
-                    if (!empShift.includes("day") && !empShift.includes("am") && (empShift.includes("night") || empShift.includes("pm"))) {
-                      return false;
-                    }
-                  } else if (filterVal === "night") {
-                    if (!empShift.includes("night") && !empShift.includes("pm")) {
-                      return false;
-                    }
-                  } else if (emp.shift !== employeeFilterShift) {
-                    return false;
-                  }
-                }
-                if (employeeSearchQuery.trim()) {
-                  const q = employeeSearchQuery.toLowerCase();
-                  if (
-                    !emp.name?.toLowerCase().includes(q) &&
-                    !emp.email?.toLowerCase().includes(q) &&
-                    !emp.phone?.toLowerCase().includes(q) &&
-                    !emp.employee_id?.toLowerCase().includes(q)
-                  ) return false;
-                }
-                return true;
-              });
-              if (filtered.length === 0) {
-                return (
-                  <tr>
-                    <td colSpan={8} className="px-6 py-16 text-center text-sm text-[var(--color-brand-secondary)] font-medium">
-                      {t.table.noMatches}
-                    </td>
-                  </tr>
-                );
-              }
-              return filtered.map((emp: any) => {
+            ) : filteredEmployees.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-16 text-center text-sm text-[var(--color-brand-secondary)] font-medium">
+                  {t.table.noMatches}
+                </td>
+              </tr>
+            ) : (
+              filteredEmployees.map((emp: any) => {
                 const isSuperadmin = emp.employee_id === "superadmin";
                 const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
                 const effectiveSalary = matchProv ? (matchProv.fixedSalary ?? matchProv.fixed_salary ?? emp.salary ?? 0) : (emp.salary || 0);
@@ -1208,69 +1272,7 @@ export default function AdminEmployeesView({
                             {(!hasPermission || hasPermission("employees.action_edit")) && (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setEditingEmployee(emp);
-                                  setNewEmployeeName(emp.name || "");
-                                  setNewEmployeeEmail(emp.email || "");
-                                  setNewEmployeeRole(emp.role_name || "");
-                                  setNewEmployeePhone(emp.phone || "");
-                                  setNewEmployeeDepartment(emp.department || "Reception");
-                                  updateShiftState(emp.shift || "Day");
-                                  setNewEmployeeSalary(String(effectiveSalary));
-                                  setNewEmployeeNationalId(emp.national_id || "");
-                                  setNewEmployeeNationalIdFront(emp.national_id_front || "");
-                                  setNewEmployeeNationalIdBack(emp.national_id_back || "");
-                                  applyAddressToState(emp.address || "");
-                                  setNewEmployeeBranchId(emp.branch_id || "");
-                                  const rawContract = emp.contract_file || "";
-                                  let contractUrl = "";
-                                  let additionalList: any[] = [];
-                                  try {
-                                    if (rawContract.startsWith('{')) {
-                                      const parsed = JSON.parse(rawContract);
-                                      contractUrl = parsed.contract || "";
-                                      additionalList = parsed.additional || [];
-                                    } else {
-                                      contractUrl = rawContract;
-                                    }
-                                  } catch (e) {
-                                    contractUrl = rawContract;
-                                  }
-                                  setNewEmployeeContract(contractUrl);
-                                  setNewEmployeeContractName(emp.contract_file_name || "");
-                                  setNewEmployeeAdditionalFiles(additionalList);
-                                  setNewEmployeeRequiredTargetAmount(String(emp.requiredTargetAmount || 0));
-                                  setNewEmployeeBonusPercentage(String(emp.bonusPercentage || 0));
-                                  const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
-                                  setNewEmployeeSpecialty(matchProv?.specialty || "");
-                                  setNewEmployeeSelectedServices(matchProv?.services || []);
-                                  setNewEmployeeRating(String(matchProv?.rating || 5));
-                                  setNewEmployeeCommissionType(matchProv?.commissionType || "none");
-                                  setNewEmployeeCommissionValue(String(matchProv?.commissionValue || 0));
-                                  setNewEmployeeCommissionBase((matchProv?.commissionBase as "gross" | "net_of_materials") || "gross");
-                                  setNewEmployeeCommissionFixedComponent(String(matchProv?.commissionFixedComponent || 0));
-                                  setNewEmployeeServiceCommissions(Array.isArray(matchProv?.serviceCommissions) ? matchProv.serviceCommissions : []);
-                                  let bIds: string[] = [];
-                                  if (matchProv?.workingDaysHours?.branch_ids && Array.isArray(matchProv.workingDaysHours.branch_ids)) {
-                                    bIds = matchProv.workingDaysHours.branch_ids;
-                                  } else if (emp.branch_id) {
-                                    bIds = [emp.branch_id];
-                                  } else if (branches.length > 0) {
-                                    bIds = [branches[0].id];
-                                  }
-                                  setNewEmployeeBranchIds(bIds);
-                                  setNewEmployeeSelectedScheduleBranchId(bIds[0] || "");
-                                  const sched = loadEmployeeWorkingSchedule(emp, matchProv, bIds[0]);
-                                  setNewEmployeeWorkingDaysHours(sched);
-                                  const onlineSched = (bIds[0] && matchProv?.workingDaysHours?.branch_schedules?.[bIds[0]]?.online) || matchProv?.workingDaysHours?.online || sched;
-                                  setNewEmployeeOnlineWorkingDaysHours(onlineSched);
-                                  const existingBranchSchedules = emp?.working_days_hours?.branch_schedules
-                                    || emp?.workingDaysHours?.branch_schedules
-                                    || matchProv?.workingDaysHours?.branch_schedules
-                                    || (bIds[0] ? { [bIds[0]]: { in_person: sched, online: onlineSched } } : {});
-                                  setNewEmployeeBranchSchedules(existingBranchSchedules);
-                                  setIsEditingEmployeeModalOpen(true);
-                                }}
+                                onClick={() => handleOpenEditEmployee(emp)}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] transition hover:border-[var(--cr-accent)] hover:text-[var(--cr-primary)]"
                                 title={t.actions.editEmployee}
                               >
@@ -1301,15 +1303,135 @@ export default function AdminEmployeesView({
                         )}
                       </div>
                     </td>
-                    </tr>
-                  );
-                });
-              })()}
-            </tbody>
-          </table>
-        </div>
-      </>
-      )}
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Adaptive Cards */}
+      <div className="block md:hidden space-y-3">
+        {loadingRolesAndEmployees ? (
+          <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-8 text-center text-sm text-[var(--color-brand-secondary)] font-medium">
+            {t.table.loadingEmployees}
+          </div>
+        ) : filteredEmployees.length === 0 ? (
+          <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-8 text-center text-sm text-[var(--color-brand-secondary)] font-medium">
+            {t.table.noMatches}
+          </div>
+        ) : (
+          filteredEmployees.map((emp: any) => {
+            const isSuperadmin = emp.employee_id === "superadmin";
+            const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
+            const effectiveSalary = matchProv ? (matchProv.fixedSalary ?? matchProv.fixed_salary ?? emp.salary ?? 0) : (emp.salary || 0);
+
+            return (
+              <div key={emp.id} className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 shadow-xs space-y-3">
+                {/* Header: Avatar, Name/Email, Status */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-full bg-[var(--color-brand-tint)] text-[var(--cr-primary)] border border-[var(--cr-primary)]/10 flex items-center justify-center text-sm font-bold font-serif overflow-hidden shrink-0">
+                      {customerAvatars[emp.id || emp.employee_id] || emp.photo_url || emp.avatar_url ? (
+                        <img src={customerAvatars[emp.id || emp.employee_id] || emp.photo_url || emp.avatar_url} alt={emp.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <span>{emp.name ? emp.name.charAt(0).toUpperCase() : "E"}</span>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-[var(--cr-dark)] text-sm truncate">{emp.name || <span className="italic text-gray-400">{t.table.noName}</span>}</div>
+                      <div className="text-xs text-[var(--color-brand-secondary)] truncate">{emp.email}</div>
+                    </div>
+                  </div>
+                  <span className={`inline-block shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
+                    {emp.email_confirmed_at ? t.table.activeBadge : t.table.invitedBadge}
+                  </span>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[var(--cr-primary)]/5">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-brand-secondary)] block mb-0.5">{t.table.department}</span>
+                    <span className="inline-block rounded-lg bg-[var(--cr-accent)]/15 px-2 py-0.5 text-xs font-semibold text-[#8B7544] truncate max-w-full">
+                      {emp.department || t.table.fallbackDept}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-brand-secondary)] block mb-0.5">{t.table.branch}</span>
+                    <span className="inline-block rounded-lg bg-[var(--cr-primary)]/10 px-2 py-0.5 text-xs font-semibold text-[var(--cr-primary)] truncate max-w-full">
+                      {branches.find(b => b.id === emp.branch_id)?.name_en || t.table.noBranch}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-brand-secondary)] block mb-0.5">{t.table.shift}</span>
+                    <span className={`inline-block rounded-lg px-2 py-0.5 text-xs font-semibold ${(emp.shift || "").toLowerCase().includes("night") || (emp.shift || "").toLowerCase().includes("pm") ? "bg-indigo-50 text-indigo-700 border border-indigo-150" : "bg-amber-50 text-amber-700 border border-amber-150"}`}>
+                      {t.profile.shiftLabel(emp.shift)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-brand-secondary)] block mb-0.5">{t.table.phone}</span>
+                    <span className="font-mono text-xs font-medium text-[var(--cr-dark)]">{emp.phone || t.table.noPhone}</span>
+                  </div>
+                  <div className="col-span-2 flex items-center justify-between pt-1">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-brand-secondary)]">{t.table.salary}:</span>
+                    <span className="text-xs font-bold text-[var(--cr-dark)]">
+                      {Number(effectiveSalary).toLocaleString("en-US") + t.table.salarySuffix}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Actions Row */}
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--cr-primary)]/5">
+                  {(!hasPermission || hasPermission("employees.action_view_info")) && (
+                    <button
+                      type="button"
+                      onClick={() => setViewingEmployee(emp)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-secondary)] transition hover:border-[var(--cr-accent)] hover:text-[var(--cr-primary)]"
+                    >
+                      <Info size={13} /> {t.actions.viewInfo}
+                    </button>
+                  )}
+                  {!isSuperadmin && (
+                    <>
+                      {(!hasPermission || hasPermission("employees.action_edit")) && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditEmployee(emp)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[var(--cr-primary)] transition hover:border-[var(--cr-accent)] hover:bg-[var(--color-brand-light)]"
+                        >
+                          <Pencil size={13} /> {t.actions.editEmployee}
+                        </button>
+                      )}
+                      {!emp.email_confirmed_at && (!hasPermission || hasPermission("employees.action_resend_invite")) && (
+                        <button
+                          type="button"
+                          onClick={() => handleResendInvitation(emp.id)}
+                          className="inline-flex items-center gap-1 rounded-xl border border-amber-200/60 bg-amber-50/50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100/80"
+                        >
+                          {t.actions.resend}
+                        </button>
+                      )}
+                      {(!hasPermission || hasPermission("employees.action_delete")) && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteEmployee(emp.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-red-200/60 text-red-600 transition hover:bg-red-50 hover:border-red-300"
+                          title={t.actions.revoke}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </>
+    )}
     
       {/* Add / Edit Employee Modal */}
       {isEditingEmployeeModalOpen && (

@@ -344,8 +344,8 @@ export default function PatientsDirectoryView({
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm">
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm [scrollbar-width:thin]">
         <table className="w-full min-w-[750px] text-sm">
           <thead>
             <tr className="border-b border-[var(--cr-primary)]/10 bg-[#F9F9F7]">
@@ -857,6 +857,124 @@ export default function PatientsDirectoryView({
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Adaptive Cards View */}
+      <div className="block md:hidden space-y-3">
+        {sortedCustomers.length === 0 ? (
+          <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-8 text-center text-sm text-[var(--color-brand-secondary)]">
+            {t.noCustomers}
+          </div>
+        ) : (
+          sortedCustomers.map((c) => {
+            const bookingInfo = formatLastBooking(c.lastBookingDate, c.lastBookingTime);
+            const uniqueKey = c.id || c.email || c.phone;
+            const displayPhone = c.mobile || c.phone || "—";
+            const displayEmail = c.email || "—";
+            const totalSpendAmount = Number(c.spent !== undefined ? c.spent : (c.spent_amount || 0)) || 0;
+            const outstandingAmount = Number(c.outstanding) || 0;
+            const walletAmount = Number(c.wallet !== undefined ? c.wallet : (c.wallet_balance || 0)) || 0;
+            const currency = lang === "ar" ? "ج.م" : "EGP";
+
+            const canEdit = hasPermission("customers.action_edit");
+            const canView = hasPermission("customers.action_view_profile");
+            const canSettle = outstandingAmount > 0 && hasPermission("customers.action_settle_balance");
+
+            return (
+              <div
+                key={uniqueKey}
+                onClick={() => setViewingCustomerProfile(c)}
+                className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 shadow-xs space-y-3 cursor-pointer transition hover:border-[var(--cr-accent)]/50"
+              >
+                {/* Header: Name, Contact & Status Badge */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="block text-sm font-extrabold text-[var(--cr-dark)] truncate">{c.name}</span>
+                    <div className="flex flex-col text-xs font-normal text-[var(--color-brand-secondary)] mt-0.5">
+                      {displayPhone !== "—" && <span className="font-mono">{displayPhone}</span>}
+                      {displayEmail !== "—" && <span className="text-[#6B7280] truncate">{displayEmail}</span>}
+                    </div>
+                  </div>
+                  <span className={`inline-block shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold border ${c.active !== false ? "bg-green-50 text-green-700 border-green-200/50" : "bg-red-50 text-red-700 border-red-200/50"}`}>
+                    {c.active !== false ? t.activeBadge : t.inactiveBadge}
+                  </span>
+                </div>
+
+                {/* Info Grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[var(--cr-primary)]/5">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-brand-secondary)] block mb-0.5">{t.colLastBookingDate}</span>
+                    {bookingInfo ? (
+                      <div>
+                        <span className="font-bold text-[var(--cr-dark)] block">{bookingInfo.formattedDate}</span>
+                        {bookingInfo.formattedTime && (
+                          <span className="text-[10px] text-[var(--color-brand-secondary)] block">{bookingInfo.formattedTime}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-[#8A9A81]">—</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-brand-secondary)] block mb-0.5">{t.colBookings}</span>
+                    <span className="font-bold text-[var(--cr-dark)] text-sm">{c.bookings || 0}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-brand-secondary)] block mb-0.5">{t.colTotalSpend || "Total Spend"}</span>
+                    <span className="font-bold text-[var(--cr-dark)]">{totalSpendAmount.toLocaleString("en-US")} {currency}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-brand-secondary)] block mb-0.5">{t.colWallet}</span>
+                    <span className="font-bold text-[var(--cr-dark)]">{walletAmount.toLocaleString("en-US")} {currency}</span>
+                  </div>
+
+                  {outstandingAmount > 0 && (
+                    <div className="col-span-2 flex items-center justify-between rounded-xl bg-rose-50/60 border border-rose-200/60 p-2">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-rose-700">{t.colOutstanding}:</span>
+                      <span className="text-xs font-bold text-rose-700">{outstandingAmount.toLocaleString("en-US")} {currency}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions Row */}
+                {(canEdit || canView || canSettle) && (
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--cr-primary)]/5" onClick={(e) => e.stopPropagation()}>
+                    {canSettle && (
+                      <button
+                        type="button"
+                        onClick={() => setSettlingCustomer(c)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+                      >
+                        <Receipt size={13} /> {t.settleBalanceBtn || "Settle Balance"}
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditCustomer(c)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-light)]"
+                      >
+                        <Pencil size={13} /> {t.editPatientBtn}
+                      </button>
+                    )}
+                    {canView && (
+                      <button
+                        type="button"
+                        onClick={() => setViewingCustomerProfile(c)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-secondary)] transition hover:border-[var(--cr-accent)] hover:text-[var(--cr-primary)]"
+                      >
+                        <User size={13} /> {t.viewProfileBtn}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {settlingCustomer && (

@@ -210,7 +210,7 @@ export default function DoctorAnalyticsTab({
           </div>
         </div>
 
-        <div className="overflow-x-auto w-full">
+        <div className="overflow-x-auto w-full [scrollbar-width:thin]">
           <table className="w-full min-w-[500px] text-left text-xs text-[var(--cr-dark)]">
             <thead className="bg-[#F9F9F7] text-[10px] uppercase tracking-wider font-extrabold text-[var(--color-brand-secondary)] border-b border-[var(--cr-primary)]/10">
               <tr>

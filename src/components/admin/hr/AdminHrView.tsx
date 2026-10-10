@@ -258,7 +258,7 @@ export default function AdminHrView({
             <div className="p-4 sm:p-6 border-b border-[var(--cr-primary)]/10 flex items-center justify-between">
               <h3 className="text-lg font-bold text-[var(--cr-dark)]">{t.overview.workforceDirectory}</h3>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto [scrollbar-width:thin]">
               <table className="w-full border-collapse text-left text-sm min-w-[700px]">
                 <thead>
                    <tr className="border-b border-[var(--cr-primary)]/10 bg-[#F9F9F7]">
@@ -506,7 +506,7 @@ export default function AdminHrView({
     
             {/* Main Table */}
             <div className="rounded-[32px] bg-white border border-[var(--cr-primary)]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto [scrollbar-width:thin]">
                 <table className="w-full border-collapse text-left text-sm min-w-[950px]">
                   <thead>
                      <tr className="border-b border-[var(--cr-primary)]/10 bg-[#F9F9F7]">
@@ -931,7 +931,7 @@ export default function AdminHrView({
     
             {/* Main Table */}
             <div className="rounded-[32px] bg-white border border-[var(--cr-primary)]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto [scrollbar-width:thin]">
                 <table className="w-full border-collapse text-left text-sm min-w-[900px]">
                   <thead>
                     <tr className="bg-[var(--color-brand-tint)] text-[10px] font-bold uppercase tracking-widest text-[var(--cr-primary)] border-b border-[var(--cr-primary)]/10">
@@ -1113,7 +1113,7 @@ export default function AdminHrView({
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Leave Request List */}
           <div className="lg:col-span-2">
-            <div className="overflow-x-auto rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm">
+            <div className="overflow-x-auto [scrollbar-width:thin] rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm">
               <div className="px-5 py-4 border-b border-[var(--cr-primary)]/10 flex items-center justify-between">
                 <h3 className="text-base font-bold text-[var(--cr-dark)]">{t.leaves.heading}</h3>
               </div>
@@ -1504,7 +1504,7 @@ export default function AdminHrView({
               <h3 className="text-lg font-bold text-[var(--cr-dark)]">{t.attendance.heading}</h3>
               <p className="mt-1 text-xs text-[var(--color-brand-secondary)]">{t.attendance.subtitle}</p>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto [scrollbar-width:thin]">
               <table className="w-full border-collapse text-left text-sm min-w-[800px]">
                 <thead>
                   <tr className="bg-[var(--color-brand-tint)] text-[10px] font-bold uppercase tracking-widest text-[var(--cr-primary)] border-b border-[var(--cr-primary)]/10">
@@ -1652,7 +1652,7 @@ export default function AdminHrView({
               <h3 className="text-lg font-bold text-[var(--cr-dark)]">{t.targets.title}</h3>
               <p className="mt-1 text-xs text-[var(--color-brand-secondary)]">{t.targets.subtitle}</p>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto [scrollbar-width:thin]">
               <table className="w-full border-collapse text-left text-sm min-w-[850px]">
                 <thead>
                   <tr className="bg-[var(--color-brand-tint)] text-[10px] font-bold uppercase tracking-widest text-[var(--cr-primary)] border-b border-[var(--cr-primary)]/10">

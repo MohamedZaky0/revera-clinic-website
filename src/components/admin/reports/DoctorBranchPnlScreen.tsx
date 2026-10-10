@@ -174,7 +174,7 @@ export function DoctorBranchPnlScreen({ accessToken, branches = [] }: DoctorBran
             Contribution margin only — no fixed overhead per doctor, since rent/depreciation can&apos;t be
             attributed to one doctor.
           </p>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto [scrollbar-width:thin]">
             <table className="w-full min-w-[800px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--cr-divider)] bg-[var(--cr-divider)] text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -237,7 +237,7 @@ export function DoctorBranchPnlScreen({ accessToken, branches = [] }: DoctorBran
             Loan interest can&apos;t be attributed to a branch (loans aren&apos;t tracked per branch), so it
             always appears under &quot;Not linked to a branch&quot; below.
           </p>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto [scrollbar-width:thin]">
             <table className="w-full min-w-[900px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--cr-divider)] bg-[var(--cr-divider)] text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">

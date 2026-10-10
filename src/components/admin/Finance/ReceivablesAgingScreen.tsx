@@ -137,7 +137,7 @@ export function ReceivablesAgingScreen({ accessToken, branches = [] }: Receivabl
             className="rounded-[32px] border p-6 shadow-sm"
             style={{ backgroundColor: "var(--cr-white)", borderColor: "var(--cr-divider)" }}
           >
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto [scrollbar-width:thin]">
               <table className="w-full min-w-[800px] text-sm">
                 <thead>
                   <tr className="border-b border-[var(--cr-divider)] bg-[var(--cr-divider)] text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">

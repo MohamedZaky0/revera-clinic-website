@@ -147,7 +147,7 @@ export function BudgetVsActualScreen({ accessToken, branches = [] }: BudgetVsAct
             <h3 className="mb-4 text-lg font-semibold" style={{ color: "var(--cr-dark)" }}>
               Budget vs actual by category
             </h3>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto [scrollbar-width:thin]">
               <table className="w-full min-w-[800px] text-sm">
                 <thead>
                   <tr className="border-b border-[var(--cr-divider)] bg-[var(--cr-divider)] text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -200,7 +200,7 @@ export function BudgetVsActualScreen({ accessToken, branches = [] }: BudgetVsAct
               <p className="mb-4 text-xs text-muted-foreground">
                 These categories had real expenses this month but no budget line to compare against.
               </p>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto [scrollbar-width:thin]">
                 <table className="w-full min-w-[500px] text-sm">
                   <thead>
                     <tr className="border-b border-[var(--cr-divider)] text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
