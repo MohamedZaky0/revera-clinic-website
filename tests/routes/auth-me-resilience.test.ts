@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { AuthRetryableFetchError } from '@supabase/supabase-js';
 
 const mockAuthGetUser = vi.fn();
 const mockFromData = vi.fn();
@@ -45,6 +46,27 @@ describe('GET /api/auth/me resilience', () => {
   });
 
   it('returns 401 when token is invalid or expired', async () => {
+    mockAuthGetUser.mockResolvedValue({
+      data: { user: null },
+      error: { message: 'Invalid JWT token' },
+    });
+    const res = await getAuthMe(makeReq('bad-token'));
+    expect(res.status).toBe(401);
+  });
+
+  it('RISK-113: returns 503, not 401, when verifying the token fails for a transient reason (network blip, Supabase momentarily unreachable) - a 401 here forces a real, working session to log out', async () => {
+    mockAuthGetUser.mockResolvedValue({
+      data: { user: null },
+      error: new AuthRetryableFetchError('Service temporarily unavailable', 503),
+    });
+    const res = await getAuthMe(makeReq('valid-but-unverifiable-token'));
+    expect(res.status).toBe(503);
+    expect(res.status).not.toBe(401);
+    const body = await res.json();
+    expect(body.error).not.toMatch(/invalid|expired/i);
+  });
+
+  it('RISK-113: a plain, non-retryable auth error still returns 401 (the fix does not mask a genuine rejection)', async () => {
     mockAuthGetUser.mockResolvedValue({
       data: { user: null },
       error: { message: 'Invalid JWT token' },

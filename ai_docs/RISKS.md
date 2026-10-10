@@ -5081,6 +5081,58 @@ browser) coverage instead. Verified manually: see
 
 ---
 
+## RISK-113: A Transient Failure Verifying The Login Token Was Treated As A Real Logout, Forcing Staff Off The System On A Flaky Connection (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_113_AUTH_ME_TRANSIENT_ERROR_MANUAL_TESTS.md`
+
+**Severity:** High (reported live, disrupting a working clinic) · **Type:** Session/auth reliability
+**Found:** 2026-10-10, investigating a live report: staff on one specific clinic laptop were being
+logged out automatically during active use.
+
+**Confirmed via production runtime logs/errors was attempted but blocked** (`get_runtime_errors` /
+`get_runtime_logs` returned 403 for this project through the connected Vercel MCP — likely a plan/
+scope limitation, not evidence either way; the diagnosis below is grounded in reading the code path
+directly, not in observed production log lines). Investigation instead confirmed the mechanism by
+reading `GET /api/auth/me` and the client's `handleAuthSession` in `src/app/admin/page.tsx` end to
+end, and by finding closely related prior art: **DEC-102** (2026-10-06, already on `main`) fixed a
+different cause of this exact symptom — a missing email fallback in the same route's employee lookup
+— but left one branch of the same function with the old, unsafe behaviour.
+
+**What was wrong:** `GET /api/auth/me` calls `supabaseServer.auth.getUser(token)` to verify the staff
+member's login with Supabase's own auth server. This call runs **every time the client checks who is
+logged in — not just at login, but again automatically on every background token refresh**, which
+Supabase's SDK does roughly once an hour while the person keeps working, completely invisibly to
+them. The route treated **any** failure of that call — `authError || !user` — identically: a flat
+401 "Invalid or expired session." The client (`admin/page.tsx`, per DEC-102's own rule) signs the
+user out and hard-redirects to `/login` on exactly a 401 or 403, and preserves the session for every
+other status. So a login that was never actually invalid — Supabase's auth server was simply
+unreachable for a moment (a brief network drop, a momentary Supabase hiccup, a security tool on that
+one machine interfering with the request) — produced the same forced logout as a genuinely expired
+session. Because the background check re-runs roughly hourly for the entire time someone is logged
+in, a connection that drops out even occasionally will eventually hit this window and bounce the
+person to the login screen mid-work, with no actual problem with their login.
+
+**Fix:** Supabase's SDK already distinguishes these two cases internally — `isAuthRetryableFetchError()`
+(exported from `@supabase/supabase-js`) is true only for a transient failure to reach the auth server,
+never for a confirmed-invalid token. `GET /api/auth/me` now checks this first and answers with `503`,
+not `401`, when it's true — the client's existing non-401/403 branch already preserves the session
+for exactly this case (the same branch DEC-102 added for a plain `500`), so no client change was
+needed. A genuinely invalid or expired token is completely unaffected and still returns 401 and still
+signs the person out, confirmed by a dedicated regression test.
+
+**Tests:** `tests/routes/auth-me-resilience.test.ts` (+2: the retryable-error case returns 503, and a
+plain non-retryable auth error still returns 401). Mutation-checked: disabling the new branch fails
+exactly the new 503 test, nothing else. Full suite: 1299 passed, 4 expected-fail, `tsc` and `eslint`
+clean (the file's one pre-existing `prefer-const` lint error, unrelated to this change, left as-is
+per convention).
+
+**Not done:** the Vercel runtime-log/error tools could not confirm this diagnosis directly against
+real production traffic (403, access/plan-gated) — the fix is correct on the merits of the code path
+regardless, but a direct log confirmation that this specific laptop's failures match this exact
+pattern is still open, tracked in the manual checklist's last item (ask the clinic to report back
+after it ships).
+
+---
 ## PROPOSALS.md Reference
 
 
