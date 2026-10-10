@@ -65,13 +65,13 @@ export default function BookingSettingsView({
 }: BookingSettingsViewProps) {
   return (
     <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <div className="mb-6">
-        <h2 className="text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
-        <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
+      <div className="mb-4 sm:mb-6">
+        <h2 className="text-2xl sm:text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
+        <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
       </div>
 
-      <div className="max-w-4xl rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-        <h3 className="text-xl font-bold text-[var(--cr-dark)] border-b border-gray-100 pb-3">{t.bookingRules}</h3>
+      <div className="max-w-4xl rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-4 sm:space-y-6">
+        <h3 className="text-lg sm:text-xl font-bold text-[var(--cr-dark)] border-b border-gray-100 pb-3">{t.bookingRules}</h3>
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <div className="flex items-center gap-1.5 mb-2">

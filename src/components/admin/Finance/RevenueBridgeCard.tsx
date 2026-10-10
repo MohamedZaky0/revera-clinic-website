@@ -96,23 +96,25 @@ export function RevenueBridgeCard({ period, branchId, accessToken, revenueEarned
       {loading && !cash ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : bridge ? (
-        <table className="w-full text-sm">
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.key} className={r.strong ? "border-t-2" : "border-t"} style={{ borderColor: "var(--cr-divider)" }}>
-                <td className="w-8 py-2.5 text-center font-semibold text-muted-foreground" aria-hidden="true">{r.sign}</td>
-                <td className="py-2.5 pe-4">
-                  <span className={r.strong ? "font-semibold" : ""} style={{ color: "var(--cr-dark)" }}>{r.label}</span>
-                  <span className="ms-2 text-xs text-muted-foreground" dir="rtl">{r.labelAr}</span>
-                  {r.hint && <p className="text-xs text-muted-foreground">{r.hint}</p>}
-                </td>
-                <td className={`whitespace-nowrap py-2.5 text-end tabular-nums ${r.strong ? "font-semibold" : ""}`} style={{ color: "var(--cr-dark)" }}>
-                  {egp(Math.abs(r.value))}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto w-full [scrollbar-width:thin]">
+          <table className="w-full text-sm min-w-[340px]">
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.key} className={r.strong ? "border-t-2" : "border-t"} style={{ borderColor: "var(--cr-divider)" }}>
+                  <td className="w-8 py-2.5 text-center font-semibold text-muted-foreground" aria-hidden="true">{r.sign}</td>
+                  <td className="py-2.5 pe-4">
+                    <span className={r.strong ? "font-semibold" : ""} style={{ color: "var(--cr-dark)" }}>{r.label}</span>
+                    <span className="ms-2 text-xs text-muted-foreground" dir="rtl">{r.labelAr}</span>
+                    {r.hint && <p className="text-xs text-muted-foreground">{r.hint}</p>}
+                  </td>
+                  <td className={`whitespace-nowrap py-2.5 text-end tabular-nums ${r.strong ? "font-semibold" : ""}`} style={{ color: "var(--cr-dark)" }}>
+                    {egp(Math.abs(r.value))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : null}
     </div>
   );

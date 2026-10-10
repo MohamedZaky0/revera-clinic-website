@@ -326,8 +326,8 @@ export const PatientTransactionsHistoryTab: React.FC<PatientTransactionsHistoryT
 
       {/* ── Patient Transactions Table ── */}
       <div className="overflow-hidden rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-start text-xs border-collapse">
+        <div className="overflow-x-auto [scrollbar-width:thin]">
+          <table className="w-full text-start text-xs border-collapse min-w-[700px]">
             <thead>
               <tr className="border-b border-gray-100 bg-[#F9F9F7] text-[11px] font-bold uppercase tracking-wider text-gray-500">
                 <th className="py-3 px-4 text-start">

@@ -492,20 +492,20 @@ export default function RoleManagementView({
   }
 
   return (
-    <div className="space-y-8 animate-fadeIn" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <div className="mb-6">
-        <h2 className="text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
-        <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
+    <div className="space-y-6 sm:space-y-8 animate-fadeIn" dir={lang === "ar" ? "rtl" : "ltr"}>
+      <div className="mb-4 sm:mb-6">
+        <h2 className="text-2xl sm:text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
+        <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
       </div>
 
       {/* Grid for Roles and Employee Accounts */}
-      <div className="grid gap-8 lg:grid-cols-1">
+      <div className="grid gap-6 sm:gap-8 lg:grid-cols-1">
         {/* 1. Manage Roles Card */}
-        <div className="rounded-[40px] bg-[var(--color-brand-light)] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-          <h3 className="text-xl font-bold text-[var(--cr-dark)] mb-4">{t.defineRoles.cardTitle}</h3>
+        <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-[var(--color-brand-light)] p-4 sm:p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+          <h3 className="text-lg sm:text-xl font-bold text-[var(--cr-dark)] mb-3 sm:mb-4">{t.defineRoles.cardTitle}</h3>
           
           {/* Create Role Form */}
-          <form onSubmit={handleCreateRole} className="mb-6 space-y-4 rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-5">
+          <form onSubmit={handleCreateRole} className="mb-6 space-y-4 rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-3.5 sm:p-5">
             <div className="space-y-4">
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">{t.defineRoles.roleNameLabel}</label>
@@ -523,13 +523,13 @@ export default function RoleManagementView({
               </div>
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-3">{t.defineRoles.permissionsLabel}</label>
-                <div className="grid gap-4 md:grid-cols-2 max-h-[550px] overflow-y-auto rounded-3xl border border-[var(--cr-primary)]/10 p-5 bg-[var(--color-brand-light)]">
+                <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 max-h-[550px] overflow-y-auto rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 p-3.5 sm:p-5 bg-[var(--color-brand-light)]">
                   {PERMISSION_STRUCTURE.map((group) => {
                     const allChecked = group.items.every(item => newRolePermissions.includes(item.key));
                     const someChecked = group.items.some(item => newRolePermissions.includes(item.key)) && !allChecked;
 
                     return (
-                      <div key={group.category} className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 shadow-sm flex flex-col justify-between">
+                      <div key={group.category} className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/5 pb-2 mb-3">
                             <label className="flex items-center gap-2 text-xs font-bold text-[var(--cr-dark)] cursor-pointer select-none">
@@ -549,9 +549,9 @@ export default function RoleManagementView({
                                 }}
                                 className="h-4 w-4 accent-[var(--cr-primary)] rounded"
                               />
-                              {t.permissionCategories[group.category as keyof typeof t.permissionCategories] || group.category}
+                              <span className="truncate">{t.permissionCategories[group.category as keyof typeof t.permissionCategories] || group.category}</span>
                             </label>
-                            <span className="text-[10px] font-bold text-[var(--cr-primary)] bg-[var(--cr-primary)]/5 px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] font-bold text-[var(--cr-primary)] bg-[var(--cr-primary)]/5 px-2 py-0.5 rounded-full shrink-0">
                               {group.items.filter(item => newRolePermissions.includes(item.key)).length} / {group.items.length}
                             </span>
                           </div>
@@ -568,9 +568,9 @@ export default function RoleManagementView({
                                       setNewRolePermissions(prev => prev.filter(p => p !== item.key));
                                     }
                                   }}
-                                  className="h-4 w-4 accent-[var(--cr-primary)] rounded"
+                                  className="h-4 w-4 accent-[var(--cr-primary)] rounded shrink-0"
                                 />
-                                {t.permissionLabels[item.key as keyof typeof t.permissionLabels] || item.label}
+                                <span>{t.permissionLabels[item.key as keyof typeof t.permissionLabels] || item.label}</span>
                               </label>
                             ))}
                           </div>
@@ -587,15 +587,15 @@ export default function RoleManagementView({
 
             <button
               type="submit"
-              className="rounded-2xl bg-[var(--cr-primary)] px-5 py-2 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition"
+              className="rounded-2xl bg-[var(--cr-primary)] px-5 py-2.5 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition shadow-sm w-full sm:w-auto"
             >
               {t.defineRoles.saveRoleBtn}
             </button>
           </form>
 
-          {/* Roles Table */}
-          <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-            <table className="w-full text-sm">
+          {/* Desktop Roles Table */}
+          <div className="hidden md:block overflow-x-auto rounded-[24px] sm:rounded-[32px] border border-[#E6E9EB] bg-white [scrollbar-width:thin]">
+            <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-secondary)]">
                   <th className="px-6 py-4 text-start">{t.defineRoles.tableRoleName}</th>
@@ -651,15 +651,75 @@ export default function RoleManagementView({
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Adaptive Roles Cards */}
+          <div className="block md:hidden space-y-3">
+            {loadingRolesAndEmployees ? (
+              <div className="rounded-2xl border border-[#E6E9EB] bg-white p-6 text-center text-xs text-gray-400">
+                {t.defineRoles.loadingRoles}
+              </div>
+            ) : rolesList.length === 0 ? (
+              <div className="rounded-2xl border border-[#E6E9EB] bg-white p-6 text-center text-xs text-gray-400">
+                {t.defineRoles.noRoles}
+              </div>
+            ) : (
+              rolesList.map((r) => (
+                <div key={r.id} className="rounded-2xl border border-[#E6E9EB] bg-white p-4 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between gap-2 border-b border-[#E6E9EB]/60 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-[var(--cr-dark)] capitalize">{r.name}</span>
+                      {r.locked && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-bold">
+                          <Lock size={11} /> {t.defineRoles.systemLocked || "Locked"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {adminRole === "superadmin" && r.name?.toLowerCase() !== 'superadmin' && (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleRoleLock(r.name, Boolean(r.locked))}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--color-brand-light)] text-gray-600 hover:text-[var(--cr-primary)] transition"
+                          title={r.locked ? t.defineRoles.unlockRoleTitle : t.defineRoles.lockRoleTitle}
+                        >
+                          {r.locked ? <Lock size={14} /> : <Unlock size={14} />}
+                        </button>
+                      )}
+                      {!r.locked && r.name?.toLowerCase() !== 'superadmin' && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRole(r.name)}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:text-red-800 transition"
+                          title={t.defineRoles.deleteRoleTitle}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] block mb-1.5">{t.defineRoles.tableAllowedModules}</span>
+                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                      {r.permissions.map((p: string) => (
+                        <span key={p} className="rounded-full bg-[var(--color-brand-tint)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--cr-primary)] border border-[var(--cr-primary)]/10">
+                          {permissionKeyToLabel[p] || p}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         {/* 2. Manage Employees / Credentials Provisioning */}
-        <div className="rounded-[40px] bg-[var(--color-brand-light)] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-          <h3 className="text-xl font-bold text-[var(--cr-dark)] mb-4">{t.provisionEmployees.cardTitle}</h3>
+        <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-[var(--color-brand-light)] p-4 sm:p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+          <h3 className="text-lg sm:text-xl font-bold text-[var(--cr-dark)] mb-3 sm:mb-4">{t.provisionEmployees.cardTitle}</h3>
           
           {/* Create Employee Form — OAuth Invite Flow */}
-          <form onSubmit={handleCreateEmployee} className="mb-6 space-y-4 rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-5">
-            <div className="grid gap-4 sm:grid-cols-3">
+          <form onSubmit={handleCreateEmployee} className="mb-6 space-y-4 rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-3.5 sm:p-5">
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">{t.provisionEmployees.fullNameLabel}</label>
                 <input
@@ -708,7 +768,7 @@ export default function RoleManagementView({
             </div>
 
             {/* Invite info banner */}
-            <div className="flex items-start gap-2.5 rounded-2xl bg-[#EDF5E8] border border-[var(--cr-primary)]/15 px-4 py-3">
+            <div className="flex items-start gap-2.5 rounded-2xl bg-[#EDF5E8] border border-[var(--cr-primary)]/15 px-3.5 sm:px-4 py-3">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mt-0.5 shrink-0 text-[var(--cr-primary)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <p className="text-xs text-[var(--cr-primary)] font-medium leading-relaxed">
                 {t.provisionEmployees.inviteBanner}
@@ -720,16 +780,16 @@ export default function RoleManagementView({
 
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-2xl bg-[var(--cr-primary)] px-5 py-2 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--cr-primary)] px-5 py-2.5 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition shadow-sm w-full sm:w-auto"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
               {t.provisionEmployees.sendInvitationBtn}
             </button>
           </form>
 
-          {/* Employees Table */}
-          <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-            <table className="w-full text-sm">
+          {/* Desktop Employees Table */}
+          <div className="hidden md:block overflow-x-auto rounded-[24px] sm:rounded-[32px] border border-[#E6E9EB] bg-white [scrollbar-width:thin]">
+            <table className="w-full text-sm min-w-[650px]">
               <thead>
                 <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-secondary)]">
                   <th className="px-6 py-4 text-start">{t.provisionEmployees.tableFullName}</th>
@@ -738,7 +798,6 @@ export default function RoleManagementView({
                   <th className="px-6 py-4 text-center">{t.provisionEmployees.tableStatus}</th>
                   <th className="px-6 py-4 text-center">{t.provisionEmployees.tableActions}</th>
                 </tr>
-
               </thead>
               <tbody className="divide-y divide-[#E6E9EB] text-[var(--cr-primary)] font-medium">
                 {loadingRolesAndEmployees ? (
@@ -760,10 +819,6 @@ export default function RoleManagementView({
                           className="rounded-lg border border-[#E6E9EB] bg-[var(--color-brand-light)] px-2 py-1 text-xs font-semibold text-[var(--cr-primary)] focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)] outline-none"
                         >
                           {rolesList
-                            // RISK-069: admin can assign/edit any operational role, but only
-                            // superadmin can grant the admin/superadmin tier itself — don't even
-                            // offer those two options when the caller isn't superadmin, the
-                            // server rejects them anyway.
                             .filter((r) => adminRole === "superadmin" || (r.name !== "admin" && r.name !== "superadmin"))
                             .map((r) => (
                               <option key={r.id} value={r.name}>
@@ -813,12 +868,95 @@ export default function RoleManagementView({
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Adaptive Employees Cards */}
+          <div className="block md:hidden space-y-3">
+            {loadingRolesAndEmployees ? (
+              <div className="rounded-2xl border border-[#E6E9EB] bg-white p-6 text-center text-xs text-gray-400">
+                {t.provisionEmployees.loadingAccounts}
+              </div>
+            ) : employeesList.length === 0 ? (
+              <div className="rounded-2xl border border-[#E6E9EB] bg-white p-6 text-center text-xs text-gray-400">
+                {t.provisionEmployees.noAccounts}
+              </div>
+            ) : (
+              employeesList.map((emp) => (
+                <div key={emp.id} className="rounded-2xl border border-[#E6E9EB] bg-white p-4 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between gap-2 border-b border-[#E6E9EB]/60 pb-2.5">
+                    <div>
+                      <h4 className="font-bold text-sm text-[var(--cr-dark)]">{emp.name || emp.employee_id || '—'}</h4>
+                      <p className="font-mono text-xs text-[var(--color-brand-secondary)] mt-0.5">{emp.email}</p>
+                    </div>
+                    <div>
+                      {emp.email_confirmed_at ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">{t.provisionEmployees.active}</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">{t.provisionEmployees.invitePending}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[var(--color-brand-secondary)]">{t.provisionEmployees.tableAssignedRole}:</span>
+                      {(adminRole === "superadmin" || adminRole === "admin") && emp.employee_id !== "superadmin" ? (
+                        <select
+                          value={emp.role_name}
+                          onChange={(e) => handleUpdateEmployeeRole(emp.id, e.target.value)}
+                          className="rounded-lg border border-[#E6E9EB] bg-[var(--color-brand-light)] px-2.5 py-1 text-xs font-semibold text-[var(--cr-primary)] focus:border-[var(--cr-primary)] outline-none"
+                        >
+                          {rolesList
+                            .filter((r) => adminRole === "superadmin" || (r.name !== "admin" && r.name !== "superadmin"))
+                            .map((r) => (
+                              <option key={r.id} value={r.name}>
+                                {r.name}
+                              </option>
+                            ))}
+                        </select>
+                      ) : (
+                        <span className="capitalize text-xs font-bold text-[var(--cr-primary)]">{emp.role_name}</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-1 sm:pt-0">
+                      {emp.employee_id !== 'superadmin' ? (
+                        <>
+                          {!emp.email_confirmed_at && (
+                            <button
+                              type="button"
+                              onClick={() => handleResendInvitation(emp.id)}
+                              className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100"
+                              title={t.provisionEmployees.resendTitle}
+                            >
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9z"/></svg>
+                              {t.provisionEmployees.resendBtn}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEmployee(emp.id)}
+                            className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-100 transition"
+                            title={t.provisionEmployees.revokeAccessTitle}
+                          >
+                            <Trash2 size={13} />
+                            <span>Revoke</span>
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-400 font-semibold italic">{t.provisionEmployees.systemOwner}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         {/* 3. Department Management Card */}
-        <div className="rounded-[40px] bg-[var(--color-brand-light)] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-          <h3 className="text-xl font-bold text-[var(--cr-dark)] mb-1">{t.departments.cardTitle}</h3>
-          <p className="text-xs text-[var(--color-brand-secondary)] mb-5">{t.departments.subtitle}</p>
+        <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-[var(--color-brand-light)] p-4 sm:p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+          <h3 className="text-lg sm:text-xl font-bold text-[var(--cr-dark)] mb-1">{t.departments.cardTitle}</h3>
+          <p className="text-xs text-[var(--color-brand-secondary)] mb-4 sm:mb-5">{t.departments.subtitle}</p>
 
           <form
             onSubmit={(e) => {
@@ -832,26 +970,26 @@ export default function RoleManagementView({
               handleSaveDepartments([...departmentsList, val]);
               setNewDeptInput("");
             }}
-            className="flex flex-wrap gap-3 mb-6"
+            className="flex flex-col sm:flex-row gap-3 mb-5 sm:mb-6"
           >
             <input
               type="text"
               placeholder={t.departments.inputPlaceholder}
               value={newDeptInput}
               onChange={(e) => setNewDeptInput(e.target.value)}
-              className="w-full max-w-md rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
+              className="w-full sm:max-w-md rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
             />
             <button
               type="submit"
-              className="rounded-2xl bg-[var(--cr-primary)] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#2e3a26] transition flex items-center gap-1.5"
+              className="rounded-2xl bg-[var(--cr-primary)] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#2e3a26] transition flex items-center justify-center gap-1.5 shadow-sm shrink-0"
             >
               <Plus size={14} /> {t.departments.addBtn}
             </button>
           </form>
 
-          <div className="flex flex-wrap gap-2.5">
+          <div className="flex flex-wrap gap-2 sm:gap-2.5">
             {departmentsList.map((dept) => (
-              <div key={dept} className="flex items-center gap-2 rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2 text-xs font-bold text-[var(--cr-dark)] shadow-sm">
+              <div key={dept} className="flex items-center gap-2 rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-3.5 sm:px-4 py-2 text-xs font-bold text-[var(--cr-dark)] shadow-sm">
                 <span>{dept}</span>
                 {dept !== "Doctors" && dept !== "Receptionist" && (
                   <button

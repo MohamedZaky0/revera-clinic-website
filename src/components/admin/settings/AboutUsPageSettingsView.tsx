@@ -109,7 +109,7 @@ export default function AboutUsPageSettingsView({
 }: AboutUsPageSettingsViewProps) {
   return (
     <div className="space-y-8">
-      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+      <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
         <div>
           <h3 className="text-2xl font-bold text-[var(--cr-dark)]">About Section Photos</h3>
           <p className="text-sm text-[var(--color-brand-secondary)] mt-1">Upload or edit the three main images displayed in the homepage About section.</p>
@@ -299,7 +299,7 @@ export default function AboutUsPageSettingsView({
         </div>
       </div>
 
-      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+      <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
         <div>
           <h3 className="text-2xl font-bold text-[var(--cr-dark)]">What We Do</h3>
           <p className="text-sm text-[var(--color-brand-secondary)] mt-1">Upload or edit the photos and modify checklist items shown in the "What We Do" section on the About Us page.</p>
@@ -546,7 +546,7 @@ export default function AboutUsPageSettingsView({
         </div>
 
         {/* Frequently Asked Questions Section */}
-        <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+        <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
           <div>
             <h3 className="text-2xl font-bold text-[var(--cr-dark)]">Frequently Asked Questions</h3>
             <p className="text-sm text-[var(--color-brand-secondary)] mt-1">Configure the images, tag, heading, and list of questions & answers for the FAQ accordion on the About Us page.</p>

@@ -34,30 +34,30 @@ export default function InactivitySettingsView({
   t,
 }: InactivitySettingsViewProps) {
   return (
-    <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-6 sm:space-y-8" dir={lang === "ar" ? "rtl" : "ltr"}>
+      <div className="mb-4 sm:mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
-          <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
+          <h2 className="text-2xl sm:text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
+          <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
         </div>
         <button
           onClick={handleSaveInactivitySettings}
           disabled={savingInactivitySettings}
-          className="rounded-3xl bg-[var(--cr-primary)] px-6 py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+          className="rounded-3xl bg-[var(--cr-primary)] px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md w-full sm:w-auto"
         >
           {savingInactivitySettings ? t.savingBtn : t.saveBtn}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-start">
         {/* Inactivity Threshold */}
-        <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-          <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-            <div className="h-10 w-10 flex items-center justify-center rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+        <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-4 sm:space-y-6">
+          <div className="flex items-center gap-3 border-b border-gray-100 pb-3 sm:pb-4">
+            <div className="h-10 w-10 flex items-center justify-center rounded-full bg-amber-50 text-amber-600 border border-amber-100 shrink-0">
               <Hourglass size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-[var(--cr-dark)]">{t.inactivityDuration}</h3>
+              <h3 className="text-base sm:text-lg font-bold text-[var(--cr-dark)]">{t.inactivityDuration}</h3>
               <p className="text-xs text-[var(--color-brand-secondary)]">{t.inactivityDurationDesc}</p>
             </div>
           </div>
@@ -65,7 +65,7 @@ export default function InactivitySettingsView({
             <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)] mb-2">
               {t.alertThreshold}
             </label>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
               <input
                 type="range"
                 min={5}
@@ -75,14 +75,14 @@ export default function InactivitySettingsView({
                 onChange={(e) => setInactivityThreshold(Number(e.target.value))}
                 className="flex-1 accent-[var(--cr-primary)] h-2 rounded-full cursor-pointer"
               />
-              <div className="w-20 rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-center text-sm font-bold text-[var(--cr-dark)]">
+              <div className="w-20 rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-center text-sm font-bold text-[var(--cr-dark)] shrink-0">
                 {inactivityThreshold} {t.min}
               </div>
             </div>
             <p className="text-[11px] text-[#8A9A81] mt-2">
               {t.alertThresholdHint} <strong>{inactivityThreshold} {t.minutes}</strong>, {t.alertThresholdHint2}
             </p>
-            <div className="mt-4 grid grid-cols-4 gap-2">
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[10, 15, 30, 60].map(val => (
                 <button
                   key={val}
@@ -98,13 +98,13 @@ export default function InactivitySettingsView({
         </div>
 
         {/* Alert Countdown Duration */}
-        <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-          <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-            <div className="h-10 w-10 flex items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-100">
+        <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-4 sm:space-y-6">
+          <div className="flex items-center gap-3 border-b border-gray-100 pb-3 sm:pb-4">
+            <div className="h-10 w-10 flex items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-100 shrink-0">
               <Clock size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-[var(--cr-dark)]">{t.countdownDuration}</h3>
+              <h3 className="text-base sm:text-lg font-bold text-[var(--cr-dark)]">{t.countdownDuration}</h3>
               <p className="text-xs text-[var(--color-brand-secondary)]">{t.countdownDurationDesc}</p>
             </div>
           </div>
@@ -112,7 +112,7 @@ export default function InactivitySettingsView({
             <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-secondary)] mb-2">
               {t.countdownLabel}
             </label>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
               <input
                 type="range"
                 min={5}
@@ -122,14 +122,14 @@ export default function InactivitySettingsView({
                 onChange={(e) => setInactivityCountdown(Number(e.target.value))}
                 className="flex-1 accent-[var(--cr-primary)] h-2 rounded-full cursor-pointer"
               />
-              <div className="w-20 rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-center text-sm font-bold text-[var(--cr-dark)]">
+              <div className="w-20 rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-2 text-center text-sm font-bold text-[var(--cr-dark)] shrink-0">
                 {inactivityCountdown}s
               </div>
             </div>
             <p className="text-[11px] text-[#8A9A81] mt-2">
               {t.countdownHint} <strong>{inactivityCountdown} {t.seconds}</strong> {t.countdownHint2}
             </p>
-            <div className="mt-4 grid grid-cols-4 gap-2">
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[5, 10, 30, 60].map(val => (
                 <button
                   key={val}
@@ -146,15 +146,15 @@ export default function InactivitySettingsView({
       </div>
 
       {/* GPS Location Shift Verification Card */}
-      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4">
+      <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-4 sm:space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-3 sm:pb-4">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 flex items-center justify-center rounded-full bg-[#EBF0E6] text-[var(--cr-primary)] border border-[var(--cr-primary)]/10 shrink-0">
               <MapPin size={20} />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h3 className="text-lg font-bold text-[var(--cr-dark)]">{t.enableGpsShiftInfoTitle || t.enableGpsShift}</h3>
+                <h3 className="text-base sm:text-lg font-bold text-[var(--cr-dark)]">{t.enableGpsShiftInfoTitle || t.enableGpsShift}</h3>
                 {setActiveInfoFeature && (
                   <button
                     type="button"
@@ -216,38 +216,38 @@ export default function InactivitySettingsView({
       </div>
 
       {/* Preview Card */}
-      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-        <h3 className="text-lg font-bold text-[var(--cr-dark)] border-b border-gray-100 pb-4 mb-6">{t.alertPreview}</h3>
-        <div className="flex flex-col md:flex-row gap-8 items-start">
-          <div className="flex-1 bg-[var(--color-brand-light)] rounded-3xl p-6 border border-[var(--cr-primary)]/10">
+      <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+        <h3 className="text-base sm:text-lg font-bold text-[var(--cr-dark)] border-b border-gray-100 pb-3 sm:pb-4 mb-4 sm:mb-6">{t.alertPreview}</h3>
+        <div className="flex flex-col md:flex-row gap-6 sm:gap-8 items-start">
+          <div className="w-full md:flex-1 bg-[var(--color-brand-light)] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-[var(--cr-primary)]/10">
             <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)] mb-3">{t.alertPreviewDesc}</p>
-            <div className="rounded-[24px] bg-white border border-[var(--cr-primary)]/10 p-6 text-center space-y-4 shadow-md max-w-xs mx-auto">
+            <div className="rounded-[24px] bg-white border border-[var(--cr-primary)]/10 p-5 sm:p-6 text-center space-y-4 shadow-md max-w-xs mx-auto">
               <div className="h-12 w-12 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-600 border border-amber-100">
                 <Clock size={24} />
               </div>
-              <h4 className="text-lg font-bold text-[var(--cr-dark)]">{t.activityVerification}</h4>
+              <h4 className="text-base sm:text-lg font-bold text-[var(--cr-dark)]">{t.activityVerification}</h4>
               <p className="text-xs text-[var(--color-brand-secondary)]">{t.activityVerificationDesc}</p>
-              <div className="text-4xl font-bold text-[var(--cr-primary)]">{inactivityCountdown}s</div>
+              <div className="text-3xl sm:text-4xl font-bold text-[var(--cr-primary)]">{inactivityCountdown}s</div>
               <p className="text-[10px] text-[#8A9A81]">{t.alertSentToAdmin}</p>
               <div className="rounded-2xl bg-[var(--cr-primary)] py-2 px-4 text-xs font-bold text-white">{t.iAmPresent}</div>
             </div>
           </div>
-          <div className="flex-1 space-y-4">
-            <div className="flex items-start gap-3 rounded-2xl bg-amber-50 border border-amber-100 p-4">
+          <div className="w-full md:flex-1 space-y-3 sm:space-y-4">
+            <div className="flex items-start gap-3 rounded-2xl bg-amber-50 border border-amber-100 p-3.5 sm:p-4">
               <Hourglass size={16} className="mt-0.5 text-amber-600 flex-shrink-0" />
               <div>
                 <p className="text-sm font-semibold text-[var(--cr-dark)]">{t.alertTriggersAfter} {inactivityThreshold} {t.minutes}</p>
                 <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">{t.alertTriggersAfterHint}</p>
               </div>
             </div>
-            <div className="flex items-start gap-3 rounded-2xl bg-rose-50 border border-rose-100 p-4">
+            <div className="flex items-start gap-3 rounded-2xl bg-rose-50 border border-rose-100 p-3.5 sm:p-4">
               <Clock size={16} className="mt-0.5 text-rose-600 flex-shrink-0" />
               <div>
                 <p className="text-sm font-semibold text-[var(--cr-dark)]">{t.employeeHas} {inactivityCountdown} {t.seconds} {t.toRespond}</p>
                 <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">{t.employeeHasHint}</p>
               </div>
             </div>
-            <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+            <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 border border-emerald-100 p-3.5 sm:p-4">
               <Check size={16} className="mt-0.5 text-emerald-600 flex-shrink-0" />
               <div>
                 <p className="text-sm font-semibold text-[var(--cr-dark)]">{t.appliesToStandard}</p>

@@ -132,7 +132,7 @@ export default function HomePageSettingsView({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
         <div>
           <h3 className="text-2xl font-bold text-[var(--cr-dark)]">Hero Slider Editor</h3>
           <p className="text-sm text-[var(--color-brand-secondary)] mt-1">Manage slides, headings, descriptions, and background images.</p>
@@ -421,7 +421,7 @@ export default function HomePageSettingsView({
       )}
 
       {/* Before / After Results Editor */}
-      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+      <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[var(--color-brand-sand)]">
           <div>
             <h3 className="text-2xl font-bold text-[var(--cr-dark)]">Before / After Results</h3>
