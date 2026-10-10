@@ -243,7 +243,8 @@ export default function AdminDoctorsView({
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm scrollbar-none">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto rounded-2xl border border-[var(--cr-primary)]/10 bg-white shadow-sm [scrollbar-width:thin]">
             <table className="w-full min-w-[700px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--cr-primary)]/10 bg-[#F9F9F7]">
@@ -404,6 +405,119 @@ export default function AdminDoctorsView({
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Adaptive Cards View */}
+          <div className="block md:hidden space-y-3">
+            {filteredProviders.length === 0 ? (
+              <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-8 text-center text-sm text-[var(--color-brand-secondary)]">
+                {t.noProvidersFound}
+              </div>
+            ) : (
+              filteredProviders.map((provider) => {
+                const docKey = provider.id || provider.name;
+                const isExpanded = !!expandedDoctorServices[docKey];
+                const displayServices = isExpanded ? provider.services : (provider.services || []).slice(0, 2);
+                const hasMore = (provider.services || []).length > 2;
+
+                const canEdit = hasPermission("providers.action_edit");
+                const canChangeStatus = hasPermission("providers.action_change_status");
+                const canDelete = provider.id && hasPermission("providers.action_delete");
+
+                return (
+                  <div
+                    key={docKey}
+                    onClick={() => setViewingDoctorDetails(provider)}
+                    className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 shadow-xs space-y-3 cursor-pointer transition hover:border-[var(--cr-accent)]/50"
+                  >
+                    {/* Header: Avatar, Name, Rating, Bookings & Status Badge */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-full bg-[var(--color-brand-tint)] text-[var(--cr-primary)] border border-[var(--cr-primary)]/10 flex items-center justify-center text-sm font-bold shrink-0 overflow-hidden">
+                          {provider.avatar_url || provider.image ? (
+                            <img src={provider.avatar_url || provider.image} alt={provider.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <span>{(provider.name || "D").charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-bold text-[var(--cr-dark)] text-sm truncate">{provider.name}</div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="inline-flex items-center gap-1 text-[var(--cr-dark)] font-semibold text-xs">
+                              <Star size={12} className="text-[var(--cr-accent)] fill-[var(--cr-accent)]" />
+                              {provider.rating}
+                            </span>
+                            <span className="text-[11px] text-[var(--color-brand-secondary)]">
+                              • {provider.bookings} {t.colBookings}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <span className={`inline-block shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold border ${getDoctorStatusBadgeClass(provider.active !== false)}`}>
+                        {provider.active !== false ? (t.activeBadge || "Active") : (t.inactiveBadge || "Inactive")}
+                      </span>
+                    </div>
+
+                    {/* Services Tags */}
+                    {provider.services && provider.services.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[var(--cr-primary)]/5">
+                        {displayServices.map((service: string) => (
+                          <span key={service} className="inline-block rounded-full border border-[var(--cr-primary)]/15 bg-[var(--color-brand-tint)]/60 px-2.5 py-0.5 text-[11px] font-medium text-[var(--cr-primary)]">
+                            {service}
+                          </span>
+                        ))}
+                        {hasMore && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpandedDoctorServices(docKey);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-full bg-[var(--cr-accent)]/20 hover:bg-[var(--cr-accent)]/35 border border-[var(--cr-accent)]/40 px-2.5 py-0.5 text-[11px] font-bold text-[var(--cr-primary)] transition active:scale-95 cursor-pointer"
+                          >
+                            {isExpanded ? t.showLess : `${t.morePrefix}${provider.services.length - 2}${t.moreSuffix}`}
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    {(canEdit || canChangeStatus || canDelete) && (
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--cr-primary)]/5" onClick={(e) => e.stopPropagation()}>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => openEditProviderModal(provider)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-light)]"
+                          >
+                            <Pencil size={13} /> {t.editDoctorBtn}
+                          </button>
+                        )}
+                        {canChangeStatus && (
+                          <button
+                            type="button"
+                            onClick={() => setStatusModalDoctor(provider)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-secondary)] transition hover:bg-[var(--color-brand-light)]"
+                          >
+                            <Power size={13} /> {t.changeStatusBtn || "Change Status"}
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteProvider(provider.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
+                            title={t.deleteDoctorBtn}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}

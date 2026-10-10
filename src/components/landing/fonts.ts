@@ -11,7 +11,6 @@ export const cairo = Cairo({
 export const playfair = Playfair_Display({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
-  style: ["normal", "italic"],
   variable: "--font-lp-serif",
   display: "swap",
 });

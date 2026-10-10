@@ -128,7 +128,7 @@ export function PackageProfitabilityScreen({ accessToken }: PackageProfitability
               Sorted by margin. &quot;Cost to Deliver&quot; is the real materials/device cost of the sessions
               used this month, from the same costing used everywhere else in Finance.
             </p>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto [scrollbar-width:thin]">
               <table className="w-full min-w-[1100px] text-sm">
                 <thead>
                   <tr className="border-b border-[var(--cr-divider)] bg-[var(--cr-divider)] text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">

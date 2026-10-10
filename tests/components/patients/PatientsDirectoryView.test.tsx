@@ -79,12 +79,12 @@ describe('PatientsDirectoryView — Total Spend Column & Sorting Engine (TC-096)
     render(<PatientsDirectoryView {...defaultProps} />);
 
     // Header check
-    expect(screen.getByText('Total Spend')).toBeDefined();
+    expect(screen.getAllByText('Total Spend').length).toBeGreaterThanOrEqual(1);
 
     // Value checks
-    expect(screen.getByText('8,500 EGP')).toBeDefined();
-    expect(screen.getByText('1,200 EGP')).toBeDefined();
-    expect(screen.getByText('15,000 EGP')).toBeDefined();
+    expect(screen.getAllByText('8,500 EGP').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('1,200 EGP').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('15,000 EGP').length).toBeGreaterThanOrEqual(1);
   });
 
   it('sorts patients by Name (A to Z) when Name A-Z is selected', () => {
@@ -163,7 +163,7 @@ describe('PatientsDirectoryView — Total Spend Column & Sorting Engine (TC-096)
     );
 
     // Header check in Arabic
-    expect(screen.getByText(adminTranslations.ar.patients.patientsDirectoryView.colTotalSpend)).toBeDefined();
-    expect(screen.getByText('8,500 ج.م')).toBeDefined();
+    expect(screen.getAllByText(adminTranslations.ar.patients.patientsDirectoryView.colTotalSpend).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('8,500 ج.م').length).toBeGreaterThanOrEqual(1);
   });
 });

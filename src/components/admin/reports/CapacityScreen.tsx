@@ -217,7 +217,7 @@ export function CapacityScreen({ accessToken, branches = [] }: CapacityScreenPro
             <h3 className="mb-4 text-lg font-semibold" style={{ color: "var(--cr-dark)" }}>
               By branch
             </h3>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto [scrollbar-width:thin]">
               <table className="w-full min-w-[560px] text-sm">
                 <thead>
                   <tr className="border-b border-[var(--cr-divider)] text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">

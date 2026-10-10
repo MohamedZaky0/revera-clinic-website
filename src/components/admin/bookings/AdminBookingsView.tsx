@@ -1602,7 +1602,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
         </div>
         {/* Table Container */}
-        <div className="w-full overflow-x-auto">
+        <div className="w-full overflow-x-auto [scrollbar-width:thin]">
           <table className="w-full text-start text-xs border-collapse min-w-[750px]">
             <thead>
               <tr className="border-b border-gray-100 text-[11px] font-bold text-[#6B7280]">
@@ -1862,7 +1862,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           )}
 
           {/* Table Container */}
-          <div className="w-full overflow-x-auto rounded-2xl border border-gray-100">
+          <div className="w-full overflow-x-auto rounded-2xl border border-gray-100 [scrollbar-width:thin]">
             <table className="w-full text-start text-xs border-collapse min-w-[800px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-[#F9F9F7] text-[10px] uppercase font-bold tracking-tight text-[#9CA3AF]">
@@ -2273,7 +2273,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               )}
 
               {/* Table */}
-              <div className="w-full overflow-x-auto">
+              <div className="w-full overflow-x-auto [scrollbar-width:thin]">
                 <table className="w-full text-start border-collapse text-xs min-w-[700px]">
                   <thead>
                     <tr className="border-b border-gray-100 text-[10px] uppercase font-bold tracking-tight text-[#9CA3AF]">
