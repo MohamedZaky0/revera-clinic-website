@@ -36,13 +36,13 @@ export default function ServiceHoursView({
 }: ServiceHoursViewProps) {
   return (
     <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
+          <h2 className="text-2xl sm:text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
           <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
 
           {/* Branch selector select dropdown */}
-          <div className="mt-4 flex items-center gap-3">
+          <div className="mt-4 flex flex-wrap items-center gap-3">
             <label className="text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-secondary)]">{t.activeBranch}</label>
             <select
               value={selectedBranchForHoursId}
@@ -58,17 +58,17 @@ export default function ServiceHoursView({
         <button
           onClick={() => handleSaveBranchServiceHours()}
           disabled={savingBranchHours || !selectedBranchForHoursId}
-          className="inline-flex items-center gap-2 rounded-3xl bg-[var(--cr-primary)] px-5 py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50"
+          className="inline-flex w-full sm:w-auto justify-center items-center gap-2 rounded-3xl bg-[var(--cr-primary)] px-5 py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50"
         >
           {savingBranchHours ? t.savingBtn : t.saveBtn}
         </button>
       </div>
-      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-4">
+      <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-4">
         {serviceHours.map((sh, idx) => (
-          <div key={idx} className="flex items-center justify-between border-b border-[var(--color-brand-sand)] pb-3 last:border-b-0 last:pb-0">
-            <span className="font-semibold text-[var(--cr-dark)] w-28">{lang === "ar" ? sh.dayAr : sh.day}</span>
-            <div className="flex items-center gap-4 flex-1 justify-end">
-              <label className="flex items-center gap-2 cursor-pointer mr-2">
+          <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--color-brand-sand)] pb-3 last:border-b-0 last:pb-0">
+            <span className="font-semibold text-[var(--cr-dark)] sm:w-28">{lang === "ar" ? sh.dayAr : sh.day}</span>
+            <div className="flex flex-wrap items-center gap-4 flex-1 justify-between sm:justify-end">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={sh.isOpen}
@@ -91,7 +91,7 @@ export default function ServiceHoursView({
                       newHours[idx].openTime = e.target.value;
                       setServiceHours(newHours);
                     }}
-                    className="rounded-lg border border-[var(--cr-primary)]/15 px-2 py-1 text-sm outline-none w-28"
+                    className="rounded-lg border border-[var(--cr-primary)]/15 px-2 py-1 text-sm outline-none w-24 sm:w-28"
                   />
                   <span className="text-sm text-[var(--color-brand-secondary)]">{t.to}</span>
                   <input
@@ -102,7 +102,7 @@ export default function ServiceHoursView({
                       newHours[idx].closeTime = e.target.value;
                       setServiceHours(newHours);
                     }}
-                    className="rounded-lg border border-[var(--cr-primary)]/15 px-2 py-1 text-sm outline-none w-28"
+                    className="rounded-lg border border-[var(--cr-primary)]/15 px-2 py-1 text-sm outline-none w-24 sm:w-28"
                   />
                 </div>
               )}

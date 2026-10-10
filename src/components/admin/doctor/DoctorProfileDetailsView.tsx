@@ -579,8 +579,8 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
         </div>
 
         {/* Schedule Table */}
-        <div className="overflow-hidden rounded-2xl border border-gray-100">
-          <table className="w-full text-left text-xs border-collapse">
+        <div className="overflow-x-auto rounded-2xl border border-gray-100 [scrollbar-width:thin]">
+          <table className="w-full text-left text-xs border-collapse min-w-[500px]">
             <thead>
               <tr className="bg-[#F7F7F9] text-[11px] font-semibold text-[#9CA3AF] border-b border-gray-100">
                 <th className="py-2.5 px-4 font-semibold w-1/5">Day</th>
@@ -792,8 +792,8 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
         </div>
 
         {/* Table Container */}
-        <div className="overflow-x-auto scrollbar-none rounded-2xl border border-gray-100">
-          <table className="w-full border-collapse text-left text-xs">
+        <div className="overflow-x-auto [scrollbar-width:thin] rounded-2xl border border-gray-100">
+          <table className="w-full border-collapse text-left text-xs min-w-[700px]">
             <thead>
               <tr className="bg-[#F7F7F9] text-[11px] uppercase tracking-wider text-[#9CA3AF] border-b border-gray-100">
                 <th className="py-3 px-3 font-semibold">Date</th>

@@ -45,21 +45,21 @@ export default function QueueSettingsView({
 }: QueueSettingsViewProps) {
   return (
     <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-4 sm:mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
-          <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
+          <h2 className="text-2xl sm:text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
+          <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
         </div>
         <button
           onClick={handleSaveQueueSettings}
           disabled={savingQueueSettings}
-          className="rounded-3xl bg-[var(--cr-primary)] px-6 py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+          className="rounded-3xl bg-[var(--cr-primary)] px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md w-full sm:w-auto"
         >
           {savingQueueSettings ? t.savingBtn : t.saveBtn}
         </button>
       </div>
 
-      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-6">
+      <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-4 sm:space-y-6">
         <div className="space-y-4">
           <label className="flex items-center gap-3 cursor-pointer">
             <input

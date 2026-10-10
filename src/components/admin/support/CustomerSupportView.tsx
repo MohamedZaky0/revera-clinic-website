@@ -290,8 +290,8 @@ export default function CustomerSupportView({ lang = "en", hasPermission }: Prop
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Tickets Table */}
         <div className="lg:col-span-2 overflow-hidden rounded-3xl border border-[var(--cr-primary)]/10 bg-white shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-[var(--cr-dark)]" dir={isAr ? "rtl" : "ltr"}>
+          <div className="overflow-x-auto [scrollbar-width:thin]">
+            <table className="w-full text-left text-xs text-[var(--cr-dark)] min-w-[550px]" dir={isAr ? "rtl" : "ltr"}>
               <thead className="bg-[#F9F9F7] text-[11px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] border-b border-gray-100">
                 <tr>
                   <th className="px-5 py-4">{isAr ? "المريض والتذكرة" : "Patient & ID"}</th>

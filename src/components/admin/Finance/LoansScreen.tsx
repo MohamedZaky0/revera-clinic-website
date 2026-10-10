@@ -467,8 +467,8 @@ export function LoansScreen({ accessToken }: LoansScreenProps) {
                 <X size={18} />
               </button>
             </div>
-            <div className="overflow-x-auto rounded-xl border border-[var(--cr-divider)]">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto [scrollbar-width:thin] rounded-xl border border-[var(--cr-divider)]">
+              <table className="w-full text-sm min-w-[550px]">
                 <thead>
                   <tr className="border-b border-[var(--cr-divider)] bg-[var(--cr-divider)] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     <th className="px-4 py-3 text-left">Period</th>

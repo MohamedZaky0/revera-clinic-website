@@ -37,14 +37,14 @@ export default function BranchesView({
 }: BranchesViewProps) {
   return (
     <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-4 sm:mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
-          <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
+          <h2 className="text-2xl sm:text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
+          <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
         </div>
         <button
           onClick={() => setBranchModal({ open: true, mode: "add", branch: { status: "active", sort_order: branches.length } })}
-          className="inline-flex items-center gap-2 rounded-3xl bg-[var(--cr-primary)] px-5 py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26]"
+          className="inline-flex items-center justify-center gap-2 rounded-3xl bg-[var(--cr-primary)] px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] w-full sm:w-auto shadow-sm"
         >
           <Plus size={16} /> {t.addBranch}
         </button>
@@ -58,9 +58,9 @@ export default function BranchesView({
           <p className="text-sm">{t.noBranches}</p>
         </div>
       ) : (
-        <div className="rounded-[40px] bg-[var(--color-brand-light)] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] grid gap-6 md:grid-cols-2">
+        <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-[var(--color-brand-light)] p-4 sm:p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] grid gap-4 sm:gap-6 md:grid-cols-2">
           {branches.map((br) => (
-            <div key={br.id} className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm flex flex-col justify-between min-h-[180px]">
+            <div key={br.id} className="rounded-2xl sm:rounded-[32px] border border-[#E6E9EB] bg-white p-4 sm:p-6 shadow-sm flex flex-col justify-between min-h-[180px]">
               <div>
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-bold text-[var(--cr-dark)] text-base">{lang === "ar" ? br.name_ar : br.name_en}</h3>
@@ -98,10 +98,10 @@ export default function BranchesView({
 
       {/* Branch Add/Edit Modal */}
       {branchModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-semibold text-[var(--cr-dark)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-[32px] md:rounded-[40px] shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 md:p-8">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h3 className="text-xl sm:text-2xl font-semibold text-[var(--cr-dark)]">
                 {branchModal.mode === "add" ? t.addBranch : t.editBranch}
               </h3>
               <button onClick={() => setBranchModal({ open: false, mode: "add", branch: {} })} className="p-2 rounded-full hover:bg-[var(--color-brand-sand)]">

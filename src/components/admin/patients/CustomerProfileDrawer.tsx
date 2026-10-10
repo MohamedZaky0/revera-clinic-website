@@ -1542,8 +1542,8 @@ export default function CustomerProfileDrawer({
                     </button>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-start text-xs border-collapse">
+                  <div className="overflow-x-auto [scrollbar-width:thin]">
+                    <table className="w-full text-start text-xs border-collapse min-w-[600px]">
                       <thead>
                         <tr className="border-b border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] text-[var(--color-brand-secondary)] font-bold uppercase tracking-wider">
                           <th className="py-3 px-4">{t.colProductName}</th>
@@ -1955,8 +1955,8 @@ export default function CustomerProfileDrawer({
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-start text-xs border-collapse">
+                <div className="overflow-x-auto [scrollbar-width:thin]">
+                  <table className="w-full text-start text-xs border-collapse min-w-[700px]">
                     <thead>
                       <tr className="border-b border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] text-[var(--color-brand-secondary)] font-bold uppercase tracking-wider">
                         <th className="py-3 px-4">{t.colDate || "Date / Time"}</th>

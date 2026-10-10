@@ -91,31 +91,33 @@ export function DeferredPackagesCard({ accessToken }: { accessToken?: string }) 
           </div>
 
           {(data.pulses.pulsesRemaining > 0 || data.services.length > 0) && (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="pb-2 text-start font-semibold">Owed for</th>
-                  <th className="pb-2 text-end font-semibold">Remaining</th>
-                  <th className="pb-2 text-end font-semibold">Worth</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.pulses.pulsesRemaining > 0 && (
-                  <tr className="border-t" style={{ borderColor: "var(--cr-divider)" }}>
-                    <td className="py-2" style={{ color: "var(--cr-dark)" }}>Laser pulses <span className="text-xs text-muted-foreground">({data.pulses.packages} package{data.pulses.packages === 1 ? "" : "s"})</span></td>
-                    <td className="py-2 text-end tabular-nums">{data.pulses.pulsesRemaining.toLocaleString()} pulses</td>
-                    <td className="py-2 text-end tabular-nums">{egp(data.pulses.amount)}</td>
+            <div className="overflow-x-auto w-full [scrollbar-width:thin]">
+              <table className="w-full text-sm min-w-[320px]">
+                <thead>
+                  <tr className="text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="pb-2 text-start font-semibold">Owed for</th>
+                    <th className="pb-2 text-end font-semibold">Remaining</th>
+                    <th className="pb-2 text-end font-semibold">Worth</th>
                   </tr>
-                )}
-                {data.services.map((s) => (
-                  <tr key={`${s.serviceId ?? s.serviceName}`} className="border-t" style={{ borderColor: "var(--cr-divider)" }}>
-                    <td className="py-2" style={{ color: "var(--cr-dark)" }}>{s.serviceName}</td>
-                    <td className="py-2 text-end tabular-nums">{s.sessionsRemaining.toLocaleString()} session{s.sessionsRemaining === 1 ? "" : "s"}</td>
-                    <td className="py-2 text-end tabular-nums">{egp(s.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.pulses.pulsesRemaining > 0 && (
+                    <tr className="border-t" style={{ borderColor: "var(--cr-divider)" }}>
+                      <td className="py-2" style={{ color: "var(--cr-dark)" }}>Laser pulses <span className="text-xs text-muted-foreground">({data.pulses.packages} package{data.pulses.packages === 1 ? "" : "s"})</span></td>
+                      <td className="py-2 text-end tabular-nums">{data.pulses.pulsesRemaining.toLocaleString()} pulses</td>
+                      <td className="py-2 text-end tabular-nums">{egp(data.pulses.amount)}</td>
+                    </tr>
+                  )}
+                  {data.services.map((s) => (
+                    <tr key={`${s.serviceId ?? s.serviceName}`} className="border-t" style={{ borderColor: "var(--cr-divider)" }}>
+                      <td className="py-2" style={{ color: "var(--cr-dark)" }}>{s.serviceName}</td>
+                      <td className="py-2 text-end tabular-nums">{s.sessionsRemaining.toLocaleString()} session{s.sessionsRemaining === 1 ? "" : "s"}</td>
+                      <td className="py-2 text-end tabular-nums">{egp(s.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {data.expiredTotal > 0 && (

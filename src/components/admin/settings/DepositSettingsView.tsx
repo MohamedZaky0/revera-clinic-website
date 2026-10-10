@@ -50,25 +50,25 @@ export default function DepositSettingsView({
 }: DepositSettingsViewProps) {
   return (
     <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-4 sm:mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
-          <p className="mt-2 text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
+          <h2 className="text-2xl sm:text-4xl font-semibold text-[var(--cr-dark)]">{t.title}</h2>
+          <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-[var(--color-brand-secondary)]">{t.subtitle}</p>
         </div>
         <button
           onClick={handleSaveDepositSettings}
           disabled={savingDepositSettings}
-          className="rounded-3xl bg-[var(--cr-primary)] px-6 py-3 text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+          className="rounded-3xl bg-[var(--cr-primary)] px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[var(--color-brand-light)] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md w-full sm:w-auto"
         >
           {savingDepositSettings ? t.savingBtn : t.saveBtn}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
         {/* Left Column: Form Settings */}
-        <div className="lg:col-span-7 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+        <div className="lg:col-span-7 rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-4 sm:space-y-6">
           {/* InstaPay Details */}
-          <h3 className="text-xl font-bold text-[var(--cr-dark)] border-b border-gray-100 pb-3">{t.instapayDetails}</h3>
+          <h3 className="text-lg sm:text-xl font-bold text-[var(--cr-dark)] border-b border-gray-100 pb-3">{t.instapayDetails}</h3>
 
           <div className="space-y-4">
             <div>
@@ -178,15 +178,15 @@ export default function DepositSettingsView({
         </div>
 
         {/* Right Column: Live QR Preview */}
-        <div className="lg:col-span-5 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] text-center flex flex-col items-center">
-          <h3 className="text-xl font-bold text-[var(--cr-dark)] border-b border-gray-100 pb-3 w-full mb-6">{t.liveQrPreview}</h3>
+        <div className="lg:col-span-5 rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] text-center flex flex-col items-center">
+          <h3 className="text-lg sm:text-xl font-bold text-[var(--cr-dark)] border-b border-gray-100 pb-3 w-full mb-4 sm:mb-6">{t.liveQrPreview}</h3>
           <div className="bg-white p-4 rounded-3xl border border-[var(--cr-accent)]/20 shadow-md inline-block mb-4">
             <img
               src={instapayLink && instapayLink !== "https://www.instapay.eg"
                 ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(instapayLink)}`
                 : "/images/instapay_qr.png"}
               alt="InstaPay QR Preview"
-              className="w-48 h-48 object-contain"
+              className="w-40 h-40 sm:w-48 sm:h-48 object-contain"
             />
           </div>
           <p className="text-xs text-[var(--color-brand-secondary)] font-semibold uppercase tracking-wider mb-2">{t.generatedQr}</p>

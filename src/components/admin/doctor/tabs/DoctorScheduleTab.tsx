@@ -486,8 +486,8 @@ export default function DoctorScheduleTab({
           </div>
 
           <div className="overflow-hidden rounded-2xl sm:rounded-[32px] border border-[var(--cr-primary)]/10 bg-white shadow-[0_20px_50px_rgba(47,61,41,0.05)] w-full">
-            <div className="overflow-x-auto w-full">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto w-full [scrollbar-width:thin]">
+              <table className="w-full text-left text-xs min-w-[650px]">
                 <thead className="border-b border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] text-xs uppercase tracking-wider text-[var(--color-brand-secondary)]">
                   <tr>
                     <th className="px-4 sm:px-6 py-3.5 sm:py-4 font-bold">{t.timeSlotHeader}</th>

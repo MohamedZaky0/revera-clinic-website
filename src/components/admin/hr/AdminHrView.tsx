@@ -1583,8 +1583,8 @@ export default function AdminHrView({
               <h3 className="text-lg font-bold text-[var(--cr-dark)]">{t.attendance.inactivityAlerts}</h3>
               <p className="mt-1 text-xs text-[var(--color-brand-secondary)]">{t.attendance.inactivitySubtitle}</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-sm">
+            <div className="overflow-x-auto [scrollbar-width:thin]">
+              <table className="w-full border-collapse text-left text-sm min-w-[650px]">
                 <thead>
                   <tr className="bg-[var(--color-brand-tint)] text-[10px] font-bold uppercase tracking-widest text-[var(--cr-primary)] border-b border-[var(--cr-primary)]/10">
                     <th className="px-6 py-4">{t.attendance.employee}</th>

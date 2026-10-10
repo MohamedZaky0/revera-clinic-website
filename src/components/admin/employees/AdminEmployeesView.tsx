@@ -3112,8 +3112,8 @@ export default function AdminEmployeesView({
                         {t.profile.noAttendanceRecords(attendanceInsightMonth)}
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
+                      <div className="overflow-x-auto [scrollbar-width:thin]">
+                        <table className="w-full text-left text-xs min-w-[700px]">
                           <thead className="bg-[#F7F9F6]/60 text-[var(--color-brand-secondary)] border-b border-[var(--cr-primary)]/10 font-bold uppercase tracking-wider text-[10px]">
                             <tr>
                               <th className="py-2.5 px-3">{t.profile.dateHeader}</th>

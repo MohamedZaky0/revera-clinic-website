@@ -88,7 +88,7 @@ export default function ServicesPageSettingsView({
   return (
     <div className="space-y-8">
       {/* How It Works Section */}
-      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+      <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
         <div>
           <h3 className="text-2xl font-bold text-[var(--cr-dark)]">How It Works Section</h3>
           <p className="text-sm text-[var(--color-brand-secondary)] mt-1">Configure the main heading and description for the step-by-step process section.</p>
@@ -202,7 +202,7 @@ export default function ServicesPageSettingsView({
       </div>
 
       {/* Why Choose Us Section */}
-      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+      <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-white p-4 sm:p-6 md:p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
         <div>
           <h3 className="text-2xl font-bold text-[var(--cr-dark)]">Why Choose Us Section</h3>
           <p className="text-sm text-[var(--color-brand-secondary)] mt-1">Configure the images and content for the clinic differentiation section.</p>

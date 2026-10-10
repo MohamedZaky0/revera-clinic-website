@@ -1806,8 +1806,8 @@ export default function DoctorOngoingSessionTab({
               </div>
 
               <div className="overflow-hidden rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 bg-white shadow-sm">
-                <div className="overflow-x-auto w-full">
-                  <table className="w-full text-left text-xs">
+                <div className="overflow-x-auto w-full [scrollbar-width:thin]">
+                  <table className="w-full text-left text-xs min-w-[650px]">
                     <thead className="border-b border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] text-[11px] uppercase tracking-wider text-[var(--color-brand-secondary)]">
                       <tr>
                         <th className="px-4 py-3 font-bold">{t.timeSlotHeader || "Time"}</th>
