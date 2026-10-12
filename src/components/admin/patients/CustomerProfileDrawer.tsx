@@ -36,6 +36,7 @@ interface CustomerProfileDrawerProps {
   fetchCustomers?: () => void;
   onNavigateToNewTransaction?: (patientId: string, patientName: string) => void;
   onAddPreviousBooking?: (patient: Customer) => void;
+  onDeleteCustomer?: (patient: Customer) => void;
   // Hook state
   viewingCustomerProfile: Customer | null;
   setViewingCustomerProfile: (v: Customer | null) => void;
@@ -157,6 +158,7 @@ export default function CustomerProfileDrawer({
   fetchCustomers,
   onNavigateToNewTransaction,
   onAddPreviousBooking,
+  onDeleteCustomer,
   viewingCustomerProfile,
   setViewingCustomerProfile,
   setPrescriptionBookingContext,
@@ -506,6 +508,15 @@ export default function CustomerProfileDrawer({
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--cr-primary)]/15 bg-[var(--color-brand-tint)]/40 px-3 py-1.5 text-xs font-semibold text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-tint)]"
             >
               <Pencil size={12} /> {t.editProfileBtn}
+            </button>
+          )}
+          {adminRole === "superadmin" && onDeleteCustomer && (
+            <button
+              onClick={() => onDeleteCustomer(viewingCustomerProfile)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+              title={t.deletePatientBtn || "Delete Patient"}
+            >
+              <Trash2 size={12} /> {t.deletePatientBtn || "Delete Patient"}
             </button>
           )}
         </div>

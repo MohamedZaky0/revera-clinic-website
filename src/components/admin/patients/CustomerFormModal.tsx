@@ -137,6 +137,7 @@ export default function CustomerFormModal({
 }: CustomerFormModalProps) {
   const isSuperAdmin = adminRole === "superadmin";
   const isFinancialsEditable = !selectedCustomerForEdit || isSuperAdmin;
+  const isNameLocked = Boolean(selectedCustomerForEdit) && !isSuperAdmin;
 
   const c = selectedCustomerForEdit || {};
   const parsedInitMobile = parsePhoneWithCountry(c.mobile || c.phone || "");
@@ -358,17 +359,23 @@ export default function CustomerFormModal({
           </div>
 
           {/* Edit Mode Lock Banner */}
-          {selectedCustomerForEdit && (
+          {isNameLocked && (
             <div className="flex items-center gap-2.5 rounded-xl bg-[#F0F6EE] border border-[#D5E5D1] px-4 py-3 text-xs sm:text-sm font-medium text-[#2E5233]">
               <Lock size={15} className="shrink-0 text-[#2E5233]" />
               <span>{t.nameCannotBeEdited || "Customer name cannot be edited."}</span>
+            </div>
+          )}
+          {selectedCustomerForEdit && isSuperAdmin && (
+            <div className="flex items-center gap-2.5 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs sm:text-sm font-medium text-amber-800">
+              <ShieldCheck size={15} className="shrink-0 text-amber-700" />
+              <span>{t.superAdminNameEditable || "Superadmin override: you can edit this customer's name."}</span>
             </div>
           )}
 
           {/* Customer Name */}
           <div>
             <label className="block text-xs font-semibold text-[var(--color-brand-secondary)] mb-1.5">
-              {t.nameLabel} {!selectedCustomerForEdit && <span className="text-red-500">*</span>}
+              {t.nameLabel} {!isNameLocked && <span className="text-red-500">*</span>}
             </label>
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 rtl:left-auto rtl:right-0 rtl:pl-0 rtl:pr-3.5 text-gray-400">
@@ -378,15 +385,15 @@ export default function CustomerFormModal({
                 type="text"
                 value={custName}
                 onChange={(e) => setCustName(e.target.value)}
-                readOnly={Boolean(selectedCustomerForEdit)}
-                disabled={Boolean(selectedCustomerForEdit)}
+                readOnly={isNameLocked}
+                disabled={isNameLocked}
                 placeholder={t.namePlaceholder}
                 className={`w-full rounded-xl border px-3.5 py-2.5 pl-10 rtl:pl-3.5 rtl:pr-10 text-sm outline-none transition ${
-                  selectedCustomerForEdit
+                  isNameLocked
                     ? "bg-[#F7F7F6] text-gray-700 border-gray-200 cursor-not-allowed font-medium"
                     : "bg-white text-[var(--cr-dark)] border-[var(--cr-primary)]/15 focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)]"
                 }`}
-                required={!selectedCustomerForEdit}
+                required={!isNameLocked}
               />
             </div>
           </div>

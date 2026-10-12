@@ -5185,6 +5185,73 @@ configured (worth checking in the Supabase dashboard — Authentication → Sett
 has not had this confirmed either way).
 
 ---
+
+## RISK-115: Dev DB's `customers.auth_user_id` Column Was Recorded As Migrated But Did Not Physically Exist — Every Edit To An Existing Patient 500'd (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/SUPERADMIN_PATIENT_BOOKING_MANAGEMENT_MANUAL_TESTS.md`
+
+**Severity:** High on the affected environment (blocked a core staff workflow entirely) · **Scope:**
+`revera-dev-test` Supabase project only (ref `ikbmnkjikxduwsyjxsqn`) — confirmed the separate
+production project (`Revera-clinics`, ref `whmukkypceuizscpjcdo`) was never affected.
+**Found:** 2026-10-10, while verifying an unrelated feature (superadmin name-edit unlock, see
+DEC-103) — saving any edit to an existing patient failed with a 500 and an empty response body.
+
+**Root cause:** `POST /api/customers` (`src/app/api/customers/route.ts`) does
+`.select('id, auth_user_id, mobile, email')` on `customers` whenever an existing patient (`id`
+present) is being saved — this runs for every staff edit, not just superadmin ones. On the dev DB,
+that column did not exist, even though `supabase_migrations.schema_migrations` recorded
+`20260726000100_add_customer_auth_user_id.sql` as applied. The column must have been dropped
+out-of-band at some point (manual intervention, a restore from an earlier backup, or similar) without
+a corresponding migration — the migration history and the live schema had drifted apart silently.
+`ai_docs/DB_SCHEMA.md` (line ~158) already documented the column as present, so the live schema was
+wrong relative to both the recorded migration and the docs, not the other way round.
+
+**Fix:** re-ran the exact idempotent statements from the existing migration file directly against the
+dev project (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS auth_user_id uuid`, plus the unique and FK
+constraints, each guarded by an `IF NOT EXISTS` check against `pg_constraint`) via
+`npx supabase db query --project-ref ikbmnkjikxduwsyjxsqn --linked`. No new migration file was added
+since the already-committed `20260726000100_add_customer_auth_user_id.sql` already represents the
+correct, intended state — this was a drift fix, not a schema change. Verified afterward with a direct
+`information_schema.columns` / `pg_constraint` query: column and both constraints present.
+
+**Why this matters beyond the one bug:** migration history (`supabase_migrations.schema_migrations`)
+is not proof a column physically exists — it only proves a migration *ran* at some point. If a
+database is ever restored from a backup taken before a migration, or a column is manually dropped,
+the history can go stale while the live schema regresses. Worth periodically spot-checking critical
+columns against `DB_SCHEMA.md` rather than trusting `supabase migration list` alone, especially after
+any manual DB intervention.
+
+**Not done:** did not investigate *how* the column was actually dropped (no audit trail available for
+manual SQL run outside a migration) — only confirmed it was missing and restored it.
+
+---
+
+## RISK-116: `DELETE /api/reservations` Allowed Any Administrator To Hard-Delete Any Or *All* Bookings, With No UI Entry Point To Discover It (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/SUPERADMIN_PATIENT_BOOKING_MANAGEMENT_MANUAL_TESTS.md`
+
+**Severity:** Medium (destructive capability wider than the project's own convention, but unreachable
+from the UI until this change shipped it) · **Found:** 2026-10-10, while building the first UI control
+for this endpoint (the new "Delete Booking" button, see DEC-103).
+
+**What was found:** the route already existed, fully implemented, with `?mode=soft` /`?mode=hard` and
+a `?id=all` branch that deletes *every* reservation — but gated by `requireAdministratorAccess`
+(passes both `admin` and `superadmin` roles), and with zero UI calling it. The project's own
+established convention for destructive, hard-delete-capable endpoints is superadmin-only —
+`DELETE /api/customers` already follows it. This route was the odd one out, and because nothing in
+the UI ever called it, the gap had gone unnoticed.
+
+**Fix:** `src/app/api/reservations/route.ts` — changed the guard to `requireSuperadminAccess`,
+matching `DELETE /api/customers`'s boundary, before exposing it through the new UI button. Removed
+the now-unused `requireAdministratorAccess` import (confirmed zero remaining call sites).
+`tests/routes/auth-sweep.test.ts`'s route table still lists this route as guard level `'admin'` — left
+unchanged, since that test's own docstring states per-route admin-vs-superadmin granularity is out of
+scope for that sweep (it only asserts no-token→401 and patient-session→403, both still true).
+
+**Not done:** did not audit other existing-but-unreached routes for the same admin-vs-superadmin gap
+— this was found opportunistically while wiring one specific button, not from a systematic sweep.
+
+---
 ## PROPOSALS.md Reference
 
 
