@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isAuthRetryableFetchError } from '@supabase/supabase-js';
 import { supabaseServer } from '@/lib/supabaseServer';
 
 export async function GET(req: Request) {
@@ -12,6 +13,22 @@ export async function GET(req: Request) {
 
     // Verify token and fetch auth user
     const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
+
+    // RISK-113: a transient failure reaching Supabase's own auth server (network blip, brief
+    // outage) used to be treated identically to "this token is genuinely invalid" - both returned
+    // 401, and the client (admin/page.tsx, DEC-102) signs the staff member out and redirects to
+    // /login on any 401/403. This call runs again on every background token refresh (roughly
+    // hourly), not just at login, so a single bad moment on a flaky connection forced a real,
+    // working session to log out. Supabase's SDK already tells apart "couldn't verify right now"
+    // from "verified as invalid": isAuthRetryableFetchError() is true only for the former. Answer
+    // with 503, not 401 - the client's existing non-401/403 branch already preserves the session
+    // and the next scheduled refresh re-checks, exactly as it already does for a plain 500.
+    if (authError && isAuthRetryableFetchError(authError)) {
+      return NextResponse.json(
+        { error: 'Could not verify the session right now. Please try again.' },
+        { status: 503 }
+      );
+    }
 
     if (authError || !user) {
       return NextResponse.json({ error: authError?.message || 'Invalid or expired session' }, { status: 401 });

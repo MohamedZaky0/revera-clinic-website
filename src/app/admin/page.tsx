@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback, useRef, Fragment } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
+import { recoverFromInvoluntarySignOut } from "@/lib/authRecovery";
 import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, getDurationLabel, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
 import { 
   getServiceToggles, 
@@ -794,6 +795,17 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }
   const [authChecking, setAuthChecking] = useState(true);
   const lastActivityRef = useRef<number>(Date.now());
+  // RISK-114: tells apart "we chose to end this session" (logout button, idle timeout, a rejected
+  // /api/auth/me check) from Supabase's own client silently giving up on a background token
+  // refresh and firing SIGNED_OUT with no action from this page at all - e.g. a refresh-token
+  // rotation collision when the same login is open in more than one browser tab/window. Set to
+  // true immediately before every deliberate supabase.auth.signOut() call in this file; the
+  // onAuthStateChange listener below only treats SIGNED_OUT as final when this is true.
+  const explicitSignOutRef = useRef(false);
+  // The last session this page actually held, kept across an involuntary SIGNED_OUT so a recovery
+  // attempt can hand Supabase the real refresh_token - by the time SIGNED_OUT fires, the SDK has
+  // already cleared its own stored session, so there is nothing left to refresh from otherwise.
+  const lastKnownSessionRef = useRef<any>(null);
   const [adminRole, setAdminRole] = useState<string | null>(null);
   const [adminDepartment, setAdminDepartment] = useState<string>("");
   const [forceAdminView, setForceAdminView] = useState(false);
@@ -1679,6 +1691,28 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, newSession: any) => {
       if (event === "SIGNED_OUT") {
+        if (!explicitSignOutRef.current) {
+          // RISK-114: Supabase's own client ended the session with no deliberate signOut() call
+          // from this page - most likely a background refresh that failed (e.g. a refresh-token
+          // rotation collision across two open tabs of the same login). Try one silent recovery,
+          // handing it the real refresh_token from the last session this page actually held,
+          // rather than immediately dropping to the login screen mid-booking or mid-edit.
+          const lastRefreshToken = lastKnownSessionRef.current?.refresh_token;
+          if (lastRefreshToken) {
+            recoverFromInvoluntarySignOut(supabase, lastRefreshToken).then((result) => {
+              if (result.recovered) {
+                handleAuthSession(result.session);
+              } else {
+                if (typeof window !== "undefined") {
+                  sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
+                }
+                handleAuthSession(null);
+              }
+            });
+            return;
+          }
+        }
+        explicitSignOutRef.current = false;
         if (typeof window !== "undefined") {
           sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         }
@@ -1688,6 +1722,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
     async function handleAuthSession(currSession: any) {
       setSession(currSession);
+      if (currSession?.user) {
+        lastKnownSessionRef.current = currSession;
+      }
       if (!currSession?.user) {
         setAdminRole(null);
         setAdminPermissions([]);
@@ -1722,6 +1759,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const effectivePortal = portalRole || 'admin';
           if (!isPortalRoleMatch(authData.role, effectivePortal)) {
             console.warn(`Role mismatch: user is ${authData.role} but attempted to access ${effectivePortal} portal.`);
+            explicitSignOutRef.current = true;
             await supabase.auth.signOut();
             setAdminRole(null);
             setAdminDepartment("");
@@ -1758,6 +1796,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           await fetchRolesAndEmployees();
         } else if (res.status === 401 || res.status === 403) {
           console.warn("Unregistered or unauthorized employee session. Logging out.");
+          explicitSignOutRef.current = true;
           await supabase.auth.signOut();
           setAdminRole(null);
           setAdminDepartment("");
@@ -1811,6 +1850,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         }
         triggerCheckout().finally(() => {
+          explicitSignOutRef.current = true;
           supabase.auth.signOut().then(() => {
             if (typeof window !== "undefined") {
               window.location.href = "/login";
@@ -2183,6 +2223,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   async function handleLogout() {
     if (supabase) {
       await triggerCheckout();
+      explicitSignOutRef.current = true;
       await supabase.auth.signOut();
     }
     if (typeof window !== "undefined") {
@@ -5283,6 +5324,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         fetchCustomers();
         setDeleteCustomerTarget(null);
         setShowCustomerFormModal(false);
+        setViewingCustomerProfile(null);
       })
       .catch((err) => {
         console.error("handleDeleteCustomer error:", err);
@@ -6620,6 +6662,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     setPreviousBookingCustomer(patient);
                     setShowAddPreviousBooking(true);
                   }}
+                  onDeleteCustomer={(patient) => setDeleteCustomerTarget(patient)}
                   viewingCustomerProfile={viewingCustomerProfile}
                   setViewingCustomerProfile={setViewingCustomerProfile}
                   setPrescriptionBookingContext={setPrescriptionBookingContext}
