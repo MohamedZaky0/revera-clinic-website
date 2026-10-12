@@ -107,7 +107,20 @@ export function hasStaffPermission(access: StaffAccess, permission: string) {
 
 export function hasFinancePermission(access: StaffAccess, permission: string) {
   const normRole = (access.role || "").toLowerCase().trim().replace(/[\s_-]+/g, "");
-  return normRole === "superadmin" || access.permissions.includes(permission);
+  if (normRole === "superadmin" || normRole === "admin") return true;
+  const perms = access.permissions || [];
+  if (perms.includes("*") || perms.includes(permission)) return true;
+
+  // Category fallback for coarse permissions
+  const category = permission.split(".")[0];
+  const coarseMap: Record<string, string[]> = {
+    transactions: ["Transactions", "transactions", "Finance", "finance"],
+    finance: ["Finance", "finance"],
+  };
+  const coarseKeys = coarseMap[category];
+  if (coarseKeys && coarseKeys.some((k) => perms.includes(k))) return true;
+
+  return false;
 }
 
 /**

@@ -1,7 +1,9 @@
 import { supabaseServer } from '@/lib/supabaseServer';
+import { recordTransaction } from '@/lib/transactionLedger';
 
 /**
  * Write a wallet_txns ledger row and update customers.wallet_balance together.
+ * Also synchronizes with the customer-facing transactions ledger.
  *
  * Ordering: the ledger row is inserted first. If it fails the scalar is not
  * updated and the error surfaces. A ledger row with no scalar update is
@@ -57,6 +59,17 @@ export async function recordWalletMovement({
   if (updateError) {
     throw new Error(`Failed to update customer wallet_balance: ${updateError.message}`);
   }
+
+  // Also record in transactions ledger so it appears in the financial overview and transaction history
+  await recordTransaction({
+    type: direction === 'in' ? 'wallet_topup' : 'wallet_deduction',
+    amount: direction === 'in' ? amount : -amount,
+    description: reason || (direction === 'in' ? 'Wallet deposit' : 'Wallet payment deduction'),
+    customerId,
+    invoiceId: invoiceId ?? null,
+    paymentMethod: 'wallet',
+    source: 'automatic',
+  });
 }
 
 /**

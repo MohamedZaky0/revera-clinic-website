@@ -213,7 +213,8 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
         </div>
       )}
 
-      <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto [scrollbar-width:thin] rounded-[32px] border border-[#E6E9EB] bg-white">
         <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-secondary)]">
@@ -280,6 +281,78 @@ export default function PurchasesScreen({ authHeaders, canManage = true, lang, t
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Adaptive Cards View */}
+      <div className="block md:hidden space-y-3">
+        {loading ? (
+          <div className="rounded-2xl border border-[#E6E9EB] bg-white p-8 text-center text-sm text-[var(--color-brand-secondary)]">
+            {t.loading}
+          </div>
+        ) : filteredPurchases.length === 0 ? (
+          <div className="rounded-2xl border border-[#E6E9EB] bg-white p-8 text-center text-[var(--color-brand-secondary)]">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <PackageCheck size={32} className="text-[#A3B19B]" />
+              <p className="font-semibold text-[var(--cr-dark)]">{t.emptyTitle}</p>
+              <p className="text-xs text-[var(--color-brand-secondary)]">{t.emptyDesc}</p>
+            </div>
+          </div>
+        ) : (
+          filteredPurchases.map((p) => {
+            const isPaid = p.paid >= p.total;
+            const isPartial = p.paid > 0 && p.paid < p.total;
+            return (
+              <div
+                key={p.id}
+                className="rounded-2xl border border-[#E6E9EB] bg-white p-4 shadow-xs space-y-3"
+              >
+                <div className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2">
+                  <div>
+                    <span className="font-mono text-xs text-[var(--color-brand-secondary)] block">
+                      {new Date(p.purchased_at).toLocaleDateString("en-GB", { dateStyle: "medium" })}
+                    </span>
+                    <h4 className="font-bold text-sm text-[var(--cr-dark)] mt-0.5">{p.suppliers?.name || "—"}</h4>
+                  </div>
+                  <span
+                    className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                      isPaid
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : isPartial
+                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                        : "bg-gray-100 text-gray-600 border border-gray-200"
+                    }`}
+                  >
+                    {isPaid ? t.paid : isPartial ? t.partiallyPaid : t.unpaid}
+                  </span>
+                </div>
+
+                {/* Items */}
+                <div className="rounded-xl bg-[#FAFBF9] p-2.5 text-xs border border-[#E6E9EB]/60">
+                  <span className="text-[10px] uppercase font-semibold text-[var(--color-brand-secondary)] block mb-1">{t.thItems}</span>
+                  <div className="flex flex-wrap gap-1">
+                    {(p.purchase_lines || []).map((l, idx) => (
+                      <span key={idx} className="inline-flex items-center rounded-md bg-white px-2 py-0.5 text-[11px] font-medium text-[var(--cr-dark)] border border-[#E6E9EB]">
+                        {l.inventory_products?.name || t.unknownItem} <span className="font-mono ms-1 text-[var(--cr-primary)] font-bold">({l.qty})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Total & Paid */}
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <div>
+                    <span className="text-[10px] uppercase font-semibold text-[var(--color-brand-secondary)] block">{t.thPaid}</span>
+                    <span className="font-mono text-[var(--color-brand-secondary)]">EGP {Number(p.paid).toFixed(2)}</span>
+                  </div>
+                  <div className="text-end">
+                    <span className="text-[10px] uppercase font-semibold text-[var(--color-brand-secondary)] block">{t.thTotal}</span>
+                    <span className="font-mono font-bold text-sm text-[var(--cr-dark)]">EGP {Number(p.total).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {modalOpen && (

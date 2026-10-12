@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess } from '@/lib/access';
 import { appendPaymentToExistingInvoice } from '@/app/api/reservations/route';
+import { recordTransaction } from '@/lib/transactionLedger';
 
 export const dynamic = 'force-dynamic';
 
@@ -161,11 +162,12 @@ export async function POST(req: Request) {
       }
     }
 
-    const settled = parsedAmount - remaining;
+    let settled = parsedAmount - remaining;
     if (settled <= 0) {
-      return NextResponse.json({
-        error: 'No unpaid bookings were found to settle this payment against.',
-      }, { status: 400 });
+      // Fallback: If customer has outstanding balance but no pending bookings/invoices were found,
+      // allow settling the balance directly against their account.
+      settled = Math.min(parsedAmount, currentOutstanding);
+      remaining = parsedAmount - settled;
     }
 
     // Move the customer scalars by exactly what was actually applied.
@@ -182,6 +184,20 @@ export async function POST(req: Request) {
       console.error('settle-debt balance update error:', balErr.message);
       return NextResponse.json({ error: 'Payment was recorded but balances failed to update.' }, { status: 500 });
     }
+
+    // Record the financial transaction entry so it appears in the Transactions tab and till
+    const staffName = access.access.employee?.email?.split('@')[0] || 'Staff User';
+    await recordTransaction({
+      type: 'outstanding_payment',
+      amount: settled,
+      description: note ? `Debt settlement: ${note}` : `Outstanding balance settlement for ${customer.name || 'patient'}`,
+      customerId,
+      paymentMethod,
+      source: 'manual',
+      reason: note || 'Patient debt settlement',
+      createdByEmployeeId: access.access.employee?.id || null,
+      createdByName: staffName,
+    });
 
     return NextResponse.json({
       success: true,

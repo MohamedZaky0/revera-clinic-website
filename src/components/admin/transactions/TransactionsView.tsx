@@ -146,6 +146,13 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
     fetchTransactions();
   }, [filters]);
 
+  // Synchronize branch filter whenever currentBranchId prop updates
+  useEffect(() => {
+    if (currentBranchId) {
+      setFilters((prev) => ({ ...prev, branchId: currentBranchId, page: 1 }));
+    }
+  }, [currentBranchId]);
+
   const handleClearFilters = () => {
     setFilters({
       search: "",
@@ -572,9 +579,10 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         )}
       </div>
 
-      {/* ── Transactions Table ── */}
+      {/* ── Transactions Data Display (Desktop Table + Mobile Adaptive Cards) ── */}
       <div className="overflow-hidden rounded-3xl border border-[var(--cr-primary)]/10 bg-white shadow-sm">
-        <div className="overflow-x-auto [scrollbar-width:thin]">
+        {/* Desktop View: Table */}
+        <div className="hidden md:block overflow-x-auto [scrollbar-width:thin]">
           <table className="w-full text-start text-xs border-collapse min-w-[850px]">
             <thead>
               <tr className="border-b border-gray-100 bg-[#F9F9F7] text-[11px] font-bold uppercase tracking-wider text-gray-500">
@@ -788,6 +796,136 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View: Adaptive Transaction Cards */}
+        <div className="block md:hidden divide-y divide-gray-100">
+          {loading ? (
+            <div className="py-12 text-center text-gray-400">
+              <Loader2 className="animate-spin mx-auto mb-2" size={24} />
+              <span className="text-xs">{lang === "ar" ? "جاري تحميل المعاملات..." : "Loading transactions..."}</span>
+            </div>
+          ) : transactions.length === 0 ? (
+            <div className="py-12 text-center text-gray-400 p-4">
+              <AlertCircle className="mx-auto mb-2 text-gray-300" size={28} />
+              <p className="font-bold text-gray-600 text-xs">{lang === "ar" ? "لم يتم العثور على أي معاملات." : "No transactions found."}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{lang === "ar" ? "جرب تغيير الفلاتر أو تسجيل معاملة جديدة." : "Try clearing filters or recording a new transaction."}</p>
+            </div>
+          ) : (
+            transactions.map((tx) => {
+              const patientInitial = (tx.customer?.name || "P").charAt(0).toUpperCase();
+              const isNegative = Number(tx.amount) < 0;
+              const absAmt = Math.abs(Number(tx.amount || 0));
+              const isManual = tx.source === "manual";
+              const canView = !hasPermission || hasPermission("transactions.action_view_details");
+              const canPrint = !hasPermission || hasPermission("transactions.action_print_receipt");
+
+              return (
+                <div
+                  key={tx.id}
+                  onClick={() => setSelectedTxnForDetails(tx)}
+                  className="p-4 hover:bg-[#F9F9F7]/70 transition-colors active:bg-gray-100/60 cursor-pointer space-y-3"
+                >
+                  {/* Top Row: Date, ID, and Badges */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[11px] font-bold text-gray-800">
+                        {tx.transaction_id}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${getTypeBadge(tx.type)}`}>
+                        {tx.type.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${getStatusBadge(tx.status)}`}>
+                      {tx.status}
+                    </span>
+                  </div>
+
+                  {/* Middle Row: Patient & Amount */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="h-8 w-8 rounded-full bg-[#EAE8E3] text-[var(--cr-primary)] font-bold text-xs flex items-center justify-center shrink-0">
+                        {patientInitial}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-gray-900 text-xs truncate">
+                          {tx.customer?.name || (lang === "ar" ? "مريض عام" : "General Patient")}
+                        </div>
+                        <div className="text-[10px] text-gray-400 truncate">
+                          {tx.customer?.phone || "—"}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-end shrink-0">
+                      <div className={`font-black text-sm ${isNegative ? "text-rose-600" : "text-emerald-700"}`}>
+                        {isNegative ? `- EGP ${absAmt.toLocaleString()}` : Number(tx.amount) > 0 ? `+ EGP ${absAmt.toLocaleString()}` : `EGP ${absAmt.toLocaleString()}`}
+                      </div>
+                      <div className="text-[10px] text-gray-400 flex items-center justify-end gap-1">
+                        {formatPaymentMethod(tx.payment_method)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description & Reference if present */}
+                  {tx.description && (
+                    <p className="text-[11px] font-medium text-gray-600 line-clamp-2 bg-gray-50 p-2 rounded-xl">
+                      {tx.description}
+                    </p>
+                  )}
+
+                  {/* Footer Row: Timestamp, Source, and Quick Actions */}
+                  <div className="flex items-center justify-between pt-1 border-t border-gray-50 text-[10px] text-gray-400">
+                    <div className="flex items-center gap-1.5">
+                      <Clock size={11} className="text-gray-400" />
+                      <span>
+                        {new Date(tx.occurred_at).toLocaleDateString("en-GB", {
+                          day: "2-digit",
+                          month: "short",
+                        })}{" "}
+                        •{" "}
+                        {new Date(tx.occurred_at).toLocaleTimeString("en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      <span
+                        className={`ms-1.5 px-1.5 py-0.2 rounded-full font-bold ${
+                          isManual
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-sky-50 text-sky-700"
+                        }`}
+                      >
+                        {isManual ? (lang === "ar" ? "يدوي" : "Manual") : (lang === "ar" ? "آلي" : "Auto")}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      {canPrint && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTxnForDetails(tx)}
+                          className="p-1 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                          title={lang === "ar" ? "طباعة" : "Print"}
+                        >
+                          <Printer size={13} />
+                        </button>
+                      )}
+                      {canView && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTxnForDetails(tx)}
+                          className="p-1 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 font-bold flex items-center gap-1"
+                        >
+                          <Eye size={13} />
+                          <span>{lang === "ar" ? "عرض" : "View"}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* ── Table Footer & Pagination ── */}
