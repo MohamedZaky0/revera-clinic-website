@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { getServiceDurationMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from '@/lib/services';
 import { computeSettledBalances } from '@/lib/billing';
-import { requireAdministratorAccess, requireStaffAccess } from '@/lib/access';
+import { requireStaffAccess, requireSuperadminAccess } from '@/lib/access';
 import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/ledger';
 import { computeCommission, consumptionCost, costPerPulse } from '@/lib/costing';
 import { deductInventoryStock } from '@/app/api/inventory/products/route';
@@ -2158,9 +2158,11 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  // No patient-facing caller for this endpoint exists — it can hard-delete every
-  // reservation via ?id=all with no soft-delete and no confirmation beyond the admin UI.
-  const access = await requireAdministratorAccess(req);
+  // Superadmin-only: this can hard-delete a single reservation, or every reservation via
+  // ?id=all, with no confirmation beyond the admin UI. requireAdministratorAccess (which also
+  // passes a plain `admin` role) was too wide for something this destructive — matches the
+  // same superadmin-only boundary as DELETE /api/customers.
+  const access = await requireSuperadminAccess(req);
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }

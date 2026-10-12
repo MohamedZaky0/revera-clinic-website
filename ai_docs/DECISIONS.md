@@ -3447,3 +3447,52 @@ Users on specific devices (especially iOS Safari, Android Chrome, and low-memory
 
 ---
 
+## DEC-103: Superadmin Patient & Booking Management — Edit Any Field, Delete Patient, Delete Booking
+
+**Date:** 2026-10-10
+**Status:** Decided & implemented
+
+**Context:** Reported directly: the Name field on an existing patient's Edit Profile form was always
+locked (read-only), with no way for a superadmin to correct it, and there was no way to delete a
+patient or a booking anywhere in the UI — despite a fully-built delete-customer confirmation modal
+already existing in `src/app/admin/page.tsx` (`deleteCustomerTarget` state, soft/hard choice,
+superadmin-aware copy) with **no trigger wired to it anywhere in the codebase** — confirmed via
+`grep -rn "setDeleteCustomerTarget"` returning only the declaration and the clearing calls.
+
+**Decision — three changes, one request:**
+1. **Name unlock for superadmin** (`src/components/admin/patients/CustomerFormModal.tsx`): added
+   `isNameLocked = Boolean(selectedCustomerForEdit) && !isSuperAdmin`, replacing the old
+   unconditional `Boolean(selectedCustomerForEdit)` lock. Non-superadmin staff still see the field
+   locked exactly as before; superadmin sees it unlocked with an amber "Superadmin override" banner,
+   matching the existing visual pattern already used for the financials override. The save payload
+   already sent `name` unconditionally regardless of lock state, so no backend change was needed —
+   only the UI was ever actually restricting this.
+2. **Delete Patient wired, not rebuilt** (`src/components/admin/patients/CustomerProfileDrawer.tsx`,
+   `src/app/admin/page.tsx`): added a "Delete Patient" button, visible only to superadmin, on the
+   patient profile header. It calls the new `onDeleteCustomer` prop, which simply does
+   `setDeleteCustomerTarget(patient)` — reusing the pre-existing, previously-orphaned modal and its
+   `handleDeleteCustomer(id, mode)` handler rather than building a second one. (A duplicate handler
+   was written first and reverted after `tsc` caught `TS2393: Duplicate function implementation` —
+   the existing one just needed `setViewingCustomerProfile(null)` added to its success path so the
+   profile view closes after a delete triggered from inside it.)
+3. **Delete Booking, new capability** (`src/components/admin/bookings/BookingDetailsModal.tsx`,
+   `src/app/api/reservations/route.ts`): added a "Delete Booking" button, superadmin-only, always
+   visible regardless of whether the booking is historical (the ask was "any booking," not just past
+   ones). Calls the component's existing `useAlertConfirm()` hook (`showDeleteConfirm`) for the
+   soft/hard choice, then `DELETE /api/reservations?id=...&mode=...` — a route that already existed,
+   fully implemented, but had no UI entry point and was gated at `requireAdministratorAccess` rather
+   than the project's superadmin-only convention for destructive endpoints; tightened to
+   `requireSuperadminAccess` as part of exposing it — see RISK-116.
+
+**Incidental finding, same session:** verifying change #1 against a test patient surfaced RISK-115 —
+a dev-only DB drift (`customers.auth_user_id` recorded as migrated but physically missing) that broke
+every patient edit, not just superadmin ones. Fixed separately; see RISK-115.
+
+**Tests:** `tsc` clean, full suite 1304 passed / 4 expected-fail, `npm run build` clean. Manual
+checklist: `ai_docs/manual_tests/SUPERADMIN_PATIENT_BOOKING_MANAGEMENT_MANUAL_TESTS.md`. All three
+paths exercised live against the dev environment (`dev.reveraclinics.com`'s backing Supabase
+project): renamed and hard-deleted a disposable test patient, soft-deleted a zero-value test booking —
+confirmed at the database level after each action, not just via the UI's own success state.
+
+---
+

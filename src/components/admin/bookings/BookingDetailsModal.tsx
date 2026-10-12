@@ -218,7 +218,7 @@ export default function BookingDetailsModal({
   onEditPreviousBooking,
 }: BookingDetailsModalProps) {
   const { isRTL } = useLanguage();
-  const { showConfirm } = useAlertConfirm();
+  const { showConfirm, showDeleteConfirm } = useAlertConfirm();
   const tr = (adminTranslations[isRTL ? "ar" : "en"] || adminTranslations.en).bookingControl;
 
   // ── Receptionist Service Editing & Booking Control States ──
@@ -546,6 +546,35 @@ export default function BookingDetailsModal({
       setDrawerPrescriptions([]);
     }
   }, [booking?.id]);
+
+  async function handleDeleteBooking() {
+    const patientLabel = booking?.name || (booking as any)?.customer_name || booking?.phone || "this booking";
+    const deleteChoice = await showDeleteConfirm({
+      title: isRTL ? "حذف الحجز" : "Delete Booking",
+      itemName: patientLabel,
+      itemType: isRTL ? "حجز" : "booking",
+      isSuperAdmin: true,
+    });
+    if (!deleteChoice) return;
+
+    try {
+      const mode = deleteChoice === "soft" ? "soft" : "hard";
+      const res = await fetch(`/api/reservations?id=${encodeURIComponent(booking.id)}&mode=${mode}`, {
+        method: "DELETE",
+        headers: authenticatedJsonHeaders,
+      });
+      if (res.ok) {
+        onClose();
+        fetchRequests();
+        fetchAllReservations();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || (isRTL ? "فشل حذف الحجز." : "Failed to delete booking."));
+      }
+    } catch (err: any) {
+      alert((isRTL ? "خطأ أثناء حذف الحجز: " : "Error deleting booking: ") + err.message);
+    }
+  }
 
   function handleSendPrescriptionWhatsApp(rx: any, booking: any) {
     const rawPhone = String(booking?.phone || rx?.patient_phone || rx?.phone || '').trim();
@@ -3285,6 +3314,19 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           </button>
                         )}
                       </>
+                    )}
+
+                    {/* Superadmin Delete Action — any booking, not just historical */}
+                    {hasPermission("superadmin") && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteBooking}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-0.5 text-[11px] font-bold shadow-2xs transition cursor-pointer"
+                        title={isRTL ? "حذف الحجز" : "Delete Booking"}
+                      >
+                        <Trash2 size={11} />
+                        <span>{isRTL ? "حذف الحجز" : "Delete Booking"}</span>
+                      </button>
                     )}
                   </div>
                 </div>

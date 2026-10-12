@@ -5081,6 +5081,177 @@ browser) coverage instead. Verified manually: see
 
 ---
 
+## RISK-113: A Transient Failure Verifying The Login Token Was Treated As A Real Logout, Forcing Staff Off The System On A Flaky Connection (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_113_AUTH_ME_TRANSIENT_ERROR_MANUAL_TESTS.md`
+
+**Severity:** High (reported live, disrupting a working clinic) · **Type:** Session/auth reliability
+**Found:** 2026-10-10, investigating a live report: staff on one specific clinic laptop were being
+logged out automatically during active use.
+
+**Confirmed via production runtime logs/errors was attempted but blocked** (`get_runtime_errors` /
+`get_runtime_logs` returned 403 for this project through the connected Vercel MCP — likely a plan/
+scope limitation, not evidence either way; the diagnosis below is grounded in reading the code path
+directly, not in observed production log lines). Investigation instead confirmed the mechanism by
+reading `GET /api/auth/me` and the client's `handleAuthSession` in `src/app/admin/page.tsx` end to
+end, and by finding closely related prior art: **DEC-102** (2026-10-06, already on `main`) fixed a
+different cause of this exact symptom — a missing email fallback in the same route's employee lookup
+— but left one branch of the same function with the old, unsafe behaviour.
+
+**What was wrong:** `GET /api/auth/me` calls `supabaseServer.auth.getUser(token)` to verify the staff
+member's login with Supabase's own auth server. This call runs **every time the client checks who is
+logged in — not just at login, but again automatically on every background token refresh**, which
+Supabase's SDK does roughly once an hour while the person keeps working, completely invisibly to
+them. The route treated **any** failure of that call — `authError || !user` — identically: a flat
+401 "Invalid or expired session." The client (`admin/page.tsx`, per DEC-102's own rule) signs the
+user out and hard-redirects to `/login` on exactly a 401 or 403, and preserves the session for every
+other status. So a login that was never actually invalid — Supabase's auth server was simply
+unreachable for a moment (a brief network drop, a momentary Supabase hiccup, a security tool on that
+one machine interfering with the request) — produced the same forced logout as a genuinely expired
+session. Because the background check re-runs roughly hourly for the entire time someone is logged
+in, a connection that drops out even occasionally will eventually hit this window and bounce the
+person to the login screen mid-work, with no actual problem with their login.
+
+**Fix:** Supabase's SDK already distinguishes these two cases internally — `isAuthRetryableFetchError()`
+(exported from `@supabase/supabase-js`) is true only for a transient failure to reach the auth server,
+never for a confirmed-invalid token. `GET /api/auth/me` now checks this first and answers with `503`,
+not `401`, when it's true — the client's existing non-401/403 branch already preserves the session
+for exactly this case (the same branch DEC-102 added for a plain `500`), so no client change was
+needed. A genuinely invalid or expired token is completely unaffected and still returns 401 and still
+signs the person out, confirmed by a dedicated regression test.
+
+**Tests:** `tests/routes/auth-me-resilience.test.ts` (+2: the retryable-error case returns 503, and a
+plain non-retryable auth error still returns 401). Mutation-checked: disabling the new branch fails
+exactly the new 503 test, nothing else. Full suite: 1299 passed, 4 expected-fail, `tsc` and `eslint`
+clean (the file's one pre-existing `prefer-const` lint error, unrelated to this change, left as-is
+per convention).
+
+**Not done:** the Vercel runtime-log/error tools could not confirm this diagnosis directly against
+real production traffic (403, access/plan-gated) — the fix is correct on the merits of the code path
+regardless, but a direct log confirmation that this specific laptop's failures match this exact
+pattern is still open, tracked in the manual checklist's last item (ask the clinic to report back
+after it ships).
+
+---
+## RISK-114: Supabase's Own Client Could Sign A Working Staff Session Out On Its Own, With No Deliberate Logout From This App — Minutes Into Active Use, Mid-Booking Or Mid-Edit (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_114_MULTI_TAB_AUTH_RECOVERY_MANUAL_TESTS.md`
+
+**Severity:** High (reported live, disrupting a working clinic) · **Type:** Session/auth reliability
+**Found:** 2026-10-12, following up a live report (RISK-113, 2026-10-10) that turned out to have a
+**second, separate cause**: the clinic reported the forced logout happening again, within as little
+as 5 minutes, specifically while editing a patient file or creating a new booking.
+
+**Why RISK-113 alone didn't explain this:** RISK-113 fixed `GET /api/auth/me` treating a transient
+verification failure as a real logout. That route only runs on a background token refresh
+(~hourly) — it cannot explain a logout within 5 minutes, tied to a specific action. Investigating
+the 5-minute, action-tied pattern led to a different, unrelated mechanism in the same auth flow:
+Supabase's own browser client (not this app's code) can decide on its own that a session is dead and
+fire a `SIGNED_OUT` auth event with **no `supabase.auth.signOut()` call from this app at all**. The
+most common real-world trigger: the same staff login open in more than one browser tab/window — each
+tab holds its own copy of the refresh token and independently tries to refresh it in the background;
+Supabase's refresh tokens can only be *used* once (rotation), so whichever tab refreshes second gets
+rejected, and the SDK's default reaction to a rejected refresh is to tear the session down and emit
+`SIGNED_OUT`. A front-desk computer that keeps a patient-file tab and a bookings tab open side by
+side is exactly the shape of machine this hits. `src/app/admin/page.tsx`'s `onAuthStateChange`
+listener treated every `SIGNED_OUT` event identically to a user clicking "Logout" — there was no way
+to tell "this app ended the session on purpose" apart from "Supabase's client gave up by itself."
+
+**Fix:** `src/lib/authRecovery.ts` → `recoverFromInvoluntarySignOut()` — a pure, directly-tested
+function. `admin/page.tsx` now marks an `explicitSignOutRef` immediately before each of its own 4
+deliberate `supabase.auth.signOut()` calls (the logout button, the role-portal-mismatch guard, the
+`/api/auth/me` 401/403 rejection, the 1-hour idle timeout). A `SIGNED_OUT` event that arrives
+**without** that flag set is treated as involuntary: the page keeps a `lastKnownSessionRef` of the
+last real session it held (captured proactively — by the time `SIGNED_OUT` fires, Supabase's client
+has already cleared its own stored session, so there is nothing left to recover from otherwise) and
+hands that session's `refresh_token` straight to `supabase.auth.refreshSession({ refresh_token })` as
+one silent recovery attempt. If that succeeds, the session is restored with zero visible disruption —
+the user never sees a login screen. Only if the retry also fails does the page fall back to showing
+the login form, exactly as before.
+
+**Tests:** `tests/lib/authRecovery.test.ts` (5: recovers on a working token, gives up cleanly with no
+captured token / a rejected retry / a thrown network error / a no-error-no-session response).
+Mutation-checked: forcing the function to always report success fails 2 of the 5. Full suite: 1304
+passed, 4 expected-fail; `tsc` clean; `eslint` — 0 errors on `admin/page.tsx` both before and after
+this change (220 pre-existing warnings, unrelated, left as-is per convention).
+
+**Not done:** could not confirm the multi-tab-rotation mechanism directly against real Supabase auth
+logs for this clinic's account — the Supabase MCP connection available in this session is linked to
+an unrelated project (`elevate-os`), the same mismatch documented earlier in this project's history;
+re-linking it was out of scope for this fix. The diagnosis and fix are grounded in reading the
+Supabase JS SDK's own documented refresh/rotation behaviour, not in an observed log line. Also open:
+whether this specific clinic's Supabase project has a shorter-than-default JWT/session expiry
+configured (worth checking in the Supabase dashboard — Authentication → Settings — since the client
+has not had this confirmed either way).
+
+---
+
+## RISK-115: Dev DB's `customers.auth_user_id` Column Was Recorded As Migrated But Did Not Physically Exist — Every Edit To An Existing Patient 500'd (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/SUPERADMIN_PATIENT_BOOKING_MANAGEMENT_MANUAL_TESTS.md`
+
+**Severity:** High on the affected environment (blocked a core staff workflow entirely) · **Scope:**
+`revera-dev-test` Supabase project only (ref `ikbmnkjikxduwsyjxsqn`) — confirmed the separate
+production project (`Revera-clinics`, ref `whmukkypceuizscpjcdo`) was never affected.
+**Found:** 2026-10-10, while verifying an unrelated feature (superadmin name-edit unlock, see
+DEC-103) — saving any edit to an existing patient failed with a 500 and an empty response body.
+
+**Root cause:** `POST /api/customers` (`src/app/api/customers/route.ts`) does
+`.select('id, auth_user_id, mobile, email')` on `customers` whenever an existing patient (`id`
+present) is being saved — this runs for every staff edit, not just superadmin ones. On the dev DB,
+that column did not exist, even though `supabase_migrations.schema_migrations` recorded
+`20260726000100_add_customer_auth_user_id.sql` as applied. The column must have been dropped
+out-of-band at some point (manual intervention, a restore from an earlier backup, or similar) without
+a corresponding migration — the migration history and the live schema had drifted apart silently.
+`ai_docs/DB_SCHEMA.md` (line ~158) already documented the column as present, so the live schema was
+wrong relative to both the recorded migration and the docs, not the other way round.
+
+**Fix:** re-ran the exact idempotent statements from the existing migration file directly against the
+dev project (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS auth_user_id uuid`, plus the unique and FK
+constraints, each guarded by an `IF NOT EXISTS` check against `pg_constraint`) via
+`npx supabase db query --project-ref ikbmnkjikxduwsyjxsqn --linked`. No new migration file was added
+since the already-committed `20260726000100_add_customer_auth_user_id.sql` already represents the
+correct, intended state — this was a drift fix, not a schema change. Verified afterward with a direct
+`information_schema.columns` / `pg_constraint` query: column and both constraints present.
+
+**Why this matters beyond the one bug:** migration history (`supabase_migrations.schema_migrations`)
+is not proof a column physically exists — it only proves a migration *ran* at some point. If a
+database is ever restored from a backup taken before a migration, or a column is manually dropped,
+the history can go stale while the live schema regresses. Worth periodically spot-checking critical
+columns against `DB_SCHEMA.md` rather than trusting `supabase migration list` alone, especially after
+any manual DB intervention.
+
+**Not done:** did not investigate *how* the column was actually dropped (no audit trail available for
+manual SQL run outside a migration) — only confirmed it was missing and restored it.
+
+---
+
+## RISK-116: `DELETE /api/reservations` Allowed Any Administrator To Hard-Delete Any Or *All* Bookings, With No UI Entry Point To Discover It (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/SUPERADMIN_PATIENT_BOOKING_MANAGEMENT_MANUAL_TESTS.md`
+
+**Severity:** Medium (destructive capability wider than the project's own convention, but unreachable
+from the UI until this change shipped it) · **Found:** 2026-10-10, while building the first UI control
+for this endpoint (the new "Delete Booking" button, see DEC-103).
+
+**What was found:** the route already existed, fully implemented, with `?mode=soft` /`?mode=hard` and
+a `?id=all` branch that deletes *every* reservation — but gated by `requireAdministratorAccess`
+(passes both `admin` and `superadmin` roles), and with zero UI calling it. The project's own
+established convention for destructive, hard-delete-capable endpoints is superadmin-only —
+`DELETE /api/customers` already follows it. This route was the odd one out, and because nothing in
+the UI ever called it, the gap had gone unnoticed.
+
+**Fix:** `src/app/api/reservations/route.ts` — changed the guard to `requireSuperadminAccess`,
+matching `DELETE /api/customers`'s boundary, before exposing it through the new UI button. Removed
+the now-unused `requireAdministratorAccess` import (confirmed zero remaining call sites).
+`tests/routes/auth-sweep.test.ts`'s route table still lists this route as guard level `'admin'` — left
+unchanged, since that test's own docstring states per-route admin-vs-superadmin granularity is out of
+scope for that sweep (it only asserts no-token→401 and patient-session→403, both still true).
+
+**Not done:** did not audit other existing-but-unreached routes for the same admin-vs-superadmin gap
+— this was found opportunistically while wiring one specific button, not from a systematic sweep.
+
+---
 ## PROPOSALS.md Reference
 
 

@@ -5323,6 +5323,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         fetchCustomers();
         setDeleteCustomerTarget(null);
         setShowCustomerFormModal(false);
+        setViewingCustomerProfile(null);
       })
       .catch((err) => {
         console.error("handleDeleteCustomer error:", err);
@@ -6660,6 +6661,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     setPreviousBookingCustomer(patient);
                     setShowAddPreviousBooking(true);
                   }}
+                  onDeleteCustomer={(patient) => setDeleteCustomerTarget(patient)}
                   viewingCustomerProfile={viewingCustomerProfile}
                   setViewingCustomerProfile={setViewingCustomerProfile}
                   setPrescriptionBookingContext={setPrescriptionBookingContext}

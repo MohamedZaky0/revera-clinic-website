@@ -70,6 +70,7 @@ export const adminTranslations = {
         contactSectionTitle: "Contact Information",
         contactSectionSubtitle: "Manage the customer's contact details.",
         nameCannotBeEdited: "Customer name cannot be edited.",
+        superAdminNameEditable: "Superadmin override: you can edit this customer's name.",
         nameLabel: "Customer Name",
         namePlaceholder: "e.g. Mohamed Aly",
         mobileLabel: "Mobile Number",
@@ -196,6 +197,7 @@ export const adminTranslations = {
       customerProfileDrawer: {
         backBtn: "Back to Patients",
         editProfileBtn: "Edit Profile",
+        deletePatientBtn: "Delete Patient",
         addPreviousBookingBtn: "Add Previous Booking",
         uploadPhotoTitle: "Upload/Change Profile Picture",
         removePhotoTitle: "Remove Photo",
@@ -2908,6 +2910,7 @@ export const adminTranslations = {
         contactSectionTitle: "معلومات الاتصال",
         contactSectionSubtitle: "إدارة تفاصيل الاتصال الخاصة بالمريض.",
         nameCannotBeEdited: "لا يمكن تعديل اسم العميل.",
+        superAdminNameEditable: "صلاحية السوبر أدمن: يمكنك تعديل اسم هذا العميل.",
         nameLabel: "اسم المريض",
         namePlaceholder: "مثال: محمد علي",
         mobileLabel: "رقم الهاتف",
@@ -3034,6 +3037,7 @@ export const adminTranslations = {
       customerProfileDrawer: {
         backBtn: "العودة للمرضى",
         editProfileBtn: "تعديل الملف الشخصي",
+        deletePatientBtn: "حذف المريض",
         addPreviousBookingBtn: "إضافة حجز سابق",
         uploadPhotoTitle: "رفع/تغيير الصورة الشخصية",
         removePhotoTitle: "إزالة الصورة",
