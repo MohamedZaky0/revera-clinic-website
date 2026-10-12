@@ -5133,6 +5133,58 @@ pattern is still open, tracked in the manual checklist's last item (ask the clin
 after it ships).
 
 ---
+## RISK-114: Supabase's Own Client Could Sign A Working Staff Session Out On Its Own, With No Deliberate Logout From This App — Minutes Into Active Use, Mid-Booking Or Mid-Edit (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_114_MULTI_TAB_AUTH_RECOVERY_MANUAL_TESTS.md`
+
+**Severity:** High (reported live, disrupting a working clinic) · **Type:** Session/auth reliability
+**Found:** 2026-10-12, following up a live report (RISK-113, 2026-10-10) that turned out to have a
+**second, separate cause**: the clinic reported the forced logout happening again, within as little
+as 5 minutes, specifically while editing a patient file or creating a new booking.
+
+**Why RISK-113 alone didn't explain this:** RISK-113 fixed `GET /api/auth/me` treating a transient
+verification failure as a real logout. That route only runs on a background token refresh
+(~hourly) — it cannot explain a logout within 5 minutes, tied to a specific action. Investigating
+the 5-minute, action-tied pattern led to a different, unrelated mechanism in the same auth flow:
+Supabase's own browser client (not this app's code) can decide on its own that a session is dead and
+fire a `SIGNED_OUT` auth event with **no `supabase.auth.signOut()` call from this app at all**. The
+most common real-world trigger: the same staff login open in more than one browser tab/window — each
+tab holds its own copy of the refresh token and independently tries to refresh it in the background;
+Supabase's refresh tokens can only be *used* once (rotation), so whichever tab refreshes second gets
+rejected, and the SDK's default reaction to a rejected refresh is to tear the session down and emit
+`SIGNED_OUT`. A front-desk computer that keeps a patient-file tab and a bookings tab open side by
+side is exactly the shape of machine this hits. `src/app/admin/page.tsx`'s `onAuthStateChange`
+listener treated every `SIGNED_OUT` event identically to a user clicking "Logout" — there was no way
+to tell "this app ended the session on purpose" apart from "Supabase's client gave up by itself."
+
+**Fix:** `src/lib/authRecovery.ts` → `recoverFromInvoluntarySignOut()` — a pure, directly-tested
+function. `admin/page.tsx` now marks an `explicitSignOutRef` immediately before each of its own 4
+deliberate `supabase.auth.signOut()` calls (the logout button, the role-portal-mismatch guard, the
+`/api/auth/me` 401/403 rejection, the 1-hour idle timeout). A `SIGNED_OUT` event that arrives
+**without** that flag set is treated as involuntary: the page keeps a `lastKnownSessionRef` of the
+last real session it held (captured proactively — by the time `SIGNED_OUT` fires, Supabase's client
+has already cleared its own stored session, so there is nothing left to recover from otherwise) and
+hands that session's `refresh_token` straight to `supabase.auth.refreshSession({ refresh_token })` as
+one silent recovery attempt. If that succeeds, the session is restored with zero visible disruption —
+the user never sees a login screen. Only if the retry also fails does the page fall back to showing
+the login form, exactly as before.
+
+**Tests:** `tests/lib/authRecovery.test.ts` (5: recovers on a working token, gives up cleanly with no
+captured token / a rejected retry / a thrown network error / a no-error-no-session response).
+Mutation-checked: forcing the function to always report success fails 2 of the 5. Full suite: 1304
+passed, 4 expected-fail; `tsc` clean; `eslint` — 0 errors on `admin/page.tsx` both before and after
+this change (220 pre-existing warnings, unrelated, left as-is per convention).
+
+**Not done:** could not confirm the multi-tab-rotation mechanism directly against real Supabase auth
+logs for this clinic's account — the Supabase MCP connection available in this session is linked to
+an unrelated project (`elevate-os`), the same mismatch documented earlier in this project's history;
+re-linking it was out of scope for this fix. The diagnosis and fix are grounded in reading the
+Supabase JS SDK's own documented refresh/rotation behaviour, not in an observed log line. Also open:
+whether this specific clinic's Supabase project has a shorter-than-default JWT/session expiry
+configured (worth checking in the Supabase dashboard — Authentication → Settings — since the client
+has not had this confirmed either way).
+
+---
 ## PROPOSALS.md Reference
 
 
