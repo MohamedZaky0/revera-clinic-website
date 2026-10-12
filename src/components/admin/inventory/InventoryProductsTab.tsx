@@ -386,48 +386,48 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
     return (
       <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
         {/* Stats Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="rounded-[28px] bg-white p-5 border border-[#E6E9EB] shadow-sm flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EBF0E6] text-[var(--cr-primary)]">
-              <ShoppingBag size={22} />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="rounded-2xl sm:rounded-[28px] bg-white p-4 sm:p-5 border border-[#E6E9EB] shadow-sm flex items-center gap-3 sm:gap-4">
+            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-[#EBF0E6] text-[var(--cr-primary)] shrink-0">
+              <ShoppingBag size={20} />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider">{t.totalProducts}</p>
-              <p className="text-2xl font-bold text-[var(--cr-dark)]">{products.length}</p>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider truncate">{t.totalProducts}</p>
+              <p className="text-xl sm:text-2xl font-bold text-[var(--cr-dark)]">{products.length}</p>
             </div>
           </div>
 
-          <div className="rounded-[28px] bg-white p-5 border border-[#E6E9EB] shadow-sm flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-100">
-              <CheckCircle size={22} />
+          <div className="rounded-2xl sm:rounded-[28px] bg-white p-4 sm:p-5 border border-[#E6E9EB] shadow-sm flex items-center gap-3 sm:gap-4">
+            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0">
+              <CheckCircle size={20} />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider">{t.activeCatalog}</p>
-              <p className="text-2xl font-bold text-[var(--cr-dark)]">
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider truncate">{t.activeCatalog}</p>
+              <p className="text-xl sm:text-2xl font-bold text-[var(--cr-dark)]">
                 {products.filter((p) => p.status === "Active").length}
               </p>
             </div>
           </div>
 
-          <div className="rounded-[28px] bg-white p-5 border border-[#E6E9EB] shadow-sm flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 border border-amber-100">
-              <AlertTriangle size={22} />
+          <div className="rounded-2xl sm:rounded-[28px] bg-white p-4 sm:p-5 border border-[#E6E9EB] shadow-sm flex items-center gap-3 sm:gap-4">
+            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 border border-amber-100 shrink-0">
+              <AlertTriangle size={20} />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider">{t.lowStockAlerts}</p>
-              <p className="text-2xl font-bold text-amber-700">
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider truncate">{t.lowStockAlerts}</p>
+              <p className="text-xl sm:text-2xl font-bold text-amber-700">
                 {products.filter((p) => p.stock_quantity <= p.min_reorder_quantity).length}
               </p>
             </div>
           </div>
 
-          <div className="rounded-[28px] bg-white p-5 border border-[#E6E9EB] shadow-sm flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 border border-blue-100">
-              <Package size={22} />
+          <div className="rounded-2xl sm:rounded-[28px] bg-white p-4 sm:p-5 border border-[#E6E9EB] shadow-sm flex items-center gap-3 sm:gap-4">
+            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 border border-blue-100 shrink-0">
+              <Package size={20} />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider">{t.stockValuation}</p>
-              <p className="text-xl font-bold text-[var(--cr-dark)]">
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-semibold text-[var(--color-brand-secondary)] uppercase tracking-wider truncate">{t.stockValuation}</p>
+              <p className="text-base sm:text-xl font-bold text-[var(--cr-dark)] truncate">
                 EGP {products.reduce((sum, p) => sum + (p.stock_quantity * p.purchase_price), 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
@@ -435,7 +435,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
         </div>
 
         {/* Main Container */}
-        <div className="rounded-[40px] bg-[var(--color-brand-light)] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB] space-y-6">
+        <div className="rounded-2xl sm:rounded-[32px] md:rounded-[40px] bg-[var(--color-brand-light)] p-3.5 sm:p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB] space-y-6">
           {/* Sub-tabs for Catalog vs Sales History */}
           <div className="flex items-center gap-1.5 p-1 bg-[var(--color-brand-sand)] rounded-xl w-fit mb-6">
             <button
@@ -521,8 +521,8 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                 </div>
               </div>
 
-              {/* Table View */}
-              <div className="overflow-x-auto [scrollbar-width:thin] rounded-[32px] border border-[#E6E9EB] bg-white">
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto [scrollbar-width:thin] rounded-[32px] border border-[#E6E9EB] bg-white">
                 <table className="w-full min-w-[900px] text-sm">
                   <thead>
                     <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-secondary)]">
@@ -676,6 +676,149 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                   </tbody>
                 </table>
               </div>
+
+              {/* Mobile Adaptive Cards View - Catalog */}
+              <div className="block md:hidden space-y-3.5">
+                {filteredInventoryProducts.length === 0 ? (
+                  <div className="rounded-2xl border border-[#E6E9EB] bg-white p-8 text-center text-[var(--color-brand-secondary)]">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <ShoppingBag size={32} className="text-[#A3B19B]" />
+                      <p className="font-semibold text-[var(--cr-dark)]">{t.emptyTitle}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)]">{t.emptyDesc}</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resetProductForm();
+                          setShowAddProductModal(true);
+                        }}
+                        className={`mt-2 ${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[var(--cr-primary)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] cursor-pointer`}
+                      >
+                        <Plus size={14} /> {t.addItemBtn}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  filteredInventoryProducts.map((prod) => {
+                    const isLowStock = prod.stock_quantity <= prod.min_reorder_quantity;
+                    return (
+                      <div
+                        key={prod.id}
+                        className="rounded-2xl border border-[#E6E9EB] bg-white p-4 shadow-xs space-y-3"
+                      >
+                        {/* Header: Icon, Name, Category & Status */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EBF0E6] text-[var(--cr-primary)] font-bold">
+                              <ShoppingBag size={16} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-bold text-[var(--cr-dark)] text-sm truncate">{prod.name}</h4>
+                              {prod.name_ar && (
+                                <p className="text-xs text-[var(--color-brand-secondary)] dir-rtl font-sans truncate">{prod.name_ar}</p>
+                              )}
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                <span className="inline-flex items-center rounded-md bg-[#EBF0E6] px-2 py-0.5 text-[10px] font-semibold text-[var(--cr-primary)]">
+                                  {categoryLabel(prod.category)}
+                                </span>
+                                {prod.sku && (
+                                  <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono text-gray-600">
+                                    {prod.sku}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <span
+                            className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                              prod.status === "Active"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : prod.status === "Out of Stock"
+                                ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                : "bg-gray-100 text-gray-600 border border-gray-200"
+                            }`}
+                          >
+                            {prod.status === "Active" ? t.statusActive : prod.status === "Out of Stock" ? t.statusOutOfStock : prod.status === "Inactive" ? t.statusInactive : prod.status === "Discontinued" ? t.statusDiscontinued : prod.status}
+                          </span>
+                        </div>
+
+                        {/* Prices & Stock Grid */}
+                        <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#FAFBF9] p-2.5 border border-[#E6E9EB]/60 text-xs">
+                          <div>
+                            <span className="text-[10px] uppercase font-semibold text-[var(--color-brand-secondary)] block">{t.thSellingPrice}</span>
+                            <span className="font-mono font-bold text-sm text-[var(--cr-primary)]">EGP {prod.selling_price.toFixed(2)}</span>
+                            <span className="text-[10px] text-[var(--color-brand-secondary)] block font-mono">Cost: EGP {prod.purchase_price.toFixed(2)}</span>
+                          </div>
+                          <div className="text-end">
+                            <span className="text-[10px] uppercase font-semibold text-[var(--color-brand-secondary)] block">{t.thStockLevel}</span>
+                            <span className={`font-mono font-bold text-sm ${isLowStock ? "text-amber-700" : "text-[var(--cr-dark)]"}`}>
+                              {prod.stock_quantity} {prod.unit}s
+                            </span>
+                            {isLowStock && (
+                              <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 border border-amber-200">
+                                <AlertTriangle size={9} /> {t.reorderMin(prod.min_reorder_quantity)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions Row */}
+                        <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-gray-100">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSellProductModal(prod)}
+                            disabled={prod.stock_quantity <= 0 || prod.role === "consumable"}
+                            className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1 rounded-xl bg-[var(--cr-primary)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 disabled:cursor-not-allowed`}
+                            title={prod.role === "consumable" ? t.consumableTitle : prod.stock_quantity <= 0 ? t.outOfStockTitle : t.sellProductTitle}
+                          >
+                            <Tag size={12} />
+                            <span>{prod.role === "consumable" ? t.consumableOnly : t.sellProductTitle}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEditProductModal(prod)}
+                            className={`${canManage ? "inline-flex" : "hidden"} rounded-xl border border-[#E6E9EB] bg-white p-2 text-[var(--color-brand-secondary)] transition hover:bg-[#EBF0E6] hover:text-[var(--cr-primary)]`}
+                            title={t.editProductTitle}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          {canManage && isSuperadmin ? (
+                            <>
+                              <button
+                                type="button"
+                                data-testid={`soft-delete-product-${prod.id}`}
+                                onClick={() => requestDeleteProduct(prod.id, prod.name, "soft")}
+                                className="inline-flex rounded-xl border border-amber-200 bg-amber-50 p-2 text-amber-600 transition hover:bg-amber-100"
+                                title={t.softDeleteTitle}
+                              >
+                                <Archive size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                data-testid={`hard-delete-product-${prod.id}`}
+                                onClick={() => requestDeleteProduct(prod.id, prod.name, "hard")}
+                                className="inline-flex rounded-xl border border-rose-100 bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
+                                title={t.hardDeleteTitle}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          ) : canManage ? (
+                            <button
+                              type="button"
+                              data-testid={`soft-delete-product-${prod.id}`}
+                              onClick={() => requestDeleteProduct(prod.id, prod.name, "soft")}
+                              className="inline-flex rounded-xl border border-rose-100 bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
+                              title={t.deleteProductTitle}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </>
           ) : (
             /* PRODUCT SALES HISTORY TAB */
@@ -687,7 +830,8 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                 </div>
               </div>
 
-              <div className="overflow-x-auto [scrollbar-width:thin] rounded-[32px] border border-[#E6E9EB] bg-white">
+              {/* Desktop Table View - Sales History */}
+              <div className="hidden md:block overflow-x-auto [scrollbar-width:thin] rounded-[32px] border border-[#E6E9EB] bg-white">
                 <table className="w-full min-w-[800px] text-sm">
                   <thead>
                     <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-secondary)]">
@@ -745,6 +889,60 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Adaptive Cards View - Sales History */}
+              <div className="block md:hidden space-y-3">
+                {productSalesHistory.length === 0 ? (
+                  <div className="rounded-2xl border border-[#E6E9EB] bg-white p-8 text-center text-[var(--color-brand-secondary)]">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Receipt size={32} className="text-[#A3B19B]" />
+                      <p className="font-semibold text-[var(--cr-dark)]">{t.noSalesTitle}</p>
+                      <p className="text-xs text-[var(--color-brand-secondary)]">{t.noSalesDesc}</p>
+                    </div>
+                  </div>
+                ) : (
+                  productSalesHistory.map((sale) => (
+                    <div
+                      key={sale.id}
+                      className="rounded-2xl border border-[#E6E9EB] bg-white p-4 shadow-xs space-y-2.5"
+                    >
+                      {/* Top row: Date & Total Amount */}
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                        <span className="font-mono text-xs text-[var(--color-brand-secondary)]">
+                          {new Date(sale.created_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}
+                        </span>
+                        <span className="font-mono font-bold text-sm text-[var(--cr-primary)]">
+                          EGP {(sale.total_amount || 0).toFixed(2)}
+                        </span>
+                      </div>
+
+                      {/* Product Details */}
+                      <div>
+                        <h4 className="font-bold text-sm text-[var(--cr-dark)]">{sale.product_name}</h4>
+                        {sale.product_sku && (
+                          <span className="inline-block mt-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono text-gray-600">
+                            SKU: {sale.product_sku}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Patient & Quantity breakdown */}
+                      <div className="flex items-center justify-between text-xs pt-1">
+                        <div>
+                          <span className="text-[var(--cr-dark)] font-semibold">{sale.customer_name}</span>
+                          {sale.customer_mobile && (
+                            <span className="text-[var(--color-brand-secondary)] block text-[11px] font-mono">{sale.customer_mobile}</span>
+                          )}
+                        </div>
+                        <div className="text-end">
+                          <span className="font-mono font-bold text-[var(--cr-dark)]">{sale.quantity} pcs</span>
+                          <span className="text-[10px] text-[var(--color-brand-secondary)] block font-mono">@ EGP {(sale.unit_price || 0).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}

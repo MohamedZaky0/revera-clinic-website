@@ -214,7 +214,7 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
     return (
       <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
         {/* Stats Summary Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {/* Card 1: Total Devices */}
           <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
             <div className="flex items-center justify-between">
@@ -351,9 +351,10 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
           </div>
         )}
 
-        {/* Devices Table */}
-        <div className="rounded-[36px] bg-[var(--color-brand-light)] p-4 sm:p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB]">
-          <div className="overflow-x-auto [scrollbar-width:thin] rounded-[28px] border border-[#E6E9EB] bg-white">
+        {/* Devices Table & Mobile Cards */}
+        <div className="rounded-2xl sm:rounded-[32px] md:rounded-[36px] bg-[var(--color-brand-light)] p-3.5 sm:p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB]">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto [scrollbar-width:thin] rounded-[28px] border border-[#E6E9EB] bg-white">
             <table className="w-full text-sm min-w-[750px]">
               <thead>
                 <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--color-brand-secondary)]">
@@ -619,6 +620,213 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Adaptive Cards View */}
+          <div className="block md:hidden space-y-3.5">
+            {loading ? (
+              <div className="rounded-2xl border border-[#E6E9EB] bg-white p-8 text-center text-sm text-[var(--color-brand-secondary)]">
+                <Loader2 className="inline-block animate-spin me-2" size={18} /> {t.loading}
+              </div>
+            ) : filteredDevices.length === 0 ? (
+              <div className="rounded-2xl border border-[#E6E9EB] bg-white p-8 text-center text-sm text-[var(--color-brand-secondary)]">
+                <div className="flex flex-col items-center justify-center gap-3">
+                  <Gauge size={32} className="text-[#A3B19B]" />
+                  <p className="font-semibold text-[var(--cr-dark)]">{t.emptyTitle}</p>
+                  <p className="text-xs text-[var(--color-brand-secondary)]">{t.emptyDesc}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingDevice(null);
+                      setDeviceName("");
+                      setDeviceModel("");
+                      setDeviceSerial("");
+                      setDeviceCategory("Laser Hair Removal");
+                      setDeviceBranchId(branches.length > 0 ? branches[0].id : "");
+                      setDeviceInitialPulses("0");
+                      setDeviceWarningThreshold1("80000");
+                      setDeviceMaintenanceThreshold2("100000");
+                      setDeviceNotes("");
+                      setShowAddModal(true);
+                    }}
+                    className={`${canManage ? "inline-flex" : "hidden"} items-center gap-2 rounded-2xl bg-[var(--cr-primary)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] shadow-sm cursor-pointer`}
+                  >
+                    <Plus size={14} /> {t.addDeviceBtn}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              filteredDevices.map((dev) => {
+                const current = Number(dev.current_pulse_count) || 0;
+                const t1 = Number(dev.warning_threshold_1) || 80000;
+                const t2 = Number(dev.maintenance_threshold_2) || 100000;
+                const percent = Math.min(100, Math.round((current / t2) * 100));
+                const branchObj = branches.find((b) => b.id === dev.branch_id);
+
+                const canUpdatePulses = !hasPermission ? canManage : hasPermission("inventory.action_update_pulses");
+                const canReset = !hasPermission ? canManage : hasPermission("inventory.action_reset_counter");
+                const canViewHistory = !hasPermission ? true : hasPermission("inventory.action_view_device_history");
+                const canEditDevice = !hasPermission ? canManage : hasPermission("inventory.action_edit_device");
+
+                return (
+                  <div
+                    key={dev.id}
+                    className="rounded-2xl border border-[#E6E9EB] bg-white p-4 shadow-xs space-y-3"
+                  >
+                    {/* Header: Name, Status & Category */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-[var(--cr-dark)] text-base truncate">{dev.name}</h4>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          <span className="inline-flex items-center rounded-md bg-[var(--color-brand-tint)] px-2 py-0.5 text-[11px] font-semibold text-[var(--cr-primary)]">
+                            {categoryLabel(dev.category)}
+                          </span>
+                          <span className="text-[11px] text-[var(--color-brand-secondary)] font-medium">
+                            • {branchObj ? branchObj.name_en : t.allBranches}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        {dev.status === "Maintenance Due" && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-0.5 text-[10px] font-bold text-red-700 border border-red-200">
+                            <Wrench size={11} /> {t.badgeMaintenanceDue}
+                          </span>
+                        )}
+                        {dev.status === "Warning" && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">
+                            <AlertTriangle size={11} /> {t.badgeWarning}
+                          </span>
+                        )}
+                        {dev.status === "Optimal" && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                            <CheckCircle size={11} /> {t.badgeOptimal}
+                          </span>
+                        )}
+                        {dev.status === "Out of Service" && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-bold text-gray-600 border border-gray-200">
+                            {t.badgeOutOfService}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Model & Serial Numbers */}
+                    <div className="flex flex-wrap gap-2 text-xs font-mono">
+                      <span className="rounded-lg bg-[#F4F6F4] px-2 py-1 text-[var(--color-brand-secondary)] border border-[#E6E9EB]">
+                        {t.modelCellLabel} <span className="font-semibold text-[var(--cr-dark)]">{dev.model || t.na}</span>
+                      </span>
+                      <span className="rounded-lg bg-[#F4F6F4] px-2 py-1 text-[var(--color-brand-secondary)] border border-[#E6E9EB]">
+                        {t.snCellLabel} <span className="font-semibold text-[var(--cr-dark)]">{dev.serial_number || t.na}</span>
+                      </span>
+                    </div>
+
+                    {/* Pulse Progress */}
+                    <div className="rounded-xl bg-[#FAFBF9] p-3 border border-[#E6E9EB]/60">
+                      <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
+                        <span className="font-mono text-sm text-[var(--cr-dark)] font-bold">
+                          {current.toLocaleString("en-GB")} <span className="text-xs text-[var(--color-brand-secondary)] font-normal">{t.pulses}</span>
+                        </span>
+                        <span className="text-[11px] text-[var(--color-brand-secondary)] font-mono">
+                          {t.maxLabel} {t2.toLocaleString("en-GB")}
+                        </span>
+                      </div>
+                      <div className="w-full bg-[#EBF0E6] h-2.5 rounded-full overflow-hidden flex">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            dev.status === "Maintenance Due"
+                              ? "bg-red-500"
+                              : dev.status === "Warning"
+                              ? "bg-amber-500"
+                              : "bg-[var(--cr-primary)]"
+                          }`}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-[#8C9A84] mt-1 font-mono">
+                        <span>{t.firstWarnAt} {t1.toLocaleString("en-GB")}</span>
+                        <span>{t.limitAt} {t2.toLocaleString("en-GB")}</span>
+                      </div>
+                    </div>
+
+                    {/* Footer Actions */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-100">
+                      <div className="text-[11px] text-[var(--color-brand-secondary)]">
+                        {t.thLastService}: <span className="font-medium text-[var(--cr-dark)]">{dev.last_maintenance_date ? new Date(dev.last_maintenance_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : t.na}</span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {canUpdatePulses && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDeviceForPulses(dev);
+                              setNewPulseCountInput(String(dev.current_pulse_count || 0));
+                              setShowUpdatePulsesModal(true);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl bg-[var(--cr-primary)] px-2.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-[#2e3a26] transition cursor-pointer"
+                          >
+                            <Gauge size={12} />
+                            <span>{t.updatePulses}</span>
+                          </button>
+                        )}
+                        {canReset && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDeviceForReset(dev);
+                              setResetReason("Routine Maintenance");
+                              setResetPerformedBy("");
+                              setResetNotes("");
+                              setShowResetPulsesModal(true);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
+                            title={t.resetCounter}
+                          >
+                            <RotateCcw size={12} />
+                          </button>
+                        )}
+                        {canViewHistory && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDeviceForHistory(dev);
+                              setShowHistoryModal(true);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                            title={t.viewHistory}
+                          >
+                            <History size={12} />
+                          </button>
+                        )}
+                        {canEditDevice && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingDevice(dev);
+                              setDeviceName(dev.name || "");
+                              setDeviceModel(dev.model || "");
+                              setDeviceSerial(dev.serial_number || "");
+                              setDeviceCategory(dev.category || "Laser Hair Removal");
+                              setDeviceBranchId(dev.branch_id || "");
+                              setDeviceInitialPulses(String(dev.initial_pulse_count || 0));
+                              setDeviceWarningThreshold1(String(dev.warning_threshold_1 || 80000));
+                              setDeviceMaintenanceThreshold2(String(dev.maintenance_threshold_2 || 100000));
+                              setDeviceLampReplacementCost(String(dev.lamp_replacement_cost ?? 0));
+                              setDeviceNotes(dev.notes || "");
+                              setShowAddModal(true);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                            title={t.editDevice}
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 

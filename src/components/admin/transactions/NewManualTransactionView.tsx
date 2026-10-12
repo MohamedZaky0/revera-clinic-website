@@ -61,6 +61,9 @@ function buildOccurredAt(dateStr: string, timeStr: string): string {
  */
 const MANUAL_TRANSACTION_TYPES = [
   { id: "refund", labelEn: "Refund", labelAr: "استرداد" },
+  { id: "payment", labelEn: "Direct Payment", labelAr: "دفعة مباشرة" },
+  { id: "outstanding_payment", labelEn: "Outstanding Debt Settlement", labelAr: "سداد مديونية" },
+  { id: "wallet_topup", labelEn: "Wallet Top-up (Deposit)", labelAr: "إيداع محفظة" },
   { id: "service_charge", labelEn: "Service Charge", labelAr: "رسوم خدمة" },
   { id: "product_purchase", labelEn: "Product / Package Purchase", labelAr: "شراء منتج / باقة" },
 ] as const;
@@ -114,8 +117,10 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
 }) => {
   const isAr = lang === "ar";
 
-  // Form Type State (default to refund or service_charge)
-  const [transactionType, setTransactionType] = useState<"refund" | "service_charge" | "product_purchase">("refund");
+  // Form Type State
+  const [transactionType, setTransactionType] = useState<
+    "refund" | "payment" | "outstanding_payment" | "wallet_topup" | "service_charge" | "product_purchase"
+  >("refund");
   
   // Patient Selection State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(preSelectedCustomerId || "");

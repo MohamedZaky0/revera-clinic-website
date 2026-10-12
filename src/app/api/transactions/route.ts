@@ -74,25 +74,36 @@ export async function GET(req: Request) {
       query = query.eq('source', sourceFilter);
     }
 
-    // Date range filter
+    // Date range filter using Africa/Cairo local calendar dates
     const now = new Date();
+    const cairoDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+    const cairoMidnightUtc = new Date(`${cairoDateStr}T00:00:00+02:00`); // base Cairo time
+    // Helper to get ISO bounds for Cairo calendar day
+    const getCairoDayBounds = (daysOffset: number = 0) => {
+      const d = new Date(cairoDateStr);
+      d.setDate(d.getDate() + daysOffset);
+      const dayStr = d.toLocaleDateString('en-CA');
+      return {
+        start: new Date(`${dayStr}T00:00:00+02:00`).toISOString(),
+        end: new Date(`${dayStr}T23:59:59.999+02:00`).toISOString(),
+      };
+    };
+
     if (dateRange === 'today') {
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
-      query = query.gte('occurred_at', todayStart).lte('occurred_at', todayEnd);
+      const { start, end } = getCairoDayBounds(0);
+      query = query.gte('occurred_at', start).lte('occurred_at', end);
     } else if (dateRange === 'yesterday') {
-      const yestStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toISOString();
-      const yestEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999).toISOString();
-      query = query.gte('occurred_at', yestStart).lte('occurred_at', yestEnd);
+      const { start, end } = getCairoDayBounds(-1);
+      query = query.gte('occurred_at', start).lte('occurred_at', end);
     } else if (dateRange === 'week') {
       const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
       query = query.gte('occurred_at', weekStart);
     } else if (dateRange === 'month') {
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const monthStart = new Date(`${cairoDateStr.slice(0, 7)}-01T00:00:00+02:00`).toISOString();
       query = query.gte('occurred_at', monthStart);
     } else if (dateRange === 'custom' && startDateParam && endDateParam) {
-      query = query.gte('occurred_at', new Date(startDateParam).toISOString())
-                   .lte('occurred_at', new Date(endDateParam + 'T23:59:59.999Z').toISOString());
+      query = query.gte('occurred_at', new Date(`${startDateParam}T00:00:00+02:00`).toISOString())
+                   .lte('occurred_at', new Date(`${endDateParam}T23:59:59.999+02:00`).toISOString());
     }
 
     // Sorting
@@ -194,16 +205,15 @@ export async function GET(req: Request) {
       }
     });
 
-    // Compute Today's Net Payments = Completed Payments Today - Completed Refunds Today
-    const todayStartIso = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-    const todayEndIso = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
+    // Compute Today's Net Payments (الخزينة) = Cash In Today - Cash Refunds Today
+    const { start: todayStartIso, end: todayEndIso } = getCairoDayBounds(0);
 
     let todayTxnsQuery = supabaseServer
       .from('transactions')
       .select('type, amount, status')
       .gte('occurred_at', todayStartIso)
       .lte('occurred_at', todayEndIso)
-      .eq('status', 'completed');
+      .in('status', ['completed', 'refunded', 'paid']);
 
     if (branchId !== 'all' && branchId) {
       todayTxnsQuery = todayTxnsQuery.eq('branch_id', branchId);
@@ -219,10 +229,10 @@ export async function GET(req: Request) {
     (todayTxns || []).forEach((tx: any) => {
       const amt = Number(tx.amount || 0);
       if (CASH_IN_TYPES.has(tx.type)) {
-        todayNetPayments += amt;
+        todayNetPayments += Math.abs(amt);
         todayPaymentsCount += 1;
       } else if (tx.type === 'refund') {
-        todayNetPayments += amt;
+        todayNetPayments -= Math.abs(amt);
         todayPaymentsCount += 1;
       }
     });
@@ -230,7 +240,7 @@ export async function GET(req: Request) {
     let todayEstimatedTotal = 0;
     (todayTxns || []).forEach((tx: any) => {
       if (tx.type === 'service_charge' || tx.type === 'product_purchase') {
-        todayEstimatedTotal += Number(tx.amount || 0);
+        todayEstimatedTotal += Math.abs(Number(tx.amount || 0));
       }
     });
 
@@ -254,7 +264,7 @@ export async function GET(req: Request) {
     }
 
     const stats = {
-      todayNetPayments,
+      todayNetPayments: Math.max(0, todayNetPayments),
       todayPaymentsCount,
       todayEstimatedTotal,
       totalOutstanding,
@@ -314,36 +324,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Transaction Type is required.' }, { status: 400 });
     }
 
-    // Explicitly reject types that must only be created through system automation or specific sub-workflows
-    if (transaction_type === 'payment') {
-      return NextResponse.json({
-        error: 'Direct payments are recorded automatically when bookings are confirmed or settled.',
-      }, { status: 400 });
-    }
-
-    if (transaction_type === 'outstanding_payment') {
-      return NextResponse.json({
-        error: "Outstanding balances are settled from the patient's profile (Settle Balance), which applies the payment to their unpaid bookings.",
-      }, { status: 400 });
-    }
-
-    if (transaction_type === 'wallet_topup' || transaction_type === 'wallet_deduction') {
-      return NextResponse.json({
-        error: 'Wallet deposits and deductions are automated system operations handled through the patient wallet workflow.',
-      }, { status: 400 });
-    }
-
-    if (transaction_type === 'adjustment') {
-      return NextResponse.json({
-        error: 'Manual balance adjustments are not permitted directly through transactions. Use patient balance adjustments or wallet workflows.',
-      }, { status: 400 });
-    }
-
-    // Only manual types: refund, service_charge, product_purchase
-    const ALLOWED_MANUAL_TYPES = ['refund', 'service_charge', 'product_purchase'];
+    // Allowed manual transaction types
+    const ALLOWED_MANUAL_TYPES = [
+      'payment',
+      'outstanding_payment',
+      'wallet_topup',
+      'wallet_deduction',
+      'refund',
+      'service_charge',
+      'product_purchase',
+    ];
     if (!ALLOWED_MANUAL_TYPES.includes(transaction_type)) {
       return NextResponse.json({
-        error: `Manual transaction type "${transaction_type}" is not supported. Allowed types are: Refund, Service Charge, Product / Package Purchase.`,
+        error: `Manual transaction type "${transaction_type}" is not supported.`,
       }, { status: 400 });
     }
 
@@ -446,6 +439,27 @@ export async function POST(req: Request) {
       }
 
       finalDescription = finalDescription || `Refund: ${reason.trim()}`;
+    } else if (transaction_type === 'payment') {
+      finalAmount = parsedAmount;
+      finalStatus = 'completed';
+      finalDescription = finalDescription || `Payment received from ${customer.name || 'patient'}`;
+    } else if (transaction_type === 'outstanding_payment') {
+      finalAmount = parsedAmount;
+      finalStatus = 'completed';
+      finalDescription = finalDescription || `Debt settlement from ${customer.name || 'patient'}`;
+    } else if (transaction_type === 'wallet_topup') {
+      finalAmount = parsedAmount;
+      finalStatus = 'completed';
+      finalDescription = finalDescription || `Wallet top-up for ${customer.name || 'patient'}`;
+    } else if (transaction_type === 'wallet_deduction') {
+      if (parsedAmount > Number(customer.wallet_balance || 0)) {
+        return NextResponse.json({
+          error: `Deduction amount exceeds patient's wallet balance of EGP ${Number(customer.wallet_balance || 0).toLocaleString()}.`,
+        }, { status: 400 });
+      }
+      finalAmount = -parsedAmount;
+      finalStatus = 'completed';
+      finalDescription = finalDescription || `Wallet deduction for ${customer.name || 'patient'}`;
     } else if (transaction_type === 'service_charge') {
       if (!description?.trim()) {
         return NextResponse.json({ error: 'A description is required for service charges.' }, { status: 400 });
@@ -512,7 +526,7 @@ export async function POST(req: Request) {
 
     // Update Customer scalar balances
     let newWallet = Number(customer.wallet_balance || 0);
-    const newOutstanding = Number(customer.outstanding || 0);
+    let newOutstanding = Number(customer.outstanding || 0);
     let newSpent = Number(customer.spent_amount || 0);
 
     if (transaction_type === 'refund') {
@@ -527,6 +541,29 @@ export async function POST(req: Request) {
           invoice_id: invoice_id || null,
         });
       }
+    } else if (transaction_type === 'payment') {
+      newSpent += parsedAmount;
+    } else if (transaction_type === 'outstanding_payment') {
+      newOutstanding = Math.max(0, newOutstanding - parsedAmount);
+      newSpent += parsedAmount;
+    } else if (transaction_type === 'wallet_topup') {
+      newWallet += parsedAmount;
+      await supabaseServer.from('wallet_txns').insert({
+        customer_id,
+        direction: 'in',
+        amount: parsedAmount,
+        reason: finalDescription || 'Manual wallet top-up',
+        invoice_id: invoice_id || null,
+      });
+    } else if (transaction_type === 'wallet_deduction') {
+      newWallet = Math.max(0, newWallet - parsedAmount);
+      await supabaseServer.from('wallet_txns').insert({
+        customer_id,
+        direction: 'out',
+        amount: parsedAmount,
+        reason: finalDescription || 'Manual wallet deduction',
+        invoice_id: invoice_id || null,
+      });
     } else if (transaction_type === 'service_charge' || transaction_type === 'product_purchase') {
       newSpent += parsedAmount;
     }

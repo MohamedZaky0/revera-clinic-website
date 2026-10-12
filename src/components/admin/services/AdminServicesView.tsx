@@ -479,36 +479,36 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
               {/* Category header row */}
               <div
                 onClick={() => toggleCategoryExpand(cat.key)}
-                className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 transition hover:bg-[#F9F9F7]"
+                className="flex w-full cursor-pointer flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4 transition hover:bg-[#F9F9F7]"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
                   {/* Category Drag Handle */}
                   <div
                     onMouseEnter={() => setCatDraggable(prev => ({ ...prev, [cat.key]: true }))}
                     onMouseLeave={() => setCatDraggable(prev => ({ ...prev, [cat.key]: false }))}
                     onClick={(e) => e.stopPropagation()}
-                    className="cursor-grab active:cursor-grabbing inline-flex h-7 w-7 items-center justify-center rounded border border-[var(--cr-primary)]/10 bg-white text-[var(--color-brand-secondary)]/60 hover:bg-[var(--color-brand-sand)] hover:text-[var(--cr-primary)] transition"
+                    className="hidden sm:inline-flex cursor-grab active:cursor-grabbing h-7 w-7 shrink-0 items-center justify-center rounded border border-[var(--cr-primary)]/10 bg-white text-[var(--color-brand-secondary)]/60 hover:bg-[var(--color-brand-sand)] hover:text-[var(--cr-primary)] transition"
                     title={t.dragReorderCategory}
                   >
                     <GripVertical size={14} />
                   </div>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-brand-tint)]">
+                  <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-brand-tint)]">
                     <Layers size={16} className="text-[var(--cr-primary)]" />
                   </div>
-                  <div className="text-start">
-                    <p className="font-semibold text-[var(--cr-dark)]">{cat.en}</p>
+                  <div className="text-start min-w-0 flex-1">
+                    <p className="font-semibold text-sm sm:text-base text-[var(--cr-dark)] truncate">{cat.en}</p>
                   </div>
-                  <span className="ms-1 inline-flex items-center rounded-full bg-[var(--cr-primary)]/8 px-2.5 py-0.5 text-xs font-semibold text-[var(--cr-primary)]">
+                  <span className="ms-1 shrink-0 inline-flex items-center rounded-full bg-[var(--cr-primary)]/8 px-2 py-0.5 text-[11px] sm:text-xs font-semibold text-[var(--cr-primary)]">
                     {catServices.length} {catServices.length !== 1 ? t.serviceCountSuffixPlural : t.serviceCountSuffix}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-end gap-2 shrink-0">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setDeleteCategoryTarget(cat);
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                    className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 cursor-pointer"
                   >
                     {t.removeBtn}
                   </button>
@@ -543,17 +543,17 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       setEditingService(null);
                       setShowAddServiceModal(true);
                     }}
-                    className={`${hasPermission("services.create") ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-xl bg-[var(--cr-primary)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-brand-light)] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer`}
+                    className={`${hasPermission("services.create") ? "inline-flex" : "hidden"} items-center gap-1 rounded-xl bg-[var(--cr-primary)] px-3 py-1 sm:px-3.5 sm:py-1.5 text-xs font-semibold text-[var(--color-brand-light)] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer`}
                   >
                     <Plus size={12} /> {t.addServiceBtn}
                   </button>
-                  <span className="text-[var(--color-brand-secondary)] transition-transform duration-200" style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
-                    <ChevronDown size={18} />
+                  <span className="text-[var(--color-brand-secondary)] transition-transform duration-200 p-1" style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
+                    <ChevronDown size={16} />
                   </span>
                 </div>
               </div>
 
-              {/* Services sub-table */}
+              {/* Services sub-table & Mobile Cards */}
               {isExpanded && (
                 <div className="border-t border-[var(--cr-primary)]/8">
                   {catServices.length === 0 ? (
@@ -565,227 +565,347 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       <p className="text-xs text-[var(--color-brand-secondary)]">{t.noServicesHint}</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[860px] text-sm">
-                        <thead>
-                          <tr className="bg-[#F9F9F7]">
-                            <th className="w-10 px-3 py-2.5"></th>
-                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colId}</th>
-                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colName}</th>
-                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colCreatedAt}</th>
-                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colBranchPrice}</th>
-                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colBranches}</th>
-                            <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colSortOrder}</th>
-                            <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colStatus}</th>
-                            <th className="px-3 py-2.5"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--cr-primary)]/6">
-                          {catServices.map((svc) => {
-                            const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
-                            const isInactive = !toggles.active;
-                            const rowFaded = isInactive;
-                            return (
-                              <tr
-                                key={svc.id}
-                                draggable={!!rowDraggable[svc.id]}
-                                onDragStart={(e) => {
-                                  e.dataTransfer.setData("text/plain", svc.id.toString());
-                                  setDraggedServiceId(svc.id);
-                                }}
-                                onDragOver={(e) => {
-                                  e.preventDefault();
-                                  setDragOverServiceId(svc.id);
-                                }}
-                                onDragEnd={() => {
-                                  setDraggedServiceId(null);
-                                  setDragOverServiceId(null);
-                                }}
-                                onDrop={(e) => {
-                                  e.preventDefault();
-                                  if (draggedServiceId !== null && draggedServiceId !== svc.id) {
-                                    handleReorderServices(draggedServiceId, svc.id);
-                                  }
-                                  setDraggedServiceId(null);
-                                  setDragOverServiceId(null);
-                                }}
-                                className={`transition ${
-                                  draggedServiceId === svc.id ? "opacity-30 bg-[var(--color-brand-sand)]" : ""
-                                } ${
-                                  dragOverServiceId === svc.id ? "border-t-2 border-t-[var(--cr-accent)]" : ""
-                                } ${
-                                  rowFaded ? "opacity-50 bg-[#F9F9F7]" : "hover:bg-[#F9F9F7]"
-                                }`}
-                              >
-                                {/* Drag Handle */}
-                                <td className="px-3 py-3 text-center">
-                                  <div
-                                    onMouseEnter={() => setRowDraggable(prev => ({ ...prev, [svc.id]: true }))}
-                                    onMouseLeave={() => setRowDraggable(prev => ({ ...prev, [svc.id]: false }))}
-                                    className="cursor-grab active:cursor-grabbing inline-flex h-7 w-7 items-center justify-center rounded border border-[var(--cr-primary)]/10 bg-white text-[var(--color-brand-secondary)]/60 hover:bg-[var(--color-brand-sand)] hover:text-[var(--cr-primary)] transition"
-                                    title={t.dragReorder}
-                                  >
-                                    <GripVertical size={14} />
-                                  </div>
-                                </td>
-                                <td className="px-5 py-3 font-mono text-xs text-[var(--color-brand-secondary)]">{svc.id}</td>
-                                <td className="px-5 py-3">
-                                  <div className="flex items-center gap-2">
-                                    <p className={`font-semibold ${ rowFaded ? "line-through text-[var(--color-brand-secondary)]" : "text-[var(--cr-dark)]" }`}>{svc.en}</p>
+                    <>
+                      {/* Desktop Table */}
+                      <div className="hidden md:block overflow-x-auto [scrollbar-width:thin]">
+                        <table className="w-full min-w-[860px] text-sm">
+                          <thead>
+                            <tr className="bg-[#F9F9F7]">
+                              <th className="w-10 px-3 py-2.5"></th>
+                              <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colId}</th>
+                              <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colName}</th>
+                              <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colCreatedAt}</th>
+                              <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colBranchPrice}</th>
+                              <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colBranches}</th>
+                              <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colSortOrder}</th>
+                              <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brand-secondary)]">{t.colStatus}</th>
+                              <th className="px-3 py-2.5"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[var(--cr-primary)]/6">
+                            {catServices.map((svc) => {
+                              const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
+                              const isInactive = !toggles.active;
+                              const rowFaded = isInactive;
+                              return (
+                                <tr
+                                  key={svc.id}
+                                  draggable={!!rowDraggable[svc.id]}
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.setData("text/plain", svc.id.toString());
+                                    setDraggedServiceId(svc.id);
+                                  }}
+                                  onDragOver={(e) => {
+                                    e.preventDefault();
+                                    setDragOverServiceId(svc.id);
+                                  }}
+                                  onDragEnd={() => {
+                                    setDraggedServiceId(null);
+                                    setDragOverServiceId(null);
+                                  }}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    if (draggedServiceId !== null && draggedServiceId !== svc.id) {
+                                      handleReorderServices(draggedServiceId, svc.id);
+                                    }
+                                    setDraggedServiceId(null);
+                                    setDragOverServiceId(null);
+                                  }}
+                                  className={`transition ${
+                                    draggedServiceId === svc.id ? "opacity-30 bg-[var(--color-brand-sand)]" : ""
+                                  } ${
+                                    dragOverServiceId === svc.id ? "border-t-2 border-t-[var(--cr-accent)]" : ""
+                                  } ${
+                                    rowFaded ? "opacity-50 bg-[#F9F9F7]" : "hover:bg-[#F9F9F7]"
+                                  }`}
+                                >
+                                  {/* Drag Handle */}
+                                  <td className="px-3 py-3 text-center">
+                                    <div
+                                      onMouseEnter={() => setRowDraggable(prev => ({ ...prev, [svc.id]: true }))}
+                                      onMouseLeave={() => setRowDraggable(prev => ({ ...prev, [svc.id]: false }))}
+                                      className="cursor-grab active:cursor-grabbing inline-flex h-7 w-7 items-center justify-center rounded border border-[var(--cr-primary)]/10 bg-white text-[var(--color-brand-secondary)]/60 hover:bg-[var(--color-brand-sand)] hover:text-[var(--cr-primary)] transition"
+                                      title={t.dragReorder}
+                                    >
+                                      <GripVertical size={14} />
+                                    </div>
+                                  </td>
+                                  <td className="px-5 py-3 font-mono text-xs text-[var(--color-brand-secondary)]">{svc.id}</td>
+                                  <td className="px-5 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <p className={`font-semibold ${ rowFaded ? "line-through text-[var(--color-brand-secondary)]" : "text-[var(--cr-dark)]" }`}>{svc.en}</p>
+                                      {(svc.islaser || svc.is_laser || checkIsLaserService(svc)) && (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
+                                          <Sparkles size={11} className="text-emerald-600" />
+                                          <span>Laser</span>
+                                        </span>
+                                      )}
+                                      {isInactive && (
+                                        <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-500">{t.statusInactive}</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-5 py-3 text-[var(--color-brand-secondary)]">
+                                    {svc.createdAt ? (
+                                      <>
+                                        <span className="block text-sm font-medium text-[var(--cr-dark)]">
+                                          {svc.createdAt.split(" ").slice(0, 2).join(" ")}
+                                        </span>
+                                        <span className="text-xs">
+                                          {svc.createdAt.split(" ").slice(2).join(" ")}
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="block text-sm font-medium text-[var(--cr-dark)]">30 Apr</span>
+                                        <span className="text-xs">2:01 pm</span>
+                                      </>
+                                    )}
+                                  </td>
+                                  <td className="px-5 py-3">
+                                    <span className="font-medium text-[var(--cr-accent)]">EGP {svc.price ?? 0}</span>
+                                  </td>
+                                  <td className="px-5 py-3 text-xs text-[var(--color-brand-secondary)] max-w-[200px] truncate">
+                                    {(() => {
+                                      const activeBp = getActiveBranchPricing(svc);
+                                      if (activeBp.length > 0) {
+                                        return activeBp.map((bp) => (
+                                          <div key={bp.name} className="flex items-center gap-1.5 mb-0.5 text-[11px]">
+                                            <span className="font-medium text-[var(--cr-dark)]">{bp.name}:</span>
+                                            <span className="text-[var(--cr-accent)]">EGP {bp.price}</span>
+                                            {bp.isDefault && <span className="text-[8px] bg-[var(--cr-primary)]/10 text-[var(--cr-primary)] px-1 rounded font-bold">Def</span>}
+                                          </div>
+                                        ));
+                                      }
+                                      const activeBranches = branches.filter((b) => b.status === "active");
+                                      const fallbackBranchName = activeBranches.length === 1 ? (activeBranches[0].name_en || activeBranches[0].name_ar) : null;
+                                      return (
+                                        <div className="flex items-center gap-1.5 text-[11px]">
+                                          {fallbackBranchName && <span className="font-medium text-[var(--cr-dark)]">{fallbackBranchName}:</span>}
+                                          <span className="text-[var(--cr-accent)]">EGP {svc.price ?? 0}</span>
+                                        </div>
+                                      );
+                                    })()}
+                                  </td>
+                                  <td className="px-5 py-3 text-center">
+                                    <span className="font-medium text-[var(--cr-dark)]">{svc.sortOrder ?? 0}</span>
+                                  </td>
+                                  {/* Status Badge */}
+                                  <td className="px-5 py-3 text-center">
+                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                                      toggles.active
+                                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                                        : "bg-gray-100 text-gray-500 border border-gray-200"
+                                    }`}>
+                                      {toggles.active ? t.statusActive : t.statusInactive}
+                                    </span>
+                                  </td>
+                                  {/* 3 Dots Actions Menu */}
+                                  <td className="px-3 py-3 text-center">
+                                    {(() => {
+                                      const canEdit = hasPermission("services.action_edit");
+                                      const canToggle = hasPermission("services.action_toggle_status");
+                                      const canDelete = hasPermission("services.action_delete");
+                                      if (!canEdit && !canToggle && !canDelete) return null;
+
+                                      return (
+                                        <div className="relative inline-block text-start">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveServiceRowMenuId(prev => prev === svc.id ? null : svc.id);
+                                            }}
+                                            className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
+                                              activeServiceRowMenuId === svc.id
+                                                ? "border-[var(--cr-primary)] bg-[var(--cr-primary)] text-white"
+                                                : "border-[var(--cr-primary)]/15 bg-white text-[var(--color-brand-secondary)] hover:border-[var(--cr-accent)] hover:text-[var(--cr-primary)]"
+                                            }`}
+                                            title={t.actionsTitle}
+                                          >
+                                            <MoreVertical size={13} />
+                                          </button>
+
+                                          {activeServiceRowMenuId === svc.id && (
+                                            <div className="absolute end-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[var(--cr-primary)]/15 text-xs text-start dropdown-action-menu">
+                                              {canEdit && (
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setActiveServiceRowMenuId(null);
+                                                    handleEditService(svc);
+                                                  }}
+                                                  className="w-full text-start px-3 py-2 rounded-lg hover:bg-[var(--color-brand-light)] font-semibold text-[var(--cr-dark)] flex items-center gap-2 transition cursor-pointer"
+                                                >
+                                                  <Pencil size={13} className="text-[var(--color-brand-secondary)]" />
+                                                  <span>{t.editService}</span>
+                                                </button>
+                                              )}
+
+                                              {canToggle && (
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleService(svc.id, "active");
+                                                  }}
+                                                  className="w-full text-start px-3 py-2 rounded-lg hover:bg-[var(--color-brand-light)] font-semibold text-[var(--cr-dark)] flex items-center justify-between transition cursor-pointer"
+                                                >
+                                                  <div className="flex items-center gap-2">
+                                                    <span className={`h-2 w-2 rounded-full ${toggles.active ? "bg-emerald-500" : "bg-gray-300"}`} />
+                                                    <span>{toggles.active ? t.deactivate : t.activate}</span>
+                                                  </div>
+                                                  <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] bg-[var(--color-brand-sand)] px-1.5 py-0.5 rounded">
+                                                    {toggles.active ? t.statusActive : t.statusOff}
+                                                  </span>
+                                                </button>
+                                              )}
+
+                                              {canDelete && (
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setActiveServiceRowMenuId(null);
+                                                    setDeleteServiceTarget(svc);
+                                                  }}
+                                                  className="w-full text-start px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
+                                                >
+                                                  <Trash2 size={13} className="text-red-600" />
+                                                  <span>{t.deleteService}</span>
+                                                </button>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile Adaptive Cards */}
+                      <div className="block md:hidden divide-y divide-[var(--cr-primary)]/10 p-3.5 space-y-3.5 bg-[#FAFBF9]">
+                        {catServices.map((svc) => {
+                          const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
+                          const isInactive = !toggles.active;
+                          const activeBp = getActiveBranchPricing(svc);
+                          const canEdit = hasPermission("services.action_edit");
+                          const canToggle = hasPermission("services.action_toggle_status");
+                          const canDelete = hasPermission("services.action_delete");
+
+                          return (
+                            <div
+                              key={svc.id}
+                              className={`rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-4 shadow-xs transition ${
+                                isInactive ? "opacity-60 bg-gray-50/70" : ""
+                              }`}
+                            >
+                              {/* Top Bar: ID, Name, Laser & Status */}
+                              <div className="flex items-start justify-between gap-2 mb-2.5">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="font-mono text-[10px] font-bold text-[var(--color-brand-secondary)] bg-[var(--color-brand-sand)] px-2 py-0.5 rounded-md border border-[var(--cr-primary)]/10">
+                                      #{svc.id}
+                                    </span>
                                     {(svc.islaser || svc.is_laser || checkIsLaserService(svc)) && (
                                       <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
-                                        <Sparkles size={11} className="text-emerald-600" />
+                                        <Sparkles size={10} className="text-emerald-600" />
                                         <span>Laser</span>
                                       </span>
                                     )}
-                                    {isInactive && (
-                                      <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-500">{t.statusInactive}</span>
-                                    )}
                                   </div>
-                                </td>
-                                <td className="px-5 py-3 text-[var(--color-brand-secondary)]">
-                                  {svc.createdAt ? (
-                                    <>
-                                      <span className="block text-sm font-medium text-[var(--cr-dark)]">
-                                        {svc.createdAt.split(" ").slice(0, 2).join(" ")}
-                                      </span>
-                                      <span className="text-xs">
-                                        {svc.createdAt.split(" ").slice(2).join(" ")}
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span className="block text-sm font-medium text-[var(--cr-dark)]">30 Apr</span>
-                                      <span className="text-xs">2:01 pm</span>
-                                    </>
-                                  )}
-                                </td>
-                                <td className="px-5 py-3">
-                                  <span className="font-medium text-[var(--cr-accent)]">EGP {svc.price ?? 0}</span>
-                                </td>
-                                <td className="px-5 py-3 text-xs text-[var(--color-brand-secondary)] max-w-[200px] truncate">
-                                  {(() => {
-                                    const activeBp = getActiveBranchPricing(svc);
-                                    if (activeBp.length > 0) {
-                                      return activeBp.map((bp) => (
-                                        <div key={bp.name} className="flex items-center gap-1.5 mb-0.5 text-[11px]">
-                                          <span className="font-medium text-[var(--cr-dark)]">{bp.name}:</span>
-                                          <span className="text-[var(--cr-accent)]">EGP {bp.price}</span>
-                                          {bp.isDefault && <span className="text-[8px] bg-[var(--cr-primary)]/10 text-[var(--cr-primary)] px-1 rounded font-bold">Def</span>}
-                                        </div>
-                                      ));
-                                    }
-                                    const activeBranches = branches.filter((b) => b.status === "active");
-                                    const fallbackBranchName = activeBranches.length === 1 ? (activeBranches[0].name_en || activeBranches[0].name_ar) : null;
-                                    return (
-                                      <div className="flex items-center gap-1.5 text-[11px]">
-                                        {fallbackBranchName && <span className="font-medium text-[var(--cr-dark)]">{fallbackBranchName}:</span>}
-                                        <span className="text-[var(--cr-accent)]">EGP {svc.price ?? 0}</span>
-                                      </div>
-                                    );
-                                  })()}
-                                </td>
-                                <td className="px-5 py-3 text-center">
-                                  <span className="font-medium text-[var(--cr-dark)]">{svc.sortOrder ?? 0}</span>
-                                </td>
-                                {/* Status Badge */}
-                                <td className="px-5 py-3 text-center">
-                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                                  <h4 className={`text-sm font-bold truncate ${isInactive ? "line-through text-[var(--color-brand-secondary)]" : "text-[var(--cr-dark)]"}`}>
+                                    {svc.en}
+                                  </h4>
+                                </div>
+                                <span
+                                  className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                                     toggles.active
-                                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                       : "bg-gray-100 text-gray-500 border border-gray-200"
-                                  }`}>
-                                    {toggles.active ? t.statusActive : t.statusInactive}
-                                  </span>
-                                </td>
-                                {/* 3 Dots Actions Menu */}
-                                <td className="px-3 py-3 text-center">
-                                  {(() => {
-                                    const canEdit = hasPermission("services.action_edit");
-                                    const canToggle = hasPermission("services.action_toggle_status");
-                                    const canDelete = hasPermission("services.action_delete");
-                                    if (!canEdit && !canToggle && !canDelete) return null;
+                                  }`}
+                                >
+                                  {toggles.active ? t.statusActive : t.statusInactive}
+                                </span>
+                              </div>
 
-                                    return (
-                                      <div className="relative inline-block text-start">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActiveServiceRowMenuId(prev => prev === svc.id ? null : svc.id);
-                                          }}
-                                          className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
-                                            activeServiceRowMenuId === svc.id
-                                              ? "border-[var(--cr-primary)] bg-[var(--cr-primary)] text-white"
-                                              : "border-[var(--cr-primary)]/15 bg-white text-[var(--color-brand-secondary)] hover:border-[var(--cr-accent)] hover:text-[var(--cr-primary)]"
-                                          }`}
-                                          title={t.actionsTitle}
-                                        >
-                                          <MoreVertical size={13} />
-                                        </button>
+                              {/* Price & Branch Pricing Details */}
+                              <div className="rounded-xl bg-[#F8F9F6] p-2.5 mb-3 border border-[var(--cr-primary)]/8 text-xs space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-semibold text-[var(--color-brand-secondary)]">{t.colBranchPrice}:</span>
+                                  <span className="font-bold text-[var(--cr-accent)] text-sm">EGP {svc.price ?? 0}</span>
+                                </div>
+                                {activeBp.length > 0 && (
+                                  <div className="pt-1.5 border-t border-[var(--cr-primary)]/6 flex flex-wrap gap-1.5">
+                                    {activeBp.map((bp) => (
+                                      <span key={bp.name} className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[10px] font-medium text-[var(--cr-dark)] border border-[var(--cr-primary)]/10">
+                                        <span>{bp.name}:</span>
+                                        <span className="font-bold text-[var(--cr-accent)]">EGP {bp.price}</span>
+                                        {bp.isDefault && <span className="bg-[var(--cr-primary)]/10 text-[var(--cr-primary)] px-1 rounded text-[8px] font-bold">Def</span>}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
 
-                                        {activeServiceRowMenuId === svc.id && (
-                                          <div className="absolute end-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[var(--cr-primary)]/15 text-xs text-start dropdown-action-menu">
-                                            {canEdit && (
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setActiveServiceRowMenuId(null);
-                                                  handleEditService(svc);
-                                                }}
-                                                className="w-full text-start px-3 py-2 rounded-lg hover:bg-[var(--color-brand-light)] font-semibold text-[var(--cr-dark)] flex items-center gap-2 transition cursor-pointer"
-                                              >
-                                                <Pencil size={13} className="text-[var(--color-brand-secondary)]" />
-                                                <span>{t.editService}</span>
-                                              </button>
-                                            )}
-
-                                            {canToggle && (
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  toggleService(svc.id, "active");
-                                                }}
-                                                className="w-full text-start px-3 py-2 rounded-lg hover:bg-[var(--color-brand-light)] font-semibold text-[var(--cr-dark)] flex items-center justify-between transition cursor-pointer"
-                                              >
-                                                <div className="flex items-center gap-2">
-                                                  <span className={`h-2 w-2 rounded-full ${toggles.active ? "bg-emerald-500" : "bg-gray-300"}`} />
-                                                  <span>{toggles.active ? t.deactivate : t.activate}</span>
-                                                </div>
-                                                <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] bg-[var(--color-brand-sand)] px-1.5 py-0.5 rounded">
-                                                  {toggles.active ? t.statusActive : t.statusOff}
-                                                </span>
-                                              </button>
-                                            )}
-
-                                            {canDelete && (
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setActiveServiceRowMenuId(null);
-                                                  setDeleteServiceTarget(svc);
-                                                }}
-                                                className="w-full text-start px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
-                                              >
-                                                <Trash2 size={13} className="text-red-600" />
-                                                <span>{t.deleteService}</span>
-                                              </button>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })()}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                              {/* Action Buttons Row */}
+                              {(canEdit || canToggle || canDelete) && (
+                                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--cr-primary)]/8">
+                                  {canToggle && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleService(svc.id, "active");
+                                      }}
+                                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold border transition cursor-pointer ${
+                                        toggles.active
+                                          ? "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                                          : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                      }`}
+                                    >
+                                      <span className={`h-2 w-2 rounded-full ${toggles.active ? "bg-emerald-500" : "bg-gray-300"}`} />
+                                      <span>{toggles.active ? t.deactivate : t.activate}</span>
+                                    </button>
+                                  )}
+                                  {canEdit && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditService(svc);
+                                      }}
+                                      className="inline-flex items-center gap-1 rounded-xl border border-[var(--cr-primary)]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[var(--cr-primary)] hover:bg-[var(--color-brand-light)] transition cursor-pointer"
+                                    >
+                                      <Pencil size={12} />
+                                      <span>{t.editService}</span>
+                                    </button>
+                                  )}
+                                  {canDelete && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteServiceTarget(svc);
+                                      }}
+                                      className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 transition cursor-pointer"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
                 </div>
               )}

@@ -157,7 +157,8 @@ export default function SuppliersScreen({ authHeaders, canManage = true, lang, t
         </div>
       )}
 
-      <div className="overflow-x-auto [scrollbar-width:thin] rounded-[32px] border border-[#E6E9EB] bg-white">
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto [scrollbar-width:thin] rounded-[32px] border border-[#E6E9EB] bg-white">
         <table className="w-full min-w-[700px] text-sm">
           <thead>
             <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-secondary)]">
@@ -225,6 +226,75 @@ export default function SuppliersScreen({ authHeaders, canManage = true, lang, t
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Adaptive Cards View */}
+      <div className="block md:hidden space-y-3">
+        {loading ? (
+          <div className="rounded-2xl border border-[#E6E9EB] bg-white p-8 text-center text-sm text-[var(--color-brand-secondary)]">
+            {t.loading}
+          </div>
+        ) : filteredSuppliers.length === 0 ? (
+          <div className="rounded-2xl border border-[#E6E9EB] bg-white p-8 text-center text-[var(--color-brand-secondary)]">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <Truck size={32} className="text-[#A3B19B]" />
+              <p className="font-semibold text-[var(--cr-dark)]">{t.emptyTitle}</p>
+              <p className="text-xs text-[var(--color-brand-secondary)]">{t.emptyDesc}</p>
+            </div>
+          </div>
+        ) : (
+          filteredSuppliers.map((s) => (
+            <div
+              key={s.id}
+              className="rounded-2xl border border-[#E6E9EB] bg-white p-4 shadow-xs space-y-3"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-bold text-base text-[var(--cr-dark)]">{s.name}</h4>
+                  {s.contact && (
+                    <p className="text-xs text-[var(--color-brand-secondary)] mt-0.5">{s.contact}</p>
+                  )}
+                </div>
+                <span
+                  className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                    s.active
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-gray-100 text-gray-600 border border-gray-200"
+                  }`}
+                >
+                  {s.active ? t.active : t.inactive}
+                </span>
+              </div>
+
+              {s.payment_terms && (
+                <div className="rounded-xl bg-[#FAFBF9] px-3 py-2 text-xs border border-[#E6E9EB]/60">
+                  <span className="text-[10px] uppercase font-semibold text-[var(--color-brand-secondary)] block">{t.thPaymentTerms}</span>
+                  <span className="text-[var(--cr-dark)] font-medium">{s.payment_terms}</span>
+                </div>
+              )}
+
+              {canManage && (
+                <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(s)}
+                    className="inline-flex items-center gap-1 rounded-xl border border-[#E6E9EB] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-secondary)] hover:bg-[#EBF0E6] hover:text-[var(--cr-primary)] transition"
+                  >
+                    <Pencil size={13} />
+                    <span>{t.editTitle}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(s)}
+                    className="inline-flex items-center gap-1 rounded-xl border border-rose-100 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
       {modal.open && (
