@@ -1004,12 +1004,13 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             setSelectedTxnForDetails(null);
             onNewTransaction();
           }}
+          lang={lang}
         />
       )}
 
       {/* ── Audit Logs Modal ── */}
       {showAuditLogsModal && (
-        <TransactionAuditLogsModal onClose={() => setShowAuditLogsModal(false)} />
+        <TransactionAuditLogsModal onClose={() => setShowAuditLogsModal(false)} lang={lang} />
       )}
     </div>
   );

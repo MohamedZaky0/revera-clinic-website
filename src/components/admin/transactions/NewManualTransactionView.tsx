@@ -23,6 +23,7 @@ import {
   ShoppingBag,
   HelpCircle,
   Coins,
+  History,
 } from "lucide-react";
 import {
   TransactionType,
@@ -61,9 +62,6 @@ function buildOccurredAt(dateStr: string, timeStr: string): string {
  */
 const MANUAL_TRANSACTION_TYPES = [
   { id: "refund", labelEn: "Refund", labelAr: "استرداد" },
-  { id: "payment", labelEn: "Direct Payment", labelAr: "دفعة مباشرة" },
-  { id: "outstanding_payment", labelEn: "Outstanding Debt Settlement", labelAr: "سداد مديونية" },
-  { id: "wallet_topup", labelEn: "Wallet Top-up (Deposit)", labelAr: "إيداع محفظة" },
   { id: "service_charge", labelEn: "Service Charge", labelAr: "رسوم خدمة" },
   { id: "product_purchase", labelEn: "Product / Package Purchase", labelAr: "شراء منتج / باقة" },
 ] as const;
@@ -102,6 +100,7 @@ interface NewManualTransactionViewProps {
   staffName?: string;
   branches?: { id: string; name_en: string; name_ar?: string }[];
   onAddNewPatient?: () => void;
+  onAddPreviousBooking?: () => void;
   lang?: "en" | "ar";
 }
 
@@ -113,13 +112,14 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
   staffName = "Staff User",
   branches = [],
   onAddNewPatient,
+  onAddPreviousBooking,
   lang = "en",
 }) => {
   const isAr = lang === "ar";
 
-  // Form Type State
+  // Form Type State (Refund, Service Charge, Product/Package Purchase)
   const [transactionType, setTransactionType] = useState<
-    "refund" | "payment" | "outstanding_payment" | "wallet_topup" | "service_charge" | "product_purchase"
+    "refund" | "service_charge" | "product_purchase"
   >("refund");
   
   // Patient Selection State
@@ -499,6 +499,28 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
           <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-xs font-semibold text-emerald-700 flex items-center gap-2.5 animate-in slide-in-from-top-2">
             <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
             <span>{successMsg}</span>
+          </div>
+        )}
+
+        {/* Guidance banner for bookings & debt settlement */}
+        {onAddPreviousBooking && (
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs animate-in fade-in">
+            <div className="flex items-center gap-2 text-emerald-900 font-medium">
+              <Info size={16} className="text-emerald-700 shrink-0" />
+              <span>
+                {isAr
+                  ? "هل تريد تسجيل دفعة لحجز سابق أو سداد مديونية مريض بالعيادة؟"
+                  : "Looking to record a payment for a past booking or settle patient balance?"}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onAddPreviousBooking}
+              className="px-3.5 py-1.5 rounded-xl bg-[#313A28] text-white font-bold hover:bg-[#20271a] transition-colors shadow-2xs flex items-center justify-center gap-1.5 shrink-0"
+            >
+              <History size={13} />
+              <span>{isAr ? "إضافة حجز سابق" : "Add Previous Booking"}</span>
+            </button>
           </div>
         )}
 

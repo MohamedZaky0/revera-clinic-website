@@ -6559,6 +6559,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   setActiveNav("Patients");
                   setShowCustomerFormModal(true);
                 }}
+                onAddPreviousBooking={() => {
+                  setPreviousBookingCustomer(null);
+                  setTransactionsSubView("previous_booking");
+                }}
                 lang={lang}
               />
             ) : (

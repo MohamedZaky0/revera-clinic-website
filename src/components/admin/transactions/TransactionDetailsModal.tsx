@@ -38,6 +38,8 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
 
   if (!transaction) return null;
 
+  const isAr = lang === "ar";
+
   const handlePrint = () => {
     window.print();
   };
@@ -54,7 +56,7 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-200" dir={isAr ? "rtl" : "ltr"}>
       <div className="relative w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
@@ -65,14 +67,15 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-bold text-[var(--cr-dark)]">
-                  Transaction Details
+                  {isAr ? "تفاصيل المعاملة" : "Transaction Details"}
                 </h3>
                 <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 font-semibold">
                   {transaction.transaction_id}
                 </span>
               </div>
               <p className="text-xs text-gray-500">
-                Created on {new Date(transaction.created_at || transaction.occurred_at).toLocaleString()}
+                {isAr ? "سُجلت في: " : "Created on "}
+                {new Date(transaction.created_at || transaction.occurred_at).toLocaleString()}
               </p>
             </div>
           </div>
@@ -91,7 +94,7 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
           <div className="rounded-2xl bg-[#F9F9F7] p-5 border border-gray-100 flex items-center justify-between">
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                Transaction Amount
+                {isAr ? "مبلغ المعاملة" : "Transaction Amount"}
               </span>
               <div className={`text-3xl font-black mt-0.5 ${
                 Number(transaction.amount) < 0 ? "text-rose-600" : "text-emerald-700"
@@ -112,7 +115,7 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
                 {transaction.status}
               </span>
               <span className="text-[11px] font-semibold text-gray-500 uppercase">
-                Source: {transaction.source || "Manual"}
+                {isAr ? "المصدر: " : "Source: "}{transaction.source || "Manual"}
               </span>
             </div>
           </div>
@@ -120,7 +123,9 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-4 text-xs">
             <div className="p-3.5 rounded-xl border border-gray-100 bg-white space-y-1">
-              <span className="text-gray-400 font-bold uppercase text-[10px]">Transaction Type</span>
+              <span className="text-gray-400 font-bold uppercase text-[10px]">
+                {isAr ? "نوع المعاملة" : "Transaction Type"}
+              </span>
               <div className="font-semibold text-gray-800 capitalize flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 {transaction.type.replace(/_/g, " ")}
@@ -128,7 +133,9 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
             </div>
 
             <div className="p-3.5 rounded-xl border border-gray-100 bg-white space-y-1">
-              <span className="text-gray-400 font-bold uppercase text-[10px]">Payment Method</span>
+              <span className="text-gray-400 font-bold uppercase text-[10px]">
+                {isAr ? "طريقة الدفع" : "Payment Method"}
+              </span>
               <div className="font-semibold text-gray-800 capitalize flex items-center gap-1.5">
                 <CreditCard size={13} className="text-gray-500" />
                 {transaction.payment_method.replace(/_/g, " ")}
@@ -136,9 +143,11 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
             </div>
 
             <div className="p-3.5 rounded-xl border border-gray-100 bg-white space-y-1">
-              <span className="text-gray-400 font-bold uppercase text-[10px]">Patient</span>
+              <span className="text-gray-400 font-bold uppercase text-[10px]">
+                {isAr ? "المريض" : "Patient"}
+              </span>
               <div className="font-bold text-[var(--cr-dark)]">
-                {transaction.customer?.name || "Clinic General Patient"}
+                {transaction.customer?.name || (isAr ? "مريض غير مسجل" : "Clinic General Patient")}
               </div>
               {transaction.customer?.phone && (
                 <div className="text-gray-500 text-[11px]">
@@ -148,29 +157,33 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
             </div>
 
             <div className="p-3.5 rounded-xl border border-gray-100 bg-white space-y-1">
-              <span className="text-gray-400 font-bold uppercase text-[10px]">Branch / Location</span>
+              <span className="text-gray-400 font-bold uppercase text-[10px]">
+                {isAr ? "الفرع" : "Branch / Location"}
+              </span>
               <div className="font-semibold text-gray-800 flex items-center gap-1.5">
                 <Building2 size={13} className="text-gray-500" />
-                {transaction.branch?.name_en || "Main Branch"}
+                {(isAr && transaction.branch?.name_ar ? transaction.branch.name_ar : transaction.branch?.name_en) || (isAr ? "الفرع الرئيسي" : "Main Branch")}
               </div>
             </div>
           </div>
 
           {/* Description & Reference */}
           <div className="p-4 rounded-xl border border-gray-100 bg-white space-y-2">
-            <span className="text-gray-400 font-bold uppercase text-[10px]">Description</span>
+            <span className="text-gray-400 font-bold uppercase text-[10px]">
+              {isAr ? "الوصف" : "Description"}
+            </span>
             <p className="text-xs font-medium text-gray-800 leading-relaxed">
-              {transaction.description || "No description provided."}
+              {transaction.description || (isAr ? "لا يوجد وصف مدون." : "No description provided.")}
             </p>
             {transaction.reference_no && (
               <div className="pt-2 border-t border-gray-100 flex items-center gap-2 text-xs">
-                <span className="text-gray-400 font-bold">Reference / Receipt:</span>
+                <span className="text-gray-400 font-bold">{isAr ? "المرجع / الإيصال:" : "Reference / Receipt:"}</span>
                 <span className="font-mono text-gray-700 font-semibold">{transaction.reference_no}</span>
               </div>
             )}
             {transaction.reason && (
               <div className="pt-2 border-t border-gray-100 flex items-center gap-2 text-xs text-rose-700">
-                <span className="font-bold">Reason:</span>
+                <span className="font-bold">{isAr ? "السبب:" : "Reason:"}</span>
                 <span>{transaction.reason}</span>
               </div>
             )}
@@ -180,7 +193,7 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
           <div className="rounded-xl bg-gray-50 p-3 text-[11px] text-gray-500 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <User size={12} className="text-gray-400" />
-              <span>Created by: <strong className="text-gray-700">{transaction.created_by_name || "Staff"}</strong></span>
+              <span>{isAr ? "سُجل بواسطة: " : "Created by: "}<strong className="text-gray-700">{transaction.created_by_name || "Staff"}</strong></span>
             </div>
             <div className="flex items-center gap-1.5">
               <Clock size={12} className="text-gray-400" />
@@ -197,7 +210,7 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 font-semibold text-xs hover:bg-gray-50 transition-colors shadow-2xs"
           >
             <Printer size={14} />
-            Print Receipt
+            <span>{isAr ? "طباعة الإيصال" : "Print Receipt"}</span>
           </button>
 
           <div className="flex items-center gap-2">
@@ -211,7 +224,7 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 font-semibold text-xs hover:bg-rose-100 transition-colors"
               >
                 <RotateCcw size={13} />
-                Issue Refund
+                <span>{isAr ? "استرداد المبلغ" : "Issue Refund"}</span>
               </button>
             )}
 
@@ -225,7 +238,7 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 font-semibold text-xs hover:bg-amber-100 transition-colors"
               >
                 <Sliders size={13} />
-                Create Adjustment
+                <span>{isAr ? "تسوية رصيد" : "Create Adjustment"}</span>
               </button>
             )}
 
@@ -234,7 +247,7 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
               onClick={onClose}
               className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs transition-colors"
             >
-              Close
+              {isAr ? "إغلاق" : "Close"}
             </button>
           </div>
         </div>

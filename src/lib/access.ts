@@ -107,7 +107,7 @@ export function hasStaffPermission(access: StaffAccess, permission: string) {
 
 export function hasFinancePermission(access: StaffAccess, permission: string) {
   const normRole = (access.role || "").toLowerCase().trim().replace(/[\s_-]+/g, "");
-  if (normRole === "superadmin" || normRole === "admin") return true;
+  if (normRole === "superadmin") return true;
   const perms = access.permissions || [];
   if (perms.includes("*") || perms.includes(permission)) return true;
 
