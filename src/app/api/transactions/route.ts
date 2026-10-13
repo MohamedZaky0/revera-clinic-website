@@ -324,12 +324,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Transaction Type is required.' }, { status: 400 });
     }
 
-    // Allowed manual transaction types
+    // Direct payments, debt settlement, wallet movements, and balance adjustments
+    // are automated operations with dedicated transactional ledger workflows (RISK-076).
+    if (transaction_type === 'payment') {
+      return NextResponse.json({
+        error: 'Direct payments are recorded automatically via booking checkout or previous booking intake.',
+      }, { status: 400 });
+    }
+    if (transaction_type === 'outstanding_payment') {
+      return NextResponse.json({
+        error: 'Outstanding balance payments must be recorded via Settle Balance on the patient profile.',
+      }, { status: 400 });
+    }
+    if (transaction_type === 'wallet_topup' || transaction_type === 'wallet_deduction') {
+      return NextResponse.json({
+        error: 'Wallet deposits and deductions are automated via the patient wallet workflow.',
+      }, { status: 400 });
+    }
+    if (transaction_type === 'adjustment') {
+      return NextResponse.json({
+        error: 'Manual balance adjustments are not permitted directly through transactions. Use patient balance adjustments or wallet workflows.',
+      }, { status: 400 });
+    }
+
+    // Allowed manual transaction types strictly limited to:
+    // 1. refund, 2. service_charge, 3. product_purchase
     const ALLOWED_MANUAL_TYPES = [
-      'payment',
-      'outstanding_payment',
-      'wallet_topup',
-      'wallet_deduction',
       'refund',
       'service_charge',
       'product_purchase',

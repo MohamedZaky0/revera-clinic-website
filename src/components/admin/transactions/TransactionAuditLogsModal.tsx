@@ -36,8 +36,10 @@ export const TransactionAuditLogsModal: React.FC<TransactionAuditLogsModalProps>
     fetchLogs();
   }, []);
 
+  const isAr = lang === "ar";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-200" dir={isAr ? "rtl" : "ltr"}>
       <div className="relative w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl border border-gray-100 max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
@@ -47,10 +49,10 @@ export const TransactionAuditLogsModal: React.FC<TransactionAuditLogsModalProps>
             </div>
             <div>
               <h3 className="text-lg font-bold text-[var(--cr-dark)]">
-                Financial Audit Logs
+                {isAr ? "سجل التدقيق المالي" : "Financial Audit Logs"}
               </h3>
               <p className="text-xs text-gray-500">
-                Immutable audit trail of all manual and automated financial events
+                {isAr ? "سجل تدقيق غير قابل للتعديل لجميع العمليات المالية" : "Immutable audit trail of all manual and automated financial events"}
               </p>
             </div>
           </div>
@@ -68,11 +70,11 @@ export const TransactionAuditLogsModal: React.FC<TransactionAuditLogsModalProps>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
               <Loader2 className="animate-spin mb-2" size={24} />
-              <p className="text-xs">Loading audit logs...</p>
+              <p className="text-xs">{isAr ? "جاري تحميل سجل التدقيق..." : "Loading audit logs..."}</p>
             </div>
           ) : logs.length === 0 ? (
             <div className="text-center py-16 text-gray-400 text-xs">
-              No audit logs recorded yet.
+              {isAr ? "لا توجد سجلات تدقيق مسجلة حتى الآن." : "No audit logs recorded yet."}
             </div>
           ) : (
             logs.map((log) => (
@@ -126,7 +128,7 @@ export const TransactionAuditLogsModal: React.FC<TransactionAuditLogsModalProps>
             onClick={onClose}
             className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs transition-colors"
           >
-            Close
+            {isAr ? "إغلاق" : "Close"}
           </button>
         </div>
       </div>

@@ -3496,3 +3496,38 @@ confirmed at the database level after each action, not just via the UI's own suc
 
 ---
 
+## DEC-104: Transactions Section Integrity, Till Reconciliation & Mobile Responsiveness Overhaul
+
+**Date:** 2026-10-13
+**Status:** Decided & implemented
+
+**Context:**
+The Transactions section was reported as corrupted with empty listings, uncalculated card balances (Today's Payments, Outstanding, and Wallet Balance), and broken manual transaction flows.
+Investigation revealed:
+1. **Branch filter masking transactions:** Initializing `filters.branchId` to `currentBranchId` when the admin topbar selected Sheikh Zayed (which had 0 recorded transactions) rendered an empty list and 0 EGP payments, even though New Cairo had 166 transactions. Furthermore, 13 transactions had `branch_id: null` (online bookings/clinic-wide) and were dropped whenever a specific branch filter was applied.
+2. **Timezone mismatch on Today's Payments:** Server-side date filtering using UTC dates mismatched the clinic's local timezone (`Africa/Cairo`, UTC+2/UTC+3), causing payments received today to be omitted.
+3. **Manual Transaction Type Violations (RISK-076):** `NewManualTransactionView.tsx` offered direct `payment`, `outstanding_payment`, and `wallet_topup`, which were rejected by the `POST /api/transactions` API contract with 400 errors, confusing users who expected them to be created manually instead of through automated checkout/debt settlement/wallet workflows.
+4. **Duplicate Transaction Recording in Settle Debt:** `/api/customers/settle-debt` called `recordTransaction` directly after `appendPaymentToExistingInvoice` had already logged an `outstanding_payment` transaction, doubling ledger entries.
+5. **Mobile Responsiveness:** Wide desktop table layout overflowed on mobile viewports.
+
+**Decision:**
+1. **Transactions Overview Cards & Till Reconciliation (`/api/transactions`):**
+   - Implemented Africa/Cairo calendar day bounds for Today's Payments (`todayNetPayments = cash-in today - refunds today`).
+   - Reconciled clinic-wide Outstanding (`customers.outstanding > 0`) and Wallet Balances (`customers.wallet_balance > 0`).
+   - Defaulted `branchId` to `'all'` so the complete financial picture is immediately visible upon landing on the Transactions tab, with full branch filtering available.
+2. **Strict RISK-076 Manual Creation Contract:**
+   - Manual transaction creation strictly supports 3 operations: `refund` (with reason, original transaction reference, and remaining balance cap), `service_charge` (with description and amount), and `product_purchase` (with catalog item selection, unit price, quantity, and auto-computed total).
+   - Direct `payment`, `outstanding_payment`, `wallet_topup`, `wallet_deduction`, and `adjustment` are cleanly rejected with informative 400 error messages.
+   - Added an informative guidance banner and quick button in `NewManualTransactionView.tsx` directing staff to "Add Previous Booking" or patient debt settlement when recording booking payments.
+3. **Settlement Ledger De-duplication:**
+   - Restored `/api/customers/settle-debt` to rely solely on `appendPaymentToExistingInvoice` for reservation ledger entries, eliminating duplicate rows.
+4. **Bilingual Support & Mobile Adaptive Cards:**
+   - Added mobile responsive adaptive cards (`block md:hidden`) matching desktop table fields.
+   - Fully internationalized `TransactionDetailsModal.tsx` and `TransactionAuditLogsModal.tsx` with English and Arabic labels, RTL layout, and receipt printing.
+5. **Automated Verification:**
+   - Registered `TC-098: Transactions & Till Financial Ledger Engine` in the Admin Settings System Test Suite (`admin/page.tsx`).
+   - All 43 tests in `tests/routes/transactions.test.ts` passing (100%).
+   - All 36 route test files passing (785 passed | 4 expected fail).
+   - Production build verified with `npm run build` (0 compiler/TypeScript errors).
+
+---
