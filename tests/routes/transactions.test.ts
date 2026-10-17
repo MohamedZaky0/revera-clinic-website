@@ -540,3 +540,67 @@ describe('GET — transactions list and stats', () => {
     expect((await resSearchNone.json()).transactions).toHaveLength(0);
   });
 });
+
+// ── GET — filter hardening (branchId injection, Cairo custom-range bounds) ───
+
+describe('GET — branchId validation', () => {
+  const BRANCH_A = '7e08ed2a-74bd-49fe-8300-ee363a1b04eb';
+  beforeEach(() => seedStaffAuth('superadmin', []));
+
+  it('rejects a branchId carrying extra PostgREST filter syntax → 400', async () => {
+    const res = await GET(staffReq('GET', { query: `branchId=${encodeURIComponent('x,branch_id.not.is.null')}` }));
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a non-UUID branchId → 400', async () => {
+    const res = await GET(staffReq('GET', { query: 'branchId=not-a-uuid' }));
+    expect(res.status).toBe(400);
+  });
+
+  it('a valid branch UUID returns that branch plus unassigned (branch_id null) rows only', async () => {
+    fake.seed('transactions', [
+      { id: 't1', transaction_id: 'TXN-1', type: 'payment', amount: 10, status: 'completed', branch_id: BRANCH_A, occurred_at: '2026-01-15T10:00:00Z' },
+      { id: 't2', transaction_id: 'TXN-2', type: 'payment', amount: 20, status: 'completed', branch_id: null, occurred_at: '2026-01-15T11:00:00Z' },
+      { id: 't3', transaction_id: 'TXN-3', type: 'payment', amount: 30, status: 'completed', branch_id: 'other-branch', occurred_at: '2026-01-15T12:00:00Z' },
+    ]);
+    const res = await GET(staffReq('GET', { query: `branchId=${BRANCH_A}` }));
+    expect(res.status).toBe(200);
+    const ids = (await res.json()).transactions.map((t: any) => t.id).sort();
+    expect(ids).toEqual(['t1', 't2']);
+  });
+});
+
+describe('GET — custom date range uses Cairo day boundaries', () => {
+  beforeEach(() => seedStaffAuth('superadmin', []));
+
+  async function idsFor(start: string, end: string) {
+    const res = await GET(staffReq('GET', { query: `dateRange=custom&startDate=${start}&endDate=${end}` }));
+    expect(res.status).toBe(200);
+    return (await res.json()).transactions.map((t: any) => t.id).sort();
+  }
+
+  it('winter (UTC+2): 2026-01-15 spans 2026-01-14T22:00Z to 2026-01-15T21:59:59Z', async () => {
+    fake.seed('transactions', [
+      { id: 'before', type: 'payment', amount: 1, status: 'completed', occurred_at: '2026-01-14T21:30:00Z' },
+      { id: 'in-early', type: 'payment', amount: 1, status: 'completed', occurred_at: '2026-01-14T22:30:00Z' },
+      { id: 'in-late', type: 'payment', amount: 1, status: 'completed', occurred_at: '2026-01-15T21:30:00Z' },
+      { id: 'after', type: 'payment', amount: 1, status: 'completed', occurred_at: '2026-01-15T22:30:00Z' },
+    ]);
+    expect(await idsFor('2026-01-15', '2026-01-15')).toEqual(['in-early', 'in-late']);
+  });
+
+  it('summer (UTC+3, DST): 2026-07-15 spans 2026-07-14T21:00Z to 2026-07-15T20:59:59Z', async () => {
+    fake.seed('transactions', [
+      { id: 'before', type: 'payment', amount: 1, status: 'completed', occurred_at: '2026-07-14T20:30:00Z' },
+      { id: 'in-early', type: 'payment', amount: 1, status: 'completed', occurred_at: '2026-07-14T21:30:00Z' },
+      { id: 'in-late', type: 'payment', amount: 1, status: 'completed', occurred_at: '2026-07-15T20:30:00Z' },
+      { id: 'after', type: 'payment', amount: 1, status: 'completed', occurred_at: '2026-07-15T21:30:00Z' },
+    ]);
+    expect(await idsFor('2026-07-15', '2026-07-15')).toEqual(['in-early', 'in-late']);
+  });
+
+  it('a malformed startDate/endDate → 400 instead of a 500 from Date parsing', async () => {
+    const res = await GET(staffReq('GET', { query: 'dateRange=custom&startDate=garbage&endDate=2026-01-15' }));
+    expect(res.status).toBe(400);
+  });
+});
