@@ -115,7 +115,28 @@ export async function POST(req: Request) {
       }
 
       try {
-        await appendPaymentToExistingInvoice(r.id, portion, access.access.employee?.id || null);
+        const appended = await appendPaymentToExistingInvoice(
+          r.id,
+          portion,
+          access.access.employee?.id || null,
+          paymentMethod,
+          body.paymentReference || null
+        );
+        if (!appended) {
+          await recordTransaction({
+            type: 'outstanding_payment',
+            amount: portion,
+            description: `Balance settlement for reservation ${r.id.slice(0, 8)}`,
+            customerId,
+            branchId: r.branch_id || (access.access.employee as any)?.branch_id || null,
+            reservationId: r.id,
+            paymentMethod: paymentMethod || 'cash',
+            referenceNo: body.paymentReference || null,
+            createdByEmployeeId: access.access.employee?.id || null,
+            status: 'completed',
+            source: 'automatic',
+          });
+        }
       } catch (payErr) {
         // The booking is already marked settled; a missing payments row is recoverable and must
         // not roll the whole settlement back on the patient standing at the desk.
@@ -151,7 +172,21 @@ export async function POST(req: Request) {
             invoice_id: inv.id,
             amount: portion,
             method: paymentMethod,
+            reference: body.paymentReference || null,
             received_by_employee_id: access.access.employee?.id || null,
+          });
+          await recordTransaction({
+            type: 'outstanding_payment',
+            amount: portion,
+            description: `Balance settlement for invoice ${inv.invoice_no || ''}`.trim(),
+            customerId,
+            branchId: (access.access.employee as any)?.branch_id || null,
+            invoiceId: inv.id,
+            paymentMethod: paymentMethod || 'cash',
+            referenceNo: body.paymentReference || null,
+            createdByEmployeeId: access.access.employee?.id || null,
+            status: 'completed',
+            source: 'automatic',
           });
         } catch (payErr) {
           console.error(`settle-debt failed to append payment for invoice ${inv.id}:`, payErr);

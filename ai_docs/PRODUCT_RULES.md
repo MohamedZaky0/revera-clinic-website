@@ -1324,7 +1324,10 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
 - **Unassigned Manual Transactions Inclusion**: Querying transactions by branch preserves unassigned/manual transactions (`branch_id IS NULL`) alongside the selected branch so manual till entries are never dropped.
 - **System Test Suite**: Verified under `TC-101` in the Admin Settings System Test Suite.
 
-
-
-
-
+### 12. Booking Creation, Checkout Ledger Dual-Write & Debt Settlement Engine Rule
+**Enforced in:** `src/app/api/reservations/route.ts`, `src/app/api/customers/settle-debt/route.ts`, `src/app/api/transactions/route.ts`, `src/components/admin/bookings/AdminNewBookingView.tsx`
+- **Services Schema Cat Alignment**: Selects `cat` (not `category`) in `writeCheckoutInvoice` and `PATCH /api/reservations`, preventing Postgres `42703` column errors, ensuring `derivedTotalCost` is accurately derived, and allowing checkout invoices and automatic transactions to persist reliably.
+- **Immediate Booking Payment Ledger Logging**: When an initial deposit or payment (`amountPaid > 0`) is made during booking creation (`POST /api/reservations`), `recordTransaction` is automatically invoked with `type: 'payment'`, `source: 'automatic'`, and the chosen payment method, immediately registering in Today's Payments (الخزينة) and the Financial Transactions table.
+- **Booking Creation Payment Method Selection**: `AdminNewBookingView.tsx` dynamically displays payment method buttons (Cash, Card, InstaPay, Vodafone Cash, Bank Transfer) and an optional transaction reference input whenever `amountPaidNow > 0`.
+- **Debt Settlement Automatic Ledger Recording**: When a patient settles debt via `POST /api/customers/settle-debt`, each allocated settlement automatically writes an `outstanding_payment` transaction with the specified payment method and reference number, immediately reducing patient debt and increasing today's net payments.
+- **System Test Suite**: Verified under `TC-102` in the Admin Settings System Test Suite.

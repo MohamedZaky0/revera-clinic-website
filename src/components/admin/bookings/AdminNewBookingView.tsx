@@ -302,6 +302,8 @@ export default function AdminNewBookingView({
   const [notes, setNotes] = useState<string>("");
   const [customBookingValue, setCustomBookingValue] = useState<number | null>(null);
   const [amountPaidNow, setAmountPaidNow] = useState<number | "">("");
+  const [bookingPaymentMethod, setBookingPaymentMethod] = useState<string>("cash");
+  const [bookingPaymentReference, setBookingPaymentReference] = useState<string>("");
 
   // Laser Payment Mode (Option 1: Service Fixed, Option 2: Pay per Pulse, Option 3: Pulses Package)
   const [laserPaymentMode, setLaserPaymentMode] = useState<"SERVICE" | "PER_PULSE" | "PACKAGE">("SERVICE");
@@ -1393,6 +1395,8 @@ export default function AdminNewBookingView({
         explicitCustomerId: resolvedCustomerId,
         amountPaid: numAmountPaid,
         amountLeft: Math.max(0, remainingValue),
+        paymentMethod: numAmountPaid > 0 ? bookingPaymentMethod : undefined,
+        paymentReference: numAmountPaid > 0 && bookingPaymentReference ? bookingPaymentReference.trim() : undefined,
         isLaserService: isLaserService,
         laserPaymentMode: isLaserService ? laserPaymentMode : null,
         laserPricePerPulse: isLaserService && laserPaymentMode === "PER_PULSE" ? laserPerPulsePrice : null,
@@ -2843,6 +2847,52 @@ export default function AdminNewBookingView({
                     </div>
                   </div>
                 </div>
+
+                {/* Payment Method Selector when Amount Paid Now > 0 */}
+                {Number(amountPaidNow) > 0 && (
+                  <div className="rounded-2xl border border-[var(--cr-primary)]/15 bg-white p-4 space-y-3">
+                    <label className="block text-xs font-bold text-[var(--color-brand-secondary)]">
+                      {lang === 'ar' ? 'طريقة الدفع' : 'Payment Method'}
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {[
+                        { id: 'cash', labelEn: 'Cash', labelAr: 'نقدي', icon: '💵' },
+                        { id: 'card', labelEn: 'Card', labelAr: 'بطاقة', icon: '💳' },
+                        { id: 'instapay', labelEn: 'InstaPay', labelAr: 'إنستاباي', icon: '⚡' },
+                        { id: 'vodafone_cash', labelEn: 'Vodafone', labelAr: 'فودافون كاش', icon: '📱' },
+                        { id: 'bank_transfer', labelEn: 'Transfer', labelAr: 'تحويل', icon: '🏦' }
+                      ].map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setBookingPaymentMethod(m.id)}
+                          className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                            bookingPaymentMethod === m.id
+                              ? 'bg-[var(--cr-primary)] text-white border-[var(--cr-primary)] shadow-sm'
+                              : 'bg-white text-[var(--cr-dark)] border-[var(--cr-primary)]/15 hover:border-emerald-600 hover:bg-emerald-50/50'
+                          }`}
+                        >
+                          <span>{m.icon}</span>
+                          <span>{lang === 'ar' ? m.labelAr : m.labelEn}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {bookingPaymentMethod !== 'cash' && (
+                      <div className="pt-1">
+                        <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
+                          {lang === 'ar' ? 'رقم الإيصال / المعاملة (اختياري)' : 'Reference / Receipt No. (Optional)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={bookingPaymentReference}
+                          onChange={(e) => setBookingPaymentReference(e.target.value)}
+                          placeholder="e.g. InstaPay Ref #, Card Auth Code..."
+                          className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2 text-xs font-medium text-[var(--cr-dark)] outline-none focus:border-emerald-700"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Live Remaining Balance Calculation Callout */}
                 <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--color-brand-light)] border border-[var(--cr-primary)]/10 text-xs">

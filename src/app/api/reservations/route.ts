@@ -364,7 +364,7 @@ async function writeCheckoutInvoice(params: {
 
   const { data: services, error: svcErr } = await supabaseServer
     .from('services')
-    .select('id, en, ar, price, branch_pricing, islaser, is_laser, category')
+    .select('id, en, ar, price, branch_pricing, islaser, is_laser, cat')
     .in('id', serviceIds);
   if (svcErr) throw svcErr;
   if (!services || services.length === 0) return;
@@ -434,7 +434,7 @@ async function writeCheckoutInvoice(params: {
       (svc.en && svc.en.toLowerCase().includes('laser')) ||
       (svc.name && svc.name.toLowerCase().includes('laser')) ||
       (svc.ar && svc.ar.includes('ليزر')) ||
-      (svc.category && String(svc.category).toLowerCase().includes('laser'))
+      ((svc.cat || svc.category) && String(svc.cat || svc.category).toLowerCase().includes('laser'))
     );
 
     if (isPerPulseMode && isLaser) {
@@ -634,8 +634,8 @@ export async function appendPaymentToExistingInvoice(
   receivedByEmployeeId?: string | null,
   paymentMethod?: string,
   paymentReference?: string | null,
-): Promise<void> {
-  if (amount <= 0) return;
+): Promise<boolean> {
+  if (amount <= 0) return false;
 
   const { data: invoice, error: findErr } = await supabaseServer
     .from('invoices')
@@ -644,7 +644,7 @@ export async function appendPaymentToExistingInvoice(
     .eq('status', 'issued')
     .maybeSingle();
   if (findErr) throw findErr;
-  if (!invoice) return;
+  if (!invoice) return false;
 
   const { error: paymentErr } = await supabaseServer.from('payments').insert({
     invoice_id: invoice.id,
@@ -670,6 +670,7 @@ export async function appendPaymentToExistingInvoice(
     referenceNo: paymentReference || null,
     createdByEmployeeId: receivedByEmployeeId || null,
   });
+  return true;
 }
 
 export async function GET(req: Request) {
@@ -1100,13 +1101,15 @@ export async function POST(req: Request) {
     // (CORRUPT-U06: a session can now carry more than one service).
     let servicePrice = 0;
     let bookingDurationMinutes = 30;
+    let fetchedSvcs: any[] = [];
     try {
       const { data: svcs } = await supabaseServer
         .from('services')
-        .select('id, price, branch_pricing, duration, duration_minutes')
+        .select('id, en, ar, price, branch_pricing, duration, duration_minutes')
         .in('id', allServiceIds);
 
       if (svcs && svcs.length > 0) {
+        fetchedSvcs = svcs;
         bookingDurationMinutes = svcs.reduce((sum: number, s: any) => sum + getServiceDurationMinutes(s), 0);
         servicePrice = svcs.reduce((sum: number, s: any) => {
           const mappedService = { price: s.price !== null ? Number(s.price) : 0, branchPricing: s.branch_pricing };
@@ -1254,6 +1257,27 @@ export async function POST(req: Request) {
       );
       throw error;
     }
+    if (initialAmountPaid > 0) {
+      try {
+        const svcNames = fetchedSvcs.map((s: any) => s.en || s.ar || `Service #${s.id}`).join(' + ') || `Service #${data.service_id}`;
+        await recordTransaction({
+          type: 'payment',
+          amount: initialAmountPaid,
+          description: `Booking payment for ${data.name || 'Patient'} (${svcNames})`,
+          customerId: data.customer_id,
+          branchId: data.branch_id,
+          reservationId: data.id,
+          paymentMethod: body.paymentMethod || 'cash',
+          referenceNo: body.paymentReference || null,
+          createdByEmployeeId: data.created_by_employee_id || null,
+          status: 'completed',
+          source: 'automatic',
+        });
+      } catch (txErr) {
+        console.error('Failed to record initial booking transaction (non-fatal):', txErr);
+      }
+    }
+
     const mapped = mapRow(data);
     const requiresDeposit = !isManualBooking && depositPercentage > 0;
     return NextResponse.json({
@@ -1777,7 +1801,7 @@ export async function PATCH(req: Request) {
 
         const { data: svcs } = await supabaseServer
           .from('services')
-          .select('id, en, ar, price, branch_pricing, islaser, is_laser, category')
+          .select('id, en, ar, price, branch_pricing, islaser, is_laser, cat')
           .in('id', effectiveServiceIds);
         if (svcs && svcs.length > 0) {
           derivedTotalCost = svcs.reduce((sum: number, s: any) => {
@@ -1787,7 +1811,7 @@ export async function PATCH(req: Request) {
               (s.en && s.en.toLowerCase().includes('laser')) ||
               (s.name && s.name.toLowerCase().includes('laser')) ||
               (s.ar && s.ar.includes('ليزر')) ||
-              (s.category && String(s.category).toLowerCase().includes('laser'))
+              ((s.cat || s.category) && String(s.cat || s.category).toLowerCase().includes('laser'))
             );
             if (isPerPulseMode && isLaser) {
               return sum + (primaryDeliveredPulses > 0 ? (primaryDeliveredPulses * updatePulseRate) : 0);
