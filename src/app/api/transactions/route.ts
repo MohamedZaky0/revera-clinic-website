@@ -56,7 +56,7 @@ export async function GET(req: Request) {
     }
 
     if (branchId !== 'all' && branchId) {
-      query = query.eq('branch_id', branchId);
+      query = query.or(`branch_id.eq.${branchId},branch_id.is.null`);
     }
 
     if (typeFilter !== 'all') {
