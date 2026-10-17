@@ -806,10 +806,12 @@ The following are **not currently enforced in code**:
 ## Receptionist Booking Control & Booked Service Editing Rules
 **Enforced in:** `src/app/api/reservations/route.ts`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/components/admin/translations.ts`.
 
-1. **Full Receptionist Booking Status Lifecycle Control**:
-   - Receptionists and authorized staff have direct, single-click control over booking status transitions across the entire lifecycle: `pending`, `confirmed` / `approved`, `checked_in` / arrived, `started` / in-progress, `completed`, `cancelled`, and `no_show`.
-   - The interactive status selector is available directly in the modal header and session flow card.
-   - Cancel and No-Show transitions require explicit confirmation to avoid accidental cancellations.
+1. **Superadmin Booking Status Override Control**:
+   - The interactive status dropdown selector in the Booking Details modal header is restricted strictly to **Superadmins** (`hasPermission("superadmin")`).
+   - For all other staff roles (e.g., receptionists, doctors, standard admins), the status is rendered as a clean, static, non-interactive badge (e.g. `COMPLETED`, `CONFIRMED`), preventing unauthorized or accidental arbitrary status jumps.
+   - Normal staff proceed through standard operational lifecycle buttons in the Session Flow card (Check In, Start Session, Settle Invoice) or Other Actions (Postpone, Cancel, No-Show).
+   - The **Other Actions** panel (Postpone, Cancel, No-Show) is strictly hidden for checked-in patients (`checked_in`), in-progress treatments (`started`), completed sessions (`completed`), cancelled bookings (`cancelled`/`rejected`), and no-shows (`no_show`), ensuring that once a patient has physically arrived and checked in, pre-arrival cancellation/rescheduling actions are disabled.
+   - Any manual status transition via `handleUpdateBookingStatus` strictly validates `hasPermission("superadmin")` and displays a bilingual authorization warning if unauthorized. Cancel and No-Show transitions additionally require explicit confirmation.
 
 2. **Booked Service Replacement On Patient Arrival**:
    - Receptionists can edit or replace the assigned clinical service directly when the patient arrives at the clinic or from the Booking Details drawer.
@@ -1299,6 +1301,29 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
   - Only explicit `401` / `403` status responses initiate sign-out; transient network hiccups (500, network timeouts) do not destroy authenticated sessions.
 - **System Test Suite**:
   - Verified under `TC-097` in the Admin Settings System Test Suite.
+
+### 10. Clinical Ongoing & Ending Session Financial Isolation & Privacy Rule
+**Enforced in:** `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/components/admin/doctor/modals/DoctorSessionDrawer.tsx`, `src/components/admin/doctor/modals/DoctorPatientHistoryDrawer.tsx`
+- **Clinical View Financial Masking**: All monetary amounts, pricing rates, currency symbols (`EGP`), and financial invoice summary breakdowns are completely removed from:
+  1. **Doctor Ongoing Session View** (`DoctorOngoingSessionTab.tsx`): Doctors record clinical intake, hardware pulse counts, and consumable items used without viewing price per pulse, extra pulse charges, or session invoice breakdowns.
+  2. **Doctor Session & History Drawers** (`DoctorSessionDrawer.tsx` & `DoctorPatientHistoryDrawer.tsx`): Primary service header prices, service select dropdown prices, total invoice logs, and billed monetary amounts are removed; only delivered pulse counts and consumables used are displayed.
+  3. **Receptionist Ending Session View** (`BookingDetailsModal.tsx` in `viewMode === 'end_session'`): Receptionists record medical intake, delivered pulses, and consumed products without displaying base prices, product prices, or the final session invoice card.
+- **Financial Calculation Preservation**: All background calculations (`handleConfirmEndSession`, invoice math, inventory stock deduction, and database updates) remain fully functional and intact, with financial settlement reserved strictly for the Checkout workflow (`CheckoutModal.tsx`).
+- **Superadmin Only Session Type Modification**: Changing session type is strictly restricted to `superadmin` role (`hasPermission("superadmin")`).
+- **Postpone, Cancel, and No Show Action Suppression on Check-in**: When a patient is checked in (`booking.status === 'checked_in'`), the Postpone, Cancel, and No Show actions in `BookingDetailsModal.tsx` are hidden to prevent invalid status conflicts.
+- **System Test Suite**: Verified under `TC-099` & `TC-100` in the Admin Settings System Test Suite.
+
+### 11. Financial Ledger Integrity, Payment Methods & Interactive Till Engine Rule
+**Enforced in:** `src/app/api/transactions/route.ts`, `src/app/api/invoices/route.ts`, `src/app/api/reservations/route.ts`, `src/app/admin/page.tsx`, `src/components/admin/transactions/TransactionsView.tsx`, `src/components/admin/transactions/NewManualTransactionView.tsx`
+- **Cairo Timezone Bounds & DST Dynamic Detection**: Cairo ISO day bounds for today's net payments (`getCairoIsoBounds`) dynamically detect standard/daylight saving time (UTC+2 or UTC+3) so till transactions are queried accurately throughout the year.
+- **Float Precision & Micro-Balance Filter**: Customer balances in `customers` table and transaction aggregations round to 2 decimal places (`Math.round(val * 100) / 100`), suppressing floating-point arithmetic residue (< 0.01) from display corruption.
+- **Interactive Metric Cards & Breakdown Modal**: Transactions top 3 overview cards (Today's Payments, Outstanding Debt, and Wallet Balances) are interactive and clickable, opening a search-enabled drilldown modal displaying patient names, phone numbers, individual payment methods, reference IDs, and formatted amounts.
+- **Auto-Generated Reference Numbering**: Supports auto-generating sequential invoice/receipt reference IDs formatted as `INV-000001` via `GET /api/invoices?action=next_no`, with auto-fetch and manual refresh triggers in manual transactions.
+- **Checkout Payment Methods & Reference**: The checkout modal (`handleConfirmCheckout`) supports selectable payment methods (`cash`, `card`, `instapay`, `vodafone_cash`, `bank_transfer`) with transaction/reference number capture, propagating the chosen method to `payments` and `transactions` tables.
+- **Checkout Settlement Isolation**: Prevents duplicate auto-calls to `/api/customers/settle-debt` during checkout of partially paid bookings, preserving the accurate remaining `amount_left` and avoiding over-crediting of debt.
+- **Unassigned Manual Transactions Inclusion**: Querying transactions by branch preserves unassigned/manual transactions (`branch_id IS NULL`) alongside the selected branch so manual till entries are never dropped.
+- **System Test Suite**: Verified under `TC-101` in the Admin Settings System Test Suite.
+
 
 
 

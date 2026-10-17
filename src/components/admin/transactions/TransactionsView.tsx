@@ -96,6 +96,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   const [selectedTxnForDetails, setSelectedTxnForDetails] = useState<TransactionItem | null>(null);
   const [showAuditLogsModal, setShowAuditLogsModal] = useState(false);
   const [activeDropdownTxnId, setActiveDropdownTxnId] = useState<string | null>(null);
+  const [drilldownModal, setDrilldownModal] = useState<'today_payments' | 'outstanding' | 'wallet' | null>(null);
+  const [drilldownSearch, setDrilldownSearch] = useState<string>('');
 
   // Close 3-dots dropdown on outside click
   useEffect(() => {
@@ -336,14 +338,25 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       {/* ── Quick Overview Cards ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
         {/* Card 1: Today's Payments */}
-        <div className="rounded-3xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
-          <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+        <div
+          onClick={() => {
+            setDrilldownSearch("");
+            setDrilldownModal("today_payments");
+          }}
+          className="rounded-3xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm flex items-start gap-4 hover:shadow-md hover:border-emerald-300 transition-all cursor-pointer group select-none"
+        >
+          <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0 group-hover:scale-105 transition-transform">
             <Wallet size={24} />
           </div>
-          <div className="space-y-1">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
-              {lang === "ar" ? "مدفوعات اليوم (الخزينة)" : "Today's Payments"}
-            </span>
+          <div className="space-y-1 flex-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                {lang === "ar" ? "مدفوعات اليوم (الخزينة)" : "Today's Payments"}
+              </span>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 group-hover:bg-emerald-100 px-2 py-0.5 rounded-lg transition-colors">
+                {lang === "ar" ? "عرض التفاصيل" : "Details"} ↗
+              </span>
+            </div>
             <div className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
               EGP {stats.todayNetPayments.toLocaleString()}
             </div>
@@ -361,14 +374,25 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         </div>
 
         {/* Card 2: Outstanding */}
-        <div className="rounded-3xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
-          <div className="h-12 w-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold shrink-0">
+        <div
+          onClick={() => {
+            setDrilldownSearch("");
+            setDrilldownModal("outstanding");
+          }}
+          className="rounded-3xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm flex items-start gap-4 hover:shadow-md hover:border-rose-300 transition-all cursor-pointer group select-none"
+        >
+          <div className="h-12 w-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold shrink-0 group-hover:scale-105 transition-transform">
             <FileText size={24} />
           </div>
-          <div className="space-y-1">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
-              {lang === "ar" ? "المبالغ المستحقة" : "Outstanding"}
-            </span>
+          <div className="space-y-1 flex-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                {lang === "ar" ? "المبالغ المستحقة" : "Outstanding"}
+              </span>
+              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 group-hover:bg-rose-100 px-2 py-0.5 rounded-lg transition-colors">
+                {lang === "ar" ? "عرض التفاصيل" : "Details"} ↗
+              </span>
+            </div>
             <div className="text-2xl sm:text-3xl font-black text-rose-600 tracking-tight">
               EGP {stats.totalOutstanding.toLocaleString()}
             </div>
@@ -380,16 +404,25 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
         {/* Card 3: Wallet Balance */}
         <div
-          className="rounded-3xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow"
+          onClick={() => {
+            setDrilldownSearch("");
+            setDrilldownModal("wallet");
+          }}
+          className="rounded-3xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm flex items-start gap-4 hover:shadow-md hover:border-sky-300 transition-all cursor-pointer group select-none"
           title={lang === "ar" ? "إجمالي الأرصدة المتاحة في محافظ المرضى بالعيادة" : "Total active patient wallet credit across all patients"}
         >
-          <div className="h-12 w-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold shrink-0">
+          <div className="h-12 w-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold shrink-0 group-hover:scale-105 transition-transform">
             <Coins size={24} />
           </div>
-          <div className="space-y-1">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
-              {lang === "ar" ? "أرصدة المحافظ" : "Wallet Balance"}
-            </span>
+          <div className="space-y-1 flex-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                {lang === "ar" ? "أرصدة المحافظ" : "Wallet Balance"}
+              </span>
+              <span className="text-[10px] font-bold text-sky-700 bg-sky-50 group-hover:bg-sky-100 px-2 py-0.5 rounded-lg transition-colors">
+                {lang === "ar" ? "عرض التفاصيل" : "Details"} ↗
+              </span>
+            </div>
             <div className="text-2xl sm:text-3xl font-black text-sky-600 tracking-tight">
               EGP {stats.totalWalletBalance.toLocaleString()}
             </div>
@@ -1011,6 +1044,265 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       {/* ── Audit Logs Modal ── */}
       {showAuditLogsModal && (
         <TransactionAuditLogsModal onClose={() => setShowAuditLogsModal(false)} lang={lang} />
+      )}
+
+      {/* ── Metric Drilldown Modal ── */}
+      {drilldownModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-3xl rounded-3xl bg-white shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[85vh]">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`h-10 w-10 rounded-2xl flex items-center justify-center font-bold ${
+                    drilldownModal === "today_payments"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : drilldownModal === "outstanding"
+                      ? "bg-rose-100 text-rose-700"
+                      : "bg-sky-100 text-sky-700"
+                  }`}
+                >
+                  {drilldownModal === "today_payments" && <Wallet size={20} />}
+                  {drilldownModal === "outstanding" && <FileText size={20} />}
+                  {drilldownModal === "wallet" && <Coins size={20} />}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">
+                    {drilldownModal === "today_payments" && (lang === "ar" ? "تفاصيل مدفوعات اليوم (الخزينة)" : "Today's Payments Breakdown")}
+                    {drilldownModal === "outstanding" && (lang === "ar" ? "سجل المديونيات المستحقة على المرضى" : "Patients with Outstanding Debt")}
+                    {drilldownModal === "wallet" && (lang === "ar" ? "أرصدة محافظ المرضى المتاحة" : "Patient Wallet Balances")}
+                  </h3>
+                  <p className="text-xs text-gray-500 font-medium">
+                    {drilldownModal === "today_payments" &&
+                      (lang === "ar"
+                        ? `إجمالي المقبوضات: ${stats.todayNetPayments.toLocaleString()} ج.م عبر ${stats.todayPaymentsCount} معاملة`
+                        : `Total Collected: EGP ${stats.todayNetPayments.toLocaleString()} across ${stats.todayPaymentsCount} transactions`)}
+                    {drilldownModal === "outstanding" &&
+                      (lang === "ar"
+                        ? `إجمالي المديونية: ${stats.totalOutstanding.toLocaleString()} ج.م لدى ${stats.outstandingCount} مريض`
+                        : `Total Outstanding: EGP ${stats.totalOutstanding.toLocaleString()} across ${stats.outstandingCount} patients`)}
+                    {drilldownModal === "wallet" &&
+                      (lang === "ar"
+                        ? `إجمالي أرصدة المحافظ: ${stats.totalWalletBalance.toLocaleString()} ج.م لدى ${stats.activeWalletCount} مريض`
+                        : `Total Wallet Credit: EGP ${stats.totalWalletBalance.toLocaleString()} across ${stats.activeWalletCount} patients`)}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDrilldownModal(null)}
+                className="h-8 w-8 rounded-full bg-white hover:bg-gray-100 text-gray-500 flex items-center justify-center border border-gray-200 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Search Bar */}
+            <div className="p-4 border-b border-gray-100 bg-white">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={drilldownSearch}
+                  onChange={(e) => setDrilldownSearch(e.target.value)}
+                  placeholder={
+                    lang === "ar"
+                      ? "ابحث باسم المريض أو رقم الهاتف أو رقم المرجع..."
+                      : "Search by patient name, mobile, or reference..."
+                  }
+                  className="w-full rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] px-4 py-2.5 pe-10 text-xs font-medium text-gray-800 placeholder-gray-400 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition"
+                />
+                <div className={`absolute top-3 text-gray-400 ${lang === "ar" ? "left-3.5" : "right-3.5"}`}>
+                  <Search size={15} />
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body / Items List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+              {/* Today Payments List */}
+              {drilldownModal === "today_payments" && (() => {
+                const list = (stats.todayPaymentsList || []).filter((item) => {
+                  if (!drilldownSearch.trim()) return true;
+                  const q = drilldownSearch.toLowerCase();
+                  return (
+                    (item.customer_name || item.patientName || "").toLowerCase().includes(q) ||
+                    (item.customer_phone || item.phone || "").toLowerCase().includes(q) ||
+                    (item.reference_no || item.referenceNo || "").toLowerCase().includes(q) ||
+                    (item.transaction_id || "").toLowerCase().includes(q)
+                  );
+                });
+
+                if (list.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-gray-400 text-xs">
+                      {lang === "ar" ? "لا توجد مدفوعات مسجلة اليوم تطابق البحث" : "No payments found matching search."}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2">
+                    {list.map((item, idx) => (
+                      <div
+                        key={item.id || idx}
+                        className="rounded-2xl border border-gray-100 bg-[#FBFBFA] p-3.5 flex items-center justify-between gap-3 text-xs hover:border-emerald-200 transition"
+                      >
+                        <div className="space-y-0.5">
+                          <div className="font-bold text-gray-900 flex items-center gap-2">
+                            <span>{item.customer_name || item.patientName || "Guest / Patient"}</span>
+                            {(item.reference_no || item.referenceNo) && (
+                              <span className="text-[10px] font-mono bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded-md border border-emerald-100 font-bold">
+                                {item.reference_no || item.referenceNo}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-gray-500 flex items-center gap-2">
+                            <span>{item.customer_phone || item.phone || "—"}</span>
+                            <span>•</span>
+                            <span className="capitalize">{item.payment_method || item.paymentMethod || "cash"}</span>
+                            {(item.occurred_at || item.occurredAt) && (
+                              <>
+                                <span>•</span>
+                                <span>{new Date(item.occurred_at || item.occurredAt || "").toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-end">
+                          <span className={`font-black text-sm ${Number(item.amount) >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                            {Number(item.amount) >= 0 ? "+" : ""}{Number(item.amount).toLocaleString()} EGP
+                          </span>
+                          <span className="block text-[10px] text-gray-400 capitalize">
+                            {item.type?.replace(/_/g, " ") || "Payment"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* Outstanding Debt List */}
+              {drilldownModal === "outstanding" && (() => {
+                const list = (stats.outstandingPatientsList || []).filter((item) => {
+                  if (!drilldownSearch.trim()) return true;
+                  const q = drilldownSearch.toLowerCase();
+                  return (
+                    (item.name || "").toLowerCase().includes(q) ||
+                    (item.phone || item.mobile || "").toLowerCase().includes(q)
+                  );
+                });
+
+                if (list.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-gray-400 text-xs">
+                      {lang === "ar" ? "لا توجد مديونيات مستحقة تطابق البحث" : "No outstanding debt found matching search."}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2">
+                    {list.map((item, idx) => (
+                      <div
+                        key={item.id || idx}
+                        className="rounded-2xl border border-gray-100 bg-[#FBFBFA] p-3.5 flex items-center justify-between gap-3 text-xs hover:border-rose-200 transition"
+                      >
+                        <div className="space-y-0.5">
+                          <div className="font-bold text-gray-900">{item.name}</div>
+                          <div className="text-[11px] text-gray-500">{item.phone || item.mobile || "—"}</div>
+                        </div>
+
+                        <div className="text-end flex items-center gap-4">
+                          {Number(item.wallet_balance || item.walletBalance || 0) > 0 && (
+                            <div className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded-xl">
+                              {lang === "ar" ? "محفظة: " : "Wallet: "}
+                              {Number(item.wallet_balance || item.walletBalance).toLocaleString()} EGP
+                            </div>
+                          )}
+                          <div>
+                            <span className="font-black text-sm text-rose-600 block">
+                              EGP {Number(item.outstanding || 0).toLocaleString()}
+                            </span>
+                            <span className="text-[10px] text-gray-400 font-semibold">
+                              {lang === "ar" ? "مبلغ مستحق" : "Outstanding"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* Wallet Balances List */}
+              {drilldownModal === "wallet" && (() => {
+                const list = (stats.walletPatientsList || []).filter((item) => {
+                  if (!drilldownSearch.trim()) return true;
+                  const q = drilldownSearch.toLowerCase();
+                  return (
+                    (item.name || "").toLowerCase().includes(q) ||
+                    (item.phone || item.mobile || "").toLowerCase().includes(q)
+                  );
+                });
+
+                if (list.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-gray-400 text-xs">
+                      {lang === "ar" ? "لا توجد أرصدة محافظ تطابق البحث" : "No wallet balances found matching search."}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2">
+                    {list.map((item, idx) => (
+                      <div
+                        key={item.id || idx}
+                        className="rounded-2xl border border-gray-100 bg-[#FBFBFA] p-3.5 flex items-center justify-between gap-3 text-xs hover:border-sky-200 transition"
+                      >
+                        <div className="space-y-0.5">
+                          <div className="font-bold text-gray-900">{item.name}</div>
+                          <div className="text-[11px] text-gray-500">{item.phone || item.mobile || "—"}</div>
+                        </div>
+
+                        <div className="text-end flex items-center gap-4">
+                          {Number(item.outstanding || 0) > 0 && (
+                            <div className="text-[11px] text-rose-700 font-bold bg-rose-50 px-2 py-1 rounded-xl">
+                              {lang === "ar" ? "مستحق: " : "Due: "}
+                              {Number(item.outstanding).toLocaleString()} EGP
+                            </div>
+                          )}
+                          <div>
+                            <span className="font-black text-sm text-sky-700 block">
+                              EGP {Number(item.wallet_balance || item.walletBalance || 0).toLocaleString()}
+                            </span>
+                            <span className="text-[10px] text-gray-400 font-semibold">
+                              {lang === "ar" ? "رصيد المحفظة" : "Wallet Balance"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setDrilldownModal(null)}
+                className="rounded-xl border border-gray-200 bg-white px-5 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              >
+                {lang === "ar" ? "إغلاق" : "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

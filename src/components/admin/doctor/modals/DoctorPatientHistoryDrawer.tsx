@@ -355,9 +355,9 @@ export default function DoctorPatientHistoryDrawer({
                 </span>
               </div>
               <div className="bg-white p-4 rounded-2xl border border-[var(--cr-primary)]/10 shadow-xs">
-                <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block">Total Additional Pulses Billed</span>
+                <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider block">Total Additional Pulses</span>
                 <span className="text-xl font-black text-amber-800 mt-1 block">
-                  {laserLogs.reduce((sum, l) => sum + Number(l.additional_charge || 0), 0)} EGP
+                  {laserLogs.reduce((sum, l) => sum + Number(l.additional_pulses || 0), 0)} Pulses
                 </span>
               </div>
             </div>
@@ -410,7 +410,7 @@ export default function DoctorPatientHistoryDrawer({
                       <div className="bg-[var(--color-brand-light)] p-2.5 rounded-xl border border-[var(--cr-primary)]/10">
                         <span className="text-[10px] text-[var(--color-brand-secondary)] block">Extra Pulses</span>
                         <span className={`font-extrabold ${Number(log.additional_pulses) > 0 ? "text-amber-800" : "text-[var(--color-brand-secondary)]"}`}>
-                          {log.additional_pulses || 0} {Number(log.additional_charge) > 0 && `(+${log.additional_charge} EGP)`}
+                          {log.additional_pulses || 0}
                         </span>
                       </div>
 
@@ -575,7 +575,7 @@ export default function DoctorPatientHistoryDrawer({
                   {parsed.productsLog && (
                     <div className="text-xs font-medium text-[#374151] bg-[#F7F7F9] p-3 rounded-2xl border border-gray-200 flex items-center gap-2">
                       <Package size={15} className="text-[var(--cr-primary)] shrink-0" />
-                      <span className="truncate">{parsed.productsLog.replace(/^\[Products Used During Session\]:\s*/i, "Consumables Used: ")}</span>
+                      <span className="truncate">{parsed.productsLog.replace(/^\[Products Used During Session\]:\s*/i, "Consumables Used: ").replace(/\s*x\s*\d+(?:\.\d+)?\s*EGP\s*=\s*\d+(?:\.\d+)?\s*EGP/g, "")}</span>
                     </div>
                   )}
                 </div>

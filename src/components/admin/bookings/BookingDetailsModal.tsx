@@ -829,11 +829,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       });
   }, [booking?.id]);
 
-  // ── Receptionist Full Booking Status Control ──
+  // ── Superadmin Full Booking Status Control ──
   const handleUpdateBookingStatus = async (newStatus: string) => {
     if (!booking || isUpdatingStatus) return;
-    if (!hasPermission("bookings.edit")) {
-      alert(isRTL ? "ليس لديك صلاحية لتعديل الحجز" : "You do not have permission to edit bookings.");
+    if (!hasPermission("superadmin")) {
+      alert(isRTL ? "تعديل حالة الحجز متاح للمشرف العام فقط" : "Changing booking status is restricted to superadmins only.");
       return;
     }
 
@@ -1637,6 +1637,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           status: "completed",
           doctorNotes: clinicalNote || (booking.doctorNotes ?? ""),
           notes: updatedNotes,
+          amountPaid: paidAmount,
           amountLeft: finalAmountLeft,
           total_price: finalInvoiceAmount,
           price: finalInvoiceAmount,
@@ -2098,7 +2099,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const isInvoicePaid = !isExceededDeficit && (
           isZeroHistoricalBooking ||
           (sessionPaid >= totalPrice && totalPrice > 0) ||
-          (sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || booking.status === 'completed' || isHistoricalBooking))
+          (sessionLeft <= 0 && (sessionPaid > 0 || isLaserPackage || totalPrice === 0 || isHistoricalBooking))
         );
 
         // Primary effective service for end session
@@ -2227,22 +2228,22 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </div>
                   </div>
 
-                  {/* LASER PER-PULSE AGREEMENT NOTICE */}
+                  {/* LASER PER-PULSE NOTICE (CLINICAL PULSE TRACKING) */}
                   {isLaserPerPulse && (
                     <div className="rounded-3xl border border-amber-300 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-emerald-500/10 p-5 shadow-xs space-y-1.5 animate-fadeIn">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-2 font-black text-[var(--cr-dark)] text-sm">
                           <Zap size={18} className="text-amber-600 fill-amber-500 animate-pulse" />
-                          <span>{isRTL ? "اتفاقية محاسبة خدمات الليزر بنظام حساب النبضات" : "Laser Per-Pulse Settlement Agreement"}</span>
+                          <span>{isRTL ? "خدمات الليزر بنظام حساب النبضات" : "Laser Per-Pulse Session"}</span>
                         </div>
                         <span className="rounded-full bg-amber-200 text-amber-900 border border-amber-300 px-3 py-1 text-xs font-black">
-                          {laserPulseRate} EGP / {isRTL ? "نبضة" : "pulse"}
+                          {totalSessionPulses} {isRTL ? "نبضة مسجلة" : "pulses recorded"}
                         </span>
                       </div>
                       <p className="text-xs text-[var(--cr-dark)] font-semibold leading-relaxed">
                         {isRTL
-                          ? `تم الاتفاق على أن تكون خدمات الليزر في هذه الجلسة مدفوعة بنظام حساب النبضات (${totalSessionPulses} نبضة × ${laserPulseRate} ج.م = ${totalSessionPulses * laserPulseRate} ج.م)`
-                          : `Settled that laser services in this session are charged per pulse (${totalSessionPulses} pulses × ${laserPulseRate} EGP = ${totalSessionPulses * laserPulseRate} EGP)`}
+                          ? `خدمات الليزر في هذه الجلسة بنظام حساب النبضات (إجمالي النبضات المسجلة: ${totalSessionPulses} نبضة).`
+                          : `Laser services in this session are tracked by delivered pulses (Total recorded: ${totalSessionPulses} pulses).`}
                       </p>
                     </div>
                   )}
@@ -2792,9 +2793,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                     </span>
                                   )}
                                 </span>
-                                <span className="font-extrabold text-[var(--cr-primary)]">
-                                  {baseBookingPrice} EGP {isLaserPerPulse && isPrimaryLaser && Number(primaryPulses) > 0 ? `(${primaryPulses} × ${laserPulseRate} EGP)` : ""}
-                                </span>
                               </div>
 
                               <div className="bg-white p-3 rounded-xl border border-[var(--cr-primary)]/10 space-y-3">
@@ -2816,7 +2814,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                   >
                                     {localServices.map((s) => (
                                       <option key={s.id} value={s.id}>
-                                        {isRTL ? (s.ar || s.en) : (s.en || s.ar)} ({getEffectiveServicePrice(s, booking?.branchId, branches)} EGP){checkIsLaserService(s) ? (isRTL ? " ⚡ (ليزر)" : " ⚡ (Laser)") : ""}
+                                        {isRTL ? (s.ar || s.en) : (s.en || s.ar)}{checkIsLaserService(s) ? (isRTL ? " ⚡ (ليزر)" : " ⚡ (Laser)") : ""}
                                       </option>
                                     ))}
                                   </select>
@@ -2891,7 +2889,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                     <option value="">{isRTL ? "-- اختر الخدمة الإضافية --" : "-- Select Additional Service --"}</option>
                                     {localServices.map((s) => (
                                       <option key={s.id} value={s.id}>
-                                        {isRTL ? (s.ar || s.en) : (s.en || s.ar)} ({getEffectiveServicePrice(s, booking?.branchId, branches)} EGP){checkIsLaserService(s) ? (isRTL ? " ⚡ (ليزر)" : " ⚡ (Laser)") : ""}
+                                        {isRTL ? (s.ar || s.en) : (s.en || s.ar)}{checkIsLaserService(s) ? (isRTL ? " ⚡ (ليزر)" : " ⚡ (Laser)") : ""}
                                       </option>
                                     ))}
                                   </select>
@@ -2988,13 +2986,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                           )}
                                         </div>
                                         <div className="flex items-center gap-3 shrink-0">
-                                          <span className="font-extrabold text-[var(--cr-primary)]">
-                                            {isLaserPackage && isItemLaser ? (
-                                              <span className="text-purple-700 font-bold">0 EGP (Package Redemption)</span>
-                                            ) : (
-                                              `+${itemDisplayPrice} EGP ${isLaserPerPulse && isItemLaser && Number(item.pulses) > 0 ? `(${item.pulses} × ${laserPulseRate} EGP)` : ""}`
-                                            )}
-                                          </span>
                                           <button
                                             type="button"
                                             onClick={() => handleRemoveServiceFromSession(item.id)}
@@ -3034,7 +3025,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 const isOutOfStock = Number(p.stock_quantity ?? p.stockQuantity ?? p.stock ?? p.quantity ?? 0) <= 0 || p.status === "Out of Stock";
                                 return (
                                   <option key={p.id} value={p.id} disabled={isOutOfStock}>
-                                    {p.name} ({p.price || p.unit_price || p.selling_price || 0} EGP){isOutOfStock ? " — Out of Stock" : ""}
+                                    {p.name}{isOutOfStock ? " — Out of Stock" : ""}
                                   </option>
                                 );
                               })}
@@ -3056,7 +3047,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             disabled={!selectedSessionProductId}
                             className="w-full rounded-xl bg-[var(--cr-primary)] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
                           >
-                            <Plus size={14} /> {isRTL ? "إضافة المنتج للفاتورة وخصمه من المخزون" : "Add Product to Invoice & Deduct Stock"}
+                            <Plus size={14} /> {isRTL ? "إضافة المنتج للجلسة وخصمه من المخزون" : "Add Product & Deduct Stock"}
                           </button>
 
                           {usedProducts.length > 0 && (
@@ -3065,10 +3056,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                                 <div key={i} className="flex items-center justify-between text-xs bg-white p-2.5 rounded-xl border border-[var(--cr-primary)]/10 gap-2">
                                   <div className="min-w-0">
                                     <span className="font-bold text-[var(--cr-dark)] block truncate">{item.name}</span>
-                                    <span className="text-[10px] text-[var(--color-brand-secondary)] block truncate">Qty: {item.qty} x {item.unitPrice} EGP</span>
+                                    <span className="text-[10px] text-[var(--color-brand-secondary)] block truncate">Qty: {item.qty}</span>
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0">
-                                    <span className="font-extrabold text-[var(--cr-primary)]">+{item.total} EGP</span>
                                     <button
                                       type="button"
                                       onClick={() => handleRemoveProductFromSession(i)}
@@ -3108,27 +3098,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             }}
                           />
                         )}
-
-                        {/* FINAL SESSION INVOICE SUMMARY */}
-                        <div className="bg-[var(--cr-primary)]/05 p-4 rounded-2xl space-y-2 text-xs border border-[var(--cr-primary)]/10">
-                          <div className="flex flex-wrap items-center justify-between gap-3 text-[var(--color-brand-secondary)]">
-                            <span>{isRTL ? "الخدمة الأساسية:" : "Base Service:"} <strong className="text-[var(--cr-dark)]">{baseBookingPrice} EGP</strong></span>
-                            {additionalServicesSubtotal > 0 && (
-                              <span>{isRTL ? "خدمات إضافية:" : "Extra Services:"} <strong className="text-[var(--cr-dark)]">+{additionalServicesSubtotal} EGP</strong></span>
-                            )}
-                            {productsSubtotal > 0 && (
-                              <span>{isRTL ? "منتجات ومستهلكات:" : "Products:"} <strong className="text-[var(--cr-dark)]">+{productsSubtotal} EGP</strong></span>
-                            )}
-                          </div>
-                          <div className="pt-2 border-t border-[var(--cr-primary)]/10 flex items-center justify-between text-[var(--cr-primary)] font-extrabold text-sm sm:text-base">
-                            <span>{isRTL ? "إجمالي فاتورة الجلسة النهائية:" : "Final Session Invoice:"}</span>
-                            <span>{endSessionInvoiceTotal} EGP</span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-[var(--color-brand-secondary)] pt-1">
-                            <span>{isRTL ? "المدفوع مسبقاً:" : "Paid:"} <strong className="text-emerald-700">{sessionPaid} EGP</strong></span>
-                            <span>{isRTL ? "المتبقي للتحصيل:" : "Outstanding:"} <strong className={endSessionAmountLeft > 0 ? "text-rose-700 font-bold" : "text-emerald-700 font-bold"}>{endSessionAmountLeft} EGP</strong></span>
-                          </div>
-                        </div>
                       </div>
 
                     </div>
@@ -3230,8 +3199,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       </button>
                     </span>
 
-                    {/* Interactive Status Selector / Badge */}
-                    {hasPermission("bookings.edit") ? (
+                    {/* Interactive Status Selector / Badge (Restricted to Superadmin Only) */}
+                    {hasPermission("superadmin") ? (
                       <div className="relative inline-flex items-center">
                         <select
                           value={booking.status === "approved" ? "confirmed" : booking.status}
@@ -4179,7 +4148,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   </div>
 
                   {/* 2. OTHER ACTIONS CARD */}
-                  {!['completed', 'cancelled', 'rejected', 'no_show', 'started'].includes(booking.status) && hasPermission("bookings.edit") && (
+                  {!['completed', 'cancelled', 'rejected', 'no_show', 'started', 'checked_in'].includes(booking.status) && hasPermission("bookings.edit") && (
                     <div className="rounded-2xl border border-[var(--cr-primary)]/10 bg-white p-5 space-y-3 shadow-2xs">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)]">OTHER ACTIONS</p>
                       
