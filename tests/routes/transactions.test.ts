@@ -3,10 +3,10 @@
  * module (RISK-076: see ai_docs/RISKS.md).
  *
  * Requirements & Validations:
- *  - Manual creation is strictly limited to 3 allowed transaction types:
- *    `refund`, `service_charge`, `product_purchase`.
- *  - Prohibited from manual creation: `payment`, `outstanding_payment`, `wallet_topup`,
- *    `wallet_deduction`, `adjustment` (these are automated through bookings, settlement, and wallet flows).
+ *  - Manual creation supports `refund`, `service_charge`, `product_purchase`, and (DEC-105) the
+ *    money-movement types `payment`/`outstanding_payment` (needs `transactions.manual_payment`) and
+ *    `wallet_topup`/`wallet_deduction` (needs `transactions.manual_wallet`) — superadmin always,
+ *    other roles only via an exact grant in Role Management. `adjustment` stays rejected.
  *  - GET /api/transactions supports filtering by `source` ('all' | 'manual' | 'automatic'),
  *    `dateRange`, `type`, `paymentMethod`, `status`, `branchId`, `amountRange`, `customerId`, and `search`.
  *  - Permission guards: `transactions.view` for GET, `transactions.create` for POST,
@@ -149,42 +149,43 @@ describe('POST — request validation & allowed types', () => {
     expect(res.status).toBe(400);
   });
 
-  it('manual "payment" is rejected → 400 (automated via bookings/checkout only)', async () => {
+  it('manual "payment" by superadmin is recorded as a manual payment row', async () => {
     fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 0, spent_amount: 0 }]);
     const res = await POST(staffReq('POST', { body: { transaction_type: 'payment', customer_id: CUSTOMER_ID, amount: 100 } }));
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toMatch(/direct payments are recorded automatically/i);
+    expect(res.status).toBe(200);
+    const row = fake.rows('transactions')[0];
+    expect(row.type).toBe('payment');
+    expect(row.source).toBe('manual');
   });
 
-  it('manual "outstanding_payment" is rejected → 400 (automated via Settle Balance only)', async () => {
+  it('manual "outstanding_payment" by superadmin reduces the patient debt', async () => {
     fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 400, spent_amount: 1000 }]);
-    const res = await POST(staffReq('POST', {
-      body: { transaction_type: 'outstanding_payment', customer_id: CUSTOMER_ID, amount: 300 },
-    }));
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/settle balance/i);
+    const res = await POST(staffReq('POST', { body: { transaction_type: 'outstanding_payment', customer_id: CUSTOMER_ID, amount: 300 } }));
+    expect(res.status).toBe(200);
+    expect(fake.rows('customers')[0].outstanding).toBe(100);
   });
 
-  it('manual "wallet_topup" is rejected → 400 (automated via patient wallet workflow)', async () => {
+  it('manual "wallet_topup" by superadmin credits the wallet', async () => {
     fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 0, spent_amount: 0 }]);
     const res = await POST(staffReq('POST', { body: { transaction_type: 'wallet_topup', customer_id: CUSTOMER_ID, amount: 200 } }));
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/wallet deposits and deductions are automated/i);
+    expect(res.status).toBe(200);
+    expect(fake.rows('customers')[0].wallet_balance).toBe(200);
   });
 
-  it('manual "wallet_deduction" is rejected → 400 (automated via patient wallet workflow)', async () => {
+  it('manual "wallet_deduction" by superadmin debits the wallet but cannot exceed the balance', async () => {
     fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 500, outstanding: 0, spent_amount: 0 }]);
-    const res = await POST(staffReq('POST', { body: { transaction_type: 'wallet_deduction', customer_id: CUSTOMER_ID, amount: 200 } }));
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/wallet deposits and deductions are automated/i);
+    const ok = await POST(staffReq('POST', { body: { transaction_type: 'wallet_deduction', customer_id: CUSTOMER_ID, amount: 200 } }));
+    expect(ok.status).toBe(200);
+    expect(fake.rows('customers')[0].wallet_balance).toBe(300);
+    const tooMuch = await POST(staffReq('POST', { body: { transaction_type: 'wallet_deduction', customer_id: CUSTOMER_ID, amount: 999 } }));
+    expect(tooMuch.status).toBe(400);
   });
 
-  it('manual "adjustment" is rejected → 400', async () => {
+  it('manual "adjustment" is still rejected → 400 (use the patient balance adjustment tools)', async () => {
     fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 0, spent_amount: 0 }]);
     const res = await POST(staffReq('POST', { body: { transaction_type: 'adjustment', customer_id: CUSTOMER_ID, amount: 100 } }));
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/manual balance adjustments are not permitted/i);
+    expect((await res.json()).error).toMatch(/not supported/i);
   });
 
   it.each([0, -50, NaN])('amount %s → 400', async (amount) => {
@@ -602,5 +603,58 @@ describe('GET — custom date range uses Cairo day boundaries', () => {
   it('a malformed startDate/endDate → 400 instead of a 500 from Date parsing', async () => {
     const res = await GET(staffReq('GET', { query: 'dateRange=custom&startDate=garbage&endDate=2026-01-15' }));
     expect(res.status).toBe(400);
+  });
+});
+
+// ── POST — manual payment & wallet permissions (DEC-105) ─────────────────────
+
+describe('POST — manual payment & wallet movements need an explicit Role Management grant', () => {
+  const body = (type: string, amount = 100) => ({ body: { transaction_type: type, customer_id: CUSTOMER_ID, amount } });
+  beforeEach(() => {
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 500, outstanding: 400, spent_amount: 0 }]);
+  });
+
+  it.each(['payment', 'outstanding_payment', 'wallet_topup', 'wallet_deduction'])(
+    '%s → 403 for staff with only transactions.create',
+    async (type) => {
+      seedStaffAuth('receptionist', ['transactions.create']);
+      const res = await POST(staffReq('POST', body(type)));
+      expect(res.status).toBe(403);
+      expect(fake.rows('transactions')).toHaveLength(0);
+    },
+  );
+
+  it('transactions.manual_payment unlocks payment and outstanding_payment, not wallet movements', async () => {
+    seedStaffAuth('receptionist', ['transactions.create', 'transactions.manual_payment']);
+    expect((await POST(staffReq('POST', body('payment')))).status).toBe(200);
+    expect((await POST(staffReq('POST', body('outstanding_payment')))).status).toBe(200);
+    expect((await POST(staffReq('POST', body('wallet_topup')))).status).toBe(403);
+    expect((await POST(staffReq('POST', body('wallet_deduction')))).status).toBe(403);
+  });
+
+  it('transactions.manual_wallet unlocks wallet_topup and wallet_deduction, not payments', async () => {
+    seedStaffAuth('receptionist', ['transactions.create', 'transactions.manual_wallet']);
+    expect((await POST(staffReq('POST', body('wallet_topup')))).status).toBe(200);
+    expect((await POST(staffReq('POST', body('wallet_deduction')))).status).toBe(200);
+    expect((await POST(staffReq('POST', body('payment')))).status).toBe(403);
+    expect((await POST(staffReq('POST', body('outstanding_payment')))).status).toBe(403);
+  });
+
+  it('a coarse "Finance" role label is not enough — the two keys are exact-grant only', async () => {
+    seedStaffAuth('receptionist', ['Finance']);
+    expect((await POST(staffReq('POST', body('payment')))).status).toBe(403);
+    expect((await POST(staffReq('POST', body('wallet_topup')))).status).toBe(403);
+    expect((await POST(staffReq('POST', body('service_charge') as any))).status).not.toBe(403);
+  });
+
+  it('the manual_* keys do not replace transactions.create', async () => {
+    seedStaffAuth('receptionist', ['transactions.manual_payment']);
+    expect((await POST(staffReq('POST', body('payment')))).status).toBe(403);
+  });
+
+  it('service_charge is unaffected by the new keys', async () => {
+    seedStaffAuth('receptionist', ['transactions.create']);
+    const res = await POST(staffReq('POST', { body: { transaction_type: 'service_charge', customer_id: CUSTOMER_ID, amount: 100, description: 'Consultation' } }));
+    expect(res.status).toBe(200);
   });
 });

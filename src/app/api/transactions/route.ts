@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireStaffAccess, hasFinancePermission } from '@/lib/access';
+import { requireStaffAccess, hasFinancePermission, hasGranularPermission } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { formatInvoiceNo } from '@/lib/ledger';
 
@@ -433,6 +433,23 @@ export async function POST(req: Request) {
     // Refunds require granular transactions.refund permission
     if (transaction_type === 'refund' && !hasFinancePermission(access.access, 'transactions.refund')) {
       return NextResponse.json({ error: 'Permission to process refunds is required.' }, { status: 403 });
+    }
+
+    // Manual payments / debt settlements and wallet movements move real money without a booking
+    // behind them (DEC-105). Superadmin always may; any other role needs the explicit grant from
+    // Role Management. hasGranularPermission is deliberately exact-key, so the coarse
+    // "Transactions"/"Finance" role labels do not imply these two.
+    if (
+      (transaction_type === 'payment' || transaction_type === 'outstanding_payment')
+      && !hasGranularPermission(access.access, 'transactions.manual_payment')
+    ) {
+      return NextResponse.json({ error: 'Permission to record manual payments and debt settlements is required.' }, { status: 403 });
+    }
+    if (
+      (transaction_type === 'wallet_topup' || transaction_type === 'wallet_deduction')
+      && !hasGranularPermission(access.access, 'transactions.manual_wallet')
+    ) {
+      return NextResponse.json({ error: 'Permission to record manual wallet deposits and deductions is required.' }, { status: 403 });
     }
 
     const parsedAmount = Number(amount);

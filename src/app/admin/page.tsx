@@ -896,8 +896,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       if (["hr.manage_leaves", "hr.manage_performance"].includes(permKey) && adminPermissions.includes("hr.manage_attendance")) return true;
     }
 
-    // Transactions fallbacks
-    if (permKey.startsWith("transactions.")) {
+    // Transactions fallbacks (the two manual-money keys are exact-grant only, mirroring the API)
+    if (permKey.startsWith("transactions.") && permKey !== "transactions.manual_payment" && permKey !== "transactions.manual_wallet") {
       if (adminPermissions.includes("Transactions") || adminPermissions.includes("transactions")) return true;
       if (["transactions.action_view_details", "transactions.action_print_receipt"].includes(permKey)) {
         if (adminPermissions.includes("transactions.view")) return true;
@@ -6571,6 +6571,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   setTransactionsSubView("previous_booking");
                 }}
                 lang={lang}
+                hasPermission={hasPermission}
               />
             ) : (
               <TransactionsView
