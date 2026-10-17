@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireStaffAccess, hasFinancePermission } from '@/lib/access';
+import { requireStaffAccess, hasFinancePermission, hasGranularPermission } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { formatInvoiceNo } from '@/lib/ledger';
 
@@ -12,6 +12,32 @@ const VALID_TRANSACTION_TYPES = [
 
 function formatTxnId(seqVal: number): string {
   return `TXN-${String(seqVal).padStart(6, '0')}`;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Africa/Cairo's UTC offset (+02:00 winter / +03:00 DST) in effect at the given instant.
+function cairoOffsetStr(at: Date): string {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', timeZoneName: 'shortOffset' }).formatToParts(at);
+  const tzPart = parts.find((p) => p.type === 'timeZoneName')?.value || 'GMT+3';
+  const match = tzPart.match(/GMT([+-])(\d+)(?::(\d+))?/);
+  let offsetMinutes = 180;
+  if (match) {
+    const sign = match[1] === '-' ? -1 : 1;
+    offsetMinutes = sign * (parseInt(match[2], 10) * 60 + (match[3] ? parseInt(match[3], 10) : 0));
+  }
+  const pad = (n: number) => String(Math.abs(n)).padStart(2, '0');
+  return `${offsetMinutes >= 0 ? '+' : '-'}${pad(Math.floor(Math.abs(offsetMinutes) / 60))}:${pad(Math.abs(offsetMinutes) % 60)}`;
+}
+
+// Start/end instants of a Cairo calendar day given as YYYY-MM-DD.
+function cairoDayBounds(ymd: string): { start: string; end: string } {
+  const offset = cairoOffsetStr(new Date(`${ymd}T12:00:00Z`));
+  return {
+    start: new Date(`${ymd}T00:00:00${offset}`).toISOString(),
+    end: new Date(`${ymd}T23:59:59.999${offset}`).toISOString(),
+  };
 }
 
 export async function GET(req: Request) {
@@ -39,6 +65,16 @@ export async function GET(req: Request) {
   const customerId = searchParams.get('customerId');
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '10', 10)));
+
+  // branchId is interpolated into a PostgREST .or() expression below, so anything but a UUID
+  // (e.g. "x,branch_id.not.is.null") could widen the filter to other branches' rows.
+  if (branchId !== 'all' && !UUID_RE.test(branchId)) {
+    return NextResponse.json({ error: 'Invalid branchId.' }, { status: 400 });
+  }
+  if (dateRange === 'custom' && startDateParam && endDateParam
+    && !(YMD_RE.test(startDateParam) && YMD_RE.test(endDateParam))) {
+    return NextResponse.json({ error: 'startDate and endDate must be YYYY-MM-DD.' }, { status: 400 });
+  }
 
   try {
     // 1. Fetch transactions with relations
@@ -80,24 +116,7 @@ export async function GET(req: Request) {
     const getCairoIsoBounds = (daysOffset: number = 0) => {
       const targetDate = new Date(now.getTime() + daysOffset * 86400000);
       const dayYmd = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(targetDate);
-      const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', timeZoneName: 'shortOffset' }).formatToParts(targetDate);
-      const tzPart = parts.find((p) => p.type === 'timeZoneName')?.value || 'GMT+3';
-      const match = tzPart.match(/GMT([+-])(\d+)(?::(\d+))?/);
-      let offsetMinutes = 180;
-      if (match) {
-        const sign = match[1] === '-' ? -1 : 1;
-        const hours = parseInt(match[2], 10);
-        const mins = match[3] ? parseInt(match[3], 10) : 0;
-        offsetMinutes = sign * (hours * 60 + mins);
-      }
-      const offsetSign = offsetMinutes >= 0 ? '+' : '-';
-      const pad = (n: number) => String(Math.abs(n)).padStart(2, '0');
-      const offsetStr = `${offsetSign}${pad(Math.floor(Math.abs(offsetMinutes) / 60))}:${pad(Math.abs(offsetMinutes) % 60)}`;
-      return {
-        dayStr: dayYmd,
-        start: new Date(`${dayYmd}T00:00:00${offsetStr}`).toISOString(),
-        end: new Date(`${dayYmd}T23:59:59.999${offsetStr}`).toISOString(),
-      };
+      return { dayStr: dayYmd, ...cairoDayBounds(dayYmd) };
     };
 
     if (dateRange === 'today') {
@@ -111,22 +130,10 @@ export async function GET(req: Request) {
       query = query.gte('occurred_at', weekStart);
     } else if (dateRange === 'month') {
       const { dayStr } = getCairoIsoBounds(0);
-      const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', timeZoneName: 'shortOffset' }).formatToParts(now);
-      const tzPart = parts.find((p) => p.type === 'timeZoneName')?.value || 'GMT+3';
-      const match = tzPart.match(/GMT([+-])(\d+)(?::(\d+))?/);
-      let offsetMinutes = 180;
-      if (match) {
-        const sign = match[1] === '-' ? -1 : 1;
-        offsetMinutes = sign * (parseInt(match[2], 10) * 60 + (match[3] ? parseInt(match[3], 10) : 0));
-      }
-      const offsetSign = offsetMinutes >= 0 ? '+' : '-';
-      const pad = (n: number) => String(Math.abs(n)).padStart(2, '0');
-      const offsetStr = `${offsetSign}${pad(Math.floor(Math.abs(offsetMinutes) / 60))}:${pad(Math.abs(offsetMinutes) % 60)}`;
-      const monthStart = new Date(`${dayStr.slice(0, 7)}-01T00:00:00${offsetStr}`).toISOString();
-      query = query.gte('occurred_at', monthStart);
+      query = query.gte('occurred_at', cairoDayBounds(`${dayStr.slice(0, 7)}-01`).start);
     } else if (dateRange === 'custom' && startDateParam && endDateParam) {
-      query = query.gte('occurred_at', new Date(`${startDateParam}T00:00:00Z`).toISOString())
-                   .lte('occurred_at', new Date(`${endDateParam}T23:59:59.999Z`).toISOString());
+      query = query.gte('occurred_at', cairoDayBounds(startDateParam).start)
+                   .lte('occurred_at', cairoDayBounds(endDateParam).end);
     }
 
     // Sorting
@@ -426,6 +433,23 @@ export async function POST(req: Request) {
     // Refunds require granular transactions.refund permission
     if (transaction_type === 'refund' && !hasFinancePermission(access.access, 'transactions.refund')) {
       return NextResponse.json({ error: 'Permission to process refunds is required.' }, { status: 403 });
+    }
+
+    // Manual payments / debt settlements and wallet movements move real money without a booking
+    // behind them (DEC-105). Superadmin always may; any other role needs the explicit grant from
+    // Role Management. hasGranularPermission is deliberately exact-key, so the coarse
+    // "Transactions"/"Finance" role labels do not imply these two.
+    if (
+      (transaction_type === 'payment' || transaction_type === 'outstanding_payment')
+      && !hasGranularPermission(access.access, 'transactions.manual_payment')
+    ) {
+      return NextResponse.json({ error: 'Permission to record manual payments and debt settlements is required.' }, { status: 403 });
+    }
+    if (
+      (transaction_type === 'wallet_topup' || transaction_type === 'wallet_deduction')
+      && !hasGranularPermission(access.access, 'transactions.manual_wallet')
+    ) {
+      return NextResponse.json({ error: 'Permission to record manual wallet deposits and deductions is required.' }, { status: 403 });
     }
 
     const parsedAmount = Number(amount);

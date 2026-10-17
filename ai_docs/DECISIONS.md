@@ -3531,3 +3531,22 @@ Investigation revealed:
    - Production build verified with `npm run build` (0 compiler/TypeScript errors).
 
 ---
+
+---
+
+## DEC-105: Manual Payments & Wallet Movements Reopened — Superadmin Always, Other Roles By Role-Management Grant
+
+**Date:** 2026-10-17
+**Status:** Decided & implemented
+**Supersedes:** the "Strict RISK-076 Manual Creation Contract" in DEC-104 (decision 2), which banned manual `payment`, `outstanding_payment`, `wallet_topup`, `wallet_deduction`.
+
+**Context:** DEC-104 (2026-10-13) banned these four manual types and its test file asserted the ban. Commit c5c6bbc (2026-10-17) silently removed the ban from `POST /api/transactions` and offered the types in the UI with no permission check and without updating DEC-104 or the 5 tests that encoded it. Result: any role holding `transactions.create` could top up a wallet or clear a debt with no booking behind it. The owner decided the capability is wanted, but only for superadmin by default, widenable per role.
+
+**Decision:**
+1. New granular permissions in Role Management → Financial Transactions: `transactions.manual_payment` (payment + outstanding_payment) and `transactions.manual_wallet` (wallet_topup + wallet_deduction).
+2. `POST /api/transactions` enforces them with `hasGranularPermission` (exact key; superadmin and `*` pass; coarse "Transactions"/"Finance" labels deliberately do not). `transactions.create` is still required first. 403 otherwise.
+3. `NewManualTransactionView` hides the gated type buttons without the grant; the client `hasPermission` in `admin/page.tsx` excludes the two keys from its coarse "Transactions" fallback to match the API.
+4. `adjustment` stays rejected.
+5. The 5 outdated tests were rewritten to the new contract and 9 permission tests added (`tests/routes/transactions.test.ts`).
+
+**Not done:** existing roles are not migrated — nobody but superadmin has the keys until granted. Whether to give a seeded role (e.g. an accountant role) the keys by default is left to the owner.

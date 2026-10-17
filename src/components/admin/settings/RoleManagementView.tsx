@@ -149,7 +149,9 @@ const PERMISSION_STRUCTURE = [
       { key: "transactions.action_view_details", label: "View Details (Table 3-Dots)" },
       { key: "transactions.action_print_receipt", label: "Print Receipt (Table 3-Dots)" },
       { key: "transactions.action_refund", label: "Process Refund (Table 3-Dots)" },
-      { key: "transactions.refund", label: "Process Refunds & Adjustments" }
+      { key: "transactions.refund", label: "Process Refunds & Adjustments" },
+      { key: "transactions.manual_payment", label: "Record Manual Payments & Debt Settlements" },
+      { key: "transactions.manual_wallet", label: "Record Manual Wallet Deposits & Deductions" }
     ]
   },
   {

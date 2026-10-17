@@ -107,6 +107,8 @@ interface NewManualTransactionViewProps {
   onAddNewPatient?: () => void;
   onAddPreviousBooking?: () => void;
   lang?: "en" | "ar";
+  /** Role-permission check; payment/wallet types are hidden unless granted (superadmin always passes). */
+  hasPermission?: (permKey: string) => boolean;
 }
 
 export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> = ({
@@ -119,13 +121,23 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
   onAddNewPatient,
   onAddPreviousBooking,
   lang = "en",
+  hasPermission,
 }) => {
   const isAr = lang === "ar";
+
+  const availableTypes = MANUAL_TRANSACTION_TYPES.filter((t) => {
+    if (!hasPermission) return true;
+    if (t.id === "payment" || t.id === "outstanding_payment") return hasPermission("transactions.manual_payment");
+    if (t.id === "wallet_topup") return hasPermission("transactions.manual_wallet");
+    return true;
+  });
 
   // Form Type State
   const [transactionType, setTransactionType] = useState<
     "payment" | "product_purchase" | "service_charge" | "outstanding_payment" | "wallet_topup" | "refund"
-  >("payment");
+  >(
+    (availableTypes.find((t) => t.id === "payment") ?? availableTypes[0]).id
+  );
   
   // Patient Selection State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(preSelectedCustomerId || "");
@@ -597,7 +609,7 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                   }}
                   className="w-full appearance-none rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] px-4 py-3 text-xs font-semibold text-gray-800 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all"
                 >
-                  {MANUAL_TRANSACTION_TYPES.map((opt) => (
+                  {availableTypes.map((opt) => (
                     <option key={opt.id} value={opt.id}>
                       {isAr ? opt.labelAr : opt.labelEn}
                     </option>

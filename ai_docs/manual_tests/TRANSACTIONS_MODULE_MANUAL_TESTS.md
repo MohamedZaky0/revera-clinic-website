@@ -109,3 +109,18 @@ automatic recording and the new flows.
   - If the patient's recorded debt is larger than their unpaid bookings account for, confirm the
     modal warns you that part of it **could not be allocated** rather than silently reducing the
     balance.
+
+---
+
+## DEC-105 — Manual payment & wallet permissions (added 2026-10-17)
+
+> Reasoning: `ai_docs/DECISIONS.md` → **DEC-105**. Automated coverage: `tests/routes/transactions.test.ts`.
+
+- [ ] Role Management → open any non-superadmin role → Financial Transactions group lists **"Record Manual Payments & Debt Settlements"** and **"Record Manual Wallet Deposits & Deductions"**; Arabic labels show in AR mode.
+- [ ] Role with only "Create Manual Transaction" → + New Transaction shows **no** Direct Payment / Settle Debt / Wallet Top-up buttons; the default selected type is a permitted one.
+- [ ] Same role, forge the request (dev tools → resend `POST /api/transactions` with `transaction_type: payment`) → **403**.
+- [ ] Grant "Record Manual Payments…" → Direct Payment and Settle Debt appear and save; Wallet Top-up still hidden/403.
+- [ ] Grant "Record Manual Wallet…" instead → Wallet Top-up appears and saves; payments still hidden/403.
+- [ ] Role labelled only "Finance"/"Transactions" (coarse) does **not** see the gated types.
+- [ ] Superadmin sees all types; a manual payment appears in Today's Payments (الخزينة) and the patient's wallet/outstanding update correctly.
+- [ ] `adjustment` is still rejected (400).

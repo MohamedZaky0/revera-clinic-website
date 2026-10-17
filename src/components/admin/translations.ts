@@ -2217,6 +2217,8 @@ export const adminTranslations = {
         "transactions.action_print_receipt": "Print Receipt (Table 3-Dots)",
         "transactions.action_refund": "Process Refund (Table 3-Dots)",
         "transactions.refund": "Process Refunds & Adjustments",
+        "transactions.manual_payment": "Record Manual Payments & Debt Settlements",
+        "transactions.manual_wallet": "Record Manual Wallet Deposits & Deductions",
 
         // 10. Marketing & Campaigns
         "marketing.view_campaigns": "View Marketing Campaigns & Offers",
@@ -5057,6 +5059,8 @@ export const adminTranslations = {
         "transactions.action_print_receipt": "طباعة إيصال القبض (القائمة 3-نقاط)",
         "transactions.action_refund": "إجراء استرداد / تسوية (القائمة 3-نقاط)",
         "transactions.refund": "معالجة المبالغ المستردة والتسويات",
+        "transactions.manual_payment": "تسجيل مدفوعات وتسويات مديونية يدوية",
+        "transactions.manual_wallet": "تسجيل إيداع وسحب محفظة يدوي",
 
         // 10. Marketing & Campaigns
         "marketing.view_campaigns": "عرض الحملات التسويقية والعروض",
