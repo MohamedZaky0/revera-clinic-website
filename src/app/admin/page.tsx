@@ -1194,10 +1194,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [checkoutDeficitChoice, setCheckoutDeficitChoice] = useState<"BUY_NEW_PACKAGE" | "PAY_PER_PULSE">("BUY_NEW_PACKAGE");
   const [checkoutDeficitPackageId, setCheckoutDeficitPackageId] = useState<string>("");
   const [checkoutDeficitPulseRate, setCheckoutDeficitPulseRate] = useState<number>(1.5);
+  const [checkoutPaymentMethod, setCheckoutPaymentMethod] = useState<"cash" | "card" | "instapay" | "vodafone_cash" | "bank_transfer">("cash");
+  const [checkoutPaymentReference, setCheckoutPaymentReference] = useState<string>("");
   const [allCatalogPackages, setAllCatalogPackages] = useState<any[]>([]);
 
   useEffect(() => {
     if (checkoutBooking) {
+      setCheckoutPaymentMethod("cash");
+      setCheckoutPaymentReference("");
       fetch("/api/packages", { cache: "no-store" })
         .then((res) => (res.ok ? res.json() : []))
         .then((data) => {
@@ -2654,8 +2658,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-094', name: 'Multi-Service Booking & Intake Session Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies multi-service selection, duration aggregation, cumulative pricing, and reservation line items generation across new and previous booking intake.', status: 'idle' },
     { id: 'TC-095', name: 'Previous Booking Multi-Product Selection & Inventory Sales Engine', category: 'Services & Bookings', endpoint: '/api/reservations/previous', description: 'Verifies selecting multiple retail products in previous bookings, invoice value auto-calculation, itemized reservation line items, and product sales recording.', status: 'idle' },
     { id: 'TC-096', name: 'Patient Directory Total Spend & Name Sorting Engine', category: 'Medical & Patients', endpoint: '/api/customers', description: 'Verifies the Total Spend column in the patients directory table, alphabetical A-Z / Z-A name sorting, and dynamic financial spend sorting.', status: 'idle' },
-    { id: 'TC-097', name: 'Resilient Staff Auth & Mobile Context Preservation Engine', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Verifies resilient staff session resolution, email fallback auto-linking, and prevention of unexpected logouts during native mobile date picker interactions.', status: 'idle' },
-    { id: 'TC-098', name: 'Transactions & Till Financial Ledger Engine', category: 'Finance & Accounting', endpoint: '/api/transactions', description: 'Verifies financial transactions retrieval, Cairo calendar timezone bounds, today net payments, outstanding debt, wallet balances, and manual transaction operations.', status: 'idle' }
+    { id: 'TC-098', name: 'Transactions & Till Financial Ledger Engine', category: 'Finance & Accounting', endpoint: '/api/transactions', description: 'Verifies financial transactions retrieval, Cairo calendar timezone bounds, today net payments, outstanding debt, wallet balances, and manual transaction operations.', status: 'idle' },
+    { id: 'TC-099', name: 'Superadmin Booking Status Override Control Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies that interactive booking status overriding is restricted to superadmin role and validates reservation lifecycle transitions.', status: 'idle' },
+    { id: 'TC-100', name: 'Clinical Session Financial Isolation & Privacy Engine', category: 'Doctor & Clinical', endpoint: '/api/reservations', description: 'Verifies complete removal of pricing, rate, and monetary settlement details from doctor ongoing session views and receptionist ending session clinical intake, isolating financial calculations to checkout.', status: 'idle' },
+    { id: 'TC-101', name: 'Financial Ledger Integrity, Payment Methods & Interactive Till Engine', category: 'Finance & Accounting', endpoint: '/api/transactions', description: 'Verifies Cairo calendar timezone bounds, precision rounding of wallet balances, breakdown lists for today payments, debt, and wallet, automatic reference generation, and checkout payment methods.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -10012,7 +10018,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   walletWithdrawal: walletDeduction,
                   walletDeposit: changeAmount > 0 && depositChangeToWallet ? changeAmount : 0,
                   customerId: customerRecord?.id || (checkoutBooking as any).customerId || (checkoutBooking as any).customer_id,
-                  redeemedServiceIds: Object.keys(redeemedPackageItems).map(Number)
+                  redeemedServiceIds: Object.keys(redeemedPackageItems).map(Number),
+                  paymentMethod: checkoutPaymentMethod,
+                  paymentReference: checkoutPaymentReference ? checkoutPaymentReference.trim() : null
                 })
               });
               if (res.ok) {
@@ -10104,46 +10112,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   }
                 }
 
-                // If customer had an outstanding balance (e.g. from in-booking package purchase) and paid now at checkout, settle debt
-                if (customerRecord && Number(customerRecord.outstanding || 0) > 0 && amountPaidNum > 0) {
-                  try {
-                    const settleAmount = Math.min(Number(customerRecord.outstanding || 0), amountPaidNum);
-                    await fetch("/api/customers/settle-debt", {
-                      method: "POST",
-                      headers: authenticatedJsonHeaders,
-                      body: JSON.stringify({
-                        customerId: customerRecord.id,
-                        amount: settleAmount,
-                        paymentMethod: "cash",
-                        note: `Checkout settlement for booking #${checkoutBooking.id}`
-                      })
-                    });
-                  } catch (debtErr) {
-                    console.warn("Non-fatal debt settlement error at checkout:", debtErr);
-                  }
-                }
-
-                // If customer had an outstanding balance (e.g. from in-booking package purchase) and paid now at checkout, settle debt
-                if (customerRecord && Number(customerRecord.outstanding || 0) > 0 && amountPaidNum > 0) {
-                  try {
-                    const settleAmount = Math.min(Number(customerRecord.outstanding || 0), amountPaidNum);
-                    await fetch("/api/customers/settle-debt", {
-                      method: "POST",
-                      headers: authenticatedJsonHeaders,
-                      body: JSON.stringify({
-                        customerId: customerRecord.id,
-                        amount: settleAmount,
-                        paymentMethod: "cash",
-                        note: `Checkout settlement for booking #${checkoutBooking.id}`
-                      })
-                    });
-                  } catch (debtErr) {
-                    console.warn("Non-fatal debt settlement error at checkout:", debtErr);
-                  }
-                }
-
                 setCheckoutBooking(null);
                 setCheckoutAmountPaid("");
+                setCheckoutPaymentMethod("cash");
+                setCheckoutPaymentReference("");
                 setUseWalletBalance(false);
                 setDepositChangeToWallet(false);
                 setRedeemedPackageItems({});
@@ -10513,6 +10485,52 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     </div>
                   </div>
 
+                  {/* Payment Method Selector */}
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--color-brand-secondary)] mb-2">
+                      Payment Method / طريقة الدفع
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {[
+                        { id: 'cash', labelEn: 'Cash', labelAr: 'نقدي', icon: '💵' },
+                        { id: 'card', labelEn: 'Visa / Card', labelAr: 'بطاقة بنكية', icon: '💳' },
+                        { id: 'instapay', labelEn: 'InstaPay', labelAr: 'إنستاباي', icon: '⚡' },
+                        { id: 'vodafone_cash', labelEn: 'Vodafone Cash', labelAr: 'فودافون كاش', icon: '📱' },
+                        { id: 'bank_transfer', labelEn: 'Bank Transfer', labelAr: 'تحويل بنكي', icon: '🏦' }
+                      ].map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setCheckoutPaymentMethod(m.id as any)}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                            checkoutPaymentMethod === m.id
+                              ? 'bg-[var(--cr-primary)] text-white border-[var(--cr-primary)] shadow-sm'
+                              : 'bg-white text-[var(--cr-dark)] border-[var(--cr-primary)]/15 hover:border-[var(--cr-accent)] hover:bg-[var(--color-brand-tint)]/20'
+                          }`}
+                        >
+                          <span>{m.icon}</span>
+                          <span className="truncate">{m.labelEn} / {m.labelAr}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Payment Reference (for non-cash payments) */}
+                  {checkoutPaymentMethod !== 'cash' && (
+                    <div>
+                      <label className="block text-xs font-bold text-[var(--color-brand-secondary)] mb-1">
+                        Transaction / Reference No. / رقم العملية أو الإيصال
+                      </label>
+                      <input
+                        type="text"
+                        value={checkoutPaymentReference}
+                        onChange={(e) => setCheckoutPaymentReference(e.target.value)}
+                        placeholder="e.g. InstaPay Ref #, Card Auth Code, Transaction ID..."
+                        className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-xs font-medium text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
+                      />
+                    </div>
+                  )}
+
                   {/* Calculations & Overpay Options */}
                   {changeAmount > 0 && (
                     <div className="rounded-2xl border border-green-200 bg-green-50/50 p-4 space-y-3">
@@ -10548,6 +10566,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     onClick={() => {
                       setCheckoutBooking(null);
                       setCheckoutAmountPaid("");
+                      setCheckoutPaymentMethod("cash");
+                      setCheckoutPaymentReference("");
                       setUseWalletBalance(false);
                       setDepositChangeToWallet(false);
                       setRedeemedPackageItems({});

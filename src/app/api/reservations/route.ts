@@ -338,10 +338,12 @@ async function writeCheckoutInvoice(params: {
   consumptionOverrides?: Record<string, Record<string, number>>;
   receivedByEmployeeId?: string | null;
   redeemedServiceIds?: number[];
+  paymentMethod?: string;
+  paymentReference?: string | null;
 }): Promise<void> {
   const {
     reservationId, customerId, branchId, providerId, serviceIds, amountPaid, priorPaid = 0,
-    consumptionOverrides, receivedByEmployeeId, redeemedServiceIds,
+    consumptionOverrides, receivedByEmployeeId, redeemedServiceIds, paymentMethod, paymentReference,
   } = params;
   if (serviceIds.length === 0) return;
   const redeemedSet = new Set((redeemedServiceIds || []).map(Number));
@@ -574,7 +576,8 @@ async function writeCheckoutInvoice(params: {
     const { error: paymentErr } = await supabaseServer.from('payments').insert({
       invoice_id: invoice.id,
       amount: amountPaid,
-      method: 'cash',
+      method: paymentMethod || 'cash',
+      reference: paymentReference || null,
       received_by_employee_id: receivedByEmployeeId || null,
     });
     if (paymentErr) throw paymentErr;
@@ -609,6 +612,8 @@ async function writeCheckoutInvoice(params: {
       branchId,
       invoiceId: invoice.id,
       reservationId,
+      paymentMethod: paymentMethod || 'cash',
+      referenceNo: paymentReference || null,
       createdByEmployeeId: receivedByEmployeeId || null,
     });
   }
@@ -626,7 +631,9 @@ async function writeCheckoutInvoice(params: {
 export async function appendPaymentToExistingInvoice(
   reservationId: string,
   amount: number,
-  receivedByEmployeeId?: string | null
+  receivedByEmployeeId?: string | null,
+  paymentMethod?: string,
+  paymentReference?: string | null,
 ): Promise<void> {
   if (amount <= 0) return;
 
@@ -642,7 +649,8 @@ export async function appendPaymentToExistingInvoice(
   const { error: paymentErr } = await supabaseServer.from('payments').insert({
     invoice_id: invoice.id,
     amount,
-    method: 'cash',
+    method: paymentMethod || 'cash',
+    reference: paymentReference || null,
     received_by_employee_id: receivedByEmployeeId || null,
   });
   if (paymentErr) throw paymentErr;
@@ -658,6 +666,8 @@ export async function appendPaymentToExistingInvoice(
     branchId: invoice.branch_id,
     invoiceId: invoice.id,
     reservationId,
+    paymentMethod: paymentMethod || 'cash',
+    referenceNo: paymentReference || null,
     createdByEmployeeId: receivedByEmployeeId || null,
   });
 }
@@ -1263,7 +1273,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, doctorNotes, receptionNotes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId, consumptionOverrides, redeemedServiceIds, date: newDate, followUpDate, customerId: explicitCustomerId } = body;
+    const { action, timeSlot, status, doctorName, notes, doctorNotes, receptionNotes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId, consumptionOverrides, redeemedServiceIds, date: newDate, followUpDate, customerId: explicitCustomerId, paymentMethod, paymentReference } = body;
 
     const id = (rawUrlId && rawUrlId !== 'undefined' && rawUrlId !== 'null') ? rawUrlId : (body.id || body.booking_id || body.reservation_id);
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
@@ -2106,9 +2116,17 @@ export async function PATCH(req: Request) {
               priorPaid: oldPaidAmount,
               consumptionOverrides,
               redeemedServiceIds: Array.isArray(redeemedServiceIds) ? redeemedServiceIds.map(Number) : undefined,
+              paymentMethod: paymentMethod || 'cash',
+              paymentReference: paymentReference || null,
             });
           } else if (wasAlreadyCompleted && paymentDelta > 0) {
-            await appendPaymentToExistingInvoice(id, paymentDelta);
+            await appendPaymentToExistingInvoice(
+              id,
+              paymentDelta,
+              createdByEmployeeId || null,
+              paymentMethod || 'cash',
+              paymentReference || null
+            );
           }
         } catch (invoiceErr) {
           console.error('Failed to write Phase 1 invoice (dual-write, non-fatal):', invoiceErr, '| reservation:', id);

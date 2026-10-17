@@ -1316,9 +1316,9 @@ export default function DoctorOngoingSessionTab({
                     </h3>
                     <p className="text-[11px] text-[var(--color-brand-secondary)] mt-0.5">
                       {laserMode === "SERVICE"
-                        ? (t.laserModeServiceDesc || "Option 1: Fixed catalog price with hardware pulse tracking.")
+                        ? (t.laserModeServiceDesc || "Option 1: Standard service with hardware pulse tracking.")
                         : laserMode === "PER_PULSE"
-                        ? (t.laserModePerPulseDesc || "Option 2: Pay per pulse deal agreed at reception (Pulses × Unit Price).")
+                        ? (t.laserModePerPulseDesc || "Option 2: Pay per pulse agreed at reception (Hardware pulse tracking).")
                         : (t.laserModePackageDesc || "Option 3: Deduct from active package with automatic deficit spillover handling.")}
                     </p>
                   </div>
@@ -1417,7 +1417,7 @@ export default function DoctorOngoingSessionTab({
                           </span>
                         </div>
                         <p className="text-[11px] text-[var(--color-brand-secondary)] mt-1">
-                          Fixed Service Price: <strong className="text-[var(--cr-primary)]">{baseBookingPrice} EGP</strong> (Standard pulses recorded for clinical tracking; 0 EGP price change).
+                          Standard pulses recorded for clinical tracking.
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -1448,38 +1448,16 @@ export default function DoctorOngoingSessionTab({
 
                       {hasAdditionalPulses && (
                         <div className="space-y-3 bg-white p-3.5 rounded-xl border border-amber-200">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div>
-                              <label className="block text-[10px] font-bold text-[var(--color-brand-secondary)] mb-1">Additional Pulses Qty</label>
-                              <input
-                                type="number"
-                                min={1}
-                                value={additionalPulsesQty}
-                                onChange={(e) => setAdditionalPulsesQty(Math.max(0, parseInt(e.target.value) || 0))}
-                                className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none"
-                                placeholder="e.g. 100"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-[var(--color-brand-secondary)] mb-1">Price Per Pulse (EGP)</label>
-                              <input
-                                type="number"
-                                min={0}
-                                step={0.5}
-                                value={additionalPulseUnitPrice}
-                                onChange={(e) => setAdditionalPulseUnitPrice(Math.max(0, parseFloat(e.target.value) || 0))}
-                                className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none"
-                                placeholder="5"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-[var(--color-brand-secondary)] mb-1">Additional Charge</label>
-                              <div className="w-full rounded-xl bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-black text-amber-900">
-                                +{additionalPulsesQty * additionalPulseUnitPrice} EGP
-                              </div>
-                            </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-[var(--color-brand-secondary)] mb-1">Additional Pulses Qty</label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={additionalPulsesQty}
+                              onChange={(e) => setAdditionalPulsesQty(Math.max(0, parseInt(e.target.value) || 0))}
+                              className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-3 py-1.5 text-xs font-bold text-[var(--cr-dark)] outline-none"
+                              placeholder="e.g. 100"
+                            />
                           </div>
 
                           <div>
@@ -1503,54 +1481,27 @@ export default function DoctorOngoingSessionTab({
                 {/* OPTION 2: PAY PER PULSE (POST-SESSION ACTUALS) */}
                 {laserMode === "PER_PULSE" && (
                   <div className="space-y-4 bg-[var(--color-brand-light)] p-4 rounded-2xl border border-[var(--cr-primary)]/10 animate-fadeIn">
-                    <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <span className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider block">
-                          Option 2: Pay per Pulse (Post-Session Actuals)
-                        </span>
-                        <span className="text-2xl font-black text-emerald-950">
-                          {standardPulsesDelivered * additionalPulseUnitPrice} <span className="text-xs font-bold text-emerald-700">EGP Total Charge</span>
-                        </span>
-                        <p className="text-[11px] text-emerald-800 mt-1 font-medium">
-                          Deal agreed at reception: <strong>{additionalPulseUnitPrice} EGP</strong> per delivered pulse.
-                        </p>
-                      </div>
-
-                      <div className="bg-white px-3.5 py-2 rounded-xl border border-emerald-300 text-xs text-end font-bold text-emerald-950 shadow-xs">
-                        <span className="block text-[10px] text-emerald-700 uppercase">Live Math</span>
-                        {standardPulsesDelivered} Pulses × {additionalPulseUnitPrice} EGP
-                      </div>
+                    <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
+                      <span className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider block">
+                        Option 2: Pay per Pulse (Post-Session Actuals)
+                      </span>
+                      <p className="text-[11px] text-emerald-800 mt-1 font-medium">
+                        Record the delivered pulses below. Financial settlement and billing will be handled at reception checkout.
+                      </p>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-[var(--cr-primary)]/10">
-                      <div>
-                        <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
-                          Actual Pulses Delivered in This Session <span className="text-emerald-700 font-black">*</span>
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={standardPulsesDelivered}
-                          onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
-                          className="w-full rounded-xl border border-[var(--cr-primary)]/20 bg-[var(--color-brand-light)] px-3.5 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
-                          placeholder="e.g. 1000"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
-                          Agreed Rate per Pulse (EGP)
-                        </label>
-                        <input
-                          type="number"
-                          min={0.1}
-                          step={0.5}
-                          value={additionalPulseUnitPrice}
-                          onChange={(e) => setAdditionalPulseUnitPrice(Math.max(0.1, parseFloat(e.target.value) || 1))}
-                          className="w-full rounded-xl border border-[var(--cr-primary)]/20 bg-[var(--color-brand-light)] px-3.5 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
-                          placeholder="5"
-                        />
-                      </div>
+                    <div className="bg-white p-4 rounded-xl border border-[var(--cr-primary)]/10">
+                      <label className="block text-[11px] font-bold text-[var(--color-brand-secondary)] mb-1">
+                        Actual Pulses Delivered in This Session <span className="text-emerald-700 font-black">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={standardPulsesDelivered}
+                        onChange={(e) => setStandardPulsesDelivered(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full rounded-xl border border-[var(--cr-primary)]/20 bg-[var(--color-brand-light)] px-3.5 py-2 text-xs font-bold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
+                        placeholder="e.g. 1000"
+                      />
                     </div>
                   </div>
                 )}
@@ -1610,7 +1561,7 @@ export default function DoctorOngoingSessionTab({
                       <option value="">{t.selectServicePlaceholder}</option>
                       {servicesList.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.en || s.name || s.title || s.name_en || s.ar} ({s.price || 0} EGP)
+                          {s.en || s.name || s.title || s.name_en || s.ar}
                         </option>
                       ))}
                     </select>
@@ -1634,14 +1585,6 @@ export default function DoctorOngoingSessionTab({
                             <span className="font-bold text-[var(--cr-dark)] block truncate">{item.name}</span>
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
-                            {(() => {
-                              const srv = servicesList.find((s) => String(s.id) === String(item.serviceId));
-                              const isLaser = item.isLaser || checkIsLaserService(srv);
-                              if (laserMode === "PACKAGE" && isLaser) {
-                                return <span className="font-extrabold text-purple-700">0 EGP (Package Redemption)</span>;
-                              }
-                              return <span className="font-extrabold text-[var(--cr-primary)]">+{item.price} EGP</span>;
-                            })()}
                             <button
                               type="button"
                               onClick={() => handleRemoveServiceFromSession(item.id)}
@@ -1678,7 +1621,7 @@ export default function DoctorOngoingSessionTab({
                         const isOutOfStock = Number(p.stock_quantity ?? p.stockQuantity ?? 0) <= 0 || p.status === "Out of Stock";
                         return (
                         <option key={p.id} value={p.id} disabled={isOutOfStock}>
-                          {p.name} ({p.price || p.unit_price || p.selling_price || 0} EGP){isOutOfStock ? " — Out of Stock" : ""}
+                          {p.name}{isOutOfStock ? " — Out of Stock" : ""}
                         </option>
                         );
                       })}
@@ -1708,10 +1651,9 @@ export default function DoctorOngoingSessionTab({
                         <div key={i} className="flex items-center justify-between text-xs bg-white p-2 rounded-xl border border-[var(--cr-primary)]/10 gap-2">
                           <div className="min-w-0">
                             <span className="font-bold text-[var(--cr-dark)] block truncate">{item.name}</span>
-                            <span className="text-[10px] text-[var(--color-brand-secondary)] block truncate">Qty: {item.qty} x {item.unitPrice} EGP</span>
+                            <span className="text-[10px] text-[var(--color-brand-secondary)] block truncate">Qty: {item.qty}</span>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className="font-extrabold text-[var(--cr-primary)]">{item.total} EGP</span>
                             <button
                               type="button"
                               onClick={() => handleRemoveProductFromSession(i)}
@@ -1724,33 +1666,6 @@ export default function DoctorOngoingSessionTab({
                       ))}
                     </div>
                   )}
-                </div>
-
-                {/* Final Session Invoice Breakdown Summary */}
-                <div className="bg-[var(--cr-primary)]/05 p-3.5 sm:p-4 rounded-2xl space-y-2 text-xs">
-                  <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 text-[var(--color-brand-secondary)]">
-                    <span>
-                      {t.baseServiceLabel}{" "}
-                      <strong className="text-[var(--cr-dark)]">
-                        {laserMode === "SERVICE" ? `${baseBookingPrice} EGP` : "0 EGP (Prepaid / Package Pulses)"}
-                      </strong>
-                    </span>
-                    {laserAdditionalCharge > 0 && (
-                      <span className="text-amber-800 font-bold">
-                        <span>Extra Pulses: <strong className="text-amber-900">+{laserAdditionalCharge} EGP</strong></span>
-                      </span>
-                    )}
-                    {additionalServicesSubtotal > 0 && (
-                      <span>{t.additionalServicesSubtotal} <strong className="text-[var(--cr-dark)]">+{additionalServicesSubtotal} EGP</strong></span>
-                    )}
-                    {productsSubtotal > 0 && (
-                      <span>{t.productsAddonsLabel} <strong className="text-[var(--cr-dark)]">+{productsSubtotal} EGP</strong></span>
-                    )}
-                  </div>
-                  <div className="pt-2 border-t border-[var(--cr-primary)]/10 flex items-center justify-between text-[var(--cr-primary)] font-extrabold text-sm sm:text-base">
-                    <span>{t.finalInvoiceLabel}</span>
-                    <span>{finalSessionTotal} EGP</span>
-                  </div>
                 </div>
               </div>
 

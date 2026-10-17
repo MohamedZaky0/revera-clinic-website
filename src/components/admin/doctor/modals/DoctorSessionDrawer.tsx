@@ -7,10 +7,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Edit,
-  Receipt,
-  CreditCard,
   Package,
-  DollarSign,
   FileText,
   Play,
   Pill,
@@ -167,7 +164,6 @@ export default function DoctorSessionDrawer({
               <span className="font-bold text-[var(--color-brand-secondary)] flex items-center gap-1.5">
                 <FileText size={14} className="text-[var(--cr-primary)]" /> {t.primaryBookingService || "Primary Reserved Service"}
               </span>
-              <span className="font-extrabold text-[var(--cr-primary)]">{scheduleModalBooking.price || scheduleModalBooking.total_price || 0} EGP</span>
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs bg-white p-3 rounded-2xl border border-[var(--cr-primary)]/10 gap-2">
               <div className="flex-1 w-full">
@@ -189,7 +185,7 @@ export default function DoctorSessionDrawer({
                   )}
                   {servicesList.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.en || s.name || s.title || s.name_en || s.ar} ({s.price || 0} EGP)
+                      {s.en || s.name || s.title || s.name_en || s.ar}
                     </option>
                   ))}
                 </select>
@@ -342,36 +338,22 @@ export default function DoctorSessionDrawer({
             )}
           </div>
 
-          {/* 3. Session Consumables & Financial Breakdown */}
-          {(parsedNotes.productsLog || parsedNotes.invoiceLog) && (
+          {/* 3. Session Consumables */}
+          {parsedNotes.productsLog && (
             <div className="rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 bg-white p-4 sm:p-5 shadow-sm space-y-3">
               <h4 className="text-xs font-extrabold text-[var(--cr-dark)] uppercase tracking-wider flex items-center gap-2">
-                <Receipt size={15} className="text-[var(--cr-primary)]" /> {t.sessionSummaryTitle}
+                <Package size={15} className="text-[var(--cr-primary)]" /> {t.productsUsedTitle}
               </h4>
 
-              {parsedNotes.productsLog && (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3.5 sm:p-4 text-xs">
-                  <div className="flex items-center gap-2 font-bold text-emerald-900">
-                    <Package size={14} className="text-emerald-700" />
-                    <span>{t.productsUsedTitle}</span>
-                  </div>
-                  <pre className="font-mono text-emerald-800 text-[11px] pt-1 whitespace-pre-wrap leading-relaxed">
-                    {parsedNotes.productsLog.replace(/^\[Products Used During Session\]:\s*/i, "")}
-                  </pre>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3.5 sm:p-4 text-xs">
+                <div className="flex items-center gap-2 font-bold text-emerald-900">
+                  <Package size={14} className="text-emerald-700" />
+                  <span>{t.productsUsedTitle}</span>
                 </div>
-              )}
-
-              {parsedNotes.invoiceLog && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 sm:p-4 text-xs flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2 font-bold text-slate-800">
-                    <DollarSign size={14} className="text-slate-600" />
-                    <span>{t.updatedInvoiceTotal}</span>
-                  </div>
-                  <span className="font-extrabold text-sm text-[var(--cr-primary)]">
-                    {parsedNotes.invoiceLog.replace(/^\[Invoice Total Updated\]:\s*/i, "")}
-                  </span>
-                </div>
-              )}
+                <pre className="font-mono text-emerald-800 text-[11px] pt-1 whitespace-pre-wrap leading-relaxed">
+                  {parsedNotes.productsLog.replace(/^\[Products Used During Session\]:\s*/i, "").replace(/\s*x\s*\d+(?:\.\d+)?\s*EGP\s*=\s*\d+(?:\.\d+)?\s*EGP/g, "")}
+                </pre>
+              </div>
             </div>
           )}
 

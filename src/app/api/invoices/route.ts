@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server';
 import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { formatInvoiceNo } from '@/lib/ledger';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/invoices?reservationId=X
+ * GET /api/invoices?action=next_no
  *
- * Returns the non-void invoice (if any) for a given reservation, together with its
- * invoice_lines and joined service/product names for bilingual display. Staff-only.
+ * Returns the non-void invoice (if any) for a given reservation, or generates
+ * the next atomic invoice/reference sequence number in INV-000001 format. Staff-only.
  *
  * Brief 32 (RISK-010): the Booking Invoice Modal previously re-derived totals from live
  * service prices; this endpoint exposes the immutable ledger data written at checkout time
@@ -21,10 +23,31 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
+  const action = searchParams.get('action');
+
+  if (action === 'next_no') {
+    try {
+      const { data: seqValue, error: seqErr } = await supabaseServer.rpc('next_invoice_no');
+      if (seqErr || seqValue == null) {
+        console.error('Error fetching next_invoice_no sequence:', seqErr);
+        return NextResponse.json({ error: 'Failed to generate next invoice number.' }, { status: 500 });
+      }
+      const formattedNo = formatInvoiceNo(Number(seqValue));
+      return NextResponse.json({
+        sequence: Number(seqValue),
+        referenceNo: formattedNo,
+        nextInvoiceNo: formattedNo,
+      });
+    } catch (err: any) {
+      console.error('next_no handler error:', err);
+      return NextResponse.json({ error: err.message || 'Failed to generate next reference.' }, { status: 500 });
+    }
+  }
+
   const reservationId = searchParams.get('reservationId');
 
   if (!reservationId) {
-    return NextResponse.json({ error: 'reservationId query parameter is required.' }, { status: 400 });
+    return NextResponse.json({ error: 'reservationId or action=next_no query parameter is required.' }, { status: 400 });
   }
 
   try {

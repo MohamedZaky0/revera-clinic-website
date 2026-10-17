@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireStaffAccess, hasFinancePermission } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { formatInvoiceNo } from '@/lib/ledger';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,34 +77,56 @@ export async function GET(req: Request) {
 
     // Date range filter using Africa/Cairo local calendar dates
     const now = new Date();
-    const cairoDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
-    const cairoMidnightUtc = new Date(`${cairoDateStr}T00:00:00+02:00`); // base Cairo time
-    // Helper to get ISO bounds for Cairo calendar day
-    const getCairoDayBounds = (daysOffset: number = 0) => {
-      const d = new Date(cairoDateStr);
-      d.setDate(d.getDate() + daysOffset);
-      const dayStr = d.toLocaleDateString('en-CA');
+    const getCairoIsoBounds = (daysOffset: number = 0) => {
+      const targetDate = new Date(now.getTime() + daysOffset * 86400000);
+      const dayYmd = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(targetDate);
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', timeZoneName: 'shortOffset' }).formatToParts(targetDate);
+      const tzPart = parts.find((p) => p.type === 'timeZoneName')?.value || 'GMT+3';
+      const match = tzPart.match(/GMT([+-])(\d+)(?::(\d+))?/);
+      let offsetMinutes = 180;
+      if (match) {
+        const sign = match[1] === '-' ? -1 : 1;
+        const hours = parseInt(match[2], 10);
+        const mins = match[3] ? parseInt(match[3], 10) : 0;
+        offsetMinutes = sign * (hours * 60 + mins);
+      }
+      const offsetSign = offsetMinutes >= 0 ? '+' : '-';
+      const pad = (n: number) => String(Math.abs(n)).padStart(2, '0');
+      const offsetStr = `${offsetSign}${pad(Math.floor(Math.abs(offsetMinutes) / 60))}:${pad(Math.abs(offsetMinutes) % 60)}`;
       return {
-        start: new Date(`${dayStr}T00:00:00+02:00`).toISOString(),
-        end: new Date(`${dayStr}T23:59:59.999+02:00`).toISOString(),
+        dayStr: dayYmd,
+        start: new Date(`${dayYmd}T00:00:00${offsetStr}`).toISOString(),
+        end: new Date(`${dayYmd}T23:59:59.999${offsetStr}`).toISOString(),
       };
     };
 
     if (dateRange === 'today') {
-      const { start, end } = getCairoDayBounds(0);
+      const { start, end } = getCairoIsoBounds(0);
       query = query.gte('occurred_at', start).lte('occurred_at', end);
     } else if (dateRange === 'yesterday') {
-      const { start, end } = getCairoDayBounds(-1);
+      const { start, end } = getCairoIsoBounds(-1);
       query = query.gte('occurred_at', start).lte('occurred_at', end);
     } else if (dateRange === 'week') {
       const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
       query = query.gte('occurred_at', weekStart);
     } else if (dateRange === 'month') {
-      const monthStart = new Date(`${cairoDateStr.slice(0, 7)}-01T00:00:00+02:00`).toISOString();
+      const { dayStr } = getCairoIsoBounds(0);
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', timeZoneName: 'shortOffset' }).formatToParts(now);
+      const tzPart = parts.find((p) => p.type === 'timeZoneName')?.value || 'GMT+3';
+      const match = tzPart.match(/GMT([+-])(\d+)(?::(\d+))?/);
+      let offsetMinutes = 180;
+      if (match) {
+        const sign = match[1] === '-' ? -1 : 1;
+        offsetMinutes = sign * (parseInt(match[2], 10) * 60 + (match[3] ? parseInt(match[3], 10) : 0));
+      }
+      const offsetSign = offsetMinutes >= 0 ? '+' : '-';
+      const pad = (n: number) => String(Math.abs(n)).padStart(2, '0');
+      const offsetStr = `${offsetSign}${pad(Math.floor(Math.abs(offsetMinutes) / 60))}:${pad(Math.abs(offsetMinutes) % 60)}`;
+      const monthStart = new Date(`${dayStr.slice(0, 7)}-01T00:00:00${offsetStr}`).toISOString();
       query = query.gte('occurred_at', monthStart);
     } else if (dateRange === 'custom' && startDateParam && endDateParam) {
-      query = query.gte('occurred_at', new Date(`${startDateParam}T00:00:00+02:00`).toISOString())
-                   .lte('occurred_at', new Date(`${endDateParam}T23:59:59.999+02:00`).toISOString());
+      query = query.gte('occurred_at', new Date(`${startDateParam}T00:00:00Z`).toISOString())
+                   .lte('occurred_at', new Date(`${endDateParam}T23:59:59.999Z`).toISOString());
     }
 
     // Sorting
@@ -184,39 +207,66 @@ export async function GET(req: Request) {
     // clinic-wide, even when a branch filter is applied to the transaction list itself.
     const { data: allCustomers, error: custErr } = await supabaseServer
       .from('customers')
-      .select('id, wallet_balance, outstanding, spent_amount');
+      .select('id, name, mobile, wallet_balance, outstanding, spent_amount');
     if (custErr) console.error('customers stats fetch error:', custErr.message);
 
     let totalOutstanding = 0;
     let outstandingCount = 0;
     let totalWalletBalance = 0;
     let activeWalletCount = 0;
+    const outstandingPatientsList: any[] = [];
+    const walletPatientsList: any[] = [];
 
     (allCustomers || []).forEach((c: any) => {
-      const out = Number(c.outstanding || 0);
-      const wal = Number(c.wallet_balance || 0);
-      if (out > 0) {
+      const rawOut = Number(c.outstanding || 0);
+      const rawWal = Number(c.wallet_balance || 0);
+      const out = Math.round(rawOut * 100) / 100;
+      const wal = Math.round(rawWal * 100) / 100;
+
+      if (out >= 0.01) {
         totalOutstanding += out;
         outstandingCount += 1;
+        outstandingPatientsList.push({
+          id: c.id,
+          name: c.name || 'Patient',
+          phone: c.mobile || '',
+          outstanding: out,
+          wallet_balance: wal >= 0.01 ? wal : 0,
+          spent_amount: Math.round(Number(c.spent_amount || 0) * 100) / 100,
+        });
       }
-      if (wal > 0) {
+      if (wal >= 0.01) {
         totalWalletBalance += wal;
         activeWalletCount += 1;
+        walletPatientsList.push({
+          id: c.id,
+          name: c.name || 'Patient',
+          phone: c.mobile || '',
+          wallet_balance: wal,
+          outstanding: out >= 0.01 ? out : 0,
+          spent_amount: Math.round(Number(c.spent_amount || 0) * 100) / 100,
+        });
       }
     });
 
+    outstandingPatientsList.sort((a, b) => b.outstanding - a.outstanding);
+    walletPatientsList.sort((a, b) => b.wallet_balance - a.wallet_balance);
+
     // Compute Today's Net Payments (الخزينة) = Cash In Today - Cash Refunds Today
-    const { start: todayStartIso, end: todayEndIso } = getCairoDayBounds(0);
+    const { start: todayStartIso, end: todayEndIso } = getCairoIsoBounds(0);
 
     let todayTxnsQuery = supabaseServer
       .from('transactions')
-      .select('type, amount, status')
+      .select(`
+        id, transaction_id, type, amount, status, payment_method, occurred_at, reference_no, description, customer_id, branch_id,
+        customer:customers(id, name, mobile)
+      `)
       .gte('occurred_at', todayStartIso)
       .lte('occurred_at', todayEndIso)
       .in('status', ['completed', 'refunded', 'paid']);
 
     if (branchId !== 'all' && branchId) {
-      todayTxnsQuery = todayTxnsQuery.eq('branch_id', branchId);
+      todayTxnsQuery = todayTxnsQuery.or(`branch_id.eq.${branchId},branch_id.is.null`);
     }
 
     const { data: todayTxns, error: todayTxnsErr } = await todayTxnsQuery;
@@ -225,17 +275,47 @@ export async function GET(req: Request) {
     const CASH_IN_TYPES = new Set(['payment', 'outstanding_payment', 'wallet_topup']);
     let todayNetPayments = 0;
     let todayPaymentsCount = 0;
+    const todayPaymentsList: any[] = [];
 
     (todayTxns || []).forEach((tx: any) => {
-      const amt = Number(tx.amount || 0);
+      const amt = Math.round(Number(tx.amount || 0) * 100) / 100;
+      const absAmt = Math.abs(amt);
       if (CASH_IN_TYPES.has(tx.type)) {
-        todayNetPayments += Math.abs(amt);
+        todayNetPayments += absAmt;
         todayPaymentsCount += 1;
+        todayPaymentsList.push({
+          id: tx.id,
+          transaction_id: tx.transaction_id,
+          customer_id: tx.customer_id,
+          customer_name: (tx.customer as any)?.name || 'Guest / Patient',
+          customer_phone: (tx.customer as any)?.mobile || '',
+          amount: absAmt,
+          payment_method: tx.payment_method || 'cash',
+          occurred_at: tx.occurred_at,
+          reference_no: tx.reference_no,
+          type: tx.type,
+          description: tx.description,
+        });
       } else if (tx.type === 'refund') {
-        todayNetPayments -= Math.abs(amt);
+        todayNetPayments -= absAmt;
         todayPaymentsCount += 1;
+        todayPaymentsList.push({
+          id: tx.id,
+          transaction_id: tx.transaction_id,
+          customer_id: tx.customer_id,
+          customer_name: (tx.customer as any)?.name || 'Guest / Patient',
+          customer_phone: (tx.customer as any)?.mobile || '',
+          amount: -absAmt,
+          payment_method: tx.payment_method || 'cash',
+          occurred_at: tx.occurred_at,
+          reference_no: tx.reference_no,
+          type: tx.type,
+          description: tx.description,
+        });
       }
     });
+
+    todayPaymentsList.sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
 
     let todayEstimatedTotal = 0;
     (todayTxns || []).forEach((tx: any) => {
@@ -256,21 +336,24 @@ export async function GET(req: Request) {
           .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
       }
       patientStats = {
-        totalSpent: spent,
-        patientOutstanding: Number(selectedCustomer?.outstanding || 0),
-        patientWalletBalance: Number(selectedCustomer?.wallet_balance || 0),
+        totalSpent: Math.round(spent * 100) / 100,
+        patientOutstanding: Math.round(Number(selectedCustomer?.outstanding || 0) * 100) / 100,
+        patientWalletBalance: Math.round(Number(selectedCustomer?.wallet_balance || 0) * 100) / 100,
         patientTransactionsCount: patientTransactions.length,
       };
     }
 
     const stats = {
-      todayNetPayments: Math.max(0, todayNetPayments),
+      todayNetPayments: Math.max(0, Math.round(todayNetPayments * 100) / 100),
       todayPaymentsCount,
-      todayEstimatedTotal,
-      totalOutstanding,
+      todayEstimatedTotal: Math.round(todayEstimatedTotal * 100) / 100,
+      totalOutstanding: Math.round(totalOutstanding * 100) / 100,
       outstandingCount,
-      totalWalletBalance,
+      totalWalletBalance: Math.round(totalWalletBalance * 100) / 100,
       activeWalletCount,
+      todayPaymentsList,
+      outstandingPatientsList,
+      walletPatientsList,
       ...patientStats,
     };
 
@@ -324,32 +407,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Transaction Type is required.' }, { status: 400 });
     }
 
-    // Direct payments, debt settlement, wallet movements, and balance adjustments
-    // are automated operations with dedicated transactional ledger workflows (RISK-076).
-    if (transaction_type === 'payment') {
-      return NextResponse.json({
-        error: 'Direct payments are recorded automatically via booking checkout or previous booking intake.',
-      }, { status: 400 });
-    }
-    if (transaction_type === 'outstanding_payment') {
-      return NextResponse.json({
-        error: 'Outstanding balance payments must be recorded via Settle Balance on the patient profile.',
-      }, { status: 400 });
-    }
-    if (transaction_type === 'wallet_topup' || transaction_type === 'wallet_deduction') {
-      return NextResponse.json({
-        error: 'Wallet deposits and deductions are automated via the patient wallet workflow.',
-      }, { status: 400 });
-    }
-    if (transaction_type === 'adjustment') {
-      return NextResponse.json({
-        error: 'Manual balance adjustments are not permitted directly through transactions. Use patient balance adjustments or wallet workflows.',
-      }, { status: 400 });
-    }
-
-    // Allowed manual transaction types strictly limited to:
-    // 1. refund, 2. service_charge, 3. product_purchase
+    // Allowed manual transaction types
     const ALLOWED_MANUAL_TYPES = [
+      'payment',
+      'outstanding_payment',
+      'wallet_topup',
+      'wallet_deduction',
       'refund',
       'service_charge',
       'product_purchase',
@@ -511,6 +574,19 @@ export async function POST(req: Request) {
 
     const staffName = access.access.employee?.email?.split('@')[0] || 'Staff User';
 
+    // Auto-generate reference_no in INV-000001 format if missing or blank
+    let finalReferenceNo = reference_no?.trim() || null;
+    if (!finalReferenceNo) {
+      try {
+        const { data: invSeqVal } = await supabaseServer.rpc('next_invoice_no');
+        if (invSeqVal != null) {
+          finalReferenceNo = formatInvoiceNo(Number(invSeqVal));
+        }
+      } catch (refErr) {
+        console.warn('Auto-reference generation error:', refErr);
+      }
+    }
+
     // Insert transaction
     const newTxnRow = {
       transaction_id: txnIdString,
@@ -524,7 +600,7 @@ export async function POST(req: Request) {
       amount: finalAmount,
       status: finalStatus,
       source: 'manual',
-      reference_no: reference_no?.trim() || null,
+      reference_no: finalReferenceNo,
       related_transaction_id: related_transaction_id || null,
       reason: reason?.trim() || null,
       notes: notes?.trim() || null,
@@ -591,9 +667,9 @@ export async function POST(req: Request) {
     await supabaseServer
       .from('customers')
       .update({
-        wallet_balance: newWallet,
-        outstanding: newOutstanding,
-        spent_amount: newSpent,
+        wallet_balance: Math.round(newWallet * 100) / 100,
+        outstanding: Math.round(newOutstanding * 100) / 100,
+        spent_amount: Math.round(newSpent * 100) / 100,
         updated_at: new Date().toISOString(),
       })
       .eq('id', customer_id);

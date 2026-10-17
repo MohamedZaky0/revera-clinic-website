@@ -72,6 +72,36 @@ export interface TransactionItem {
   reservation_code?: string | null;
 }
 
+export interface TodayPaymentItem {
+  id: string;
+  transaction_id?: string;
+  customer_id?: string | null;
+  customer_name?: string;
+  customer_phone?: string;
+  patientName?: string;
+  phone?: string;
+  amount: number;
+  payment_method?: string;
+  paymentMethod?: string;
+  reference_no?: string | null;
+  referenceNo?: string | null;
+  type: string;
+  description?: string;
+  occurred_at?: string;
+  occurredAt?: string;
+}
+
+export interface PatientBalanceItem {
+  id: string;
+  name: string;
+  phone?: string;
+  mobile?: string;
+  outstanding?: number;
+  wallet_balance?: number;
+  walletBalance?: number;
+  spent_amount?: number;
+}
+
 export interface TransactionStats {
   todayNetPayments: number;
   todayPaymentsCount: number;
@@ -81,6 +111,9 @@ export interface TransactionStats {
   outstandingCount: number;
   totalWalletBalance: number;
   activeWalletCount: number;
+  todayPaymentsList?: TodayPaymentItem[];
+  outstandingPatientsList?: PatientBalanceItem[];
+  walletPatientsList?: PatientBalanceItem[];
   // Patient-specific totals
   totalSpent?: number;
   patientOutstanding?: number;

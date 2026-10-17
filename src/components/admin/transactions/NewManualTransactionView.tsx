@@ -54,16 +54,21 @@ function buildOccurredAt(dateStr: string, timeStr: string): string {
 }
 
 /**
- * Manual transaction types strictly limited to 3 options per specification:
- * 1. Refund
- * 2. Service Charge
- * 3. Product / Package Purchase
- * Direct payments and wallet balance adjustments are automated system operations.
+ * Manual transaction types supported by the system:
+ * 1. Direct Payment (دفع مباشر)
+ * 2. Product / Package Purchase (شراء منتج / باقة)
+ * 3. Service Charge (رسوم خدمة)
+ * 4. Settle Debt / Outstanding (سداد مديونية)
+ * 5. Wallet Top-up (إيداع في المحفظة)
+ * 6. Refund (استرداد)
  */
 const MANUAL_TRANSACTION_TYPES = [
-  { id: "refund", labelEn: "Refund", labelAr: "استرداد" },
-  { id: "service_charge", labelEn: "Service Charge", labelAr: "رسوم خدمة" },
+  { id: "payment", labelEn: "Direct Payment", labelAr: "دفع مباشر" },
   { id: "product_purchase", labelEn: "Product / Package Purchase", labelAr: "شراء منتج / باقة" },
+  { id: "service_charge", labelEn: "Service Charge", labelAr: "رسوم خدمة" },
+  { id: "outstanding_payment", labelEn: "Settle Debt / Outstanding", labelAr: "سداد مديونية" },
+  { id: "wallet_topup", labelEn: "Wallet Top-up", labelAr: "إيداع في المحفظة" },
+  { id: "refund", labelEn: "Refund", labelAr: "استرداد" },
 ] as const;
 
 interface CustomerOption {
@@ -117,10 +122,10 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
 }) => {
   const isAr = lang === "ar";
 
-  // Form Type State (Refund, Service Charge, Product/Package Purchase)
+  // Form Type State
   const [transactionType, setTransactionType] = useState<
-    "refund" | "service_charge" | "product_purchase"
-  >("refund");
+    "payment" | "product_purchase" | "service_charge" | "outstanding_payment" | "wallet_topup" | "refund"
+  >("payment");
   
   // Patient Selection State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(preSelectedCustomerId || "");
@@ -135,9 +140,32 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [branchId, setBranchId] = useState<string>(branches[0]?.id || "");
   const [referenceNo, setReferenceNo] = useState<string>("");
+  const [loadingRefNo, setLoadingRefNo] = useState<boolean>(false);
   const [description, setDescription] = useState<string>("");
   const [reason, setReason] = useState<string>("");
   const [refundDestination, setRefundDestination] = useState<"cash" | "wallet">("cash");
+
+  // Auto-generate invoice/receipt reference number
+  const fetchNextRefNo = async () => {
+    try {
+      setLoadingRefNo(true);
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/invoices?action=next_no", { headers });
+      if (res.ok) {
+        const data = await res.json();
+        const nextNo = data.referenceNo || data.nextInvoiceNo;
+        if (nextNo) setReferenceNo(nextNo);
+      }
+    } catch (err) {
+      console.error("Error fetching next reference no:", err);
+    } finally {
+      setLoadingRefNo(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNextRefNo();
+  }, []);
 
   // Product / Package Purchase Fields
   const [itemType, setItemType] = useState<"product" | "package">("product");
@@ -553,8 +581,8 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                   className="group relative cursor-pointer"
                   title={
                     isAr
-                      ? "المعاملات اليدوية تقتصر على الاسترداد ورسوم الخدمات وشراء المنتجات/الباقات. المدفوعات المباشرة وحركات المحفظة تتم تلقائياً."
-                      : "Manual transactions are strictly limited to Refunds, Service Charges, and Product/Package Purchases. Direct payments and wallet adjustments are automated via bookings."
+                      ? "اختر نوع المعاملة المالية المطلوبة (دفع مباشر، شراء منتجات/باقات، رسوم خدمة، سداد مديونية، شحن محفظة، استرداد)."
+                      : "Choose the manual financial transaction type (Direct Payment, Product/Package Purchase, Service Charge, Settle Debt, Wallet Top-up, Refund)."
                   }
                 >
                   <HelpCircle size={13} className="text-gray-400 hover:text-gray-600 transition-colors" />
@@ -579,8 +607,8 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
               </div>
               <p className="text-[10px] text-gray-400">
                 {isAr
-                  ? "ملاحظة: المدفوعات المباشرة وحركات المحفظة تُسجل آلياً عبر مسارات الحجوزات وملفات المرضى."
-                  : "Direct payments & wallet deposits/withdrawals are automated system operations."}
+                  ? "تسجيل دقيق لكافة الحركات المالية اليدوية وإيرادات العيادة المباشرة."
+                  : "Accurately log clinic financial transactions, debt settlements, and till revenues."}
               </p>
             </div>
 
@@ -677,9 +705,20 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                 </div>
 
                 {currentOutstanding > 0 && (
-                  <div className="text-xs text-rose-700 font-bold bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100">
-                    <span>{isAr ? "المبلغ المستحق:" : "Outstanding:"}</span>{" "}
-                    <span>EGP {currentOutstanding.toLocaleString()}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs text-rose-700 font-bold bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100">
+                      <span>{isAr ? "المبلغ المستحق:" : "Outstanding:"}</span>{" "}
+                      <span>EGP {currentOutstanding.toLocaleString()}</span>
+                    </div>
+                    {transactionType === "outstanding_payment" && (
+                      <button
+                        type="button"
+                        onClick={() => setAmount(String(currentOutstanding))}
+                        className="text-[11px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 px-2.5 py-1.5 rounded-xl cursor-pointer transition shadow-2xs"
+                      >
+                        {isAr ? "سداد كامل المديونية" : "Pay Full Debt"}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -940,23 +979,35 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
           {/* Reference & Description */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <label className="block text-xs font-bold text-gray-700">
-                  {isAr ? "المرجع (حجز / فاتورة / إيصال)" : "Reference (Booking / Invoice / Receipt)"}
-                </label>
-                <div
-                  className="cursor-pointer text-gray-400 hover:text-gray-600"
-                  title={isAr ? "أدخل رقم مرجعي مثل كود الحجز أو رقم الإيصال للتتبع" : "Enter a reference number such as booking ID or invoice receipt"}
-                >
-                  <HelpCircle size={13} />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <label className="block text-xs font-bold text-gray-700">
+                    {isAr ? "المرجع (رقم الفاتورة / الإيصال)" : "Reference (Invoice / Receipt No.)"}
+                  </label>
+                  <div
+                    className="cursor-pointer text-gray-400 hover:text-gray-600"
+                    title={isAr ? "رقم مرجعي تلقائي بتنسيق INV-000001 أو إيصال مخصص" : "Auto-generated INV-000001 format reference or custom receipt"}
+                  >
+                    <HelpCircle size={13} />
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={fetchNextRefNo}
+                  disabled={loadingRefNo}
+                  className="flex items-center gap-1 text-[11px] font-bold text-[var(--cr-primary)] hover:underline cursor-pointer disabled:opacity-50"
+                  title={isAr ? "توليد كود تلقائي جديد" : "Generate / Refresh reference number"}
+                >
+                  <RotateCcw size={12} className={loadingRefNo ? "animate-spin" : ""} />
+                  <span>{isAr ? "توليد كود تلقائي" : "Auto Ref"}</span>
+                </button>
               </div>
               <input
                 type="text"
                 value={referenceNo}
                 onChange={(e) => setReferenceNo(e.target.value)}
-                placeholder={isAr ? "مثال: REC-10023 أو INV-002048" : "e.g. REC-10023 or INV-002048"}
-                className="w-full rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] px-4 py-3 text-xs font-semibold text-gray-800 placeholder-gray-400 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all"
+                placeholder="INV-000001"
+                className="w-full rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] px-4 py-3 text-xs font-bold text-gray-800 placeholder-gray-400 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all font-mono"
               />
             </div>
 
