@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireAdministratorAccess, requireSuperadminAccess } from '@/lib/access';
 import { normalizeServiceCommissions } from '@/lib/providerCommissions';
+import {
+  getEmployeeBranchIds,
+  readRequestedBranchIds,
+  validateBranchSelection,
+  type BranchSelectionResult,
+} from '@/lib/employeeBranches';
 import fs from 'fs';
 import path from 'path';
 
@@ -24,6 +30,33 @@ const STRONG_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8
 function deniesRoleGrant(callerRole: string, targetRole: unknown): boolean {
   if (typeof targetRole !== 'string' || !targetRole) return false;
   return targetRole.trim().toLowerCase() === 'superadmin' && callerRole !== 'superadmin';
+}
+
+/**
+ * DEC-110: validate a requested branch assignment against the live `branches` table.
+ *
+ * `alreadyAssigned` is the employee's stored assignment (empty for a new hire). Branches in it may stay
+ * even if they have since gone inactive; any other branch must be active.
+ */
+async function resolveBranchAssignment(raw: unknown[], alreadyAssigned: string[]): Promise<BranchSelectionResult> {
+  const candidateIds = raw
+    .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+    .map((v) => v.trim());
+
+  let branchRows: { id: string; status: string | null }[] = [];
+  if (candidateIds.length > 0) {
+    const { data, error } = await supabaseServer
+      .from('branches')
+      .select('id, status')
+      .in('id', candidateIds);
+    if (error) {
+      // 22P02 = invalid_text_representation: the caller sent something that is not a uuid.
+      if ((error as any).code === '22P02') return { ok: false, error: 'One or more branch ids are not valid.' };
+      throw error;
+    }
+    branchRows = data || [];
+  }
+  return validateBranchSelection(raw, branchRows, alreadyAssigned);
 }
 
 async function getEmployeeWorkingSchedulesMap(): Promise<Record<string, any>> {
@@ -132,6 +165,8 @@ export async function GET(req: Request) {
 
       return {
         ...emp,
+        // DEC-110: always present, primary first, even for rows written before branch_ids existed.
+        branch_ids: getEmployeeBranchIds(emp),
         working_days_hours: savedSched,
         workingDaysHours: savedSched,
         requiredTargetAmount: emp.required_target_amount !== null ? Number(emp.required_target_amount) : 0,
@@ -155,7 +190,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType, password: rawPassword } = body;
+    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType, password: rawPassword } = body;
 
     if (!email || !name || !roleName) {
       return NextResponse.json(
@@ -192,6 +227,21 @@ export async function POST(req: Request) {
         { status: 403 }
       );
     }
+
+    // DEC-110: branches are validated BEFORE the auth user is created, so a bad branch never leaves an
+    // orphaned auth account behind. A request that names no branch at all (the Role Management
+    // "provision" form) still creates a branch-less account, exactly as before; a request that names
+    // branches must name at least one valid, active one.
+    const branchRequest = readRequestedBranchIds(body);
+    let branchIdsToSave: string[] = [];
+    if (branchRequest.requested) {
+      const resolved = await resolveBranchAssignment(branchRequest.raw, []);
+      if (!resolved.ok) {
+        return NextResponse.json({ error: resolved.error, field: 'branchIds' }, { status: 400 });
+      }
+      branchIdsToSave = resolved.ids;
+    }
+    const primaryBranchId: string | null = branchIdsToSave[0] ?? null;
 
     const { data: existingEmp, error: existError } = await supabaseServer
       .from('employee_accounts')
@@ -307,7 +357,8 @@ export async function POST(req: Request) {
         national_id_front: nationalIdFront || null,
         national_id_back: nationalIdBack || null,
         address: address || null,
-        branch_id: branchId || null,
+        branch_id: primaryBranchId,
+        branch_ids: branchIdsToSave,
         contract_file: contractFile || null,
         contract_file_name: contractFileName || null,
         required_target_amount: requiredTargetAmount ? Number(requiredTargetAmount) : 0,
@@ -346,7 +397,8 @@ export async function POST(req: Request) {
         national_id_front: nationalIdFront || null,
         national_id_back: nationalIdBack || null,
         address: address || null,
-        branch_id: branchId || null,
+        branch_id: primaryBranchId,
+        branch_ids: branchIdsToSave,
         contract_file: contractFile || null,
         contract_file_name: contractFileName || null,
         required_target_amount: requiredTargetAmount ? Number(requiredTargetAmount) : 0,
@@ -380,6 +432,7 @@ export async function POST(req: Request) {
 
     const mapped = newEmployee ? {
       ...newEmployee,
+      branch_ids: getEmployeeBranchIds(newEmployee),
       working_days_hours: workingDaysHours || newEmployee.working_days_hours || null,
       workingDaysHours: workingDaysHours || newEmployee.working_days_hours || null,
       requiredTargetAmount: newEmployee.required_target_amount !== null ? Number(newEmployee.required_target_amount) : 0,
@@ -399,7 +452,7 @@ export async function POST(req: Request) {
           phone: phone || null,
           specialty: body.specialty || null,
           national_id: nationalId || null,
-          branch_id: branchId || null,
+          branch_id: primaryBranchId,
           fixed_salary: salary ? Number(salary) : 0,
           commission_type: body.commission_type || 'none',
           commission_value: body.commission_value ? Number(body.commission_value) : 0,
@@ -473,7 +526,8 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType, resendInvite } = body;
+    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType, resendInvite } = body;
+    const branchRequest = readRequestedBranchIds(body);
     const workingDaysHours = body.workingDaysHours !== undefined ? body.workingDaysHours : body.working_days_hours;
 
     if (!id) {
@@ -491,7 +545,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Employee account not found.' }, { status: 404 });
     }
 
-    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchId !== undefined || requiredTargetAmount !== undefined || bonusPercentage !== undefined || targetType !== undefined || bonusType !== undefined || workingDaysHours !== undefined)) {
+    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchRequest.requested || requiredTargetAmount !== undefined || bonusPercentage !== undefined || targetType !== undefined || bonusType !== undefined || workingDaysHours !== undefined)) {
       const updates: Record<string, any> = {};
       if (roleName) {
         if (employee.employee_id === 'superadmin') {
@@ -518,6 +572,19 @@ export async function PATCH(req: Request) {
         updates.role_name = roleName;
       }
 
+      // DEC-110: validate a branch change before anything is written. Branches the employee already has
+      // may stay even if now inactive; anything newly added must be active. Empty is rejected.
+      let patchedPrimaryBranchId: string | undefined;
+      if (branchRequest.requested) {
+        const resolved = await resolveBranchAssignment(branchRequest.raw, getEmployeeBranchIds(employee));
+        if (!resolved.ok) {
+          return NextResponse.json({ error: resolved.error, field: 'branchIds' }, { status: 400 });
+        }
+        updates.branch_id = resolved.primary;
+        updates.branch_ids = resolved.ids;
+        patchedPrimaryBranchId = resolved.primary;
+      }
+
       if (name !== undefined) updates.name = name;
       if (phone !== undefined) updates.phone = phone;
       if (department !== undefined) updates.department = department;
@@ -527,7 +594,6 @@ export async function PATCH(req: Request) {
       if (nationalIdFront !== undefined) updates.national_id_front = nationalIdFront;
       if (nationalIdBack !== undefined) updates.national_id_back = nationalIdBack;
       if (address !== undefined) updates.address = address;
-      if (branchId !== undefined) updates.branch_id = branchId || null;
       if (contractFile !== undefined) updates.contract_file = contractFile;
       if (contractFileName !== undefined) updates.contract_file_name = contractFileName;
       if (requiredTargetAmount !== undefined) updates.required_target_amount = Number(requiredTargetAmount);
@@ -588,6 +654,7 @@ export async function PATCH(req: Request) {
 
       const mapped = updatedEmp || employee ? {
         ...(updatedEmp || employee),
+        branch_ids: getEmployeeBranchIds(updatedEmp || employee),
         working_days_hours: effectiveSched,
         workingDaysHours: effectiveSched,
         requiredTargetAmount: (updatedEmp || employee).required_target_amount !== null ? Number((updatedEmp || employee).required_target_amount) : 0,
@@ -606,7 +673,7 @@ export async function PATCH(req: Request) {
           const docName = name !== undefined ? name : employee.name;
           const docPhone = phone !== undefined ? phone : employee.phone;
           const docSalary = salary !== undefined ? salary : employee.salary;
-          const docBranchId = branchId !== undefined ? branchId : employee.branch_id;
+          const docBranchId = patchedPrimaryBranchId !== undefined ? patchedPrimaryBranchId : employee.branch_id;
           const docNationalId = nationalId !== undefined ? nationalId : employee.national_id;
 
           const { data: existingProvider } = await supabaseServer

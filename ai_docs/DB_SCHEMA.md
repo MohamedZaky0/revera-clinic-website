@@ -27,7 +27,7 @@ implemented. The current deployment is single-tenant (Revera only).
 branches
   └──< reservations (branch_id FK, nullable)
   └──< services (via branch_pricing JSON field, not a FK)
-  └──< employee_accounts (branch_id FK, nullable)
+  └──< employee_accounts (branch_id FK, nullable — primary branch; branch_ids uuid[] holds all assigned branches, DEC-110)
   └──< providers (branch_id FK, nullable)
   └──< rooms (branch_id FK)
 
@@ -328,7 +328,8 @@ The full page content structure mirrors the `Translation` type in `src/types/ind
 | `department` | text | Default `'Reception'` |
 | `shift` | text | Default `'Day'` — `"Day"`, `"Night"`, or custom time range string |
 | `salary` | numeric | Default 0 |
-| `branch_id` | UUID | FK → branches.id, nullable |
+| `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable — the employee's **primary** (default) branch. Every pre-multi-branch reader uses only this column. |
+| `branch_ids` | UUID[] | NOT NULL, default `{}`, GIN-indexed. **Added 2026-10-18** by `20261018000000_add_branch_ids_to_employee_accounts.sql` (DEC-110). Every branch the employee works at, primary first (`branch_ids[1] = branch_id` when both are set). No FK on the elements — a deleted branch can leave a dangling id; readers resolve against `branches`. Backfilled from `branch_id`. Read it through `getEmployeeBranchIds()` in `src/lib/employeeBranches.ts`, not directly. New assignments must be to an `active` branch (enforced by `/api/employees`, not by the database). |
 | `national_id` | text | nullable |
 | `national_id_front` | text | Base64 data or image URL, nullable |
 | `national_id_back` | text | Base64 data or image URL, nullable |

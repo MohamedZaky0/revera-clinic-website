@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { clearFetchCache } from "@/lib/fetchCache";
+import { formatEmployeeBranchNames } from "@/lib/employeeBranches";
 import { adminTranslations } from "@/components/admin/translations";
 interface AdminHrViewProps {
   // HR sub-tab and data states (kept in page.tsx)
@@ -292,7 +293,7 @@ export default function AdminHrView({
                          </td>
                          <td className="px-5 py-4"><span className="inline-block rounded-lg bg-[var(--cr-accent)]/15 px-2.5 py-1 text-xs font-semibold text-[#8B7544]">{emp.department || "—"}</span></td>
                          <td className="px-5 py-4 text-xs font-semibold text-[var(--cr-dark)]">{emp.role_name || "—"}</td>
-                         <td className="px-5 py-4"><span className="inline-block rounded-lg bg-[var(--cr-primary)]/10 px-2.5 py-1 text-xs font-semibold text-[var(--cr-primary)]">{branches.find(b => b.id === emp.branch_id)?.name_en || "—"}</span></td>
+                         <td className="px-5 py-4"><span className="inline-block rounded-lg bg-[var(--cr-primary)]/10 px-2.5 py-1 text-xs font-semibold text-[var(--cr-primary)]">{formatEmployeeBranchNames(emp, branches, lang) || "—"}</span></td>
                          <td className="px-5 py-4 text-xs font-mono font-bold text-[var(--cr-dark)]">
                            {t.egp} {Number(emp.salary || 0).toLocaleString("en-GB")}
                          </td>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyHrAccess } from '@/lib/auth';
 import { requireStaffAccess } from '@/lib/access';
+import { loadEmployeeBranchIds } from '@/lib/employeeBranchesServer';
 import https from 'https';
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -279,8 +280,11 @@ export async function POST(req: Request) {
 
     const isSuperadmin = employee.role_name?.toLowerCase() === 'superadmin';
 
+    // DEC-110: an employee may work at several branches. `branch_id` stays the primary one.
+    const assignedBranchIds = await loadEmployeeBranchIds(employee.id, employee.branch_id);
+
     // Global superadmin without assigned branch auto-checks in
-    if (isSuperadmin && !employee.branch_id) {
+    if (isSuperadmin && assignedBranchIds.length === 0) {
       const { data, error } = await supabaseServer
         .from('hr_attendance')
         .upsert({
@@ -297,65 +301,81 @@ export async function POST(req: Request) {
       return NextResponse.json(data);
     }
 
-    if (!employee.branch_id) {
+    if (assignedBranchIds.length === 0) {
       return NextResponse.json({ error: 'no_branch', message: 'No branch assigned to employee.' }, { status: 400 });
     }
 
-    // Fetch branch coordinates and maps link / embed
-    const { data: branch, error: bErr } = await supabaseServer
+    // Fetch coordinates and maps link / embed for every assigned branch
+    const { data: branchRows, error: bErr } = await supabaseServer
       .from('branches')
-      .select('latitude, longitude, maps_embed, maps_link, name_en')
-      .eq('id', employee.branch_id)
-      .single();
+      .select('id, latitude, longitude, maps_embed, maps_link, name_en')
+      .in('id', assignedBranchIds);
 
-    if (bErr || !branch) {
+    if (bErr || !branchRows || branchRows.length === 0) {
       return NextResponse.json({ error: 'Branch details not found.' }, { status: 404 });
     }
 
-    let targetLat = branch.latitude ? Number(branch.latitude) : null;
-    let targetLng = branch.longitude ? Number(branch.longitude) : null;
+    // Primary branch first, so the single-branch behaviour (and the branch named in the
+    // "not configured" message) is unchanged for an employee with one branch.
+    const assignedBranches = assignedBranchIds
+      .map((id) => branchRows.find((b: any) => String(b.id) === id))
+      .filter(Boolean) as any[];
 
-    if (!targetLat || !targetLng || isNaN(targetLat) || isNaN(targetLng)) {
-      // 1. Try sync parsing from maps_embed
-      if (branch.maps_embed) {
-        const parsed = extractCoordsFromUrlOrEmbed(branch.maps_embed);
-        if (parsed) {
-          targetLat = parsed.latitude;
-          targetLng = parsed.longitude;
+    const resolveBranchTarget = async (branch: any): Promise<{ lat: number; lng: number } | null> => {
+      let targetLat = branch.latitude ? Number(branch.latitude) : null;
+      let targetLng = branch.longitude ? Number(branch.longitude) : null;
+
+      if (!targetLat || !targetLng || isNaN(targetLat) || isNaN(targetLng)) {
+        // 1. Try sync parsing from maps_embed
+        if (branch.maps_embed) {
+          const parsed = extractCoordsFromUrlOrEmbed(branch.maps_embed);
+          if (parsed) {
+            targetLat = parsed.latitude;
+            targetLng = parsed.longitude;
+          }
         }
-      }
 
-      // 2. Try sync parsing from maps_link
-      if ((!targetLat || !targetLng) && branch.maps_link) {
-        const parsed = extractCoordsFromUrlOrEmbed(branch.maps_link);
-        if (parsed) {
-          targetLat = parsed.latitude;
-          targetLng = parsed.longitude;
-        } else {
-          // 3. Fallback async resolution
-          const asyncParsed = await extractCoordsFromMapsLink(branch.maps_link);
-          if (asyncParsed) {
-            targetLat = asyncParsed.latitude;
-            targetLng = asyncParsed.longitude;
+        // 2. Try sync parsing from maps_link
+        if ((!targetLat || !targetLng) && branch.maps_link) {
+          const parsed = extractCoordsFromUrlOrEmbed(branch.maps_link);
+          if (parsed) {
+            targetLat = parsed.latitude;
+            targetLng = parsed.longitude;
+          } else {
+            // 3. Fallback async resolution
+            const asyncParsed = await extractCoordsFromMapsLink(branch.maps_link);
+            if (asyncParsed) {
+              targetLat = asyncParsed.latitude;
+              targetLng = asyncParsed.longitude;
+            }
           }
         }
       }
+
+      if (!targetLat || !targetLng) return null;
+      return { lat: targetLat, lng: targetLng };
+    };
+
+    // The employee may check in from ANY of their branches: measure against each one that has a
+    // location configured and keep the nearest.
+    let branch: any = null;
+    let dist = Infinity;
+    for (const candidate of assignedBranches) {
+      const target = await resolveBranchTarget(candidate);
+      if (!target) continue;
+      const d = getDistanceInMeters(parsedLatitude, parsedLongitude, target.lat, target.lng);
+      if (d < dist) {
+        dist = d;
+        branch = candidate;
+      }
     }
 
-    if (!targetLat || !targetLng) {
+    if (!branch) {
       return NextResponse.json(
-        { error: 'no_location_configured', message: `No GPS coordinates or Google Maps link configured for branch: ${branch.name_en || 'Assigned Branch'}.` },
+        { error: 'no_location_configured', message: `No GPS coordinates or Google Maps link configured for branch: ${assignedBranches[0]?.name_en || 'Assigned Branch'}.` },
         { status: 400 }
       );
     }
-
-    // Compute distance between employee and branch
-    const dist = getDistanceInMeters(
-      parsedLatitude,
-      parsedLongitude,
-      targetLat,
-      targetLng
-    );
 
     console.log(`Employee ${employee.id} checkin distance to ${branch.name_en}: ${dist.toFixed(0)} meters`);
 

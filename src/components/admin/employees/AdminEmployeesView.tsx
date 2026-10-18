@@ -46,6 +46,13 @@ import {
   Loader2,
 } from "lucide-react";
 import { Branch } from "@/types";
+import EmployeeBranchPicker from "@/components/admin/employees/EmployeeBranchPicker";
+import {
+  branchesOfferedFor,
+  formatEmployeeBranchNames,
+  getEmployeeBranchIds,
+  resolveEditBranchSelection,
+} from "@/lib/employeeBranches";
 import { compressImage } from "@/lib/image";
 import { clearFetchCache } from "@/lib/fetchCache";
 import { DoctorServiceCommissionEditor, ServiceCommissionEntry, DefaultCommissionType } from "@/components/admin/services/DoctorServiceCommissionEditor";
@@ -368,6 +375,9 @@ export default function AdminEmployeesView({
   const [newEmployeeServiceCommissions, setNewEmployeeServiceCommissions] = useState<ServiceCommissionEntry[]>([]);
   const [newEmployeeScheduleTab, setNewEmployeeScheduleTab] = useState<"in_person" | "online">("in_person");
   const [newEmployeeBranchIds, setNewEmployeeBranchIds] = useState<string[]>([]);
+  // DEC-110: the branches the employee being edited already holds. An inactive one among them stays
+  // listed in the picker (instead of silently disappearing); empty when adding a new employee.
+  const [newEmployeeOriginalBranchIds, setNewEmployeeOriginalBranchIds] = useState<string[]>([]);
   const [newEmployeeWorkingDaysHours, setNewEmployeeWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string; shifts?: Array<{ start: string; end: string }> }>>({
     Sunday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
     Monday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
@@ -546,6 +556,24 @@ export default function AdminEmployeesView({
     setNewEmployeeOnlineWorkingDaysHours(targetSched.online || defaultDaySched);
     setNewEmployeeSelectedScheduleBranchId(targetBranchId);
   }
+  // DEC-110: single place that keeps `newEmployeeBranchIds` (ordered, first = primary) and the
+  // legacy `newEmployeeBranchId` (the primary) in step.
+  const applyBranchSelection = (ids: string[]) => {
+    setNewEmployeeBranchIds(ids);
+    setNewEmployeeBranchId(ids[0] || "");
+  };
+  function handleBranchSelectionChange(nextIds: string[]) {
+    const activeId = newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0];
+    applyBranchSelection(nextIds);
+    // The branch whose schedule is open on screen was just unticked: move to another ticked one.
+    if (nextIds.length > 0 && activeId && !nextIds.includes(activeId)) {
+      handleEmployeeBranchScheduleTabChange(nextIds[0]);
+    }
+  }
+  const computeEditBranchIds = (emp: any, matchProv?: any): string[] => {
+    const providerIds = Array.isArray(matchProv?.workingDaysHours?.branch_ids) ? matchProv.workingDaysHours.branch_ids : [];
+    return resolveEditBranchSelection(emp, branches, providerIds);
+  };
   const [viewingEmployeeNotes, setViewingEmployeeNotes] = useState<any[]>([]);
   const [loadingEmployeeNotes, setLoadingEmployeeNotes] = useState(false);
   const [viewingEmployeeBookings, setViewingEmployeeBookings] = useState<any[]>([]);
@@ -993,7 +1021,6 @@ export default function AdminEmployeesView({
     setNewEmployeeNationalIdFront(emp.national_id_front || "");
     setNewEmployeeNationalIdBack(emp.national_id_back || "");
     applyAddressToState(emp.address || "");
-    setNewEmployeeBranchId(emp.branch_id || "");
     const rawContract = emp.contract_file || "";
     let contractUrl = "";
     let additionalList: any[] = [];
@@ -1021,15 +1048,9 @@ export default function AdminEmployeesView({
     setNewEmployeeCommissionBase((matchProv?.commissionBase as "gross" | "net_of_materials") || "gross");
     setNewEmployeeCommissionFixedComponent(String(matchProv?.commissionFixedComponent || 0));
     setNewEmployeeServiceCommissions(Array.isArray(matchProv?.serviceCommissions) ? matchProv.serviceCommissions : []);
-    let bIds: string[] = [];
-    if (matchProv?.workingDaysHours?.branch_ids && Array.isArray(matchProv.workingDaysHours.branch_ids)) {
-      bIds = matchProv.workingDaysHours.branch_ids;
-    } else if (emp.branch_id) {
-      bIds = [emp.branch_id];
-    } else if (branches.length > 0) {
-      bIds = [branches[0].id];
-    }
-    setNewEmployeeBranchIds(bIds);
+    const bIds = computeEditBranchIds(emp, matchProv);
+    applyBranchSelection(bIds);
+    setNewEmployeeOriginalBranchIds(getEmployeeBranchIds(emp));
     setNewEmployeeSelectedScheduleBranchId(bIds[0] || "");
     const sched = loadEmployeeWorkingSchedule(emp, matchProv, bIds[0]);
     setNewEmployeeWorkingDaysHours(sched);
@@ -1104,7 +1125,6 @@ export default function AdminEmployeesView({
             setNewEmployeeNationalIdFront("");
             setNewEmployeeNationalIdBack("");
             applyAddressToState("");
-            setNewEmployeeBranchId(branches.length > 0 ? branches[0].id : "");
             setNewEmployeeContract("");
             setNewEmployeeContractName("");
             setNewEmployeeAdditionalFiles([]);
@@ -1119,8 +1139,10 @@ export default function AdminEmployeesView({
             setNewEmployeeCommissionFixedComponent("0");
             setNewEmployeeServiceCommissions([]);
             setNewEmployeeScheduleTab("in_person");
-            const defaultBranchId = branches.length > 0 ? branches[0].id : "";
-            setNewEmployeeBranchIds(defaultBranchId ? [defaultBranchId] : []);
+            // DEC-110: only an ACTIVE branch may be pre-ticked for a new employee.
+            const defaultBranchId = branchesOfferedFor(branches)[0]?.id || "";
+            applyBranchSelection(defaultBranchId ? [defaultBranchId] : []);
+            setNewEmployeeOriginalBranchIds([]);
             setNewEmployeeSelectedScheduleBranchId(defaultBranchId);
             const defaultDays = {
               Sunday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
@@ -1239,7 +1261,7 @@ export default function AdminEmployeesView({
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
                       <span className="inline-block rounded-lg bg-[var(--cr-primary)]/10 px-2.5 py-1 text-xs font-semibold text-[var(--cr-primary)]">
-                        {branches.find(b => b.id === emp.branch_id)?.name_en || t.table.noBranch}
+                        {formatEmployeeBranchNames(emp, branches, lang) || t.table.noBranch}
                       </span>
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
@@ -1360,7 +1382,7 @@ export default function AdminEmployeesView({
                   <div>
                     <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-brand-secondary)] block mb-0.5">{t.table.branch}</span>
                     <span className="inline-block rounded-lg bg-[var(--cr-primary)]/10 px-2 py-0.5 text-xs font-semibold text-[var(--cr-primary)] truncate max-w-full">
-                      {branches.find(b => b.id === emp.branch_id)?.name_en || t.table.noBranch}
+                      {formatEmployeeBranchNames(emp, branches, lang) || t.table.noBranch}
                     </span>
                   </div>
                   <div>
@@ -1464,6 +1486,11 @@ export default function AdminEmployeesView({
                   alert(t.form.nameRequired);
                   return;
                 }
+                // DEC-110: an employee must belong to at least one branch.
+                if (newEmployeeBranchIds.length === 0) {
+                  alert(t.form.branchRequired);
+                  return;
+                }
                 try {
                   const activeBranchId = newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0] || newEmployeeBranchId;
                   const isDoctor = !!(newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc"));
@@ -1509,12 +1536,13 @@ export default function AdminEmployeesView({
                       in_person: newEmployeeWorkingDaysHours,
                       online: newEmployeeOnlineWorkingDaysHours
                     }
-                  } : {
-                    [newEmployeeBranchId || activeBranchId]: {
-                      in_person: newEmployeeWorkingDaysHours,
-                      online: {}
-                    }
-                  };
+                  } : Object.fromEntries(
+                    // Non-doctors have one weekly schedule; it applies at every branch they are on.
+                    (newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId || activeBranchId]).map((bId) => [
+                      bId,
+                      { in_person: newEmployeeWorkingDaysHours, online: {} },
+                    ])
+                  ) as Record<string, { in_person: any; online: any }>;
 
                   if (isDoctor) {
                     for (const bId of newEmployeeBranchIds) {
@@ -1528,7 +1556,7 @@ export default function AdminEmployeesView({
                   }
 
                   const finalWorkingDaysHours = {
-                    branch_ids: isDoctor ? (newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId]) : [newEmployeeBranchId || activeBranchId],
+                    branch_ids: newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId || activeBranchId],
                     branch_schedules: compiledBranchSchedules
                   };
 
@@ -1551,7 +1579,7 @@ export default function AdminEmployeesView({
                         nationalIdFront: newEmployeeNationalIdFront || null,
                         nationalIdBack: newEmployeeNationalIdBack || null,
                         address: buildAddress(newEmployeeAddressLine1.trim(), newEmployeeAddressLine2.trim(), newEmployeeCity.trim(), newEmployeeGovernorateProp.trim(), newEmployeePostalCode.trim(), newEmployeeCountry.trim()) || null,
-                        branchId: newEmployeeBranchId || null,
+                        branchIds: newEmployeeBranchIds,
                         contractFile: newEmployeeAdditionalFiles.length > 0 
                           ? JSON.stringify({ contract: newEmployeeContract || "", additional: newEmployeeAdditionalFiles }) 
                           : (newEmployeeContract || null),
@@ -1611,7 +1639,7 @@ export default function AdminEmployeesView({
                         nationalIdFront: newEmployeeNationalIdFront || null,
                         nationalIdBack: newEmployeeNationalIdBack || null,
                         address: buildAddress(newEmployeeAddressLine1.trim(), newEmployeeAddressLine2.trim(), newEmployeeCity.trim(), newEmployeeGovernorateProp.trim(), newEmployeePostalCode.trim(), newEmployeeCountry.trim()) || null,
-                        branchId: (isDoctor ? newEmployeeBranchIds[0] : newEmployeeBranchId) || newEmployeeBranchId || null,
+                        branchIds: newEmployeeBranchIds,
                         contractFile: newEmployeeAdditionalFiles.length > 0 
                           ? JSON.stringify({ contract: newEmployeeContract || "", additional: newEmployeeAdditionalFiles }) 
                           : (newEmployeeContract || null),
@@ -1731,24 +1759,16 @@ export default function AdminEmployeesView({
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.form.assignedBranch} {t.form.required}</label>
-                  <select
-                    required
-                    value={newEmployeeBranchId}
-                    onChange={(e) => {
-                      setNewEmployeeBranchId(e.target.value);
-                      setNewEmployeeBranchIds([e.target.value]);
-                    }}
-                    className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm text-[var(--cr-primary)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
-                  >
-                    <option value="" disabled>{t.form.selectBranch}</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>{b.name_en}</option>
-                    ))}
-                  </select>
-                </div>
               </div>
+
+              <EmployeeBranchPicker
+                branches={branches}
+                selectedIds={newEmployeeBranchIds}
+                originalIds={newEmployeeOriginalBranchIds}
+                onChange={handleBranchSelectionChange}
+                lang={lang}
+                labels={t.form}
+              />
     
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -1837,48 +1857,8 @@ export default function AdminEmployeesView({
     
     
     
-                  {/* Row 3: Assigned Branches */}
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-2">
-                      Assigned Branches (Select one or more for Doctor)
-                    </label>
-                    <div className="flex flex-wrap gap-2 p-2.5 rounded-2xl border border-[var(--cr-primary)]/15 bg-white min-h-[42px] items-center">
-                      {branches.map((b) => {
-                        const isSelected = newEmployeeBranchIds.includes(b.id);
-                        return (
-                          <button
-                            key={b.id}
-                            type="button"
-                            onClick={() => {
-                              let nextIds: string[];
-                              if (isSelected) {
-                                if (newEmployeeBranchIds.length <= 1) return;
-                                nextIds = newEmployeeBranchIds.filter((id) => id !== b.id);
-                              } else {
-                                nextIds = [...newEmployeeBranchIds, b.id];
-                              }
-                              setNewEmployeeBranchIds(nextIds);
-                              setNewEmployeeBranchId(nextIds[0]);
-    
-                              // If current active schedule branch is removed, switch active branch schedule tab
-                              const activeId = newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0];
-                              if (!nextIds.includes(activeId)) {
-                                handleEmployeeBranchScheduleTabChange(nextIds[0]);
-                              }
-                            }}
-                            className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
-                              isSelected
-                                ? "bg-[var(--cr-primary)] text-white border-[var(--cr-primary)]"
-                                : "bg-gray-50 text-[var(--cr-primary)] border-[var(--cr-primary)]/15 hover:bg-[var(--cr-primary)]/10"
-                            }`}
-                          >
-                            {b.name_en} {isSelected ? "✓" : "+"}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-    
+                  {/* Row 3 (assigned branches) now lives in the shared branch picker above the Department field (DEC-110). */}
+
                   {/* Row 4: Doctor Schedule Grid with Branch Selector, In-Clinic vs Online Consultations tabs & Multi-shift per day */}
                   <div>
                     {/* Branch Selector Bar when doctor is assigned to multiple branches */}
@@ -2120,10 +2100,9 @@ export default function AdminEmployeesView({
                       {t.nonDoctorSection?.weeklyShifts || "Staff Weekly Shifts & Working Days Schedule"}
                     </div>
                     {newEmployeeBranchId && (
-                      <span className="text-[11px] font-bold text-[var(--color-brand-secondary)] bg-white px-2.5 py-1 rounded-lg border border-[var(--cr-primary)]/15 w-max">
-                        {lang === "ar"
-                          ? (branches.find(b => b.id === newEmployeeBranchId)?.name_ar || branches.find(b => b.id === newEmployeeBranchId)?.name_en || "الفرع المخصص")
-                          : (branches.find(b => b.id === newEmployeeBranchId)?.name_en || branches.find(b => b.id === newEmployeeBranchId)?.name_ar || "Assigned Branch")}
+                      <span className="text-[11px] font-bold text-[var(--color-brand-secondary)] bg-white px-2.5 py-1 rounded-lg border border-[var(--cr-primary)]/15 w-max max-w-full">
+                        {formatEmployeeBranchNames({ branch_id: newEmployeeBranchId, branch_ids: newEmployeeBranchIds }, branches, lang)
+                          || (lang === "ar" ? "الفرع المخصص" : "Assigned Branch")}
                       </span>
                     )}
                   </div>
@@ -2764,7 +2743,6 @@ export default function AdminEmployeesView({
                   setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
                   setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
                   applyAddressToState(viewingEmployee.address || "");
-                  setNewEmployeeBranchId(viewingEmployee.branch_id || "");
                   const rawContract = viewingEmployee.contract_file || "";
                   let contractUrl = "";
                   let additionalList: any[] = [];
@@ -2793,15 +2771,9 @@ export default function AdminEmployeesView({
                   setNewEmployeeCommissionBase((matchProv2?.commissionBase as "gross" | "net_of_materials") || "gross");
                   setNewEmployeeCommissionFixedComponent(String(matchProv2?.commissionFixedComponent || 0));
                   setNewEmployeeServiceCommissions(Array.isArray(matchProv2?.serviceCommissions) ? matchProv2.serviceCommissions : []);
-                  let bIds: string[] = [];
-                  if (matchProv2?.workingDaysHours?.branch_ids && Array.isArray(matchProv2.workingDaysHours.branch_ids)) {
-                    bIds = matchProv2.workingDaysHours.branch_ids;
-                  } else if (viewingEmployee.branch_id) {
-                    bIds = [viewingEmployee.branch_id];
-                  } else if (branches.length > 0) {
-                    bIds = [branches[0].id];
-                  }
-                  setNewEmployeeBranchIds(bIds);
+                  const bIds = computeEditBranchIds(viewingEmployee, matchProv2);
+                  applyBranchSelection(bIds);
+                  setNewEmployeeOriginalBranchIds(getEmployeeBranchIds(viewingEmployee));
                   const sched = loadEmployeeWorkingSchedule(viewingEmployee, matchProv2, bIds[0]);
                   setNewEmployeeWorkingDaysHours(sched);
                   const onlineSched = (bIds[0] && matchProv2?.workingDaysHours?.branch_schedules?.[bIds[0]]?.online) || matchProv2?.workingDaysHours?.online || sched;

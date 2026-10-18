@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { requireStaffAccess } from "@/lib/access";
 import { getDistanceInMeters, resolveBranchCoordinates } from "@/lib/geo";
+import { getEmployeeBranchIds } from "@/lib/employeeBranches";
+import { loadEmployeeBranchIds } from "@/lib/employeeBranchesServer";
 
 const ALLOWED_ROLES = ["receptionist", "hr", "admin", "superadmin"];
 
@@ -181,7 +183,13 @@ export async function GET(req: Request) {
     // 3. Resolve Branch Information
     let branchNameEn = "New Cairo Branch";
     let branchNameAr = "فرع التجمع الخامس";
-    const branchId = emp?.branch_id || null;
+    // DEC-110: a multi-branch employee sees the branch they are currently working in (the one the
+    // admin shell passes as ?branchId=), provided it is one of theirs; otherwise their primary branch.
+    const assignedBranchIds = getEmployeeBranchIds(emp);
+    const branchId =
+      (branchIdParam && assignedBranchIds.includes(branchIdParam) ? branchIdParam : null) ||
+      emp?.branch_id ||
+      null;
 
     const { data: branchRows } = await supabaseServer
       .from("branches")
@@ -831,9 +839,12 @@ export async function POST(req: Request) {
         }
 
         // Fetch clinic branch(es) to check distance
+        // DEC-110: every branch the employee is assigned to counts as their own location, not just
+        // the primary one.
+        const assignedBranchIds = await loadEmployeeBranchIds(empId, employeeRecord?.branch_id);
         let branchesQuery = supabaseServer.from("branches").select("id, name_en, name_ar, latitude, longitude, maps_embed, maps_link, status");
-        if (employeeRecord?.branch_id) {
-          branchesQuery = branchesQuery.eq("id", employeeRecord.branch_id);
+        if (assignedBranchIds.length > 0) {
+          branchesQuery = branchesQuery.in("id", assignedBranchIds);
         }
 
         const { data: branchRows } = await branchesQuery;

@@ -166,6 +166,7 @@ import type { InventoryProductsTabRef } from "@/components/admin/inventory/Inven
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
+import { getEmployeeBranchIds } from "@/lib/employeeBranches";
 
 export type Req = {
   id: string;
@@ -2030,6 +2031,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     }
   }, [session, activeNav, employeesList.length]);
 
+  // DEC-110: branches a non-admin staff member may work in (primary first). Admins/superadmins are not
+  // branch-locked, so this stays empty for them. One entry = the pre-multi-branch behaviour (locked).
+  const myAssignedBranchIds = useMemo(() => {
+    if (adminRole === "superadmin" || adminRole === "admin" || !adminEmail) return [] as string[];
+    const me = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail.toLowerCase());
+    return getEmployeeBranchIds(me);
+  }, [adminRole, adminEmail, employeesList]);
+  const employeeBranchInitRef = useRef(false);
+
   useEffect(() => {
     if (!adminEmail || employeesList.length === 0) return;
     const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
@@ -2041,7 +2051,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       setProfileNatIdFront(profileEmployee.national_id_front || "");
       setProfileNatIdBack(profileEmployee.national_id_back || "");
       if (adminRole !== "superadmin" && adminRole !== "admin" && profileEmployee.branch_id) {
-        setBranch(profileEmployee.branch_id);
+        // First time we learn who this is, land on their primary branch. After that, only pull the
+        // selection back if it is not one of their assigned branches -- a multi-branch employee who
+        // switched branch must not be bounced to the primary each time the employee list refreshes.
+        const assigned = getEmployeeBranchIds(profileEmployee);
+        const firstResolve = !employeeBranchInitRef.current;
+        employeeBranchInitRef.current = true;
+        setBranch((prev) => (firstResolve || !assigned.includes(prev) ? profileEmployee.branch_id : prev));
       }
     } else if (adminRole === "superadmin") {
       setProfileName("System Owner");
@@ -6093,14 +6109,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               >
                 <Menu size={16} className="sm:w-[18px] sm:h-[18px]" />
               </button>
-              {adminRole === "superadmin" || adminRole === "admin" ? (
+              {adminRole === "superadmin" || adminRole === "admin" || myAssignedBranchIds.length > 1 ? (
                 <div className="relative min-w-0 max-w-[130px] sm:max-w-[200px] md:max-w-none">
                   <select
                     value={branch}
                     onChange={(e) => setBranch(e.target.value)}
                     className="w-full appearance-none rounded-xl border border-[var(--cr-primary)]/15 bg-white py-1.5 sm:py-2 pl-2.5 sm:pl-3 pr-7 sm:pr-8 text-xs sm:text-sm font-medium text-[var(--cr-dark)] shadow-sm outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20 cursor-pointer truncate"
                   >
-                    {branches.map((b) => (
+                    {(adminRole === "superadmin" || adminRole === "admin"
+                      ? branches
+                      : myAssignedBranchIds
+                          .map((id) => branches.find((b) => b.id === id))
+                          .filter((b): b is Branch => !!b)
+                    ).map((b) => (
                       <option key={b.id} value={b.id}>{b.name_en}</option>
                     ))}
                   </select>
@@ -7012,9 +7033,16 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   address: profileAddress || profileEmployee?.address || "",
                   role: isSuperadminBypass ? "Superadmin" : (profileEmployee?.role_name || (matchProv ? "Doctor" : "Employee")),
                   branch: currentBranchName,
-                  branchesList: Array.isArray(profileEmployee?.branches) && profileEmployee.branches.length > 0
-                    ? profileEmployee.branches
-                    : [currentBranchName],
+                  branchesList: (() => {
+                    // DEC-110: a multi-branch employee's profile lists every branch they work at.
+                    const assignedNames = getEmployeeBranchIds(profileEmployee)
+                      .map((id) => branches.find((b) => b.id === id)?.name_en)
+                      .filter((n): n is string => !!n);
+                    if (assignedNames.length > 1) return assignedNames;
+                    return Array.isArray(profileEmployee?.branches) && profileEmployee.branches.length > 0
+                      ? profileEmployee.branches
+                      : [currentBranchName];
+                  })(),
                   department: profileEmployee?.department || (matchProv ? "Doctor" : "Reception"),
                   employeeId: isSuperadminBypass ? "EMP-SUPER" : (profileEmployee?.employee_id || (matchProv?.id ? `DOC-${matchProv.id.slice(0, 5).toUpperCase()}` : "EMP-001")),
                   employmentType: "Full Time",

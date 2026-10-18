@@ -899,7 +899,7 @@ Alias for `/api/page-settings` — upserts the `value` JSONB for the given key.
 
 Returns all employee accounts with role and branch info.
 
-**Response:** `EmployeeAccount[]`
+**Response:** `EmployeeAccount[]` — each row has `branch_id` (primary) and `branch_ids` (all assigned branches, primary first, always present).
 
 ---
 
@@ -907,9 +907,17 @@ Returns all employee accounts with role and branch info.
 
 Creates an employee account and sends a Supabase Auth invite email.
 
-**Body:** `{ name, email, role_id, branch_id?, active? }`
+**Body:** `{ name, email, roleName, branchIds?, password?, ... }`
 
-**Response:** Created employee account
+`branchIds` (DEC-110): ordered array of branch ids, first = primary branch (stored as `branch_id`; the whole list in `branch_ids`). The legacy single `branchId` is still accepted. If neither is sent the account is created with no branch. If sent: must be non-empty, unique, existing, and **active** — otherwise `400` (`field: "branchIds"`), before any auth user is created.
+
+**Response:** Created employee account (includes `branch_ids`)
+
+---
+
+## PATCH /api/employees
+
+Updates an employee. Send only the fields being changed. `branchIds` / legacy `branchId` follow the same rules as POST, except a branch the employee **already holds** may stay even if it is now inactive. An empty list (or a null `branchId`) is rejected with `400`.
 
 ---
 
