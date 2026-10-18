@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireStaffAccess, hasFinancePermission, hasGranularPermission } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { formatInvoiceNo } from '@/lib/ledger';
 
 export const dynamic = 'force-dynamic';
 
@@ -598,18 +597,11 @@ export async function POST(req: Request) {
 
     const staffName = access.access.employee?.email?.split('@')[0] || 'Staff User';
 
-    // Auto-generate reference_no in INV-000001 format if missing or blank
-    let finalReferenceNo = reference_no?.trim() || null;
-    if (!finalReferenceNo) {
-      try {
-        const { data: invSeqVal } = await supabaseServer.rpc('next_invoice_no');
-        if (invSeqVal != null) {
-          finalReferenceNo = formatInvoiceNo(Number(invSeqVal));
-        }
-      } catch (refErr) {
-        console.warn('Auto-reference generation error:', refErr);
-      }
-    }
+    // A blank reference becomes RCT-<n>, reusing the number this transaction already drew from
+    // transaction_seq for its TXN id. It must NOT draw from invoice_no_seq: that sequence numbers
+    // real invoices, and a manual transaction is not one, so every use would leave a gap in the
+    // invoice numbering.
+    const finalReferenceNo = reference_no?.trim() || `RCT-${String(Number(seqVal)).padStart(6, '0')}`;
 
     // Insert transaction
     const newTxnRow = {

@@ -141,9 +141,29 @@ describe('session state switching', () => {
 });
 
 describe('additional services + laser extra pulses — money math', () => {
-  // The old per-service "Pulses (e.g. 150)" input and its /api/service-devices lookup were removed
-  // when pulse intake was isolated to the laser section (DEC-062/069). An added service now carries
-  // only a name and a price; pulses are entered once, in the laser panel, and priced by laserMode.
+  // DEC-105/PRODUCT_RULES §10: the doctor view shows NO prices, so the totals can no longer be read
+  // off the screen. The math is still real — every add/remove of an additional service PATCHes
+  // `/api/reservations` with the recomputed `amountLeft` (= final session total − amountPaid), and
+  // the pulse charge reaches the parent via handleCompleteTreatment. Those are what is asserted.
+  //
+  // An added service now carries only a name and a price; pulses are entered once, in the laser
+  // panel, and priced by the clinic-wide default per-pulse price (5 EGP here — not editable by the
+  // doctor any more).
+  function patchedAmountLeft(): number[] {
+    return fetchFake.calls
+      .filter((c) => c.method === 'PATCH' && c.path === '/api/reservations')
+      .map((c) => c.body.amountLeft);
+  }
+
+  beforeEach(() => {
+    fetchFake.on('PATCH', '/api/reservations', () => ({ status: 200, body: {} }));
+  });
+
+  // "Chemical Peel" is also an <option> in the service picker, so count only the added row.
+  function addedPeelElements(): HTMLElement[] {
+    return screen.queryAllByText('Chemical Peel').filter((el) => el.tagName !== 'OPTION');
+  }
+
   async function addSecondService(user: ReturnType<typeof userEvent.setup>) {
     const panel = additionalServicesPanel();
     const [serviceSelect] = within(panel).getAllByRole('combobox');
@@ -151,57 +171,62 @@ describe('additional services + laser extra pulses — money math', () => {
     await user.click(within(panel).getByRole('button', { name: /addAdditionalServiceBtn/ }));
   }
 
-  // Standard Pulses / Additional Qty / Price Per Pulse / Reason are all plain inputs whose value
-  // starts at 0 or "", so typing would append — fireEvent.change sets the value outright.
-  function enableChargedPulses(qty: number, unitPrice: number, reason?: string) {
+  // Standard Pulses / Additional Qty / Reason are plain inputs whose value starts at 0 or "", so
+  // typing would append — fireEvent.change sets the value outright.
+  function enableChargedPulses(qty: number, reason?: string) {
     fireEvent.click(screen.getByLabelText(/Add Additional Charged Pulses/));
     fireEvent.change(screen.getByPlaceholderText('e.g. 100'), { target: { value: String(qty) } });
-    fireEvent.change(screen.getByPlaceholderText('5'), { target: { value: String(unitPrice) } });
     if (reason) {
       fireEvent.change(screen.getByPlaceholderText(/Extended session for high hair density/), { target: { value: reason } });
     }
   }
 
-  it('adding a service adds its price to the final total, and the line item and breakdown agree', async () => {
+  it('shows no monetary amounts to the doctor while a service is added', async () => {
     const user = userEvent.setup();
     render(<DoctorOngoingSessionTab {...baseProps()} />);
     await addSecondService(user);
-
-    // "+300 EGP" appears twice by design: the added line item, and the additionalServicesSubtotal
-    // in the breakdown summary — both must agree.
-    expect(screen.getAllByText('+300 EGP')).toHaveLength(2);
-    // finalSessionTotal = base(800) + additionalServicesSubtotal(300) + products(0) + laser extra(0)
-    expect(screen.getByText('1100 EGP')).toBeInTheDocument();
+    expect(addedPeelElements()).toHaveLength(1);
+    expect(screen.queryByText(/EGP/)).not.toBeInTheDocument();
   });
 
-  it('removing an added service subtracts it back out of the final total', async () => {
+  it('adding a service adds its price to the amount left synced to the booking', async () => {
     const user = userEvent.setup();
     render(<DoctorOngoingSessionTab {...baseProps()} />);
     await addSecondService(user);
-    expect(screen.getByText('1100 EGP')).toBeInTheDocument();
+    // finalSessionTotal = base(800) + additionalServices(300) + products(0) + laser extra(0), nothing paid yet
+    await waitFor(() => expect(patchedAmountLeft()).toEqual([1100]));
+  });
 
-    // The remove button is icon-only with no accessible name, so it's found by scoping to the
-    // added-service row (identified by its price text — the row's <span>, not the breakdown
-    // summary's <strong> which shows the same "+300 EGP" for the subtotal).
-    const row = screen.getAllByText('+300 EGP').find((el) => el.tagName === 'SPAN')!.closest('div')!.parentElement as HTMLElement;
+  it('removing an added service subtracts it back out of the amount left', async () => {
+    const user = userEvent.setup();
+    render(<DoctorOngoingSessionTab {...baseProps()} />);
+    await addSecondService(user);
+    await waitFor(() => expect(patchedAmountLeft()).toEqual([1100]));
+
+    // The remove button is icon-only with no accessible name, so it is found by scoping to the row
+    // that carries the added service's name.
+    const row = addedPeelElements()[0].closest('div')!.parentElement as HTMLElement;
     await user.click(within(row).getByRole('button'));
 
-    expect(screen.queryByText('+300 EGP')).not.toBeInTheDocument();
-    const finalRow = screen.getByText('finalInvoiceLabel').parentElement as HTMLElement;
-    expect(within(finalRow).getByText('800 EGP')).toBeInTheDocument();
+    expect(addedPeelElements()).toHaveLength(0);
+    await waitFor(() => expect(patchedAmountLeft()).toEqual([1100, 800]));
   });
 
-  it('includes the products subtotal passed in from the parent in the final invoice total', () => {
+  it('includes the products subtotal passed in from the parent in the amount left', async () => {
+    const user = userEvent.setup();
     render(<DoctorOngoingSessionTab {...baseProps({ productsSubtotal: 150 })} />);
-    // finalSessionTotal = 800 (base) + 0 (no additional services) + 150 (products)
-    expect(screen.getByText('950 EGP')).toBeInTheDocument();
+    await addSecondService(user);
+    // 800 (base) + 300 (added service) + 150 (products)
+    await waitFor(() => expect(patchedAmountLeft()).toEqual([1250]));
   });
 
-  it('charges additional pulses (qty × price per pulse) on top of the fixed service price', () => {
+  it('charges additional pulses (qty × the clinic per-pulse price) on top of the fixed service price', async () => {
+    const user = userEvent.setup();
     render(<DoctorOngoingSessionTab {...baseProps({ productsSubtotal: 150 })} />);
-    enableChargedPulses(20, 5, 'High hair density');
-    // 800 (fixed service) + 150 (products) + 20 × 5 (additional charged pulses)
-    expect(screen.getByText('1050 EGP')).toBeInTheDocument();
+    enableChargedPulses(20, 'High hair density');
+    await addSecondService(user);
+    // 800 (fixed service) + 300 (added service) + 150 (products) + 20 × 5 (additional charged pulses)
+    await waitFor(() => expect(patchedAmountLeft()).toEqual([1350]));
   });
 
   it('completing treatment passes standard + charged additional pulses and the laser charge to the parent handler', async () => {
@@ -213,7 +238,7 @@ describe('additional services + laser extra pulses — money math', () => {
     render(<DoctorOngoingSessionTab {...baseProps({ handleCompleteTreatment, medicalRecord: { id: 'mr-1' } })} />);
 
     fireEvent.change(screen.getByPlaceholderText('Pulses'), { target: { value: '40' } });
-    enableChargedPulses(60, 5, 'Extended session');
+    enableChargedPulses(60, 'Extended session');
     await user.click(screen.getByText('completeTreatmentBtn'));
 
     // totalSessionPulses = standard(40) + additional(60) = 100
@@ -237,7 +262,7 @@ describe('additional services + laser extra pulses — money math', () => {
     const user = userEvent.setup();
     render(<DoctorOngoingSessionTab {...baseProps({ handleCompleteTreatment, medicalRecord: { id: 'mr-1' } })} />);
 
-    enableChargedPulses(60, 5); // no reason
+    enableChargedPulses(60); // no reason
     await user.click(screen.getByText('completeTreatmentBtn'));
 
     expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('reason'));

@@ -3553,3 +3553,20 @@ Investigation revealed:
 5. The 5 outdated tests were rewritten to the new contract and 9 permission tests added (`tests/routes/transactions.test.ts`).
 
 **Not done:** existing roles are not migrated — nobody but superadmin has the keys until granted. Whether to give a seeded role (e.g. an accountant role) the keys by default is left to the owner.
+
+---
+
+## DEC-106: Manual-Transaction Reference Numbers No Longer Consume Invoice Numbers; Doctor-Session Tests Follow The Masked Pricing
+
+**Date:** 2026-10-18
+**Status:** Decided & implemented
+
+**Context:**
+1. Commit c5c6bbc made two things draw from `invoice_no_seq` (via `next_invoice_no()`): opening *New Transaction* (`GET /api/invoices?action=next_no`, to prefill a reference) and saving a manual transaction with a blank reference. That sequence numbers real invoices (checkout, package sales, product sales, laser deficit, historical invoices), so every form opened or manual transaction saved left a permanent gap in the invoice numbering. Observed live: opening the form showed `INV-000126`.
+2. The same commit hid all prices from the doctor ongoing-session view (PRODUCT_RULES §10, intentional). Six tests in `DoctorOngoingSessionTab.test.tsx` still looked for on-screen prices (`+300 EGP`, `1100 EGP`) and a "Price Per Pulse" input that no longer exist, so they failed on `dev` and `main`.
+
+**Decision:**
+1. A blank reference becomes `RCT-<n>` with `<n>` taken from the transaction's own `transaction_seq` value (the same number as its `TXN-<n>` id). No invoice-sequence draw, no extra sequence, no migration. The form no longer pre-fetches anything and shows an "Auto on save" placeholder; the "Auto Ref" button and the `action=next_no` endpoint were removed. A reference typed by staff is kept as is.
+2. The six tests were rewritten to assert the same business math through what the component still emits: the recomputed `amountLeft` PATCHed to `/api/reservations` on every add/remove of an additional service (base + added services + products + charged pulses − paid), plus a new test that no `EGP` text appears in the doctor view. Charged-pulse tests dropped the removed price input (the clinic default of 5 EGP applies).
+
+**Not done:** invoice numbers already skipped before this fix are not renumbered or back-filled. Whether a gap-free legal invoice sequence is a requirement for the clinic was not confirmed.

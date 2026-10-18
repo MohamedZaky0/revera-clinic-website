@@ -658,3 +658,38 @@ describe('POST — manual payment & wallet movements need an explicit Role Manag
     expect(res.status).toBe(200);
   });
 });
+
+// ── POST — auto reference number must not consume invoice numbers ────────────
+
+describe('POST — blank reference_no gets an RCT- receipt number', () => {
+  beforeEach(() => {
+    seedStaffAuth('superadmin', []);
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 0, spent_amount: 0 }]);
+  });
+
+  const charge = (extra: Record<string, unknown> = {}) => ({
+    body: { transaction_type: 'service_charge', customer_id: CUSTOMER_ID, amount: 100, description: 'Consultation', ...extra },
+  });
+
+  it('derives RCT-<n> from its own sequence value (same n as its TXN id)', async () => {
+    const res = await POST(staffReq('POST', charge()));
+    expect(res.status).toBe(200);
+    const row = fake.rows('transactions')[0];
+    expect(row.transaction_id).toBe('TXN-001001');
+    expect(row.reference_no).toBe('RCT-001001');
+  });
+
+  it('never calls next_invoice_no — invoice numbering must not get gaps from manual transactions', async () => {
+    const invoiceRpc = vi.fn(() => ({ data: 9999, error: null }));
+    fake.setRpc('next_invoice_no', invoiceRpc);
+    await POST(staffReq('POST', charge()));
+    await POST(staffReq('POST', charge({ reference_no: '   ' })));
+    expect(invoiceRpc).not.toHaveBeenCalled();
+    expect(fake.rows('transactions').every((r: any) => /^RCT-\d{6}$/.test(r.reference_no))).toBe(true);
+  });
+
+  it('keeps a reference the staff member typed', async () => {
+    await POST(staffReq('POST', charge({ reference_no: 'PAPER-77' })));
+    expect(fake.rows('transactions')[0].reference_no).toBe('PAPER-77');
+  });
+});

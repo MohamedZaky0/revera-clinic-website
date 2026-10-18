@@ -152,32 +152,9 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [branchId, setBranchId] = useState<string>(branches[0]?.id || "");
   const [referenceNo, setReferenceNo] = useState<string>("");
-  const [loadingRefNo, setLoadingRefNo] = useState<boolean>(false);
   const [description, setDescription] = useState<string>("");
   const [reason, setReason] = useState<string>("");
   const [refundDestination, setRefundDestination] = useState<"cash" | "wallet">("cash");
-
-  // Auto-generate invoice/receipt reference number
-  const fetchNextRefNo = async () => {
-    try {
-      setLoadingRefNo(true);
-      const headers = await getAuthHeaders();
-      const res = await fetch("/api/invoices?action=next_no", { headers });
-      if (res.ok) {
-        const data = await res.json();
-        const nextNo = data.referenceNo || data.nextInvoiceNo;
-        if (nextNo) setReferenceNo(nextNo);
-      }
-    } catch (err) {
-      console.error("Error fetching next reference no:", err);
-    } finally {
-      setLoadingRefNo(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchNextRefNo();
-  }, []);
 
   // Product / Package Purchase Fields
   const [itemType, setItemType] = useState<"product" | "package">("product");
@@ -998,27 +975,17 @@ export const NewManualTransactionView: React.FC<NewManualTransactionViewProps> =
                   </label>
                   <div
                     className="cursor-pointer text-gray-400 hover:text-gray-600"
-                    title={isAr ? "رقم مرجعي تلقائي بتنسيق INV-000001 أو إيصال مخصص" : "Auto-generated INV-000001 format reference or custom receipt"}
+                    title={isAr ? "اتركه فارغاً ليُنشأ رقم إيصال تلقائي (RCT-000001) عند الحفظ، أو أدخل رقم إيصال مخصص" : "Leave blank to auto-generate a receipt number (RCT-000001) on save, or enter a custom one"}
                   >
                     <HelpCircle size={13} />
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={fetchNextRefNo}
-                  disabled={loadingRefNo}
-                  className="flex items-center gap-1 text-[11px] font-bold text-[var(--cr-primary)] hover:underline cursor-pointer disabled:opacity-50"
-                  title={isAr ? "توليد كود تلقائي جديد" : "Generate / Refresh reference number"}
-                >
-                  <RotateCcw size={12} className={loadingRefNo ? "animate-spin" : ""} />
-                  <span>{isAr ? "توليد كود تلقائي" : "Auto Ref"}</span>
-                </button>
               </div>
               <input
                 type="text"
                 value={referenceNo}
                 onChange={(e) => setReferenceNo(e.target.value)}
-                placeholder="INV-000001"
+                placeholder={isAr ? "تلقائي عند الحفظ (RCT-000001)" : "Auto on save (RCT-000001)"}
                 className="w-full rounded-2xl border border-gray-200 bg-[var(--color-brand-light)] px-4 py-3 text-xs font-bold text-gray-800 placeholder-gray-400 focus:border-[var(--cr-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--cr-primary)] transition-all font-mono"
               />
             </div>
