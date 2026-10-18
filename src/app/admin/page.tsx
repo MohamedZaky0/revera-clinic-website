@@ -1084,11 +1084,6 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [locationWarningOpen, setLocationWarningOpen] = useState(false);
   const [locationWarningMsg, setLocationWarningMsg] = useState("");
   // Profile settings states
-  const [profilePassword, setProfilePassword] = useState("");
-  const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
-  const [profilePasswordSaving, setProfilePasswordSaving] = useState(false);
-  const [profilePasswordError, setProfilePasswordError] = useState("");
-  const [profilePasswordSuccess, setProfilePasswordSuccess] = useState("");
 
   // Personal profile states
   const [profileName, setProfileName] = useState("");
@@ -4328,43 +4323,6 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     }
   }
 
-  async function handleSavePersonalPassword(e: React.FormEvent) {
-    e.preventDefault();
-    if (!profilePassword || !profileConfirmPassword) {
-      setProfilePasswordError("Please fill in both password fields.");
-      return;
-    }
-    if (profilePassword !== profileConfirmPassword) {
-      setProfilePasswordError("Passwords do not match.");
-      return;
-    }
-    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-    if (!strongPasswordRegex.test(profilePassword)) {
-      setProfilePasswordError("Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g. @$!%*?&#).");
-      return;
-    }
-
-    setProfilePasswordSaving(true);
-    setProfilePasswordError("");
-    setProfilePasswordSuccess("");
-    try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: profilePassword,
-      });
-
-      if (updateError) throw updateError;
-
-      setProfilePasswordSuccess("Password changed successfully!");
-      setProfilePassword("");
-      setProfileConfirmPassword("");
-    } catch (err: any) {
-      console.error("handleSavePersonalPassword error:", err);
-      setProfilePasswordError(err.message || "Failed to update password.");
-    } finally {
-      setProfilePasswordSaving(false);
-    }
-  }
-
   async function handleSaveDepositSettings() {
     setSavingDepositSettings(true);
     try {
@@ -7061,10 +7019,6 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       console.error("Failed to save profile changes:", e);
                     }
                   }
-                }}
-                onUpdatePassword={async (pwd) => {
-                  setProfilePassword(pwd);
-                  setProfileConfirmPassword(pwd);
                 }}
                 onAvatarUpload={async (file) => {
                   const key = profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile";

@@ -32,6 +32,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { STRONG_PASSWORD_RE } from "@/lib/passwordPolicy";
 import { adminTranslations } from "./translations";
 
 export interface UserProfileData {
@@ -125,7 +126,7 @@ export interface UserProfileViewTranslations {
   confirmNewPassword: string;
   enterNewPassword: string;
   confirmNewPasswordPlaceholder: string;
-  passwordTooShort: string;
+  passwordTooWeak: string;
   passwordsDoNotMatch: string;
   passwordUpdated: string;
   passwordUpdateFailed: string;
@@ -151,7 +152,6 @@ export interface UserProfileViewTranslations {
 interface UserProfileViewProps {
   user: UserProfileData;
   onUpdateUser?: (updatedData: Partial<UserProfileData>) => Promise<void> | void;
-  onUpdatePassword?: (newPassword: string) => Promise<void> | void;
   onAvatarUpload?: (file: File) => Promise<void> | void;
   onAvatarRemove?: () => Promise<void> | void;
   isDoctorView?: boolean;
@@ -171,7 +171,6 @@ interface AttendanceRecord {
 export default function UserProfileView({
   user,
   onUpdateUser,
-  onUpdatePassword,
   onAvatarUpload,
   onAvatarRemove,
   isDoctorView = false,
@@ -980,8 +979,8 @@ export default function UserProfileView({
     setPasswordError("");
     setPasswordSuccess("");
 
-    if (!newPassword || newPassword.length < 6) {
-      setPasswordError(tr?.passwordTooShort ?? "Password must be at least 6 characters long.");
+    if (!STRONG_PASSWORD_RE.test(newPassword)) {
+      setPasswordError(tr?.passwordTooWeak ?? "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number and a symbol.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -991,9 +990,10 @@ export default function UserProfileView({
 
     setUpdatingPassword(true);
     try {
-      if (onUpdatePassword) {
-        await onUpdatePassword(newPassword);
-      }
+      // The change must really happen before success is shown (an earlier version only stored the
+      // value in local state and reported success regardless).
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) throw updateError;
       setPasswordSuccess(tr?.passwordUpdated ?? "Password updated successfully!");
       setNewPassword("");
       setConfirmPassword("");

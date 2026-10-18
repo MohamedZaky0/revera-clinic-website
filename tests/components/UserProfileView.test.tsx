@@ -12,15 +12,21 @@ import userEvent from '@testing-library/user-event';
 import { createSupabaseFake } from '../helpers/supabaseFake';
 
 const fake = createSupabaseFake();
+const mockUpdateUser = vi.fn();
 
 vi.mock('@/lib/supabaseClient', () => ({
-  supabase: { from: (table: string) => fake.client.from(table) },
+  supabase: {
+    from: (table: string) => fake.client.from(table),
+    auth: { updateUser: (...args: any[]) => mockUpdateUser(...args) },
+  },
 }));
 
 import UserProfileView, { type UserProfileData } from '@/components/admin/UserProfileView';
 
 beforeEach(() => {
   fake.reset();
+  mockUpdateUser.mockReset();
+  mockUpdateUser.mockResolvedValue({ data: { user: {} }, error: null });
 });
 
 afterEach(() => {
@@ -230,60 +236,59 @@ describe('edit personal information', () => {
 });
 
 describe('change password', () => {
+  const STRONG = 'Str0ng!Pass';
+
   async function openModal(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: /Change Password/ }));
   }
 
-  it('rejects a password shorter than 6 characters without calling onUpdatePassword', async () => {
+  async function renderAndOpen() {
     fake.seed('branches', []);
     fake.seed('employee_accounts', [{ id: 'emp-1', email: 'sara@clinic.com' }]);
     fake.seed('reservations', []);
-    const onUpdatePassword = vi.fn();
     const user = userEvent.setup();
-    render(<UserProfileView user={{ ...BASE_USER, id: 'emp-1' }} onUpdatePassword={onUpdatePassword} />);
+    render(<UserProfileView user={{ ...BASE_USER, id: 'emp-1' }} />);
     await screen.findByText('Personal Information');
     await openModal(user);
+    return user;
+  }
 
-    await user.type(screen.getByPlaceholderText('Enter new password'), '123');
-    await user.type(screen.getByPlaceholderText('Confirm new password'), '123');
+  async function submit(user: ReturnType<typeof userEvent.setup>, pwd: string, confirm = pwd) {
+    await user.type(screen.getByPlaceholderText('Enter new password'), pwd);
+    await user.type(screen.getByPlaceholderText('Confirm new password'), confirm);
     await user.click(screen.getByRole('button', { name: 'Update Password' }));
+  }
 
-    expect(await screen.findByText('Password must be at least 6 characters long.')).toBeInTheDocument();
-    expect(onUpdatePassword).not.toHaveBeenCalled();
+  it('rejects a password that breaks the 8+ / upper / lower / digit / symbol rule without calling Supabase', async () => {
+    const user = await renderAndOpen();
+    await submit(user, 'newpassword123'); // 14 chars, but no uppercase and no symbol
+
+    expect(await screen.findByText(/at least 8 characters and include an uppercase letter/)).toBeInTheDocument();
+    expect(mockUpdateUser).not.toHaveBeenCalled();
   });
 
-  it('rejects mismatched passwords without calling onUpdatePassword', async () => {
-    fake.seed('branches', []);
-    fake.seed('employee_accounts', [{ id: 'emp-1', email: 'sara@clinic.com' }]);
-    fake.seed('reservations', []);
-    const onUpdatePassword = vi.fn();
-    const user = userEvent.setup();
-    render(<UserProfileView user={{ ...BASE_USER, id: 'emp-1' }} onUpdatePassword={onUpdatePassword} />);
-    await screen.findByText('Personal Information');
-    await openModal(user);
-
-    await user.type(screen.getByPlaceholderText('Enter new password'), 'password1');
-    await user.type(screen.getByPlaceholderText('Confirm new password'), 'password2');
-    await user.click(screen.getByRole('button', { name: 'Update Password' }));
+  it('rejects mismatched passwords without calling Supabase', async () => {
+    const user = await renderAndOpen();
+    await submit(user, STRONG, 'Str0ng!Pasz');
 
     expect(await screen.findByText('Passwords do not match.')).toBeInTheDocument();
-    expect(onUpdatePassword).not.toHaveBeenCalled();
+    expect(mockUpdateUser).not.toHaveBeenCalled();
   });
 
-  it('calls onUpdatePassword with the new password when valid and matching', async () => {
-    fake.seed('branches', []);
-    fake.seed('employee_accounts', [{ id: 'emp-1', email: 'sara@clinic.com' }]);
-    fake.seed('reservations', []);
-    const onUpdatePassword = vi.fn().mockResolvedValue(undefined);
-    const user = userEvent.setup();
-    render(<UserProfileView user={{ ...BASE_USER, id: 'emp-1' }} onUpdatePassword={onUpdatePassword} />);
-    await screen.findByText('Personal Information');
-    await openModal(user);
+  it('really changes the password through Supabase and only then reports success', async () => {
+    const user = await renderAndOpen();
+    await submit(user, STRONG);
 
-    await user.type(screen.getByPlaceholderText('Enter new password'), 'newpassword123');
-    await user.type(screen.getByPlaceholderText('Confirm new password'), 'newpassword123');
-    await user.click(screen.getByRole('button', { name: 'Update Password' }));
+    await waitFor(() => expect(mockUpdateUser).toHaveBeenCalledWith({ password: STRONG }));
+    expect(await screen.findByText('Password updated successfully!')).toBeInTheDocument();
+  });
 
-    await waitFor(() => expect(onUpdatePassword).toHaveBeenCalledWith('newpassword123'));
+  it('shows the failure and NOT a success message when Supabase refuses the change', async () => {
+    mockUpdateUser.mockResolvedValue({ data: { user: null }, error: { message: 'New password should be different from the old password.' } });
+    const user = await renderAndOpen();
+    await submit(user, STRONG);
+
+    expect(await screen.findByText('New password should be different from the old password.')).toBeInTheDocument();
+    expect(screen.queryByText('Password updated successfully!')).not.toBeInTheDocument();
   });
 });
