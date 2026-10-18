@@ -3445,6 +3445,9 @@ Users on specific devices (especially iOS Safari, Android Chrome, and low-memory
    - Added `TC-097: Resilient Staff Auth & Mobile Context Preservation Engine` to `INITIAL_SYSTEM_TEST_SUITES` in `src/app/admin/page.tsx`.
    - Created Vitest test suite `tests/routes/auth-me-resilience.test.ts`.
 
+**Follow-up:** a remaining gap in the same route (a transient Supabase-verification failure also
+returned 401, forcing the same kind of logout) was found and fixed 2026-10-10 — see RISK-113.
+
 ---
 
 ## DEC-103: Superadmin Patient & Booking Management — Edit Any Field, Delete Patient, Delete Booking
