@@ -100,7 +100,6 @@ import {
   Presentation,
   TrendingUp,
   CircleUser,
-  User,
   Tag,
   PlusCircle,
   Pencil,
@@ -5808,11 +5807,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           </div>
 
           <nav className="flex-1 min-h-0 space-y-1 overflow-y-auto pe-0.5">
-            {permittedSidebarItems.map((item) => {
+            {permittedSidebarItems.filter((item) => item.label !== "Logout").map((item) => {
               if (item.label === "Settings") {
                 const Icon = item.icon;
                 const active = [
-                  "Profile",
                   "Service Hours",
                   "Branches",
                   "Users",
@@ -5988,12 +5986,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   title={isComingSoon ? (adminTranslations[lang].sidebar.comingSoon || "Coming Soon") : undefined}
                   onClick={async () => {
                     if (isComingSoon) return;
-                    if (item.label === "Logout") {
-                      handleLogout();
-                    } else {
-                      setActiveNav(item.label);
-                      setSidebarOpen(false);
-                    }
+                    setActiveNav(item.label);
+                    setSidebarOpen(false);
                   }}
                   className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-start text-xs font-semibold transition-all duration-200 ${
                     isComingSoon
@@ -6024,6 +6018,66 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               );
             })}
           </nav>
+
+          {/* Account footer: separated from the navigation, pinned outside the scroll area */}
+          {(() => {
+            const me = employeesList.find(
+              (emp) => emp.email && adminEmail && emp.email.toLowerCase() === adminEmail.toLowerCase()
+            );
+            const displayName = profileName || me?.name || adminEmail?.split("@")[0] || "";
+            const roleLabel = adminRole === "superadmin" ? "Superadmin" : (me?.role_name || adminRole || "");
+            const avatarSrc = customerAvatars[me?.id || me?.employee_id || adminEmail || "my-profile"];
+            const initials = displayName.trim().split(/\s+/).slice(0, 2).map((w: string) => w[0]?.toUpperCase() || "").join("") || "?";
+            const profileActive = activeNav === "Profile";
+            return (
+              <div className="mt-3 shrink-0 space-y-1 border-t border-[var(--color-brand-light)]/15 pt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveNav("Profile");
+                    setSidebarOpen(false);
+                  }}
+                  aria-current={profileActive ? "page" : undefined}
+                  title={adminTranslations[lang].sidebar.myProfileTitle}
+                  className={`flex w-full items-center gap-2.5 rounded-2xl px-2 py-2 text-start transition-all duration-200 ${
+                    profileActive
+                      ? "bg-[var(--color-brand-light)] text-[var(--cr-primary)] shadow-lg"
+                      : "text-[var(--color-brand-light)]/90 hover:bg-[var(--color-brand-light)]/10"
+                  }`}
+                >
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--cr-accent)]/25 text-xs font-bold">
+                    {avatarSrc ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      initials
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-bold">{displayName || adminTranslations[lang].sidebar.myProfile}</span>
+                    <span className="block truncate text-[10px] capitalize opacity-70">{roleLabel}</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    // Logout also records the attendance check-out, so it is never a one-click action.
+                    const ok = await showConfirm(
+                      adminTranslations[lang].sidebar.logoutConfirmMessage,
+                      adminTranslations[lang].sidebar.logoutConfirmTitle
+                    );
+                    if (ok) handleLogout();
+                  }}
+                  className="group flex w-full items-center gap-2.5 rounded-2xl px-2 py-2 text-start text-xs font-semibold text-[var(--color-brand-light)]/80 transition-all duration-200 hover:bg-[var(--color-brand-light)]/10 hover:text-[var(--color-brand-light)]"
+                >
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-brand-light)]/10 group-hover:bg-[var(--cr-accent)]/15">
+                    <LogOut size={16} />
+                  </span>
+                  <span className="truncate">{adminTranslations[lang].sidebar.Logout}</span>
+                </button>
+              </div>
+            );
+          })()}
         </aside>
 
         <main dir={lang === "ar" ? "rtl" : "ltr"} className="flex flex-col min-w-0 w-full px-3 sm:px-4 md:px-8 py-0 overflow-x-hidden">
@@ -6057,21 +6111,6 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   {branches.find((b) => b.id === branch)?.name_en || "Loading..."}
                 </div>
               )}
-
-              {/* Profile Button beside Branch Dropdown */}
-              <button
-                type="button"
-                onClick={() => setActiveNav("Profile")}
-                className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-xl px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold transition shadow-sm border shrink-0 ${
-                  activeNav === "Profile"
-                    ? "bg-[var(--cr-primary)] text-white border-[var(--cr-primary)]"
-                    : "bg-white text-[var(--cr-primary)] border-[var(--cr-primary)]/15 hover:bg-[var(--cr-primary)]/10"
-                }`}
-                title="View Personal Profile & Staff Details"
-              >
-                <User size={14} />
-                <span className="hidden sm:inline">Profile</span>
-              </button>
             </div>
 
             {/* Right: new entry, notifications, user profile */}
@@ -6967,7 +7006,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               <UserProfileView
                 user={{
                   id: profileEmployee?.id || profileEmployee?.employee_id || matchProv?.id || adminEmail || "my-profile",
-                  name: profileName || profileEmployee?.name || matchProv?.name || (isSuperadminBypass ? "zaki" : "Employee Account"),
+                  name: profileName || profileEmployee?.name || matchProv?.name || (adminEmail?.split("@")[0] || "Employee Account"),
                   email: adminEmail || profileEmployee?.email || "",
                   phone: profilePhone || profileEmployee?.phone || matchProv?.phone || "",
                   address: profileAddress || profileEmployee?.address || "",
