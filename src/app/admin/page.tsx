@@ -7570,7 +7570,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               setEmployeeProfileActiveTab={setEmployeeProfileActiveTab}
               hasPermission={hasPermission}
               branches={branches}
-              rolesList={rolesList}
+              rolesList={adminRole === "superadmin" ? rolesList : rolesList.filter((r: any) => String(r?.name || "").trim().toLowerCase() !== "superadmin")}
               departmentsList={departmentsList}
               employeesList={employeesList}
               loadingRolesAndEmployees={loadingRolesAndEmployees}

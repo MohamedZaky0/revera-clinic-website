@@ -3570,3 +3570,22 @@ Investigation revealed:
 2. The six tests were rewritten to assert the same business math through what the component still emits: the recomputed `amountLeft` PATCHed to `/api/reservations` on every add/remove of an additional service (base + added services + products + charged pulses − paid), plus a new test that no `EGP` text appears in the doctor view. Charged-pulse tests dropped the removed price input (the clinic default of 5 EGP applies).
 
 **Not done:** invoice numbers already skipped before this fix are not renumbered or back-filled. Whether a gap-free legal invoice sequence is a requirement for the clinic was not confirmed.
+
+---
+
+## DEC-107: Admin May Grant `admin`; `superadmin` Stays Reserved To The Superadmin
+
+**Date:** 2026-10-18
+**Status:** Decided & implemented
+**Refines:** RISK-069 (previously: only a superadmin may grant the admin *or* superadmin tier).
+
+**Decision (owner, 2026-10-18):** an `admin` may add or promote an employee to `admin`, but must never be able to create or promote anyone to `superadmin`.
+
+**Implementation:**
+1. `deniesRoleGrant` in `src/app/api/employees/route.ts` now reserves only `superadmin` (still case-insensitive, still shared by POST and PATCH). Error text: "Only the superadmin can grant superadmin access."
+2. New mirror guard in PATCH: a non-superadmin caller cannot change the role of an account that currently holds `superadmin` (before, only the built-in owner account `employee_id = 'superadmin'` was protected, so an admin could demote any other superadmin).
+3. `src/app/admin/page.tsx` filters the `superadmin` role out of the roles list handed to the Employees view for non-superadmin callers. (The old comment claimed the dropdown already hid privileged roles; it did not, so an admin only found out via a 403 after submitting.)
+4. Tests: admin CAN create/promote admin; admin still gets 403 for superadmin on POST and PATCH; admin gets 403 changing a non-owner superadmin account's role; superadmin can.
+
+**Not done:** an admin can still edit non-role fields (salary, shift, etc.) of a superadmin account. Not asked for, left as is.
+

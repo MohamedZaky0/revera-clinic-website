@@ -109,7 +109,7 @@ describe('POST /api/employees — privilege escalation on create (RISK-069)', ()
     expect(mockDb.employee_accounts.some((e: any) => e.email === 'new@clinic.test')).toBe(false);
   });
 
-  it('a non-superadmin admin cannot create a new account at admin', async () => {
+  it('an admin CAN create another admin (DEC-107) — only the superadmin tier is reserved', async () => {
     seedAdminAuth();
     seedRoles();
 
@@ -117,8 +117,8 @@ describe('POST /api/employees — privilege escalation on create (RISK-069)', ()
       email: 'new2@clinic.test', name: 'New Hire', roleName: 'admin', password: STRONG_PASSWORD,
     }));
 
-    expect(res.status).toBe(403);
-    expect(mockDb.employee_accounts.some((e: any) => e.email === 'new2@clinic.test')).toBe(false);
+    expect(res.status).toBe(201);
+    expect(mockDb.employee_accounts.find((e: any) => e.email === 'new2@clinic.test')?.role_name).toBe('admin');
   });
 
   it('the guard is case-insensitive — "SuperAdmin" is still refused', async () => {

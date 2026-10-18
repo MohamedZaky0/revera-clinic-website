@@ -11,20 +11,19 @@ const SCHEDULES_FILE_PATH = path.join(process.cwd(), 'data', 'employee_schedules
 // and a self-set one can never diverge in strength.
 const STRONG_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
-const PRIVILEGED_ROLES = ['admin', 'superadmin'];
-
 /**
- * RISK-069: an admin may assign and edit any operational role, but only a superadmin may grant the
- * admin/superadmin tier itself.
+ * RISK-069 / DEC-107: an admin may assign and edit any role up to and including `admin`, but only a
+ * superadmin may grant `superadmin` — the one tier an admin must never be able to mint for anyone,
+ * itself included.
  *
  * Shared by POST and PATCH deliberately. PATCH carried this check and POST did not, so an admin who
  * could not promote an existing employee could just create a new one at `superadmin` instead --
  * with a password of their choosing, since the account is created already confirmed. The role
- * dropdown hides those two options from non-superadmins, but that is a UI filter, not a guard.
+ * dropdown hides the superadmin option from admins, but that is a UI filter, not a guard.
  */
 function deniesRoleGrant(callerRole: string, targetRole: unknown): boolean {
   if (typeof targetRole !== 'string' || !targetRole) return false;
-  return PRIVILEGED_ROLES.includes(targetRole.trim().toLowerCase()) && callerRole !== 'superadmin';
+  return targetRole.trim().toLowerCase() === 'superadmin' && callerRole !== 'superadmin';
 }
 
 async function getEmployeeWorkingSchedulesMap(): Promise<Record<string, any>> {
@@ -189,7 +188,7 @@ export async function POST(req: Request) {
 
     if (deniesRoleGrant(access.access.role, roleName)) {
       return NextResponse.json(
-        { error: 'Only the superadmin can grant admin or superadmin access.' },
+        { error: 'Only the superadmin can grant superadmin access.' },
         { status: 403 }
       );
     }
@@ -499,7 +498,12 @@ export async function PATCH(req: Request) {
           return NextResponse.json({ error: 'Cannot modify the role of the system owner account.' }, { status: 400 });
         }
         if (deniesRoleGrant(access.access.role, roleName)) {
-          return NextResponse.json({ error: 'Only the superadmin can grant admin or superadmin access.' }, { status: 403 });
+          return NextResponse.json({ error: 'Only the superadmin can grant superadmin access.' }, { status: 403 });
+        }
+        // The mirror of the grant rule: an admin must not be able to demote or re-role a superadmin
+        // account either (only the built-in owner account was protected from that before).
+        if (String(employee.role_name || '').trim().toLowerCase() === 'superadmin' && access.access.role !== 'superadmin') {
+          return NextResponse.json({ error: 'Only the superadmin can change the role of a superadmin account.' }, { status: 403 });
         }
         const { data: roleExists, error: roleCheckError } = await supabaseServer
           .from('roles')

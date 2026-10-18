@@ -137,7 +137,7 @@ describe('PATCH /api/employees role change — privilege escalation (RISK-069)',
     expect(target.role_name).toBe('receptionist');
   });
 
-  it('a non-superadmin admin cannot promote another account to admin', async () => {
+  it('an admin CAN promote another account to admin (DEC-107)', async () => {
     seedAdminAuth();
     seedTargetEmployee();
     mockDb.roles.push({ name: 'admin', permissions: [] });
@@ -146,9 +146,41 @@ describe('PATCH /api/employees role change — privilege escalation (RISK-069)',
       employeesPatchReq({ id: EMP_TARGET, roleName: 'admin' }),
     );
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
     const target = mockDb.employee_accounts.find((e: any) => e.id === EMP_TARGET)!;
-    expect(target.role_name).toBe('receptionist');
+    expect(target.role_name).toBe('admin');
+  });
+
+  it('an admin cannot change the role of an existing superadmin-role account (not just the owner account)', async () => {
+    seedAdminAuth();
+    mockDb.employee_accounts.push({
+      id: EMP_TARGET, employee_id: 'EMP-009', email: 'second-super@clinic.test',
+      role_name: 'superadmin', auth_user_id: USER_TARGET_AUTH,
+    });
+    mockDb.roles.push({ name: 'receptionist', permissions: [] });
+
+    const res = await PATCH_EMPLOYEES(
+      employeesPatchReq({ id: EMP_TARGET, roleName: 'receptionist' }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(mockDb.employee_accounts.find((e: any) => e.id === EMP_TARGET)!.role_name).toBe('superadmin');
+  });
+
+  it('a superadmin CAN change another superadmin-role account role', async () => {
+    seedSuperadminAuth();
+    mockDb.employee_accounts.push({
+      id: EMP_TARGET, employee_id: 'EMP-009', email: 'second-super@clinic.test',
+      role_name: 'superadmin', auth_user_id: USER_TARGET_AUTH,
+    });
+    mockDb.roles.push({ name: 'receptionist', permissions: [] });
+
+    const res = await PATCH_EMPLOYEES(
+      employeesPatchReq({ id: EMP_TARGET, roleName: 'receptionist' }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockDb.employee_accounts.find((e: any) => e.id === EMP_TARGET)!.role_name).toBe('receptionist');
   });
 
   it('a non-superadmin admin CAN change another account to an operational role (not admin/superadmin)', async () => {
