@@ -769,7 +769,7 @@ The following are **not currently enforced in code**:
    - On desktop, the main content wrapper uses `flex-1 flex flex-col min-w-0 max-w-full md:ps-[220px]` (padding-inline-start), permanently locking the sidebar to the viewport so the sidebar never scrolls away or reveals background gaps when page content scrolls down.
    - The scrollable `<nav>` flex container must include `flex-1 min-h-0 space-y-1 overflow-y-auto` to allow proper inner scrolling and prevent flex container height distortion.
    - Every sidebar item and submenu link must trigger `setSidebarOpen(false)` on click to auto-dismiss the drawer on mobile viewports.
-   - Sticky top header elements adapt gracefully on `< 640px` screens: branch dropdown uses `max-w-[130px] sm:max-w-[200px] truncate`, Profile button hides text (`hidden sm:inline`), and gaps/paddings scale down to `gap-1.5 sm:gap-3` and `px-2 sm:px-4`.
+   - Sticky top header elements adapt gracefully on `< 640px` screens: branch dropdown uses `max-w-[130px] sm:max-w-[200px] truncate` (the Profile entry now lives in the sidebar account footer, DEC-109), and gaps/paddings scale down to `gap-1.5 sm:gap-3` and `px-2 sm:px-4`.
 2. **Table Container Scoping & Minimum Widths**:
    - All administrative data tables must be wrapped in `<div className="overflow-x-auto ...">` with explicit minimum table widths (`min-w-[700px]` to `min-w-[950px]`).
    - `overflow-hidden` must never be applied directly to a table container without an `overflow-x-auto` wrapper, preventing crushed columns and content clipping.

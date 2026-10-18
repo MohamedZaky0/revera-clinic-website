@@ -127,6 +127,9 @@ export interface UserProfileViewTranslations {
   enterNewPassword: string;
   confirmNewPasswordPlaceholder: string;
   passwordTooWeak: string;
+  passwordRequirements: string;
+  security: string;
+  securityHint: string;
   passwordsDoNotMatch: string;
   passwordUpdated: string;
   passwordUpdateFailed: string;
@@ -261,7 +264,6 @@ export default function UserProfileView({
 
   // Local edit states
   const [showEditPersonalModal, setShowEditPersonalModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showAttendanceHistoryModal, setShowAttendanceHistoryModal] = useState(false);
 
   // Form states - Only Email, Phone, Address can be edited
@@ -997,10 +999,7 @@ export default function UserProfileView({
       setPasswordSuccess(tr?.passwordUpdated ?? "Password updated successfully!");
       setNewPassword("");
       setConfirmPassword("");
-      setTimeout(() => {
-        setShowPasswordModal(false);
-        setPasswordSuccess("");
-      }, 1500);
+      setTimeout(() => setPasswordSuccess(""), 5000);
     } catch (err: any) {
       setPasswordError(err.message || (tr?.passwordUpdateFailed ?? "Failed to update password."));
     } finally {
@@ -1011,7 +1010,7 @@ export default function UserProfileView({
   const dir = lang === "ar" ? "rtl" : "ltr";
 
   return (
-    <div dir={dir} className="w-full max-w-5xl mx-auto space-y-6 pb-12 animate-fadeIn text-[var(--cr-dark)] print:p-0 print:m-0 print:max-w-none">
+    <div dir={dir} className="w-full max-w-7xl mx-auto space-y-6 pb-12 animate-fadeIn text-[var(--cr-dark)] print:p-0 print:m-0 print:max-w-none">
       
       {/* ── HEADER USER PROFILE CARD ── */}
       <div className="rounded-[32px] border border-[var(--cr-primary)]/12 bg-[#F9F9F7] p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
@@ -1130,12 +1129,13 @@ export default function UserProfileView({
         </div>
       </div>
 
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-12">
       {/* ── SECTION 1: PERSONAL INFORMATION ── */}
-      <div className="rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
+      <div className="rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6 xl:col-span-7">
         <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--cr-accent)] text-white text-xs font-black">
-              1
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--cr-accent)]/15 text-[var(--cr-primary)]">
+              <User size={16} />
             </span>
             <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[var(--cr-accent)]">
               {tr?.personalInformation ?? "Personal Information"}
@@ -1194,13 +1194,91 @@ export default function UserProfileView({
         </div>
       </div>
 
+      {/* ── SECURITY ── */}
+      <div className="rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-5 xl:col-span-5 print:hidden">
+        <div className="flex items-center gap-3 border-b border-[var(--cr-primary)]/10 pb-4">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--cr-accent)]/15 text-[var(--cr-primary)]">
+            <Shield size={16} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[var(--cr-accent)]">
+              {tr?.security ?? "Security"}
+            </h2>
+            <p className="text-[11px] text-[var(--color-brand-secondary)]">
+              {tr?.securityHint ?? "Choose a strong password you do not use anywhere else."}
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handlePasswordSubmit} className="space-y-4 text-xs">
+          <h3 className="flex items-center gap-2 text-xs font-bold text-[var(--cr-dark)]">
+            <Lock size={14} className="text-[var(--cr-primary)]" />
+            {tr?.changePassword ?? "Change Password"}
+          </h3>
+
+          <div>
+            <label htmlFor="profile-new-password" className="block font-bold text-[var(--color-brand-secondary)] mb-1">{tr?.newPassword ?? "New Password"}</label>
+            <input
+              id="profile-new-password"
+              type="password"
+              required
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder={tr?.enterNewPassword ?? "Enter new password"}
+              className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-2.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="profile-confirm-password" className="block font-bold text-[var(--color-brand-secondary)] mb-1">{tr?.confirmNewPassword ?? "Confirm New Password"}</label>
+            <input
+              id="profile-confirm-password"
+              type="password"
+              required
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder={tr?.confirmNewPasswordPlaceholder ?? "Confirm new password"}
+              className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-2.5 text-xs text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
+            />
+          </div>
+
+          <p className="text-[11px] leading-relaxed text-[var(--color-brand-secondary)]">
+            {tr?.passwordRequirements ?? "At least 8 characters with an uppercase letter, a lowercase letter, a number and a symbol."}
+          </p>
+
+          {passwordError && (
+            <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs">
+              {passwordError}
+            </div>
+          )}
+
+          {passwordSuccess && (
+            <div role="status" className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-xs">
+              {passwordSuccess}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-2 border-t border-[var(--cr-primary)]/10">
+            <button
+              type="submit"
+              disabled={updatingPassword}
+              className="rounded-xl bg-[var(--cr-primary)] px-5 py-2 font-bold text-white hover:bg-[#2e3a26] disabled:opacity-60"
+            >
+              {updatingPassword ? (tr?.updating ?? "Updating...") : (tr?.updatePassword ?? "Update Password")}
+            </button>
+          </div>
+        </form>
+      </div>
+
       {/* ── SECTION 2: WORK INFORMATION & WEEKLY SCHEDULE ── */}
-      <div className="rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
+      <div className="rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6 xl:col-span-12">
         {/* Section Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4 gap-3">
           <div className="flex items-center gap-3">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--cr-accent)] text-white text-xs font-black shadow-xs">
-              2
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--cr-accent)]/15 text-[var(--cr-primary)]">
+              <Briefcase size={16} />
             </span>
             <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[var(--cr-accent)]">
               {tr?.workInformation ?? "Work Information & Weekly Schedule"}
@@ -1412,11 +1490,11 @@ export default function UserProfileView({
       </div>
 
       {/* ── SECTION 3: ATTENDANCE SUMMARY (REAL DATA FROM DATABASE) ── */}
-      <div className="rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
+      <div className="rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6 xl:col-span-6">
         <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--cr-accent)] text-white text-xs font-black">
-              3
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--cr-accent)]/15 text-[var(--cr-primary)]">
+              <CalendarCheck size={16} />
             </span>
             <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[var(--cr-accent)]">
               {tr?.attendanceSummary ?? "Attendance Summary"}
@@ -1498,11 +1576,11 @@ export default function UserProfileView({
       </div>
 
       {/* ── SECTION 4: PAYROLL SUMMARY (REAL DATA FROM DATABASE: DOCTOR PAYROLL VS STAFF PAYROLL) ── */}
-      <div className="rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
+      <div className="rounded-3xl border border-[var(--cr-primary)]/12 bg-white p-4 sm:p-6 md:p-8 shadow-xs space-y-6 xl:col-span-6">
         <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--cr-accent)] text-white text-xs font-black">
-              4
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--cr-accent)]/15 text-[var(--cr-primary)]">
+              <DollarSign size={16} />
             </span>
             <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[var(--cr-accent)]">
               {isDoctorView ? (tr?.doctorPayrollSummary ?? "Doctor Payroll Summary") : (tr?.payrollSummary ?? "Payroll Summary")}
@@ -1565,16 +1643,6 @@ export default function UserProfileView({
         </div>
       </div>
 
-      {/* ── BOTTOM ACTION BUTTON: CHANGE PASSWORD ── */}
-      <div className="pt-2 print:hidden">
-        <button
-          type="button"
-          onClick={() => setShowPasswordModal(true)}
-          className="w-full flex items-center justify-center gap-2.5 rounded-2xl border border-[var(--cr-primary)]/20 bg-white py-3.5 text-xs font-bold text-[var(--cr-dark)] hover:bg-[#F9F9F7] transition shadow-xs"
-        >
-          <Lock size={16} className="text-[var(--cr-primary)]" />
-          <span>{tr?.changePassword ?? "Change Password"}</span>
-        </button>
       </div>
 
       {/* ── MODAL 1: EDIT PERSONAL INFORMATION (EMAIL, PHONE & ADDRESS ONLY) ── */}
@@ -1649,77 +1717,6 @@ export default function UserProfileView({
                   className="rounded-xl bg-[var(--cr-primary)] px-5 py-2 font-bold text-white hover:bg-[#2e3a26] transition disabled:opacity-50"
                 >
                   {savingUser ? (tr?.saving ?? "Saving...") : (tr?.saveChanges ?? "Save Changes")}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── MODAL 2: CHANGE PASSWORD ── */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <div className="relative w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-[var(--cr-primary)]/15">
-            <div className="flex items-center justify-between border-b border-[var(--cr-primary)]/10 pb-3">
-              <h3 className="text-sm font-black uppercase tracking-wider text-[var(--cr-dark)] flex items-center gap-2">
-                <Lock size={16} className="text-[var(--cr-primary)]" /> {tr?.changePassword ?? "Change Password"}
-              </h3>
-              <button onClick={() => setShowPasswordModal(false)} className="p-2 rounded-xl text-[var(--color-brand-secondary)] hover:bg-[var(--color-brand-light)]">
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handlePasswordSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-[var(--color-brand-secondary)] mb-1">{tr?.newPassword ?? "New Password"}</label>
-                <input
-                  type="password"
-                  required
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder={tr?.enterNewPassword ?? "Enter new password"}
-                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-2.5 text-xs text-[var(--cr-dark)] outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--color-brand-secondary)] mb-1">{tr?.confirmNewPassword ?? "Confirm New Password"}</label>
-                <input
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder={tr?.confirmNewPasswordPlaceholder ?? "Confirm new password"}
-                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-2.5 text-xs text-[var(--cr-dark)] outline-none"
-                />
-              </div>
-
-              {passwordError && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs">
-                  {passwordError}
-                </div>
-              )}
-
-              {passwordSuccess && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-xs">
-                  {passwordSuccess}
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--cr-primary)]/10">
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordModal(false)}
-                  className="rounded-xl border border-[var(--cr-primary)]/20 bg-white px-4 py-2 font-bold text-[var(--cr-primary)]"
-                >
-                  {tr?.cancel ?? "Cancel"}
-                </button>
-                <button
-                  type="submit"
-                  disabled={updatingPassword}
-                  className="rounded-xl bg-[var(--cr-primary)] px-5 py-2 font-bold text-white hover:bg-[#2e3a26]"
-                >
-                  {updatingPassword ? (tr?.updating ?? "Updating...") : (tr?.updatePassword ?? "Update Password")}
                 </button>
               </div>
             </form>

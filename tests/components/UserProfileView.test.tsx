@@ -238,10 +238,6 @@ describe('edit personal information', () => {
 describe('change password', () => {
   const STRONG = 'Str0ng!Pass';
 
-  async function openModal(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(screen.getByRole('button', { name: /Change Password/ }));
-  }
-
   async function renderAndOpen() {
     fake.seed('branches', []);
     fake.seed('employee_accounts', [{ id: 'emp-1', email: 'sara@clinic.com' }]);
@@ -249,7 +245,6 @@ describe('change password', () => {
     const user = userEvent.setup();
     render(<UserProfileView user={{ ...BASE_USER, id: 'emp-1' }} />);
     await screen.findByText('Personal Information');
-    await openModal(user);
     return user;
   }
 
@@ -258,6 +253,14 @@ describe('change password', () => {
     await user.type(screen.getByPlaceholderText('Confirm new password'), confirm);
     await user.click(screen.getByRole('button', { name: 'Update Password' }));
   }
+
+  it('is an always-visible Security card on the page, not a button that opens a modal', async () => {
+    await renderAndOpen();
+
+    expect(screen.getByRole('heading', { name: 'Security' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Enter new password')).toBeInTheDocument();
+    expect(screen.getByText(/At least 8 characters with an uppercase letter/)).toBeInTheDocument();
+  });
 
   it('rejects a password that breaks the 8+ / upper / lower / digit / symbol rule without calling Supabase', async () => {
     const user = await renderAndOpen();

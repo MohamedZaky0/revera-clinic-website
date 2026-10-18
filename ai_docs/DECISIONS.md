@@ -3602,3 +3602,21 @@ Investigation revealed:
 
 **Not done:** whether a clinic wants a non-zero default for new hires is a product decision; none is applied. The same literals were searched for in `src/` and no other occurrence exists.
 
+---
+
+## DEC-109: Profile And Logout Move To A Sidebar Account Footer; Profile Becomes A Card Grid With A Security Card; Change Password Really Works
+
+**Date:** 2026-10-18
+**Status:** Decided & implemented
+**Replaces:** the 2026-08-06 placement of Profile as a header button beside the branch selector (no earlier recorded decision).
+
+**Context:** A UI/UX review (Opus agent, verified against the code) found: (1) Change Password reported success while changing nothing: the admin/reception mount only stored the value in local React state, the doctor mount passed no handler, and the real handler in `page.tsx` was never called; (2) Profile sat in the header next to the branch selector although branch means "which data" and Profile means "who am I"; (3) Logout looked like any nav item, scrolled away inside the nav and, because it also records the attendance check-out, had a side effect on an accidental click; (4) the Profile page was a single narrow column of numbered sections with empty sides, and Change Password was a bare button at the very bottom.
+
+**Decision:**
+1. Change Password (commit 80353a9): `UserProfileView` calls `supabase.auth.updateUser` itself and shows Supabase's error instead of a false success, under the same 8+/upper/lower/digit/symbol rule used at account creation (`src/lib/passwordPolicy.ts`). Dead handler and state removed.
+2. Sidebar footer (commit a58981d): an account row (avatar, name, role) that opens Profile, then Logout, under a divider and outside the scrolling nav, the same pattern the doctor portal already used. Logout asks for confirmation. The header Profile button is gone; opening Profile no longer highlights Settings; the hardcoded personal-name fallback is gone.
+3. Profile page: a card grid (Personal Information and Security side by side, Work Information full width, Attendance and Payroll side by side on wide screens, one column below `xl`), icon chips instead of 1-2-3-4 numbering (the content is not a sequence), container widened to `max-w-7xl`, and the page now follows the selected language (it was hardcoded English in the admin shell). Change Password is an always-visible Security card with an inline form and the password rule shown up front; the modal is removed.
+
+**Stays the same:** the Profile data and edit-contact modal, the attendance history modal, Logout behaviour (now behind a confirm), every other navigation item, and the doctor portal's own sidebar.
+
+**Not done:** the doctor portal's hardcoded "Profile" tooltip/label and its `text-left` classes were not touched. Whether Supabase's "secure password change" setting requires a recent login was not checked against the dashboard (if it does, the error is now shown instead of hidden).

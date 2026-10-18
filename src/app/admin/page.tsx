@@ -7031,8 +7031,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                   monthlyTarget: Number(profileEmployee?.required_target_amount || 0),
                   avatarUrl: customerAvatars[profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile"] || matchProv?.image || null
                 }}
-                lang="en"
-                t={adminTranslations.en.userProfile as UserProfileViewTranslations}
+                lang={lang}
+                t={adminTranslations[lang].userProfile as UserProfileViewTranslations}
                 onUpdateUser={async (updated) => {
                   if (updated.email) setAdminEmail(updated.email);
                   if (updated.phone) setProfilePhone(updated.phone);
