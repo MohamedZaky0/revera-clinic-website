@@ -859,11 +859,8 @@ export default function UserProfileView({
           const { data: prov } = await qProv.maybeSingle();
 
           if (prov) {
-            salary = Number(prov.fixed_salary || prov.salary || salary || 15000);
-            target = Number(prov.target_amount || prov.required_target_amount || target || 60000);
-          } else if (salary === 0) {
-            salary = 15000;
-            target = 60000;
+            salary = Number(prov.fixed_salary || prov.salary || salary);
+            target = Number(prov.target_amount || prov.required_target_amount || target);
           }
 
           // 2. Query doctor_payroll for current month fixed salary & calculated commissions
@@ -885,13 +882,10 @@ export default function UserProfileView({
           const { data: emp } = await qEmp.maybeSingle();
 
           if (emp) {
-            salary = Number(emp.salary || salary || 8000);
-            target = Number(emp.required_target_amount || target || 50000);
+            salary = Number(emp.salary || salary);
+            target = Number(emp.required_target_amount || target);
             bonusComm = Number(emp.bonus || (emp.bonus_percentage ? (salary * emp.bonus_percentage / 100) : 0));
             deds = Number(emp.deductions || 0);
-          } else if (salary === 0) {
-            salary = 8000;
-            target = 50000;
           }
         }
 
@@ -949,6 +943,11 @@ export default function UserProfileView({
   const monthlyTarget = Number(payrollDetails.target || 0);
   const targetProgressAmount = targetRevenue;
   const targetPct = monthlyTarget > 0 ? Math.min(100, Math.round((targetProgressAmount / monthlyTarget) * 100)) : 0;
+  // A salary or target that was never entered must read as "not set", never as 0 EGP (looks like a
+  // real zero) and never as an invented default.
+  const salaryNotSet = basicSalary <= 0;
+  const targetNotSet = monthlyTarget <= 0;
+  const netSalaryNotSet = salaryNotSet && bonuses === 0 && deductions === 0;
 
   const handleOpenEditPersonal = () => {
     setEditEmail(user.email || "");
@@ -1527,7 +1526,7 @@ export default function UserProfileView({
           <div className="space-y-3 bg-[var(--color-brand-light)] p-5 rounded-2xl border border-[var(--cr-primary)]/10">
             <div className="flex justify-between items-center pb-2 border-b border-[var(--cr-primary)]/10">
               <span className="font-bold text-[var(--color-brand-secondary)]">{tr?.fixedBasicSalary ?? "Fixed / Basic Salary"}</span>
-              <span className="font-black text-[var(--cr-dark)]">{basicSalary.toLocaleString()} EGP</span>
+              <span className="font-black text-[var(--cr-dark)]">{salaryNotSet ? "—" : `${basicSalary.toLocaleString()} EGP`}</span>
             </div>
 
             <div className="flex justify-between items-center pb-2 border-b border-[var(--cr-primary)]/10">
@@ -1544,13 +1543,13 @@ export default function UserProfileView({
           <div className="space-y-3 bg-[var(--color-brand-light)] p-5 rounded-2xl border border-[var(--cr-primary)]/10">
             <div className="flex justify-between items-center pb-2 border-b border-[var(--cr-primary)]/10">
               <span className="font-bold text-[var(--color-brand-secondary)]">{tr?.monthlyTarget ?? "Monthly Target"}</span>
-              <span className="font-black text-[var(--cr-dark)]">{monthlyTarget.toLocaleString()} EGP</span>
+              <span className="font-black text-[var(--cr-dark)]">{targetNotSet ? "—" : `${monthlyTarget.toLocaleString()} EGP`}</span>
             </div>
 
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs font-bold">
                 <span className="text-[var(--color-brand-secondary)]">{tr?.targetProgress ?? "Target Progress"}</span>
-                <span className="text-[var(--cr-primary)]">{targetProgressAmount.toLocaleString()} / {monthlyTarget.toLocaleString()} EGP ({targetPct}%)</span>
+                <span className="text-[var(--cr-primary)]">{targetNotSet ? "—" : `${targetProgressAmount.toLocaleString()} / ${monthlyTarget.toLocaleString()} EGP (${targetPct}%)`}</span>
               </div>
               <div className="h-2.5 w-full rounded-full bg-[var(--cr-primary)]/15 overflow-hidden">
                 <div className="h-full bg-[var(--cr-primary)] rounded-full transition-all duration-500" style={{ width: `${targetPct}%` }} />
@@ -1562,7 +1561,7 @@ export default function UserProfileView({
         {/* Net Salary Highlight Card */}
         <div className="rounded-2xl bg-[#EDE4C8]/40 border border-[var(--cr-accent)]/40 p-5 flex items-center justify-between">
           <span className="text-sm font-extrabold text-[var(--cr-primary)]">{tr?.netSalary ?? "Net Salary"}</span>
-          <span className="text-xl md:text-2xl font-black text-[var(--cr-primary)]">{netSalary.toLocaleString()} EGP</span>
+          <span className="text-xl md:text-2xl font-black text-[var(--cr-primary)]">{netSalaryNotSet ? "—" : `${netSalary.toLocaleString()} EGP`}</span>
         </div>
       </div>
 

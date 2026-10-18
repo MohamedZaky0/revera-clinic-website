@@ -113,6 +113,62 @@ describe('staff payroll — net salary math', () => {
   });
 });
 
+describe('salary and target that were never entered are not invented', () => {
+  // The profile used to substitute 15,000 / 60,000 (doctor) and 8,000 / 50,000 (staff) whenever the
+  // database had no salary or target, presenting made-up money as the person's real pay.
+  const INVENTED = [/15,000/, /60,000/, /8,000/, /50,000/];
+
+  function expectNoInventedFigures() {
+    for (const re of INVENTED) expect(screen.queryByText(re)).not.toBeInTheDocument();
+  }
+
+  it('a doctor whose provider row has no salary/target shows "—", not 15,000 / 60,000', async () => {
+    fake.seed('branches', []);
+    fake.seed('providers', [{ id: 'doc-1', name: 'Dr. Sara Adel', fixed_salary: null, target_amount: null }]);
+    fake.seed('doctor_payroll', []);
+    fake.seed('reservations', []);
+
+    render(<UserProfileView user={{ ...BASE_USER, id: 'doc-1' }} isDoctorView />);
+
+    await waitFor(() => expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3));
+    expectNoInventedFigures();
+  });
+
+  it('a doctor with no provider row at all shows "—", not 15,000 / 60,000', async () => {
+    fake.seed('branches', []);
+    fake.seed('providers', []);
+    fake.seed('doctor_payroll', []);
+    fake.seed('reservations', []);
+
+    render(<UserProfileView user={{ ...BASE_USER, id: 'doc-1' }} isDoctorView />);
+
+    await waitFor(() => expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3));
+    expectNoInventedFigures();
+  });
+
+  it('a staff member with no salary/target in employee_accounts shows "—", not 8,000 / 50,000', async () => {
+    fake.seed('branches', []);
+    fake.seed('employee_accounts', [{ id: 'emp-1', email: 'sara@clinic.com', salary: null, required_target_amount: null }]);
+    fake.seed('reservations', []);
+
+    render(<UserProfileView user={{ ...BASE_USER, id: 'emp-1', role: 'Receptionist' }} />);
+
+    await waitFor(() => expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3));
+    expectNoInventedFigures();
+  });
+
+  it('a staff member with no employee_accounts row at all shows "—", not 8,000 / 50,000', async () => {
+    fake.seed('branches', []);
+    fake.seed('employee_accounts', []);
+    fake.seed('reservations', []);
+
+    render(<UserProfileView user={{ ...BASE_USER, id: 'emp-9', role: 'Receptionist' }} />);
+
+    await waitFor(() => expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3));
+    expectNoInventedFigures();
+  });
+});
+
 describe('target progress', () => {
   it('sums only this doctor\'s completed/confirmed/approved/started reservations in the current month toward the target', async () => {
     fake.seed('branches', []);

@@ -3589,3 +3589,16 @@ Investigation revealed:
 
 **Not done:** an admin can still edit non-role fields (salary, shift, etc.) of a superadmin account. Not asked for, left as is.
 
+---
+
+## DEC-108: Profile Payroll Card Never Invents A Salary Or Target
+
+**Date:** 2026-10-18
+**Status:** Decided & implemented
+
+**Context:** `UserProfileView.tsx` substituted hardcoded figures whenever the database had none: doctors got a 15,000 EGP salary and 60,000 EGP target, staff got 8,000 / 50,000. They were shown as the person's real pay and fed the "Net Salary" line, even though the file's own comment said the figures were "strictly based on database metrics". Same class of problem as the fabricated demo data removed under RISK-076.
+
+**Decision:** the fallbacks are gone. A salary or target that is missing or 0 renders as "—" (Fixed/Basic Salary, Monthly Target, Target Progress) and Net Salary renders "—" when there is no salary, bonus or deduction at all. Real values (including a legitimately entered amount) display exactly as before. Four tests cover doctor/staff with a null field and with no row; they fail against the old code.
+
+**Not done:** whether a clinic wants a non-zero default for new hires is a product decision; none is applied. The same literals were searched for in `src/` and no other occurrence exists.
+
