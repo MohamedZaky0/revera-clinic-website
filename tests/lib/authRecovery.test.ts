@@ -188,3 +188,29 @@ describe('logout reasons', () => {
     }
   });
 });
+
+describe('deliberate logout broadcast between tabs', () => {
+  function fakeStorage() {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) };
+  }
+
+  it('is seen by another tab right after the logout, and not before it or long after', async () => {
+    const { broadcastDeliberateLogout, wasDeliberateLogoutRecently } = await import('@/lib/authRecovery');
+    const s = fakeStorage();
+    expect(wasDeliberateLogoutRecently('revera', 15000, s)).toBe(false);
+    broadcastDeliberateLogout('revera', s);
+    expect(wasDeliberateLogoutRecently('revera', 15000, s)).toBe(true);
+    s.setItem('revera_deliberate_logout_at', String(Date.now() - 60000));
+    expect(wasDeliberateLogoutRecently('revera', 15000, s)).toBe(false);
+  });
+
+  it('ignores garbage and a timestamp from the future', async () => {
+    const { wasDeliberateLogoutRecently } = await import('@/lib/authRecovery');
+    const s = fakeStorage();
+    s.setItem('revera_deliberate_logout_at', 'abc');
+    expect(wasDeliberateLogoutRecently('revera', 15000, s)).toBe(false);
+    s.setItem('revera_deliberate_logout_at', String(Date.now() + 60000));
+    expect(wasDeliberateLogoutRecently('revera', 15000, s)).toBe(false);
+  });
+});

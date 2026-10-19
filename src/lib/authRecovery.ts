@@ -192,3 +192,29 @@ export function describeLogoutReason(reason: LogoutReason): string {
       return 'Your session ended unexpectedly. Please sign in again.';
   }
 }
+
+/**
+ * A deliberate Logout in one tab empties the shared stored session, which every other open tab of
+ * this browser sees as a SIGNED_OUT it did not cause. Those tabs must follow the logout, not try to
+ * "recover" the session that was just ended on purpose, and must not call it unexpected. The tab
+ * that logs out leaves a short-lived timestamp for the others to read.
+ */
+const LOGOUT_BROADCAST_KEY_SUFFIX = '_deliberate_logout_at';
+
+export function broadcastDeliberateLogout(prefix: string, storage?: StorageLike): void {
+  try {
+    safeStorage(storage)?.setItem(`${prefix}${LOGOUT_BROADCAST_KEY_SUFFIX}`, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function wasDeliberateLogoutRecently(prefix: string, withinMs = 15000, storage?: StorageLike): boolean {
+  try {
+    const raw = safeStorage(storage)?.getItem(`${prefix}${LOGOUT_BROADCAST_KEY_SUFFIX}`);
+    const at = Number(raw);
+    return Number.isFinite(at) && at > 0 && Date.now() - at >= 0 && Date.now() - at <= withinMs;
+  } catch {
+    return false;
+  }
+}
