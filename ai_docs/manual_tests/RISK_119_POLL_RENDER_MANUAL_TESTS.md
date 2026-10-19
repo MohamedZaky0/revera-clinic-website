@@ -44,6 +44,14 @@
 - [ ] On Bookings: approve a booking (openApprove path), reject a booking, export CSV, print — each works as before.
 - [ ] Profiler on Bookings: approve one booking — `AdminBookingsView` commits when `allReservations` actually changes, and does not commit on unrelated shell state changes (e.g. opening/closing an unrelated modal).
 
+## The 3 s Bookings / Doctor pollers (Part B2)
+- [ ] Bookings screen open and idle 60 s: Profiler shows no `AdminBookingsView` commit caused by a poll tick (the view still commits on real data changes and on its own user interactions).
+- [ ] Approve a pending booking: the table updates within one tick — the key-compare must not swallow a real change.
+- [ ] Reject a booking, create a booking on the public site, mark a prescription follow-up: each still appears without a manual reload.
+- [ ] Local optimistic update check: perform an action that patches a row in place (e.g. set a follow-up date), then let a poll tick pass — the patch is not flickered back to stale server data, and genuinely different server data still replaces it.
+- [ ] Doctor account (`/doctor`) idle 60 s: its reservations list does not re-render on identical ticks; a real booking change still appears within ~3 s.
+- [ ] Edit a booking's notes / amount paid on another tab while Bookings is open — it appears on the next tick (these keys are in the compare list; confirm a non-status field change is not missed).
+
 ## Regressions to look for
 - [ ] The 15 s poll still runs after an access-token rotation (~1 h in): bookings keep updating, no 401 loop (RISK-053 path — fetchers are now `useCallback`, the poll effect still re-arms on token change).
 - [ ] Schedule view (`calendarView === "Schedule"`) still refetches its day's reservations after a booking write (`fetchAllReservations` side-sync).
