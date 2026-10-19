@@ -10,8 +10,91 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-No brief is currently active — Brief 35 landed and is archived below. The items below are queued but
-not yet written up; write one before handing it to Windsurf.
+## Brief 36 — Admin refresh: stop tables reloading on every shell render (Devices table first)
+
+**Active. Windsurf may start it.** Read first: `ai_docs/RISKS.md` RISK-118 and RISK-053 (the comment in
+`src/app/admin/page.tsx` above the booking-poll effect), and `ai_docs/ARCHITECTURE.md` (shell is a
+composer; do not add section logic to it).
+
+**The complaint (Mohamed, 2026-10-19).** Tables "take time to refresh" and the reload is visible
+inside the page. In Inventory → Devices the table keeps flashing its "Loading…" row. RISK-118
+(commit `e20f994`, on `main`) fixed the reload-on-tab-switch side and the shell's own fetchers. The
+children below were left untouched and are the next cause.
+
+### Findings — verified by reading code on 2026-10-19; re-verify line numbers before editing
+
+1. **Root cause of the Devices table flashing.** `src/app/admin/page.tsx:602` defines
+   `const authenticatedJsonHeaders = { … }` as a plain object literal, so it is a **new object on
+   every render of the shell**. It is passed to children as `authHeaders` (48 uses in `page.tsx`;
+   `AdminInventoryView` receives it at ~`page.tsx:7722`). `InventoryDevicesTab.tsx:124-145` builds
+   `fetchDevices = useCallback(…, [authHeaders, onDeviceCountChange])` and runs
+   `useEffect(() => { fetchDevices(); }, [fetchDevices])`. New headers object → new `fetchDevices` →
+   the effect refetches, and `fetchDevices` starts with `setLoading(true)`, which swaps the whole
+   `<tbody>` for the spinner row (`InventoryDevicesTab.tsx:370`, also `:627`). The shell re-renders on
+   every state change, including the 15 s booking poll, so the table refetches and flashes at least
+   that often while the tab is open.
+2. **Same defect, same pattern, elsewhere:** `InventoryProductsTab.tsx:120-141`
+   (`fetchProductSalesHistory`, `[authHeaders]`), `DeviceAuditLogsModal.tsx:~60` (`[authHeaders]`).
+   Grep every `components/admin/**` file for `authHeaders` / `headers` appearing in a hook
+   dependency array; there may be more.
+3. **Polls re-render the whole shell even when nothing changed.** The 15 s booking poll
+   (`page.tsx`, effect after the "Re-fetch bookings whenever branch selection changes" comment) calls
+   `setRequests(data)` / `setAllReservations(data)` with a freshly parsed array each time, and the 30 s
+   HR-alerts poll calls `setActiveMissingAlerts(data)`. A new array identity is a state change, so the
+   shell (≈350 `useState`, one component) and every child re-render every 15 s / 30 s even when the
+   data is identical.
+4. **Extracted views are not memoized.** `grep -rn "memo(" src/components/admin` finds nothing, so a
+   shell re-render re-renders every mounted view and its table.
+
+### Scope — three ordered parts, one PR each, stop after each for Mohamed to check
+
+**Part A — stable headers + quiet child refetch (the Devices fix).**
+1. In the shell, make `authenticatedJsonHeaders` a `useMemo` keyed on `session?.access_token`. It must
+   still carry the live token after a rotation (RISK-053): the memo key is the token, so it does.
+2. `InventoryDevicesTab`, `InventoryProductsTab` (sales history), `DeviceAuditLogsModal`: show the
+   loading row/spinner **only when there is no data yet**; a refetch with rows on screen runs quietly,
+   and a failed refetch keeps the rows. Use the same rule RISK-118 applied to customers/inventory
+   (`dbCustomersRef` pattern in `page.tsx`, "hadData"). After add/edit/reset-pulses writes
+   (`InventoryDevicesTab.tsx:~890, ~1115, ~1250`) the follow-up `fetchDevices()` must also be quiet.
+3. Do not change what the Devices table shows, its filters, the row menu or the modals.
+
+**Part B — a poll that found nothing new does not re-render.** In the shell, for `requests`,
+`allReservations`, `activeMissingAlerts` (and any other poll-fed state you find), keep the previous
+value when the new data is equal (cheap compare: length plus id/status/updated-at per row, or a stable
+JSON compare if rows are small; pick one and justify it in the PR). Must still update immediately when
+something really changed, including after a write the user just made.
+
+**Part C — `React.memo` only where measured.** With React DevTools Profiler, record the Bookings,
+Patients and Inventory screens idle for 60 s and with a booking approved. List the components that
+re-render with unchanged props. Wrap only the heaviest of those (candidates:
+`BookingDetailsModal` 5k lines, `AdminBookingsView`, `AdminEmployeesView`, `CustomerProfileDrawer`) in
+`React.memo`, and stabilize the props that defeat it (inline arrow functions and object/array
+literals passed from the shell → `useCallback` / `useMemo`). Include before/after commit counts in the
+PR. If a view cannot be memoized without large prop plumbing, leave it and say so.
+
+### Out of scope — do NOT do these in this brief
+- Moving state or fetchers out of the shell, a context/store, or splitting `page.tsx` further. That is
+  a separate decision (the shell owns state for many screens; this brief only stops the wasted work).
+- The permission refresh cadence (RISK-118 note: now on load and token rotation). Do not "fix" it here.
+- Changing any API route, the cache helper `src/lib/fetchCache.ts`, or auth flow code.
+
+### Acceptance
+- Devices tab open and idle for 60 s, Network panel filtered to `inventory/devices`: **no repeat
+  request** and **no spinner row** while the 15 s poll runs. Same for Products' sales history.
+- Adding a device, editing one, updating pulses and resetting pulses each still refresh the table
+  (quietly) and show the change.
+- A poll tick with no data change causes no re-render of the shell (show it in the Profiler).
+- Switching branch, first load, and an empty table still show the loading state as before.
+- `tsc` and `eslint` clean on touched files; full `vitest` run passes; add a test for any pure helper
+  you introduce (e.g. the "is the poll data equal" check).
+
+### Deliverables (standing project rules)
+Dev Notes block per `CLAUDE.md`; a manual checklist `ai_docs/manual_tests/RISK_119_…_MANUAL_TESTS.md`
+(next free number is RISK-119; confirm with `grep -n "^## RISK-1" ai_docs/RISKS.md | tail -3`); the
+RISKS entry in the same change. **Verify in a logged-in browser** — the author of this brief could
+not (no test login was available), so nothing above has been observed live, only read from code.
+
+---
 
 ### Queued, not yet written
 
