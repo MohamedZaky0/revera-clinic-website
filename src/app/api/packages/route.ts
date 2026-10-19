@@ -60,7 +60,9 @@ function validatePackagePayload(body: any): { error?: string; data?: PackageApiP
   const parsedTotalPulses = Number(totalPulses ?? 0);
   const parsedPrice = Number(price);
   const parsedTaxRate = Number(taxRate ?? 0);
-  const parsedValidityDays = Number(validityDays ?? 0);
+  // A package nobody gave a validity to is valid for a year, not for 0 days (which expires the
+  // moment it is sold). An explicit 0 is still honoured.
+  const parsedValidityDays = validityDays === undefined || validityDays === null || validityDays === '' ? 365 : Number(validityDays);
   const parsedExtensionDays = Number(extensionDays ?? 0);
 
   if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
