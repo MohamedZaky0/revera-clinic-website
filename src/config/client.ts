@@ -53,6 +53,10 @@ Attached is my payment transaction receipt photo.`,
   siteUrl: "https://www.reveraclinics.com",
   googleMapsUrl:
     "https://www.google.com/maps/place/Revera+Clinic+-+Tagamoa+Branch/@30.0012424,31.4513301,956m/data=!3m2!1e3!4b1!4m6!3m5!1s0x145823da15b7dca9:0xb388d9b9c32ebce5!8m2!3d30.0012378!4d31.4539104!16s%2Fg%2F11z28vdn2h",
+  // Google Maps embed + turn-by-turn link for the branch (coordinates are from the Maps listing above)
+  googleMapsEmbedUrl:
+    "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3455.240762819966!2d31.45133547617349!3d30.001242420615263!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x145823da15b7dca9%3A0xb388d9b9c32ebce5!2sRevera%20Clinic%20-%20Tagamoa%20Branch!5e0!3m2!1sen!2sit!4v1792411408256!5m2!1sen!2sit",
+  googleMapsDirectionsUrl: "https://www.google.com/maps/dir/?api=1&destination=30.0012378,31.4539104",
   instagramUrl: "https://www.instagram.com/reveraclinicss/",
   addressAr: "المنطقة الصناعية، قسم أول القاهرة الجديدة",
   // Google Tag Manager container for the ad landing pages (public id; NEXT_PUBLIC_GTM_ID overrides it)
