@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, useCallback, useRef, Fragment } from "rea
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
 import { recoverFromInvoluntarySignOut, verifyStaffSession, recordLogoutReason, clearLogoutReason, broadcastDeliberateLogout, wasDeliberateLogoutRecently, writeSharedActivity, lastActivityAcrossTabs, isIdleExpired, IDLE_LOGOUT_MS } from "@/lib/authRecovery";
+import { parseSection, withSection } from "@/lib/adminSection";
 import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, getDurationLabel, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
 import { 
   getServiceToggles, 
@@ -814,6 +815,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // attempt can hand Supabase the real refresh_token - by the time SIGNED_OUT fires, the SDK has
   // already cleared its own stored session, so there is nothing left to refresh from otherwise.
   const lastKnownSessionRef = useRef<any>(null);
+  // Which section the URL asked for is applied once, right after the first successful login check.
+  const sectionRestoredRef = useRef(false);
+  // The last login this page fully verified against /api/auth/me. Supabase re-announces the same
+  // login (SIGNED_IN) every time the browser tab becomes visible again; re-verifying and re-fetching
+  // everything each time made every table reload on a simple window switch.
+  const lastVerifiedRef = useRef<{ userId: string; token: string; at: number } | null>(null);
+  const verifyingTokenRef = useRef<string | null>(null);
+  const pollBranchRef = useRef<string | null>(null);
   const [adminRole, setAdminRole] = useState<string | null>(null);
   const [adminDepartment, setAdminDepartment] = useState<string>("");
   const [forceAdminView, setForceAdminView] = useState(false);
@@ -1686,7 +1695,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         if (typeof window !== "undefined") {
           sessionStorage.setItem(`${CLIENT.storagePrefix}_admin_session_active`, "true");
         }
-        handleAuthSession(cachedSession);
+        // The listener below also reports this same login on load; verify it once, not twice.
+        if (verifyingTokenRef.current !== cachedSession.access_token && lastVerifiedRef.current?.token !== cachedSession.access_token) {
+          handleAuthSession(cachedSession);
+        }
       } else {
         setAuthChecking(false);
       }
@@ -1741,11 +1753,31 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         }
       }
+      // The same login announced again (Supabase does this on every return to the tab, and once more
+      // on page load) needs no new /api/auth/me check or data reload while it was verified recently.
+      const verified = lastVerifiedRef.current;
+      if (
+        (event === "SIGNED_IN" || event === "INITIAL_SESSION") &&
+        newSession?.user &&
+        (verifyingTokenRef.current === newSession.access_token ||
+          (verified &&
+            verified.userId === newSession.user.id &&
+            verified.token === newSession.access_token &&
+            Date.now() - verified.at < 5 * 60 * 1000))
+      ) {
+        lastKnownSessionRef.current = newSession;
+        return;
+      }
       handleAuthSession(newSession);
     });
 
     async function handleAuthSession(currSession: any) {
-      setSession(currSession);
+      // Same person and same token: keep the existing object so nothing keyed on `session` re-runs.
+      setSession((prev: any) =>
+        prev && currSession && prev.user?.id === currSession.user?.id && prev.access_token === currSession.access_token
+          ? prev
+          : currSession
+      );
       if (currSession?.user) {
         lastKnownSessionRef.current = currSession;
       }
@@ -1767,6 +1799,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       }
       // Reset activity timer upon successful authentication
       lastActivityRef.current = Date.now();
+      verifyingTokenRef.current = currSession.access_token ?? null;
 
       try {
         // RISK-117: a 401 is not final until one forced token refresh has failed to fix it, and a
@@ -1813,6 +1846,18 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           setAdminEmail(authData.email || "");
           setAdminEmployeeId(authData.employeeId || "");
           setAdminDbId(authData.id || "");
+          lastVerifiedRef.current = {
+            userId: verification.session?.user?.id,
+            token: verification.session?.access_token,
+            at: Date.now(),
+          };
+
+          if (!sectionRestoredRef.current) {
+            sectionRestoredRef.current = true;
+            const requested = typeof window !== "undefined" ? parseSection(window.location.search) : null;
+            // A section the person may not open is corrected by the permission effect further down.
+            if (requested) setActiveNav(requested);
+          }
 
           if (typeof window !== "undefined") {
             const roleSlug = getRoleSlug(authData.role);
@@ -1849,6 +1894,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         console.error("Error retrieving admin permissions:", err);
         setSessionVerifyFailed(true);
       } finally {
+        verifyingTokenRef.current = null;
         setAuthChecking(false);
       }
     }
@@ -2117,7 +2163,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
   async function fetchRolesAndEmployees() {
     console.log("RBAC - fetchRolesAndEmployees called!");
-    setLoadingRolesAndEmployees(true);
+    if (employeesList.length === 0) setLoadingRolesAndEmployees(true);
     try {
       if (!session?.access_token) return;
       const headers = { Authorization: `Bearer ${session.access_token}` };
@@ -2339,6 +2385,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       }
     }
   }, [session, adminRole]);
+
+  // Keep the open section in the URL so a reload (F5) lands on the same page instead of Dashboard.
+  useEffect(() => {
+    if (!adminRole || !sectionRestoredRef.current || typeof window === "undefined") return;
+    const next = withSection(window.location.search, activeNav);
+    if (next !== window.location.search) {
+      window.history.replaceState(null, "", window.location.pathname + next + window.location.hash);
+    }
+  }, [activeNav, adminRole]);
 
   // Geolocation Check-In on login resolution (Disabled for now per user request)
   useEffect(() => {
@@ -2854,9 +2909,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // Inventory Products State
   const [inventoryProducts, setInventoryProducts] = useState<any[]>([]);
   const [inventoryProductsLoading, setInventoryProductsLoading] = useState(false);
+  const inventoryProductsRef = useRef<any[]>([]);
+  inventoryProductsRef.current = inventoryProducts;
   const fetchInventoryProducts = useCallback(async () => {
     try {
-      setInventoryProductsLoading(true);
+      if (inventoryProductsRef.current.length === 0) setInventoryProductsLoading(true);
       if (!session?.access_token) return;
       const res = await fetch("/api/inventory/products", {
         headers: { Authorization: `Bearer ${session.access_token}` }
@@ -4036,9 +4093,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     let isMounted = true;
     let timerId: NodeJS.Timeout;
 
-    // Initial load WITH spinner
-    fetchRequests(true);
-    fetchAllReservations();
+    // Spinner only for the first load or a branch switch. This effect also re-runs when the login
+    // token rotates, which must not flash the booking tables.
+    const branchChanged = pollBranchRef.current !== branch;
+    pollBranchRef.current = branch;
+    fetchRequests(branchChanged);
+    fetchAllReservations(false, !branchChanged);
 
     const poll = async () => {
       try {
@@ -4048,7 +4108,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         
         await Promise.all([
           fetchRequests(false) || Promise.resolve(),
-          fetchAllReservations() || Promise.resolve()
+          fetchAllReservations(false, true) || Promise.resolve()
         ]);
       } catch (err) {
         if (err instanceof TypeError || String(err).includes("Failed to fetch")) {
@@ -4983,7 +5043,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           setRequests(data);
         } else {
           console.error("fetchRequests: expected array, got", data);
-          setRequests([]);
+          // a background poll keeps what is on screen; only a first/branch-change load empties it
+          if (showSpinner) setRequests([]);
         }
         if (showSpinner) setLoading(false);
       })
@@ -4993,7 +5054,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         } else {
           console.error("fetchRequests error:", err);
         }
-        setRequests([]);
+        if (showSpinner) setRequests([]);
         if (showSpinner) setLoading(false);
       });
   }
@@ -5020,8 +5081,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // a stable identity per session, paired with the effect below that depends on it, means the
   // moment `session` actually resolves, this function's identity changes and the effect re-fires
   // automatically — same pattern already used by fetchInventoryProducts/fetchInventoryDevices.
+  // A refresh while a list is already on screen runs quietly: no "Loading..." flash, and a failed
+  // attempt keeps the rows that are showing instead of blanking the table.
+  const dbCustomersRef = useRef<Customer[]>([]);
+  dbCustomersRef.current = dbCustomers;
   const fetchCustomers = useCallback(() => {
-    setLoadingCustomers(true);
+    const hadData = dbCustomersRef.current.length > 0;
+    if (!hadData) setLoadingCustomers(true);
     fetchCustomerAvatars();
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (session?.access_token) {
@@ -5037,12 +5103,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           setDbCustomers(data);
         } else {
           console.error("fetchCustomers: expected array, got", data);
-          setDbCustomers([]);
+          if (!hadData) setDbCustomers([]);
         }
       })
       .catch((err) => {
         console.error("fetchCustomers error:", err);
-        setDbCustomers([]);
+        if (!hadData) setDbCustomers([]);
       })
       .finally(() => {
         setLoadingCustomers(false);
@@ -5391,7 +5457,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // array" reliably returned a list that predated the change that had just been made, which is
   // why new bookings only appeared after a full page reload. Pass useCache=true only where a
   // slightly stale list is genuinely acceptable.
-  function fetchAllReservations(useCache = false) {
+  // keepOnError: the 15s background poll passes true so one failed request does not blank every
+  // booking table until the next poll succeeds.
+  function fetchAllReservations(useCache = false, keepOnError = false) {
     const branchParam = branch ? `?branchId=${branch}` : "";
     const url = `/api/reservations${branchParam}`;
     if (!useCache) clearFetchCache(url);
@@ -5401,7 +5469,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           setAllReservations(data);
         } else {
           console.error("fetchAllReservations: expected array, got", data);
-          setAllReservations([]);
+          if (!keepOnError) setAllReservations([]);
         }
       })
       .catch((err) => {
@@ -5410,7 +5478,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         } else {
           console.error("fetchAllReservations error:", err);
         }
-        setAllReservations([]);
+        if (!keepOnError) setAllReservations([]);
       });
 
     // Automatically keep schedule view reservations in sync if it's active
