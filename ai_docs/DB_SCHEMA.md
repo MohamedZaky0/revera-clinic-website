@@ -245,8 +245,9 @@ read-only `/api/availability`. An admin can double-book a doctor from the panel.
 | `enable_reminder` | boolean | Default true |
 | `branch_pricing` | JSONB | Array of `{name, price, visible, status, isDefault}`, default `{}` |
 | `islaser` / `is_laser` | boolean | Default false. **Added 2026-09-20** by `20260920010000_add_islaser_to_services.sql`. Marks service as laser service requiring equipment device connection and enabling 3-tier payment options. |
-| `visible` | boolean | default true |
+| `visible` | boolean | default true. Also set to false by the soft delete, and the admin Services list hides every `visible = false` row. Do not use it to mean "not on the website". |
 | `active` | boolean | default true |
+| `show_on_website` | boolean | NOT NULL, default true. **Added 2026-10-19** by `20261019000000_add_show_on_website_to_services.sql` (DEC-111). Whether the public website (services section, services page, online booking) offers this service. `false` keeps it fully usable in the admin: reception can book it, the doctor can add it to a session, packages can include it. Separate from `active` and `visible`. The WhatsApp bot (`/api/bot/services`) does not look at it. |
 | `created_at` | timestamptz | |
 
 ---

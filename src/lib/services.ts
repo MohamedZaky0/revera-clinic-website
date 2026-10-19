@@ -209,6 +209,8 @@ export interface ServiceItem {
   enableReminder?: boolean;
   visible?: boolean;
   active?: boolean;
+  /** DEC-111: false = usable in the admin but not offered on the public website. Missing means shown. */
+  showOnWebsite?: boolean;
   branchPricing?: Array<{
     name: string;
     price: number;
@@ -427,4 +429,9 @@ export function getServicePriceDetails(
   }
 
   return result;
+}
+
+/** Whether the public website should list this service (active, visible and not marked system-only). */
+export function isShownOnWebsite(s: Pick<ServiceItem, 'active' | 'visible' | 'showOnWebsite'>): boolean {
+  return s.active !== false && s.visible !== false && s.showOnWebsite !== false;
 }

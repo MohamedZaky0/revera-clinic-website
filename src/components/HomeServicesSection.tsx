@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Category, ServiceItem, getServicePriceDetails } from "@/lib/services";
+import { Category, ServiceItem, getServicePriceDetails, isShownOnWebsite } from "@/lib/services";
 import { CLIENT } from "@/config/client";
 import { 
   getServiceToggles, 
@@ -406,7 +406,7 @@ export function HomeServicesSection() {
 
   // Only show services that are active & visible in database
   const activeServices = useMemo(() => {
-    return dynamicServices.filter(s => s.active !== false && s.visible !== false);
+    return dynamicServices.filter(isShownOnWebsite);
   }, [dynamicServices]);
 
   // Merge any categories referenced by active services that may not yet be in dynamicCategories

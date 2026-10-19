@@ -25,7 +25,7 @@ vi.mock('@/lib/supabaseServer', () => ({
   getSupabaseServer: () => ({ auth: { getUser: (...args: any[]) => fake.authGetUser(...args) }, from: (t: string) => fake.client.from(t) }),
 }));
 
-import { POST } from '@/app/api/services/route';
+import { GET, POST } from '@/app/api/services/route';
 
 const USER_ID = 'user-1';
 const EMP_ID = 'emp-1';
@@ -127,5 +127,61 @@ describe('POST /api/services — mixed create+update array (RISK-088)', () => {
     const res = await POST(postReq(NEW_SERVICE));
     expect(res.status).toBe(403);
     expect(fake.db.services).toHaveLength(1); // nothing created
+  });
+});
+
+describe('services.show_on_website (DEC-111)', () => {
+  const stored = (id: number) => fake.db.services.find((s: any) => s.id === id);
+
+  it('a new service defaults to shown on the website', async () => {
+    seedStaff('superadmin', []);
+    const res = await POST(postReq(NEW_SERVICE));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.showOnWebsite).toBe(true);
+    expect(stored(body.id).show_on_website).toBe(true);
+  });
+
+  it('a new service can be created system-only', async () => {
+    seedStaff('superadmin', []);
+    const res = await POST(postReq({ ...NEW_SERVICE, showOnWebsite: false }));
+    const body = await res.json();
+    expect(body.showOnWebsite).toBe(false);
+    expect(stored(body.id).show_on_website).toBe(false);
+  });
+
+  it('turning it off and on again on an existing service is stored', async () => {
+    seedStaff('superadmin', []);
+    await POST(postReq({ ...EXISTING_SERVICE, showOnWebsite: false }));
+    expect(stored(1).show_on_website).toBe(false);
+    await POST(postReq({ ...EXISTING_SERVICE, showOnWebsite: true }));
+    expect(stored(1).show_on_website).toBe(true);
+  });
+
+  it('a save that does not mention the flag keeps a hidden service hidden (older tab, bulk sync)', async () => {
+    seedStaff('superadmin', []);
+    fake.seed('services', [{ ...EXISTING_SERVICE, show_on_website: false }]);
+    await POST(postReq([EXISTING_SERVICE, NEW_SERVICE])); // neither row carries showOnWebsite
+    expect(stored(1).show_on_website).toBe(false);
+    const created = fake.db.services.find((s: any) => s.en === NEW_SERVICE.en);
+    expect(created.show_on_website).toBe(true);
+  });
+
+  it('a save that does not mention the flag leaves a shown service shown', async () => {
+    seedStaff('superadmin', []);
+    fake.seed('services', [{ ...EXISTING_SERVICE, show_on_website: true }]);
+    await POST(postReq(EXISTING_SERVICE));
+    expect(stored(1).show_on_website).toBe(true);
+  });
+
+  it('GET reports showOnWebsite, treating a missing value as shown', async () => {
+    fake.seed('services', [
+      { ...EXISTING_SERVICE, id: 1, show_on_website: false },
+      { ...EXISTING_SERVICE, id: 2, en: 'B', show_on_website: true },
+      { ...EXISTING_SERVICE, id: 3, en: 'C' },
+    ]);
+    const res = await GET(new Request('http://localhost/api/services'));
+    const rows = await res.json();
+    expect(rows.map((r: any) => [r.id, r.showOnWebsite])).toEqual([[1, false], [2, true], [3, true]]);
   });
 });
