@@ -5252,6 +5252,28 @@ scope for that sweep (it only asserts no-token→401 and patient-session→403, 
 — this was found opportunistically while wiring one specific button, not from a systematic sweep.
 
 ---
+
+## RISK-117: Two More Ways A Working Session Was Thrown Out To /login Mid-Booking (Refresh-Looking Logout On The Clinic Laptop) (RESOLVED, ROOT CAUSE ON THE LAPTOP NOT CONFIRMED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_117_SESSION_VERIFICATION_MANUAL_TESTS.md`
+
+**Severity:** High (reported live, repeatedly) · **Type:** Session/auth reliability
+**Found:** 2026-10-19, following up the clinic's report that while creating a New Booking, typing a patient's details or looking at an old booking, the page suddenly "refreshes" and they are logged out. Third report of the same symptom after RISK-113 (transient `/api/auth/me` failure) and RISK-114 (Supabase's own client firing SIGNED_OUT).
+
+**What was found:** there is no `location.reload()` anywhere in the app. What looks like a refresh is a hard navigation to `/login` (`window.location.href` / `replace`), and the admin shell had two paths that did that without the person choosing to:
+1. **A 401 from `/api/auth/me` was final.** `handleAuthSession` signed out on the first 401. A 401 does not always mean the login is dead: the access token held in memory can be stale while the refresh token is fine (laptop asleep or offline past the token's one-hour life, a clock that is off so the client thinks the token is still valid). The correct response is to force one token refresh and verify again; the page signed out instead.
+2. **Any non-auth failure on load looked like a logout.** If `/api/auth/me` failed with anything other than 401/403 (cold Vercel function, brief network loss, 5xx, a thrown fetch) the session was kept but `adminRole` stayed empty, and the effect "no session or no role -> `window.location.replace('/login')`" then fired. This only bites on a (re)load, which is exactly when a browser restores or discards a background tab on a low-memory laptop, so it fits "suddenly refreshed".
+
+**Fix:**
+- `src/lib/authRecovery.ts` -> `verifyStaffSession()`, a pure, directly tested function: a 200 verifies; a 403 is final; a 401 triggers exactly one `refreshSession()` and a second check (final only if that also fails, or the refresh token itself is refused with a 4xx); a network error, 5xx or 503 is retried (1s, 3s) and then reported as `transient`, never as a logout.
+- `src/app/admin/page.tsx`: `handleAuthSession` uses it. On `transient` the session is kept and a "Could not verify your session right now" panel with a Try again button is shown (auto-retry every 15s); the redirect to `/login` now happens only when there is no session at all.
+- **Cause visible next time:** before any redirect the shell records why (`inactivity`, `session_rejected`, `wrong_portal`, `session_ended`) in localStorage, and `/login` shows it once as an amber notice. A deliberate Logout clears it. So the next report can say which one it was instead of "it just logged me out".
+
+**Tests:** `tests/lib/authRecovery.test.ts` (+14: ok / 403 / stale-token 401 refreshed and verified with the fresh token / persistent 401 refreshes only once / refresh token refused / refresh unreachable = transient / 503 retried with the delays / persistent 503 = transient / network failure / no session / reason round trip, `onlyIfEmpty`, clear, expiry). Full suite 1421 passed, 4 expected-fail; `tsc` clean.
+
+**Not done / unconfirmed:** this could not be reproduced here (it needs the clinic laptop) and Vercel runtime logs were not available, so which of the two paths (or the 1-hour inactivity timer after the laptop slept) caused the clinic's case is a diagnosis from the code, not an observation. The inactivity timer is unchanged: it counts mouse, keyboard, click, scroll and touch, so typing in a form keeps it alive, but a laptop that sleeps for an hour comes back logged out by design. If it happens again, the notice on the login page names the cause. Also worth checking on that laptop: its date/time and time zone are correct.
+
+---
 ## PROPOSALS.md Reference
 
 
