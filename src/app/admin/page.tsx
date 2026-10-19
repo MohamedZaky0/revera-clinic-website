@@ -2251,7 +2251,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`
           },
-          body: JSON.stringify({ employeeId: adminDbId })
+          body: JSON.stringify({ employeeId: adminDbId }),
+          // survives the redirect to /login that follows a logout
+          keepalive: true
         });
       } catch (err) {
         console.error("Error during attendance check-out:", err);
@@ -2281,7 +2283,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     deliberateLogoutRef.current = true;
     clearLogoutReason(CLIENT.storagePrefix);
     if (supabase) {
-      await triggerCheckout();
+      // Never let a slow attendance call leave the Logout button looking dead: wait at most 4s.
+      await Promise.race([triggerCheckout(), new Promise<void>((resolve) => setTimeout(resolve, 4000))]);
       explicitSignOutRef.current = true;
       broadcastDeliberateLogout(CLIENT.storagePrefix);
       // 'local': ending this device's session must not log the same account out on other computers.
