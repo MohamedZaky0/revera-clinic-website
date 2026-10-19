@@ -121,17 +121,26 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
     // Row menu ref for click-outside
     const rowMenuRef = useRef<HTMLDivElement>(null);
 
+    // Mirrors the dbCustomersRef pattern in admin/page.tsx: a refetch while rows
+    // are already on screen runs quietly (no loading-row flash), and a failed or
+    // malformed refetch keeps the rows that are showing.
+    const devicesRef = useRef<Device[]>([]);
+
     const fetchDevices = useCallback(async () => {
+      const hadData = devicesRef.current.length > 0;
+      if (!hadData) setLoading(true);
       try {
-        setLoading(true);
         const res = await fetch("/api/inventory/devices", {
           headers: authHeaders,
         });
         if (res.ok) {
           const data = await res.json();
-          setDevices(data.devices || []);
-          setHistory(data.history || []);
-          onDeviceCountChange?.(data.devices?.length || 0);
+          if (Array.isArray(data.devices)) {
+            devicesRef.current = data.devices;
+            setDevices(data.devices);
+            if (Array.isArray(data.history)) setHistory(data.history);
+            onDeviceCountChange?.(data.devices.length);
+          }
         }
       } catch (err) {
         console.error("Error fetching inventory devices:", err);

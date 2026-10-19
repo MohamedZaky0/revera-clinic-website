@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Gauge, RotateCcw, Search, X } from "lucide-react";
 import { adminTranslations } from "../translations";
 
@@ -41,16 +41,24 @@ export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devic
   const [filterDevice, setFilterDevice] = useState("all");
   const [filterType, setFilterType] = useState("all");
 
+  // Quiet-refresh: the spinner replaces the list only while there is nothing on
+  // screen yet; a failed or malformed refetch keeps the rows that are showing.
+  const auditLogsRef = useRef<DeviceAuditLog[]>([]);
+
   const fetchLogs = useCallback(async () => {
+    const hadData = auditLogsRef.current.length > 0;
+    if (!hadData) setLoading(true);
     try {
-      setLoading(true);
       const res = await fetch("/api/inventory/devices/audit-logs", {
         headers: authHeaders,
         cache: "no-store",
       });
       if (res.ok) {
         const data = await res.json();
-        setAuditLogs(data || []);
+        if (Array.isArray(data)) {
+          auditLogsRef.current = data;
+          setAuditLogs(data);
+        }
       }
     } catch (err) {
       console.error("fetchDeviceAuditLogs error:", err);

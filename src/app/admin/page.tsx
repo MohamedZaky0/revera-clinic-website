@@ -599,10 +599,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     return null;
   }, [session?.access_token]);
 
-  const authenticatedJsonHeaders = {
+  // Memoized on the access token so children can put these headers in hook
+  // dependency arrays without refetching on every shell render (the 15 s poll,
+  // any state change). A token rotation still produces a fresh object.
+  const authenticatedJsonHeaders = useMemo(() => ({
     "Content-Type": "application/json",
     "Authorization": `Bearer ${session?.access_token || ""}`
-  };
+  }), [session?.access_token]);
 
   // Category CRUD helpers — backed by /api/categories and Supabase
   const loadCategoriesFromApi = useCallback(async () => {

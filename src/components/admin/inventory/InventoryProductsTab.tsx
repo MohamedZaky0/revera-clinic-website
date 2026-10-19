@@ -6,6 +6,7 @@ import {
   useEffect,
   useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -117,15 +118,24 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
     const [searchPatientAttempted, setSearchPatientAttempted] = useState(false);
     const [submittingSellProduct, setSubmittingSellProduct] = useState(false);
 
+    // Same quiet-refresh pattern as InventoryDevicesTab: only flag loading when
+    // there is nothing on screen yet, and keep existing rows on a failed or
+    // malformed refetch.
+    const productSalesHistoryRef = useRef<any[]>([]);
+
     const fetchProductSalesHistory = useCallback(async () => {
+      const hadData = productSalesHistoryRef.current.length > 0;
+      if (!hadData) setProductSalesLoading(true);
       try {
-        setProductSalesLoading(true);
         const res = await fetch("/api/inventory/products/sales", {
           headers: authHeaders,
         });
         if (res.ok) {
           const data = await res.json();
-          setProductSalesHistory(data.sales || []);
+          if (Array.isArray(data.sales)) {
+            productSalesHistoryRef.current = data.sales;
+            setProductSalesHistory(data.sales);
+          }
         }
       } catch (err) {
         console.error("Error fetching product sales history:", err);
