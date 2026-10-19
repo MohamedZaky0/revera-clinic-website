@@ -262,8 +262,8 @@ export default function DoctorSidebar({
           <button
             type="button"
             onClick={() => handleTabClick("profile")}
-            title="View Doctor Profile & Security Settings"
-            className={`flex w-full items-center gap-2 rounded-xl p-2 transition-all text-left group cursor-pointer ${
+            title={t.profileMenuTitle}
+            className={`flex w-full items-center gap-2 rounded-xl p-2 transition-all text-start group cursor-pointer ${
               activeTab === "profile"
                 ? "bg-[var(--color-brand-light)] text-[var(--cr-primary)] shadow-md"
                 : "bg-black/20 text-[var(--color-brand-light)] border border-white/10 hover:bg-white/10"
@@ -277,9 +277,9 @@ export default function DoctorSidebar({
               }`}
             >
               {(doctorName.replace(/^Dr\.?\s*/i, "") || "D").slice(0, 2).toUpperCase()}
-              <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-[var(--cr-primary)]" />
+              <span className="absolute bottom-0 end-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-[var(--cr-primary)]" />
             </div>
-            <div className="text-left min-w-0 flex-1">
+            <div className="text-start min-w-0 flex-1">
               <p
                 className={`text-[11px] font-bold tracking-tight leading-tight truncate ${
                   activeTab === "profile" ? "text-[var(--cr-primary)]" : "text-[var(--color-brand-light)]"

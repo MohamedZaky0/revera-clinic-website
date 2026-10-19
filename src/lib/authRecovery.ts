@@ -218,3 +218,38 @@ export function wasDeliberateLogoutRecently(prefix: string, withinMs = 15000, st
     return false;
   }
 }
+
+/**
+ * Idle detection across tabs. Each tab used to watch only its own mouse and keyboard, so a tab left
+ * in the background while the person worked in another tab of the same app counted as idle: after
+ * an hour it signed the whole browser out (the session is shared), and for non-admin staff it raised
+ * a false "inactive" alert. Every tab now also publishes its activity here and the idle check uses
+ * the latest activity seen in any tab.
+ */
+export const IDLE_LOGOUT_MS = 60 * 60 * 1000;
+const ACTIVITY_KEY_SUFFIX = '_last_activity_at';
+
+export function writeSharedActivity(prefix: string, now: number = Date.now(), storage?: StorageLike): void {
+  try {
+    safeStorage(storage)?.setItem(`${prefix}${ACTIVITY_KEY_SUFFIX}`, String(now));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Latest activity of this tab and of any other tab. A stored time in the future is ignored. */
+export function lastActivityAcrossTabs(localLast: number, prefix: string, now: number = Date.now(), storage?: StorageLike): number {
+  try {
+    const shared = Number(safeStorage(storage)?.getItem(`${prefix}${ACTIVITY_KEY_SUFFIX}`));
+    if (Number.isFinite(shared) && shared > 0 && shared <= now + 5000) {
+      return Math.max(localLast, shared);
+    }
+  } catch {
+    /* ignore */
+  }
+  return localLast;
+}
+
+export function isIdleExpired(now: number, lastActivity: number, limitMs: number = IDLE_LOGOUT_MS): boolean {
+  return now - lastActivity >= limitMs;
+}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback, useRef, Fragment } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
-import { recoverFromInvoluntarySignOut, verifyStaffSession, recordLogoutReason, clearLogoutReason, broadcastDeliberateLogout, wasDeliberateLogoutRecently } from "@/lib/authRecovery";
+import { recoverFromInvoluntarySignOut, verifyStaffSession, recordLogoutReason, clearLogoutReason, broadcastDeliberateLogout, wasDeliberateLogoutRecently, writeSharedActivity, lastActivityAcrossTabs, isIdleExpired, IDLE_LOGOUT_MS } from "@/lib/authRecovery";
 import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, getDurationLabel, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
 import { 
   getServiceToggles, 
@@ -1867,8 +1867,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   useEffect(() => {
     if (!session || !adminRole) return;
 
+    let lastSharedWrite = 0;
     const resetTimer = () => {
-      lastActivityRef.current = Date.now();
+      const now = Date.now();
+      lastActivityRef.current = now;
+      // let the other tabs of this browser know this one is in use (at most every 10 s)
+      if (now - lastSharedWrite > 10000) {
+        lastSharedWrite = now;
+        writeSharedActivity(CLIENT.storagePrefix, now);
+      }
       setPresenceModalOpen(prev => {
         if (prev) return false;
         return prev;
@@ -1880,10 +1887,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       window.addEventListener(event, resetTimer);
     });
 
-    // Check every 10 seconds. Timeout is 1 hour (3600000 ms)
+    // Check every 10 seconds. Timeout is 1 hour, counted from the latest activity in ANY tab.
     const interval = setInterval(() => {
-      const elapsed = Date.now() - lastActivityRef.current;
-      if (elapsed >= 3600000) {
+      const lastActivity = lastActivityAcrossTabs(lastActivityRef.current, CLIENT.storagePrefix);
+      if (isIdleExpired(Date.now(), lastActivity, IDLE_LOGOUT_MS)) {
         clearInterval(interval);
         console.log("Inactivity timeout reached. Logging out.");
         recordLogoutReason(CLIENT.storagePrefix, 'inactivity');
@@ -1891,7 +1898,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         if (typeof window !== "undefined") {
           sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         }
-        triggerCheckout().finally(() => {
+        // wait at most 4 s for the attendance check-out so an unreachable server cannot stall the logout
+        Promise.race([triggerCheckout(), new Promise<void>((resolve) => setTimeout(resolve, 4000))]).finally(() => {
           explicitSignOutRef.current = true;
           supabase.auth.signOut({ scope: 'local' }).then(() => {
             if (typeof window !== "undefined") {
@@ -2351,7 +2359,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     const checkIntervalMs = isTestMode ? 1000 : 5000;
 
     const interval = setInterval(() => {
-      const elapsed = Date.now() - lastActivityRef.current;
+      const elapsed = Date.now() - lastActivityAcrossTabs(lastActivityRef.current, CLIENT.storagePrefix);
       if (elapsed >= thresholdMs && !presenceModalOpen) {
         setPresenceCountdown(inactivityCountdown);
         setPresenceModalOpen(true);
