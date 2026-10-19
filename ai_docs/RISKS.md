@@ -4759,7 +4759,7 @@ The pages are live in code but these items came from Manus and were never checke
 - **Doctor photo** (`doctor-portrait.webp`, from `doctor/portrait-about.jpg`) is not confirmed to be the
   laser practitioner. Note `doctor/portrait-main.jpg` is byte-identical to `clinic/treatment.jpg` (a
   microneedling shot), so it must not be used as a "doctor" image.
-- **Address** "المنطقة الصناعية، قسم أول القاهرة الجديدة" came from Manus; confirm against the branch.
+- ~~Address~~ — **resolved 2026-10-19:** owner supplied "Ozone Medical Center، عيادة C261، حي النرجس، التجمع الخامس، القاهرة الجديدة" (replaces the vague Manus address). Still worth checking it matches the Maps listing pin.
 - **Opening hours / reply time** are not stated anywhere; visitors are told to WhatsApp for "المواعيد".
 - **Tracking:** `landing_view`, `whatsapp_click`, `call_click`, `map_click`, `scroll_depth` go to
   `dataLayer`. GTM container **GTM-5ZXBL7LR** is now installed on the landing pages (`CLIENT.gtmId`), but the
