@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getRoleSlug, getRoleDisplayName } from "@/lib/roleUtils";
 import { Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowLeft } from "lucide-react";
 import { CLIENT } from "@/config/client";
+import { consumeLogoutReason, describeLogoutReason } from "@/lib/authRecovery";
 
 export default function UnifiedStaffLoginPage() {
   const router = useRouter();
@@ -17,6 +18,13 @@ export default function UnifiedStaffLoginPage() {
   const [error, setError] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
   const [redirectingTo, setRedirectingTo] = useState<string | null>(null);
+  const [signedOutNotice, setSignedOutNotice] = useState<string | null>(null);
+
+  // Why the admin shell last sent this person here without a Logout click (RISK-117), shown once.
+  useEffect(() => {
+    const reason = consumeLogoutReason(CLIENT.storagePrefix);
+    if (reason) setSignedOutNotice(describeLogoutReason(reason));
+  }, []);
 
   // Check if staff member already has an active authenticated session
   useEffect(() => {
@@ -259,6 +267,12 @@ export default function UnifiedStaffLoginPage() {
                 </button>
               </div>
             </div>
+
+            {signedOutNotice && !error && (
+              <div role="status" className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+                {signedOutNotice}
+              </div>
+            )}
 
             {error && (
               <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2 animate-shake">

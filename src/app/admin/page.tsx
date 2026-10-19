@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback, useRef, Fragment } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
-import { recoverFromInvoluntarySignOut } from "@/lib/authRecovery";
+import { recoverFromInvoluntarySignOut, verifyStaffSession, recordLogoutReason, clearLogoutReason } from "@/lib/authRecovery";
 import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, getDurationLabel, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
 import { 
   getServiceToggles, 
@@ -794,6 +794,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       .catch(() => setRooms([]));
   }
   const [authChecking, setAuthChecking] = useState(true);
+  // RISK-117: a valid session exists but /api/auth/me could not be reached or answered (cold start,
+  // brief network loss). The page keeps the session and offers a retry instead of bouncing to /login.
+  const [sessionVerifyFailed, setSessionVerifyFailed] = useState(false);
+  const retryVerifyRef = useRef<(() => void) | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
   // RISK-114: tells apart "we chose to end this session" (logout button, idle timeout, a rejected
   // /api/auth/me check) from Supabase's own client silently giving up on a background token
@@ -1744,20 +1748,28 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       lastActivityRef.current = Date.now();
 
       try {
-        const token = currSession.access_token;
-        const res = await fetch('/api/auth/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+        // RISK-117: a 401 is not final until one forced token refresh has failed to fix it, and a
+        // failure that is not an auth answer (cold start, network) keeps the session.
+        const verification = await verifyStaffSession({
+          session: currSession,
+          fetchMe: (accessToken) => fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${accessToken}` } }),
+          refreshSession: () => supabase.auth.refreshSession(),
         });
 
-        if (res.ok) {
-          const authData = await res.json();
+        if (verification.status === 'ok') {
+          setSessionVerifyFailed(false);
+          const authData = verification.me;
+          if (verification.session !== currSession) {
+            // the stored access token had gone stale; carry on with the refreshed one
+            setSession(verification.session);
+            lastKnownSessionRef.current = verification.session;
+          }
 
           // Role Portal Restriction: Enforce that users can only log in from their matching role portal
           const effectivePortal = portalRole || 'admin';
           if (!isPortalRoleMatch(authData.role, effectivePortal)) {
             console.warn(`Role mismatch: user is ${authData.role} but attempted to access ${effectivePortal} portal.`);
+            recordLogoutReason(CLIENT.storagePrefix, 'wrong_portal');
             explicitSignOutRef.current = true;
             await supabase.auth.signOut();
             setAdminRole(null);
@@ -1793,8 +1805,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
           // Pre-fetch employee accounts list so doctor role is known immediately before rendering
           await fetchRolesAndEmployees();
-        } else if (res.status === 401 || res.status === 403) {
-          console.warn("Unregistered or unauthorized employee session. Logging out.");
+        } else if (verification.status === 'unauthorized') {
+          console.warn(`Unregistered or unauthorized employee session (${verification.httpStatus}) after a token refresh. Logging out.`);
+          recordLogoutReason(CLIENT.storagePrefix, 'session_rejected');
           explicitSignOutRef.current = true;
           await supabase.auth.signOut();
           setAdminRole(null);
@@ -1808,14 +1821,21 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             window.location.href = "/login";
           }
         } else {
-          console.warn(`Temporary /api/auth/me response status: ${res.status}. Preserving current session.`);
+          console.warn("Could not verify the session right now (transient). Keeping the session and offering a retry.");
+          setSessionVerifyFailed(true);
         }
       } catch (err) {
         console.error("Error retrieving admin permissions:", err);
+        setSessionVerifyFailed(true);
       } finally {
         setAuthChecking(false);
       }
     }
+
+    retryVerifyRef.current = () => {
+      const held = lastKnownSessionRef.current;
+      if (held) handleAuthSession(held);
+    };
 
     return () => {
       subscription.unsubscribe();
@@ -1845,6 +1865,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       if (elapsed >= 3600000) {
         clearInterval(interval);
         console.log("Inactivity timeout reached. Logging out.");
+        recordLogoutReason(CLIENT.storagePrefix, 'inactivity');
         if (typeof window !== "undefined") {
           sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         }
@@ -2235,6 +2256,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }, [activeNav, fetchHrData]);
 
   async function handleLogout() {
+    clearLogoutReason(CLIENT.storagePrefix);
     if (supabase) {
       await triggerCheckout();
       explicitSignOutRef.current = true;
@@ -2249,13 +2271,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
   // If session is missing after auth checking, redirect to /login
   useEffect(() => {
-    if (!authChecking && (!session || !adminRole)) {
+    // Only a missing session sends the person to /login. A session whose role could not be
+    // verified right now (RISK-117) stays here and is retried below.
+    if (!authChecking && !session) {
       if (typeof window !== "undefined") {
+        recordLogoutReason(CLIENT.storagePrefix, 'session_ended', { onlyIfEmpty: true });
         sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         window.location.replace("/login");
       }
     }
   }, [authChecking, session, adminRole]);
+
+  useEffect(() => {
+    if (authChecking || !session || adminRole || !sessionVerifyFailed) return;
+    const timer = setInterval(() => retryVerifyRef.current?.(), 15000);
+    return () => clearInterval(timer);
+  }, [authChecking, session, adminRole, sessionVerifyFailed]);
 
   // Synchronize browser URL to end with the user's role slug (/[role] or /admin)
   useEffect(() => {
@@ -5655,6 +5686,29 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 rounded-full border-4 border-[var(--cr-accent)] border-t-transparent"></div>
           <p className="text-sm font-semibold tracking-wider">Verifying administrator session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (session && !adminRole) {
+    return (
+      <div id="admin-root" className="admin-view flex min-h-screen items-center justify-center bg-[var(--color-brand-sand)] px-4">
+        <div className="w-full max-w-md rounded-[32px] bg-[var(--color-brand-light)] p-8 shadow-[0_20px_60px_rgba(31,37,26,0.15)] text-center space-y-4">
+          <h2 className="text-xl font-bold text-[var(--cr-dark)]">Could not verify your session right now</h2>
+          <p className="text-xs text-[var(--color-brand-secondary)] font-medium leading-relaxed">
+            You are still signed in. The connection to the server was interrupted, so the page could not load your permissions. It will retry automatically.
+          </p>
+          <button
+            type="button"
+            onClick={() => retryVerifyRef.current?.()}
+            className="mt-2 inline-flex items-center justify-center w-full rounded-2xl bg-[var(--cr-primary)] py-3.5 text-sm font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition shadow-md"
+          >
+            Try again
+          </button>
+          <Link href="/login" className="block text-xs font-semibold text-[var(--color-brand-secondary)] underline">
+            Go to Staff Login
+          </Link>
         </div>
       </div>
     );
