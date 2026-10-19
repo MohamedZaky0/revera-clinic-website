@@ -3645,3 +3645,37 @@ Investigation revealed:
 - Doctors created before this change who work at several branches have the extra branches only in their provider schedule JSON; the backfill deliberately does not guess a name/phone match to copy them. Opening such a doctor in Edit merges those provider branches in (active ones only) so re-saving does not drop one; their `employee_accounts.branch_ids` is filled on that first save.
 - Deleting a branch leaves its id in `branch_ids` arrays (and `branch_id` is nulled by the existing `ON DELETE SET NULL`). Harmless to every reader; a cleanup trigger was judged over-engineering.
 - Apply the migration **before** deploying this code: POST/PATCH write `branch_ids` and fail loudly on a database without the column. (Attendance check-in and shift start read it in a separate, failure-tolerant query, so they degrade to the primary branch instead.)
+
+---
+
+## DEC-111: Services Can Be System-Only (Not On The Website)
+
+**Date:** 2026-10-19
+**Status:** Decided & implemented (migration to be applied before deploy)
+
+**Context:** RRS, Derma and Mesotherapy are decided after the Consultation, so they must exist in the system (reception books them, the doctor adds them to a session, packages include them) without being advertised on the public site. Packages already have this (`show_on_website`).
+
+**Why not reuse `services.visible`:** it is what the soft delete sets (`active = false, visible = false`) and `AdminServicesView` hides every `visible = false` row with no way to show it again, so using it would make a service vanish from the admin list and be indistinguishable from a deleted one.
+
+**Decision:**
+1. New column `services.show_on_website boolean NOT NULL DEFAULT true` (`20261019000000_add_show_on_website_to_services.sql`, DB_SCHEMA.md updated). Default true: every existing service keeps appearing exactly as before.
+2. `/api/services` returns `showOnWebsite` and accepts it. A save that omits it (an older admin tab, the bulk sync that POSTs the whole list) keeps the stored value instead of re-publishing a hidden service; new rows default to shown.
+3. Admin: a "Show on website" switch in the service form and an amber "Not on website" badge on the list rows and cards.
+4. Website: `isShownOnWebsite()` (`active`, `visible` and `showOnWebsite` all not false) now drives the services section and the home services section; the online booking modal offers only such services and ignores a `?service=` preselection of a system-only one. The modal still keeps the full list internally because existing bookings of a system-only service need its duration to block their time slots.
+5. The WhatsApp bot (`/api/bot/services`) is deliberately unchanged: it keeps listing system-only services (owner's decision 2026-10-19).
+
+**Not done / known limits:** `GET /api/services` is still public and returns every service, so a system-only service's name and price can be read by anyone who opens the API; the website hides it client-side, as it already does for inactive services. `POST /api/reservations` trusts the client's `isManual` flag, so an online booking of a hidden service could still be forged through the API. Both would need server-side enforcement if that matters.
+
+---
+
+## DEC-112: New Booking's New-Patient Intake Asks For Date Of Birth, Not A Typed Age
+
+**Date:** 2026-10-19
+**Status:** Decided & implemented
+
+**Context:** DEC-041 made `customers.date_of_birth` the durable field and the Add/Edit Patient form got it on 2026-10-04, but the New Booking screen's new-patient intake still asked for a free-typed Age. A patient created from New Booking therefore had a number that is stale a year later and no birth date, so they showed as "incomplete" for birthday campaigns. (Add Previous Booking never collects either, only name and phone.)
+
+**Decision:** in `AdminNewBookingView` the intake shows Date of Birth (not in the future) next to Age. Once a birth date is entered the age is calculated and read-only, exactly like Add/Edit Patient; without one the typed age still works for the legacy case. Selecting an existing patient pre-fills their birth date (and clears a previously selected patient's value instead of carrying it over). On save `ageFieldsForSave()` (`src/lib/age.ts`, tested) sends `date_of_birth` and drops `age` when a date exists, matching what `POST /api/customers` already does. New translation keys `dobLabel` and `ageFromDobNote` in the New Booking section (EN + AR).
+
+**Not done:** Add Previous Booking, the public booking modal and the doctor portal intake do not collect a birth date; patients created there stay without one until someone fills it in Add/Edit Patient.
+

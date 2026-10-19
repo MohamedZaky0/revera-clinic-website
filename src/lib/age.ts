@@ -24,3 +24,19 @@ export function calculateAge(dateOfBirth: string | null | undefined, now: Date =
 
   return age >= 0 ? age : null;
 }
+
+/**
+ * What to send for a patient's age and birth date when saving a form that offers both (DEC-041):
+ * a real birth date wins and the typed-in age snapshot is dropped; without one the typed age is
+ * kept for legacy entry. Mirrors POST /api/customers, which also nulls `age` when it gets a date.
+ */
+export function ageFieldsForSave(
+  dateOfBirth: string | null | undefined,
+  typedAge: string | null | undefined,
+): { age: number | null; date_of_birth: string | null } {
+  const dob = (dateOfBirth ?? '').trim();
+  if (dob) return { age: null, date_of_birth: dob };
+  const text = (typedAge ?? '').trim();
+  const n = Number(text);
+  return { age: text !== '' && Number.isFinite(n) ? n : null, date_of_birth: null };
+}
