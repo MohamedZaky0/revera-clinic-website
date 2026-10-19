@@ -5289,6 +5289,31 @@ scope for that sweep (it only asserts no-token→401 and patient-session→403, 
 **Not done / unconfirmed:** this could not be reproduced here (it needs the clinic laptop) and Vercel runtime logs were not available, so which of the two paths (or the 1-hour inactivity timer after the laptop slept) caused the clinic's case is a diagnosis from the code, not an observation. The inactivity timer is unchanged: it counts mouse, keyboard, click, scroll and touch, so typing in a form keeps it alive, but a laptop that sleeps for an hour comes back logged out by design. If it happens again, the notice on the login page names the cause. Also worth checking on that laptop: its date/time and time zone are correct.
 
 ---
+## RISK-118: Reloading The Admin Panel Always Landed On Dashboard, And Every Window Switch Reloaded Every Table With A "Loading" Flash (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_118_REFRESH_BEHAVIOUR_MANUAL_TESTS.md`
+
+**Severity:** Medium (daily friction for reception/doctors; no data loss) · **Type:** UX / state handling
+**Found:** 2026-10-19, owner report: "F5 anywhere returns me to Dashboard, and tables take a while and visibly reload inside the page, not just the table." Diagnosed by reading `src/app/admin/page.tsx` and the installed `@supabase/auth-js` 2.108.1; **not measured in a live logged-in browser** (no test login was available).
+
+**Causes found:**
+1. The open section was a plain `useState("Dashboard")` with nothing in the URL or storage, so any reload started at Dashboard (also for `/reception` and `/doctor`, which render the same component).
+2. Supabase re-announces the stored login (`SIGNED_IN`) every time the browser tab becomes visible again (`_onVisibilityChanged` -> `_recoverAndRefresh`), and once more on page load next to the explicit `getSession()` call. Each announcement re-ran `/api/auth/me`, replaced the `session` object, and so re-fired every fetcher keyed on `[session]` (customers, inventory products, HR data, customer packages), each setting its own "Loading..." flag.
+3. Background refreshes blanked data: `fetchCustomers` emptied the patient list on any failed refresh, the 15 s booking poll emptied `allReservations`/`requests` on one failed request, and the poll effect (re-created whenever the access token rotates, RISK-053) started with a spinner every time.
+4. Structural, **not changed here**: the whole panel is one ~11,500-line component with ~350 `useState`, so every state change re-renders every table. This is why a refresh of one list feels like the whole page refreshing. Splitting it is a separate project.
+
+**Fix (all in `src/app/admin/page.tsx` unless noted):**
+1. The open section is kept in the URL as `?section=<label>` (`src/lib/adminSection.ts`, whitelist of known sections; Dashboard keeps the URL clean; other query params such as `?setup=true` are preserved). It is restored once after the first successful login check; a section the person may not open is still corrected by the existing permission effect. Not restored: sub-state inside a section (calendar vs list tab, an open patient profile).
+2. `SIGNED_IN`/`INITIAL_SESSION` for a login that was verified in the last 5 minutes (same user and token), or is being verified right now, is ignored. The first-load `getSession()` path skips a login the listener already handles. `setSession` keeps the previous object when user and token are unchanged, so the `[session]` fetchers only re-run when the token really changes (about hourly).
+3. Customers, inventory products and employees show their loading state only when nothing is on screen yet. Failed or malformed background refreshes keep the current rows. The booking poll (`fetchAllReservations(useCache, keepOnError)`, `fetchRequests`) keeps data on error and shows the spinner only for the first load or a branch switch.
+
+**Behaviour change to know about:** permissions were previously re-checked on every return to the tab (as a side effect of the re-announcement). They are now re-checked on load, on token rotation (about hourly) and on the retry path, so a permission change made by an admin can take up to about an hour to reach an already-open tab. A reload picks it up immediately.
+
+**Tests:** `tests/lib/adminSection.test.ts` (7). Full suite 1443 passed / 4 expected-fail, `tsc` clean, `eslint` unchanged (0 errors; 216 pre-existing warnings). The component-level behaviour (dedupe, quiet refresh) has no automated test: `admin/page.tsx` is not unit-testable in isolation.
+
+**Not done / unconfirmed:** nobody has yet watched this in a logged-in browser; the checklist's evidence log is empty on purpose.
+
+---
 ## PROPOSALS.md Reference
 
 
