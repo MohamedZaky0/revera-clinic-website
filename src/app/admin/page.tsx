@@ -167,6 +167,7 @@ import type { InventoryProductsTabRef } from "@/components/admin/inventory/Inven
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
+import { pollDataEqual } from "@/lib/pollEqual";
 import { getEmployeeBranchIds } from "@/lib/employeeBranches";
 
 export type Req = {
@@ -2293,7 +2294,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       });
       if (res.ok) {
         const data = await res.json();
-        setActiveMissingAlerts(data);
+        setActiveMissingAlerts(prev => (pollDataEqual(prev, data) ? prev : data));
       }
     } catch (err) {
       console.error("Error loading missing alerts:", err);
@@ -5045,7 +5046,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     return cachedFetch(`/api/reservations?status=pending${branchParam}`, 2000, authenticatedJsonHeaders)
       .then((data) => {
         if (Array.isArray(data)) {
-          setRequests(data);
+          // keep the previous array when the poll found nothing new, so an
+          // identical tick does not re-render the whole shell
+          setRequests(prev => (pollDataEqual(prev, data) ? prev : data));
         } else {
           console.error("fetchRequests: expected array, got", data);
           // a background poll keeps what is on screen; only a first/branch-change load empties it
@@ -5073,7 +5076,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     fetch(`/api/reservations?date=${dateStr}`, { cache: "no-store", headers: authenticatedJsonHeaders })
       .then(r => r.json())
       .then(data => {
-        if (Array.isArray(data)) setScheduleReservations(data);
+        if (Array.isArray(data)) setScheduleReservations(prev => (pollDataEqual(prev, data) ? prev : data));
         else setScheduleReservations([]);
       })
       .catch(() => setScheduleReservations([]));
@@ -5471,7 +5474,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     return cachedFetch(url, 2000, authenticatedJsonHeaders)
       .then((data) => {
         if (Array.isArray(data)) {
-          setAllReservations(data);
+          setAllReservations(prev => (pollDataEqual(prev, data) ? prev : data));
         } else {
           console.error("fetchAllReservations: expected array, got", data);
           if (!keepOnError) setAllReservations([]);
