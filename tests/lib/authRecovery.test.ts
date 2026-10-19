@@ -214,3 +214,47 @@ describe('deliberate logout broadcast between tabs', () => {
     expect(wasDeliberateLogoutRecently('revera', 15000, s)).toBe(false);
   });
 });
+
+describe('idle detection across tabs', () => {
+  function fakeStorage() {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) };
+  }
+
+  it('a tab that was never touched is NOT idle while another tab is in use', async () => {
+    const { writeSharedActivity, lastActivityAcrossTabs, isIdleExpired, IDLE_LOGOUT_MS } = await import('@/lib/authRecovery');
+    const s = fakeStorage();
+    const now = 10_000_000_000;
+    const backgroundTabLast = now - 2 * IDLE_LOGOUT_MS; // idle for two hours in its own right
+    expect(isIdleExpired(now, lastActivityAcrossTabs(backgroundTabLast, 'revera', now, s))).toBe(true);
+
+    writeSharedActivity('revera', now - 5 * 60 * 1000, s); // the other tab was used 5 minutes ago
+    const last = lastActivityAcrossTabs(backgroundTabLast, 'revera', now, s);
+    expect(last).toBe(now - 5 * 60 * 1000);
+    expect(isIdleExpired(now, last)).toBe(false);
+  });
+
+  it('really idle in every tab still expires after the limit', async () => {
+    const { writeSharedActivity, lastActivityAcrossTabs, isIdleExpired, IDLE_LOGOUT_MS } = await import('@/lib/authRecovery');
+    const s = fakeStorage();
+    const now = 10_000_000_000;
+    writeSharedActivity('revera', now - IDLE_LOGOUT_MS - 1000, s);
+    expect(isIdleExpired(now, lastActivityAcrossTabs(now - IDLE_LOGOUT_MS - 5000, 'revera', now, s))).toBe(true);
+  });
+
+  it('the limit is exclusive on the low side and inclusive at exactly one hour', async () => {
+    const { isIdleExpired, IDLE_LOGOUT_MS } = await import('@/lib/authRecovery');
+    expect(isIdleExpired(IDLE_LOGOUT_MS - 1, 0)).toBe(false);
+    expect(isIdleExpired(IDLE_LOGOUT_MS, 0)).toBe(true);
+  });
+
+  it('ignores a garbage or far-future stored time instead of staying logged in forever', async () => {
+    const { lastActivityAcrossTabs } = await import('@/lib/authRecovery');
+    const s = fakeStorage();
+    const now = 10_000_000_000;
+    s.setItem('revera_last_activity_at', 'abc');
+    expect(lastActivityAcrossTabs(123, 'revera', now, s)).toBe(123);
+    s.setItem('revera_last_activity_at', String(now + 24 * 3600 * 1000));
+    expect(lastActivityAcrossTabs(123, 'revera', now, s)).toBe(123);
+  });
+});

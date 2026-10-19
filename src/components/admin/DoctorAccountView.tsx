@@ -17,6 +17,7 @@ import DoctorAnalyticsTab from "./doctor/tabs/DoctorAnalyticsTab";
 import DoctorSettingsTab from "./doctor/tabs/DoctorSettingsTab";
 import DoctorProfileTab from "./doctor/tabs/DoctorProfileTab";
 import UserProfileView, { UserProfileViewTranslations } from "./UserProfileView";
+import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import DoctorSessionDrawer from "./doctor/modals/DoctorSessionDrawer";
 import DoctorPatientHistoryDrawer from "./doctor/modals/DoctorPatientHistoryDrawer";
 import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
@@ -42,6 +43,11 @@ export default function DoctorAccountView({
 }: DoctorAccountViewProps) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const t = doctorTranslations[lang];
+  const { showConfirm } = useAlertConfirm();
+  // Signing out also records the attendance check-out, so it is never a one-click action.
+  const confirmSignOut = async () => {
+    if (await showConfirm(t.signOutConfirmMessage, t.signOutConfirmTitle)) onLogout();
+  };
   const [activeTab, setActiveTab] = useState<DoctorTab>("schedule");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [scheduleViewMode, setScheduleViewMode] = useState<"calendar" | "list">("calendar");
@@ -1532,7 +1538,7 @@ export default function DoctorAccountView({
         lang={lang}
         setLang={setLang}
         onFetchReservations={fetchDoctorReservations}
-        onLogout={onLogout}
+        onLogout={confirmSignOut}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
       />
@@ -1590,7 +1596,7 @@ export default function DoctorAccountView({
                 ? "bg-white text-[var(--cr-primary)] ring-2 ring-emerald-400"
                 : "bg-white/15 text-white hover:bg-white/25"
             }`}
-            title="Doctor Profile"
+            title={t.profileMenuTitle}
           >
             {(doctorName.replace(/^Dr\.?\s*/i, "") || "D").slice(0, 2).toUpperCase()}
           </button>
@@ -1871,7 +1877,7 @@ export default function DoctorAccountView({
           <div className={`p-1 rounded-lg ${activeTab === "profile" ? "bg-[var(--cr-primary)]/10 text-[var(--cr-primary)]" : ""}`}>
             <User size={18} />
           </div>
-          <span className="text-[10px] mt-0.5">Profile</span>
+          <span className="text-[10px] mt-0.5">{t.profile}</span>
         </button>
       </nav>
 

@@ -36,3 +36,11 @@
 - [ ] Open admin API pages (Employees, HR, Role Management) while Supabase is slow or rate limited: you may see a load error, but you stay logged in (the API answers 503, not 401).
 - [ ] After a production deploy, tabs that were open during it reload once on next click; check you are still signed in afterwards.
 
+## Third pass (idle cases and doctor portal)
+- [ ] Two tabs of the app: leave tab A untouched, work in tab B for over an hour (or temporarily lower `IDLE_LOGOUT_MS` in `src/lib/authRecovery.ts` to a few minutes). Tab A must NOT sign the browser out while B is in use. Stop touching both: after the limit both go to /login with the "hour without activity" notice.
+- [ ] Non-admin staff (e.g. receptionist) with two tabs: working in tab B must not raise the "inactive" presence popup or an HR alert from tab A.
+- [ ] Idle logout while the attendance server is unreachable (block `/api/hr/attendance`): you still reach /login within about 5 seconds.
+- [ ] Doctor portal: Sign Out asks "Sign out?" first; Cancel stays. Tooltips on the account card and the mobile avatar are in the portal's language; in Arabic the sidebar card text aligns right and the green online dot sits on the correct corner. The bottom-bar tab reads "الملف الشخصي" in Arabic.
+- [ ] Doctor portal Profile tab: Security card is there and Change Password really changes the password (log out and in to prove it).
+- [ ] OWNER DECISION: should an unattended screen really be logged out after an hour (see RISK-117 third pass, point 3)? If yes, tell Claude the limit to use.
+

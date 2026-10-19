@@ -17,6 +17,12 @@ import { createSupabaseFake } from '../../helpers/supabaseFake';
 
 const fetchFake = createFetchFake();
 const fake = createSupabaseFake();
+const mockShowConfirm = vi.fn();
+
+// The app wraps everything in AlertConfirmProvider (src/app/layout.tsx); a bare render has none.
+vi.mock('@/contexts/AlertConfirmContext', () => ({
+  useAlertConfirm: () => ({ showConfirm: (...args: any[]) => mockShowConfirm(...args), showAlert: vi.fn(), showDeleteConfirm: vi.fn() }),
+}));
 
 vi.mock('@/lib/supabaseClient', () => ({
   supabase: {
@@ -30,6 +36,8 @@ vi.mock('@/lib/supabaseClient', () => ({
 import DoctorAccountView from '@/components/admin/DoctorAccountView';
 
 beforeEach(() => {
+  mockShowConfirm.mockReset();
+  mockShowConfirm.mockResolvedValue(true);
   fetchFake.reset();
   fake.reset();
   vi.stubGlobal('fetch', fetchFake.fetch);
@@ -184,5 +192,46 @@ describe('reservation filtering', () => {
     expect(await screen.findByText('Repeat Patient')).toBeInTheDocument();
     // "2 Visits" legitimately appears twice: the patient card badge and the "View Details" button.
     expect(screen.getAllByText(/2\s+Visits/).length).toBeGreaterThan(0);
+  });
+});
+
+describe('sign out and profile entry points', () => {
+  function renderView(overrides: Record<string, any> = {}) {
+    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [] }));
+    fetchFake.on('GET', '/api/medical-records/templates', () => ({ status: 200, body: [] }));
+    fetchFake.on('GET', '/api/inventory/products', () => ({ status: 200, body: [] }));
+    const onLogout = vi.fn();
+    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[]} onLogout={onLogout} {...overrides} />);
+    return onLogout;
+  }
+
+  it('Sign Out asks first and does nothing when the doctor cancels', async () => {
+    mockShowConfirm.mockResolvedValue(false);
+    const onLogout = renderView();
+    const user = userEvent.setup();
+
+    await user.click(screen.getAllByRole('button', { name: /Sign Out/ })[0]);
+
+    await waitFor(() => expect(mockShowConfirm).toHaveBeenCalledTimes(1));
+    expect(mockShowConfirm.mock.calls[0][0]).toMatch(/attendance check-out/);
+    expect(onLogout).not.toHaveBeenCalled();
+  });
+
+  it('Sign Out logs out once the doctor confirms', async () => {
+    mockShowConfirm.mockResolvedValue(true);
+    const onLogout = renderView();
+    const user = userEvent.setup();
+
+    await user.click(screen.getAllByRole('button', { name: /Sign Out/ })[0]);
+
+    await waitFor(() => expect(onLogout).toHaveBeenCalledTimes(1));
+  });
+
+  it('the profile entry points carry translated labels, not hardcoded English', () => {
+    renderView();
+    // sidebar account card and the mobile header avatar share the same tooltip
+    expect(screen.getAllByTitle('View my profile, schedule and password').length).toBeGreaterThanOrEqual(2);
+    // the mobile bottom bar tab label comes from the translations
+    expect(screen.getAllByText('Profile').length).toBeGreaterThanOrEqual(1);
   });
 });
