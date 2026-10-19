@@ -3666,3 +3666,16 @@ Investigation revealed:
 
 **Not done / known limits:** `GET /api/services` is still public and returns every service, so a system-only service's name and price can be read by anyone who opens the API; the website hides it client-side, as it already does for inactive services. `POST /api/reservations` trusts the client's `isManual` flag, so an online booking of a hidden service could still be forged through the API. Both would need server-side enforcement if that matters.
 
+---
+
+## DEC-112: New Booking's New-Patient Intake Asks For Date Of Birth, Not A Typed Age
+
+**Date:** 2026-10-19
+**Status:** Decided & implemented
+
+**Context:** DEC-041 made `customers.date_of_birth` the durable field and the Add/Edit Patient form got it on 2026-10-04, but the New Booking screen's new-patient intake still asked for a free-typed Age. A patient created from New Booking therefore had a number that is stale a year later and no birth date, so they showed as "incomplete" for birthday campaigns. (Add Previous Booking never collects either, only name and phone.)
+
+**Decision:** in `AdminNewBookingView` the intake shows Date of Birth (not in the future) next to Age. Once a birth date is entered the age is calculated and read-only, exactly like Add/Edit Patient; without one the typed age still works for the legacy case. Selecting an existing patient pre-fills their birth date (and clears a previously selected patient's value instead of carrying it over). On save `ageFieldsForSave()` (`src/lib/age.ts`, tested) sends `date_of_birth` and drops `age` when a date exists, matching what `POST /api/customers` already does. New translation keys `dobLabel` and `ageFromDobNote` in the New Booking section (EN + AR).
+
+**Not done:** Add Previous Booking, the public booking modal and the doctor portal intake do not collect a birth date; patients created there stay without one until someone fills it in Add/Edit Patient.
+
