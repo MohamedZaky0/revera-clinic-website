@@ -167,6 +167,7 @@ import type { InventoryProductsTabRef } from "@/components/admin/inventory/Inven
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
+import { pollDataEqual } from "@/lib/pollEqual";
 import { getEmployeeBranchIds } from "@/lib/employeeBranches";
 
 export type Req = {
@@ -599,10 +600,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     return null;
   }, [session?.access_token]);
 
-  const authenticatedJsonHeaders = {
+  // Memoized on the access token so children can put these headers in hook
+  // dependency arrays without refetching on every shell render (the 15 s poll,
+  // any state change). A token rotation still produces a fresh object.
+  const authenticatedJsonHeaders = useMemo(() => ({
     "Content-Type": "application/json",
     "Authorization": `Bearer ${session?.access_token || ""}`
-  };
+  }), [session?.access_token]);
 
   // Category CRUD helpers — backed by /api/categories and Supabase
   const loadCategoriesFromApi = useCallback(async () => {
@@ -2290,7 +2294,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       });
       if (res.ok) {
         const data = await res.json();
-        setActiveMissingAlerts(data);
+        setActiveMissingAlerts(prev => (pollDataEqual(prev, data) ? prev : data));
       }
     } catch (err) {
       console.error("Error loading missing alerts:", err);
@@ -5034,7 +5038,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     }
   };
 
-  function fetchRequests(showSpinner = false) {
+  const fetchRequests = useCallback((showSpinner = false) => {
     if (showSpinner) {
       setLoading(true);
     }
@@ -5042,7 +5046,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     return cachedFetch(`/api/reservations?status=pending${branchParam}`, 2000, authenticatedJsonHeaders)
       .then((data) => {
         if (Array.isArray(data)) {
-          setRequests(data);
+          // keep the previous array when the poll found nothing new, so an
+          // identical tick does not re-render the whole shell
+          setRequests(prev => (pollDataEqual(prev, data) ? prev : data));
         } else {
           console.error("fetchRequests: expected array, got", data);
           // a background poll keeps what is on screen; only a first/branch-change load empties it
@@ -5059,9 +5065,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         if (showSpinner) setRequests([]);
         if (showSpinner) setLoading(false);
       });
-  }
+  }, [branch, authenticatedJsonHeaders]);
 
-  function fetchScheduleReservations() {
+  const fetchScheduleReservations = useCallback(() => {
     const dateStr = [
       scheduleDate.getFullYear(),
       String(scheduleDate.getMonth() + 1).padStart(2, '0'),
@@ -5070,11 +5076,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     fetch(`/api/reservations?date=${dateStr}`, { cache: "no-store", headers: authenticatedJsonHeaders })
       .then(r => r.json())
       .then(data => {
-        if (Array.isArray(data)) setScheduleReservations(data);
+        if (Array.isArray(data)) setScheduleReservations(prev => (pollDataEqual(prev, data) ? prev : data));
         else setScheduleReservations([]);
       })
       .catch(() => setScheduleReservations([]));
-  }
+  }, [scheduleDate, authenticatedJsonHeaders]);
 
   // useCallback keyed on [session]: Supabase's session resolves asynchronously, so a plain
   // mount-only effect calling this raced it — if the session wasn't ready yet the fetch bailed
@@ -5121,7 +5127,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     fetchCustomers();
   }, [fetchCustomers]);
 
-  function handleExportBookingsCSV() {
+  const handleExportBookingsCSV = useCallback(() => {
     if (allReservations.length === 0) {
       alert("No reservations to export.");
       return;
@@ -5149,7 +5155,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }
+  }, [allReservations]);
 
   function handleExportCustomersCSV() {
     if (customers.length === 0) {
@@ -5461,14 +5467,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // slightly stale list is genuinely acceptable.
   // keepOnError: the 15s background poll passes true so one failed request does not blank every
   // booking table until the next poll succeeds.
-  function fetchAllReservations(useCache = false, keepOnError = false) {
+  const fetchAllReservations = useCallback((useCache = false, keepOnError = false) => {
     const branchParam = branch ? `?branchId=${branch}` : "";
     const url = `/api/reservations${branchParam}`;
     if (!useCache) clearFetchCache(url);
     return cachedFetch(url, 2000, authenticatedJsonHeaders)
       .then((data) => {
         if (Array.isArray(data)) {
-          setAllReservations(data);
+          setAllReservations(prev => (pollDataEqual(prev, data) ? prev : data));
         } else {
           console.error("fetchAllReservations: expected array, got", data);
           if (!keepOnError) setAllReservations([]);
@@ -5487,7 +5493,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     if (calendarView === "Schedule") {
       fetchScheduleReservations();
     }
-  }
+  }, [branch, authenticatedJsonHeaders, calendarView, fetchScheduleReservations]);
 
   function getUnavailableSlots(approvedBookings: Req[], targetServiceId: number, end?: string): string[] {
     const svc = localServices.find(s => s.id === targetServiceId);
@@ -5539,7 +5545,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // setApproveUnavailableSlots() does not update the caller's closure within the same tick, so a
   // caller that read the state variable straight after awaiting this would see the *previous*
   // booking's list (or [] on first open) and make its decision on stale data.
-  async function refreshApproveAvailability(r: Req, dateStr: string) {
+  const refreshApproveAvailability = useCallback(async (r: Req, dateStr: string) => {
     const branchParam = r.branchId ? `&branchId=${r.branchId}` : "";
     const data = await fetch(`/api/availability?date=${dateStr}&serviceId=${r.serviceId}${branchParam}`).then((res) => res.json());
     const { start, end } = getDayOperatingHoursApprove({ ...r, date: dateStr });
@@ -5552,9 +5558,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     const first = filteredSlots.find((s) => !unavailable.includes(s)) || filteredSlots[0] || SLOTS[0];
     setSlot(first);
     return { unavailable, start, end };
-  }
+  }, [getDayOperatingHoursApprove]);
 
-  async function openApprove(r: Req) {
+  const openApprove = useCallback(async (r: Req) => {
     setLoadingApproveId(r.id);
     try {
       setApproveDate(r.date);
@@ -5588,7 +5594,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     } finally {
       setLoadingApproveId(null);
     }
-  }
+  }, [refreshApproveAvailability]);
 
   // Staff picking a different date than originally requested (e.g. the requested day turned out
   // to be a closed day, or is already fully booked) — re-derives available slots for that date
@@ -5762,7 +5768,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     }
   }
 
-  async function saveNotes(newNotes: string) {
+  const saveNotes = useCallback(async (newNotes: string) => {
     if (!viewingBooking) return;
     const res = await fetch(
       "/api/reservations?id=" + encodeURIComponent(viewingBooking.id),
@@ -5778,7 +5784,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     }
     fetchRequests();
     fetchAllReservations();
-  }
+  }, [viewingBooking, authenticatedJsonHeaders, fetchRequests, fetchAllReservations]);
 
   function handlePrintInvoice(booking: any, servicesList: any[], totalCost: number, walletUsed: number, branchName: string) {
     printInvoice(booking, servicesList, totalCost, walletUsed, branchName);
@@ -5788,6 +5794,56 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     () => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
     []
   );
+
+  // Stable handlers for the memoized AdminBookingsView / BookingDetailsModal —
+  // an inline arrow in the JSX would be a new prop on every render and defeat
+  // React.memo entirely.
+  const handleBookingsNew = useCallback((data?: any) => {
+    setNewBookingInitialData(data || null);
+    setShowFullViewNewBooking(true);
+  }, []);
+  const handleBookingsAddPrevious = useCallback(() => {
+    setPreviousBookingCustomer(null);
+    setShowAddPreviousBooking(true);
+  }, []);
+  const handleBookingsPendingApprovals = useCallback(() => {
+    const el = document.getElementById("pending-approvals-section");
+    if (el) el.scrollIntoView({ behavior: "smooth" });
+  }, []);
+  const handleBookingsFilter = useCallback(() => setShowFilterModal(true), []);
+  // RISK-053: AdminBookingsView normalises status for its own table/badges
+  // ('started' -> 'in_progress', 'approved' -> 'confirmed') and returns that
+  // normalised object here. The shared details modal switches its Session Flow
+  // actions on the *raw* DB status strings, so resolve the untouched record
+  // from allReservations by id instead of passing the normalised copy through.
+  const handleBookingsViewDetails = useCallback((booking: any) => {
+    const raw = allReservations.find((r: any) => String(r.id) === String(booking?.id));
+    setViewingBooking((raw || booking) as any);
+  }, [allReservations]);
+  const handleBookingsPrint = useCallback(() => window.print(), []);
+  const handleBookingsApprove = useCallback((booking: any) => {
+    // RISK-047/052: must go through openApprove() so the modal is pre-filled
+    // from the actual booking rather than leftover modal state.
+    openApprove(booking as any);
+  }, [openApprove]);
+  const handleBookingsReject = useCallback(async (booking: any) => {
+    try {
+      if (booking?.id) {
+        await supabase.from("reservations").update({ status: "rejected" }).eq("id", booking.id);
+        setRequests(prev => prev.filter(r => String(r.id) !== String(booking.id)));
+        setAllReservations(prev => prev.map(r => String(r.id) === String(booking.id) ? { ...r, status: "rejected" } : r));
+      }
+    } catch (e) {
+      console.error("Reject error:", e);
+    }
+  }, []);
+  const handleCloseBookingDetails = useCallback(() => setViewingBooking(null), []);
+  const handleEditPreviousBooking = useCallback((b: any) => {
+    setEditingPreviousBooking(b);
+    setActiveNav("Bookings");
+    setShowAddPreviousBooking(true);
+    setViewingBooking(null);
+  }, []);
 
   if (authChecking) {
     return (
@@ -8037,53 +8093,15 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 hasPermission={hasPermission}
                 lang={lang}
                 t={adminTranslations[lang].bookings.adminBookingsView}
-                onNewBooking={(data?: any) => {
-                  setNewBookingInitialData(data || null);
-                  setShowFullViewNewBooking(true);
-                }}
-                onAddPreviousBooking={() => {
-                  setPreviousBookingCustomer(null);
-                  setShowAddPreviousBooking(true);
-                }}
-                onPendingApprovalsClick={() => {
-                  const el = document.getElementById("pending-approvals-section");
-                  if (el) el.scrollIntoView({ behavior: "smooth" });
-                }}
-                onFilterClick={() => setShowFilterModal(true)}
-                onViewBookingDetails={(booking: any) => {
-                  // RISK-053: AdminBookingsView normalises status for its own table/badges
-                  // ('started' -> 'in_progress', 'approved' -> 'confirmed') and returns that
-                  // normalised object here. The shared details modal below switches its Session
-                  // Flow actions on the *raw* DB status strings, so passing the normalised object
-                  // straight through silently dropped the "Treatment In Session" banner and wrongly
-                  // re-exposed Postpone/Cancel/No Show for a booking that is actively in session
-                  // (the 'started' exclusion at the Other Actions block below never matched because
-                  // the value it saw was already rewritten to 'in_progress'). Resolve the untouched
-                  // record from allReservations by id instead.
-                  const raw = allReservations.find((r: any) => String(r.id) === String(booking?.id));
-                  setViewingBooking((raw || booking) as any);
-                }}
-                onPrint={() => window.print()}
+                onNewBooking={handleBookingsNew}
+                onAddPreviousBooking={handleBookingsAddPrevious}
+                onPendingApprovalsClick={handleBookingsPendingApprovals}
+                onFilterClick={handleBookingsFilter}
+                onViewBookingDetails={handleBookingsViewDetails}
+                onPrint={handleBookingsPrint}
                 onExportCSV={handleExportBookingsCSV}
-                onApproveBooking={(booking: any) => {
-                  // RISK-047/052: must go through openApprove() so the modal is pre-filled from
-                  // the actual booking (requested time, requested doctor, availability) instead
-                  // of opening with whatever `slot`/`doctorName` state happened to be left over
-                  // from a previous modal use — which is how this button independently
-                  // reintroduced the hardcoded-doctor/wrong-time bug openApprove() itself fixed.
-                  openApprove(booking as any);
-                }}
-                onRejectBooking={async (booking: any) => {
-                  try {
-                    if (booking?.id) {
-                      await supabase.from("reservations").update({ status: "rejected" }).eq("id", booking.id);
-                      setRequests(prev => prev.filter(r => String(r.id) !== String(booking.id)));
-                      setAllReservations(prev => prev.map(r => String(r.id) === String(booking.id) ? { ...r, status: "rejected" } : r));
-                    }
-                  } catch (e) {
-                    console.error("Reject error:", e);
-                  }
-                }}
+                onApproveBooking={handleBookingsApprove}
+                onRejectBooking={handleBookingsReject}
               />
             )
           )}
@@ -8301,14 +8319,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       {viewingBooking && (
         <BookingDetailsModal
           booking={viewingBooking}
-          onClose={() => setViewingBooking(null)}
+          onClose={handleCloseBookingDetails}
           setBooking={setViewingBooking}
-          onEditPreviousBooking={(b) => {
-            setEditingPreviousBooking(b);
-            setActiveNav("Bookings");
-            setShowAddPreviousBooking(true);
-            setViewingBooking(null);
-          }}
+          onEditPreviousBooking={handleEditPreviousBooking}
           rooms={rooms}
           branches={branches}
           dbCustomers={dbCustomers}

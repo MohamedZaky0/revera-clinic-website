@@ -36,6 +36,22 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getAuthHeaders } from "@/lib/authHeaders";
+import { pollDataEqual, pollRowsEqualByKeys } from "@/lib/pollEqual";
+
+// Mutable reservations columns, minus created_at/updated_at (updated_at is only
+// a DEFAULT now() on insert — no trigger — so it cannot detect changes). Used by
+// the 3 s poll to keep the previous array when a tick returns identical data;
+// see pollRowsEqualByKeys for what a key-list compare can miss.
+const RESERVATION_POLL_KEYS = [
+  "id", "service_id", "service_ids", "date", "requested_time", "name", "email",
+  "phone", "notes", "status", "time_slot", "session_type", "is_manual",
+  "doctor_name", "provider_id", "amount_paid", "amount_left", "branch_id",
+  "customer_id", "room_id", "rooms", "created_by_employee_id", "follow_up_date",
+  "approved_at", "completed_at", "started_at", "actual_duration_minutes",
+  "cancelled_at", "doctor_notes", "reception_notes", "laser_payment_mode",
+  "laser_price_per_pulse", "delivered_pulses", "laser_deficit_resolution",
+  "laser_deficit_pulses", "is_historical",
+] as const;
 import { getSessionStaleness } from "@/lib/services";
 import { adminTranslations } from "@/components/admin/translations";
 import { extractPrimaryPulses } from "./BookingDetailsModal";
@@ -127,7 +143,12 @@ function cleanDoctorName(doc: string | undefined | null): string {
   return d ? `Dr. ${d}` : "Doctor";
 }
 
-export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
+// Memoized: the admin shell re-renders on every state change (polls, timers),
+// and this is the heaviest mounted view. All props passed from page.tsx are
+// stabilized (useCallback/useMemo/state references) so an unchanged render is
+// skipped. If a new unstable prop is ever added here, the memo silently stops
+// helping — keep props referentially stable.
+export const AdminBookingsView = React.memo(function AdminBookingsView({
   allReservations = [],
   requests = [],
   providers = [],
@@ -147,7 +168,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   hasPermission,
   lang = "en",
   t,
-}) => {
+}: AdminBookingsViewProps) {
   const tr = t || adminTranslations[lang].bookings.adminBookingsView;
   // View Mode State: 'calendar' (Default) vs 'pending' vs 'all'
   const [viewMode, setViewMode] = useState<"pending" | "calendar" | "all">("calendar");
@@ -355,10 +376,12 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         if (!isMounted) return;
 
         if (!resResponse.error && resResponse.data) {
-          setDbReservations(resResponse.data);
+          setDbReservations(prev =>
+            pollRowsEqualByKeys(prev, resResponse.data, RESERVATION_POLL_KEYS) ? prev : resResponse.data
+          );
         }
         if (!provResponse.error && provResponse.data && provResponse.data.length > 0) {
-          setDbProviders(provResponse.data);
+          setDbProviders(prev => (pollDataEqual(prev, provResponse.data) ? prev : provResponse.data));
         }
 
         let combinedRx: any[] = [];
@@ -390,7 +413,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         }
 
         if (isMounted) {
-          setDbPrescriptions(combinedRx);
+          setDbPrescriptions(prev => (pollDataEqual(prev, combinedRx) ? prev : combinedRx));
         }
       } catch (err) {
         console.error("Error fetching database reservations/providers/prescriptions:", err);
@@ -2581,4 +2604,4 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
     </div>
   );
-};
+});
