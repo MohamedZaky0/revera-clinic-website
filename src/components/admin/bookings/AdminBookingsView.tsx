@@ -127,7 +127,12 @@ function cleanDoctorName(doc: string | undefined | null): string {
   return d ? `Dr. ${d}` : "Doctor";
 }
 
-export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
+// Memoized: the admin shell re-renders on every state change (polls, timers),
+// and this is the heaviest mounted view. All props passed from page.tsx are
+// stabilized (useCallback/useMemo/state references) so an unchanged render is
+// skipped. If a new unstable prop is ever added here, the memo silently stops
+// helping — keep props referentially stable.
+export const AdminBookingsView = React.memo(function AdminBookingsView({
   allReservations = [],
   requests = [],
   providers = [],
@@ -147,7 +152,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   hasPermission,
   lang = "en",
   t,
-}) => {
+}: AdminBookingsViewProps) {
   const tr = t || adminTranslations[lang].bookings.adminBookingsView;
   // View Mode State: 'calendar' (Default) vs 'pending' vs 'all'
   const [viewMode, setViewMode] = useState<"pending" | "calendar" | "all">("calendar");
@@ -2581,4 +2586,4 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
     </div>
   );
-};
+});

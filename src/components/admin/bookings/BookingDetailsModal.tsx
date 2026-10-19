@@ -187,7 +187,7 @@ interface BookingDetailsModalProps {
   onEditPreviousBooking?: (booking: any) => void;
 }
 
-export default function BookingDetailsModal({
+function BookingDetailsModal({
   booking,
   onClose,
   setBooking,
@@ -5071,3 +5071,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     </>
   );
 }
+
+// Memoized at the export boundary: this 5k-line modal stays mounted while open,
+// and the admin shell re-renders on every state change. Props from page.tsx are
+// all stabilized (useCallback/useMemo/state references).
+export default React.memo(BookingDetailsModal);
