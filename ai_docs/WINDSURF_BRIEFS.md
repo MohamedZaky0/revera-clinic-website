@@ -368,8 +368,9 @@ bookings, UI Approve, Create Device, Update Pulses, Reset Counter, Edit Device, 
 and with the server unreachable for 45 s the Pending list kept its rows. Evidence:
 `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md`.
 
-**Not verified:** the Doctor portal's 3 s poll (needs a doctor login; opening `/doctor` as a superadmin signs
-that session out), and any Profiler recording (component names are minified, so re-renders were counted by
+**Not verified:** the Doctor portal's 3 s poll (needs a login whose role or department is doctor: a superadmin
+is let through any portal URL but is shown the admin panel, because `page.tsx` picks `DoctorAccountView` from
+the account's own role/department, not from the URL), and any Profiler recording (component names are minified, so re-renders were counted by
 hook count and source size instead).
 
 **Left as decisions for Mohamed, not changed:** the 3 s Bookings poll looks redundant now that realtime covers
