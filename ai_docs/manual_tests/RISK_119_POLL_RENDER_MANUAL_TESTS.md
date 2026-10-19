@@ -10,7 +10,11 @@
 
 | Date | Check | Environment | Evidence | Result |
 |---|---|---|---|---|
-| | | | | |
+| 2026-10-19 | Section survives reload (RISK-118) | local dev, `feat/brief-36-admin-refresh` @ 8d245bd, superadmin | Click Patients -> URL `?section=Patients`; reload -> still on Patients (an extra `lang=en` from another component is preserved) | Pass |
+| 2026-10-19 | Devices tab idle 70 s: repeat requests / spinner | A/B: `dev` @ 9cb86ba (before Brief 36) vs branch | Before: 15 `/api/inventory/devices` requests, spinner reappeared 6x, shell re-rendered 14x. After: 0 devices requests (15 s polls still ran 5x), spinner 0x. Measured with browser resource timing + a React commit hook, not the Profiler | Pass |
+| 2026-10-19 | Bookings idle ~40 s: re-renders from the 3 s poll | same A/B | Before: `AdminBookingsView` re-rendered 36x, shell 8x. After (36 s): both 0x, while the 3 s poll kept running (12 ticks per 34 s). A small ~12 KB component (clock-like) renders ~1.7x/s on both | Pass |
+| 2026-10-19 | Simulated return to the tab (visibilitychange x3) | branch | One `/api/auth/me` (first re-announcement after >5 min), none for the next two; no customers / inventory / employees refetch. Not a real tab switch, a dispatched event. Baseline showed no `/api/auth/me` either because its last verification was <5 min old, so this is not an A/B for RISK-118 | Pass (weak) |
+| 2026-10-19 | NOT tested | | Network-offline behaviour (keep rows on failed poll), writes (approve/create booking, add/edit device, reset pulses) because the database may hold real data, Doctor portal poll, Profiler component names (bundle names are minified; components identified by hook count and source size) | Pending |
 
 ## Devices tab stays quiet while idle
 - [ ] Log in at `/admin`, open Inventory -> Devices, wait for the table to load. Open dev tools -> Network, filter `inventory/devices`. Leave it idle for at least 60 s (covers four 15 s poll ticks): **no repeat request** and **no "Loading" spinner row** in the table.
