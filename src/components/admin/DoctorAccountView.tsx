@@ -8,6 +8,7 @@ import { DoctorAccountViewProps, DoctorTab, DoctorPatient, UsedProduct } from ".
 import { doctorTranslations } from "./doctor/translations";
 import { adminTranslations } from "./translations";
 import { CLIENT } from "@/config/client";
+import { pollDataEqual } from "@/lib/pollEqual";
 import { parseBookingNotes, getAuthHeaders } from "./doctor/utils";
 import DoctorSidebar from "./doctor/DoctorSidebar";
 import DoctorScheduleTab from "./doctor/tabs/DoctorScheduleTab";
@@ -526,8 +527,10 @@ export default function DoctorAccountView({
         // Find doctor bookings
         const doctorBookings = resList.filter((r: any) => isDoctorMatch(r));
 
-        // Strictly set doctor-specific bookings (never fall back to clinic-wide reservations)
-        setReservations(doctorBookings);
+        // Strictly set doctor-specific bookings (never fall back to clinic-wide reservations).
+        // Keep the previous array when the 3 s poll returns identical data so an
+        // unchanged tick does not re-render the whole view.
+        setReservations(prev => (pollDataEqual(prev, doctorBookings) ? prev : doctorBookings));
       }
     } catch (err) {
       console.error("Error fetching doctor reservations:", err);
