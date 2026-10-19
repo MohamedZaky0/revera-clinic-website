@@ -64,6 +64,52 @@ value when the new data is equal (cheap compare: length plus id/status/updated-a
 JSON compare if rows are small; pick one and justify it in the PR). Must still update immediately when
 something really changed, including after a write the user just made.
 
+**Part B2 — supplement to Part B: the two child pollers Part B did not cover (added 2026-10-19 after
+reviewing commit `84ec0fb`).** Part B (`src/lib/pollEqual.ts`, `pollDataEqual`) is correct and stays as
+is, but it only covered the shell's polls. This brief said "and any other poll-fed state you find"; two
+pollers in child components were missed and are worse than the shell's:
+
+1. `src/components/admin/bookings/AdminBookingsView.tsx` (~`:341-420`, poll at ~`:405`): **every 3 s**
+   it runs `supabase.from("reservations").select("*")` with no limit, plus `providers`, `prescriptions`
+   and `/api/prescriptions`, then calls `setDbReservations`, `setDbProviders`, `setDbPrescriptions`
+   (~`:358, :361, :393`) with freshly parsed arrays. The Bookings screen (its table is the largest in
+   the app) re-renders every 3 s even when nothing changed. Most likely the biggest cause of the "table
+   refreshes inside the page" complaint on that screen.
+2. `src/components/admin/DoctorAccountView.tsx` (`fetchDoctorReservations`, ~`:513`; poll at ~`:542`):
+   **every 3 s**, `setReservations(doctorBookings)` with a new array (request is bounded by `?limit=250`).
+
+**Do, as its own commit separate from Part C:**
+- Apply the same keep-the-previous-value rule to every state those two polls set, using `pollDataEqual`
+  or a cheaper comparator **if you measure that it is needed.** `AdminBookingsView` compares an unbounded
+  table every 3 s, so a full `JSON.stringify` of prev and next may be costly as the clinic's history
+  grows. Measure it: build a 5,000-row and a 20,000-row `reservations` fixture, time the compare, and put
+  the numbers in the PR. If it costs more than roughly 20 ms per tick, use a cheaper check (row count
+  plus per-row `id` and `status`, or whatever columns actually change; `reservations` has no
+  `updated_at` as far as the migrations show, so confirm before relying on one) and say what it can
+  miss. Do not guess.
+- The optimistic local patches in `AdminBookingsView` (`setDbReservations(prev => …)` at ~`:1196` and
+  `:1221`) must keep working: server data that differs from the locally patched state must still replace
+  it, and a poll that equals the patched state must not flicker it back.
+- Realtime events and the `revera-booking-change` / `revera-prescription-change` window events must
+  still refresh immediately.
+- Grep `src/components/**` and `src/app/**` once more for `setInterval` / `setTimeout`-based pollers
+  and list any others you find in the PR. Fix only ones that set state from a fetch on a timer.
+
+**Do NOT, in B2:** change a polling interval, remove the polling, or switch these reads from the browser
+Supabase client to an API route. Instead report, in the PR description: (a) whether Supabase realtime
+already covers `reservations` (the channel at ~`:410` subscribes to `prescriptions`; check the rest) so
+the 3 s poll may be redundant, and (b) that Bookings downloads the whole `reservations` table every 3 s per
+open admin tab. Both are decisions for Mohamed. Also leave alone, but mention: `fetchAllReservations` in
+`page.tsx` has `if (calendarView === "Schedule") { fetchScheduleReservations(); }` after its `return`,
+so it never runs and the Schedule view does not refresh after writes. Do not fix it silently; it changes
+behavior.
+
+**Acceptance for B2:** with the Bookings screen open and idle for 60 s, a Profiler recording shows no
+commit of `AdminBookingsView` caused by a poll tick; approving, rejecting or creating a booking still
+updates the table within one tick; Doctor Account idle shows the same for its reservations list. Take
+Part C's "before" Profiler recording for the Bookings screen **before** B2 lands, then record B2's effect
+on the same recording, so the two parts are not mixed up.
+
 **Part C — `React.memo` only where measured.** With React DevTools Profiler, record the Bookings,
 Patients and Inventory screens idle for 60 s and with a booking approved. List the components that
 re-render with unchanged props. Wrap only the heaviest of those (candidates:
