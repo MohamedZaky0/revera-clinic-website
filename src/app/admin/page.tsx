@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback, useRef, Fragment } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
-import { recoverFromInvoluntarySignOut, verifyStaffSession, recordLogoutReason, clearLogoutReason } from "@/lib/authRecovery";
+import { recoverFromInvoluntarySignOut, verifyStaffSession, recordLogoutReason, clearLogoutReason, broadcastDeliberateLogout, wasDeliberateLogoutRecently } from "@/lib/authRecovery";
 import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, getDurationLabel, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
 import { 
   getServiceToggles, 
@@ -798,6 +798,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // brief network loss). The page keeps the session and offers a retry instead of bouncing to /login.
   const [sessionVerifyFailed, setSessionVerifyFailed] = useState(false);
   const retryVerifyRef = useRef<(() => void) | null>(null);
+  // True once the person pressed Logout. signOut() fires SIGNED_OUT and empties `session` a moment
+  // before the redirect to /login, and the "no session -> /login" effect below must not label that
+  // as an unexpected end of session.
+  const deliberateLogoutRef = useRef(false);
   const lastActivityRef = useRef<number>(Date.now());
   // RISK-114: tells apart "we chose to end this session" (logout button, idle timeout, a rejected
   // /api/auth/me check) from Supabase's own client silently giving up on a background token
@@ -1694,7 +1698,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, newSession: any) => {
       if (event === "SIGNED_OUT") {
-        if (!explicitSignOutRef.current) {
+        if (!explicitSignOutRef.current && wasDeliberateLogoutRecently(CLIENT.storagePrefix)) {
+          // Another tab of this browser pressed Logout: follow it. Trying to "recover" the session
+          // it just ended on purpose would fail, and the login page would then call it unexpected.
+          deliberateLogoutRef.current = true;
+        } else if (!explicitSignOutRef.current) {
           // RISK-114: Supabase's own client ended the session with no deliberate signOut() call
           // from this page - most likely a background refresh that failed (e.g. a refresh-token
           // rotation collision across two open tabs of the same login). Try one silent recovery,
@@ -1702,7 +1710,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           // rather than immediately dropping to the login screen mid-booking or mid-edit.
           const lastRefreshToken = lastKnownSessionRef.current?.refresh_token;
           if (lastRefreshToken) {
-            recoverFromInvoluntarySignOut(supabase, lastRefreshToken).then((result) => {
+            (async () => {
+              // First look at what is stored now: another tab may already have refreshed the login
+              // (refresh tokens rotate, so re-using this tab's older one could be refused, or worse
+              // flagged as reuse by Supabase). Only if nothing usable is stored try the old token.
+              try {
+                const { data } = await supabase.auth.getSession();
+                if (data?.session) {
+                  handleAuthSession(data.session);
+                  return;
+                }
+              } catch {
+                /* fall through to the explicit refresh */
+              }
+              const result = await recoverFromInvoluntarySignOut(supabase, lastRefreshToken);
               if (result.recovered) {
                 handleAuthSession(result.session);
               } else {
@@ -1711,7 +1732,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                 }
                 handleAuthSession(null);
               }
-            });
+            })();
             return;
           }
         }
@@ -1771,7 +1792,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             console.warn(`Role mismatch: user is ${authData.role} but attempted to access ${effectivePortal} portal.`);
             recordLogoutReason(CLIENT.storagePrefix, 'wrong_portal');
             explicitSignOutRef.current = true;
-            await supabase.auth.signOut();
+            await supabase.auth.signOut({ scope: 'local' });
             setAdminRole(null);
             setAdminDepartment("");
             setAdminPermissions([]);
@@ -1809,7 +1830,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           console.warn(`Unregistered or unauthorized employee session (${verification.httpStatus}) after a token refresh. Logging out.`);
           recordLogoutReason(CLIENT.storagePrefix, 'session_rejected');
           explicitSignOutRef.current = true;
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: 'local' });
           setAdminRole(null);
           setAdminDepartment("");
           setAdminPermissions([]);
@@ -1866,12 +1887,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         clearInterval(interval);
         console.log("Inactivity timeout reached. Logging out.");
         recordLogoutReason(CLIENT.storagePrefix, 'inactivity');
+        broadcastDeliberateLogout(CLIENT.storagePrefix);
         if (typeof window !== "undefined") {
           sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         }
         triggerCheckout().finally(() => {
           explicitSignOutRef.current = true;
-          supabase.auth.signOut().then(() => {
+          supabase.auth.signOut({ scope: 'local' }).then(() => {
             if (typeof window !== "undefined") {
               window.location.href = "/login";
             }
@@ -2256,15 +2278,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }, [activeNav, fetchHrData]);
 
   async function handleLogout() {
+    deliberateLogoutRef.current = true;
     clearLogoutReason(CLIENT.storagePrefix);
     if (supabase) {
       await triggerCheckout();
       explicitSignOutRef.current = true;
-      await supabase.auth.signOut();
+      broadcastDeliberateLogout(CLIENT.storagePrefix);
+      // 'local': ending this device's session must not log the same account out on other computers.
+      await supabase.auth.signOut({ scope: 'local' });
     }
     if (typeof window !== "undefined") {
       sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
       localStorage.removeItem(`${CLIENT.storagePrefix}_staff_auth`);
+      clearLogoutReason(CLIENT.storagePrefix);
       window.location.href = "/login";
     }
   }
@@ -2275,7 +2301,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     // verified right now (RISK-117) stays here and is retried below.
     if (!authChecking && !session) {
       if (typeof window !== "undefined") {
-        recordLogoutReason(CLIENT.storagePrefix, 'session_ended', { onlyIfEmpty: true });
+        if (!deliberateLogoutRef.current) {
+          recordLogoutReason(CLIENT.storagePrefix, 'session_ended', { onlyIfEmpty: true });
+        }
         sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         window.location.replace("/login");
       }

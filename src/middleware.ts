@@ -35,13 +35,24 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication service is not configured.' }, { status: 500 });
     }
 
-    const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: {
-        apikey: supabaseAnonKey,
-        authorization: `Bearer ${token}`,
-      },
-    });
+    let authResponse: Response;
+    try {
+      authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        headers: {
+          apikey: supabaseAnonKey,
+          authorization: `Bearer ${token}`,
+        },
+      });
+    } catch {
+      // Supabase unreachable: the session was not judged invalid, so this is not a 401.
+      return NextResponse.json({ error: 'Could not verify the session right now. Please try again.' }, { status: 503 });
+    }
 
+    // Only an answer that says the token is bad is a 401. A rate limit or an upstream failure says
+    // nothing about the login, and a 401 here reads to the client as "your session is over".
+    if (authResponse.status === 429 || authResponse.status >= 500) {
+      return NextResponse.json({ error: 'Could not verify the session right now. Please try again.' }, { status: 503 });
+    }
     if (!authResponse.ok) {
       return NextResponse.json({ error: 'Unauthorized: Invalid or expired session.' }, { status: 401 });
     }

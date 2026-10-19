@@ -26,3 +26,13 @@
 ## On the clinic laptop
 - [ ] Check the date, time and time zone are correct (a wrong clock makes tokens look valid after they have expired).
 - [ ] After a week of use, ask the clinic whether any logout still happened and what the login-page notice said. Record it here with a date.
+
+## Second pass (logout paths audit)
+- [ ] Press Logout yourself, confirm: you land on /login with NO amber notice (this was the bug).
+- [ ] Two tabs of the app open: Logout in tab A. Tab B goes to /login too, with NO notice and no flicker of the app coming back.
+- [ ] Same account on two computers (or two browsers): Logout on computer 1. Computer 2 stays logged in and keeps working.
+- [ ] Same two computers: leave computer 1 idle for an hour (or lower the idle limit while testing). It logs itself out; computer 2 stays logged in.
+- [ ] Two tabs open, one of them idle in the background past an hour: after the background tab refreshes its token, both tabs keep working (no bounce).
+- [ ] Open admin API pages (Employees, HR, Role Management) while Supabase is slow or rate limited: you may see a load error, but you stay logged in (the API answers 503, not 401).
+- [ ] After a production deploy, tabs that were open during it reload once on next click; check you are still signed in afterwards.
+
