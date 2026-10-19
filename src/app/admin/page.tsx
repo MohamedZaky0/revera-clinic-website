@@ -1413,6 +1413,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [serviceIsShared, setServiceIsShared] = useState(true);
   const [serviceIsLaser, setServiceIsLaser] = useState(false);
   const [serviceEnableReminder, setServiceEnableReminder] = useState(true);
+  const [serviceShowOnWebsite, setServiceShowOnWebsite] = useState(true);
   const [serviceImageUrl, setServiceImageUrl] = useState("");
   const [servicePrice, setServicePrice] = useState<number>(0);
   const [serviceBranchPricing, setServiceBranchPricing] = useState<Required<ServiceItem>['branchPricing']>([
@@ -1443,6 +1444,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     setServiceIsShared(svc.isShared ?? false);
     setServiceIsLaser(checkIsLaserService(svc));
     setServiceEnableReminder(svc.enableReminder ?? true);
+    setServiceShowOnWebsite(svc.showOnWebsite ?? true);
     setServiceImageUrl(svc.img || "");
     setServicePrice(svc.price ?? 0);
     
@@ -6605,6 +6607,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               serviceIsLaser={serviceIsLaser}
               setServiceIsLaser={setServiceIsLaser}
               serviceEnableReminder={serviceEnableReminder}
+              serviceShowOnWebsite={serviceShowOnWebsite}
+              setServiceShowOnWebsite={setServiceShowOnWebsite}
               setServiceEnableReminder={setServiceEnableReminder}
               serviceImageUrl={serviceImageUrl}
               setServiceImageUrl={setServiceImageUrl}

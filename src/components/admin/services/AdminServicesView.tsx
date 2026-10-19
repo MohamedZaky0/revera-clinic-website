@@ -82,6 +82,8 @@ interface AdminServicesViewProps {
   serviceIsLaser: boolean;
   setServiceIsLaser: React.Dispatch<React.SetStateAction<boolean>>;
   serviceEnableReminder: boolean;
+  serviceShowOnWebsite: boolean;
+  setServiceShowOnWebsite: (v: boolean) => void;
   setServiceEnableReminder: React.Dispatch<React.SetStateAction<boolean>>;
   serviceImageUrl: string;
   setServiceImageUrl: React.Dispatch<React.SetStateAction<string>>;
@@ -165,6 +167,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
     serviceIsShared, setServiceIsShared,
     serviceIsLaser, setServiceIsLaser,
     serviceEnableReminder, setServiceEnableReminder,
+    serviceShowOnWebsite, setServiceShowOnWebsite,
     serviceImageUrl, setServiceImageUrl,
     servicePrice, setServicePrice,
     serviceBranchPricing, setServiceBranchPricing,
@@ -532,6 +535,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                         (cat.ar ? cat.ar.includes("ليزر") : false)
                       );
                       setServiceEnableReminder(true);
+                      setServiceShowOnWebsite(true);
                       setServiceImageUrl("");
                       setServicePrice(0);
                       {
@@ -634,6 +638,9 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                   <td className="px-5 py-3">
                                     <div className="flex items-center gap-2">
                                       <p className={`font-semibold ${ rowFaded ? "line-through text-[var(--color-brand-secondary)]" : "text-[var(--cr-dark)]" }`}>{svc.en}</p>
+                                      {svc.showOnWebsite === false && (
+                                        <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200 shadow-2xs">{t.notOnWebsiteBadge}</span>
+                                      )}
                                       {(svc.islaser || svc.is_laser || checkIsLaserService(svc)) && (
                                         <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
                                           <Sparkles size={11} className="text-emerald-600" />
@@ -823,6 +830,9 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                   <h4 className={`text-sm font-bold truncate ${isInactive ? "line-through text-[var(--color-brand-secondary)]" : "text-[var(--cr-dark)]"}`}>
                                     {svc.en}
                                   </h4>
+                                  {svc.showOnWebsite === false && (
+                                    <span className="mt-1 inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">{t.notOnWebsiteBadge}</span>
+                                  )}
                                 </div>
                                 <span
                                   className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
@@ -1357,6 +1367,28 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                   </button>
                 </div>
 
+                {/* Show on website Toggle (DEC-111) */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-[var(--cr-dark)]">{t.showOnWebsiteLabel}</span>
+                    <span className="text-xs text-[var(--color-brand-secondary)] mt-0.5">{t.showOnWebsiteDesc}</span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={serviceShowOnWebsite}
+                    aria-label={t.showOnWebsiteLabel}
+                    onClick={() => setServiceShowOnWebsite(!serviceShowOnWebsite)}
+                    className="relative h-6 w-11 flex-shrink-0 rounded-full focus:outline-none transition-colors duration-300 cursor-pointer"
+                    style={{ backgroundColor: serviceShowOnWebsite ? "var(--cr-primary)" : "#E2E8F0" }}
+                  >
+                    <span
+                      className="absolute top-[4px] h-4 w-4 rounded-full bg-white shadow-md transition-all duration-300"
+                      style={{ left: serviceShowOnWebsite ? "24px" : "4px" }}
+                    />
+                  </button>
+                </div>
+
                 {/* Enable Booking Reminder Toggle */}
                 <div className="flex items-start justify-between gap-4">
                   <span className="text-sm font-semibold text-[var(--cr-dark)]">{t.enableReminderLabel}</span>
@@ -1448,6 +1480,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                           islaser: serviceIsLaser,
                           is_laser: serviceIsLaser,
                           enableReminder: serviceEnableReminder,
+                          showOnWebsite: serviceShowOnWebsite,
                           img: serviceImageUrl,
                           branchPricing: serviceBranchPricing.map(bp => ({ ...bp, price: servicePrice })),
                           visible: editingService.visible !== undefined ? editingService.visible : (serviceToggles[editingService.id]?.visible ?? true),
@@ -1475,6 +1508,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       islaser: serviceIsLaser,
                       is_laser: serviceIsLaser,
                       enableReminder: serviceEnableReminder,
+                      showOnWebsite: serviceShowOnWebsite,
                       img: serviceImageUrl,
                       branchPricing: serviceBranchPricing.map(bp => ({ ...bp, price: servicePrice })),
                       visible: defaultBranch ? defaultBranch.visible : true,

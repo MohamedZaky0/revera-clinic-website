@@ -45,6 +45,7 @@ function mapServiceRow(r: any) {
     branchPricing: r.branch_pricing,
     visible: r.visible !== false,
     active: r.active !== false,
+    showOnWebsite: r.show_on_website !== false,
     createdAt: fmtCreatedAt(r.created_at),
     rawCreatedAt: r.created_at,
     created_at: r.created_at,
@@ -84,6 +85,9 @@ function mapServiceToDb(s: any) {
     branch_pricing: Array.isArray(s.branchPricing) ? s.branchPricing : (Array.isArray(s.branch_pricing) ? s.branch_pricing : []),
     visible: s.visible !== undefined ? Boolean(s.visible) : true,
     active: s.active !== undefined ? Boolean(s.active) : true,
+    // undefined = the caller did not say; POST fills it from the stored row so a save that omits it
+    // (an older admin tab, a bulk sync) can never silently re-publish a hidden service.
+    show_on_website: s.showOnWebsite !== undefined ? Boolean(s.showOnWebsite) : (s.show_on_website !== undefined ? Boolean(s.show_on_website) : undefined),
   };
   if (s.id && Number(s.id) > 0) row.id = Number(s.id);
   return row;
@@ -129,6 +133,23 @@ export async function POST(req: Request) {
     }
 
     const servicesToUpsert = rawServices.map(mapServiceToDb);
+
+    // show_on_website must be present on every row (a missing key on one row of a bulk upsert is
+    // sent as NULL, which this NOT NULL column rejects). Where the caller did not send it, keep what
+    // is stored for existing rows and default to shown for new ones.
+    const needsStoredFlag = servicesToUpsert.filter((r) => r.show_on_website === undefined && r.id !== undefined);
+    if (needsStoredFlag.length > 0) {
+      const { data: stored, error: storedErr } = await getSupabaseServer()
+        .from('services')
+        .select('id, show_on_website')
+        .in('id', needsStoredFlag.map((r) => r.id));
+      if (storedErr) throw storedErr;
+      const storedById = new Map((stored || []).map((r: any) => [Number(r.id), r.show_on_website]));
+      for (const r of needsStoredFlag) r.show_on_website = storedById.get(Number(r.id)) !== false;
+    }
+    for (const r of servicesToUpsert) {
+      if (r.show_on_website === undefined) r.show_on_website = true;
+    }
 
     // Rows keeping their existing id and brand-new rows (no id — the DB assigns one) cannot go
     // through the same .upsert() call: PostgREST builds one INSERT from the whole array, and any

@@ -227,7 +227,11 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { serviceId?: number } | null;
-      const id = detail?.serviceId ?? null;
+      // A ?service= link or button for a service that is not on the website (DEC-111) opens the
+      // booking with nothing preselected instead of offering it.
+      const requestedId = detail?.serviceId ?? null;
+      const requested = requestedId ? dynamicServices.find((service) => service.id === requestedId) : undefined;
+      const id = requested && requested.showOnWebsite === false ? null : requestedId;
       setServiceId(id);
       setAdditionalServiceIds([]);
       if (id) {
@@ -909,8 +913,10 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
     }, 1500);
   }
 
-  // Filter out services that admin marked as inactive or hidden
-  const activeServices = dynamicServices.filter(s => isServiceActive(s.id, serviceToggles));
+  // Filter out services that admin marked as inactive, hidden, or not on the website (DEC-111).
+  // dynamicServices itself stays complete: existing bookings of a system-only service still need
+  // its duration to block their slots.
+  const activeServices = dynamicServices.filter(s => isServiceActive(s.id, serviceToggles) && s.showOnWebsite !== false);
   const servicesForCategory = activeServices.filter((service) => {
     if (service.cat !== selectedCategory) return false;
     let serviceType = service.unit?.toLowerCase() || "both";
