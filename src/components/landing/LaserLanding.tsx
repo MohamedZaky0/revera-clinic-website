@@ -5,7 +5,7 @@ import {
   Phone, ShieldCheck, Sparkles, Star, Stethoscope, Target, ThermometerSnowflake, Waves,
 } from "lucide-react";
 import { CLIENT } from "@/config/client";
-import { LANDING_COPY, LANDING_REVIEWS, type LandingVariant } from "@/lib/landingCopy";
+import { LANDING_COPY, type LandingVariant } from "@/lib/landingCopy";
 import { landingFontClass } from "./fonts";
 import { LandingAnalytics } from "./LandingAnalytics";
 import { LandingLogo } from "./LandingLogo";
@@ -241,10 +241,10 @@ export function LaserLanding({ variant }: { variant: LandingVariant }) {
               </div>
             </div>
             <div className="lp-reviews-grid">
-              {LANDING_REVIEWS.map(({ name, quote }) => (
+              {c.reviews.map(({ name, quote, lang }) => (
                 <article key={name}>
                   <span className="lp-quote-mark" aria-hidden="true">“</span>
-                  <p>«{quote}»</p>
+                  <p lang={lang} dir={lang === "en" ? "ltr" : "rtl"}>{lang === "en" ? `“${quote}”` : `«${quote}»`}</p>
                   <footer><strong>{name}</strong><span>تقييم على Google</span></footer>
                 </article>
               ))}
@@ -269,6 +269,33 @@ export function LaserLanding({ variant }: { variant: LandingVariant }) {
                   <p>{a}</p>
                 </details>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="lp-section lp-location" id="location">
+          <div className="lp-wrap lp-location-grid">
+            <div className="lp-location-copy">
+              <span className="lp-kicker">فين العيادة؟</span>
+              <h2>فرع التجمع الخامس<br /><em>سهل توصله.</em></h2>
+              <p className="lp-location-name" dir="ltr">Revera Clinic – Tagamoa Branch</p>
+              <p>{CLIENT.addressAr}</p>
+              <div className="lp-location-actions">
+                <a className="lp-wa" href={CLIENT.googleMapsDirectionsUrl} target="_blank" rel="noreferrer" data-lp-event="map_click" data-lp-placement="directions">
+                  <MapPin size={18} aria-hidden="true" />
+                  <span>اتجاهات على الخريطة</span>
+                </a>
+                <CallCta placement="location">اتصل قبل ما تيجي</CallCta>
+              </div>
+            </div>
+            <div className="lp-map">
+              <iframe
+                src={CLIENT.googleMapsEmbedUrl}
+                title="موقع Revera Clinic فرع التجمع الخامس على خريطة Google"
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
             </div>
           </div>
         </section>

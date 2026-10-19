@@ -8,6 +8,11 @@ export type LandingVariant = "women" | "women-dark" | "men";
 
 export type QA = { q: string; a: string };
 
+// Real Google reviews, verbatim (typos kept). `lang` is the language the reviewer wrote in, so the card
+// can set lang/dir correctly. Women and men pages get different sets: a review that says "suitable for us
+// as women" must never show to a male visitor. Keep in sync with the Maps listing.
+export type Review = { name: string; quote: string; lang: "ar" | "en" };
+
 export interface LandingCopy {
   variant: LandingVariant;
   path: string;
@@ -30,6 +35,7 @@ export interface LandingCopy {
   darkSkinFirst: boolean;
   processLine: string;
   conversation: { title: [string, string]; body: string; quote: string; cta: string; image: { src: string; alt: string } };
+  reviews: Review[];
   faq: QA[];
   finalTitle: [string, string];
   finalBody: string;
@@ -58,6 +64,18 @@ const where: QA = {
   q: "فين العيادة ومواعيدكم إيه؟",
   a: `فرع التجمع الخامس — ${CLIENT.addressAr}. اتصل أو ابعت لنا على WhatsApp للتفاصيل والمواعيد.`,
 };
+
+const REVIEWS_WOMEN: Review[] = [
+  { name: "Rody Crokly", quote: "مكان حلو اوي، جربت الليزر، ونتيجة الليزر كويسه جدا، والاستاف والدكاتره محترمين اوي ولطاف", lang: "ar" },
+  { name: "Ash Kamal", quote: "العياده مجهزه باحدث الأجهزة المناسبه لينا كبنات و التعقيم و نتايج الليزر توووحفة", lang: "ar" },
+  { name: "rana zaky", quote: "Professionals and friendly staff. Hygeneic and high quality devices. I recommend it so much", lang: "en" },
+];
+
+const REVIEWS_MEN: Review[] = [
+  { name: "Turki Alnesf", quote: "افضل عياده ليزر إزاله شعر نضافه و امانه", lang: "ar" },
+  { name: "Man Man", quote: "Best laser clinic in town", lang: "en" },
+  { name: "Youssef Leheta", quote: "Best laser clinic", lang: "en" },
+];
 
 const women: LandingCopy = {
   variant: "women",
@@ -93,6 +111,7 @@ const women: LandingCopy = {
     cta: "ابدئي محادثتك على WhatsApp",
     image: { src: "/images/landing/consultation.webp", alt: "استشارة بين طبيبة ومراجعة داخل العيادة" },
   },
+  reviews: REVIEWS_WOMEN,
   faq: [
     {
       q: "هل الليزر مناسب للبشرة السمراء؟",
@@ -175,6 +194,7 @@ const men: LandingCopy = {
     cta: "ابدأ محادثتك على WhatsApp",
     image: { src: "/images/landing/doctor-portrait.webp", alt: `الفريق الطبي في ${CLIENT.name}` },
   },
+  reviews: REVIEWS_MEN,
   faq: [
     pain,
     sessions,
@@ -207,10 +227,3 @@ export const LANDING_COPY: Record<LandingVariant, LandingCopy> = {
   "women-dark": womenDark,
   men,
 };
-
-// Real Google reviews. Verbatim quotes; keep in sync with the Maps listing.
-export const LANDING_REVIEWS: { name: string; quote: string }[] = [
-  { name: "Rody Crokly", quote: "مكان حلو اوي، جربت الليزر، ونتيجة الليزر كويسه جدا، والاستاف والدكاتره محترمين اوي ولطاف" },
-  { name: "Turki Alnesf", quote: "افضل عياده ليزر إزاله شعر نضافه و امانه" },
-  { name: "Ash Kamal", quote: "العياده مجهزه باحدث الأجهزة المناسبه لينا كبنات و التعقيم و نتايج الليزر توووحفة" },
-];
