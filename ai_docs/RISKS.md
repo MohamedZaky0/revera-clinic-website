@@ -5317,6 +5317,31 @@ scope for that sweep (it only asserts no-token→401 and patient-session→403, 
 ## PROPOSALS.md Reference
 
 
+## RISK-119: The Admin Shell's Own Polls And Re-Renders Kept Refetching And Flashing Tables (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md`
+
+**Severity:** Medium (same daily friction as RISK-118; no data loss) · **Type:** UX / render performance
+**Found:** 2026-10-19, follow-up to RISK-118. Diagnosed by reading code on `feat/brief-36-admin-refresh`; **not measured in a live logged-in browser**.
+
+**Causes found:**
+1. `authenticatedJsonHeaders` in `src/app/admin/page.tsx` was a plain object literal — a new identity every shell render — passed to children as `authHeaders`. `InventoryDevicesTab`, `InventoryProductsTab` (sales history) and `DeviceAuditLogsModal` keyed `useCallback` fetchers on it inside `useEffect`, so every shell state change (including the 15 s booking poll) refetched, and each fetch started with `setLoading(true)`, flashing a spinner row over the whole table.
+2. The 15 s booking poll and 30 s HR-alerts poll stored freshly parsed arrays every tick, so `requests`, `allReservations`, `scheduleReservations` and `activeMissingAlerts` got a new identity even when the data was identical — re-rendering the ~350-`useState` shell and every mounted child each tick.
+3. Extracted views were not memoized: `BookingDetailsModal` (~5k lines) and `AdminBookingsView` re-rendered on every shell render, further fed by inline arrow props and plain-function props (`fetchRequests`, `fetchAllReservations`, `openApprove`, `saveNotes`).
+
+**Fix (3 commits on `feat/brief-36-admin-refresh`):**
+1. **Part A:** `authenticatedJsonHeaders` is `useMemo` on `session?.access_token` (still picks up token rotation — RISK-053). The three inventory fetchers use a ref "hadData" pattern: the loading row/spinner only appears when nothing is on screen yet; failed or malformed refetches keep existing rows; post-write refetches (add/edit/pulse update/reset) run quietly.
+2. **Part B:** `src/lib/pollEqual.ts` (`pollDataEqual`) — JSON compare chosen over an id/status/updated-at key list because rows come through one serializer, and it also catches field changes a hand-picked key list would miss. All four poll-fed setters keep the previous reference when a tick is identical; post-write refetches still update immediately because the data really changed.
+3. **Part C:** `React.memo` on `BookingDetailsModal` and `AdminBookingsView`, with every prop stabilized: `fetchRequests`/`fetchAllReservations`/`fetchScheduleReservations`/`refreshApproveAvailability`/`openApprove`/`saveNotes`/`handleExportBookingsCSV` converted to `useCallback`, and the bookings/details inline handlers extracted to stable `useCallback`s (RISK-047/052/053 comments preserved). **Left unmemoized on purpose:** `AdminEmployeesView` (inline `rolesList.filter` creates a new array per render plus ~9 plain-function props) and `CustomerProfileDrawer` (~20 plain `handle*`/`fetch*` props) — memoizing them needs the large prop-plumbing refactor the brief defers.
+
+**Tests:** `tests/lib/pollEqual.test.ts` (6). Full suite 1465 passed / 4 expected-fail, `tsc` clean, `eslint` 0 errors on touched files. Profiler before/after commit counts could not be produced — needs a logged-in browser.
+
+**Not done / unconfirmed:** no live-browser observation yet; the checklist's evidence log is empty on purpose. The acceptance checks in Brief 36 (60 s idle network silence on Devices, Profiler no-commit poll ticks) are written there.
+
+---
+## PROPOSALS.md Reference
+
+
 See `PROPOSALS.md` for:
 - **PROPOSAL-001** — extract all Revera-specific values into a single `client.config.ts`,
   making fork-per-client a one-file-edit operation.
