@@ -11,6 +11,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { isDoctorEmployee } from '@/lib/roleWorkspace';
+import { getConfirmationMap } from '@/lib/employeeConfirmation';
 
 const SCHEDULES_FILE_PATH = path.join(process.cwd(), 'data', 'employee_schedules.json');
 
@@ -140,18 +141,14 @@ export async function GET(req: Request) {
 
     if (error) throw error;
 
-    // Fetch auth users using the service_role client to check email_confirmed_at
-    const { data: authData, error: authError } = await supabaseServer.auth.admin.listUsers();
-    
-    const confirmedMap = new Map<string, string | null>();
-    if (!authError && authData?.users) {
-      authData.users.forEach((u: any) => {
-        if (u.id) {
-          confirmedMap.set(u.id, u.email_confirmed_at || u.confirmed_at || null);
-        }
-      });
-    } else if (authError) {
-      console.warn("Failed to fetch auth users list for confirmation check:", authError.message);
+    // Active vs Invited comes from Supabase Auth. Look each employee up by id inside a short deadline
+    // instead of listing every auth user (first page only, no time limit): see employeeConfirmation.ts.
+    const { map: confirmedMap, complete: confirmationComplete } = await getConfirmationMap(
+      (id) => supabaseServer.auth.admin.getUserById(id),
+      (employees || []).map((e: any) => e.auth_user_id),
+    );
+    if (!confirmationComplete) {
+      console.warn('GET /api/employees: some email confirmations could not be read in time; they show as Invited for now.');
     }
 
     const schedulesMap = await getEmployeeWorkingSchedulesMap();

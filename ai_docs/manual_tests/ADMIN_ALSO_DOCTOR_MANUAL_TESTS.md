@@ -40,4 +40,6 @@
 - [ ] Log in and reload: the panel appears right after the short "Verifying administrator session..." screen, without waiting for the Employees list. Open Employees straight away: the list is there or shows its loading state, never an empty table forever.
 - [ ] With the browser's Network tab set to block or slow `/api/employees` (request blocking or Slow 3G), reload: the dashboard still opens; only the screens that need employees wait.
 - [ ] Log in as a doctor-workspace account: the Doctor Portal opens right away (name may show the email for a moment, then the real name).
+- [ ] Employees: every person who has signed in shows Active (green), only people who never accepted the invitation show Invited. Compare with Supabase Auth if unsure.
+- [ ] Employees loads in a few seconds on the first visit after a deploy (cold server), not tens of seconds.
 

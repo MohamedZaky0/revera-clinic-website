@@ -5385,5 +5385,9 @@ See `PROPOSALS.md` for:
 
 **Fix:** the call is no longer awaited (`void fetchRolesAndEmployees()`), so the panel appears as soon as `/api/auth/me` answers. The employee and role lists fill in afterwards and the screens that use them already have their own loading state. In the doctor view the name briefly falls back to the email until the list arrives.
 
-**Not fixed / limits:** `/api/employees` itself is still slow (listing every auth user to read confirmation dates) and, if it fails, the lists stay empty until the next refetch; a timeout and a lighter query would be a separate change.
+**Follow-up (same day): `/api/employees` itself.**
+- **Server:** `GET /api/employees` read "Active vs Invited" with `auth.admin.listUsers()`, which returns only the first 50 auth users (so on a project with more, some employees showed as Invited though they had signed in) and has no time limit. It now looks each employee up by id (`getUserById`, `src/lib/employeeConfirmation.ts`) in batches of 10 under a 4 s deadline, remembers confirmed users in memory for the life of the server instance, and on a timeout answers with what it has (the rest show as Invited, with a server log line) instead of hanging. Tested in `tests/lib/employeeConfirmation.test.ts`.
+- **Client:** `fetchRolesAndEmployees` loaded both lists with one `Promise.all` and discarded both if either failed. Each list is now loaded on its own, with a 20 s limit and one retry after 2 s; a failed one leaves the other in place.
+
+**Not fixed / limits:** a request that still fails after the retry leaves that list empty until the next refetch (opening Employees or Profile refetches). The in-memory confirmation cache is per server instance, so each cold instance pays the lookups once.
 
