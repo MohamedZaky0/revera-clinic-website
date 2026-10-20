@@ -55,7 +55,7 @@ export async function recoverFromInvoluntarySignOut(
  */
 export type StaffSessionVerification =
   | { status: 'ok'; me: any; session: any }
-  | { status: 'unauthorized'; httpStatus: number }
+  | { status: 'unauthorized'; httpStatus: number; code?: string }
   | { status: 'transient' };
 
 export interface VerifyStaffSessionDeps {
@@ -91,7 +91,14 @@ export async function verifyStaffSession(deps: VerifyStaffSessionDeps): Promise<
       return { status: 'ok', me: await res.json(), session };
     }
     if (res && res.status === 403) {
-      return { status: 'unauthorized', httpStatus: 403 };
+      // DEC-117: /api/auth/me says why when the account has been switched Inactive.
+      let code: string | undefined;
+      try {
+        code = (await res.json())?.code;
+      } catch {
+        /* no body: keep the generic reason */
+      }
+      return { status: 'unauthorized', httpStatus: 403, code };
     }
 
     if (res && res.status === 401) {
@@ -124,7 +131,7 @@ export async function verifyStaffSession(deps: VerifyStaffSessionDeps): Promise<
  * redirect and shown (once) on the login page, so "it logged me out" can be reported with a cause
  * instead of a guess. A deliberate Logout clears it.
  */
-export type LogoutReason = 'inactivity' | 'session_rejected' | 'wrong_portal' | 'session_ended';
+export type LogoutReason = 'inactivity' | 'session_rejected' | 'wrong_portal' | 'session_ended' | 'account_inactive';
 
 const LOGOUT_REASON_KEY_SUFFIX = '_last_logout_reason';
 
@@ -174,7 +181,7 @@ export function consumeLogoutReason(prefix: string, storage?: StorageLike): Logo
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed.at !== 'number' || Date.now() - parsed.at > 24 * 3600 * 1000) return null;
-    return ['inactivity', 'session_rejected', 'wrong_portal', 'session_ended'].includes(parsed.reason) ? parsed.reason : null;
+    return ['inactivity', 'session_rejected', 'wrong_portal', 'session_ended', 'account_inactive'].includes(parsed.reason) ? parsed.reason : null;
   } catch {
     return null;
   }
@@ -190,6 +197,8 @@ export function describeLogoutReason(reason: LogoutReason): string {
       return 'This account belongs to a different portal. Sign in from your own portal.';
     case 'session_ended':
       return 'Your session ended unexpectedly. Please sign in again.';
+    case 'account_inactive':
+      return 'This account has been made inactive, so you were signed out. Contact an administrator to get access back.';
   }
 }
 

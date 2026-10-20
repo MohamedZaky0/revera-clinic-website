@@ -1483,6 +1483,7 @@ export const adminTranslations = {
         noShift: "Day",
         activeBadge: "Active",
         invitedBadge: "Invited",
+        inactiveBadge: "Inactive",
         fallbackDept: "Reception",
         salarySuffix: " EGP",
       },
@@ -1490,6 +1491,8 @@ export const adminTranslations = {
         viewInfo: "View Info",
         editEmployee: "Edit Employee",
         resend: "Resend",
+        deactivate: "Active: switch off to remove all access",
+        activate: "Inactive: switch on to restore access",
         revoke: "Revoke access",
       },
       modal: {
@@ -4356,6 +4359,7 @@ export const adminTranslations = {
         noShift: "نهار",
         activeBadge: "نشط",
         invitedBadge: "مدعو",
+        inactiveBadge: "غير نشط",
         fallbackDept: "الاستقبال",
         salarySuffix: " ج.م",
       },
@@ -4363,6 +4367,8 @@ export const adminTranslations = {
         viewInfo: "عرض البيانات",
         editEmployee: "تعديل الموظف",
         resend: "إعادة الإرسال",
+        deactivate: "نشط: أوقفه لإزالة كل صلاحيات الدخول",
+        activate: "غير نشط: شغّله لإرجاع الدخول",
         revoke: "إلغاء الوصول",
       },
       modal: {

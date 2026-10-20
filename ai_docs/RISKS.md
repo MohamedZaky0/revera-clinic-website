@@ -5421,3 +5421,17 @@ See `PROPOSALS.md` for:
 **Suggested fix:** when `receptionistStartedSession` is `null`, look the copy up by id in `reservations` and clear it if that row is no longer an active status (or if it is missing); otherwise refresh the copy from the row. Add a component test around the effect.
 
 **Test checklist:** `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md` (Doctor portal section, evidence log 2026-10-20).
+
+---
+
+## RISK-124: "Soft Delete" Of An Employee Overwrote The Role And Did Not Block Access (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+
+**Manual test checklist:** `ai_docs/manual_tests/ACCOUNT_ACTIVE_INACTIVE_MANUAL_TESTS.md`
+
+**Severity:** Medium (the UI promised "they lose access immediately" and did not deliver it) · **Type:** Access control
+**Found:** 2026-10-22, while planning the Active/Inactive switch (DEC-117).
+
+**Cause:** `DELETE /api/employees?mode=soft` set `role_name = 'inactive'`. That discarded the person's real role (so it could not be restored), and nothing in the staff-access check looked at it: an `inactive` person who still had a valid login kept an employee row, so `requireStaffAccess` let them through to any endpoint that only needs "staff". Neither project had any row with that value (checked), so nothing needed converting.
+
+**Fix:** DEC-117: an `is_active` flag checked by `requireStaffAccess`, `verifyHrAccess` and `/api/auth/me`, plus a Supabase Auth ban; soft delete now just switches the account Inactive.
+

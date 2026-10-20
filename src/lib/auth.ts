@@ -22,12 +22,16 @@ export async function verifyHrAccess(req: Request) {
     // 2. Fetch employee role
     const { data: employee, error: empError } = await supabaseServer
       .from('employee_accounts')
-      .select('id, role_name')
+      .select('id, role_name, is_active')
       .eq('auth_user_id', user.id)
       .maybeSingle();
 
     if (empError || !employee) {
       return { error: 'Unauthorized: Access restricted to registered staff.', status: 403 };
+    }
+
+    if (employee.is_active === false) {
+      return { error: 'This account is inactive. Contact an administrator.', status: 403 };
     }
 
     const role = (employee.role_name || '').toLowerCase();
