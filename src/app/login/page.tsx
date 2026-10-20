@@ -41,9 +41,9 @@ export default function UnifiedStaffLoginPage() {
           if (res.ok) {
             const authData = await res.json();
             if (authData.role && isMounted) {
-              const roleSlug = getRoleSlug(authData.role);
+              const roleSlug = getRoleSlug(authData.role, authData.workspace);
               const targetPath = roleSlug === "admin" ? "/admin" : `/${roleSlug}`;
-              setRedirectingTo(getRoleDisplayName(authData.role));
+              setRedirectingTo(getRoleDisplayName(authData.role, authData.workspace));
               if (typeof window !== "undefined") {
                 sessionStorage.setItem(`${CLIENT.storagePrefix}_admin_session_active`, "true");
               }
@@ -142,9 +142,9 @@ export default function UnifiedStaffLoginPage() {
 
       if (meRes.ok) {
         const authData = await meRes.json();
-        const roleSlug = getRoleSlug(authData.role);
+        const roleSlug = getRoleSlug(authData.role, authData.workspace);
         const targetPath = roleSlug === "admin" ? "/admin" : `/${roleSlug}`;
-        setRedirectingTo(getRoleDisplayName(authData.role));
+        setRedirectingTo(getRoleDisplayName(authData.role, authData.workspace));
         router.replace(targetPath);
       } else {
         const errData = await meRes.json().catch(() => ({}));

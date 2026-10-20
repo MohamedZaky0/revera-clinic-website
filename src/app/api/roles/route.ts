@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireAdministratorAccess, requireSuperadminAccess } from '@/lib/access';
+import type { RoleWorkspace } from '@/lib/roleUtils';
 
 /**
  * Roles that can never be deleted or unlocked, whatever `roles.locked` says.
@@ -50,6 +51,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Role name and permissions array are required' }, { status: 400 });
     }
 
+    // DEC-113: `workspace` picks the screen the role lands on. Optional so an older admin tab that
+    // does not know about it saves permissions without silently resetting the role to 'standard'.
+    const workspace: RoleWorkspace | undefined = body.workspace === undefined ? undefined : body.workspace;
+    if (workspace !== undefined && workspace !== 'standard' && workspace !== 'doctor') {
+      return NextResponse.json({ error: "workspace must be 'standard' or 'doctor'" }, { status: 400 });
+    }
+
     // Clean name to lowercase alphanumeric (no spaces)
     const cleanedName = name.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
     if (!cleanedName) {
@@ -70,6 +78,7 @@ export async function POST(req: Request) {
       .upsert({
         name: cleanedName,
         permissions,
+        ...(workspace !== undefined ? { workspace } : {}),
         updated_at: new Date().toISOString()
       }, { onConflict: 'name' })
       .select()

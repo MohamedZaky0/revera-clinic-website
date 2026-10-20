@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getDoctorRoleNames } from '@/lib/roleWorkspace';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyHrAccess } from '@/lib/auth';
 
@@ -16,10 +17,12 @@ export async function GET(req: Request) {
 
     if (error) throw error;
 
+    // Doctors are paid through Doctor Payroll. Who counts as a doctor is decided by the role's
+    // workspace (DEC-113), not by the department label.
+    const doctorRoles = await getDoctorRoleNames();
     const filtered = (payroll || []).filter((item: any) => {
-      const dept = String(item.employee_accounts?.department || '').trim().toLowerCase();
       const role = String(item.employee_accounts?.role_name || '').trim().toLowerCase();
-      return dept !== 'doctors' && dept !== 'doctor' && role !== 'doctor' && role !== 'doctors';
+      return !doctorRoles.has(role);
     });
 
     return NextResponse.json(filtered);
@@ -47,10 +50,10 @@ export async function POST(req: Request) {
       .select('id, role_name, department, salary, required_target_amount, bonus_percentage, target_type, bonus_type');
 
     if (empErr) throw empErr;
+    const doctorRoles = await getDoctorRoleNames();
     const payrollEmployees = (employees || []).filter((emp: any) => {
       const role = String(emp.role_name || '').trim().toLowerCase();
-      const dept = String(emp.department || '').trim().toLowerCase();
-      return role !== 'superadmin' && dept !== 'doctors' && dept !== 'doctor' && role !== 'doctor' && role !== 'doctors';
+      return role !== 'superadmin' && !doctorRoles.has(role);
     });
     if (payrollEmployees.length === 0) {
       return NextResponse.json({ error: 'No non-doctor employee accounts found to run payroll.' }, { status: 400 });

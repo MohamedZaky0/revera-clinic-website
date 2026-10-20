@@ -8,6 +8,7 @@ import {
   Users,
   BarChart3,
   LogOut,
+  ShieldCheck,
   X
 } from "lucide-react";
 import { DoctorTab } from "./types";
@@ -27,6 +28,8 @@ interface DoctorSidebarProps {
   setLang: (lang: "en" | "ar") => void;
   onFetchReservations: () => void;
   onLogout: () => void;
+  /** Only passed to an admin/superadmin who opened the doctor view on purpose. */
+  onSwitchToAdmin?: () => void;
   sidebarOpen?: boolean;
   setSidebarOpen?: (open: boolean) => void;
 }
@@ -45,6 +48,7 @@ export default function DoctorSidebar({
   setLang,
   onFetchReservations,
   onLogout,
+  onSwitchToAdmin,
   sidebarOpen = false,
   setSidebarOpen
 }: DoctorSidebarProps) {
@@ -296,6 +300,18 @@ export default function DoctorSidebar({
               </p>
             </div>
           </button>
+
+          {onSwitchToAdmin && (
+            <button
+              type="button"
+              onClick={onSwitchToAdmin}
+              title={t.backToAdminViewTitle}
+              className="w-full flex items-center justify-center gap-1.5 h-8 rounded-lg border border-white/15 bg-white/10 text-[var(--color-brand-light)] hover:bg-white/20 transition text-xs font-semibold cursor-pointer"
+            >
+              <ShieldCheck size={14} />
+              <span>{t.backToAdminView}</span>
+            </button>
+          )}
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
