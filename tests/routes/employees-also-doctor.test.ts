@@ -15,6 +15,16 @@ const fake = createSupabaseFake();
 const mockDb = fake.db;
 const mockCreateUser = vi.fn();
 const mockUpdateUser = vi.fn();
+// The dev project has no employee_accounts.working_days_hours column, so the route's first insert
+// fails there and it retries without that column. This switch reproduces that.
+let missingWorkingDaysColumn = false;
+
+// The route keeps a local JSON copy of working schedules; never let a test write into data/.
+vi.mock('fs', async (importOriginal) => {
+  const actual: any = await importOriginal();
+  const stub = { ...actual, existsSync: () => false, mkdirSync: () => undefined, writeFileSync: () => undefined };
+  return { ...stub, default: stub };
+});
 
 vi.mock('@/lib/supabaseServer', () => ({
   supabaseServer: {
@@ -28,7 +38,17 @@ vi.mock('@/lib/supabaseServer', () => ({
         listUsers: () => Promise.resolve({ data: { users: [] }, error: null }),
       },
     },
-    from: (table: string) => fake.client.from(table),
+    from: (table: string) => {
+      const q: any = fake.client.from(table);
+      if (table === 'employee_accounts' && missingWorkingDaysColumn) {
+        const realInsert = q.insert.bind(q);
+        q.insert = (payload: any) =>
+          payload && 'working_days_hours' in payload
+            ? { select: () => ({ single: async () => ({ data: null, error: { message: 'column working_days_hours does not exist' } }) }) }
+            : realInsert(payload);
+      }
+      return q;
+    },
     rpc: (name: string, args?: any) => fake.client.rpc(name, args),
   },
 }));
@@ -62,6 +82,7 @@ function seed() {
 beforeEach(() => {
   vi.clearAllMocks();
   fake.reset();
+  missingWorkingDaysColumn = false;
   for (const t of ['employee_accounts', 'roles', 'customers', 'providers', 'hr_payroll']) fake.seed(t, []);
   mockCreateUser.mockResolvedValue({ data: { user: { id: NEW_AUTH_USER } }, error: null });
   mockUpdateUser.mockResolvedValue({ data: { user: {} }, error: null });
@@ -79,6 +100,17 @@ describe('POST /api/employees - also a doctor', () => {
     expect(emp?.role_name).toBe('admin');
     expect(emp?.is_also_doctor).toBe(true);
     expect(mockDb.providers.map((p: any) => p.name)).toEqual(['Dr Owner']);
+  });
+
+  it('keeps the flag when the first insert fails and the route retries without working_days_hours', async () => {
+    seed();
+    missingWorkingDaysColumn = true;
+    const res = await POST_EMPLOYEES(req('POST', {
+      email: 'retry@clinic.test', name: 'Dr Retry', roleName: 'admin', password: STRONG_PASSWORD,
+      isAlsoDoctor: true, workingDaysHours: { Sunday: { isOpen: true, start: '09:00', end: '17:00' } },
+    }));
+    expect(res.status).toBe(201);
+    expect(mockDb.employee_accounts.find((e: any) => e.email === 'retry@clinic.test')?.is_also_doctor).toBe(true);
   });
 
   it('an admin without the flag gets no provider row and no flag', async () => {

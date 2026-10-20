@@ -411,6 +411,9 @@ export async function POST(req: Request) {
         bonus_percentage: bonusPercentage ? Number(bonusPercentage) : 0,
         target_type: targetType || 'reservations',
         bonus_type: bonusType || 'percentage',
+        // A database without working_days_hours (the dev project) always lands here, so the flag
+        // has to be carried on this path too or an also-a-doctor hire is saved without it.
+        ...(alsoDoctor ? { is_also_doctor: true } : {}),
       };
 
       const resFallback = await supabaseServer
