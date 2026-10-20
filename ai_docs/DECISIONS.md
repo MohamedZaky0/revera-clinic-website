@@ -3716,3 +3716,14 @@ Investigation revealed:
 
 **Not done / known limits:** unticking the flag stops the doctor sync but does not delete or deactivate the `providers` row (it may already have bookings); deactivate the doctor from the Doctors screen if they should disappear from pickers. Past staff-payroll rows of someone who is later flagged are hidden from the staff payroll list because the filter looks at the flag, not at history.
 
+---
+
+## DEC-115: In-Clinic And Online Consultation Shifts May Overlap At The Same Branch
+
+**Date:** 2026-10-21
+**Status:** Decided & implemented
+
+**Context:** Add/Edit Employee (doctor sections) blocked saving with "Shift Overlap Detected on Sunday: New Cairo Branch (In-Clinic: 09:00 - 17:00) overlaps with New Cairo Branch (Online Consultations: 09:00 - 17:00)", and the form's own defaults for a new doctor are exactly that, so no doctor could be saved without editing the schedule first. Reported by the owner: a doctor can take online consultations while they are available in the clinic.
+
+**Decision:** the overlap check (`checkShiftOverlaps`, `AdminEmployeesView.tsx`) skips the pair In-Clinic vs Online Consultations at the SAME branch (`mayOverlap`, `src/lib/shiftOverlap.ts`, tested). Still a warning: two in-clinic shifts overlapping, two online shifts overlapping, and any overlap between shifts at different branches (including in-clinic at one branch vs online at another, kept conservative because the owner only described the same-branch case). Invalid durations (end before start) are unchanged.
+

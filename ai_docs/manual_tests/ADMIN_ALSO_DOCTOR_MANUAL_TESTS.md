@@ -25,3 +25,9 @@
 ## Payroll
 - [ ] HR -> Payroll no longer lists that person; Doctor Payroll does. Run Payroll for a month: no staff payroll row is created for them.
 - [ ] A plain admin (box not ticked) is still in the staff payroll.
+
+## Shift overlap (DEC-115)
+- [ ] Add a doctor (or tick the box on an admin) and leave the default schedule (In-Clinic 09:00-17:00 and Online 09:00-17:00, same branch): it saves, no "Shift Overlap" warning.
+- [ ] Add a second In-Clinic shift 12:00-15:00 on the same day: the warning still appears.
+- [ ] Give the doctor two branches with In-Clinic 09:00-17:00 at both on the same day: the warning still appears.
+

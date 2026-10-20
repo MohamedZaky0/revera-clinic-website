@@ -57,6 +57,7 @@ import { compressImage } from "@/lib/image";
 import { clearFetchCache } from "@/lib/fetchCache";
 import { DoctorServiceCommissionEditor, ServiceCommissionEntry, DefaultCommissionType } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import { adminTranslations } from "@/components/admin/translations";
+import { mayOverlap, type ShiftKind } from "@/lib/shiftOverlap";
 
 interface AdminEmployeesViewProps {
   // Shared with Role Management invite form
@@ -432,6 +433,7 @@ export default function AdminEmployeesView({
       const allActiveShifts: Array<{
         branchId: string;
         branchName: string;
+        kind: ShiftKind;
         type: string;
         startMin: number;
         endMin: number;
@@ -464,6 +466,7 @@ export default function AdminEmployeesView({
             allActiveShifts.push({
               branchId: bId,
               branchName: bName,
+              kind: 'in_clinic',
               type: t.doctorSection.inClinic,
               startMin: sMin,
               endMin: eMin,
@@ -492,6 +495,7 @@ export default function AdminEmployeesView({
             allActiveShifts.push({
               branchId: bId,
               branchName: bName,
+              kind: 'online',
               type: t.doctorSection.onlineConsultations,
               startMin: sMin,
               endMin: eMin,
@@ -508,6 +512,7 @@ export default function AdminEmployeesView({
           const s1 = allActiveShifts[i];
           const s2 = allActiveShifts[j];
 
+          if (mayOverlap(s1, s2)) continue;
           if (s1.startMin < s2.endMin && s1.endMin > s2.startMin) {
             return {
               hasOverlap: true,
