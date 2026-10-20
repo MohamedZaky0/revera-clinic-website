@@ -45,6 +45,7 @@ vi.mock('@/lib/supabaseServer', () => ({
         deleteUser: (...args: any[]) => mockDeleteUser(...args),
         updateUserById: () => Promise.resolve({ data: {}, error: null }),
         listUsers: () => Promise.resolve({ data: { users: [] }, error: null }),
+        getUserById: () => Promise.resolve({ data: { user: { email_confirmed_at: null } }, error: null }),
       },
     },
     from: (table: string) => fake.client.from(table),

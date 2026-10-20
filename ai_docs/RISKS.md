@@ -5289,6 +5289,67 @@ scope for that sweep (it only asserts no-token→401 and patient-session→403, 
 **Not done / unconfirmed:** this could not be reproduced here (it needs the clinic laptop) and Vercel runtime logs were not available, so which of the two paths (or the 1-hour inactivity timer after the laptop slept) caused the clinic's case is a diagnosis from the code, not an observation. The inactivity timer is unchanged: it counts mouse, keyboard, click, scroll and touch, so typing in a form keeps it alive, but a laptop that sleeps for an hour comes back logged out by design. If it happens again, the notice on the login page names the cause. Also worth checking on that laptop: its date/time and time zone are correct.
 
 ---
+## RISK-118: Reloading The Admin Panel Always Landed On Dashboard, And Every Window Switch Reloaded Every Table With A "Loading" Flash (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_118_REFRESH_BEHAVIOUR_MANUAL_TESTS.md`
+
+**Severity:** Medium (daily friction for reception/doctors; no data loss) · **Type:** UX / state handling
+**Found:** 2026-10-19, owner report: "F5 anywhere returns me to Dashboard, and tables take a while and visibly reload inside the page, not just the table." Diagnosed by reading `src/app/admin/page.tsx` and the installed `@supabase/auth-js` 2.108.1; **not measured in a live logged-in browser** (no test login was available).
+
+**Causes found:**
+1. The open section was a plain `useState("Dashboard")` with nothing in the URL or storage, so any reload started at Dashboard (also for `/reception` and `/doctor`, which render the same component).
+2. Supabase re-announces the stored login (`SIGNED_IN`) every time the browser tab becomes visible again (`_onVisibilityChanged` -> `_recoverAndRefresh`), and once more on page load next to the explicit `getSession()` call. Each announcement re-ran `/api/auth/me`, replaced the `session` object, and so re-fired every fetcher keyed on `[session]` (customers, inventory products, HR data, customer packages), each setting its own "Loading..." flag.
+3. Background refreshes blanked data: `fetchCustomers` emptied the patient list on any failed refresh, the 15 s booking poll emptied `allReservations`/`requests` on one failed request, and the poll effect (re-created whenever the access token rotates, RISK-053) started with a spinner every time.
+4. Structural, **not changed here**: the whole panel is one ~11,500-line component with ~350 `useState`, so every state change re-renders every table. This is why a refresh of one list feels like the whole page refreshing. Splitting it is a separate project.
+
+**Fix (all in `src/app/admin/page.tsx` unless noted):**
+1. The open section is kept in the URL as `?section=<label>` (`src/lib/adminSection.ts`, whitelist of known sections; Dashboard keeps the URL clean; other query params such as `?setup=true` are preserved). It is restored once after the first successful login check; a section the person may not open is still corrected by the existing permission effect. Not restored: sub-state inside a section (calendar vs list tab, an open patient profile).
+2. `SIGNED_IN`/`INITIAL_SESSION` for a login that was verified in the last 5 minutes (same user and token), or is being verified right now, is ignored. The first-load `getSession()` path skips a login the listener already handles. `setSession` keeps the previous object when user and token are unchanged, so the `[session]` fetchers only re-run when the token really changes (about hourly).
+3. Customers, inventory products and employees show their loading state only when nothing is on screen yet. Failed or malformed background refreshes keep the current rows. The booking poll (`fetchAllReservations(useCache, keepOnError)`, `fetchRequests`) keeps data on error and shows the spinner only for the first load or a branch switch.
+
+**Behaviour change to know about:** permissions were previously re-checked on every return to the tab (as a side effect of the re-announcement). They are now re-checked on load, on token rotation (about hourly) and on the retry path, so a permission change made by an admin can take up to about an hour to reach an already-open tab. A reload picks it up immediately.
+
+**Tests:** `tests/lib/adminSection.test.ts` (7). Full suite 1443 passed / 4 expected-fail, `tsc` clean, `eslint` unchanged (0 errors; 216 pre-existing warnings). The component-level behaviour (dedupe, quiet refresh) has no automated test: `admin/page.tsx` is not unit-testable in isolation.
+
+**Not done / unconfirmed:** nobody has yet watched this in a logged-in browser; the checklist's evidence log is empty on purpose.
+
+---
+## PROPOSALS.md Reference
+
+
+## RISK-119: The Admin Shell's Own Polls And Re-Renders Kept Refetching And Flashing Tables (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md`
+
+**Severity:** Medium (same daily friction as RISK-118; no data loss) · **Type:** UX / render performance
+**Found:** 2026-10-19, follow-up to RISK-118. Diagnosed by reading code on `feat/brief-36-admin-refresh`; **not measured in a live logged-in browser**.
+
+**Causes found:**
+1. `authenticatedJsonHeaders` in `src/app/admin/page.tsx` was a plain object literal — a new identity every shell render — passed to children as `authHeaders`. `InventoryDevicesTab`, `InventoryProductsTab` (sales history) and `DeviceAuditLogsModal` keyed `useCallback` fetchers on it inside `useEffect`, so every shell state change (including the 15 s booking poll) refetched, and each fetch started with `setLoading(true)`, flashing a spinner row over the whole table.
+2. The 15 s booking poll and 30 s HR-alerts poll stored freshly parsed arrays every tick, so `requests`, `allReservations`, `scheduleReservations` and `activeMissingAlerts` got a new identity even when the data was identical — re-rendering the ~350-`useState` shell and every mounted child each tick.
+3. Extracted views were not memoized: `BookingDetailsModal` (~5k lines) and `AdminBookingsView` re-rendered on every shell render, further fed by inline arrow props and plain-function props (`fetchRequests`, `fetchAllReservations`, `openApprove`, `saveNotes`).
+4. **Worst offender (Part B2):** `AdminBookingsView` ran its own **3 s** poll — `supabase.from("reservations").select("*")` unbounded, plus providers and prescriptions — storing fresh arrays into `dbReservations`/`dbProviders`/`dbPrescriptions` every tick, so the largest table in the app re-rendered every 3 s. `DoctorAccountView` polled the same way every 3 s (`?limit=250`).
+
+**Fix (3 commits on `feat/brief-36-admin-refresh`):**
+1. **Part A:** `authenticatedJsonHeaders` is `useMemo` on `session?.access_token` (still picks up token rotation — RISK-053). The three inventory fetchers use a ref "hadData" pattern: the loading row/spinner only appears when nothing is on screen yet; failed or malformed refetches keep existing rows; post-write refetches (add/edit/pulse update/reset) run quietly.
+2. **Part B:** `src/lib/pollEqual.ts` (`pollDataEqual`) — JSON compare chosen over an id/status/updated-at key list because rows come through one serializer, and it also catches field changes a hand-picked key list would miss. All four poll-fed setters keep the previous reference when a tick is identical; post-write refetches still update immediately because the data really changed.
+3. **Part C:** `React.memo` on `BookingDetailsModal` and `AdminBookingsView`, with every prop stabilized: `fetchRequests`/`fetchAllReservations`/`fetchScheduleReservations`/`refreshApproveAvailability`/`openApprove`/`saveNotes`/`handleExportBookingsCSV` converted to `useCallback`, and the bookings/details inline handlers extracted to stable `useCallback`s (RISK-047/052/053 comments preserved). **Left unmemoized on purpose:** `AdminEmployeesView` (inline `rolesList.filter` creates a new array per render plus ~9 plain-function props) and `CustomerProfileDrawer` (~20 plain `handle*`/`fetch*` props) — memoizing them needs the large prop-plumbing refactor the brief defers.
+4. **Part B2:** the two 3 s child pollers now keep the previous array on identical ticks. `AdminBookingsView` uses a key-based comparator (`pollRowsEqualByKeys`, all mutable `reservations` columns minus `created_at`/`updated_at`) because a measured `JSON.stringify` compare costs ~8 ms on 5,000 rows and ~30 ms on 20,000 — over the ~20 ms budget at 3 s cadence. `DoctorAccountView` (`?limit=250`) uses `pollDataEqual`. `updated_at` was deliberately not trusted: it is a `DEFAULT now()` on insert with no trigger. The optimistic `setDbReservations` patches and the realtime/`revera-booking-change`/`revera-prescription-change` event refreshes are untouched — differing server data still replaces local state.
+5. **Doctor portal (added 2026-10-20, branch `feat/doctor-portal-memo`):** the doctor portal's own 3 s reservations poll was already covered by Part B2 (`pollDataEqual`); it has no other poll, interval or channel. What was left was that `DoctorAccountView` (1.9k lines plus every doctor tab) was not memoized, and the shell passed it `onLogout={handleLogout}` (a plain function recreated each render) and an inline `onSwitchToAdmin` arrow. Now `export default React.memo(DoctorAccountView)`; the shell passes `handleDoctorLogout` (a `useCallback` that calls the latest `handleLogout` through a ref, so logout still uses the live session) and `handleSwitchToAdmin` (a `useCallback`). After merging current `dev` (DEC-113/114 workspace switch) `handleSwitchToAdmin` calls `switchWorkspaceView(false)` through a ref, for the same reason. `tests/components/memoizedViews.test.tsx` fails if any of the three memoized views loses its wrapper (mutation-checked). **Verified live 2026-10-20** through the admin sidebar's "Doctor view" switch (DEC-113/114): with the doctor view open and its 3 s poll running for 44 s (21 `/api/reservations` requests), neither the shell nor `DoctorAccountView` re-rendered; a new booking for that doctor appeared (8.4 s, mostly slow `?limit=250` responses of 2-5 s, not the memo); Doctor view <-> Back to Admin view works both ways. Not tested: Sign Out (it would end the owner's session), typing in the clinical note during a started session.
+
+**Reported, deliberately NOT fixed (decisions for Mohamed):**
+- The Bookings realtime channel already subscribes to `postgres_changes` on **both** `reservations` and `prescriptions`, so the 3 s full-table poll is likely redundant — removing it is a product decision.
+- Bookings downloads the entire `reservations` table every 3 s per open admin tab (`select("*")`, no limit).
+- `fetchAllReservations` in `page.tsx` has `if (calendarView === "Schedule") fetchScheduleReservations()` **after** its `return` — unreachable, so the Schedule view never actually refreshes after writes. Left as found (a behaviour change, not this brief's scope).
+- Other timer-based pollers found in the sweep that set state from a fetch: none besides the ones fixed. Non-fetch timers left alone: `ReceptionDashboardView` 1 s elapsed-time clock, `OurResults` count-up animation, the page.tsx inactivity/presence/verify-retry intervals.
+
+**Full live test, 2026-10-20 (owner-confirmed test database):** every remaining checklist item that this login could reach was run; results are in the checklist evidence logs. Two things that were "decisions" above are now settled: the Schedule view is unreachable (`calendarView` is only ever set to `Calendar` or `List`, so the dead `fetchScheduleReservations()` call after the `return` never mattered in practice), and the doctor portal poll does not wait for the previous request, so on slow responses (2-5 s here) requests overlap. Two defects were found that this work did not cause: RISK-122 (Reject on the Pending list is not saved) and RISK-123 (doctor Ongoing Session stays open after reception completes it).
+
+**Tests:** `tests/lib/pollEqual.test.ts` (6). Full suite 1465 passed / 4 expected-fail, `tsc` clean, `eslint` 0 errors on touched files. Profiler before/after commit counts could not be produced — needs a logged-in browser.
+
+**Not done / unconfirmed:** no live-browser observation yet; the checklist's evidence log is empty on purpose. The acceptance checks in Brief 36 (60 s idle network silence on Devices, Profiler no-commit poll ticks) are written there.
+
+---
 ## PROPOSALS.md Reference
 
 
@@ -5326,5 +5387,37 @@ See `PROPOSALS.md` for:
 
 **Fix:** the call is no longer awaited (`void fetchRolesAndEmployees()`), so the panel appears as soon as `/api/auth/me` answers. The employee and role lists fill in afterwards and the screens that use them already have their own loading state. In the doctor view the name briefly falls back to the email until the list arrives.
 
-**Not fixed / limits:** `/api/employees` itself is still slow (listing every auth user to read confirmation dates) and, if it fails, the lists stay empty until the next refetch; a timeout and a lighter query would be a separate change.
+**Follow-up (same day): `/api/employees` itself.**
+- **Server:** `GET /api/employees` read "Active vs Invited" with `auth.admin.listUsers()`, which returns only the first 50 auth users (so on a project with more, some employees showed as Invited though they had signed in) and has no time limit. It now looks each employee up by id (`getUserById`, `src/lib/employeeConfirmation.ts`) in batches of 10 under a 4 s deadline, remembers confirmed users in memory for the life of the server instance, and on a timeout answers with what it has (the rest show as Invited, with a server log line) instead of hanging. Tested in `tests/lib/employeeConfirmation.test.ts`.
+- **Client:** `fetchRolesAndEmployees` loaded both lists with one `Promise.all` and discarded both if either failed. Each list is now loaded on its own, with a 20 s limit and one retry after 2 s; a failed one leaves the other in place.
 
+**Not fixed / limits:** a request that still fails after the retry leaves that list empty until the next refetch (opening Employees or Profile refetches). The in-memory confirmation cache is per server instance, so each cold instance pays the lookups once.
+
+
+---
+
+## RISK-122: Reject On The Bookings Pending List Hides The Request On Screen But Saves Nothing (OPEN)
+
+**Severity:** High (a reception "reject" is silently lost; the booking stays pending and can still be approved later) · **Type:** Data integrity / RLS
+**Found:** 2026-10-20, during the full live test of RISK-118/119 (not caused by either; the code is identical before Brief 36 — checked at `5d17c15`).
+
+**What happens:** in the Pending list, Reject calls `supabase.from("reservations").update({ status: "rejected" })` straight from the browser (`handleBookingsReject`, `src/app/admin/page.tsx`), then removes the row and sets `status: "rejected"` in local state without checking the result. RLS is on for `reservations` (`20260722140000_enable_row_level_security.sql`; `SECURITY.md` §4), so the anon-key write changes nothing and returns no error. Observed on the test database: row disappears in 0.1 s, the database still says `pending_deposit`, and after a page reload the booking is back in Pending. Approve does not have this problem (`openApprove` -> `PATCH /api/reservations`).
+
+**Not yet checked (same pattern, same file family):** `AdminBookingsView.tsx` lines ~1217 and ~1242 (`update({ status: "approved" })` / `update({ status: "rejected" })`) write the same way. If those buttons are reachable they have the same defect; confirm before fixing.
+
+**Suggested fix:** send the rejection through `PATCH /api/reservations?id=` with the staff token (the route already handles `status: "rejected"`, used successfully in the RISK-119 test), update local state only after a 2xx, and show an error otherwise. Add a route-level test that a rejected booking leaves Pending.
+
+**Test checklist:** `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md` (evidence log, 2026-10-20).
+
+---
+
+## RISK-123: The Doctor's Ongoing Session Panel Stays Open After Reception Completes The Booking (OPEN)
+
+**Severity:** Medium (the doctor keeps seeing, and can keep editing, a session that is already over) · **Type:** Stale local state
+**Found:** 2026-10-20, full live test of the doctor portal (via the admin "Doctor view" switch). Not caused by Brief 36.
+
+**What happens:** `DoctorAccountView` copies the started booking into `activeSessionBooking` and only clears that copy when the copy's own `status` is completed/cancelled/rejected (the effect after `receptionistStartedSession`). When someone else completes the booking, `reservations` updates correctly (the Schedule tab showed "Completed" within seconds) and `receptionistStartedSession` becomes `null`, but the stale copy still says `started`, so it is never cleared. Observed: 30 s after `PATCH status: completed`, Ongoing Session still showed the patient and the clinical-note box. Clinical-note typing itself was fine (28 s, 15 edits across ~9 poll ticks, no resets).
+
+**Suggested fix:** when `receptionistStartedSession` is `null`, look the copy up by id in `reservations` and clear it if that row is no longer an active status (or if it is missing); otherwise refresh the copy from the row. Add a component test around the effect.
+
+**Test checklist:** `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md` (Doctor portal section, evidence log 2026-10-20).

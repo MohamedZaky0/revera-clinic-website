@@ -2211,16 +2211,31 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     try {
       if (!session?.access_token) return;
       const headers = { Authorization: `Bearer ${session.access_token}` };
-      const [rolesResponse, employeesResponse] = await Promise.all([
-        fetch('/api/roles', { headers, cache: 'no-store' }),
-        fetch('/api/employees', { headers, cache: 'no-store' })
+      // Each list is loaded on its own so one slow or failing request no longer throws away the
+      // other, each has a time limit so it cannot hang forever, and a failure is retried once.
+      const loadJson = async (url: string) => {
+        let lastError: unknown;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const res = await fetch(url, { headers, cache: 'no-store', signal: AbortSignal.timeout(20000) });
+            if (res.ok) return await res.json();
+            lastError = new Error(`${url} responded ${res.status}`);
+          } catch (e) {
+            lastError = e;
+          }
+          if (attempt === 0) await new Promise((r) => setTimeout(r, 2000));
+        }
+        throw lastError;
+      };
+      const [rolesResult, employeesResult] = await Promise.allSettled([
+        loadJson('/api/roles'),
+        loadJson('/api/employees'),
       ]);
-      if (!rolesResponse.ok || !employeesResponse.ok) {
+      if (rolesResult.status === 'fulfilled') setRolesList(rolesResult.value);
+      if (employeesResult.status === 'fulfilled') setEmployeesList(employeesResult.value);
+      if (rolesResult.status === 'rejected' || employeesResult.status === 'rejected') {
         throw new Error('Unable to load roles and employees.');
       }
-      const [roles, emps] = await Promise.all([rolesResponse.json(), employeesResponse.json()]);
-      setRolesList(roles);
-      setEmployeesList(emps);
     } catch (err) {
       console.error("Error loading roles and employees:", err);
     } finally {

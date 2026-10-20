@@ -3729,3 +3729,16 @@ Investigation revealed:
 
 **Decision:** the overlap check (`checkShiftOverlaps`, `AdminEmployeesView.tsx`) skips the pair In-Clinic vs Online Consultations at the SAME branch (`mayOverlap`, `src/lib/shiftOverlap.ts`, tested). Still a warning: two in-clinic shifts overlapping, two online shifts overlapping, and any overlap between shifts at different branches (including in-clinic at one branch vs online at another, kept conservative because the owner only described the same-branch case). Invalid durations (end before start) are unchanged.
 
+---
+
+## DEC-116: Vercel Functions Run In Dublin (`dub1`), Next To Supabase
+
+**Date:** 2026-10-21
+**Status:** Decided & implemented (`vercel.json`); effect to be confirmed by measurement after deploy
+
+**Context:** the `x-vercel-id` header of every API response read `fra1::iad1`: served from the Frankfurt edge but executed in Washington D.C. (the Vercel default), while both Supabase projects (production and dev) are in `eu-west-1` (Ireland). Each admin API route makes several database and auth calls one after the other (verify the token, look up the employee, look up the role, then the data), and every one crossed the Atlantic. On dev, `/api/roles` and `/api/employees` took 2 to 17 s per call; the admin panel felt slow and once sat on "Verifying administrator session" (RISK-121).
+
+**Decision:** `vercel.json` pins `"regions": ["dub1"]` (Dublin, the same AWS region as Supabase). It applies to every deployment of the project, dev and production alike.
+
+**Not done / limits:** only the function region changes; the Supabase projects stay where they are. Nothing else in `vercel.json` is set. The cold-start delay of a function that has been idle is a separate cost and is unchanged. If the Vercel project's own Function Region setting in the dashboard disagrees, `vercel.json` wins for new deployments.
+
