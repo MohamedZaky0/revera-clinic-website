@@ -40,7 +40,7 @@ export async function requireStaffAccess(req: Request): Promise<AccessResult> {
 
     const employeeLookup = await supabaseServer
       .from("employee_accounts")
-      .select("id, employee_id, email, role_name, auth_user_id")
+      .select("id, employee_id, email, role_name, auth_user_id, is_active")
       .eq("auth_user_id", authData.user.id)
       .maybeSingle();
     let employee = employeeLookup.data;
@@ -53,7 +53,7 @@ export async function requireStaffAccess(req: Request): Promise<AccessResult> {
       const userEmail = authData.user.email.trim().toLowerCase();
       const { data: empByEmail, error: empEmailError } = await supabaseServer
         .from("employee_accounts")
-        .select("id, employee_id, email, role_name, auth_user_id")
+        .select("id, employee_id, email, role_name, auth_user_id, is_active")
         .ilike("email", userEmail)
         .maybeSingle();
 
@@ -71,6 +71,11 @@ export async function requireStaffAccess(req: Request): Promise<AccessResult> {
     }
 
     if (!employee) return { error: "Staff access is required.", status: 403 };
+
+    // DEC-117: an inactive account has no access to anything, whatever its role says.
+    if (employee.is_active === false) {
+      return { error: "This account is inactive. Contact an administrator.", status: 403 };
+    }
 
     const rawRole = (employee.role_name || "").toLowerCase().trim();
     const cleanRole = rawRole.replace(/[\s_-]+/g, "");

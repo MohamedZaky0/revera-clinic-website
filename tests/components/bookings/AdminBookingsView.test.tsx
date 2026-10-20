@@ -128,7 +128,7 @@ describe('doctor name resolution', () => {
 });
 
 describe('pending approvals — approve/reject', () => {
-  // RISK-124: Approve only asks the parent to open the approve dialog. The row must stay listed (cancelling
+  // RISK-125: Approve only asks the parent to open the approve dialog. The row must stay listed (cancelling
   // the dialog would otherwise leave a still-pending request hidden) and nothing is written from the browser;
   // the parent saves through the API and the list changes when it refetches.
   it('approve hands the booking to onApproveBooking, keeps the row listed and does not write to Supabase', async () => {

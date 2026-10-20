@@ -919,13 +919,15 @@ Creates an employee account and sends a Supabase Auth invite email.
 
 Updates an employee. Send only the fields being changed. `branchIds` / legacy `branchId` follow the same rules as POST, except a branch the employee **already holds** may stay even if it is now inactive. An empty list (or a null `branchId`) is rejected with `400`.
 
+**Active / Inactive (DEC-117):** send `{ id, isActive: true|false }`. It is handled on its own and returns the updated row plus `authSynced` (whether the Supabase Auth ban was applied). Refused with `403` for a superadmin account and `400` for your own account. Inactive accounts get `403` from every staff endpoint and from `/api/auth/me` (`code: "account_inactive"`).
+
 ---
 
 ## DELETE /api/employees?id={id}
 
-Deletes an employee account and the linked Supabase Auth user.
+Administrator-level (admin or superadmin). `mode=hard` (default) deletes the account and the linked Supabase Auth user. `mode=soft` switches the account Inactive instead (role and records kept, Auth user banned). Refused with `403` for a superadmin account and `400` for your own account (DEC-117).
 
-**Response:** `{ success: true }`
+**Response:** `{ message }`
 
 ---
 

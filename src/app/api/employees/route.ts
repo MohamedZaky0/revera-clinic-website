@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { requireAdministratorAccess, requireSuperadminAccess } from '@/lib/access';
+import { requireAdministratorAccess } from '@/lib/access';
 import { normalizeServiceCommissions } from '@/lib/providerCommissions';
 import {
   getEmployeeBranchIds,
@@ -12,6 +12,7 @@ import fs from 'fs';
 import path from 'path';
 import { isDoctorEmployee } from '@/lib/roleWorkspace';
 import { getConfirmationMap } from '@/lib/employeeConfirmation';
+import { checkAccountAction, AUTH_BAN_DURATION } from '@/lib/accountActivation';
 
 const SCHEDULES_FILE_PATH = path.join(process.cwd(), 'data', 'employee_schedules.json');
 
@@ -127,6 +128,24 @@ async function saveEmployeeWorkingSchedule(employeeKey: string, schedule: any, a
       }, { onConflict: 'key' });
   } catch (err) {
     console.warn('Error saving employee_working_schedules to page_settings:', err);
+  }
+}
+
+/** Switch the matching Supabase Auth user on or off. Returns false when it could not be done. */
+async function setAuthUserBanned(authUserId: string | null | undefined, banned: boolean): Promise<boolean> {
+  if (!authUserId) return true;
+  try {
+    const { error } = await supabaseServer.auth.admin.updateUserById(authUserId, {
+      ban_duration: banned ? AUTH_BAN_DURATION : 'none',
+    } as any);
+    if (error) {
+      console.warn('Could not update the auth ban for an employee account:', error.message);
+      return false;
+    }
+    return true;
+  } catch (e: any) {
+    console.warn('Could not update the auth ban for an employee account:', e?.message || e);
+    return false;
   }
 }
 
@@ -552,6 +571,35 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Employee account not found.' }, { status: 404 });
     }
 
+    // DEC-117: Active / Inactive. Handled on its own and returned right away, so it can never be
+    // mixed into a profile edit by accident.
+    if (typeof body.isActive === 'boolean') {
+      const wantActive: boolean = body.isActive;
+      const check = checkAccountAction({ employeeId: access.access.employee?.id }, employee, wantActive ? 'activate' : 'deactivate');
+      if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
+
+      // Lift the sign-in ban BEFORE marking active, so a failure never leaves an "active" account
+      // that still cannot sign in. Marking inactive goes the other way round: the flag (which every
+      // request checks) first, the ban second.
+      if (wantActive && !(await setAuthUserBanned(employee.auth_user_id, false))) {
+        return NextResponse.json(
+          { error: 'Could not re-enable this account\'s sign-in. Try again in a moment.' },
+          { status: 502 }
+        );
+      }
+
+      const { data: changed, error: activeErr } = await supabaseServer
+        .from('employee_accounts')
+        .update({ is_active: wantActive })
+        .eq('id', employee.id)
+        .select()
+        .single();
+      if (activeErr) throw activeErr;
+
+      const authSynced = wantActive ? true : await setAuthUserBanned(employee.auth_user_id, true);
+      return NextResponse.json({ ...changed, authSynced });
+    }
+
     if (!resendInvite && (roleName || typeof body.isAlsoDoctor === 'boolean' || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchRequest.requested || requiredTargetAmount !== undefined || bonusPercentage !== undefined || targetType !== undefined || bonusType !== undefined || workingDaysHours !== undefined)) {
       const updates: Record<string, any> = {};
       if (typeof body.isAlsoDoctor === 'boolean') updates.is_also_doctor = body.isAlsoDoctor;
@@ -774,10 +822,10 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  // Soft (deactivate) and hard (permanent) delete are both superadmin-only — an `admin` caller
-  // would otherwise pass requireAdministratorAccess and be able to permanently remove an employee
-  // account, contradicting the documented "superadmin can choose" boundary.
-  const access = await requireSuperadminAccess(req);
+  // DEC-117 (owner's decision, 2026-10-22): an admin may delete other accounts, which used to be
+  // superadmin-only. What an admin can reach is limited by checkAccountAction: never a superadmin
+  // account, never their own, never the last active admin.
+  const access = await requireAdministratorAccess(req);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
 
   try {
@@ -800,21 +848,22 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Employee account not found' }, { status: 404 });
     }
 
-    if (employee.employee_id === 'superadmin') {
-      return NextResponse.json({ error: 'Cannot delete superadmin account' }, { status: 400 });
-    }
+    const check = checkAccountAction({ employeeId: access.access.employee?.id }, employee, 'delete');
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
 
     if (mode === 'soft') {
-      // Soft delete: deactivate role / mark inactive to revoke operational access while preserving payroll, attendance & historical records
+      // Soft delete = Inactive (DEC-117): the role and every historical record stay, access stops,
+      // and it can be switched back on. (It used to overwrite role_name with 'inactive'.)
       const { data: updated, error: softErr } = await supabaseServer
         .from('employee_accounts')
-        .update({ role_name: 'inactive' })
+        .update({ is_active: false })
         .eq('id', id)
         .select()
         .single();
 
       if (softErr) throw softErr;
-      return NextResponse.json({ message: 'Employee account soft-deleted (deactivated) successfully', data: updated });
+      await setAuthUserBanned(employee.auth_user_id, true);
+      return NextResponse.json({ message: 'Employee account deactivated successfully', data: updated });
     }
 
     if (employee.auth_user_id) {

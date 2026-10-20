@@ -5409,7 +5409,7 @@ See `PROPOSALS.md` for:
 
 **Fix (2026-10-20):** `handleBookingsReject` in `src/app/admin/page.tsx` now sends `PATCH /api/reservations?id=` with `{ action: "reject" }` and the staff token, changes the local lists only after a 2xx, shows an alert on failure and returns `true`/`false`. `handleRejectItem` no longer writes at all: it awaits `onRejectBooking` and hides the row only if it did not return `false`. The server already refuses to reject a booking that has started. `tests/components/bookings/AdminBookingsView.test.tsx`: the test that pinned the direct write was replaced by three (no browser write; row removed after a confirmed save; row kept when the save failed, mutation-checked). The shell handler has no automated test (`page.tsx` is not unit-testable in isolation).
 
-**Verified live 2026-10-20** (test database): Reject now leaves the database at `rejected` (before: `pending_deposit`), the booking does not return after poll ticks or a reload and All Appointments shows it as Canceled; with the server stopped the alert "could not be rejected (connection problem). Nothing was changed" appears and the row stays under Pending Approvals; after the server is back, Reject works. The suspected side issue is confirmed and tracked as RISK-124.
+**Verified live 2026-10-20** (test database): Reject now leaves the database at `rejected` (before: `pending_deposit`), the booking does not return after poll ticks or a reload and All Appointments shows it as Canceled; with the server stopped the alert "could not be rejected (connection problem). Nothing was changed" appears and the row stays under Pending Approvals; after the server is back, Reject works. The suspected side issue is confirmed and tracked as RISK-125.
 
 **Test checklist:** `ai_docs/manual_tests/RISK_122_REJECT_NOT_SAVED_MANUAL_TESTS.md` (the original finding is in `RISK_119_POLL_RENDER_MANUAL_TESTS.md`, evidence log 2026-10-20).
 
@@ -5428,7 +5428,18 @@ See `PROPOSALS.md` for:
 
 ---
 
-## RISK-124: Clicking Approve Hides The Booking From The Pending Table Before The Approval Is Confirmed; Cancelling The Dialog Leaves It Hidden (RESOLVED)
+## RISK-124: "Soft Delete" Of An Employee Overwrote The Role And Did Not Block Access (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+
+**Manual test checklist:** `ai_docs/manual_tests/ACCOUNT_ACTIVE_INACTIVE_MANUAL_TESTS.md`
+
+**Severity:** Medium (the UI promised "they lose access immediately" and did not deliver it) · **Type:** Access control
+**Found:** 2026-10-22, while planning the Active/Inactive switch (DEC-117).
+
+**Cause:** `DELETE /api/employees?mode=soft` set `role_name = 'inactive'`. That discarded the person's real role (so it could not be restored), and nothing in the staff-access check looked at it: an `inactive` person who still had a valid login kept an employee row, so `requireStaffAccess` let them through to any endpoint that only needs "staff". Neither project had any row with that value (checked), so nothing needed converting.
+
+**Fix:** DEC-117: an `is_active` flag checked by `requireStaffAccess`, `verifyHrAccess` and `/api/auth/me`, plus a Supabase Auth ban; soft delete now just switches the account Inactive.
+
+## RISK-125: Clicking Approve Hides The Booking From The Pending Table Before The Approval Is Confirmed; Cancelling The Dialog Leaves It Hidden (RESOLVED)
 
 **Severity:** Medium (a still-pending request vanishes from the list while the Pending badge still counts it; staff can think it was handled) · **Type:** Optimistic UI without rollback
 **Found:** 2026-10-20, while verifying RISK-122. Existing behaviour, not caused by RISK-118/119/122.

@@ -126,7 +126,12 @@ export default function UnifiedStaffLoginPage() {
       });
 
       if (authError || !data.session) {
-        setError(authError?.message || "Invalid credentials. Please verify your email/ID and password.");
+        // DEC-117: an inactive account is banned in Supabase Auth, which answers "User is banned".
+        setError(
+          /ban/i.test(authError?.message || "")
+            ? "This account is inactive. Contact an administrator to get access back."
+            : authError?.message || "Invalid credentials. Please verify your email/ID and password."
+        );
         setLoading(false);
         return;
       }

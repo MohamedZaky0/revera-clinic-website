@@ -1205,7 +1205,7 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
     return pendingApprovalsList.slice(startIndexPending, startIndexPending + pendingRowsPerPage);
   }, [pendingApprovalsList, startIndexPending, pendingRowsPerPage]);
 
-  // RISK-124: Approve only asks the parent to open the approve dialog. Nothing is hidden or marked approved
+  // RISK-125: Approve only asks the parent to open the approve dialog. Nothing is hidden or marked approved
   // here: the row leaves the pending list when the approval has really been saved (the parent refetches
   // after a confirmed approve), so cancelling the dialog leaves the request where it was. A direct browser
   // write used to run here as well; RLS blocks it, and it would have approved the booking before the
