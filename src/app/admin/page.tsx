@@ -5844,6 +5844,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     setShowAddPreviousBooking(true);
     setViewingBooking(null);
   }, []);
+  // Stable callbacks for the memoized DoctorAccountView. handleLogout is a plain function recreated on
+  // every render (it reads the live session), so route it through a ref that always points at the latest.
+  const handleLogoutRef = useRef(handleLogout);
+  handleLogoutRef.current = handleLogout;
+  const handleDoctorLogout = useCallback(() => { void handleLogoutRef.current(); }, []);
+  const handleSwitchToAdmin = useCallback(() => setForceAdminView(true), []);
 
   if (authChecking) {
     return (
@@ -5961,8 +5967,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           }
           branches={branches}
           initialReservations={allReservations}
-          onLogout={handleLogout}
-          onSwitchToAdmin={(adminRole === "superadmin" || adminRole === "admin") ? () => setForceAdminView(true) : undefined}
+          onLogout={handleDoctorLogout}
+          onSwitchToAdmin={(adminRole === "superadmin" || adminRole === "admin") ? handleSwitchToAdmin : undefined}
         />
       </div>
     );

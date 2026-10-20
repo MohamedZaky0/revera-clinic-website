@@ -61,6 +61,13 @@
 - [ ] Doctor account (`/doctor`) idle 60 s: its reservations list does not re-render on identical ticks; a real booking change still appears within ~3 s.
 - [ ] Edit a booking's notes / amount paid on another tab while Bookings is open — it appears on the next tick (these keys are in the compare list; confirm a non-status field change is not missed).
 
+## Doctor portal (memoized view; needs a login whose role or department is doctor)
+- [ ] Log in as a doctor, open Schedule (or any tab) and leave it idle 60 s. React commit hook / Profiler: `DoctorAccountView` does not re-render on poll ticks that return identical reservations (the 3 s poll still runs).
+- [ ] A real change (reception checks a patient in or approves a booking) shows on the doctor's screen within ~3 s.
+- [ ] Start a session and type in the clinical note box for 30 s: the text is never reset or overwritten by a poll tick.
+- [ ] Logout button in the doctor portal still signs out and lands on `/login` (the shell now calls `handleLogout` through a ref).
+- [ ] Open another tab as reception and approve/complete a booking: the doctor's active-session banner appears and disappears correctly.
+
 ## Regressions to look for
 - [ ] The 15 s poll still runs after an access-token rotation (~1 h in): bookings keep updating, no 401 loop (RISK-053 path — fetchers are now `useCallback`, the poll effect still re-arms on token change).
 - [ ] Schedule view (`calendarView === "Schedule"`) still refetches its day's reservations after a booking write (`fetchAllReservations` side-sync).
