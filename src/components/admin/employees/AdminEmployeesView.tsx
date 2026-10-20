@@ -58,6 +58,7 @@ import { clearFetchCache } from "@/lib/fetchCache";
 import { DoctorServiceCommissionEditor, ServiceCommissionEntry, DefaultCommissionType } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import { adminTranslations } from "@/components/admin/translations";
 import { mayOverlap, type ShiftKind } from "@/lib/shiftOverlap";
+import EmployeeActiveSwitch from "./EmployeeActiveSwitch";
 
 interface AdminEmployeesViewProps {
   // Shared with Role Management invite form
@@ -95,6 +96,7 @@ interface AdminEmployeesViewProps {
   adminEmail?: string;
   fetchHrAttendance: () => Promise<void> | void;
   handleDeleteEmployee: (id: string) => Promise<void> | void;
+  handleToggleEmployeeActive: (id: string, makeActive: boolean) => Promise<void> | void;
   handleResendInvitation: (id: string) => Promise<void> | void;
   fetchRolesAndEmployees: () => Promise<void> | void;
   getDoctorFirstReservationDate: (docName: string, resList: any[]) => string | null;
@@ -141,6 +143,7 @@ export default function AdminEmployeesView({
   adminEmail,
   fetchHrAttendance,
   handleDeleteEmployee,
+  handleToggleEmployeeActive,
   handleResendInvitation,
   fetchRolesAndEmployees,
   getDoctorFirstReservationDate,
@@ -1249,7 +1252,7 @@ export default function AdminEmployeesView({
                 const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
                 const effectiveSalary = matchProv ? (matchProv.fixedSalary ?? matchProv.fixed_salary ?? emp.salary ?? 0) : (emp.salary || 0);
                 return (
-                  <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
+                  <tr key={emp.id} className={`transition hover:bg-[#F9F9F7] ${emp.is_active === false ? "opacity-60" : ""}`}>
                     <td className="px-5 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-[var(--color-brand-tint)] text-[var(--cr-primary)] border border-[var(--cr-primary)]/10 flex items-center justify-center text-xs font-bold font-serif overflow-hidden shrink-0">
@@ -1285,8 +1288,8 @@ export default function AdminEmployeesView({
                       {Number(effectiveSalary).toLocaleString("en-US") + t.table.salarySuffix}
                     </td>
                     <td className="px-5 py-4 text-center whitespace-nowrap">
-                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
-                        {emp.email_confirmed_at ? t.table.activeBadge : t.table.invitedBadge}
+                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.is_active === false ? "bg-slate-100 text-slate-600 border-slate-200" : emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
+                        {emp.is_active === false ? t.table.inactiveBadge : emp.email_confirmed_at ? t.table.activeBadge : t.table.invitedBadge}
                       </span>
                     </td>
                     <td className="px-5 py-4 text-right whitespace-nowrap">
@@ -1304,6 +1307,14 @@ export default function AdminEmployeesView({
                         {!isSuperadmin && (
                           <>
                             {(!hasPermission || hasPermission("employees.action_edit")) && (
+                              <EmployeeActiveSwitch
+                                active={emp.is_active !== false}
+                                disabled={Boolean(adminEmail) && String(emp.email || "").toLowerCase() === String(adminEmail).toLowerCase()}
+                                label={emp.is_active === false ? t.actions.activate : t.actions.deactivate}
+                                onChange={(next) => handleToggleEmployeeActive(emp.id, next)}
+                              />
+                            )}
+                            {(!hasPermission || hasPermission("employees.action_edit")) && (
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditEmployee(emp)}
@@ -1313,7 +1324,7 @@ export default function AdminEmployeesView({
                                 <Pencil size={13} />
                               </button>
                             )}
-                            {!emp.email_confirmed_at && (!hasPermission || hasPermission("employees.action_resend_invite")) && (
+                            {emp.is_active !== false && !emp.email_confirmed_at && (!hasPermission || hasPermission("employees.action_resend_invite")) && (
                               <button
                                 type="button"
                                 onClick={() => handleResendInvitation(emp.id)}
@@ -1378,8 +1389,8 @@ export default function AdminEmployeesView({
                       <div className="text-xs text-[var(--color-brand-secondary)] truncate">{emp.email}</div>
                     </div>
                   </div>
-                  <span className={`inline-block shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
-                    {emp.email_confirmed_at ? t.table.activeBadge : t.table.invitedBadge}
+                  <span className={`inline-block shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.is_active === false ? "bg-slate-100 text-slate-600 border-slate-200" : emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
+                    {emp.is_active === false ? t.table.inactiveBadge : emp.email_confirmed_at ? t.table.activeBadge : t.table.invitedBadge}
                   </span>
                 </div>
 
@@ -1428,6 +1439,17 @@ export default function AdminEmployeesView({
                   )}
                   {!isSuperadmin && (
                     <>
+                      {(!hasPermission || hasPermission("employees.action_edit")) && (
+                        <label className="mr-auto inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-brand-secondary)]">
+                          <EmployeeActiveSwitch
+                            active={emp.is_active !== false}
+                            disabled={Boolean(adminEmail) && String(emp.email || "").toLowerCase() === String(adminEmail).toLowerCase()}
+                            label={emp.is_active === false ? t.actions.activate : t.actions.deactivate}
+                            onChange={(next) => handleToggleEmployeeActive(emp.id, next)}
+                          />
+                          {emp.is_active === false ? t.table.inactiveBadge : t.table.activeBadge}
+                        </label>
+                      )}
                       {(!hasPermission || hasPermission("employees.action_edit")) && (
                         <button
                           type="button"

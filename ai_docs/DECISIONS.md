@@ -3742,3 +3742,21 @@ Investigation revealed:
 
 **Not done / limits:** only the function region changes; the Supabase projects stay where they are. Nothing else in `vercel.json` is set. The cold-start delay of a function that has been idle is a separate cost and is unchanged. If the Vercel project's own Function Region setting in the dashboard disagrees, `vercel.json` wins for new deployments.
 
+---
+
+## DEC-117: Employee Accounts Can Be Switched Inactive; Admins Can Manage And Delete Other Accounts
+
+**Date:** 2026-10-22
+**Status:** Decided & implemented (migration to be applied before deploy)
+
+**Context:** the owner wanted an admin to be able to edit, remove and switch off other admin accounts, with "inactive" meaning that person has no access to the system at all, and the switch shown as a toggle in the Employees table. Before this: deleting an account (soft or permanent) was superadmin-only; the "soft delete" overwrote `role_name` with `'inactive'`, which lost the real role, could not be undone cleanly, and did not actually block anything (the staff-access check only looked for an employee row).
+
+**Decision:**
+1. New column `employee_accounts.is_active boolean NOT NULL DEFAULT true` (`20261022000000_add_is_active_to_employee_accounts.sql`, DB_SCHEMA.md updated).
+2. **Inactive = no access, enforced on the server.** `requireStaffAccess` (and so every administrator, superadmin, finance and permission check built on it), `verifyHrAccess` and `GET /api/auth/me` answer 403 for an inactive account. `/api/auth/me` adds `code: 'account_inactive'` so a person already signed in is returned to /login with the reason "This account has been made inactive". The Supabase Auth user is also banned (`ban_duration` 876000h; `none` to lift) so it cannot sign in or refresh a token; the login page shows a clear message for that. Switching on lifts the ban first and only then sets the flag; switching off sets the flag first and bans second, so a failure never leaves a half state that locks out an active person.
+3. **PATCH `/api/employees` `{ id, isActive }`** switches an account on or off and returns immediately (never mixed into a profile edit). **DELETE** is now administrator-level instead of superadmin-only (owner's decision); `mode=soft` now means Inactive (role and records kept, reversible) and `mode=hard` still removes the account and its Auth user.
+4. **What an admin may touch** (`checkAccountAction`, `src/lib/accountActivation.ts`): any account except superadmin accounts (they stay hidden and untouchable from here), and never their own. Since the caller is always an active admin-tier account, the second rule also guarantees the clinic cannot be left without an active admin.
+5. **UI:** a toggle switch in each Employees row (table and mobile card) before the Edit button, an "Inactive" badge replacing Active/Invited, dimmed row, no Resend invitation on inactive rows, and the switch disabled on your own row. It shows to anyone who sees the Edit button (`employees.action_edit`).
+
+**Not done / known limits:** an inactive doctor stays in `providers` and in booking doctor pickers; deactivate them from the Doctors screen as well if they should not be bookable. A person already signed in stops working on their next request (server check), not mid-request. Superadmin accounts cannot be switched off here by design.
+

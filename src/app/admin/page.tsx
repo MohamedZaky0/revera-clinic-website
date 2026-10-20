@@ -1915,7 +1915,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           void fetchRolesAndEmployees();
         } else if (verification.status === 'unauthorized') {
           console.warn(`Unregistered or unauthorized employee session (${verification.httpStatus}) after a token refresh. Logging out.`);
-          recordLogoutReason(CLIENT.storagePrefix, 'session_rejected');
+          recordLogoutReason(CLIENT.storagePrefix, verification.code === 'account_inactive' ? 'account_inactive' : 'session_rejected');
           explicitSignOutRef.current = true;
           await supabase.auth.signOut({ scope: 'local' });
           setAdminRole(null);
@@ -2623,6 +2623,38 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       }
     } catch (err: any) {
       alert("Error deleting account: " + err.message);
+    }
+  }
+
+  // DEC-117: switch an employee account Active / Inactive. Inactive keeps the role and all records but
+  // removes every kind of access; the server enforces it (this is only the control).
+  async function handleToggleEmployeeActive(id: string, makeActive: boolean) {
+    const targetEmp = employeesList.find(e => e.id === id);
+    const who = targetEmp?.name || targetEmp?.email || "this employee";
+    if (!makeActive) {
+      const ok = await showConfirm(
+        `Make ${who} inactive? They lose all access to the system immediately and are signed out. Their records stay, and you can switch them back on at any time.`
+      );
+      if (!ok) return;
+    }
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({ id, isActive: makeActive }),
+      });
+      if (res.ok) {
+        clearFetchCache();
+        fetchRolesAndEmployees();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Could not change the account status.');
+      }
+    } catch (err: any) {
+      alert('Error changing the account status: ' + err.message);
     }
   }
 
@@ -7900,6 +7932,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               adminEmail={adminEmail}
               fetchHrAttendance={fetchHrAttendance}
               handleDeleteEmployee={handleDeleteEmployee}
+              handleToggleEmployeeActive={handleToggleEmployeeActive}
               handleResendInvitation={handleResendInvitation}
               fetchRolesAndEmployees={fetchRolesAndEmployees}
               getDoctorFirstReservationDate={getDoctorFirstReservationDate}

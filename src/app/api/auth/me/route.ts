@@ -88,6 +88,15 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized: No employee profile linked to this user.' }, { status: 403 });
     }
 
+    // DEC-117: an inactive account is refused here too (the client signs the person out with a clear
+    // reason), not only on the data endpoints.
+    if (employee.is_active === false) {
+      return NextResponse.json(
+        { error: 'This account is inactive. Contact an administrator.', code: 'account_inactive' },
+        { status: 403 }
+      );
+    }
+
     const rawRole = (employee.role_name || '').toLowerCase().trim();
     const cleanRole = rawRole.replace(/[\s_-]+/g, '');
     const normalizedRole = cleanRole === 'superadmin' ? 'superadmin' : (cleanRole === 'admin' ? 'admin' : employee.role_name);
