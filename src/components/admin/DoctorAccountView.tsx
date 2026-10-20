@@ -33,7 +33,7 @@ const getLocalDateString = (d: Date = new Date()): string => {
   return `${y}-${m}-${day}`;
 };
 
-export default function DoctorAccountView({
+function DoctorAccountView({
   doctorDbId,
   doctorName = "Doctor",
   doctorEmail = "doctor@revera.com",
@@ -1937,3 +1937,8 @@ export default function DoctorAccountView({
     </div>
   );
 }
+
+// Memoized at the export boundary: the admin shell re-renders on its own state changes, and this view
+// (1.9k lines plus every doctor tab) should only re-render when its own props change. The shell passes
+// stable callbacks (handleDoctorLogout, handleSwitchToAdmin); an inline arrow prop would defeat this.
+export default React.memo(DoctorAccountView);
