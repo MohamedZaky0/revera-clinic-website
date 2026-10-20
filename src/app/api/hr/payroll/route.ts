@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   try {
     const { data: payroll, error } = await supabaseServer
       .from('hr_payroll')
-      .select('*, employee_accounts(id, name, email, role_name, department, salary)')
+      .select('*, employee_accounts(id, name, email, role_name, department, salary, is_also_doctor)')
       .order('month', { ascending: false });
 
     if (error) throw error;
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     const doctorRoles = await getDoctorRoleNames();
     const filtered = (payroll || []).filter((item: any) => {
       const role = String(item.employee_accounts?.role_name || '').trim().toLowerCase();
-      return !doctorRoles.has(role);
+      return item.employee_accounts?.is_also_doctor !== true && !doctorRoles.has(role);
     });
 
     return NextResponse.json(filtered);
@@ -47,13 +47,14 @@ export async function POST(req: Request) {
     // 1. Fetch all active employees including target configurations
     const { data: employees, error: empErr } = await supabaseServer
       .from('employee_accounts')
-      .select('id, role_name, department, salary, required_target_amount, bonus_percentage, target_type, bonus_type');
+      .select('id, role_name, department, salary, is_also_doctor, required_target_amount, bonus_percentage, target_type, bonus_type');
 
     if (empErr) throw empErr;
     const doctorRoles = await getDoctorRoleNames();
     const payrollEmployees = (employees || []).filter((emp: any) => {
       const role = String(emp.role_name || '').trim().toLowerCase();
-      return role !== 'superadmin' && !doctorRoles.has(role);
+      // An admin who is also a doctor is paid through Doctor Payroll (DEC-114), not here.
+      return role !== 'superadmin' && emp.is_also_doctor !== true && !doctorRoles.has(role);
     });
     if (payrollEmployees.length === 0) {
       return NextResponse.json({ error: 'No non-doctor employee accounts found to run payroll.' }, { status: 400 });

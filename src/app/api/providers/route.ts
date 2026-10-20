@@ -92,7 +92,7 @@ export async function GET() {
         .not('role_name', 'is', null)
     ]);
     const docEmployeesRes = {
-      data: (allEmployeesRes.data || []).filter((e: any) => doctorRoleNames.has(String(e.role_name || '').trim().toLowerCase())),
+      data: (allEmployeesRes.data || []).filter((e: any) => e.is_also_doctor === true || doctorRoleNames.has(String(e.role_name || '').trim().toLowerCase())),
     };
 
     const providersData = providersRes.data || [];

@@ -57,6 +57,7 @@ import { compressImage } from "@/lib/image";
 import { clearFetchCache } from "@/lib/fetchCache";
 import { DoctorServiceCommissionEditor, ServiceCommissionEntry, DefaultCommissionType } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import { adminTranslations } from "@/components/admin/translations";
+import { mayOverlap, type ShiftKind } from "@/lib/shiftOverlap";
 
 interface AdminEmployeesViewProps {
   // Shared with Role Management invite form
@@ -151,6 +152,9 @@ export default function AdminEmployeesView({
   // DEC-113: the doctor-only sections (schedule, services, commissions) follow the chosen role's
   // workspace, not the words "doc" in a role or department name.
   const selectedRoleIsDoctor = rolesList.find((r: any) => r.name === newEmployeeRole)?.workspace === "doctor";
+  // DEC-114: an admin (or any standard role) can also be a doctor without changing their role.
+  const [newEmployeeIsAlsoDoctor, setNewEmployeeIsAlsoDoctor] = useState(false);
+  const isDoctorEmployee = selectedRoleIsDoctor || newEmployeeIsAlsoDoctor;
   // Optional. When filled, POST /api/employees creates a confirmed account with this password
   // instead of emailing an invite, so the hire can sign in straight away.
   const [newEmployeePassword, setNewEmployeePassword] = useState("");
@@ -429,6 +433,7 @@ export default function AdminEmployeesView({
       const allActiveShifts: Array<{
         branchId: string;
         branchName: string;
+        kind: ShiftKind;
         type: string;
         startMin: number;
         endMin: number;
@@ -461,6 +466,7 @@ export default function AdminEmployeesView({
             allActiveShifts.push({
               branchId: bId,
               branchName: bName,
+              kind: 'in_clinic',
               type: t.doctorSection.inClinic,
               startMin: sMin,
               endMin: eMin,
@@ -489,6 +495,7 @@ export default function AdminEmployeesView({
             allActiveShifts.push({
               branchId: bId,
               branchName: bName,
+              kind: 'online',
               type: t.doctorSection.onlineConsultations,
               startMin: sMin,
               endMin: eMin,
@@ -505,6 +512,7 @@ export default function AdminEmployeesView({
           const s1 = allActiveShifts[i];
           const s2 = allActiveShifts[j];
 
+          if (mayOverlap(s1, s2)) continue;
           if (s1.startMin < s2.endMin && s1.endMin > s2.startMin) {
             return {
               hasOverlap: true,
@@ -1017,6 +1025,7 @@ export default function AdminEmployeesView({
     setNewEmployeeEmail(emp.email || "");
     setNewEmployeeRole(emp.role_name || "");
     setNewEmployeePhone(emp.phone || "");
+    setNewEmployeeIsAlsoDoctor(emp.is_also_doctor === true);
     setNewEmployeeDepartment(emp.department || "Reception");
     updateShiftState(emp.shift || "Day");
     setNewEmployeeSalary(String(effectiveSalary));
@@ -1120,6 +1129,7 @@ export default function AdminEmployeesView({
             setNewEmployeeRole(rolesList.find((r: any) => r.workspace !== "doctor")?.name || "");
             setNewEmployeePassword("");
             setNewEmployeePhone("");
+            setNewEmployeeIsAlsoDoctor(false);
             setNewEmployeeDepartment(departmentsList[0] || "");
             updateShiftState("Day");
             setNewEmployeeSalary("0");
@@ -1495,7 +1505,7 @@ export default function AdminEmployeesView({
                 }
                 try {
                   const activeBranchId = newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0] || newEmployeeBranchId;
-                  const isDoctor = selectedRoleIsDoctor;
+                  const isDoctor = isDoctorEmployee;
 
                   // 1. Validate Shift Overlaps
                   if (isDoctor) {
@@ -1573,6 +1583,7 @@ export default function AdminEmployeesView({
                         id: editingEmployee.id,
                         name: newEmployeeName.trim(),
                         roleName: newEmployeeRole,
+                        isAlsoDoctor: !selectedRoleIsDoctor && newEmployeeIsAlsoDoctor,
                         phone: newEmployeePhone.trim(),
                         department: newEmployeeDepartment,
                         shift: computedShift,
@@ -1633,6 +1644,7 @@ export default function AdminEmployeesView({
                         password: newEmployeePassword || undefined,
                         name: newEmployeeName.trim(),
                         roleName: newEmployeeRole,
+                        isAlsoDoctor: !selectedRoleIsDoctor && newEmployeeIsAlsoDoctor,
                         phone: newEmployeePhone.trim(),
                         department: newEmployeeDepartment,
                         shift: computedShift,
@@ -1787,8 +1799,24 @@ export default function AdminEmployeesView({
                 </div>
               </div>
     
+              {/* DEC-114: a non-doctor role (admin, superadmin...) can also treat patients */}
+              {!selectedRoleIsDoctor && (
+                <label className="flex items-start gap-3 rounded-2xl border border-[var(--cr-primary)]/15 bg-white px-4 py-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newEmployeeIsAlsoDoctor}
+                    onChange={(e) => setNewEmployeeIsAlsoDoctor(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-[var(--cr-primary)]"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-[var(--cr-dark)]">{t.form.alsoDoctorLabel}</span>
+                    <span className="block text-[11px] text-[var(--color-brand-secondary)] mt-0.5">{t.form.alsoDoctorHint}</span>
+                  </span>
+                </label>
+              )}
+
               {/* Doctor / Medical Profile Fields */}
-              {selectedRoleIsDoctor && (
+              {isDoctorEmployee && (
                 <div className="rounded-2xl border border-[var(--cr-accent)]/30 bg-[var(--color-brand-light)] p-5 space-y-5 shadow-sm animate-fadeIn">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--cr-primary)] border-b border-[var(--cr-accent)]/20 pb-3">
                     <Stethoscope size={16} className="text-[var(--cr-accent)]" />
@@ -2063,7 +2091,7 @@ export default function AdminEmployeesView({
               )}
     
               {/* Shift & Target for Non-Doctor Employees (e.g. Receptionist) */}
-              {!selectedRoleIsDoctor && (
+              {!isDoctorEmployee && (
                 <div className="rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-5 space-y-5 shadow-sm animate-fadeIn">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--cr-primary)]/10 pb-3">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--cr-primary)]">
@@ -2707,6 +2735,7 @@ export default function AdminEmployeesView({
                   setNewEmployeeEmail(viewingEmployee.email || "");
                   setNewEmployeeRole(viewingEmployee.role_name || "");
                   setNewEmployeePhone(viewingEmployee.phone || "");
+                  setNewEmployeeIsAlsoDoctor(viewingEmployee.is_also_doctor === true);
                   setNewEmployeeDepartment(viewingEmployee.department || "Reception");
                   updateShiftState(viewingEmployee.shift || "Day");
                   setNewEmployeeSalary(String(viewingEmployee.salary || 0));
