@@ -6,7 +6,11 @@
 
 | Date | Check | Environment | Evidence | Result |
 |---|---|---|---|---|
-| | Everything below | | Not run yet | Pending |
+| 2026-10-22 | Toggle switch on a throwaway receptionist, confirm dialog, row dims, badge Inactive, no Resend | dev.reveraclinics.com (superadmin test account) | Browser pane + DB: `is_active=false`, `role_name` still `receptionist`, Auth user banned | Pass |
+| 2026-10-22 | Sign in as the inactive account | dev.reveraclinics.com | Login page: "This account is inactive. Contact an administrator to get access back." | Pass |
+| 2026-10-22 | Switch it on again, sign in again | dev.reveraclinics.com | No confirm dialog; DB `is_active=true`, ban lifted; login lands on /reception | Pass |
+| 2026-10-22 | Delete the throwaway account (hard) | dev.reveraclinics.com | employee row, Auth user and provider row all gone | Pass |
+| | Already-signed-in session cut after being switched off (two browsers), admin (not superadmin) caller, own-row switch disabled, mobile/Arabic | | Not run yet (covered by unit tests only: `employees-active.test.ts`) | Pending |
 
 ## Before testing
 - [ ] Migration `20261022000000_add_is_active_to_employee_accounts.sql` applied to the database being tested (dev first, production before deploying the code).
