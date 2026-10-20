@@ -5313,3 +5313,18 @@ See `PROPOSALS.md` for:
 
 **Not yet confirmed:** nobody has created a doctor through the form on dev after the fix; the checklist covers it.
 
+---
+
+## RISK-121: The Admin Panel Sat On "Verifying administrator session..." Until A Slow Employees Request Finished (RESOLVED, NOT YET CONFIRMED UNDER A REAL SLOW BACKEND)
+
+**Manual test checklist:** `ai_docs/manual_tests/ADMIN_ALSO_DOCTOR_MANUAL_TESTS.md` (section "Loading screen")
+
+**Severity:** Medium (panel unusable for as long as the slow request lasts) · **Type:** Availability / UX
+**Found:** 2026-10-21 on dev.reveraclinics.com: after a deploy the page stayed on the loading screen for well over 30 s; the console showed two 504s (`/api/roles`, `/api/employees`) and "Unable to load roles and employees". A reload loaded normally.
+
+**Cause:** in `src/app/admin/page.tsx` the session verification (`handleAuthSession`) called `await fetchRolesAndEmployees()` after `/api/auth/me` had already succeeded, and only the `finally` block after it cleared `authChecking`. `/api/employees` is the slowest call on the page (it also runs `auth.admin.listUsers()`), and there was no timeout, so any slowness or 504 on it kept the loading screen up. The await existed so the doctor view could be decided from the employee list; since DEC-113 that decision comes from `workspace` in `/api/auth/me`, so nothing needs the list at that moment.
+
+**Fix:** the call is no longer awaited (`void fetchRolesAndEmployees()`), so the panel appears as soon as `/api/auth/me` answers. The employee and role lists fill in afterwards and the screens that use them already have their own loading state. In the doctor view the name briefly falls back to the email until the list arrives.
+
+**Not fixed / limits:** `/api/employees` itself is still slow (listing every auth user to read confirmation dates) and, if it fails, the lists stay empty until the next refetch; a timeout and a lighter query would be a separate change.
+

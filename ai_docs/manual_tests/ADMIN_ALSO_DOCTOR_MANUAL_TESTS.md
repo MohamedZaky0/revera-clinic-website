@@ -23,6 +23,8 @@
 - [ ] Untick and save: no error; the doctor row stays in Doctors (deactivate it there if needed).
 
 ## Doctor view
+- [ ] An admin who is NOT flagged does not see "Doctor view" in the sidebar footer. A flagged admin does. The superadmin always does.
+- [ ] Untick the flag for an admin who had the Doctor view open, reload: back in the admin shell, no Doctor view button.
 - [ ] Log in as that admin, open Doctor view: their own schedule and sessions load (not empty after the first seconds), and Back to Admin view returns.
 
 ## Payroll
@@ -33,4 +35,9 @@
 - [ ] Add a doctor (or tick the box on an admin) and leave the default schedule (In-Clinic 09:00-17:00 and Online 09:00-17:00, same branch): it saves, no "Shift Overlap" warning.
 - [ ] Add a second In-Clinic shift 12:00-15:00 on the same day: the warning still appears.
 - [ ] Give the doctor two branches with In-Clinic 09:00-17:00 at both on the same day: the warning still appears.
+
+## Loading screen (RISK-121)
+- [ ] Log in and reload: the panel appears right after the short "Verifying administrator session..." screen, without waiting for the Employees list. Open Employees straight away: the list is there or shows its loading state, never an empty table forever.
+- [ ] With the browser's Network tab set to block or slow `/api/employees` (request blocking or Slow 3G), reload: the dashboard still opens; only the screens that need employees wait.
+- [ ] Log in as a doctor-workspace account: the Doctor Portal opens right away (name may show the email for a moment, then the real name).
 
