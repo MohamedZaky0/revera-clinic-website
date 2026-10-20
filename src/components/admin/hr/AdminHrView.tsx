@@ -311,10 +311,10 @@ export default function AdminHrView({
       {hrActiveSubTab === "payroll" && (() => {
         // Filter payroll records
         const filtered = payrollList.filter((pay: any) => {
-          // 0. Exclude Superadmin and Doctor accounts (Doctors are managed in Doctor Payroll)
+          // 0. Exclude Superadmin accounts. Doctor accounts (doctor-workspace roles, DEC-113) are already
+          // left out by GET /api/hr/payroll because they are managed in Doctor Payroll.
           const roleName = String(pay.employee_accounts?.role_name || "").toLowerCase();
-          const deptName = String(pay.employee_accounts?.department || "").toLowerCase();
-          if (roleName === "superadmin" || roleName === "doctor" || roleName === "doctors" || deptName === "doctors" || deptName === "doctor") {
+          if (roleName === "superadmin") {
             return false;
           }
     

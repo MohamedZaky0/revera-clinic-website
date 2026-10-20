@@ -5356,3 +5356,18 @@ See `PROPOSALS.md` for:
 - **PROPOSAL-002** — the Finance & Management Accounting module. Its Phase 0 is the remediation
   plan for RISK-010 … RISK-015 and RISK-018.
 
+---
+
+## RISK-120: Creating A Doctor Failed With "Role 'Doctor' Does Not Exist" Because The Form Invented The Role Name (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+
+**Manual test checklist:** `ai_docs/manual_tests/ROLE_WORKSPACE_MANUAL_TESTS.md`
+
+**Severity:** Medium (blocks adding any doctor on a database without a role named exactly "doctor") · **Type:** Logic / data
+**Found:** 2026-10-20, reported from the dev environment.
+
+**Cause:** Add Employee hard-coded `"Doctor"` (and `"Receptionist"`) as fallback role names when the Department select was changed to a doctor-like value and no role in the list matched. `POST /api/employees` looks the role up with a case-sensitive `.eq('name', roleName)` against `roles`, whose names are lowercase, so the invented `Doctor` was rejected. The dev database also had no `doctor` role at all, and its two doctor employees had `role_name = NULL`, so nothing in the UI could have worked.
+
+**Fix:** see DEC-113. The role dropdown is the only source of the role name, an empty default makes the person choose, and a hint explains when no doctor-workspace role exists. The dev database got the `doctor` role (copied from production, workspace doctor) and its two doctor employees were linked to it.
+
+**Not yet confirmed:** nobody has created a doctor through the form on dev after the fix; the checklist covers it.
+

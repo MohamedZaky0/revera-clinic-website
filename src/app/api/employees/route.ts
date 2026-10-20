@@ -10,6 +10,7 @@ import {
 } from '@/lib/employeeBranches';
 import fs from 'fs';
 import path from 'path';
+import { isDoctorRole } from '@/lib/roleWorkspace';
 
 const SCHEDULES_FILE_PATH = path.join(process.cwd(), 'data', 'employee_schedules.json');
 
@@ -209,7 +210,7 @@ export async function POST(req: Request) {
 
     const { data: roleData, error: roleError } = await supabaseServer
        .from('roles')
-       .select('name')
+       .select('name, workspace')
        .eq('name', roleName)
        .maybeSingle();
 
@@ -441,8 +442,9 @@ export async function POST(req: Request) {
       bonusType: newEmployee.bonus_type || 'percentage'
     } : null;
 
-    // Sync with providers table if department/role is Doctor.
-    const isDoctor = (department && (department.toLowerCase().includes('doc') || department.toLowerCase() === 'doctors')) || (roleName && roleName.toLowerCase().includes('doc'));
+    // Sync with providers table when the role's workspace is 'doctor' (DEC-113). The department
+    // label and the spelling of the role name no longer decide this.
+    const isDoctor = roleData.workspace === 'doctor';
     if (isDoctor) {
       try {
         const providerPayload = {
@@ -663,10 +665,9 @@ export async function PATCH(req: Request) {
         bonusType: (updatedEmp || employee).bonus_type || 'percentage'
       } : null;
 
-      // Sync updated employee to providers table if department/role is Doctor
-      const effectiveDept = department !== undefined ? department : employee.department;
+      // Sync updated employee to providers table when their (new or existing) role is a doctor-workspace role (DEC-113)
       const effectiveRole = roleName !== undefined ? roleName : employee.role_name;
-      const isDoctor = (effectiveDept && (effectiveDept.toLowerCase().includes('doc') || effectiveDept.toLowerCase() === 'doctors')) || (effectiveRole && effectiveRole.toLowerCase().includes('doc'));
+      const isDoctor = await isDoctorRole(effectiveRole);
 
       if (isDoctor) {
         try {

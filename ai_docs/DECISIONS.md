@@ -3679,3 +3679,22 @@ Investigation revealed:
 
 **Not done:** Add Previous Booking, the public booking modal and the doctor portal intake do not collect a birth date; patients created there stay without one until someone fills it in Add/Edit Patient.
 
+---
+
+## DEC-113: A Role Chooses Its Workspace (Doctor Screens Or Standard), Instead Of The App Guessing From Names
+
+**Date:** 2026-10-20
+**Status:** Decided & implemented (migration to be applied before deploy)
+
+**Context:** The doctor screens (Schedule, Ongoing Session, Patients, Analytics, Profile) were shown when ANY of eight name checks matched: the role was "doctor"/"doctors", or the department was "Doctors"/"Doctor", on either the login data or the employee record. The Add Employee form added more guessing on top (any role or department containing the letters "doc" switched the other field and showed the doctor-only sections, and invented a role called "Doctor" when none existed). Consequences seen: a clinic whose role is called "Consultant" never got the doctor screens; a receptionist filed under the Doctors department did; and creating a doctor on a database without a role named exactly "doctor" failed with "Role 'Doctor' does not exist. Please create it first." because the form sent a role that was never in the list.
+
+**Decision:**
+1. New column `roles.workspace text NOT NULL DEFAULT 'standard' CHECK (workspace IN ('standard','doctor'))` (`20261020000000_add_workspace_to_roles.sql`; DB_SCHEMA.md updated). Roles named doctor/doctors/physician are backfilled to `doctor`, so existing doctor accounts see no change.
+2. `GET /api/auth/me` returns `workspace`; `getRoleSlug` / `getRoleDisplayName` / `isPortalRoleMatch` take it (a doctor-workspace role always lives under `/doctor`, whatever it is called). `admin/page.tsx` shows the doctor screens only when `workspace === 'doctor'`, or when an admin/superadmin chose to.
+3. Real switch between the two views for admin and superadmin accounts (the old `onSwitchToAdmin` prop was passed but never rendered, so there was no way back): a "Doctor view" button in the admin sidebar footer and a "Back to Admin view" button in the doctor sidebar. The choice is kept per tab and per account in sessionStorage so a reload stays where the person was. Doctor and other roles never see the buttons.
+4. Server side, "is this employee a doctor" is the role's workspace (`src/lib/roleWorkspace.ts`): the employees POST/PATCH providers sync, the providers list auto-sync, and the HR payroll exclusion of doctors (Doctor Payroll handles them). The department label and the letters "doc" no longer decide anything.
+5. Role Management: a Workspace selector on the role form (`POST /api/roles` accepts and validates `workspace`; omitted keeps the stored value so an older open tab cannot reset a doctor role) and a "Doctor workspace" badge on each role. Add Employee: department and role selects no longer drive each other, the doctor-only sections follow the chosen role's workspace, no invented "Doctor"/"Receptionist" fallbacks, and a hint appears when no doctor-workspace role exists yet.
+6. **Department stays**, as a plain descriptive label (reports, filters, the Doctors/Receptionist defaults in settings). It no longer gates screens or payroll.
+
+**Not done / known limits:** an employee whose role is a doctor role but who is not yet in `providers` is created there the next time the providers list loads (existing behaviour). `Reception` dashboard (`/api/reception/dashboard`) still looks at `department = Reception`; it is a different question (which employees are on the desk) and was left alone. Roles that were renamed away from doctor/doctors/physician before this migration must be set to the Doctor workspace by hand in Role Management.
+

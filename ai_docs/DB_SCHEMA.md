@@ -361,6 +361,7 @@ against the actual auth-check call sites.
 | `id` | UUID | Primary key |
 | `name` | text | Unique. Role name, e.g., 'superadmin', 'admin', 'receptionist' — this is what `employee_accounts.role_name` references |
 | `permissions` | text[] | Array of permission strings |
+| `workspace` | text | NOT NULL DEFAULT `'standard'`, CHECK in (`'standard'`,`'doctor'`). **Added 2026-10-20** by `20261020000000_add_workspace_to_roles.sql` (DEC-113). Which screen the role lands on: `standard` = the normal admin shell filtered by permissions, `doctor` = the doctor workspace (Schedule, Ongoing Session, Patients, Analytics, Profile). Backfilled to `doctor` for roles named doctor/doctors/physician. Replaces guessing from the employee's name, department or the substring "doc". Doctor-ness of an employee (providers list, HR payroll exclusion) is derived from their role's workspace. |
 | `locked` | boolean | NOT NULL DEFAULT false. When true the role's permissions cannot be edited and it cannot be deleted. Only a superadmin can toggle it (`PATCH /api/roles`). Added by `supabase/migrations/20260910000000_add_locked_to_roles.sql`, which backfills `true` for any existing `superadmin`/`admin`/`doctor`/`receptionist`/`reception` row so the previous hardcoded behaviour carries over. See DEC-052. |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |

@@ -148,6 +148,9 @@ export default function AdminEmployeesView({
   lang,
   t,
 }: AdminEmployeesViewProps) {
+  // DEC-113: the doctor-only sections (schedule, services, commissions) follow the chosen role's
+  // workspace, not the words "doc" in a role or department name.
+  const selectedRoleIsDoctor = rolesList.find((r: any) => r.name === newEmployeeRole)?.workspace === "doctor";
   // Optional. When filled, POST /api/employees creates a confirmed account with this password
   // instead of emailing an invite, so the hire can sign in straight away.
   const [newEmployeePassword, setNewEmployeePassword] = useState("");
@@ -1113,12 +1116,11 @@ export default function AdminEmployeesView({
             setEditingEmployee(null);
             setNewEmployeeName("");
             setNewEmployeeEmail("");
-            const defaultRole = rolesList.find((r: any) => !r.name.toLowerCase().includes("doc"))?.name || "receptionist";
-            setNewEmployeeRole(defaultRole);
+            // No invented role name: the select is required, so an empty default makes the person choose.
+            setNewEmployeeRole(rolesList.find((r: any) => r.workspace !== "doctor")?.name || "");
             setNewEmployeePassword("");
             setNewEmployeePhone("");
-            const defaultDept = departmentsList.find((d: string) => !d.toLowerCase().includes("doc")) || "Receptionist";
-            setNewEmployeeDepartment(defaultDept);
+            setNewEmployeeDepartment(departmentsList[0] || "");
             updateShiftState("Day");
             setNewEmployeeSalary("0");
             setNewEmployeeNationalId("");
@@ -1493,7 +1495,7 @@ export default function AdminEmployeesView({
                 }
                 try {
                   const activeBranchId = newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0] || newEmployeeBranchId;
-                  const isDoctor = !!(newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc"));
+                  const isDoctor = selectedRoleIsDoctor;
 
                   // 1. Validate Shift Overlaps
                   if (isDoctor) {
@@ -1734,30 +1736,19 @@ export default function AdminEmployeesView({
                   <select
                     required
                     value={newEmployeeRole}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setNewEmployeeRole(val);
-                      if (val.toLowerCase().includes("doc")) {
-                        const docDept = departmentsList.find((d: string) => d.toLowerCase().includes("doc"));
-                        setNewEmployeeDepartment(docDept || "Doctors");
-                      } else {
-                        if (newEmployeeDepartment.toLowerCase().includes("doc")) {
-                          const nonDocDept = departmentsList.find((d: string) => {
-                            const dLower = d.toLowerCase();
-                            const vLower = val.toLowerCase();
-                            return dLower === vLower || (vLower.includes("rec") && dLower.includes("rec"));
-                          }) || departmentsList.find((d: string) => !d.toLowerCase().includes("doc"));
-                          setNewEmployeeDepartment(nonDocDept || "Receptionist");
-                        }
-                      }
-                    }}
+                    onChange={(e) => setNewEmployeeRole(e.target.value)}
                     className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm text-[var(--cr-primary)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                   >
                     <option value="" disabled>{t.form.selectRole}</option>
                     {rolesList.map((role: any) => (
-                      <option key={role.name} value={role.name}>{role.name}</option>
+                      <option key={role.name} value={role.name}>
+                        {role.name}{role.workspace === "doctor" ? ` (${t.form.doctorWorkspaceTag})` : ""}
+                      </option>
                     ))}
                   </select>
+                  {!rolesList.some((r: any) => r.workspace === "doctor") && (
+                    <p className="mt-1.5 text-[11px] text-amber-700">{t.form.noDoctorRoleHint}</p>
+                  )}
                 </div>
               </div>
 
@@ -1775,27 +1766,7 @@ export default function AdminEmployeesView({
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-brand-secondary)] mb-1.5">{t.form.department}</label>
                   <select
                     value={newEmployeeDepartment}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setNewEmployeeDepartment(val);
-                      if (val.toLowerCase().includes("doc")) {
-                        if (!newEmployeeRole.toLowerCase().includes("doc")) {
-                          const docRole = rolesList.find((r: any) => r.name.toLowerCase().includes("doc"));
-                          if (docRole) setNewEmployeeRole(docRole.name);
-                          else setNewEmployeeRole("Doctor");
-                        }
-                      } else {
-                        if (newEmployeeRole.toLowerCase().includes("doc")) {
-                          const matchingRole = rolesList.find((r: any) => {
-                            const rLower = r.name.toLowerCase();
-                            const vLower = val.toLowerCase();
-                            return rLower === vLower || (vLower.includes("rec") && rLower.includes("rec"));
-                          }) || rolesList.find((r: any) => !r.name.toLowerCase().includes("doc"));
-                          if (matchingRole) setNewEmployeeRole(matchingRole.name);
-                          else setNewEmployeeRole("Receptionist");
-                        }
-                      }
-                    }}
+                    onChange={(e) => setNewEmployeeDepartment(e.target.value)}
                     className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] px-4 py-2.5 text-sm text-[var(--cr-primary)] outline-none focus:border-[var(--cr-accent)] cursor-pointer"
                   >
                     {departmentsList.map((dept) => (
@@ -1817,7 +1788,7 @@ export default function AdminEmployeesView({
               </div>
     
               {/* Doctor / Medical Profile Fields */}
-              {(newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc")) && (
+              {selectedRoleIsDoctor && (
                 <div className="rounded-2xl border border-[var(--cr-accent)]/30 bg-[var(--color-brand-light)] p-5 space-y-5 shadow-sm animate-fadeIn">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--cr-primary)] border-b border-[var(--cr-accent)]/20 pb-3">
                     <Stethoscope size={16} className="text-[var(--cr-accent)]" />
@@ -2092,7 +2063,7 @@ export default function AdminEmployeesView({
               )}
     
               {/* Shift & Target for Non-Doctor Employees (e.g. Receptionist) */}
-              {!(newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc")) && (
+              {!selectedRoleIsDoctor && (
                 <div className="rounded-2xl border border-[var(--cr-primary)]/15 bg-[var(--color-brand-light)] p-5 space-y-5 shadow-sm animate-fadeIn">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--cr-primary)]/10 pb-3">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--cr-primary)]">

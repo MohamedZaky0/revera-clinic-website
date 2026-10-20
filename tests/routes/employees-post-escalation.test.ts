@@ -82,7 +82,7 @@ function seedRoles() {
   mockDb.roles.push({ name: 'admin', permissions: [] });
   mockDb.roles.push({ name: 'superadmin', permissions: [] });
   mockDb.roles.push({ name: 'receptionist', permissions: [] });
-  mockDb.roles.push({ name: 'doctor', permissions: [] });
+  mockDb.roles.push({ name: 'doctor', permissions: [], workspace: 'doctor' });
 }
 
 beforeEach(() => {
@@ -236,6 +236,49 @@ describe('POST /api/employees — doctor to providers sync', () => {
     const res = await POST_EMPLOYEES(postReq({
       email: 'desk@clinic.test', name: 'Front Desk', roleName: 'receptionist',
       department: 'Reception', password: STRONG_PASSWORD,
+    }));
+
+    expect(res.status).toBe(201);
+    expect(mockDb.providers).toHaveLength(0);
+  });
+
+  // DEC-113: doctor-ness comes from the role's workspace, not from names.
+  it('syncs a provider for a custom role whose workspace is doctor, whatever it is called', async () => {
+    seedSuperadminAuth();
+    seedRoles();
+    mockDb.roles.push({ name: 'consultant', permissions: [], workspace: 'doctor' });
+
+    const res = await POST_EMPLOYEES(postReq({
+      email: 'cons@clinic.test', name: 'Dr Consultant', roleName: 'consultant', department: 'Reception',
+      password: STRONG_PASSWORD,
+    }));
+
+    expect(res.status).toBe(201);
+    expect(mockDb.providers).toHaveLength(1);
+    expect(mockDb.providers[0].name).toBe('Dr Consultant');
+  });
+
+  it('does not make a provider out of a Doctors-department employee whose role is a standard one', async () => {
+    seedSuperadminAuth();
+    seedRoles();
+
+    const res = await POST_EMPLOYEES(postReq({
+      email: 'misfiled@clinic.test', name: 'Misfiled', roleName: 'receptionist', department: 'Doctors',
+      password: STRONG_PASSWORD,
+    }));
+
+    expect(res.status).toBe(201);
+    expect(mockDb.providers).toHaveLength(0);
+  });
+
+  it('does not treat a standard role as a doctor just because its name contains doc', async () => {
+    seedSuperadminAuth();
+    seedRoles();
+    mockDb.roles.push({ name: 'docsreviewer', permissions: [], workspace: 'standard' });
+
+    const res = await POST_EMPLOYEES(postReq({
+      email: 'docs@clinic.test', name: 'Docs Reviewer', roleName: 'docsreviewer', department: 'Reception',
+      password: STRONG_PASSWORD,
     }));
 
     expect(res.status).toBe(201);

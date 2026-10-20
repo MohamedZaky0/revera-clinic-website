@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, Trash2, Lock, Unlock } from "lucide-react";
+import { Plus, Trash2, Lock, Unlock, Stethoscope } from "lucide-react";
 import { clearFetchCache } from "@/lib/fetchCache";
 import { adminTranslations } from "@/components/admin/translations";
 
@@ -283,6 +283,7 @@ export default function RoleManagementView({
 }: RoleManagementViewProps) {
   const [newRoleName, setNewRoleName] = useState("");
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>([]);
+  const [newRoleWorkspace, setNewRoleWorkspace] = useState<"standard" | "doctor">("standard");
   const [roleCreateError, setRoleCreateError] = useState("");
   const [roleCreateSuccess, setRoleCreateSuccess] = useState("");
   const [newDeptInput, setNewDeptInput] = useState("");
@@ -353,12 +354,13 @@ export default function RoleManagementView({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session?.access_token || ''}`,
         },
-        body: JSON.stringify({ name: newRoleName, permissions: newRolePermissions })
+        body: JSON.stringify({ name: newRoleName, permissions: newRolePermissions, workspace: newRoleWorkspace })
       });
 
       if (res.ok) {
         setNewRoleName("");
         setNewRolePermissions([]);
+        setNewRoleWorkspace("standard");
         setRoleCreateSuccess(t.defineRoles.roleSavedSuccess);
         fetchRolesAndEmployees();
         setTimeout(() => setRoleCreateSuccess(""), 3000);
@@ -524,6 +526,19 @@ export default function RoleManagementView({
                 />
               </div>
               <div>
+                <label htmlFor="role-workspace" className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-1.5">{t.defineRoles.workspaceLabel}</label>
+                <select
+                  id="role-workspace"
+                  value={newRoleWorkspace}
+                  onChange={(e) => setNewRoleWorkspace(e.target.value === "doctor" ? "doctor" : "standard")}
+                  className="w-full max-w-md rounded-2xl border border-[var(--cr-primary)]/15 bg-[#fff] px-4 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
+                >
+                  <option value="standard">{t.defineRoles.workspaceStandard}</option>
+                  <option value="doctor">{t.defineRoles.workspaceDoctor}</option>
+                </select>
+                <p className="mt-1.5 max-w-md text-[11px] text-[var(--color-brand-secondary)]">{t.defineRoles.workspaceHint}</p>
+              </div>
+              <div>
                 <label className="block text-xs uppercase tracking-wider text-[var(--color-brand-secondary)] font-bold mb-3">{t.defineRoles.permissionsLabel}</label>
                 <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 max-h-[550px] overflow-y-auto rounded-2xl sm:rounded-3xl border border-[var(--cr-primary)]/10 p-3.5 sm:p-5 bg-[var(--color-brand-light)]">
                   {PERMISSION_STRUCTURE.map((group) => {
@@ -616,7 +631,16 @@ export default function RoleManagementView({
                   </tr>
                 ) : rolesList.map((r) => (
                   <tr key={r.id} className="transition hover:bg-[#F9F9F7]">
-                    <td className="px-6 py-4 font-bold text-[var(--cr-dark)] capitalize">{r.name}</td>
+                    <td className="px-6 py-4 font-bold text-[var(--cr-dark)] capitalize">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span>{r.name}</span>
+                        {r.workspace === "doctor" && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold normal-case">
+                            <Stethoscope size={11} /> {t.defineRoles.workspaceDoctorBadge}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-xs font-semibold text-[var(--color-brand-secondary)]">
                       <div className="flex flex-wrap gap-1.5">
                         {r.permissions.map((p: string) => (
@@ -670,6 +694,11 @@ export default function RoleManagementView({
                   <div className="flex items-center justify-between gap-2 border-b border-[#E6E9EB]/60 pb-2.5">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm text-[var(--cr-dark)] capitalize">{r.name}</span>
+                      {r.workspace === "doctor" && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold">
+                          <Stethoscope size={11} /> {t.defineRoles.workspaceDoctorBadge}
+                        </span>
+                      )}
                       {r.locked && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-bold">
                           <Lock size={11} /> {t.defineRoles.systemLocked || "Locked"}

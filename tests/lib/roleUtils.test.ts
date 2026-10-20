@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getRoleSlug, getRoleDisplayName, isPortalRoleMatch } from '@/lib/roleUtils';
+import { getRoleSlug, getRoleDisplayName, isPortalRoleMatch, normalizeWorkspace } from '@/lib/roleUtils';
 
 describe('roleUtils - Portal Isolation and Role Mapping', () => {
   describe('getRoleSlug', () => {
@@ -59,6 +59,36 @@ describe('roleUtils - Portal Isolation and Role Mapping', () => {
       expect(isPortalRoleMatch('admin', 'superadmin')).toBe(false);
       expect(isPortalRoleMatch('receptionist', 'superadmin')).toBe(false);
       expect(isPortalRoleMatch('doctor', 'superadmin')).toBe(false);
+    });
+  });
+
+  // DEC-113: the role's explicit workspace, not its name, decides the doctor screens.
+  describe('workspace', () => {
+    it('normalizeWorkspace only accepts doctor, everything else is standard', () => {
+      expect(normalizeWorkspace('doctor')).toBe('doctor');
+      expect(normalizeWorkspace('standard')).toBe('standard');
+      expect(normalizeWorkspace(undefined)).toBe('standard');
+      expect(normalizeWorkspace(null)).toBe('standard');
+      expect(normalizeWorkspace('Doctor')).toBe('standard');
+    });
+
+    it('a doctor-workspace role lives under /doctor whatever it is called', () => {
+      expect(getRoleSlug('Consultant', 'doctor')).toBe('doctor');
+      expect(getRoleSlug('dermatologist', 'doctor')).toBe('doctor');
+      expect(getRoleDisplayName('consultant', 'doctor')).toBe('Doctor');
+    });
+
+    it('a standard-workspace role keeps its own slug, even when the name contains doc', () => {
+      expect(getRoleSlug('docs-reviewer', 'standard')).toBe('docs-reviewer');
+      expect(getRoleSlug('receptionist', 'standard')).toBe('reception');
+      expect(getRoleSlug('receptionist')).toBe('reception');
+    });
+
+    it('portal match follows the workspace', () => {
+      expect(isPortalRoleMatch('consultant', 'doctor', 'doctor')).toBe(true);
+      expect(isPortalRoleMatch('consultant', 'admin', 'doctor')).toBe(false);
+      expect(isPortalRoleMatch('consultant', 'doctor')).toBe(false);
+      expect(isPortalRoleMatch('superadmin', 'doctor', 'standard')).toBe(true);
     });
   });
 });
