@@ -43,3 +43,29 @@ describe('calculateAge', () => {
     expect(calculateAge('2000-10-01T00:00:00.000Z', now)).toBe(26);
   });
 });
+
+import { ageFieldsForSave } from '@/lib/age';
+
+describe('ageFieldsForSave (New Booking new-patient intake, DEC-041)', () => {
+  it('a birth date wins: it is sent and the typed age is dropped', () => {
+    expect(ageFieldsForSave('1995-05-15', '31')).toEqual({ age: null, date_of_birth: '1995-05-15' });
+  });
+
+  it('without a birth date the typed age is kept as a number', () => {
+    expect(ageFieldsForSave('', '28')).toEqual({ age: 28, date_of_birth: null });
+    expect(ageFieldsForSave(null, ' 28 ')).toEqual({ age: 28, date_of_birth: null });
+  });
+
+  it('neither given sends nothing', () => {
+    expect(ageFieldsForSave('', '')).toEqual({ age: null, date_of_birth: null });
+    expect(ageFieldsForSave(undefined, undefined)).toEqual({ age: null, date_of_birth: null });
+  });
+
+  it('a non-numeric age is not sent as NaN', () => {
+    expect(ageFieldsForSave('', 'abc')).toEqual({ age: null, date_of_birth: null });
+  });
+
+  it('an age of 0 (an infant) is a real value, not "missing"', () => {
+    expect(ageFieldsForSave('', '0')).toEqual({ age: 0, date_of_birth: null });
+  });
+});

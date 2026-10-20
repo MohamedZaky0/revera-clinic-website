@@ -10,6 +10,7 @@ import {
 } from '@/lib/employeeBranches';
 import fs from 'fs';
 import path from 'path';
+import { isDoctorEmployee } from '@/lib/roleWorkspace';
 
 const SCHEDULES_FILE_PATH = path.join(process.cwd(), 'data', 'employee_schedules.json');
 
@@ -209,7 +210,7 @@ export async function POST(req: Request) {
 
     const { data: roleData, error: roleError } = await supabaseServer
        .from('roles')
-       .select('name')
+       .select('name, workspace')
        .eq('name', roleName)
        .maybeSingle();
 
@@ -339,6 +340,9 @@ export async function POST(req: Request) {
 
     const workingDaysHours = body.workingDaysHours !== undefined ? body.workingDaysHours : (body.working_days_hours || null);
 
+    // DEC-114: redundant (so stored as false) for a doctor-workspace role, which is a doctor already.
+    const alsoDoctor = body.isAlsoDoctor === true && roleData.workspace !== 'doctor';
+
     let newEmployee: any = null;
     let insertError: any = null;
 
@@ -369,6 +373,8 @@ export async function POST(req: Request) {
       if (workingDaysHours) {
         insertPayload.working_days_hours = workingDaysHours;
       }
+      // Only written when true so a database that has not got the column yet still creates normal staff.
+      if (alsoDoctor) insertPayload.is_also_doctor = true;
 
       const res = await supabaseServer
         .from('employee_accounts')
@@ -405,6 +411,9 @@ export async function POST(req: Request) {
         bonus_percentage: bonusPercentage ? Number(bonusPercentage) : 0,
         target_type: targetType || 'reservations',
         bonus_type: bonusType || 'percentage',
+        // A database without working_days_hours (the dev project) always lands here, so the flag
+        // has to be carried on this path too or an also-a-doctor hire is saved without it.
+        ...(alsoDoctor ? { is_also_doctor: true } : {}),
       };
 
       const resFallback = await supabaseServer
@@ -441,8 +450,9 @@ export async function POST(req: Request) {
       bonusType: newEmployee.bonus_type || 'percentage'
     } : null;
 
-    // Sync with providers table if department/role is Doctor.
-    const isDoctor = (department && (department.toLowerCase().includes('doc') || department.toLowerCase() === 'doctors')) || (roleName && roleName.toLowerCase().includes('doc'));
+    // Sync with providers table when the role's workspace is 'doctor' (DEC-113) or the account is
+    // flagged as also a doctor (DEC-114). The department label no longer decides this.
+    const isDoctor = roleData.workspace === 'doctor' || alsoDoctor;
     if (isDoctor) {
       try {
         const providerPayload = {
@@ -545,8 +555,9 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Employee account not found.' }, { status: 404 });
     }
 
-    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchRequest.requested || requiredTargetAmount !== undefined || bonusPercentage !== undefined || targetType !== undefined || bonusType !== undefined || workingDaysHours !== undefined)) {
+    if (!resendInvite && (roleName || typeof body.isAlsoDoctor === 'boolean' || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchRequest.requested || requiredTargetAmount !== undefined || bonusPercentage !== undefined || targetType !== undefined || bonusType !== undefined || workingDaysHours !== undefined)) {
       const updates: Record<string, any> = {};
+      if (typeof body.isAlsoDoctor === 'boolean') updates.is_also_doctor = body.isAlsoDoctor;
       if (roleName) {
         if (employee.employee_id === 'superadmin') {
           return NextResponse.json({ error: 'Cannot modify the role of the system owner account.' }, { status: 400 });
@@ -663,10 +674,10 @@ export async function PATCH(req: Request) {
         bonusType: (updatedEmp || employee).bonus_type || 'percentage'
       } : null;
 
-      // Sync updated employee to providers table if department/role is Doctor
-      const effectiveDept = department !== undefined ? department : employee.department;
+      // Sync updated employee to providers table when their (new or existing) role is a doctor-workspace role (DEC-113)
       const effectiveRole = roleName !== undefined ? roleName : employee.role_name;
-      const isDoctor = (effectiveDept && (effectiveDept.toLowerCase().includes('doc') || effectiveDept.toLowerCase() === 'doctors')) || (effectiveRole && effectiveRole.toLowerCase().includes('doc'));
+      const effectiveAlsoDoctor = typeof body.isAlsoDoctor === 'boolean' ? body.isAlsoDoctor : employee.is_also_doctor;
+      const isDoctor = await isDoctorEmployee(effectiveRole, effectiveAlsoDoctor);
 
       if (isDoctor) {
         try {

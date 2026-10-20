@@ -3666,3 +3666,64 @@ Investigation revealed:
 
 **Not done / known limits:** `GET /api/services` is still public and returns every service, so a system-only service's name and price can be read by anyone who opens the API; the website hides it client-side, as it already does for inactive services. `POST /api/reservations` trusts the client's `isManual` flag, so an online booking of a hidden service could still be forged through the API. Both would need server-side enforcement if that matters.
 
+---
+
+## DEC-112: New Booking's New-Patient Intake Asks For Date Of Birth, Not A Typed Age
+
+**Date:** 2026-10-19
+**Status:** Decided & implemented
+
+**Context:** DEC-041 made `customers.date_of_birth` the durable field and the Add/Edit Patient form got it on 2026-10-04, but the New Booking screen's new-patient intake still asked for a free-typed Age. A patient created from New Booking therefore had a number that is stale a year later and no birth date, so they showed as "incomplete" for birthday campaigns. (Add Previous Booking never collects either, only name and phone.)
+
+**Decision:** in `AdminNewBookingView` the intake shows Date of Birth (not in the future) next to Age. Once a birth date is entered the age is calculated and read-only, exactly like Add/Edit Patient; without one the typed age still works for the legacy case. Selecting an existing patient pre-fills their birth date (and clears a previously selected patient's value instead of carrying it over). On save `ageFieldsForSave()` (`src/lib/age.ts`, tested) sends `date_of_birth` and drops `age` when a date exists, matching what `POST /api/customers` already does. New translation keys `dobLabel` and `ageFromDobNote` in the New Booking section (EN + AR).
+
+**Not done:** Add Previous Booking, the public booking modal and the doctor portal intake do not collect a birth date; patients created there stay without one until someone fills it in Add/Edit Patient.
+
+---
+
+## DEC-113: A Role Chooses Its Workspace (Doctor Screens Or Standard), Instead Of The App Guessing From Names
+
+**Date:** 2026-10-20
+**Status:** Decided & implemented (migration to be applied before deploy)
+
+**Context:** The doctor screens (Schedule, Ongoing Session, Patients, Analytics, Profile) were shown when ANY of eight name checks matched: the role was "doctor"/"doctors", or the department was "Doctors"/"Doctor", on either the login data or the employee record. The Add Employee form added more guessing on top (any role or department containing the letters "doc" switched the other field and showed the doctor-only sections, and invented a role called "Doctor" when none existed). Consequences seen: a clinic whose role is called "Consultant" never got the doctor screens; a receptionist filed under the Doctors department did; and creating a doctor on a database without a role named exactly "doctor" failed with "Role 'Doctor' does not exist. Please create it first." because the form sent a role that was never in the list.
+
+**Decision:**
+1. New column `roles.workspace text NOT NULL DEFAULT 'standard' CHECK (workspace IN ('standard','doctor'))` (`20261020000000_add_workspace_to_roles.sql`; DB_SCHEMA.md updated). Roles named doctor/doctors/physician are backfilled to `doctor`, so existing doctor accounts see no change.
+2. `GET /api/auth/me` returns `workspace`; `getRoleSlug` / `getRoleDisplayName` / `isPortalRoleMatch` take it (a doctor-workspace role always lives under `/doctor`, whatever it is called). `admin/page.tsx` shows the doctor screens only when `workspace === 'doctor'`, or when an admin/superadmin chose to.
+3. Real switch between the two views for admin and superadmin accounts (the old `onSwitchToAdmin` prop was passed but never rendered, so there was no way back): a "Doctor view" button in the admin sidebar footer and a "Back to Admin view" button in the doctor sidebar. The choice is kept per tab and per account in sessionStorage so a reload stays where the person was. Doctor and other roles never see the buttons.
+4. Server side, "is this employee a doctor" is the role's workspace (`src/lib/roleWorkspace.ts`): the employees POST/PATCH providers sync, the providers list auto-sync, and the HR payroll exclusion of doctors (Doctor Payroll handles them). The department label and the letters "doc" no longer decide anything.
+5. Role Management: a Workspace selector on the role form (`POST /api/roles` accepts and validates `workspace`; omitted keeps the stored value so an older open tab cannot reset a doctor role) and a "Doctor workspace" badge on each role. Add Employee: department and role selects no longer drive each other, the doctor-only sections follow the chosen role's workspace, no invented "Doctor"/"Receptionist" fallbacks, and a hint appears when no doctor-workspace role exists yet.
+6. **Department stays**, as a plain descriptive label (reports, filters, the Doctors/Receptionist defaults in settings). It no longer gates screens or payroll.
+
+**Not done / known limits:** an employee whose role is a doctor role but who is not yet in `providers` is created there the next time the providers list loads (existing behaviour). `Reception` dashboard (`/api/reception/dashboard`) still looks at `department = Reception`; it is a different question (which employees are on the desk) and was left alone. Roles that were renamed away from doctor/doctors/physician before this migration must be set to the Doctor workspace by hand in Role Management.
+
+---
+
+## DEC-114: An Admin Can Also Be A Doctor (`employee_accounts.is_also_doctor`)
+
+**Date:** 2026-10-21
+**Status:** Decided & implemented (migration to be applied before deploy)
+
+**Context:** DEC-113 made the doctor screens a property of the role. An account has exactly one role, so an admin or superadmin who also treats patients (the clinic owner, for instance) could open the doctor screens through the Doctor view switch, but had no `providers` row, so their schedule was empty and they could not be picked as a doctor in bookings. Making them a doctor-workspace role would have taken away their admin screens and permissions.
+
+**Decision:**
+1. New column `employee_accounts.is_also_doctor boolean NOT NULL DEFAULT false` (`20261021000000_add_is_also_doctor_to_employee_accounts.sql`; DB_SCHEMA.md updated). The account keeps its role and permissions.
+2. Add/Edit Employee shows a "This person also treats patients (doctor)" checkbox for any role that is not already a doctor-workspace role. Ticking it shows the same doctor sections (speciality, weekly shifts, services, commissions) as a doctor role. The form sends `isAlsoDoctor`; for a doctor-workspace role it is always sent false, and the API ignores it there (a doctor-workspace role is a doctor already).
+3. "Is this employee a doctor" is now: the role's workspace is `doctor` OR `is_also_doctor` (`isDoctorEmployee` in `src/lib/roleWorkspace.ts`). That drives the providers sync on create and edit, the providers-list auto-sync, and the payroll split.
+4. **Payroll:** an also-a-doctor employee is left out of the staff payroll (`GET` and run in `/api/hr/payroll`) and is paid through Doctor Payroll only, exactly like any other doctor, so nobody is paid twice. Their salary and commission setup are the doctor's.
+5. PATCH only writes the flag when the request contains a boolean, so an older open tab that does not know the field cannot reset it. POST only writes the column when it is true, so a database without it still creates ordinary staff.
+
+**Not done / known limits:** unticking the flag stops the doctor sync but does not delete or deactivate the `providers` row (it may already have bookings); deactivate the doctor from the Doctors screen if they should disappear from pickers. Past staff-payroll rows of someone who is later flagged are hidden from the staff payroll list because the filter looks at the flag, not at history.
+
+---
+
+## DEC-115: In-Clinic And Online Consultation Shifts May Overlap At The Same Branch
+
+**Date:** 2026-10-21
+**Status:** Decided & implemented
+
+**Context:** Add/Edit Employee (doctor sections) blocked saving with "Shift Overlap Detected on Sunday: New Cairo Branch (In-Clinic: 09:00 - 17:00) overlaps with New Cairo Branch (Online Consultations: 09:00 - 17:00)", and the form's own defaults for a new doctor are exactly that, so no doctor could be saved without editing the schedule first. Reported by the owner: a doctor can take online consultations while they are available in the clinic.
+
+**Decision:** the overlap check (`checkShiftOverlaps`, `AdminEmployeesView.tsx`) skips the pair In-Clinic vs Online Consultations at the SAME branch (`mayOverlap`, `src/lib/shiftOverlap.ts`, tested). Still a warning: two in-clinic shifts overlapping, two online shifts overlapping, and any overlap between shifts at different branches (including in-clinic at one branch vs online at another, kept conservative because the owner only described the same-branch case). Invalid durations (end before start) are unchanged.
+

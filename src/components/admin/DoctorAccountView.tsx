@@ -40,7 +40,8 @@ function DoctorAccountView({
   doctorBranch = "Main Branch",
   branches = [],
   initialReservations = [],
-  onLogout
+  onLogout,
+  onSwitchToAdmin
 }: DoctorAccountViewProps) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const t = doctorTranslations[lang];
@@ -1542,6 +1543,7 @@ function DoctorAccountView({
         setLang={setLang}
         onFetchReservations={fetchDoctorReservations}
         onLogout={confirmSignOut}
+        onSwitchToAdmin={onSwitchToAdmin}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
       />

@@ -4,6 +4,7 @@ import { requireStaffAccess, hasGranularPermission, requireSuperadminAccess } fr
 import { normalizeServiceCommissions } from '@/lib/providerCommissions';
 import fs from 'fs';
 import path from 'path';
+import { getDoctorRoleNames } from '@/lib/roleWorkspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,7 +75,9 @@ function mapProvider(p: Record<string, any>, bookingsCount: number = 0) {
  
 export async function GET() {
   try {
-    const [providersRes, reservationsRes, docEmployeesRes] = await Promise.all([
+    // DEC-113: a "doctor employee" is one whose role has the doctor workspace.
+    const doctorRoleNames = await getDoctorRoleNames();
+    const [providersRes, reservationsRes, allEmployeesRes] = await Promise.all([
       supabaseServer
         .from('providers')
         .select('*')
@@ -86,8 +89,11 @@ export async function GET() {
       supabaseServer
         .from('employee_accounts')
         .select('*')
-        .or('department.ilike.%doc%,role_name.ilike.%doc%')
+        .not('role_name', 'is', null)
     ]);
+    const docEmployeesRes = {
+      data: (allEmployeesRes.data || []).filter((e: any) => e.is_also_doctor === true || doctorRoleNames.has(String(e.role_name || '').trim().toLowerCase())),
+    };
 
     const providersData = providersRes.data || [];
 

@@ -25,11 +25,13 @@ import {
   ShieldCheck,
   Sparkles,
   Zap,
-  Layers
+  Layers,
+  Cake,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { adminTranslations } from "@/components/admin/translations";
 import { ALL_15MIN_SLOTS, getServiceDurationMinutes, normaliseTo24hSlot } from "@/lib/services";
+import { calculateAge, ageFieldsForSave } from "@/lib/age";
 
 interface ServiceItem {
   id: string | number;
@@ -268,6 +270,10 @@ export default function AdminNewBookingView({
   const [gender, setGender] = useState("");
   const [nationalId, setNationalId] = useState("");
   const [age, setAge] = useState("");
+  // DEC-041: the durable field is the date of birth; age is only a legacy typed-in snapshot used
+  // when no birth date is known, and is derived from the birth date whenever there is one.
+  const [dob, setDob] = useState("");
+  const ageFromDob = calculateAge(dob);
   const [occupation, setOccupation] = useState("");
   const [referralSource, setReferralSource] = useState("");
 
@@ -654,7 +660,9 @@ export default function AdminNewBookingView({
     // Populate additional fields if present on customer object
     if (cust.gender) setGender(cust.gender);
     if (cust.national_id) setNationalId(cust.national_id);
-    if (cust.age) setAge(String(cust.age));
+    // reset rather than keep: a previously selected patient's birth date must never carry over
+    setDob(cust.date_of_birth ? String(cust.date_of_birth).slice(0, 10) : "");
+    setAge(cust.age ? String(cust.age) : "");
     if (cust.occupation) setOccupation(cust.occupation);
     if (cust.referral || cust.referral_source) setReferralSource(cust.referral || cust.referral_source);
     if (cust.area || cust.city || cust.location_name) setCity(cust.area || cust.city || cust.location_name);
@@ -665,7 +673,7 @@ export default function AdminNewBookingView({
     if (cust.spent_amount !== undefined || cust.total_spent !== undefined) setTotalSpent(Number(cust.spent_amount ?? cust.total_spent) || 0);
     if (cust.outstanding !== undefined || cust.outstanding_balance !== undefined) setOutstandingBalance(Number(cust.outstanding ?? cust.outstanding_balance) || 0);
 
-    if (cust.gender || cust.national_id || cust.age || cust.occupation || cust.area || cust.street_name) {
+    if (cust.gender || cust.national_id || cust.age || cust.date_of_birth || cust.occupation || cust.area || cust.street_name) {
       setShowAdditionalPatientFields(true);
     }
 
@@ -1273,7 +1281,7 @@ export default function AdminNewBookingView({
             email: email.trim() || null,
             gender: gender || null,
             national_id: nationalId || null,
-            age: age ? Number(age) : null,
+            ...ageFieldsForSave(dob, age),
             occupation: occupation || null,
             referral: referralSource || null,
             area: city || null,
@@ -1811,17 +1819,43 @@ export default function AdminNewBookingView({
                     </div>
                   </div>
 
-                  {/* Row 3: Age (Photo 3) */}
+                  {/* Row 3: Date of Birth + Age (age is calculated once a birth date is entered) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-bold text-[var(--cr-dark)] mb-1.5 text-xs">{tr.ageLabel || "Age"}</label>
+                      <label htmlFor="new-booking-dob" className="block font-bold text-[var(--cr-dark)] mb-1.5 text-xs">{tr.dobLabel || "Date of Birth"}</label>
+                      <div className="relative">
+                        <div className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-gray-400">
+                          <Cake size={15} />
+                        </div>
+                        <input
+                          id="new-booking-dob"
+                          type="date"
+                          value={dob}
+                          max={new Date().toISOString().slice(0, 10)}
+                          onChange={(e) => setDob(e.target.value)}
+                          className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white ps-9 pe-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="new-booking-age" className="block font-bold text-[var(--cr-dark)] mb-1.5 text-xs">{tr.ageLabel || "Age"}</label>
                       <input
-                        type="number"
-                        value={age}
+                        id="new-booking-age"
+                        type={dob ? "text" : "number"}
+                        value={dob ? (ageFromDob ?? "") : age}
+                        readOnly={Boolean(dob)}
+                        disabled={Boolean(dob)}
                         onChange={(e) => setAge(e.target.value)}
                         placeholder={tr.agePlaceholder || "e.g. 28"}
-                        className="w-full rounded-2xl border border-[var(--cr-primary)]/20 bg-white px-3.5 py-2.5 font-bold text-[var(--cr-dark)] outline-none focus:border-emerald-700 text-xs"
+                        className={`w-full rounded-2xl border px-3.5 py-2.5 font-bold outline-none text-xs ${
+                          dob
+                            ? "border-gray-200 bg-[#F7F7F6] text-gray-700 cursor-not-allowed select-none"
+                            : "border-[var(--cr-primary)]/20 bg-white text-[var(--cr-dark)] focus:border-emerald-700"
+                        }`}
                       />
+                      {dob && (
+                        <p className="mt-1 text-[11px] text-[var(--color-brand-secondary)]">{tr.ageFromDobNote || "Calculated from date of birth"}</p>
+                      )}
                     </div>
                   </div>
 

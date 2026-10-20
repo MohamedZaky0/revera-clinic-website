@@ -86,7 +86,7 @@ beforeEach(() => {
   fake.seed('roles', [
     { name: 'admin', permissions: [] },
     { name: 'receptionist', permissions: [] },
-    { name: 'doctor', permissions: [] },
+    { name: 'doctor', permissions: [], workspace: 'doctor' },
   ]);
   fake.seed('customers', []);
   fake.seed('providers', []);

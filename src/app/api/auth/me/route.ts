@@ -95,7 +95,7 @@ export async function GET(req: Request) {
     // 2. Query roles table to get permissions
     const { data: role, error: roleError } = await supabaseServer
       .from('roles')
-      .select('permissions')
+      .select('permissions, workspace')
       .ilike('name', employee.role_name || '')
       .maybeSingle();
 
@@ -105,6 +105,8 @@ export async function GET(req: Request) {
       id: employee.id,
       role: normalizedRole,
       department: employee.department,
+      // DEC-113: the role's explicit workspace; the client no longer infers the doctor view from names.
+      workspace: role?.workspace === 'doctor' ? 'doctor' : 'standard',
       permissions: Array.isArray(role?.permissions) ? role.permissions : [],
       email: employee.email || email,
       employeeId: employee.employee_id

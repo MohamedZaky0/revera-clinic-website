@@ -20,7 +20,7 @@ import { printInvoice } from "@/lib/printUtils";
 import { Branch } from "@/types";
 import { translations } from "@/lib/translations";
 import { CLIENT } from "@/config/client";
-import { getRoleSlug, getRoleDisplayName, isPortalRoleMatch } from "@/lib/roleUtils";
+import { getRoleSlug, getRoleDisplayName, isPortalRoleMatch, normalizeWorkspace, type RoleWorkspace } from "@/lib/roleUtils";
 import { adminTranslations } from "@/components/admin/translations";
 import UserProfileView, { UserProfileViewTranslations } from "@/components/admin/UserProfileView";
 import ClinicProfileSettingsView from "@/components/admin/settings/ClinicProfileSettingsView";
@@ -137,6 +137,7 @@ import {
   Copy,
   Wallet,
   ReceiptText,
+  Stethoscope,
 } from "lucide-react";
 import { TransactionsView } from "@/components/admin/transactions/TransactionsView";
 import { NewManualTransactionView } from "@/components/admin/transactions/NewManualTransactionView";
@@ -829,7 +830,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const pollBranchRef = useRef<string | null>(null);
   const [adminRole, setAdminRole] = useState<string | null>(null);
   const [adminDepartment, setAdminDepartment] = useState<string>("");
-  const [forceAdminView, setForceAdminView] = useState(false);
+  // DEC-113: the role's explicit workspace ('doctor' = doctor screens, 'standard' = admin shell).
+  const [adminWorkspace, setAdminWorkspace] = useState<RoleWorkspace>("standard");
+  // An admin/superadmin who is also a doctor can flip to the doctor screens and back. Remembered
+  // per tab (and per account) so a reload does not throw them out of the view they chose.
+  const [viewAsDoctor, setViewAsDoctor] = useState(false);
+  const viewAsDoctorKey = `${CLIENT.storagePrefix}_view_as_doctor`;
+  const canSwitchWorkspace = adminRole === "superadmin" || adminRole === "admin";
   const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
   const hasPermission = useCallback((permKey: string): boolean => {
     if (adminRole === 'superadmin') return true;
@@ -1018,6 +1025,23 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }, [adminRole, adminPermissions, hasPermission]);
 
   const [adminEmail, setAdminEmail] = useState("");
+  useEffect(() => {
+    if (!canSwitchWorkspace || !adminEmail || typeof window === "undefined") return;
+    try {
+      setViewAsDoctor(sessionStorage.getItem(viewAsDoctorKey) === adminEmail.toLowerCase());
+    } catch {
+      /* storage unavailable: start in the admin view */
+    }
+  }, [canSwitchWorkspace, adminEmail, viewAsDoctorKey]);
+  const switchWorkspaceView = (toDoctor: boolean) => {
+    setViewAsDoctor(toDoctor);
+    try {
+      if (toDoctor) sessionStorage.setItem(viewAsDoctorKey, adminEmail.toLowerCase());
+      else sessionStorage.removeItem(viewAsDoctorKey);
+    } catch {
+      /* the choice just will not survive a reload */
+    }
+  };
   const [adminEmployeeId, setAdminEmployeeId] = useState("");
   const [adminDbId, setAdminDbId] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
@@ -1827,12 +1851,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
           // Role Portal Restriction: Enforce that users can only log in from their matching role portal
           const effectivePortal = portalRole || 'admin';
-          if (!isPortalRoleMatch(authData.role, effectivePortal)) {
+          if (!isPortalRoleMatch(authData.role, effectivePortal, authData.workspace)) {
             console.warn(`Role mismatch: user is ${authData.role} but attempted to access ${effectivePortal} portal.`);
             recordLogoutReason(CLIENT.storagePrefix, 'wrong_portal');
             explicitSignOutRef.current = true;
             await supabase.auth.signOut({ scope: 'local' });
             setAdminRole(null);
+            setAdminWorkspace("standard");
             setAdminDepartment("");
             setAdminPermissions([]);
             setAdminEmail("");
@@ -1847,6 +1872,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           }
 
           setAdminRole(authData.role);
+          setAdminWorkspace(normalizeWorkspace(authData.workspace));
           setAdminDepartment(authData.department || "");
           setAdminPermissions(authData.permissions || []);
           setAdminEmail(authData.email || "");
@@ -1866,7 +1892,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           }
 
           if (typeof window !== "undefined") {
-            const roleSlug = getRoleSlug(authData.role);
+            const roleSlug = getRoleSlug(authData.role, authData.workspace);
             if (roleSlug) {
               const targetPath = roleSlug === 'admin' ? '/admin' : `/${roleSlug}`;
               if (window.location.pathname !== targetPath) {
@@ -1883,6 +1909,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           explicitSignOutRef.current = true;
           await supabase.auth.signOut({ scope: 'local' });
           setAdminRole(null);
+          setAdminWorkspace("standard");
           setAdminDepartment("");
           setAdminPermissions([]);
           setAdminEmail("");
@@ -2382,7 +2409,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // Synchronize browser URL to end with the user's role slug (/[role] or /admin)
   useEffect(() => {
     if (session && adminRole && typeof window !== "undefined") {
-      const roleSlug = getRoleSlug(adminRole);
+      const roleSlug = getRoleSlug(adminRole, adminWorkspace);
       if (roleSlug) {
         const targetPath = roleSlug === 'admin' ? '/admin' : `/${roleSlug}`;
         if (window.location.pathname !== targetPath) {
@@ -2390,7 +2417,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         }
       }
     }
-  }, [session, adminRole]);
+  }, [session, adminRole, adminWorkspace]);
 
   // Keep the open section in the URL so a reload (F5) lands on the same page instead of Dashboard.
   useEffect(() => {
@@ -5849,7 +5876,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const handleLogoutRef = useRef(handleLogout);
   handleLogoutRef.current = handleLogout;
   const handleDoctorLogout = useCallback(() => { void handleLogoutRef.current(); }, []);
-  const handleSwitchToAdmin = useCallback(() => setForceAdminView(true), []);
+  const switchWorkspaceViewRef = useRef(switchWorkspaceView);
+  switchWorkspaceViewRef.current = switchWorkspaceView;
+  const handleSwitchToAdmin = useCallback(() => switchWorkspaceViewRef.current(false), []);
 
   if (authChecking) {
     return (
@@ -5943,17 +5972,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     (e) => e.id === adminDbId || e.email?.toLowerCase() === adminEmail.toLowerCase()
   );
 
-  const isDoctorUserAccount =
-    adminRole?.toLowerCase() === "doctor" ||
-    adminRole?.toLowerCase() === "doctors" ||
-    adminDepartment?.toLowerCase() === "doctors" ||
-    adminDepartment?.toLowerCase() === "doctor" ||
-    loggedEmpAccount?.department?.toLowerCase() === "doctors" ||
-    loggedEmpAccount?.department?.toLowerCase() === "doctor" ||
-    loggedEmpAccount?.role_name?.toLowerCase() === "doctor" ||
-    loggedEmpAccount?.role_name?.toLowerCase() === "doctors";
+  // DEC-113: the doctor screens are chosen by the role's workspace setting, never by guessing from
+  // the person's name, department or role name. An admin/superadmin can also open them on purpose.
+  const showDoctorWorkspace = adminWorkspace === "doctor" || (canSwitchWorkspace && viewAsDoctor);
 
-  if (isDoctorUserAccount && !forceAdminView) {
+  if (showDoctorWorkspace) {
     return (
       <div id="admin-root" className="admin-view flex-1 min-h-screen">
         <DoctorAccountView
@@ -5968,7 +5991,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           branches={branches}
           initialReservations={allReservations}
           onLogout={handleDoctorLogout}
-          onSwitchToAdmin={(adminRole === "superadmin" || adminRole === "admin") ? handleSwitchToAdmin : undefined}
+          onSwitchToAdmin={canSwitchWorkspace ? handleSwitchToAdmin : undefined}
         />
       </div>
     );
@@ -6299,6 +6322,22 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     <span className="block truncate text-[10px] capitalize opacity-70">{roleLabel}</span>
                   </span>
                 </button>
+                {canSwitchWorkspace && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      switchWorkspaceView(true);
+                      setSidebarOpen(false);
+                    }}
+                    title={adminTranslations[lang].sidebar.doctorViewTitle}
+                    className="group flex w-full items-center gap-2.5 rounded-2xl px-2 py-2 text-start text-xs font-semibold text-[var(--color-brand-light)]/80 transition-all duration-200 hover:bg-[var(--color-brand-light)]/10 hover:text-[var(--color-brand-light)]"
+                  >
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-brand-light)]/10 group-hover:bg-[var(--cr-accent)]/15">
+                      <Stethoscope size={16} />
+                    </span>
+                    <span className="truncate">{adminTranslations[lang].sidebar.doctorView}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={async () => {
