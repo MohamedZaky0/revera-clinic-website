@@ -5396,18 +5396,22 @@ See `PROPOSALS.md` for:
 
 ---
 
-## RISK-122: Reject On The Bookings Pending List Hides The Request On Screen But Saves Nothing (OPEN)
+## RISK-122: Reject On The Bookings Pending List Hides The Request On Screen But Saves Nothing (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_122_REJECT_NOT_SAVED_MANUAL_TESTS.md`
 
 **Severity:** High (a reception "reject" is silently lost; the booking stays pending and can still be approved later) · **Type:** Data integrity / RLS
 **Found:** 2026-10-20, during the full live test of RISK-118/119 (not caused by either; the code is identical before Brief 36 — checked at `5d17c15`).
 
 **What happens:** in the Pending list, Reject calls `supabase.from("reservations").update({ status: "rejected" })` straight from the browser (`handleBookingsReject`, `src/app/admin/page.tsx`), then removes the row and sets `status: "rejected"` in local state without checking the result. RLS is on for `reservations` (`20260722140000_enable_row_level_security.sql`; `SECURITY.md` §4), so the anon-key write changes nothing and returns no error. Observed on the test database: row disappears in 0.1 s, the database still says `pending_deposit`, and after a page reload the booking is back in Pending. Approve does not have this problem (`openApprove` -> `PATCH /api/reservations`).
 
-**Not yet checked (same pattern, same file family):** `AdminBookingsView.tsx` lines ~1217 and ~1242 (`update({ status: "approved" })` / `update({ status: "rejected" })`) write the same way. If those buttons are reachable they have the same defect; confirm before fixing.
+**Checked:** the Pending list's Reject button runs `handleRejectItem` in `AdminBookingsView.tsx`, which did its own direct browser write and then called the shell's `handleBookingsReject`, which did a second one. Both failed silently. `handleApproveItem` still contains a direct `update({ status: "approved" })` that fails the same way; it is harmless today because the real approval happens in the approve dialog (`openApprove` -> `PATCH /api/reservations`), and it was left alone.
 
-**Suggested fix:** send the rejection through `PATCH /api/reservations?id=` with the staff token (the route already handles `status: "rejected"`, used successfully in the RISK-119 test), update local state only after a 2xx, and show an error otherwise. Add a route-level test that a rejected booking leaves Pending.
+**Fix (2026-10-20):** `handleBookingsReject` in `src/app/admin/page.tsx` now sends `PATCH /api/reservations?id=` with `{ action: "reject" }` and the staff token, changes the local lists only after a 2xx, shows an alert on failure and returns `true`/`false`. `handleRejectItem` no longer writes at all: it awaits `onRejectBooking` and hides the row only if it did not return `false`. The server already refuses to reject a booking that has started. `tests/components/bookings/AdminBookingsView.test.tsx`: the test that pinned the direct write was replaced by three (no browser write; row removed after a confirmed save; row kept when the save failed, mutation-checked). The shell handler has no automated test (`page.tsx` is not unit-testable in isolation).
 
-**Test checklist:** `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md` (evidence log, 2026-10-20).
+**Suspected, not verified:** `handleApproveItem` hides the row (`approvedIds`) as soon as Approve is clicked, before the approve dialog is confirmed; cancelling the dialog may leave a still-pending booking hidden from the list until a reload. Check on the next live pass.
+
+**Test checklist:** `ai_docs/manual_tests/RISK_122_REJECT_NOT_SAVED_MANUAL_TESTS.md` (the original finding is in `RISK_119_POLL_RENDER_MANUAL_TESTS.md`, evidence log 2026-10-20).
 
 ---
 

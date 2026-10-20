@@ -584,7 +584,7 @@ function PatientPackagePromoBanner({
 }
 
 export default function AdminPage({ portalRole = 'admin' }: { portalRole?: string } = {}) {
-  const { showConfirm, showDeleteConfirm } = useAlertConfirm();
+  const { showAlert, showConfirm, showDeleteConfirm } = useAlertConfirm();
   const { isRTL } = useLanguage();
   // Auth state
   const [session, setSession] = useState<any>(null);
@@ -5879,17 +5879,31 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     // from the actual booking rather than leftover modal state.
     openApprove(booking as any);
   }, [openApprove]);
-  const handleBookingsReject = useCallback(async (booking: any) => {
+  // RISK-122: the rejection is saved through the API (the browser-side Supabase write is blocked by RLS and
+  // used to fail silently). Local lists change only after the server confirms; the caller learns the outcome.
+  const handleBookingsReject = useCallback(async (booking: any): Promise<boolean> => {
+    if (!booking?.id) return false;
     try {
-      if (booking?.id) {
-        await supabase.from("reservations").update({ status: "rejected" }).eq("id", booking.id);
-        setRequests(prev => prev.filter(r => String(r.id) !== String(booking.id)));
-        setAllReservations(prev => prev.map(r => String(r.id) === String(booking.id) ? { ...r, status: "rejected" } : r));
+      const res = await fetch(`/api/reservations?id=${encodeURIComponent(String(booking.id))}`, {
+        method: "PATCH",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify({ action: "reject" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("Reject error:", res.status, err);
+        showAlert(err?.error || "The request could not be rejected. Nothing was changed, please try again.");
+        return false;
       }
+      setRequests(prev => prev.filter(r => String(r.id) !== String(booking.id)));
+      setAllReservations(prev => prev.map(r => String(r.id) === String(booking.id) ? { ...r, status: "rejected" } : r));
+      return true;
     } catch (e) {
       console.error("Reject error:", e);
+      showAlert("The request could not be rejected (connection problem). Nothing was changed, please try again.");
+      return false;
     }
-  }, []);
+  }, [authenticatedJsonHeaders, showAlert]);
   const handleCloseBookingDetails = useCallback(() => setViewingBooking(null), []);
   const handleEditPreviousBooking = useCallback((b: any) => {
     setEditingPreviousBooking(b);

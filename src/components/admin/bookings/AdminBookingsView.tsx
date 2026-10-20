@@ -89,7 +89,8 @@ interface AdminBookingsViewProps {
   onPrint?: () => void;
   onExportCSV?: () => void;
   onApproveBooking?: (booking: any) => void;
-  onRejectBooking?: (booking: any) => void;
+  // Resolves to false when the rejection was not saved; the row then stays in the pending list.
+  onRejectBooking?: (booking: any) => void | boolean | Promise<boolean | void>;
   /** SuperAdmin-configured "Stale Session Alert" from Booking Settings. Defaults to 2 hours. */
   staleSessionThresholdHours?: number;
   /** SuperAdmin-configured "Follow-Up Reminder Lead Time" from Booking Settings. Defaults to 2 days. */
@@ -1231,16 +1232,20 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
     }
   };
 
+  // RISK-122: saving is the parent's job (a server call). The row is hidden only after it reports success,
+  // so a rejection that did not save never looks saved. A direct browser write used to run here; RLS blocks
+  // it, and it failed without any error.
   const handleRejectItem = async (item: any) => {
     try {
       const rawObj = item.raw || item;
       const targetId = String(rawObj?.id || item.id || "");
+      if (!targetId || !onRejectBooking) return;
+
+      const saved = await onRejectBooking({ ...rawObj, id: targetId, status: "rejected" });
+      if (saved === false) return;
 
       setRejectedObjects(prev => new Set(prev).add(rawObj));
-      if (targetId) {
-        setRejectedIds(prev => new Set(prev).add(targetId));
-        await supabase.from("reservations").update({ status: "rejected" }).eq("id", targetId);
-      }
+      setRejectedIds(prev => new Set(prev).add(targetId));
       setDbReservations(prev => {
         const exists = prev.some(r => String(r.id) === String(targetId));
         if (exists) {
@@ -1248,9 +1253,6 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
         }
         return [...prev, { ...rawObj, id: targetId, status: "rejected" }];
       });
-      if (onRejectBooking) {
-        onRejectBooking({ ...rawObj, id: targetId, status: "rejected" });
-      }
     } catch (e) {
       console.error("Reject error:", e);
     }
