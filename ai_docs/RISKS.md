@@ -5396,7 +5396,7 @@ See `PROPOSALS.md` for:
 
 ---
 
-## RISK-122: Reject On The Bookings Pending List Hides The Request On Screen But Saves Nothing (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+## RISK-122: Reject On The Bookings Pending List Hides The Request On Screen But Saves Nothing (RESOLVED)
 
 **Manual test checklist:** `ai_docs/manual_tests/RISK_122_REJECT_NOT_SAVED_MANUAL_TESTS.md`
 
@@ -5409,7 +5409,7 @@ See `PROPOSALS.md` for:
 
 **Fix (2026-10-20):** `handleBookingsReject` in `src/app/admin/page.tsx` now sends `PATCH /api/reservations?id=` with `{ action: "reject" }` and the staff token, changes the local lists only after a 2xx, shows an alert on failure and returns `true`/`false`. `handleRejectItem` no longer writes at all: it awaits `onRejectBooking` and hides the row only if it did not return `false`. The server already refuses to reject a booking that has started. `tests/components/bookings/AdminBookingsView.test.tsx`: the test that pinned the direct write was replaced by three (no browser write; row removed after a confirmed save; row kept when the save failed, mutation-checked). The shell handler has no automated test (`page.tsx` is not unit-testable in isolation).
 
-**Suspected, not verified:** `handleApproveItem` hides the row (`approvedIds`) as soon as Approve is clicked, before the approve dialog is confirmed; cancelling the dialog may leave a still-pending booking hidden from the list until a reload. Check on the next live pass.
+**Verified live 2026-10-20** (test database): Reject now leaves the database at `rejected` (before: `pending_deposit`), the booking does not return after poll ticks or a reload and All Appointments shows it as Canceled; with the server stopped the alert "could not be rejected (connection problem). Nothing was changed" appears and the row stays under Pending Approvals; after the server is back, Reject works. The suspected side issue is confirmed and tracked as RISK-124.
 
 **Test checklist:** `ai_docs/manual_tests/RISK_122_REJECT_NOT_SAVED_MANUAL_TESTS.md` (the original finding is in `RISK_119_POLL_RENDER_MANUAL_TESTS.md`, evidence log 2026-10-20).
 
@@ -5425,3 +5425,16 @@ See `PROPOSALS.md` for:
 **Suggested fix:** when `receptionistStartedSession` is `null`, look the copy up by id in `reservations` and clear it if that row is no longer an active status (or if it is missing); otherwise refresh the copy from the row. Add a component test around the effect.
 
 **Test checklist:** `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md` (Doctor portal section, evidence log 2026-10-20).
+
+---
+
+## RISK-124: Clicking Approve Hides The Booking From The Pending Table Before The Approval Is Confirmed; Cancelling The Dialog Leaves It Hidden (OPEN)
+
+**Severity:** Medium (a still-pending request vanishes from the list while the Pending badge still counts it; staff can think it was handled) · **Type:** Optimistic UI without rollback
+**Found:** 2026-10-20, while verifying RISK-122. Existing behaviour, not caused by RISK-118/119/122.
+
+**What happens:** `handleApproveItem` in `AdminBookingsView.tsx` adds the booking to `approvedIds`/`approvedObjects` as soon as Approve is clicked, then calls the shell's `openApprove`, which opens the approve dialog. If the dialog is cancelled nothing undoes that. Observed on the test database: after Approve -> Cancel the row is gone from the table, the badge still says "Pending 1", the database status is still `pending_deposit`, and the row only comes back after a page reload. Confirming the dialog works normally (the approval itself goes through `PATCH /api/reservations`). The same handler also still runs a direct browser `update({ status: "approved" })`, which RLS blocks silently (see RISK-122); it does no harm today.
+
+**Suggested fix:** do not hide the row on click. Let the list change when the approval is actually saved (the shell already refetches after a confirmed approve), and drop the dead direct write. Add a component test: Approve alone leaves the row listed.
+
+**Test checklist:** `ai_docs/manual_tests/RISK_122_REJECT_NOT_SAVED_MANUAL_TESTS.md` (last item).

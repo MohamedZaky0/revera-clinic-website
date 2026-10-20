@@ -8,7 +8,10 @@
 
 | Date | Check | Environment | Evidence | Result |
 |---|---|---|---|---|
-| | | | | |
+| 2026-10-20 | Reject is saved | local dev, `fix/risk-122-reject-not-saved` @ cb3b2b3, superadmin, test DB | Pending booking rejected in the UI: gone in 0.6 s (waits for the API), database status `rejected` (before the fix `pending_deposit`), not back after 2 poll ticks or a reload, All Appointments shows Canceled | Pass |
+| 2026-10-20 | Failed save is not hidden; retry | same | Server stopped, Reject clicked: alert "The request could not be rejected (connection problem). Nothing was changed, please try again.", row stayed, badge unchanged. Server back, Reject again: gone in 1.7 s, status `rejected` | Pass |
+| 2026-10-20 | Approve then Cancel the dialog (suspected side issue) | same | Row vanished from the Pending table while the badge still said Pending 1 and the database stayed `pending_deposit`; back only after reload. Tracked as RISK-124 | FAIL (RISK-124, existing) |
+| 2026-10-20 | NOT tested | | Rejecting a booking that has already started (server returns 400; message not exercised), Approve confirm path after this change (unchanged code) | Pending |
 
 ## The rejection is saved
 - [ ] Create a pending booking (public booking form, or `POST /api/reservations`). Bookings -> Pending: click Reject. The row disappears.
@@ -23,4 +26,4 @@
 ## Neighbouring behaviour is unchanged
 - [ ] Approve from Pending still opens the approve dialog and confirming it approves the booking.
 - [ ] After a successful reject, the Pending badge count drops by one and All Appointments shows the booking as rejected.
-- [ ] Suspected (RISK-122 note): click Approve, then Cancel in the approve dialog. Check whether the booking is still listed in Pending, and whether it is back after a reload.
+- [ ] Click Approve, then Cancel in the approve dialog: the booking should stay listed in Pending (currently it disappears until a reload, see RISK-124).
