@@ -8,7 +8,12 @@
 
 | Date | Check | Environment | Evidence | Result |
 |---|---|---|---|---|
-| | | | | |
+| 2026-10-20 | Section survives reload | local dev, superadmin | Bookings, Finance and Settings -> Branches each reload onto the same page (URL `?section=...`); clicking Dashboard removes the param | Pass |
+| 2026-10-20 | Invalid / action-only section values | same | `?section=Nonsense` and `?section=Logout` open Dashboard, the param is dropped, still logged in | Pass |
+| 2026-10-20 | Password-setup link | same | `?setup=true&section=Patients`: the setup modal shows and the section opens; changing section keeps `setup=true` in the URL | Pass |
+| 2026-10-20 | Window switches do not reload tables | same | 3 simulated returns to the tab (`visibilitychange`) on Patients, Inventory and HR: one `/api/auth/me` on the first, no customers / inventory / HR refetch, 0 spinner appearances. A dispatched event, not a real tab switch | Pass (weak) |
+| 2026-10-20 | Failed background refresh keeps the table (Bookings) | same | Server stopped for 45 s: Pending list kept both rows and the badge | Pass |
+| 2026-10-20 | NOT tested | | `/reception` and `/doctor` accounts reloading in place, a role without Finance access opening `?section=Finance`, token rotation after ~1 h, idle logout, wrong-portal login, Patients offline-save | Pending |
 
 ## Section survives a reload
 - [ ] Log in at `/admin`, open Patients. The address bar now ends with `?section=Patients`. Press F5: you land on Patients, not Dashboard.

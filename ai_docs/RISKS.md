@@ -5343,6 +5343,8 @@ scope for that sweep (it only asserts no-token→401 and patient-session→403, 
 - `fetchAllReservations` in `page.tsx` has `if (calendarView === "Schedule") fetchScheduleReservations()` **after** its `return` — unreachable, so the Schedule view never actually refreshes after writes. Left as found (a behaviour change, not this brief's scope).
 - Other timer-based pollers found in the sweep that set state from a fetch: none besides the ones fixed. Non-fetch timers left alone: `ReceptionDashboardView` 1 s elapsed-time clock, `OurResults` count-up animation, the page.tsx inactivity/presence/verify-retry intervals.
 
+**Full live test, 2026-10-20 (owner-confirmed test database):** every remaining checklist item that this login could reach was run; results are in the checklist evidence logs. Two things that were "decisions" above are now settled: the Schedule view is unreachable (`calendarView` is only ever set to `Calendar` or `List`, so the dead `fetchScheduleReservations()` call after the `return` never mattered in practice), and the doctor portal poll does not wait for the previous request, so on slow responses (2-5 s here) requests overlap. Two defects were found that this work did not cause: RISK-122 (Reject on the Pending list is not saved) and RISK-123 (doctor Ongoing Session stays open after reception completes it).
+
 **Tests:** `tests/lib/pollEqual.test.ts` (6). Full suite 1465 passed / 4 expected-fail, `tsc` clean, `eslint` 0 errors on touched files. Profiler before/after commit counts could not be produced — needs a logged-in browser.
 
 **Not done / unconfirmed:** no live-browser observation yet; the checklist's evidence log is empty on purpose. The acceptance checks in Brief 36 (60 s idle network silence on Devices, Profiler no-commit poll ticks) are written there.
@@ -5391,3 +5393,31 @@ See `PROPOSALS.md` for:
 
 **Not fixed / limits:** a request that still fails after the retry leaves that list empty until the next refetch (opening Employees or Profile refetches). The in-memory confirmation cache is per server instance, so each cold instance pays the lookups once.
 
+
+---
+
+## RISK-122: Reject On The Bookings Pending List Hides The Request On Screen But Saves Nothing (OPEN)
+
+**Severity:** High (a reception "reject" is silently lost; the booking stays pending and can still be approved later) · **Type:** Data integrity / RLS
+**Found:** 2026-10-20, during the full live test of RISK-118/119 (not caused by either; the code is identical before Brief 36 — checked at `5d17c15`).
+
+**What happens:** in the Pending list, Reject calls `supabase.from("reservations").update({ status: "rejected" })` straight from the browser (`handleBookingsReject`, `src/app/admin/page.tsx`), then removes the row and sets `status: "rejected"` in local state without checking the result. RLS is on for `reservations` (`20260722140000_enable_row_level_security.sql`; `SECURITY.md` §4), so the anon-key write changes nothing and returns no error. Observed on the test database: row disappears in 0.1 s, the database still says `pending_deposit`, and after a page reload the booking is back in Pending. Approve does not have this problem (`openApprove` -> `PATCH /api/reservations`).
+
+**Not yet checked (same pattern, same file family):** `AdminBookingsView.tsx` lines ~1217 and ~1242 (`update({ status: "approved" })` / `update({ status: "rejected" })`) write the same way. If those buttons are reachable they have the same defect; confirm before fixing.
+
+**Suggested fix:** send the rejection through `PATCH /api/reservations?id=` with the staff token (the route already handles `status: "rejected"`, used successfully in the RISK-119 test), update local state only after a 2xx, and show an error otherwise. Add a route-level test that a rejected booking leaves Pending.
+
+**Test checklist:** `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md` (evidence log, 2026-10-20).
+
+---
+
+## RISK-123: The Doctor's Ongoing Session Panel Stays Open After Reception Completes The Booking (OPEN)
+
+**Severity:** Medium (the doctor keeps seeing, and can keep editing, a session that is already over) · **Type:** Stale local state
+**Found:** 2026-10-20, full live test of the doctor portal (via the admin "Doctor view" switch). Not caused by Brief 36.
+
+**What happens:** `DoctorAccountView` copies the started booking into `activeSessionBooking` and only clears that copy when the copy's own `status` is completed/cancelled/rejected (the effect after `receptionistStartedSession`). When someone else completes the booking, `reservations` updates correctly (the Schedule tab showed "Completed" within seconds) and `receptionistStartedSession` becomes `null`, but the stale copy still says `started`, so it is never cleared. Observed: 30 s after `PATCH status: completed`, Ongoing Session still showed the patient and the clinical-note box. Clinical-note typing itself was fine (28 s, 15 edits across ~9 poll ticks, no resets).
+
+**Suggested fix:** when `receptionistStartedSession` is `null`, look the copy up by id in `reservations` and clear it if that row is no longer an active status (or if it is missing); otherwise refresh the copy from the row. Add a component test around the effect.
+
+**Test checklist:** `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md` (Doctor portal section, evidence log 2026-10-20).
