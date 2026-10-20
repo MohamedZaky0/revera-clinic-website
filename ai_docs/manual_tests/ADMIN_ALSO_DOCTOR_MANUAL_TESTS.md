@@ -6,7 +6,10 @@
 
 | Date | Check | Environment | Evidence | Result |
 |---|---|---|---|---|
-| | Everything below | | Not run yet | Pending |
+| 2026-10-21 | Checkbox shows for role admin, ticking shows the doctor sections | dev.reveraclinics.com (superadmin test account) | Browser pane, DOM check | Pass |
+| 2026-10-21 | Create admin with the box ticked and the DEFAULT schedule (In-Clinic and Online both 09:00-17:00) | dev.reveraclinics.com | Saved without the overlap warning (after DEC-115); DB: role `admin`, `is_also_doctor = true`, 1 `providers` row. First attempt saved the flag as false because the insert retry path dropped it (fixed in dd99192) | Pass after fix |
+| 2026-10-21 | Edit the same person, tick the box, Save Changes | dev.reveraclinics.com | DB `is_also_doctor = true`, still 1 provider row (no duplicate); appears in the Doctors screen | Pass |
+| | Doctor view with that account, payroll split, unticking, a second login | | Not run yet | Pending |
 
 ## Before testing
 - [ ] Migration `20261021000000_add_is_also_doctor_to_employee_accounts.sql` applied to the database being tested (dev first, production before deploying the code).
