@@ -36,3 +36,8 @@
 - [ ] Add a second In-Clinic shift 12:00-15:00 on the same day: the warning still appears.
 - [ ] Give the doctor two branches with In-Clinic 09:00-17:00 at both on the same day: the warning still appears.
 
+## Loading screen (RISK-121)
+- [ ] Log in and reload: the panel appears right after the short "Verifying administrator session..." screen, without waiting for the Employees list. Open Employees straight away: the list is there or shows its loading state, never an empty table forever.
+- [ ] With the browser's Network tab set to block or slow `/api/employees` (request blocking or Slow 3G), reload: the dashboard still opens; only the screens that need employees wait.
+- [ ] Log in as a doctor-workspace account: the Doctor Portal opens right away (name may show the email for a moment, then the real name).
+

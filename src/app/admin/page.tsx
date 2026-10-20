@@ -1907,8 +1907,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             }
           }
 
-          // Pre-fetch employee accounts list so doctor role is known immediately before rendering
-          await fetchRolesAndEmployees();
+          // Load roles and employees in the background. This used to be awaited so the doctor view
+          // could be decided from the employee list, but the workspace now comes from /api/auth/me
+          // (DEC-113), and /api/employees is slow (it lists every auth user): awaiting it kept the
+          // whole panel on "Verifying administrator session..." for as long as it took, or until a
+          // 504. The panels that need the lists already show their own loading state.
+          void fetchRolesAndEmployees();
         } else if (verification.status === 'unauthorized') {
           console.warn(`Unregistered or unauthorized employee session (${verification.httpStatus}) after a token refresh. Logging out.`);
           recordLogoutReason(CLIENT.storagePrefix, 'session_rejected');
