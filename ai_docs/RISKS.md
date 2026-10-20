@@ -5428,13 +5428,15 @@ See `PROPOSALS.md` for:
 
 ---
 
-## RISK-124: Clicking Approve Hides The Booking From The Pending Table Before The Approval Is Confirmed; Cancelling The Dialog Leaves It Hidden (OPEN)
+## RISK-124: Clicking Approve Hides The Booking From The Pending Table Before The Approval Is Confirmed; Cancelling The Dialog Leaves It Hidden (RESOLVED)
 
 **Severity:** Medium (a still-pending request vanishes from the list while the Pending badge still counts it; staff can think it was handled) · **Type:** Optimistic UI without rollback
 **Found:** 2026-10-20, while verifying RISK-122. Existing behaviour, not caused by RISK-118/119/122.
 
 **What happens:** `handleApproveItem` in `AdminBookingsView.tsx` adds the booking to `approvedIds`/`approvedObjects` as soon as Approve is clicked, then calls the shell's `openApprove`, which opens the approve dialog. If the dialog is cancelled nothing undoes that. Observed on the test database: after Approve -> Cancel the row is gone from the table, the badge still says "Pending 1", the database status is still `pending_deposit`, and the row only comes back after a page reload. Confirming the dialog works normally (the approval itself goes through `PATCH /api/reservations`). The same handler also still runs a direct browser `update({ status: "approved" })`, which RLS blocks silently (see RISK-122); it does no harm today.
 
-**Suggested fix:** do not hide the row on click. Let the list change when the approval is actually saved (the shell already refetches after a confirmed approve), and drop the dead direct write. Add a component test: Approve alone leaves the row listed.
+**Fix (2026-10-20):** `handleApproveItem` in `AdminBookingsView.tsx` now only calls `onApproveBooking` (which opens the approve dialog). The `approvedIds` / `approvedObjects` state, the early `status: "approved"` change of the view's own list and the direct browser write are gone. The row leaves the Pending table when the approval has been saved: the shell already refetches after a confirmed approve. Tests in `tests/components/bookings/AdminBookingsView.test.tsx`: Approve alone keeps the row listed and writes nothing; the row goes once the parent stops listing the request (both mutation-checked).
 
-**Test checklist:** `ai_docs/manual_tests/RISK_122_REJECT_NOT_SAVED_MANUAL_TESTS.md` (last item).
+**Verified live 2026-10-20** (test database): Approve then Cancel leaves the row in Pending and the badge unchanged; Approve then Confirm approves it (database `approved`, slot `10:00`), the row leaves Pending after 4.3 s and the badge empties. Side effect to know about: after a confirmed approve the row now leaves when the save and the refetch finish (a few seconds on slow responses) instead of instantly, because it no longer disappears before the save.
+
+**Test checklist:** `ai_docs/manual_tests/RISK_122_REJECT_NOT_SAVED_MANUAL_TESTS.md` (last item; evidence 2026-10-20).

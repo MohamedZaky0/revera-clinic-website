@@ -128,7 +128,10 @@ describe('doctor name resolution', () => {
 });
 
 describe('pending approvals — approve/reject', () => {
-  it('approve writes status=approved directly to Supabase for that reservation id and calls onApproveBooking', async () => {
+  // RISK-124: Approve only asks the parent to open the approve dialog. The row must stay listed (cancelling
+  // the dialog would otherwise leave a still-pending request hidden) and nothing is written from the browser;
+  // the parent saves through the API and the list changes when it refetches.
+  it('approve hands the booking to onApproveBooking, keeps the row listed and does not write to Supabase', async () => {
     fake.seed('reservations', [{ id: 'req-1', status: 'pending' }]);
     const onApproveBooking = vi.fn();
     const user = userEvent.setup();
@@ -143,8 +146,28 @@ describe('pending approvals — approve/reject', () => {
     await screen.findByText('Pending Patient');
     await user.click(screen.getByTitle('Approve'));
 
-    await waitFor(() => expect(fake.rows('reservations').find((r) => r.id === 'req-1')?.status).toBe('approved'));
-    expect(onApproveBooking).toHaveBeenCalledWith(expect.objectContaining({ id: 'req-1' }));
+    await waitFor(() => expect(onApproveBooking).toHaveBeenCalledWith(expect.objectContaining({ id: 'req-1' })));
+    expect(screen.getByText('Pending Patient')).toBeInTheDocument();
+    expect(fake.rows('reservations').find((r) => r.id === 'req-1')?.status).toBe('pending');
+  });
+
+  it('approve removes the row once the parent no longer lists the request (the approval was saved)', async () => {
+    const onApproveBooking = vi.fn();
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <AdminBookingsView
+        requests={[{ id: 'req-5', patientName: 'Approved Later Patient' }]}
+        onApproveBooking={onApproveBooking}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Pending/ }));
+    await screen.findByText('Approved Later Patient');
+    await user.click(screen.getByTitle('Approve'));
+    expect(screen.getByText('Approved Later Patient')).toBeInTheDocument();
+
+    rerender(<AdminBookingsView requests={[]} onApproveBooking={onApproveBooking} />);
+    await waitFor(() => expect(screen.queryByText('Approved Later Patient')).not.toBeInTheDocument());
   });
 
   // RISK-122: the browser-side write to `reservations` is blocked by RLS and failed silently, so a reject
