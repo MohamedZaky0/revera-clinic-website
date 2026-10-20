@@ -89,7 +89,8 @@ interface AdminBookingsViewProps {
   onPrint?: () => void;
   onExportCSV?: () => void;
   onApproveBooking?: (booking: any) => void;
-  onRejectBooking?: (booking: any) => void;
+  // Resolves to false when the rejection was not saved; the row then stays in the pending list.
+  onRejectBooking?: (booking: any) => void | boolean | Promise<boolean | void>;
   /** SuperAdmin-configured "Stale Session Alert" from Booking Settings. Defaults to 2 hours. */
   staleSessionThresholdHours?: number;
   /** SuperAdmin-configured "Follow-Up Reminder Lead Time" from Booking Settings. Defaults to 2 days. */
@@ -1147,18 +1148,16 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
   const [pendingPage, setPendingPage] = useState(1);
   const [pendingRowsPerPage, setPendingRowsPerPage] = useState(10);
   const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());
-  const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
   const [rejectedObjects, setRejectedObjects] = useState<Set<any>>(new Set());
-  const [approvedObjects, setApprovedObjects] = useState<Set<any>>(new Set());
 
   // Compute pending list items
   const pendingApprovalsList = useMemo(() => {
     const sourceList = (requests && requests.length > 0) ? requests : mergedAppointments;
     const rawPending = sourceList.filter(r => {
-      if (rejectedObjects.has(r) || approvedObjects.has(r)) return false;
+      if (rejectedObjects.has(r)) return false;
 
       const idStr = String(r.id || "");
-      if (idStr && (rejectedIds.has(idStr) || approvedIds.has(idStr))) return false;
+      if (idStr && rejectedIds.has(idStr)) return false;
 
       return ["pending", "waiting", "pending_deposit"].includes((r.status || "pending").toLowerCase());
     });
@@ -1199,48 +1198,39 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
         raw: item
       };
     });
-  }, [requests, mergedAppointments, selectedDateStr, rejectedIds, approvedIds, rejectedObjects, approvedObjects]);
+  }, [requests, mergedAppointments, selectedDateStr, rejectedIds, rejectedObjects]);
 
   const startIndexPending = (pendingPage - 1) * pendingRowsPerPage;
   const paginatedPendingList = useMemo(() => {
     return pendingApprovalsList.slice(startIndexPending, startIndexPending + pendingRowsPerPage);
   }, [pendingApprovalsList, startIndexPending, pendingRowsPerPage]);
 
-  const handleApproveItem = async (item: any) => {
-    try {
-      const rawObj = item.raw || item;
-      const targetId = String(rawObj?.id || item.id || "");
-
-      setApprovedObjects(prev => new Set(prev).add(rawObj));
-      if (targetId) {
-        setApprovedIds(prev => new Set(prev).add(targetId));
-        await supabase.from("reservations").update({ status: "approved" }).eq("id", targetId);
-      }
-      setDbReservations(prev => {
-        const exists = prev.some(r => String(r.id) === String(targetId));
-        if (exists) {
-          return prev.map(r => String(r.id) === String(targetId) ? { ...r, status: "approved" } : r);
-        }
-        return [...prev, { ...rawObj, id: targetId, status: "approved" }];
-      });
-      if (onApproveBooking) {
-        onApproveBooking({ ...rawObj, id: targetId, status: "approved" });
-      }
-    } catch (e) {
-      console.error("Approve error:", e);
-    }
+  // RISK-125: Approve only asks the parent to open the approve dialog. Nothing is hidden or marked approved
+  // here: the row leaves the pending list when the approval has really been saved (the parent refetches
+  // after a confirmed approve), so cancelling the dialog leaves the request where it was. A direct browser
+  // write used to run here as well; RLS blocks it, and it would have approved the booking before the
+  // dialog was confirmed.
+  const handleApproveItem = (item: any) => {
+    const rawObj = item.raw || item;
+    const targetId = String(rawObj?.id || item.id || "");
+    if (!targetId || !onApproveBooking) return;
+    onApproveBooking({ ...rawObj, id: targetId, status: "approved" });
   };
 
+  // RISK-122: saving is the parent's job (a server call). The row is hidden only after it reports success,
+  // so a rejection that did not save never looks saved. A direct browser write used to run here; RLS blocks
+  // it, and it failed without any error.
   const handleRejectItem = async (item: any) => {
     try {
       const rawObj = item.raw || item;
       const targetId = String(rawObj?.id || item.id || "");
+      if (!targetId || !onRejectBooking) return;
+
+      const saved = await onRejectBooking({ ...rawObj, id: targetId, status: "rejected" });
+      if (saved === false) return;
 
       setRejectedObjects(prev => new Set(prev).add(rawObj));
-      if (targetId) {
-        setRejectedIds(prev => new Set(prev).add(targetId));
-        await supabase.from("reservations").update({ status: "rejected" }).eq("id", targetId);
-      }
+      setRejectedIds(prev => new Set(prev).add(targetId));
       setDbReservations(prev => {
         const exists = prev.some(r => String(r.id) === String(targetId));
         if (exists) {
@@ -1248,9 +1238,6 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
         }
         return [...prev, { ...rawObj, id: targetId, status: "rejected" }];
       });
-      if (onRejectBooking) {
-        onRejectBooking({ ...rawObj, id: targetId, status: "rejected" });
-      }
     } catch (e) {
       console.error("Reject error:", e);
     }
