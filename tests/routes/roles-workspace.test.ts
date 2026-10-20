@@ -103,6 +103,16 @@ describe('GET /api/auth/me - workspace', () => {
     expect(body.workspace).toBe('standard');
   });
 
+  it('returns isAlsoDoctor for a flagged admin and false otherwise', async () => {
+    mockDb.roles.push({ name: 'admin', permissions: [], workspace: 'standard' });
+    seedDoctor('admin');
+    expect((await (await GET_ME(meReq())).json()).isAlsoDoctor).toBe(false);
+    mockDb.employee_accounts[0].is_also_doctor = true;
+    const body = await (await GET_ME(meReq())).json();
+    expect(body.isAlsoDoctor).toBe(true);
+    expect(body.workspace).toBe('standard');
+  });
+
   it('returns standard when the role row predates the column', async () => {
     mockDb.roles.push({ name: 'legacy', permissions: [] });
     seedDoctor('legacy');

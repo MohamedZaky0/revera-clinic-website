@@ -107,6 +107,8 @@ export async function GET(req: Request) {
       department: employee.department,
       // DEC-113: the role's explicit workspace; the client no longer infers the doctor view from names.
       workspace: role?.workspace === 'doctor' ? 'doctor' : 'standard',
+      // DEC-114: this person also treats patients, so the Doctor view switch is offered to them.
+      isAlsoDoctor: employee.is_also_doctor === true,
       permissions: Array.isArray(role?.permissions) ? role.permissions : [],
       email: employee.email || email,
       employeeId: employee.employee_id

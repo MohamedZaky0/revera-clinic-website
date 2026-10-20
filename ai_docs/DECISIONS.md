@@ -3714,6 +3714,8 @@ Investigation revealed:
 4. **Payroll:** an also-a-doctor employee is left out of the staff payroll (`GET` and run in `/api/hr/payroll`) and is paid through Doctor Payroll only, exactly like any other doctor, so nobody is paid twice. Their salary and commission setup are the doctor's.
 5. PATCH only writes the flag when the request contains a boolean, so an older open tab that does not know the field cannot reset it. POST only writes the column when it is true, so a database without it still creates ordinary staff.
 
+6. **Doctor view is optional (added 2026-10-21):** the Doctor view / Back to Admin view switch (DEC-113) is offered only to accounts flagged `is_also_doctor` (`/api/auth/me` returns `isAlsoDoctor`) and always to the superadmin. The superadmin account is not listed under Employees, so it cannot tick the box, and it needs the screen for support and testing. Other admins no longer see the button; before this every admin did and got an empty schedule.
+
 **Not done / known limits:** unticking the flag stops the doctor sync but does not delete or deactivate the `providers` row (it may already have bookings); deactivate the doctor from the Doctors screen if they should disappear from pickers. Past staff-payroll rows of someone who is later flagged are hidden from the staff payroll list because the filter looks at the flag, not at history.
 
 ---

@@ -23,6 +23,8 @@
 - [ ] Untick and save: no error; the doctor row stays in Doctors (deactivate it there if needed).
 
 ## Doctor view
+- [ ] An admin who is NOT flagged does not see "Doctor view" in the sidebar footer. A flagged admin does. The superadmin always does.
+- [ ] Untick the flag for an admin who had the Doctor view open, reload: back in the admin shell, no Doctor view button.
 - [ ] Log in as that admin, open Doctor view: their own schedule and sessions load (not empty after the first seconds), and Back to Admin view returns.
 
 ## Payroll
