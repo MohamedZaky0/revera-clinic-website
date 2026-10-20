@@ -3698,3 +3698,21 @@ Investigation revealed:
 
 **Not done / known limits:** an employee whose role is a doctor role but who is not yet in `providers` is created there the next time the providers list loads (existing behaviour). `Reception` dashboard (`/api/reception/dashboard`) still looks at `department = Reception`; it is a different question (which employees are on the desk) and was left alone. Roles that were renamed away from doctor/doctors/physician before this migration must be set to the Doctor workspace by hand in Role Management.
 
+---
+
+## DEC-114: An Admin Can Also Be A Doctor (`employee_accounts.is_also_doctor`)
+
+**Date:** 2026-10-21
+**Status:** Decided & implemented (migration to be applied before deploy)
+
+**Context:** DEC-113 made the doctor screens a property of the role. An account has exactly one role, so an admin or superadmin who also treats patients (the clinic owner, for instance) could open the doctor screens through the Doctor view switch, but had no `providers` row, so their schedule was empty and they could not be picked as a doctor in bookings. Making them a doctor-workspace role would have taken away their admin screens and permissions.
+
+**Decision:**
+1. New column `employee_accounts.is_also_doctor boolean NOT NULL DEFAULT false` (`20261021000000_add_is_also_doctor_to_employee_accounts.sql`; DB_SCHEMA.md updated). The account keeps its role and permissions.
+2. Add/Edit Employee shows a "This person also treats patients (doctor)" checkbox for any role that is not already a doctor-workspace role. Ticking it shows the same doctor sections (speciality, weekly shifts, services, commissions) as a doctor role. The form sends `isAlsoDoctor`; for a doctor-workspace role it is always sent false, and the API ignores it there (a doctor-workspace role is a doctor already).
+3. "Is this employee a doctor" is now: the role's workspace is `doctor` OR `is_also_doctor` (`isDoctorEmployee` in `src/lib/roleWorkspace.ts`). That drives the providers sync on create and edit, the providers-list auto-sync, and the payroll split.
+4. **Payroll:** an also-a-doctor employee is left out of the staff payroll (`GET` and run in `/api/hr/payroll`) and is paid through Doctor Payroll only, exactly like any other doctor, so nobody is paid twice. Their salary and commission setup are the doctor's.
+5. PATCH only writes the flag when the request contains a boolean, so an older open tab that does not know the field cannot reset it. POST only writes the column when it is true, so a database without it still creates ordinary staff.
+
+**Not done / known limits:** unticking the flag stops the doctor sync but does not delete or deactivate the `providers` row (it may already have bookings); deactivate the doctor from the Doctors screen if they should disappear from pickers. Past staff-payroll rows of someone who is later flagged are hidden from the staff payroll list because the filter looks at the flag, not at history.
+

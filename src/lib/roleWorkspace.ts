@@ -16,6 +16,15 @@ export async function getDoctorRoleNames(): Promise<Set<string>> {
   return new Set((data || []).map((r: any) => String(r.name || '').trim().toLowerCase()).filter(Boolean));
 }
 
+/**
+ * DEC-114: an employee is a doctor when their role has the doctor workspace OR the account is
+ * flagged `is_also_doctor` (an admin who also treats patients keeps the admin role).
+ */
+export async function isDoctorEmployee(roleName: string | null | undefined, isAlsoDoctor: unknown): Promise<boolean> {
+  if (isAlsoDoctor === true) return true;
+  return isDoctorRole(roleName);
+}
+
 /** True when `roleName` (any casing) is a doctor-workspace role. */
 export async function isDoctorRole(roleName: string | null | undefined): Promise<boolean> {
   const clean = String(roleName || '').trim().toLowerCase();

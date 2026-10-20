@@ -326,7 +326,8 @@ The full page content structure mirrors the `Translation` type in `src/types/ind
 | `email` | text | Unique, Supabase Auth email |
 | `name` | text | Display name, nullable |
 | `phone` | text | nullable |
-| `department` | text | Default `'Reception'` |
+| `department` | text | Default `'Reception'`. Descriptive label only since DEC-113; it no longer decides screens, providers sync or payroll. |
+| `is_also_doctor` | boolean | NOT NULL DEFAULT false. **Added 2026-10-21** by `20261021000000_add_is_also_doctor_to_employee_accounts.sql` (DEC-114). The account keeps its (standard) role but the person also treats patients: they get a `providers` row, show in doctor pickers and are paid through Doctor Payroll, not the staff payroll. Stored false for a doctor-workspace role (already a doctor). |
 | `shift` | text | Default `'Day'` — `"Day"`, `"Night"`, or custom time range string |
 | `salary` | numeric | Default 0 |
 | `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable — the employee's **primary** (default) branch. Every pre-multi-branch reader uses only this column. |
