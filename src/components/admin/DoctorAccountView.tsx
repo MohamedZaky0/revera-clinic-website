@@ -641,12 +641,25 @@ function DoctorAccountView({
         setActiveSessionBooking(receptionistStartedSession);
       }
     } else if (activeSessionBooking) {
-      const st = String(activeSessionBooking.status || "").toLowerCase().trim();
-      if (st === "completed" || st === "done" || st === "cancelled" || st === "canceled" || st === "rejected") {
+      const isEnded = (value: any) => {
+        const s = String(value || "").toLowerCase().trim();
+        return s === "completed" || s === "done" || s === "cancelled" || s === "canceled" || s === "rejected";
+      };
+      if (isEnded(activeSessionBooking.status)) {
         setActiveSessionBooking(null);
+      } else {
+        // RISK-123: this copy only follows the booking while it is "started". If someone else ends the
+        // booking (e.g. reception completes it) the poll updates `reservations` but not this copy, so the
+        // panel used to stay open on a finished session. The realtime handler above already closes it for
+        // the same statuses; this does it for the polled data too. A booking the list has not caught up
+        // with yet (still confirmed right after the doctor pressed Start) is left alone.
+        const current = reservations.find((r) => String(r.id) === String(activeSessionBooking.id));
+        if (current && isEnded(current.status)) {
+          setActiveSessionBooking(null);
+        }
       }
     }
-  }, [receptionistStartedSession, activeSessionBooking]);
+  }, [receptionistStartedSession, activeSessionBooking, reservations]);
 
   // Sync active session clinical notes — Brief 33: prefer doctor_notes (clean column),
   // fall back to regex-cleaned legacy notes for pre-migration bookings
