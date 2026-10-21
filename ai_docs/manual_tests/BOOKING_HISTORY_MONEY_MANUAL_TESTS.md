@@ -31,3 +31,13 @@
 - [ ] A booking added with "Add Previous Booking" with an invoice value of 500 and 300 paid: Price 500, Paid 300, Outstanding 200.
 - [ ] Old booking with no recorded balance (if one exists): Price and Outstanding show a dash, never 0.
 - [ ] Row click still opens the booking details; the Payment and Status badges are unchanged.
+
+## A previous booking shows its Invoice Value (DEC-120)
+- [ ] Add Previous Booking for a patient with one service, Invoice Value **different from today's catalog price** (e.g. catalog 1500, invoice 1000), Actual Spent 1000. Open the patient, Booking History, click that booking: the service line and the total read **1000**, not 1500. Paid 1000, nothing outstanding.
+- [ ] Same with Actual Spent 400: total 1000, paid 400, outstanding 600.
+- [ ] Two services in one previous booking, Invoice Value 800 (catalog 600 + 400): the two lines add up to exactly 800 and the total is 800.
+- [ ] Change the service's catalog price afterwards: the old booking still shows the invoice value; a new online booking for that service shows the new price.
+- [ ] A previous booking with Invoice Value 0 still shows 0 EGP everywhere (unchanged).
+- [ ] A normal (non-previous) booking still shows its catalog-based price (unchanged).
+- [ ] Print / PDF invoice of an old previous booking: lines and total match the screen.
+
