@@ -12,7 +12,8 @@ import fs from 'fs';
 import path from 'path';
 import { isDoctorEmployee } from '@/lib/roleWorkspace';
 import { getConfirmationMap } from '@/lib/employeeConfirmation';
-import { checkAccountAction, AUTH_BAN_DURATION } from '@/lib/accountActivation';
+import { checkAccountAction } from '@/lib/accountActivation';
+import { setAuthUserBanned, setProviderActiveForEmployee } from '@/lib/accountAccess';
 
 const SCHEDULES_FILE_PATH = path.join(process.cwd(), 'data', 'employee_schedules.json');
 
@@ -128,24 +129,6 @@ async function saveEmployeeWorkingSchedule(employeeKey: string, schedule: any, a
       }, { onConflict: 'key' });
   } catch (err) {
     console.warn('Error saving employee_working_schedules to page_settings:', err);
-  }
-}
-
-/** Switch the matching Supabase Auth user on or off. Returns false when it could not be done. */
-async function setAuthUserBanned(authUserId: string | null | undefined, banned: boolean): Promise<boolean> {
-  if (!authUserId) return true;
-  try {
-    const { error } = await supabaseServer.auth.admin.updateUserById(authUserId, {
-      ban_duration: banned ? AUTH_BAN_DURATION : 'none',
-    } as any);
-    if (error) {
-      console.warn('Could not update the auth ban for an employee account:', error.message);
-      return false;
-    }
-    return true;
-  } catch (e: any) {
-    console.warn('Could not update the auth ban for an employee account:', e?.message || e);
-    return false;
   }
 }
 
@@ -597,7 +580,9 @@ export async function PATCH(req: Request) {
       if (activeErr) throw activeErr;
 
       const authSynced = wantActive ? true : await setAuthUserBanned(employee.auth_user_id, true);
-      return NextResponse.json({ ...changed, authSynced });
+      // DEC-118: a doctor's account being switched off takes them off the booking lists (and on again with it).
+      const providerSync = await setProviderActiveForEmployee(employee, wantActive);
+      return NextResponse.json({ ...changed, authSynced, providerSync });
     }
 
     if (!resendInvite && (roleName || typeof body.isAlsoDoctor === 'boolean' || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchRequest.requested || requiredTargetAmount !== undefined || bonusPercentage !== undefined || targetType !== undefined || bonusType !== undefined || workingDaysHours !== undefined)) {
@@ -863,6 +848,7 @@ export async function DELETE(req: Request) {
 
       if (softErr) throw softErr;
       await setAuthUserBanned(employee.auth_user_id, true);
+      await setProviderActiveForEmployee(employee, false);
       return NextResponse.json({ message: 'Employee account deactivated successfully', data: updated });
     }
 
@@ -879,6 +865,9 @@ export async function DELETE(req: Request) {
       .eq('id', id);
 
     if (deleteDbError) throw deleteDbError;
+
+    // The provider row stays (it may have bookings and payroll history) but must stop being offered.
+    await setProviderActiveForEmployee(employee, false);
 
     return NextResponse.json({ message: 'Employee account permanently deleted successfully' });
   } catch (err: any) {

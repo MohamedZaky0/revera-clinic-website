@@ -39,6 +39,7 @@ vi.mock('@/lib/supabaseServer', () => ({
 }));
 
 import { PATCH, DELETE } from '@/app/api/employees/route';
+import { DELETE as DELETE_PROVIDER } from '@/app/api/providers/route';
 import { GET as GET_ROLES } from '@/app/api/roles/route';
 import { GET as GET_ME } from '@/app/api/auth/me/route';
 import { checkAccountAction, isSuperadminAccount } from '@/lib/accountActivation';
@@ -208,5 +209,99 @@ describe('checkAccountAction', () => {
     expect(checkAccountAction(me, target, 'activate').ok).toBe(true);
     expect(checkAccountAction(me, target, 'deactivate').ok).toBe(false);
     expect(checkAccountAction(me, target, 'delete').ok).toBe(false);
+  });
+});
+
+describe('a doctor follows their account (DEC-118)', () => {
+  const provider = (id: string) => mockDb.providers.find((p: any) => p.id === id);
+
+  it('switching the account off takes the matching provider off the booking lists, and on again restores it', async () => {
+    seed();
+    mockDb.providers.push({ id: 'p-desk', name: 'Desk', phone: null, active: true });
+    const off = await PATCH(req('PATCH', '/api/employees', { id: EMP_RECEPTION, isActive: false }));
+    expect(off.status).toBe(200);
+    expect((await off.json()).providerSync).toBe('updated');
+    expect(provider('p-desk').active).toBe(false);
+
+    const on = await PATCH(req('PATCH', '/api/employees', { id: EMP_RECEPTION, isActive: true }));
+    expect(on.status).toBe(200);
+    expect(provider('p-desk').active).toBe(true);
+  });
+
+  it('matches the name regardless of case', async () => {
+    seed();
+    mockDb.providers.push({ id: 'p-desk', name: 'DESK', phone: null, active: true });
+    await PATCH(req('PATCH', '/api/employees', { id: EMP_RECEPTION, isActive: false }));
+    expect(provider('p-desk').active).toBe(false);
+  });
+
+  it('with two providers of the same name, only the one with the same phone is changed', async () => {
+    seed();
+    row(EMP_RECEPTION).phone = '0100';
+    mockDb.providers.push(
+      { id: 'p-a', name: 'Desk', phone: '0100', active: true },
+      { id: 'p-b', name: 'Desk', phone: '0200', active: true },
+    );
+    await PATCH(req('PATCH', '/api/employees', { id: EMP_RECEPTION, isActive: false }));
+    expect(provider('p-a').active).toBe(false);
+    expect(provider('p-b').active).toBe(true);
+  });
+
+  it('when it cannot tell which provider is the person, it changes none (but the account is still switched off)', async () => {
+    seed();
+    mockDb.providers.push(
+      { id: 'p-a', name: 'Desk', phone: '0100', active: true },
+      { id: 'p-b', name: 'Desk', phone: '0200', active: true },
+    );
+    const res = await PATCH(req('PATCH', '/api/employees', { id: EMP_RECEPTION, isActive: false }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).providerSync).toBe('ambiguous');
+    expect(row(EMP_RECEPTION).is_active).toBe(false);
+    expect(provider('p-a').active).toBe(true);
+    expect(provider('p-b').active).toBe(true);
+  });
+
+  it('an employee with no provider row is simply switched off', async () => {
+    seed();
+    const res = await PATCH(req('PATCH', '/api/employees', { id: EMP_RECEPTION, isActive: false }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).providerSync).toBe('none');
+  });
+
+  it('soft and permanent delete also take the doctor off the lists, keeping the provider row', async () => {
+    seed();
+    mockDb.providers.push({ id: 'p-desk', name: 'Desk', phone: null, active: true });
+    await DELETE(req('DELETE', `/api/employees?id=${EMP_RECEPTION}&mode=soft`));
+    expect(provider('p-desk').active).toBe(false);
+
+    provider('p-desk').active = true;
+    await DELETE(req('DELETE', `/api/employees?id=${EMP_RECEPTION}&mode=hard`));
+    expect(row(EMP_RECEPTION)).toBeUndefined();
+    expect(provider('p-desk')).toBeDefined();
+    expect(provider('p-desk').active).toBe(false);
+  });
+
+  it('soft-deleting a doctor from the Doctors screen switches the account off and keeps the role', async () => {
+    seed();
+    fake.authGetUser.mockResolvedValue({ data: { user: { id: 'u-super', email: 'super@clinic.test' } }, error: null });
+    mockDb.providers.push({ id: 'p-desk', name: 'Desk', phone: null, active: true });
+    const res = await DELETE_PROVIDER(req('DELETE', '/api/providers?id=p-desk&mode=soft'));
+    expect(res.status).toBe(200);
+    expect(provider('p-desk').active).toBe(false);
+    expect(row(EMP_RECEPTION).is_active).toBe(false);
+    expect(row(EMP_RECEPTION).role_name).toBe('receptionist');
+    expect(mockUpdateUser).toHaveBeenCalledWith('u-desk', expect.objectContaining({ ban_duration: '876000h' }));
+  });
+
+  it('that soft delete leaves another employee who merely shares the name alone', async () => {
+    seed();
+    fake.authGetUser.mockResolvedValue({ data: { user: { id: 'u-super', email: 'super@clinic.test' } }, error: null });
+    mockDb.employee_accounts.push({ id: 'e-twin', employee_id: 'twin@clinic.test', email: 'twin@clinic.test', name: 'Desk', role_name: 'receptionist', auth_user_id: 'u-twin', phone: '0999' });
+    row(EMP_RECEPTION).phone = '0100';
+    mockDb.providers.push({ id: 'p-desk', name: 'Desk', phone: '0100', active: true });
+    await DELETE_PROVIDER(req('DELETE', '/api/providers?id=p-desk&mode=soft'));
+    expect(row(EMP_RECEPTION).is_active).toBe(false);
+    expect(row('e-twin').is_active).toBeUndefined();
+    expect(row('e-twin').role_name).toBe('receptionist');
   });
 });
