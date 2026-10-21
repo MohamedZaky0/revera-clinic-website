@@ -32,6 +32,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { getAuthHeaders } from "@/lib/authHeaders";
 import { STRONG_PASSWORD_RE } from "@/lib/passwordPolicy";
 import { adminTranslations } from "./translations";
 
@@ -187,80 +188,27 @@ export default function UserProfileView({
   const [fetchedProvider, setFetchedProvider] = useState<any>(null);
   const [selectedScheduleBranch, setSelectedScheduleBranch] = useState<string>("all");
 
+  // The signed-in person's own employee and provider records (schedule, shift, branches). They come from the
+  // API now: the browser used to read employee_accounts and providers directly with the public key (RISK-128).
   useEffect(() => {
+    let alive = true;
     async function loadExtraDetails() {
       try {
-        const email = user.email?.trim().toLowerCase();
-        const userId = user.id?.trim();
-        const phone = user.phone?.trim();
-        const name = user.name?.trim();
-        const isUUID = !!(userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId));
-
-        if (email || userId || phone || name) {
-          // 1. Employee query from /api/employees (which merges page_settings schedule)
-          let empData: any = null;
-          try {
-            const empRes = await fetch("/api/employees", { cache: "no-store" });
-            if (empRes.ok) {
-              const allEmps = await empRes.json();
-              if (Array.isArray(allEmps)) {
-                empData = allEmps.find((e: any) =>
-                  (email && e.email && e.email.toLowerCase() === email) ||
-                  (userId && e.id === userId) ||
-                  (userId && e.employee_id === userId) ||
-                  (phone && e.phone && e.phone === phone) ||
-                  (name && e.name && e.name.trim().toLowerCase() === name.toLowerCase())
-                ) || null;
-              }
-            }
-          } catch (apiErr) {
-            console.warn("UserProfileView: /api/employees load notice:", apiErr);
-          }
-
-          // Fallback direct Supabase queries if API route was not accessible
-          if (!empData) {
-            if (email) {
-              const { data } = await supabase.from("employee_accounts").select("*").eq("email", email).maybeSingle();
-              if (data) empData = data;
-            }
-            if (!empData && isUUID) {
-              const { data } = await supabase.from("employee_accounts").select("*").eq("id", userId).maybeSingle();
-              if (data) empData = data;
-            }
-            if (!empData && userId && userId !== "my-profile" && !userId.includes("@")) {
-              const { data } = await supabase.from("employee_accounts").select("*").eq("employee_id", userId).maybeSingle();
-              if (data) empData = data;
-            }
-            if (!empData && phone) {
-              const { data } = await supabase.from("employee_accounts").select("*").eq("phone", phone).maybeSingle();
-              if (data) empData = data;
-            }
-          }
-
-          if (empData) setFetchedEmployee(empData);
-
-          // 2. Provider query (try UUID id, phone, name safely)
-          let provData = null;
-          if (isUUID) {
-            const { data } = await supabase.from("providers").select("*").eq("id", userId).maybeSingle();
-            if (data) provData = data;
-          }
-          if (!provData && phone) {
-            const { data } = await supabase.from("providers").select("*").eq("phone", phone).maybeSingle();
-            if (data) provData = data;
-          }
-          if (!provData && name && name !== "Employee Account" && name !== "zaki") {
-            const { data } = await supabase.from("providers").select("*").ilike("name", `%${name}%`).maybeSingle();
-            if (data) provData = data;
-          }
-          if (provData) setFetchedProvider(provData);
-        }
+        const headers = await getAuthHeaders();
+        const res = await fetch("/api/profile", { headers, cache: "no-store" });
+        if (!res.ok || !alive) return;
+        const data = await res.json();
+        if (data?.employee) setFetchedEmployee(data.employee);
+        if (data?.provider) setFetchedProvider(data.provider);
       } catch (err) {
         console.warn("UserProfileView: background schedule load notice:", err);
       }
     }
     loadExtraDetails();
-  }, [user.id, user.email, user.phone, user.name]);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Local edit states
   const [showEditPersonalModal, setShowEditPersonalModal] = useState(false);
@@ -289,8 +237,10 @@ export default function UserProfileView({
   useEffect(() => {
     async function loadSystemBranches() {
       try {
-        const { data } = await supabase.from("branches").select("id, name_en, name");
-        if (data && data.length > 0) {
+        const res = await fetch("/api/branches", { cache: "no-store" });
+        const raw = res.ok ? await res.json() : null;
+        const data: any[] = Array.isArray(raw) ? raw : Array.isArray(raw?.branches) ? raw.branches : [];
+        if (data.length > 0) {
           const names = data.map((b: any) => b.name_en || b.name).filter(Boolean);
           setAllSystemBranches(names);
         }
@@ -751,20 +701,11 @@ export default function UserProfileView({
       try {
         const { startStr, endStr } = getDateRange(attendancePeriod);
         
-        let query = supabase
-          .from("hr_attendance")
-          .select("*")
-          .gte("date", startStr)
-          .lte("date", endStr)
-          .order("date", { ascending: false });
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/profile/attendance?from=${startStr}&to=${endStr}`, { headers, cache: "no-store" });
+        const data: any[] | null = res.ok ? await res.json() : null;
 
-        if (user.id) {
-          query = query.or(`employee_id.eq.${user.id},employee_id.eq.${user.employeeId}`);
-        }
-
-        const { data, error } = await query;
-
-        if (!error && data && data.length > 0) {
+        if (Array.isArray(data) && data.length > 0) {
           let present = 0;
           let absent = 0;
           let late = 0;
@@ -844,44 +785,44 @@ export default function UserProfileView({
       setLoadingPayroll(true);
       try {
         const { startStr, endStr } = getDateRange(payrollPeriod);
-        const monthStr = startStr.slice(0, 7);
-        const cleanName = user.name ? user.name.replace(/^Dr\.?\s*/i, "").trim() : "";
 
         let salary = Number(user.basicSalary || 0);
         let target = Number(user.monthlyTarget || 0);
         let bonusComm = Number(user.bonuses || 0);
         let deds = Number(user.deductions || 0);
 
-        if (isDoctorView) {
-          // 1. Query providers table for Doctor Fixed Salary & Target
-          let qProv = supabase.from("providers").select("*");
-          if (user.id) qProv = qProv.eq("id", user.id);
-          else if (cleanName) qProv = qProv.ilike("name", `%${cleanName}%`);
-          const { data: prov } = await qProv.maybeSingle();
+        // One call returns this person's own employee / provider / doctor_payroll rows and the money collected
+        // on their own bookings; the browser used to read all of that with the public key (RISK-128).
+        let pay: any = null;
+        try {
+          const headers = await getAuthHeaders();
+          const res = await fetch(
+            `/api/profile/payroll?from=${startStr}&to=${endStr}&view=${isDoctorView ? "doctor" : "staff"}`,
+            { headers, cache: "no-store" }
+          );
+          if (res.ok) pay = await res.json();
+        } catch (apiErr) {
+          console.warn("UserProfileView: pay summary load notice:", apiErr);
+        }
 
+        if (isDoctorView) {
+          // Doctor Fixed Salary & Target from the provider record
+          const prov = pay?.provider;
           if (prov) {
             salary = Number(prov.fixed_salary || prov.salary || salary);
             target = Number(prov.target_amount || prov.required_target_amount || target);
           }
 
-          // 2. Query doctor_payroll for current month fixed salary & calculated commissions
-          let qDocPay = supabase.from("doctor_payroll").select("*").eq("month", monthStr);
-          if (user.id) qDocPay = qDocPay.eq("provider_id", user.id);
-          else if (prov?.id) qDocPay = qDocPay.eq("provider_id", prov.id);
-          const { data: docPay } = await qDocPay.maybeSingle();
-
+          // Current month's fixed salary & calculated commissions from doctor_payroll
+          const docPay = pay?.doctorPayroll;
           if (docPay) {
             salary = Number(docPay.fixed_salary || docPay.fixed_salary_snapshot || salary);
             bonusComm = Number(docPay.calculated_commission || docPay.commission_value || 0);
             deds = Number(docPay.deductions || 0);
           }
         } else {
-          // Query employee_accounts & hr_payroll for Staff View
-          let qEmp = supabase.from("employee_accounts").select("*");
-          if (user.id) qEmp = qEmp.eq("id", user.id);
-          else if (user.email) qEmp = qEmp.eq("email", user.email);
-          const { data: emp } = await qEmp.maybeSingle();
-
+          // Staff view: the employee record
+          const emp = pay?.employee;
           if (emp) {
             salary = Number(emp.salary || salary);
             target = Number(emp.required_target_amount || target);
@@ -897,35 +838,8 @@ export default function UserProfileView({
           deductions: deds
         });
 
-        // 3. Query reservations table for Target Progress (Completed/Confirmed Revenue)
-        const qRes = supabase
-          .from("reservations")
-          .select("amount_paid, price, status, date, doctor_name, provider_id, created_by_employee_id")
-          .gte("date", startStr)
-          .lte("date", endStr)
-          .in("status", ["completed", "confirmed", "approved", "started"]);
-
-        const { data: resData, error: resErr } = await qRes;
-
-        if (!resErr && resData && resData.length > 0) {
-          const userRev = resData.filter((r: any) => {
-            if (isDoctorView && cleanName) {
-              return (
-                (r.doctor_name && r.doctor_name.toLowerCase().includes(cleanName.toLowerCase())) ||
-                r.provider_id === user.id
-              );
-            }
-            if (user.id) {
-              return r.created_by_employee_id === user.id || r.provider_id === user.id;
-            }
-            return true;
-          });
-
-          const totalRev = userRev.reduce((sum: number, r: any) => sum + Number(r.amount_paid || r.price || 0), 0);
-          setTargetRevenue(totalRev);
-        } else {
-          setTargetRevenue(0);
-        }
+        // Target progress: the server adds up the paid amount on this person's own bookings in the period
+        setTargetRevenue(Number(pay?.targetRevenue || 0));
       } catch (err) {
         console.error("Error fetching live database payroll summary:", err);
       } finally {

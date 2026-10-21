@@ -53,6 +53,7 @@ import { extractPulsePackageQuota } from "@/lib/laserDeficit";
 import { resolveLaserPulseRate } from "@/lib/laserRate";
 import LaserDeficitPrompt from "./LaserDeficitPrompt";
 import { CLIENT } from "@/config/client";
+import { allocateServicePrices } from "@/lib/historicalServicePrices";
 
 export interface AdditionalServiceItem {
   id: string | number;
@@ -1820,7 +1821,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         });
 
         const serviceNames = bookingServices.map(bs => bs.name).join(", ");
-        const servicesCost = bookingServices.reduce((sum, bs) => sum + bs.price, 0);
+        let servicesCost = bookingServices.reduce((sum, bs) => sum + bs.price, 0);
 
         // Compute attached products and additional services from attachedProducts and notes
         const rawAttached: any[] = Array.isArray((booking as any).attachedProducts)
@@ -2039,6 +2040,19 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               });
             }
           }
+        }
+
+        // DEC-120: a booking from "Add Previous Booking" was charged the Invoice Value typed when it was
+        // entered. That is the price, not today's catalog price: spread the services' share of it over
+        // the service lines so the lines (and the total below) show what was actually charged.
+        if (isHistoricalBooking && histInvMatch && !isZeroHistoricalBooking && !isLaserPerPulse && !isLaserPackage && bookingServices.length > 0) {
+          const notedInvoice = Number(histInvMatch[1] || histInvMatch[2]);
+          const extrasCost =
+            additionalServicesList.reduce((sum, s) => sum + s.total, 0) +
+            productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
+          const allocated = allocateServicePrices(bookingServices.map((bs) => bs.price), Math.max(0, notedInvoice - extrasCost));
+          bookingServices.forEach((bs, i) => { bs.price = allocated[i]; });
+          servicesCost = allocated.reduce((sum, p) => sum + p, 0);
         }
 
         // 3. Fallback reconciliation: If notes or booking balance recorded a higher invoice total than the sum of parsed lines,

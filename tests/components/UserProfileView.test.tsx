@@ -1,46 +1,59 @@
 /**
- * Salary, target-progress, and commission figures here come from direct client-side Supabase reads
- * (`@/lib/supabaseClient`, the anon-key browser client) — NOT from an authenticated API route. That
- * contradicts ai_docs/RISKS.md RISK-019's claim that "no client component reads or writes a
- * Supabase table any more" (see the batch report). This file is mocked with the same
- * `createSupabaseFake` used for route tests so the queries this component builds are exercised for
- * real, not just stubbed to return whatever the test expects.
+ * Salary, target-progress and commission figures come from the signed-in person's own records, read through
+ * `GET /api/profile`, `/api/profile/payroll` and `/api/profile/attendance` (RISK-128). The screen used to read
+ * employee_accounts, providers, hr_attendance, doctor_payroll and reservations straight from the browser with
+ * the public key, which only worked while old "allow all" policies left those tables open. These tests answer
+ * those routes through the fetch fake, check what the screen asks for, and assert that it no longer touches any
+ * table directly. The server side (who may see what, the revenue filtering) is covered in tests/routes/profile.test.ts.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createSupabaseFake } from '../helpers/supabaseFake';
+import { createFetchFake } from '../helpers/fetchFake';
 
-const fake = createSupabaseFake();
+const fetchFake = createFetchFake();
 const mockUpdateUser = vi.fn();
+const tablesRead: string[] = [];
 
 vi.mock('@/lib/supabaseClient', () => ({
   supabase: {
-    from: (table: string) => fake.client.from(table),
-    auth: { updateUser: (...args: any[]) => mockUpdateUser(...args) },
+    from: (table: string) => {
+      tablesRead.push(table);
+      throw new Error(`UserProfileView must not read ${table} directly`);
+    },
+    auth: {
+      getSession: async () => ({ data: { session: { access_token: 'test-token' } } }),
+      updateUser: (...args: any[]) => mockUpdateUser(...args),
+    },
   },
 }));
 
 import UserProfileView, { type UserProfileData } from '@/components/admin/UserProfileView';
 
 beforeEach(() => {
-  fake.reset();
+  tablesRead.length = 0;
+  fetchFake.reset();
+  vi.stubGlobal('fetch', fetchFake.fetch);
   mockUpdateUser.mockReset();
   mockUpdateUser.mockResolvedValue({ data: { user: {} }, error: null });
+  stubProfileApi({});
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+type ProfileApiData = { employee?: any; provider?: any; doctorPayroll?: any; targetRevenue?: number };
 
-function longAgoStr(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 3);
-  return d.toISOString().slice(0, 10);
+function stubProfileApi(data: ProfileApiData) {
+  fetchFake.on('GET', '/api/profile', () => ({ status: 200, body: { employee: data.employee ?? null, provider: data.provider ?? null } }));
+  fetchFake.on('GET', '/api/profile/payroll', () => ({
+    status: 200,
+    body: { employee: data.employee ?? null, provider: data.provider ?? null, doctorPayroll: data.doctorPayroll ?? null, targetRevenue: data.targetRevenue ?? 0 },
+  }));
+  fetchFake.on('GET', '/api/profile/attendance', () => ({ status: 200, body: [] }));
+  fetchFake.on('GET', '/api/branches', () => ({ status: 200, body: [] }));
 }
 
 const BASE_USER: UserProfileData = {
@@ -49,31 +62,41 @@ const BASE_USER: UserProfileData = {
   role: 'Doctor',
 };
 
-describe('doctor payroll — net salary math', () => {
-  // RISK-111, fixed 2026-09-30: getDateRange() used to build start/end strings via
-  // `new Date(year, month, day).toISOString().split("T")[0]` — local midnight converted through
-  // UTC, which rolls back a day in any timezone ahead of UTC (including Africa/Cairo, this clinic's
-  // own timezone). `monthStr = startStr.slice(0, 7)` therefore resolved to last month, so
-  // `doctor_payroll` was looked up under the wrong month and a doctor's current-month row was never
-  // found. Fixed by formatting from the Date's own local getters (`toLocalDateStr`) instead of
-  // round-tripping through UTC. This also fixed the two "target progress" tests below, which had the
-  // same root cause (today's reservations falling just outside the UTC-shifted end boundary).
-  it('sums fixed salary + commission - deductions from the doctor_payroll row for the actual current month', async () => {
+describe('data comes from the profile API, never from direct table reads', () => {
+  it('asks the API for the profile, the pay summary and attendance with the bearer token, and reads no table', async () => {
+    render(<UserProfileView user={{ ...BASE_USER, id: 'emp-1', role: 'Receptionist' }} />);
+    await screen.findByText('Personal Information');
+
+    await waitFor(() => {
+      const paths = fetchFake.calls.map((c) => c.path);
+      expect(paths).toEqual(expect.arrayContaining(['/api/profile', '/api/profile/payroll', '/api/profile/attendance', '/api/branches']));
+    });
+    for (const path of ['/api/profile', '/api/profile/payroll', '/api/profile/attendance']) {
+      const call = fetchFake.calls.find((c) => c.path === path)!;
+      expect(call.headers.authorization || call.headers.Authorization).toBe('Bearer test-token');
+    }
+    expect(tablesRead).toEqual([]);
+  });
+
+  it('asks for the current month in the viewer\'s own timezone, as a doctor or as staff', async () => {
     const now = new Date();
-    const realCurrentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    fake.seed('branches', []);
-    fake.seed('providers', [{ id: 'doc-1', name: 'Dr. Sara Adel', fixed_salary: 15000, target_amount: 60000 }]);
-    fake.seed('doctor_payroll', [
-      {
-        id: 'dp1',
-        provider_id: 'doc-1',
-        month: realCurrentMonth,
-        fixed_salary: 15000,
-        calculated_commission: 3200,
-        deductions: 500,
-      },
-    ]);
-    fake.seed('reservations', []);
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    render(<UserProfileView user={{ ...BASE_USER, id: 'doc-1' }} isDoctorView />);
+
+    await waitFor(() => expect(fetchFake.calls.some((c) => c.path === '/api/profile/payroll')).toBe(true));
+    const call = fetchFake.calls.find((c) => c.path === '/api/profile/payroll')!;
+    expect(call.query.get('view')).toBe('doctor');
+    expect(call.query.get('from')).toBe(`${month}-01`);
+    expect(call.query.get('to')!.startsWith(month)).toBe(true);
+  });
+});
+
+describe('doctor payroll — net salary math', () => {
+  it('sums fixed salary + commission - deductions from the doctor_payroll row returned for the current month', async () => {
+    stubProfileApi({
+      provider: { id: 'doc-1', name: 'Dr. Sara Adel', fixed_salary: 15000, target_amount: 60000 },
+      doctorPayroll: { id: 'dp1', provider_id: 'doc-1', fixed_salary: 15000, calculated_commission: 3200, deductions: 500 },
+    });
 
     render(<UserProfileView user={{ ...BASE_USER, id: 'doc-1' }} isDoctorView />);
 
@@ -81,11 +104,8 @@ describe('doctor payroll — net salary math', () => {
     expect(await screen.findByText('17,700 EGP')).toBeInTheDocument();
   });
 
-  it('falls back to the providers row (fixed_salary/target_amount) when no doctor_payroll row exists yet for this month', async () => {
-    fake.seed('branches', []);
-    fake.seed('providers', [{ id: 'doc-1', name: 'Dr. Sara Adel', fixed_salary: 12000, target_amount: 50000 }]);
-    fake.seed('doctor_payroll', []);
-    fake.seed('reservations', []);
+  it('falls back to the provider row (fixed_salary/target_amount) when there is no doctor_payroll row yet for this month', async () => {
+    stubProfileApi({ provider: { id: 'doc-1', name: 'Dr. Sara Adel', fixed_salary: 12000, target_amount: 50000 } });
 
     render(<UserProfileView user={{ ...BASE_USER, id: 'doc-1' }} isDoctorView />);
 
@@ -96,10 +116,8 @@ describe('doctor payroll — net salary math', () => {
 });
 
 describe('staff payroll — net salary math', () => {
-  it('sums salary + bonus - deductions from employee_accounts', async () => {
-    fake.seed('branches', []);
-    fake.seed('employee_accounts', [{ id: 'emp-1', email: 'sara@clinic.com', salary: 8000, bonus: 1000, deductions: 200 }]);
-    fake.seed('reservations', []);
+  it('sums salary + bonus - deductions from the employee record', async () => {
+    stubProfileApi({ employee: { id: 'emp-1', email: 'sara@clinic.com', salary: 8000, bonus: 1000, deductions: 200 } });
 
     render(<UserProfileView user={{ ...BASE_USER, id: 'emp-1', role: 'Receptionist' }} />);
 
@@ -108,9 +126,7 @@ describe('staff payroll — net salary math', () => {
   });
 
   it('derives bonus from bonus_percentage of salary when no flat bonus is set', async () => {
-    fake.seed('branches', []);
-    fake.seed('employee_accounts', [{ id: 'emp-1', email: 'sara@clinic.com', salary: 10000, bonus_percentage: 10, deductions: 0 }]);
-    fake.seed('reservations', []);
+    stubProfileApi({ employee: { id: 'emp-1', email: 'sara@clinic.com', salary: 10000, bonus_percentage: 10, deductions: 0 } });
 
     render(<UserProfileView user={{ ...BASE_USER, id: 'emp-1' }} />);
 
@@ -129,10 +145,7 @@ describe('salary and target that were never entered are not invented', () => {
   }
 
   it('a doctor whose provider row has no salary/target shows "—", not 15,000 / 60,000', async () => {
-    fake.seed('branches', []);
-    fake.seed('providers', [{ id: 'doc-1', name: 'Dr. Sara Adel', fixed_salary: null, target_amount: null }]);
-    fake.seed('doctor_payroll', []);
-    fake.seed('reservations', []);
+    stubProfileApi({ provider: { id: 'doc-1', name: 'Dr. Sara Adel', fixed_salary: null, target_amount: null } });
 
     render(<UserProfileView user={{ ...BASE_USER, id: 'doc-1' }} isDoctorView />);
 
@@ -141,21 +154,14 @@ describe('salary and target that were never entered are not invented', () => {
   });
 
   it('a doctor with no provider row at all shows "—", not 15,000 / 60,000', async () => {
-    fake.seed('branches', []);
-    fake.seed('providers', []);
-    fake.seed('doctor_payroll', []);
-    fake.seed('reservations', []);
-
     render(<UserProfileView user={{ ...BASE_USER, id: 'doc-1' }} isDoctorView />);
 
     await waitFor(() => expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3));
     expectNoInventedFigures();
   });
 
-  it('a staff member with no salary/target in employee_accounts shows "—", not 8,000 / 50,000', async () => {
-    fake.seed('branches', []);
-    fake.seed('employee_accounts', [{ id: 'emp-1', email: 'sara@clinic.com', salary: null, required_target_amount: null }]);
-    fake.seed('reservations', []);
+  it('a staff member with no salary/target on the employee record shows "—", not 8,000 / 50,000', async () => {
+    stubProfileApi({ employee: { id: 'emp-1', email: 'sara@clinic.com', salary: null, required_target_amount: null } });
 
     render(<UserProfileView user={{ ...BASE_USER, id: 'emp-1', role: 'Receptionist' }} />);
 
@@ -163,12 +169,17 @@ describe('salary and target that were never entered are not invented', () => {
     expectNoInventedFigures();
   });
 
-  it('a staff member with no employee_accounts row at all shows "—", not 8,000 / 50,000', async () => {
-    fake.seed('branches', []);
-    fake.seed('employee_accounts', []);
-    fake.seed('reservations', []);
-
+  it('a staff member the API returns no employee record for shows "—", not 8,000 / 50,000', async () => {
     render(<UserProfileView user={{ ...BASE_USER, id: 'emp-9', role: 'Receptionist' }} />);
+
+    await waitFor(() => expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3));
+    expectNoInventedFigures();
+  });
+
+  it('still shows "—" (not an invented figure) when the pay summary request fails', async () => {
+    fetchFake.on('GET', '/api/profile/payroll', () => ({ status: 500, body: { error: 'boom' } }));
+
+    render(<UserProfileView user={{ ...BASE_USER, id: 'doc-1' }} isDoctorView />);
 
     await waitFor(() => expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3));
     expectNoInventedFigures();
@@ -176,30 +187,19 @@ describe('salary and target that were never entered are not invented', () => {
 });
 
 describe('target progress', () => {
-  it('sums only this doctor\'s completed/confirmed/approved/started reservations in the current month toward the target', async () => {
-    fake.seed('branches', []);
-    fake.seed('providers', [{ id: 'doc-1', name: 'Dr. Sara Adel', fixed_salary: 15000, target_amount: 20000 }]);
-    fake.seed('doctor_payroll', []);
-    fake.seed('reservations', [
-      { id: 'r1', doctor_name: 'Dr. Sara Adel', provider_id: 'doc-1', status: 'completed', date: todayStr(), amount_paid: 5000, price: 5000 },
-      { id: 'r2', doctor_name: 'Dr. Sara Adel', provider_id: 'doc-1', status: 'pending', date: todayStr(), amount_paid: 9999, price: 9999 },
-      { id: 'r3', doctor_name: 'Dr. Omar', provider_id: 'doc-2', status: 'completed', date: todayStr(), amount_paid: 8000, price: 8000 },
-      { id: 'r4', doctor_name: 'Dr. Sara Adel', provider_id: 'doc-1', status: 'confirmed', date: longAgoStr(), amount_paid: 7000, price: 7000 },
-    ]);
+  // The server adds up the paid amount on the caller's own bookings (tests/routes/profile.test.ts); the
+  // screen shows that figure against the target.
+  it('shows the collected amount the API returns against the doctor\'s target', async () => {
+    stubProfileApi({ provider: { id: 'doc-1', name: 'Dr. Sara Adel', fixed_salary: 15000, target_amount: 20000 }, targetRevenue: 5000 });
 
     render(<UserProfileView user={{ ...BASE_USER, id: 'doc-1' }} isDoctorView />);
 
-    // only r1 counts: 5000 / 20000 = 25%
+    // 5000 / 20000 = 25%
     expect(await screen.findByText('5,000 / 20,000 EGP (25%)')).toBeInTheDocument();
   });
 
   it('caps the displayed target percentage at 100 even when revenue exceeds the target', async () => {
-    fake.seed('branches', []);
-    fake.seed('providers', [{ id: 'doc-1', name: 'Dr. Sara Adel', fixed_salary: 15000, target_amount: 10000 }]);
-    fake.seed('doctor_payroll', []);
-    fake.seed('reservations', [
-      { id: 'r1', doctor_name: 'Dr. Sara Adel', provider_id: 'doc-1', status: 'completed', date: todayStr(), amount_paid: 25000, price: 25000 },
-    ]);
+    stubProfileApi({ provider: { id: 'doc-1', name: 'Dr. Sara Adel', fixed_salary: 15000, target_amount: 10000 }, targetRevenue: 25000 });
 
     render(<UserProfileView user={{ ...BASE_USER, id: 'doc-1' }} isDoctorView />);
 
@@ -209,9 +209,6 @@ describe('target progress', () => {
 
 describe('edit personal information', () => {
   it('opens pre-filled with the current contact details and calls onUpdateUser with the edited values', async () => {
-    fake.seed('branches', []);
-    fake.seed('employee_accounts', [{ id: 'emp-1', email: 'sara@clinic.com', salary: 8000 }]);
-    fake.seed('reservations', []);
     const onUpdateUser = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
 
@@ -239,9 +236,6 @@ describe('change password', () => {
   const STRONG = 'Str0ng!Pass';
 
   async function renderAndOpen() {
-    fake.seed('branches', []);
-    fake.seed('employee_accounts', [{ id: 'emp-1', email: 'sara@clinic.com' }]);
-    fake.seed('reservations', []);
     const user = userEvent.setup();
     render(<UserProfileView user={{ ...BASE_USER, id: 'emp-1' }} />);
     await screen.findByText('Personal Information');

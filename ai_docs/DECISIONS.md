@@ -3793,3 +3793,19 @@ Investigation revealed:
 
 **Not done / limits:** wallet payments are not distinguished (the reservation has no payment-method column; a wallet-funded amount appears in Paid only if checkout recorded it in `amount_paid`). There is no refund field on a completed booking, so refunds after completion cannot be shown. Bookings whose balance was never recorded show dashes instead of a catalog-price estimate. The legacy hard-coded price map behind the existing Payment badge is untouched.
 
+---
+
+## DEC-120: A Previous Booking Shows The Invoice Value It Was Charged, Not Today's Catalog Price
+
+**Date:** 2026-10-23
+**Status:** Decided & implemented (no migration)
+
+**Context:** "Add Previous Booking" records what the patient was charged at the time in **Invoice Value (EGP)** (stored in the notes as `[Invoice Total]: X EGP` with `amount_paid` and `amount_left`). Opening such a booking from the patient's Booking History (the booking details screen) priced each service line from the **current catalog** and only let the invoice value raise the total, never lower it. So after a catalog price change, or when the invoice was lower than today's price, an old booking showed today's price instead of what was charged. Owner: the invoice value is the service price at the time of booking and must be the one shown.
+
+**Decision:**
+1. In `BookingDetailsModal`, for a historical booking that has an invoice value (and is not zero-priced, laser per-pulse or laser package), the invoice value is authoritative. The services' share of it (invoice value minus any attached products and additional services) is spread over the service lines by `allocateServicePrices` (`src/lib/historicalServicePrices.ts`, tested): in proportion to their catalog prices, equally when the catalog gives no basis, the last line absorbing rounding. The lines therefore add up to exactly what was charged, the total follows, and the printed invoice (which reuses the same lines) agrees.
+2. Other bookings (online, New Booking) are unchanged: their price still comes from the catalog and the stored amounts.
+3. The Booking History table's money columns already used the invoice value for these bookings (DEC-119); they are unchanged.
+
+**Not done / limits:** the invoice value is a single number for the whole booking. If a previous booking included a **package purchase** or a **product** price in its invoice value that is not stored as a product line, that part lands on the service line(s) (the app has no stored breakdown to separate it). With several services the split between them is a proportional allocation, not a recorded figure. The older Payment badge in the Booking History table still derives from a hard-coded fallback price map where no amount is stored; it was not touched.
+

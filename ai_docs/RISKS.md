@@ -695,6 +695,8 @@ the browser with the anon key, which enabling RLS would have turned into a silen
 reported success. That write moved server-side into `POST /api/inventory/products/sales` in
 `8108b82`, and no client component reads or writes a Supabase table any more.
 
+**Update 2026-10-21:** the residual risk below is not Low: measured with the anon key it exposes staff accounts, payroll, attendance and prescriptions, and the same policies allow writes. Tracked and fixed (migration written, not yet applied) as RISK-128. The statement below that no client component reads a Supabase table any more is also wrong (`UserProfileView`, `DoctorAccountView`, `AdminNewBookingView`).
+
 **Residual risk:** the subset carrying permissive "allow all" policies (`roles`,
 `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`,
 `device_maintenance_history`, `admin_roles`) is functionally open — salary and inventory data is
@@ -5339,7 +5341,7 @@ scope for that sweep (it only asserts no-token→401 and patient-session→403, 
 
 **Reported, deliberately NOT fixed (decisions for Mohamed):**
 - The Bookings realtime channel already subscribes to `postgres_changes` on **both** `reservations` and `prescriptions`, so the 3 s full-table poll is likely redundant — removing it is a product decision.
-- Bookings downloads the entire `reservations` table every 3 s per open admin tab (`select("*")`, no limit).
+- Bookings downloads the entire `reservations` table every 3 s per open admin tab (`select("*")`, no limit). **Resolved by RISK-126 (2026-10-21).**
 - `fetchAllReservations` in `page.tsx` has `if (calendarView === "Schedule") fetchScheduleReservations()` **after** its `return` — unreachable, so the Schedule view never actually refreshes after writes. Left as found (a behaviour change, not this brief's scope).
 - Other timer-based pollers found in the sweep that set state from a fetch: none besides the ones fixed. Non-fetch timers left alone: `ReceptionDashboardView` 1 s elapsed-time clock, `OurResults` count-up animation, the page.tsx inactivity/presence/verify-retry intervals.
 
@@ -5396,29 +5398,35 @@ See `PROPOSALS.md` for:
 
 ---
 
-## RISK-122: Reject On The Bookings Pending List Hides The Request On Screen But Saves Nothing (OPEN)
+## RISK-122: Reject On The Bookings Pending List Hides The Request On Screen But Saves Nothing (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_122_REJECT_NOT_SAVED_MANUAL_TESTS.md`
 
 **Severity:** High (a reception "reject" is silently lost; the booking stays pending and can still be approved later) · **Type:** Data integrity / RLS
 **Found:** 2026-10-20, during the full live test of RISK-118/119 (not caused by either; the code is identical before Brief 36 — checked at `5d17c15`).
 
 **What happens:** in the Pending list, Reject calls `supabase.from("reservations").update({ status: "rejected" })` straight from the browser (`handleBookingsReject`, `src/app/admin/page.tsx`), then removes the row and sets `status: "rejected"` in local state without checking the result. RLS is on for `reservations` (`20260722140000_enable_row_level_security.sql`; `SECURITY.md` §4), so the anon-key write changes nothing and returns no error. Observed on the test database: row disappears in 0.1 s, the database still says `pending_deposit`, and after a page reload the booking is back in Pending. Approve does not have this problem (`openApprove` -> `PATCH /api/reservations`).
 
-**Not yet checked (same pattern, same file family):** `AdminBookingsView.tsx` lines ~1217 and ~1242 (`update({ status: "approved" })` / `update({ status: "rejected" })`) write the same way. If those buttons are reachable they have the same defect; confirm before fixing.
+**Checked:** the Pending list's Reject button runs `handleRejectItem` in `AdminBookingsView.tsx`, which did its own direct browser write and then called the shell's `handleBookingsReject`, which did a second one. Both failed silently. `handleApproveItem` still contains a direct `update({ status: "approved" })` that fails the same way; it is harmless today because the real approval happens in the approve dialog (`openApprove` -> `PATCH /api/reservations`), and it was left alone.
 
-**Suggested fix:** send the rejection through `PATCH /api/reservations?id=` with the staff token (the route already handles `status: "rejected"`, used successfully in the RISK-119 test), update local state only after a 2xx, and show an error otherwise. Add a route-level test that a rejected booking leaves Pending.
+**Fix (2026-10-20):** `handleBookingsReject` in `src/app/admin/page.tsx` now sends `PATCH /api/reservations?id=` with `{ action: "reject" }` and the staff token, changes the local lists only after a 2xx, shows an alert on failure and returns `true`/`false`. `handleRejectItem` no longer writes at all: it awaits `onRejectBooking` and hides the row only if it did not return `false`. The server already refuses to reject a booking that has started. `tests/components/bookings/AdminBookingsView.test.tsx`: the test that pinned the direct write was replaced by three (no browser write; row removed after a confirmed save; row kept when the save failed, mutation-checked). The shell handler has no automated test (`page.tsx` is not unit-testable in isolation).
 
-**Test checklist:** `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md` (evidence log, 2026-10-20).
+**Verified live 2026-10-20** (test database): Reject now leaves the database at `rejected` (before: `pending_deposit`), the booking does not return after poll ticks or a reload and All Appointments shows it as Canceled; with the server stopped the alert "could not be rejected (connection problem). Nothing was changed" appears and the row stays under Pending Approvals; after the server is back, Reject works. The suspected side issue is confirmed and tracked as RISK-125.
+
+**Test checklist:** `ai_docs/manual_tests/RISK_122_REJECT_NOT_SAVED_MANUAL_TESTS.md` (the original finding is in `RISK_119_POLL_RENDER_MANUAL_TESTS.md`, evidence log 2026-10-20).
 
 ---
 
-## RISK-123: The Doctor's Ongoing Session Panel Stays Open After Reception Completes The Booking (OPEN)
+## RISK-123: The Doctor's Ongoing Session Panel Stays Open After Reception Completes The Booking (RESOLVED)
 
 **Severity:** Medium (the doctor keeps seeing, and can keep editing, a session that is already over) · **Type:** Stale local state
 **Found:** 2026-10-20, full live test of the doctor portal (via the admin "Doctor view" switch). Not caused by Brief 36.
 
 **What happens:** `DoctorAccountView` copies the started booking into `activeSessionBooking` and only clears that copy when the copy's own `status` is completed/cancelled/rejected (the effect after `receptionistStartedSession`). When someone else completes the booking, `reservations` updates correctly (the Schedule tab showed "Completed" within seconds) and `receptionistStartedSession` becomes `null`, but the stale copy still says `started`, so it is never cleared. Observed: 30 s after `PATCH status: completed`, Ongoing Session still showed the patient and the clinical-note box. Clinical-note typing itself was fine (28 s, 15 edits across ~9 poll ticks, no resets).
 
-**Suggested fix:** when `receptionistStartedSession` is `null`, look the copy up by id in `reservations` and clear it if that row is no longer an active status (or if it is missing); otherwise refresh the copy from the row. Add a component test around the effect.
+**Fix (2026-10-21):** in `DoctorAccountView.tsx`, the effect that keeps `activeSessionBooking` in step now also looks the copy up in `reservations` and clears it when the list says that booking is completed, done, cancelled or rejected (the same statuses the realtime handler already closed it for; realtime does not reach the browser under RLS, so only the poll path was affected). A booking the list has not caught up with yet (still confirmed right after the doctor pressed Start) is left alone. Tests in `tests/components/doctor/DoctorAccountView.test.tsx`: the panel closes when the polled list turns the started booking into completed (fails without the fix), and stays open while the list still shows it started. A doctor with unsaved text in the clinical-note box loses it when the booking is ended elsewhere, as the realtime path always did.
+
+**Verified live 2026-10-21** (test database, Doctor view): a started booking opens the panel in 0.3 s and it stays open through 14 s of poll ticks; after `PATCH status completed` the panel closed in 2.1 s and shows "Waiting for Receptionist to Start Session" (before the fix it was still open after 30 s).
 
 **Test checklist:** `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md` (Doctor portal section, evidence log 2026-10-20).
 
@@ -5435,3 +5443,86 @@ See `PROPOSALS.md` for:
 
 **Fix:** DEC-117: an `is_active` flag checked by `requireStaffAccess`, `verifyHrAccess` and `/api/auth/me`, plus a Supabase Auth ban; soft delete now just switches the account Inactive.
 
+## RISK-125: Clicking Approve Hides The Booking From The Pending Table Before The Approval Is Confirmed; Cancelling The Dialog Leaves It Hidden (RESOLVED)
+
+**Severity:** Medium (a still-pending request vanishes from the list while the Pending badge still counts it; staff can think it was handled) · **Type:** Optimistic UI without rollback
+**Found:** 2026-10-20, while verifying RISK-122. Existing behaviour, not caused by RISK-118/119/122.
+
+**What happens:** `handleApproveItem` in `AdminBookingsView.tsx` adds the booking to `approvedIds`/`approvedObjects` as soon as Approve is clicked, then calls the shell's `openApprove`, which opens the approve dialog. If the dialog is cancelled nothing undoes that. Observed on the test database: after Approve -> Cancel the row is gone from the table, the badge still says "Pending 1", the database status is still `pending_deposit`, and the row only comes back after a page reload. Confirming the dialog works normally (the approval itself goes through `PATCH /api/reservations`). The same handler also still runs a direct browser `update({ status: "approved" })`, which RLS blocks silently (see RISK-122); it does no harm today.
+
+**Fix (2026-10-20):** `handleApproveItem` in `AdminBookingsView.tsx` now only calls `onApproveBooking` (which opens the approve dialog). The `approvedIds` / `approvedObjects` state, the early `status: "approved"` change of the view's own list and the direct browser write are gone. The row leaves the Pending table when the approval has been saved: the shell already refetches after a confirmed approve. Tests in `tests/components/bookings/AdminBookingsView.test.tsx`: Approve alone keeps the row listed and writes nothing; the row goes once the parent stops listing the request (both mutation-checked).
+
+**Verified live 2026-10-20** (test database): Approve then Cancel leaves the row in Pending and the badge unchanged; Approve then Confirm approves it (database `approved`, slot `10:00`), the row leaves Pending after 4.3 s and the badge empties. Side effect to know about: after a confirmed approve the row now leaves when the save and the refetch finish (a few seconds on slow responses) instead of instantly, because it no longer disappears before the save.
+
+**Test checklist:** `ai_docs/manual_tests/RISK_122_REJECT_NOT_SAVED_MANUAL_TESTS.md` (last item; evidence 2026-10-20).
+
+---
+
+## RISK-126: The Bookings Screen Downloaded Reservations, Providers And Prescriptions Straight From Supabase Every 3 s, And The First Two Came Back Empty (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_126_BOOKINGS_POLL_MANUAL_TESTS.md`
+
+**Severity:** Medium (wasted load on every open admin tab, plus a design that only works if the database is left open to the browser key) · **Type:** Performance / data access
+**Found:** 2026-10-20 in the RISK-119 review; measured 2026-10-21. Decision taken by Mohamed on 2026-10-21 ("fix the 3 s poll").
+
+**What was wrong:** `AdminBookingsView` ran `supabase.from("reservations").select("*")` (whole table, no limit), `providers`, `prescriptions` and `GET /api/prescriptions` every 3 s per open tab. With the browser (anon) key the first two returned **empty arrays** on the test database (36 reservations and 6 providers exist; `customers` too), because row-level security blocks them, so the view lived off the props the shell loads through the authenticated API and the 3 s reads were pure waste. The `prescriptions` read worked only because that table still carries an "allow all" policy (RISK-019 residual): the anon key can read every prescription on this database. Realtime for `reservations` cannot reach the browser either, for the same reason. The doctor portal separately polled `/api/reservations?limit=250` every 3 s without waiting for the previous request, so slow responses (2-5 s) stacked up.
+
+**Fix:**
+- `AdminBookingsView.tsx`: no direct Supabase table reads at all. Follow-up reminders come from `GET /api/prescriptions` only (authenticated), once on load, then every 15 s while the tab is visible, one request at a time, plus on tab focus and on the existing prescription events. The `dbReservations` / `dbProviders` override layers (empty under RLS and cleared every 3 s) are gone; bookings and doctors come from the props. The unused `pollRowsEqualByKeys` comparator and the reservation key list were removed with them. `pollDataEqual` stays.
+- `DoctorAccountView.tsx`: the 3 s poll stays (it is how reception's changes reach the doctor), but a tick is skipped while the previous request is still running or the tab is hidden, and the list refreshes when the tab becomes visible again.
+- Tests: `tests/components/bookings/AdminBookingsView.test.tsx` (+4: no browser reads of reservations/providers/prescriptions, 15 s cadence, one request at a time, hidden tab) and `tests/components/doctor/DoctorAccountView.test.tsx` (+3: 3 s cadence, skipped tick while in flight, hidden tab); the new tests fail against the old code. Full suite 1542 passed / 4 expected-fail, `tsc` clean, `eslint` 0 errors.
+
+**Verified live 2026-10-21** (test database): over 64 s on Bookings, `/api/prescriptions` at 0, 15, 30, 45 and 60 s and **zero** direct Supabase requests (before: reservations, providers and prescriptions requests every 3 s); doctor portal over 54 s: a reservations request every 3 s, never more than one in flight; a started booking opened the Ongoing Session panel in 1.0 s and a completion closed it in 3.0 s.
+
+**Behaviour change to know about:** nothing the Bookings screen shows depended on the browser reads on this database. If the **production** database does not have row-level security on `reservations` (RISK-019 says it was applied to dev; production is not confirmed in this repo), those reads used to work there and bookings reached this screen within 3 s; they now arrive with the shell's authenticated poll (15 s) and after the user's own actions. Production should be checked (below): if the browser key can read reservations there, that is a patient-data exposure on its own.
+
+**Still open (not part of this fix):** the browser key can read `prescriptions` (and the other "allow all" tables listed in RISK-019). To check any database, request `/rest/v1/reservations?select=id&limit=1` with the anon key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) as both `apikey` and bearer token: `[]` means row-level security is blocking it, rows mean the table is open.
+
+---
+
+## RISK-127: The Doctor Portal Briefly Showed Every Doctor's Patients On First Load (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/ACCOUNT_ACTIVE_INACTIVE_MANUAL_TESTS.md` (section "Doctor portal first load")
+
+**Severity:** Medium (patient privacy: one doctor could see, for a few seconds, other doctors' patients and numbers) · **Type:** Data isolation
+**Found:** 2026-10-21 on dev.reveraclinics.com: opening the Doctor view as the superadmin first showed "29 Patients / 26 Sessions" and, after a reload, the correct "0".
+
+**Cause:** `DoctorAccountView` started its `reservations` state from the `initialReservations` prop, which the admin shell filled with `allReservations` (the whole clinic). Only the validity filter (no rejected/cancelled) was applied, never the doctor filter, because that needs the provider record, which is only known after the first lookups. The doctor's own fetch (`/api/reservations`, filtered with `isDoctorMatch`) replaced it a few seconds later. Anyone logged in as a doctor-workspace role saw the same flash.
+
+**Fix:** the state starts empty and `loading` starts true; the `initialReservations` prop was removed from the component, its type and the shell. Two tests: the first load shows nothing from a clinic-wide list passed in (it fails against the old behaviour, checked), and only this doctor's bookings appear once the answer arrives.
+
+**Not changed:** the doctor filter itself (`isDoctorMatch`) and the server-side list (`GET /api/reservations` still returns what the caller's role may read); the fix is that the screen no longer shows anything before it has applied the filter. The doctor portal shows 0 patients for a moment on first load instead of other doctors' data.
+
+## RISK-128: The Public Browser Key Could Read Staff Accounts, Salaries, Attendance, Prescriptions And More — And Write Or Delete Accounts And Roles (MIGRATION WRITTEN, NOT YET APPLIED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_128_CLOSE_OPEN_RLS_MANUAL_TESTS.md`
+
+**Severity:** High (personal and salary data readable by anyone who opens the website; account and role tables writable) · **Type:** Security / RLS. This is the "residual risk" that RISK-019 left open and rated Low.
+**Found:** 2026-10-21 while fixing RISK-126, by testing every table with the anon key (`scripts/check-anon-access.mjs`).
+
+**Measured on the test database (64 tables):** with `NEXT_PUBLIC_SUPABASE_ANON_KEY`, which is in every page of the site, these returned data: `employee_accounts` (11 rows), `hr_payroll`, `hr_attendance`, `hr_leave_requests`, `hr_missing_alerts`, `hr_performance_reviews`, `prescriptions`, `roles`, `inventory_devices`, `inventory_products`, `product_sales`, `device_maintenance_history` and `terms_and_conditions`. The other 43 tables were blocked. The baseline migration (`20260726000000_dev_schema_baseline.sql`, lines ~971-1107) also contains `FOR INSERT / UPDATE / DELETE` and `FOR ALL` policies for `employee_accounts`, `roles` and the `hr_*`, `prescriptions`, `inventory_*` and `product_sales` tables; on a copy of those policies the anon key could insert, update and **delete** rows (tested on a throwaway Postgres, nothing was written to any real database). RISK-019 and SECURITY.md §4 said the app no longer calls Supabase with the anon key for table access, which is not true (see below), so nobody was looking at these policies.
+
+**Why nothing visibly broke:** every API route uses the service role key and bypasses RLS, so the application never needed these policies; they only helped strangers.
+
+**Fix: `supabase/migrations/20261023000000_close_open_rls_policies.sql` (written and tested, not applied to any database yet).**
+- Enables RLS on the listed tables (no-op where it already is).
+- Drops every policy open to public / anon / authenticated on: `device_maintenance_history`, `employee_notes`, `hr_leave_requests`, `hr_missing_alerts`, `hr_payroll`, `hr_performance_reviews`, `inventory_devices`, `inventory_products`, `prescriptions`, `product_sales`, `roles`, `terms_and_conditions`. None of these is read from the browser (terms are served by `/api/terms`).
+- `employee_accounts` and `hr_attendance`: drops the INSERT / UPDATE / DELETE / ALL policies and **keeps a public SELECT policy** (re-created if the only open policy was an ALL one), because `UserProfileView.tsx` and `DoctorAccountView.tsx` still read these two tables straight from the browser.
+- Never touches policies limited to `service_role`. Idempotent. Rollback = re-create the baseline policies (not recommended).
+- Tested in PGlite (in-process Postgres) against the 35 real baseline policy statements: before, the anon key could read, insert, update and delete on all 13 tables; after, it can do none of that on the 12 closed tables and can only read the two kept ones; a second run changes nothing; an ALL-only `hr_attendance` keeps its read; a table with RLS off is closed. The service role is unaffected.
+- Side effect: realtime events for `prescriptions` stop reaching the browser (they depended on the open policy); the Bookings screen polls every 15 s and on prescription events (RISK-126).
+
+**Follow-up done (2026-10-21, branch `fix/profile-reads-via-api`): the two screens no longer read those tables from the browser.** `UserProfileView` and `DoctorAccountView` now use three new authenticated routes that only ever return the signed-in caller's own data and take no id from the request: `GET /api/profile` (own employee row with the schedule, and the matching provider row), `GET /api/profile/attendance?from&to` and `GET /api/profile/payroll?from&to&view=doctor|staff` (own employee, provider, the month's `doctor_payroll` row, and the money collected on the caller's own bookings). `/api/employees` and `/api/hr/attendance` are admin / HR only, which is why non-admin staff only ever saw their profile through the open read policies. The old reads of `providers`, `doctor_payroll`, `reservations` and `branches` in the same screens were already blocked by RLS (they returned nothing); they now come from the routes, and `branches` from `/api/branches`. Nothing in the browser reads `employee_accounts` or `hr_attendance` any more, so after this code is deployed the last two read policies can be dropped (the two statements are in the migration header). Tests: `tests/routes/profile.test.ts` (19: self-scoping, ignored ids, validation, revenue rules, strict provider matching; mutation-checked), `tests/components/UserProfileView.test.tsx` (rewritten to the new routes; asserts no table is read) and `tests/components/doctor/DoctorAccountView.test.tsx` (+4). Verified live: both screens and the doctor portal made no request to `*.supabase.co`.
+
+**Behaviour that changes with it (all because the old reads never worked under RLS):**
+- The doctor's provider record now actually loads, so a booking assigned to their provider id shows for them even when another name is on it, and one assigned to a different provider no longer matches by name alone (the matching rules in `DoctorAccountView` were written for this).
+- The provider is matched to the account strictly on the server (same id, phone, national id, or the exact name; exactly one match, otherwise none). The old browser chain also used substring and e-mail-prefix guesses, which would have matched `saif@superadmin.com` to "saifuldeen Naser" and shown that doctor's pay to the wrong person; they are not used.
+- Attendance now shows: the old query filtered on `user.employeeId` as well, which is not a uuid, so it errored and the list stayed empty.
+- Target progress now has a figure to show: the old reservations query selected a `price` column that `reservations` does not have, so it always errored and showed 0. The server sums `amount_paid` on the caller's own bookings (a doctor's: assigned to them; staff: created by them) for completed, confirmed, approved and started bookings in the period.
+
+**Not covered:** `AdminNewBookingView.tsx` (services, providers, branches, rooms, customers, reservations) and the `reservation_products` reads in `page.tsx` / `BookingDetailsModal.tsx` still call Supabase from the browser. RLS blocks all of them, so they already return nothing and are no security issue, but they are dead reads that should move to the API too.
+
+**Before applying (owner):**
+1. Run `scripts/check-anon-access.mjs` on **production** too: it may not have RLS at all (RISK-019 only confirms dev).
+2. Apply the migration to dev first, rerun the script (expect only `employee_accounts` and `hr_attendance` readable), and walk the checklist.
+3. Apply to production in a quiet window.
