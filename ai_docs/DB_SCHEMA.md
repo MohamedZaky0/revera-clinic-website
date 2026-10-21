@@ -1590,6 +1590,9 @@ enabled (30 days for memory, 180 days for the log).
   A subset — `roles`, `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`,
   `inventory_products`, `inventory_devices`, `product_sales`, `device_maintenance_history`,
   `admin_roles` — also carries permissive "allow all" policies, so it is functionally open.
+  **RISK-127:** `supabase/migrations/20261023000000_close_open_rls_policies.sql` (written 2026-10-21, not yet
+  applied) drops those open policies except a public SELECT on `employee_accounts` and `hr_attendance`, which
+  the browser still reads. Measure any database with `node scripts/check-anon-access.mjs`.
   **Every other table has RLS on with no policies at all: service-role-only.** Any code path
   reaching for the anon key will silently receive zero rows.
 

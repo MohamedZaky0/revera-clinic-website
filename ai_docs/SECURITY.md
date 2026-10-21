@@ -177,14 +177,17 @@ see the RISK references there for what changed and when.
   layer.** Because every API route uses the service role key, RLS enforces nothing about *who*
   can call a route — that's entirely `access.ts` / middleware's job (§1–§3). A route with no
   role check has full read/write to its table regardless of RLS being "on."
-- **Residual permissive policies:** per `RISKS.md` RISK-019, a subset of tables (`roles`,
-  `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`,
-  `device_maintenance_history`, `admin_roles`) still carry pre-2026-07-25 "allow all" policies from
-  older migrations, layered underneath the blanket enable. These are functionally open to the
-  anon key. Nothing in the current app calls Supabase with the anon key for table access anymore
-  (confirmed by RISK-019's audit), so this is currently latent rather than exploited — but it means
-  a future client-side Supabase call to one of those tables would silently succeed instead of
-  being denied. Tightening/dropping those old permissive policies is still open work.
+- **Residual permissive policies (RISK-127):** a subset of tables (`roles`, `employee_accounts`, `hr_*`,
+  `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`, `device_maintenance_history`,
+  `terms_and_conditions`, `admin_roles`) carry pre-2026-07-25 "allow all" policies, layered underneath the
+  blanket enable. Measured on the test database on 2026-10-21 these were readable with the anon key (which is
+  public: it ships in every page), and the baseline policies also allow INSERT / UPDATE / DELETE on
+  `employee_accounts` and `roles`. The statement that nothing calls Supabase with the anon key for table access
+  any more was wrong: `UserProfileView`, `DoctorAccountView` and `AdminNewBookingView` still do. Fix:
+  `supabase/migrations/20261023000000_close_open_rls_policies.sql` (written and tested on a throwaway
+  Postgres, **not yet applied** to any database). It keeps a public SELECT on `employee_accounts` and
+  `hr_attendance` until those browser reads move to API routes. Check any database with
+  `node scripts/check-anon-access.mjs`; run it against production, where RLS is not confirmed.
 - **New tables must enable RLS explicitly in their own migration.** The blanket-enable migration is
   a one-shot `DO` loop over tables that existed *at the time it ran* — it is not a trigger and does
   not apply retroactively to tables created later. See `supabase/migrations/README.md` and the

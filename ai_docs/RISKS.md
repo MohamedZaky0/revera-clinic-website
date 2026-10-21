@@ -695,6 +695,8 @@ the browser with the anon key, which enabling RLS would have turned into a silen
 reported success. That write moved server-side into `POST /api/inventory/products/sales` in
 `8108b82`, and no client component reads or writes a Supabase table any more.
 
+**Update 2026-10-21:** the residual risk below is not Low: measured with the anon key it exposes staff accounts, payroll, attendance and prescriptions, and the same policies allow writes. Tracked and fixed (migration written, not yet applied) as RISK-127. The statement below that no client component reads a Supabase table any more is also wrong (`UserProfileView`, `DoctorAccountView`, `AdminNewBookingView`).
+
 **Residual risk:** the subset carrying permissive "allow all" policies (`roles`,
 `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`,
 `device_maintenance_history`, `admin_roles`) is functionally open — salary and inventory data is
@@ -5475,3 +5477,31 @@ See `PROPOSALS.md` for:
 **Behaviour change to know about:** nothing the Bookings screen shows depended on the browser reads on this database. If the **production** database does not have row-level security on `reservations` (RISK-019 says it was applied to dev; production is not confirmed in this repo), those reads used to work there and bookings reached this screen within 3 s; they now arrive with the shell's authenticated poll (15 s) and after the user's own actions. Production should be checked (below): if the browser key can read reservations there, that is a patient-data exposure on its own.
 
 **Still open (not part of this fix):** the browser key can read `prescriptions` (and the other "allow all" tables listed in RISK-019). To check any database, request `/rest/v1/reservations?select=id&limit=1` with the anon key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) as both `apikey` and bearer token: `[]` means row-level security is blocking it, rows mean the table is open.
+
+---
+
+## RISK-127: The Public Browser Key Could Read Staff Accounts, Salaries, Attendance, Prescriptions And More — And Write Or Delete Accounts And Roles (MIGRATION WRITTEN, NOT YET APPLIED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_127_CLOSE_OPEN_RLS_MANUAL_TESTS.md`
+
+**Severity:** High (personal and salary data readable by anyone who opens the website; account and role tables writable) · **Type:** Security / RLS. This is the "residual risk" that RISK-019 left open and rated Low.
+**Found:** 2026-10-21 while fixing RISK-126, by testing every table with the anon key (`scripts/check-anon-access.mjs`).
+
+**Measured on the test database (64 tables):** with `NEXT_PUBLIC_SUPABASE_ANON_KEY`, which is in every page of the site, these returned data: `employee_accounts` (11 rows), `hr_payroll`, `hr_attendance`, `hr_leave_requests`, `hr_missing_alerts`, `hr_performance_reviews`, `prescriptions`, `roles`, `inventory_devices`, `inventory_products`, `product_sales`, `device_maintenance_history` and `terms_and_conditions`. The other 43 tables were blocked. The baseline migration (`20260726000000_dev_schema_baseline.sql`, lines ~971-1107) also contains `FOR INSERT / UPDATE / DELETE` and `FOR ALL` policies for `employee_accounts`, `roles` and the `hr_*`, `prescriptions`, `inventory_*` and `product_sales` tables; on a copy of those policies the anon key could insert, update and **delete** rows (tested on a throwaway Postgres, nothing was written to any real database). RISK-019 and SECURITY.md §4 said the app no longer calls Supabase with the anon key for table access, which is not true (see below), so nobody was looking at these policies.
+
+**Why nothing visibly broke:** every API route uses the service role key and bypasses RLS, so the application never needed these policies; they only helped strangers.
+
+**Fix: `supabase/migrations/20261023000000_close_open_rls_policies.sql` (written and tested, not applied to any database yet).**
+- Enables RLS on the listed tables (no-op where it already is).
+- Drops every policy open to public / anon / authenticated on: `device_maintenance_history`, `employee_notes`, `hr_leave_requests`, `hr_missing_alerts`, `hr_payroll`, `hr_performance_reviews`, `inventory_devices`, `inventory_products`, `prescriptions`, `product_sales`, `roles`, `terms_and_conditions`. None of these is read from the browser (terms are served by `/api/terms`).
+- `employee_accounts` and `hr_attendance`: drops the INSERT / UPDATE / DELETE / ALL policies and **keeps a public SELECT policy** (re-created if the only open policy was an ALL one), because `UserProfileView.tsx` and `DoctorAccountView.tsx` still read these two tables straight from the browser.
+- Never touches policies limited to `service_role`. Idempotent. Rollback = re-create the baseline policies (not recommended).
+- Tested in PGlite (in-process Postgres) against the 35 real baseline policy statements: before, the anon key could read, insert, update and delete on all 13 tables; after, it can do none of that on the 12 closed tables and can only read the two kept ones; a second run changes nothing; an ALL-only `hr_attendance` keeps its read; a table with RLS off is closed. The service role is unaffected.
+- Side effect: realtime events for `prescriptions` stop reaching the browser (they depended on the open policy); the Bookings screen polls every 15 s and on prescription events (RISK-126).
+
+**Not fixed here / follow-up:** the browser still reads `employee_accounts` and `hr_attendance` directly (`UserProfileView.tsx` lines ~223-253 and ~755, `DoctorAccountView.tsx` ~99-151), plus `providers`, `branches`, `doctor_payroll` and `reservations` in the same files, which RLS already blocks (those reads return nothing today, so those parts of the screens run on whatever else fills them). `AdminNewBookingView.tsx` (services, providers, branches, rooms, customers, reservations) and the `reservation_products` reads in `page.tsx` / `BookingDetailsModal.tsx` are in the same situation. Move them to authenticated API routes, then drop the last two read policies (the two statements are in the migration header). Until then the staff list, emails and attendance remain readable with the browser key.
+
+**Before applying (owner):**
+1. Run `scripts/check-anon-access.mjs` on **production** too: it may not have RLS at all (RISK-019 only confirms dev).
+2. Apply the migration to dev first, rerun the script (expect only `employee_accounts` and `hr_attendance` readable), and walk the checklist.
+3. Apply to production in a quiet window.
