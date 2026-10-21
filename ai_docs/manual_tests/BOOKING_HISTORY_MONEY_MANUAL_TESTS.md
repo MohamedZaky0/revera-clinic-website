@@ -40,4 +40,5 @@
 - [ ] A previous booking with Invoice Value 0 still shows 0 EGP everywhere (unchanged).
 - [ ] A normal (non-previous) booking still shows its catalog-based price (unchanged).
 - [ ] Print / PDF invoice of an old previous booking: lines and total match the screen.
+- 2026-10-23, dev.reveraclinics.com, superadmin: previous booking created through the API for a throwaway patient, service catalog price 100, Invoice Value 700, Actual Spent 700: the booking details screen showed the service line 700 EGP, Total Price 700, Service Price 700, Paid 700, Outstanding 0 (before the change the line would have read 100). Booking and patient deleted afterwards. Not yet run: two services, partial payment, print invoice, Arabic.
 
