@@ -910,9 +910,12 @@ function DoctorAccountView({
         method: "PATCH",
         headers,
         body: JSON.stringify({
-          service: newServiceName,
+          // PATCH /api/reservations only reads `serviceId` (camelCase) off the body — it was
+          // sent here as `service_id`, so the server silently ignored it and the reservation's
+          // actual service_id/service_ids never changed, even though the local optimistic state
+          // below made the price look updated on screen.
+          serviceId: newService.id,
           service_name: newServiceName,
-          service_id: newService.id,
           price: newServicePrice
         })
       });

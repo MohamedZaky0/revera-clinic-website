@@ -1171,11 +1171,14 @@ export default function AdminNewBookingView({
     : isPackageCovered || isPerPulseMode
     ? 0
     : (typeof amountPaidNow === "number" ? amountPaidNow : 0);
+  // Not clamped at 0: a negative remainingValue is a real overpayment/credit, and the
+  // "Credit Balance" badge below already expects to render it — it just never could while this
+  // was clamped, silently discarding whatever the patient overpaid instead of crediting it.
   const remainingValue = isNewPackagePurchase
-    ? Math.max(0, bookingValue - numAmountPaid)
+    ? bookingValue - numAmountPaid
     : isPackageCovered || isPerPulseMode
     ? 0
-    : Math.max(0, bookingValue - numAmountPaid);
+    : bookingValue - numAmountPaid;
   const selectedTime = selectedTimes[0] || "";
   const totalDurationMinutes = useMemo(() => {
     if (allSelectedServices.length > 0) {
@@ -1403,6 +1406,9 @@ export default function AdminNewBookingView({
         explicitCustomerId: resolvedCustomerId,
         amountPaid: numAmountPaid,
         amountLeft: Math.max(0, remainingValue),
+        // Whatever was paid beyond the booking's value — credited to the patient's wallet
+        // server-side instead of being dropped (RISK: previously unrecorded anywhere).
+        walletDeposit: Math.max(0, -remainingValue),
         paymentMethod: numAmountPaid > 0 ? bookingPaymentMethod : undefined,
         paymentReference: numAmountPaid > 0 && bookingPaymentReference ? bookingPaymentReference.trim() : undefined,
         isLaserService: isLaserService,

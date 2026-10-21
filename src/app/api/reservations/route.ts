@@ -1278,6 +1278,32 @@ export async function POST(req: Request) {
       }
     }
 
+    // Credit any overpayment (amountPaid beyond what the booking is actually worth) to the
+    // customer's wallet instead of silently dropping it — the client computes this the same
+    // way the checkout/PATCH flow already does (an explicit one-shot walletDeposit instruction).
+    const initialWalletDeposit = body.walletDeposit !== undefined ? Number(body.walletDeposit) : 0;
+    if (initialWalletDeposit > 0 && data.customer_id) {
+      try {
+        const { data: custForWallet, error: custWalletErr } = await supabaseServer
+          .from('customers')
+          .select('wallet_balance')
+          .eq('id', data.customer_id)
+          .maybeSingle();
+        if (!custWalletErr && custForWallet) {
+          const newWalletBalance = Number(custForWallet.wallet_balance || 0) + initialWalletDeposit;
+          await recordWalletMovement({
+            customerId: data.customer_id,
+            direction: 'in',
+            amount: initialWalletDeposit,
+            reason: `Overpayment credited to wallet from booking on ${data.date || ''}`,
+            newBalance: newWalletBalance,
+          });
+        }
+      } catch (wErr) {
+        console.error('Failed to credit booking overpayment to wallet (non-fatal):', wErr);
+      }
+    }
+
     const mapped = mapRow(data);
     const requiresDeposit = !isManualBooking && depositPercentage > 0;
     return NextResponse.json({
