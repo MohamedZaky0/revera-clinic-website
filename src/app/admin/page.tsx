@@ -44,6 +44,7 @@ import CustomerProfileDrawer from "@/components/admin/patients/CustomerProfileDr
 import { useCustomerProfile } from "@/components/admin/patients/useCustomerProfile";
 import BookingDetailsModal, { checkIsLaserService, parseAdditionalServiceLine, extractPrimaryPulses } from "@/components/admin/bookings/BookingDetailsModal";
 import { extractPulsePackageQuota } from "@/lib/laserDeficit";
+import { totalPaidFromBookings } from "@/lib/patientSpend";
 import {
   AlarmClock,
   ArrowLeft,
@@ -3952,12 +3953,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         ? customerReservations.length
         : Number(c.number_of_bookings || 0);
 
-      const totalSpentCalculated = customerReservations.reduce((sum: number, r: any) => {
-        if (['approved', 'confirmed', 'completed', 'started'].includes(r.status)) {
-          return sum + Number(r.price || r.totalPrice || 0);
-        }
-        return sum;
-      }, 0);
+      // DEC-121: money actually paid on delivered bookings. The old sum of `price`/`totalPrice` was always 0
+      // (reservations have neither), so a patient who paid showed 0 unless customers.spent_amount was filled.
+      const totalSpentCalculated = totalPaidFromBookings(customerReservations);
 
       // Extract real last booking date and time from reservations
       let lastBookingDateVal: string | null = null;
@@ -4028,12 +4026,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         return false;
       });
 
-      const totalSpent = patientReservations.reduce((sum: number, pr: any) => {
-        if (['approved', 'confirmed', 'completed', 'started'].includes(pr.status)) {
-          return sum + Number(pr.price || pr.totalPrice || 0);
-        }
-        return sum;
-      }, 0);
+      const totalSpent = totalPaidFromBookings(patientReservations);
 
       // Extract real last booking date and time for reservation-derived customers
       let lastBookingDateVal: string | null = null;

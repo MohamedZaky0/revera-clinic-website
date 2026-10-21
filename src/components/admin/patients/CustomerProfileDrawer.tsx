@@ -631,7 +631,8 @@ export default function CustomerProfileDrawer({
                   </div>
                 </div>
                 <div className="mt-2 text-lg sm:text-xl font-black text-[var(--cr-dark)] tracking-tight">
-                  {Number(viewingCustomerProfile.spent_amount !== undefined ? viewingCustomerProfile.spent_amount : viewingCustomerProfile.spent || 0).toLocaleString()} <span className="text-xs font-bold text-[var(--color-brand-secondary)]">{t.egp || "EGP"}</span>
+                  {/* DEC-121: the larger of the stored column and the figure worked out from the bookings (same rule as the list); reading the stored column alone showed 0 for a patient who had paid */}
+                  {Math.max(Number(viewingCustomerProfile.spent_amount || 0), Number(viewingCustomerProfile.spent || 0)).toLocaleString()} <span className="text-xs font-bold text-[var(--color-brand-secondary)]">{t.egp || "EGP"}</span>
                 </div>
                 <div className="text-[11px] text-[var(--color-brand-secondary)] mt-0.5 font-medium">
                   {t.allTime || "All time"}

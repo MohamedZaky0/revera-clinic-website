@@ -5526,3 +5526,19 @@ See `PROPOSALS.md` for:
 1. Run `scripts/check-anon-access.mjs` on **production** too: it may not have RLS at all (RISK-019 only confirms dev).
 2. Apply the migration to dev first, rerun the script (expect only `employee_accounts` and `hr_attendance` readable), and walk the checklist.
 3. Apply to production in a quiet window.
+
+---
+
+## RISK-129: Patients Who Paid Showed "Total Spend 0" (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/BOOKING_HISTORY_MONEY_MANUAL_TESTS.md` (section "Total Spend")
+
+**Severity:** Medium (wrong number on the main patient card and the patients list sort) · **Type:** Calculation
+**Found:** 2026-10-23, by the owner on production: a patient whose Booking History showed 1,500 and 1,200 paid had Total Spend 0.
+
+**Cause:** the calculated spend summed a `price` / `totalPrice` that reservations do not have, so it was always 0; only `customers.spent_amount` ever showed, and previous bookings never write it. See DEC-121.
+
+**Fix:** sum the stored paid amounts of delivered bookings (DEC-121).
+
+**Open:** the same patient also has a booking with no service (shown as "Service #null") and 2,820 outstanding; whether that is real or a data entry problem was not checked. Outstanding on the card (2,820) vs the sum of the rows (2,920) is the stored-value drift described in DEC-121.
+
