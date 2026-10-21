@@ -59,3 +59,8 @@
 - [ ] A balance on a booking that is only confirmed or approved (not completed yet) is not added to the patient's Outstanding.
 - [ ] A patient whose Outstanding was stored higher (package debt) keeps that higher number.
 
+## A booking with no service (DEC-122)
+- [ ] A previous booking with no service shows "No service selected" in the Booking History table (not "Service #null").
+- [ ] Open it, Edit Previous Booking, choose a service, Save: the booking now shows that service, and the Service Price, Paid and Outstanding are unchanged (for example 500 / 200 / 300), not replaced by the catalog price.
+- [ ] Add a NEW previous booking and choose a service: the Invoice Value and Actual Spent are still filled from the catalog price, as before.
+

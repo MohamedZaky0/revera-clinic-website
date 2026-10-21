@@ -3828,3 +3828,18 @@ Investigation revealed:
 
 **Not done / limits:** (1) when the stored figure is the larger one (4 patients on production, including one with 5,000 and three packages) it is shown as stored; whether those are real package debts or stale numbers cannot be told from the data and needs the owner's review. (2) A superadmin who lowers Outstanding by hand ("Adjust Outstanding") below what the completed bookings still show as left will see the bookings' figure, because the balances on those bookings were not changed; clearing the debt properly means settling it (Settle Debt) so the bookings and the total move together. (3) **Wallet** still comes only from `customers.wallet_balance`.
 
+---
+
+## DEC-122: A Booking With No Service Is Legitimate; Giving It One Must Not Overwrite Its Money
+
+**Date:** 2026-10-23
+**Status:** Decided & implemented (no migration)
+
+**Context:** an old booking can legitimately have no service (on production 94 of the 202 previous bookings have none, measured read-only on 2026-10-23, and the patient list showed them as "Service #null"). The owner wants that to be allowed, with an option to give such a booking a specific service later. The option already existed (Edit Previous Booking has an optional Service field and the API accepts it), but testing it on dev showed a data-corruption trap: choosing a service replaced the booking's recorded **Invoice Value 500 with the catalog price 100 and Actual Spent 200 with 100** (the form refills both from catalog prices on every change), so saving would have rewritten what the patient was charged and paid.
+
+**Decision:**
+1. In edit mode the form no longer refills the Invoice Value / Actual Spent from the catalog when the booking already has an invoice value (`shouldAutoFillInvoice`, `src/lib/bookingMoney.ts`, tested). A new previous booking is filled exactly as before, and an edited booking whose invoice value is empty may still be filled. The numbers can still be changed by hand.
+2. The Booking History table shows "No service selected" (EN/AR) instead of "Service #null".
+
+**Not done / limits:** in edit mode, adding a package or product no longer updates the invoice value by itself either; type the new total. The booking details screen still shows the generic "Clinic Service" label for a booking with no service.
+
