@@ -24,6 +24,7 @@ import {
   Zap,
 } from "lucide-react";
 import { calculateAge } from "@/lib/age";
+import { computeBookingMoney, formatMoneyCell } from "@/lib/bookingMoney";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
 import ConfirmPackagePriceModal from "@/components/admin/patients/ConfirmPackagePriceModal";
@@ -918,13 +919,16 @@ export default function CustomerProfileDrawer({
               </span>
             </div>
             <div className="overflow-x-auto rounded-xl border border-[#E6E9EB]">
-              <table className="w-full text-xs min-w-[650px]">
+              <table className="w-full text-xs min-w-[950px]">
                 <thead>
                   <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] font-bold text-[var(--color-brand-secondary)] uppercase tracking-wider text-[10px]">
                     <th className="px-4 py-3 text-start">{t.colDateSlot}</th>
                     <th className="px-4 py-3 text-start">{t.colService}</th>
                     <th className="px-4 py-3 text-start">{t.colProvider}</th>
                     <th className="px-4 py-3 text-start">{t.colRoom}</th>
+                    <th className="px-4 py-3 text-end whitespace-nowrap">{t.colServicePrice}</th>
+                    <th className="px-4 py-3 text-end whitespace-nowrap">{t.colPaid}</th>
+                    <th className="px-4 py-3 text-end whitespace-nowrap">{t.colOutstanding}</th>
                     <th className="px-4 py-3 text-center">{t.colPayment}</th>
                     <th className="px-4 py-3 text-center">{t.colStatus}</th>
                   </tr>
@@ -939,7 +943,7 @@ export default function CustomerProfileDrawer({
                     if (history.length === 0) {
                       return (
                         <tr>
-                          <td colSpan={6} className="px-4 py-6 text-center text-gray-400 italic">
+                          <td colSpan={9} className="px-4 py-6 text-center text-gray-400 italic">
                             {t.noHistory}
                           </td>
                         </tr>
@@ -972,6 +976,19 @@ export default function CustomerProfileDrawer({
                       const redemptions = customerPackageRedemptions.filter((r: any) => r.reservationId === res.id);
                       const roomName = rooms.find((rm: any) => rm.id === res.roomId)?.name || "—";
                       const paymentStatus: "paid" | "partial" | "unpaid" = left <= 0 ? "paid" : (spent > 0 ? "partial" : "unpaid");
+                      // DEC-119: money columns read the stored amount_paid / amount_left only (no catalog guess).
+                      const money = computeBookingMoney(res, {
+                        packageCovered:
+                          redemptions.length > 0 ||
+                          (res as any).laserPaymentMode === "PACKAGE" ||
+                          Boolean((res as any).customerPackageId),
+                      });
+                      const priceCell =
+                        money.priceNote === "package"
+                          ? t.moneyCoveredByPackage
+                          : money.priceNote === "not_delivered"
+                            ? t.moneyNotDelivered
+                            : formatMoneyCell(money.price);
                       const paymentBadgeClass =
                         paymentStatus === "paid"
                           ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
@@ -991,6 +1008,27 @@ export default function CustomerProfileDrawer({
                           <td className="px-4 py-3 font-semibold text-[var(--cr-dark)]">{serv}</td>
                           <td className="px-4 py-3">{res.doctorName || "—"}</td>
                           <td className="px-4 py-3">{roomName}</td>
+                          <td className="px-4 py-3 text-end whitespace-nowrap tabular-nums font-semibold text-[var(--cr-dark)]" data-testid="history-service-price">
+                            {money.price === null && money.priceNote ? (
+                              <span className="text-[10px] font-semibold text-[var(--color-brand-secondary)] whitespace-normal">{priceCell}</span>
+                            ) : (
+                              <>
+                                {priceCell}
+                                {money.price !== null && <span className="ms-1 text-[10px] font-bold text-[var(--color-brand-secondary)]">{t.egp || "EGP"}</span>}
+                              </>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-end whitespace-nowrap tabular-nums" data-testid="history-paid">
+                            {formatMoneyCell(money.paid)}
+                            {money.paid !== null && <span className="ms-1 text-[10px] font-bold text-[var(--color-brand-secondary)]">{t.egp || "EGP"}</span>}
+                          </td>
+                          <td
+                            className={`px-4 py-3 text-end whitespace-nowrap tabular-nums font-semibold ${money.outstanding !== null && money.outstanding > 0 ? "text-rose-600" : ""}`}
+                            data-testid="history-outstanding"
+                          >
+                            {formatMoneyCell(money.outstanding)}
+                            {money.outstanding !== null && <span className="ms-1 text-[10px] font-bold text-[var(--color-brand-secondary)]">{t.egp || "EGP"}</span>}
+                          </td>
                           <td className="px-4 py-3 text-center">
                             <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${paymentBadgeClass}`}>
                               {t.paymentStatusLabels[paymentStatus]}

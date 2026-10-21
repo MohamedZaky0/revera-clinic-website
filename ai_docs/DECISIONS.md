@@ -3776,3 +3776,20 @@ Investigation revealed:
 
 **Not done / limits:** switching the account back on also turns the doctor back on, even if the doctor had been deactivated separately on the Doctors screen before; do that again if needed. Deactivating a doctor on the Doctors screen (the status toggle) does not switch their account off; only the soft delete does. Bookings already made with that doctor are untouched.
 
+## DEC-119: Booking History Shows Service Price, Paid And Outstanding Per Booking
+
+**Date:** 2026-10-21
+**Status:** Decided & implemented (no migration; UI + one small pure helper)
+
+**Context:** the owner wanted the patient profile's Booking History tab to show, for every booking row, the total price of the service, what has been paid and what is still owed. A `reservations` row has no stored total: `total_price` / `price` are not columns on that table (the PATCH route tries to write them and drops them when the column is missing) and `GET /api/reservations` does not return them. The only money on the row is `amount_paid` and `amount_left`, and the rest of the app already treats them as `total = paid + left` (the Bookings list's `rawAmt` fallback and the booking modal's `totalPrice` floor). The old table also had a private price guess for the payment badge (a hard-coded service-price map); it was left alone and is not used by the new columns.
+
+**Decision:** `src/lib/bookingMoney.ts` (`computeBookingMoney`, tested in `tests/lib/bookingMoney.test.ts`) reads only the stored fields; nothing is recomputed from the service catalog.
+1. **Paid** = `amount_paid`; blank / non-numeric / negative shows a dash.
+2. **Outstanding** = `amount_left`. A blank balance shows a dash (never 0, which would read as "settled"). A stored negative value is shown as stored.
+3. **Service Price** = `amount_paid + amount_left` (covers deposit, partial payment, checkout with add-ons and discounts, and later debt settlement, which moves money from left to paid). For a booking added through "Add Previous Booking" the invoice value written in its notes wins, and a blank balance is then derived as `max(0, invoice value - paid)`. If the sum is 0 the price is unknown (dash), not "free".
+4. **Cancelled / rejected / no-show:** no service price (shows "Not delivered"), Outstanding is 0 (the cancel and no-show actions set `amount_left = 0`, and a rejected request can still carry the balance it was created with, which is not a debt), Paid is whatever is stored (0 after the deposit refund on cancellation; the kept deposit on no-show). Postponed bookings are treated like any open booking.
+5. **Package-covered session** (a package redemption exists for the booking, or `laser_payment_mode = 'PACKAGE'`, or a `customer_package_id`): when the booking itself was billed 0 the price cell says "Covered by package" instead of a fake price or a misleading 0. If the session has an extra charge, the real numbers show.
+6. The tab only has a table (no separate mobile card layout); it scrolls horizontally on small screens, now with a wider minimum width.
+
+**Not done / limits:** wallet payments are not distinguished (the reservation has no payment-method column; a wallet-funded amount appears in Paid only if checkout recorded it in `amount_paid`). There is no refund field on a completed booking, so refunds after completion cannot be shown. Bookings whose balance was never recorded show dashes instead of a catalog-price estimate. The legacy hard-coded price map behind the existing Payment badge is untouched.
+
