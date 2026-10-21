@@ -552,6 +552,43 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ ...changed, authSynced, providerSync });
     }
 
+    // Superadmin-only: set a brand new password for an employee whose login no longer works
+    // (forgotten password, or any other reason). Handled on its own and returned right away,
+    // same as isActive above, so it can never be mixed into an unrelated profile edit.
+    if (typeof body.newPassword === 'string') {
+      if (access.access.role !== 'superadmin') {
+        return NextResponse.json(
+          { error: 'Only the superadmin can set a new password for another account.' },
+          { status: 403 }
+        );
+      }
+      if (!employee.auth_user_id) {
+        return NextResponse.json(
+          { error: 'This account has no linked login yet — resend the invite instead.' },
+          { status: 400 }
+        );
+      }
+      if (!STRONG_PASSWORD_RE.test(body.newPassword)) {
+        return NextResponse.json(
+          {
+            error: 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol.',
+            field: 'newPassword',
+          },
+          { status: 400 }
+        );
+      }
+
+      const { error: pwError } = await supabaseServer.auth.admin.updateUserById(employee.auth_user_id, {
+        password: body.newPassword,
+        email_confirm: true,
+      });
+      if (pwError) {
+        return NextResponse.json({ error: pwError.message || 'Failed to set the new password.' }, { status: 502 });
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
     if (!resendInvite && (roleName || typeof body.isAlsoDoctor === 'boolean' || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchRequest.requested || requiredTargetAmount !== undefined || bonusPercentage !== undefined || targetType !== undefined || bonusType !== undefined || workingDaysHours !== undefined)) {
       const updates: Record<string, any> = {};
       if (typeof body.isAlsoDoctor === 'boolean') updates.is_also_doctor = body.isAlsoDoctor;

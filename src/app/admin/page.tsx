@@ -7976,6 +7976,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               session={session}
               adminDbId={adminDbId}
               adminEmail={adminEmail}
+              adminRole={adminRole}
               fetchHrAttendance={fetchHrAttendance}
               handleDeleteEmployee={handleDeleteEmployee}
               handleToggleEmployeeActive={handleToggleEmployeeActive}
