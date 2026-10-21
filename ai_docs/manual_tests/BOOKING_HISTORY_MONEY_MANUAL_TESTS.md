@@ -47,4 +47,5 @@
 - [ ] View Invoice / Print Invoice of that booking: the same two lines and total 800.
 - [ ] Arabic: the Booking History headers and the booking details labels read right, numbers line up.
 - [ ] Payment badge: a fully paid booking = Paid, a partly paid one = Partial, a booking with nothing paid and a balance = Unpaid, a cancelled one and an old booking with no recorded balance = a dash.
+- 2026-10-23, dev.reveraclinics.com, superadmin, throwaway two-service previous booking (services 100 + 150, Invoice Value 800, Actual Spent 300): table 800 / 300 / 500 and badge Partial; booking details list each service once (320 + 480), Total 800, Payment Summary 800 / 300 / 500 Partially Paid; Invoice preview subtotal 800, paid 300 (a single line with the whole total, as the invoice template always did); Arabic: RTL layout, Arabic headers, 800ج.م and badge جزئي. Print to PDF itself not run. Data deleted afterwards.
 
