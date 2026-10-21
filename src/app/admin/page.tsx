@@ -3231,6 +3231,39 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     showConfirm,
   });
 
+  // The profile drawer's Financial Summary banner (Total Spend/Wallet/Outstanding) reads from
+  // this local `viewingCustomerProfile` object, set once when the drawer opens. Actions taken
+  // while it stays open — Add Previous Booking, package sales, wallet adjustments — only
+  // refresh the master `dbCustomers` list via fetchCustomers(), so the banner kept showing
+  // stale totals (e.g. "Total Spend: 0" right after a historical payment was recorded) until
+  // the drawer was closed and reopened. Re-sync its financial fields whenever the master list
+  // updates and this customer's numbers have actually changed.
+  useEffect(() => {
+    if (!viewingCustomerProfile?.id) return;
+    const fresh = dbCustomers.find((c) => String(c.id) === String(viewingCustomerProfile.id));
+    if (!fresh) return;
+    const changed =
+      fresh.spent_amount !== viewingCustomerProfile.spent_amount ||
+      fresh.outstanding !== viewingCustomerProfile.outstanding ||
+      fresh.wallet_balance !== viewingCustomerProfile.wallet_balance ||
+      fresh.number_of_bookings !== viewingCustomerProfile.number_of_bookings;
+    if (changed) {
+      setViewingCustomerProfile((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              spent_amount: fresh.spent_amount,
+              spent: fresh.spent_amount,
+              outstanding: fresh.outstanding,
+              wallet_balance: fresh.wallet_balance,
+              wallet: fresh.wallet_balance,
+              number_of_bookings: fresh.number_of_bookings,
+            }
+          : prev
+      );
+    }
+  }, [dbCustomers, viewingCustomerProfile, setViewingCustomerProfile]);
+
   useEffect(() => {
     if (activeNav === "Inventory" || activeNav === "Products" || activeNav === "Patients" || viewingCustomerProfile) {
       fetchInventoryProducts();
