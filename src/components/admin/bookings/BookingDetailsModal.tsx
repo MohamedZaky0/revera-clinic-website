@@ -1840,6 +1840,18 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const total = Number(item.total) || (qty * unitPrice);
           const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
 
+          // DEC-120: "Add Previous Booking" stores every service after the first BOTH in the booking's own service
+          // list and as an extra line. The service list already prices it, so listing the extra line too showed
+          // the same service twice. A different, really additional service is not in the booking's list and stays.
+          if (
+            isHistoricalBooking &&
+            lineType === 'additional_service' &&
+            item.serviceId &&
+            selectedServiceIds.some((id) => String(id) === String(item.serviceId))
+          ) {
+            continue;
+          }
+
           // Skip device pulse counters from billing products list in per-pulse mode or zero-cost tracking
           if (isLaserPerPulse && lineType === 'device_pulses') {
             continue;

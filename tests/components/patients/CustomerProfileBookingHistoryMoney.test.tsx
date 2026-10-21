@@ -196,6 +196,46 @@ describe('Patient profile -> Booking History money columns (DEC-119)', () => {
     expect(screen.getByTestId('history-paid').textContent).toContain('0');
   });
 
+  // The Payment badge reads the same stored amounts as the columns (it used to guess from the catalog and a
+  // hard-coded price map when the balance was missing).
+  it('Payment badge: paid, partial and unpaid follow the stored paid and outstanding amounts', () => {
+    const reservations = [
+      { ...baseRes, id: 'b-paid', status: 'completed', amountPaid: 400, amountLeft: 0 },
+      { ...baseRes, id: 'b-partial', status: 'completed', amountPaid: 100, amountLeft: 300 },
+      { ...baseRes, id: 'b-unpaid', status: 'approved', amountPaid: 0, amountLeft: 400 },
+    ];
+    render(<CustomerProfileDrawer {...(buildProps({ allReservations: reservations }) as any)} />);
+    const t = adminTranslations.en.patients.customerProfileDrawer;
+    const badges = screen.getAllByTestId('history-payment').map((b) => b.textContent);
+    expect(badges).toEqual([t.paymentStatusLabels.paid, t.paymentStatusLabels.partial, t.paymentStatusLabels.unpaid]);
+  });
+
+  it('Payment badge: a missing balance is a dash, not a guess from the catalog price (even for a known service)', () => {
+    // service 1 is in the catalog at 400 and was in the old hard-coded map: the old badge computed 400 - 0 and said Unpaid
+    const reservations = [{ ...baseRes, id: 'b-unknown', status: 'approved', amountPaid: 0, amountLeft: null }];
+    render(<CustomerProfileDrawer {...(buildProps({ allReservations: reservations }) as any)} />);
+    expect(screen.getByTestId('history-payment').textContent).toBe('—');
+    expect(screen.getByTestId('history-outstanding').textContent).toBe('—');
+  });
+
+  it('Payment badge: a cancelled booking is a dash, not "Paid"', () => {
+    const reservations = [{ ...baseRes, id: 'b-cancel', status: 'cancelled', amountPaid: 0, amountLeft: 0 }];
+    render(<CustomerProfileDrawer {...(buildProps({ allReservations: reservations }) as any)} />);
+    expect(screen.getByTestId('history-payment').textContent).toBe('—');
+  });
+
+  it('Payment badge: an old "Add Previous Booking" entry is partial when the invoice value exceeds what was paid', () => {
+    const reservations = [{
+      ...baseRes, id: 'b-hist', status: 'completed', amountPaid: 300, amountLeft: null,
+      notes: '[Historical Booking] Added manually. [Invoice Total]: 800 EGP. Actual Spent: 300 EGP.',
+    }];
+    render(<CustomerProfileDrawer {...(buildProps({ allReservations: reservations }) as any)} />);
+    const t = adminTranslations.en.patients.customerProfileDrawer;
+    expect(screen.getByTestId('history-service-price').textContent).toContain('800');
+    expect(screen.getByTestId('history-outstanding').textContent).toContain('500');
+    expect(screen.getByTestId('history-payment').textContent).toBe(t.paymentStatusLabels.partial);
+  });
+
   it('shows the empty state across all nine columns', () => {
     const { container } = render(<CustomerProfileDrawer {...(buildProps() as any)} />);
     const td = container.querySelector('tbody td[colspan]');
