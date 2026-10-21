@@ -24,10 +24,27 @@ if (!url || !anon) {
 
 const headers = (key) => ({ apikey: key, Authorization: `Bearer ${key}` });
 
+// Table names declared in the repo's migrations: the fallback when the database will not list its own tables.
+async function tablesFromMigrations() {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const dir = new URL("../supabase/migrations/", import.meta.url);
+  const names = new Set();
+  for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql"))) {
+    const sql = readFileSync(new URL(file, dir), "utf8");
+    for (const m of sql.matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\s+(?:"?public"?\.)?"?([a-z0-9_]+)"?/gi)) names.add(m[1]);
+  }
+  return [...names].sort();
+}
+
+let listedFromDatabase = true;
 async function listTables() {
-  // The REST root describes every exposed table; the service key sees all of them, the anon key may see none.
+  // The REST root describes every exposed table; the service key sees all of them. Newer Supabase projects
+  // refuse it to the anon key (HTTP 401), so then the names come from the migrations in this repo.
   const res = await fetch(`${url}/rest/v1/`, { headers: headers(service || anon) });
-  if (!res.ok) throw new Error(`Could not list tables (HTTP ${res.status}). Provide SUPABASE_SERVICE_ROLE_KEY.`);
+  if (!res.ok) {
+    listedFromDatabase = false;
+    return tablesFromMigrations();
+  }
   const spec = await res.json();
   return Object.keys(spec.paths || {})
     .filter((p) => p !== "/" && !p.startsWith("/rpc/"))
@@ -51,6 +68,11 @@ for (const table of tables) {
 
   const res = await fetch(`${url}/rest/v1/${table}?select=*&limit=1`, { headers: headers(anon) });
   if (!res.ok) {
+    const body = await res.text();
+    if (/api key/i.test(body)) {
+      console.error("The browser key was rejected by this project (invalid or missing API key). Check NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+      process.exit(2);
+    }
     closed.push(table);
     continue;
   }
@@ -61,6 +83,9 @@ for (const table of tables) {
 }
 
 console.log(`Tables checked: ${tables.length}`);
+if (!listedFromDatabase) {
+  console.log("(The database would not list its tables, so the names come from supabase/migrations. Without SUPABASE_SERVICE_ROLE_KEY an empty table cannot be told apart from a blocked one, so read 'Blocked' as 'returned nothing'.)");
+}
 console.log(`\nREADABLE with the browser key (${open.length}):`);
 open.forEach((t) => console.log(`  ${t}`));
 if (unknown.length) {

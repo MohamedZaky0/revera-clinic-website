@@ -5522,6 +5522,10 @@ See `PROPOSALS.md` for:
 
 **Not covered:** `AdminNewBookingView.tsx` (services, providers, branches, rooms, customers, reservations) and the `reservation_products` reads in `page.tsx` / `BookingDetailsModal.tsx` still call Supabase from the browser. RLS blocks all of them, so they already return nothing and are no security issue, but they are dead reads that should move to the API too.
 
+**Applied and checked (2026-10-21, owner):** the migration and the two read-policy drops were run on the dev project and on production. `node scripts/check-anon-access.mjs` now reports 0 readable tables on both (64 checked; 8 are empty, so the result says nothing for them). Profile screens checked after the change. Not covered by the script: writes with the browser key.
+
+**Guards added:** `tests/lib/migrationsRls.test.ts` reads the migrations and fails when a new one creates an open policy (`USING (true)` / `WITH CHECK (true)`, except for `service_role`) or a table without `ENABLE ROW LEVEL SECURITY` (mutation-checked). It found one old case, `terms_and_conditions`, created without RLS and open until this migration; it is listed as the only exception. `check-anon-access.mjs` now falls back to the table names in the migrations when the project refuses to list its tables to the anon key (HTTP 401, the case on production) and stops with a clear message on a rejected key instead of calling every table blocked. Run it on every new clinic project before handing it over and after any migration that adds tables; it needs a real project, so it is not part of the test suite.
+
 **Before applying (owner):**
 1. Run `scripts/check-anon-access.mjs` on **production** too: it may not have RLS at all (RISK-019 only confirms dev).
 2. Apply the migration to dev first, rerun the script (expect only `employee_accounts` and `hr_attendance` readable), and walk the checklist.
