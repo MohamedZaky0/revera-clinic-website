@@ -47,3 +47,8 @@
 - [ ] Soft delete from the Doctors screen (superadmin): the doctor goes Inactive, their employee account is now Inactive with its role intact (not `inactive`).
 - [ ] An admin who is also a doctor (is_also_doctor): switching their account off removes them from the doctor lists too.
 
+## Doctor portal first load (RISK-127)
+- 2026-10-21, dev.reveraclinics.com, superadmin Doctor view, reload and sample the numbers every 200 ms for 8 s: all 40 samples read 0 Patients / 0 Sessions from the first one (before the fix the first render read 29 / 26). Pass for the superadmin; not yet seen with a real doctor account that has bookings.
+- [ ] Log in as a doctor (or open Doctor view as the superadmin) and reload on the Schedule tab several times: at no moment do you see patients, counts or sessions that are not yours; before your data arrives the numbers are 0 / empty, never someone else's.
+- [ ] Patients tab and Analytics tab, same check right after a reload.
+

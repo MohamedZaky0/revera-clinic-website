@@ -1,7 +1,7 @@
-# RISK-127 — Close The Open "Allow All" RLS Policies — Manual Test Checklist
+# RISK-128 — Close The Open "Allow All" RLS Policies — Manual Test Checklist
 
 > **Living document.** Update with dated evidence as each check is run.
-> Full reasoning: `ai_docs/RISKS.md` -> **RISK-127**. Migration: `supabase/migrations/20261023000000_close_open_rls_policies.sql`. Check tool: `scripts/check-anon-access.mjs`.
+> Full reasoning: `ai_docs/RISKS.md` -> **RISK-128**. Migration: `supabase/migrations/20261023000000_close_open_rls_policies.sql`. Check tool: `scripts/check-anon-access.mjs`.
 > The migration has **not been applied to any database yet**. Apply it to dev first.
 
 ## Evidence log

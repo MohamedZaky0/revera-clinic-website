@@ -695,7 +695,7 @@ the browser with the anon key, which enabling RLS would have turned into a silen
 reported success. That write moved server-side into `POST /api/inventory/products/sales` in
 `8108b82`, and no client component reads or writes a Supabase table any more.
 
-**Update 2026-10-21:** the residual risk below is not Low: measured with the anon key it exposes staff accounts, payroll, attendance and prescriptions, and the same policies allow writes. Tracked and fixed (migration written, not yet applied) as RISK-127. The statement below that no client component reads a Supabase table any more is also wrong (`UserProfileView`, `DoctorAccountView`, `AdminNewBookingView`).
+**Update 2026-10-21:** the residual risk below is not Low: measured with the anon key it exposes staff accounts, payroll, attendance and prescriptions, and the same policies allow writes. Tracked and fixed (migration written, not yet applied) as RISK-128. The statement below that no client component reads a Supabase table any more is also wrong (`UserProfileView`, `DoctorAccountView`, `AdminNewBookingView`).
 
 **Residual risk:** the subset carrying permissive "allow all" policies (`roles`,
 `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`,
@@ -5480,9 +5480,22 @@ See `PROPOSALS.md` for:
 
 ---
 
-## RISK-127: The Public Browser Key Could Read Staff Accounts, Salaries, Attendance, Prescriptions And More — And Write Or Delete Accounts And Roles (MIGRATION WRITTEN, NOT YET APPLIED)
+## RISK-127: The Doctor Portal Briefly Showed Every Doctor's Patients On First Load (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
 
-**Manual test checklist:** `ai_docs/manual_tests/RISK_127_CLOSE_OPEN_RLS_MANUAL_TESTS.md`
+**Manual test checklist:** `ai_docs/manual_tests/ACCOUNT_ACTIVE_INACTIVE_MANUAL_TESTS.md` (section "Doctor portal first load")
+
+**Severity:** Medium (patient privacy: one doctor could see, for a few seconds, other doctors' patients and numbers) · **Type:** Data isolation
+**Found:** 2026-10-21 on dev.reveraclinics.com: opening the Doctor view as the superadmin first showed "29 Patients / 26 Sessions" and, after a reload, the correct "0".
+
+**Cause:** `DoctorAccountView` started its `reservations` state from the `initialReservations` prop, which the admin shell filled with `allReservations` (the whole clinic). Only the validity filter (no rejected/cancelled) was applied, never the doctor filter, because that needs the provider record, which is only known after the first lookups. The doctor's own fetch (`/api/reservations`, filtered with `isDoctorMatch`) replaced it a few seconds later. Anyone logged in as a doctor-workspace role saw the same flash.
+
+**Fix:** the state starts empty and `loading` starts true; the `initialReservations` prop was removed from the component, its type and the shell. Two tests: the first load shows nothing from a clinic-wide list passed in (it fails against the old behaviour, checked), and only this doctor's bookings appear once the answer arrives.
+
+**Not changed:** the doctor filter itself (`isDoctorMatch`) and the server-side list (`GET /api/reservations` still returns what the caller's role may read); the fix is that the screen no longer shows anything before it has applied the filter. The doctor portal shows 0 patients for a moment on first load instead of other doctors' data.
+
+## RISK-128: The Public Browser Key Could Read Staff Accounts, Salaries, Attendance, Prescriptions And More — And Write Or Delete Accounts And Roles (MIGRATION WRITTEN, NOT YET APPLIED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_128_CLOSE_OPEN_RLS_MANUAL_TESTS.md`
 
 **Severity:** High (personal and salary data readable by anyone who opens the website; account and role tables writable) · **Type:** Security / RLS. This is the "residual risk" that RISK-019 left open and rated Low.
 **Found:** 2026-10-21 while fixing RISK-126, by testing every table with the anon key (`scripts/check-anon-access.mjs`).

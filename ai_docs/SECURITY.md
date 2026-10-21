@@ -177,7 +177,7 @@ see the RISK references there for what changed and when.
   layer.** Because every API route uses the service role key, RLS enforces nothing about *who*
   can call a route — that's entirely `access.ts` / middleware's job (§1–§3). A route with no
   role check has full read/write to its table regardless of RLS being "on."
-- **Residual permissive policies (RISK-127):** a subset of tables (`roles`, `employee_accounts`, `hr_*`,
+- **Residual permissive policies (RISK-128):** a subset of tables (`roles`, `employee_accounts`, `hr_*`,
   `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`, `device_maintenance_history`,
   `terms_and_conditions`, `admin_roles`) carry pre-2026-07-25 "allow all" policies, layered underneath the
   blanket enable. Measured on the test database on 2026-10-21 these were readable with the anon key (which is

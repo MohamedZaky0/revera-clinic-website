@@ -1,6 +1,6 @@
 -- 20261023000000_close_open_rls_policies.sql
 --
--- RISK-019 (residual) / RISK-126: close the old "allow all" policies that leave patient-adjacent,
+-- RISK-128 (the residual risk RISK-019 left open, found while fixing RISK-126): close the old "allow all" policies that leave patient-adjacent,
 -- salary and account tables readable -- and, for two of them, writable -- with the public browser
 -- key (NEXT_PUBLIC_SUPABASE_ANON_KEY).
 --
