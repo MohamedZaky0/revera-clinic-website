@@ -99,14 +99,14 @@ describe('checkout — handleCompleteTreatment', () => {
     // The component silently re-fetches /api/reservations on mount and overwrites its own
     // `reservations` state with whatever this returns — an empty-array mock would wipe out
     // `priorVisit` before the click ever happens, since the first-visit guard reads from that
-    // same state, not from `initialReservations` directly.
+    // same state it fetched.
     const priorVisit = reservation({ id: 'res-0', status: 'completed', date: '2026-01-01' });
     fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [priorVisit, reservation({})] }));
     fetchFake.on('GET', '/api/medical-records', () => ({ status: 200, body: null }));
     fetchFake.on('GET', '/api/inventory/products', () => ({ status: 200, body: [] }));
     fetchFake.on('GET', '/api/medical-records/templates', () => ({ status: 200, body: [] }));
 
-    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[priorVisit, reservation({})]} />);
+    render(<DoctorAccountView {...BASE_PROPS} />);
 
     await user.click(screen.getByTitle('Ongoing Session'));
     await user.click(await screen.findByText('Complete Treatment'));
@@ -123,14 +123,14 @@ describe('checkout — handleCompleteTreatment', () => {
     // The component silently re-fetches /api/reservations on mount and overwrites its own
     // `reservations` state with whatever this returns — an empty-array mock would wipe out
     // `priorVisit` before the click ever happens, since the first-visit guard reads from that
-    // same state, not from `initialReservations` directly.
+    // same state it fetched.
     const priorVisit = reservation({ id: 'res-0', status: 'completed', date: '2026-01-01' });
     fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [priorVisit, reservation({})] }));
     fetchFake.on('GET', '/api/medical-records', () => ({ status: 200, body: null }));
     fetchFake.on('GET', '/api/inventory/products', () => ({ status: 200, body: [] }));
     fetchFake.on('GET', '/api/medical-records/templates', () => ({ status: 200, body: [] }));
 
-    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[priorVisit, reservation({})]} />);
+    render(<DoctorAccountView {...BASE_PROPS} />);
 
     await user.click(screen.getByTitle('Ongoing Session'));
     await user.click(await screen.findByText('Complete Treatment'));
@@ -141,14 +141,14 @@ describe('checkout — handleCompleteTreatment', () => {
 
 describe('checkout — first-visit medical intake guard (4acad04)', () => {
   it('blocks completion for a first-visit patient with no medical record and no prior completed visit', async () => {
-    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [] }));
+    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [reservation({})] }));
     fetchFake.on('GET', '/api/medical-records', () => ({ status: 200, body: null }));
     fetchFake.on('GET', '/api/inventory/products', () => ({ status: 200, body: [] }));
     fetchFake.on('GET', '/api/medical-records/templates', () => ({ status: 200, body: [] }));
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const user = userEvent.setup();
 
-    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[reservation({})]} />);
+    render(<DoctorAccountView {...BASE_PROPS} />);
 
     await user.click(screen.getByTitle('Ongoing Session'));
     await user.click(await screen.findByText('Complete Treatment'));
@@ -178,7 +178,7 @@ describe('ongoing session — booking ended by someone else (RISK-123)', () => {
     stubSessionRoutes(() => [priorVisit, current]);
     const user = userEvent.setup();
 
-    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[priorVisit, current]} />);
+    render(<DoctorAccountView {...BASE_PROPS} />);
     await user.click(screen.getByTitle('Ongoing Session'));
     await screen.findByText('Complete Treatment');
 
@@ -197,7 +197,7 @@ describe('ongoing session — booking ended by someone else (RISK-123)', () => {
     stubSessionRoutes(() => [priorVisit, current]);
     const user = userEvent.setup();
 
-    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[priorVisit, current]} />);
+    render(<DoctorAccountView {...BASE_PROPS} />);
     await user.click(screen.getByTitle('Ongoing Session'));
     await screen.findByText('Complete Treatment');
 
@@ -237,7 +237,7 @@ describe('reservations poll (every 3 s)', () => {
 
   it('polls every 3 s when each request finishes in time', async () => {
     fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [reservation({})] }));
-    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[reservation({})]} />);
+    render(<DoctorAccountView {...BASE_PROPS} />);
     await advance(0);
     const afterMount = reservationCalls();
 
@@ -248,7 +248,7 @@ describe('reservations poll (every 3 s)', () => {
   it('skips a tick while the previous request is still running', async () => {
     let release: () => void = () => {};
     fetchFake.on('GET', '/api/reservations', () => new Promise((resolve) => { release = () => resolve({ status: 200, body: [reservation({})] }); }));
-    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[reservation({})]} />);
+    render(<DoctorAccountView {...BASE_PROPS} />);
     await advance(0);
     const afterMount = reservationCalls();
 
@@ -263,7 +263,7 @@ describe('reservations poll (every 3 s)', () => {
 
   it('does not poll while the tab is hidden and refreshes when it becomes visible again', async () => {
     fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [reservation({})] }));
-    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[reservation({})]} />);
+    render(<DoctorAccountView {...BASE_PROPS} />);
     await advance(0);
 
     setVisibility('hidden');
@@ -287,11 +287,9 @@ describe('reservation filtering', () => {
       reservation({ id: 'r2', status: 'rejected', name: 'Rejected Patient', customer_id: 'c2' }),
       reservation({ id: 'r3', status: 'cancelled', name: 'Cancelled Patient', customer_id: 'c3' }),
     ];
-    // fetchDoctorReservations() re-fetches on mount and overwrites the initialReservations seed —
-    // mirror it here so the background refresh doesn't wipe the fixture mid-test.
     fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: reservations }));
     const user = userEvent.setup();
-    render(<DoctorAccountView {...BASE_PROPS} initialReservations={reservations} />);
+    render(<DoctorAccountView {...BASE_PROPS} />);
 
     await user.click(screen.getByTitle('Patients'));
     expect(await screen.findByText('Kept Patient')).toBeInTheDocument();
@@ -306,12 +304,38 @@ describe('reservation filtering', () => {
     ];
     fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: reservations }));
     const user = userEvent.setup();
-    render(<DoctorAccountView {...BASE_PROPS} initialReservations={reservations} />);
+    render(<DoctorAccountView {...BASE_PROPS} />);
 
     await user.click(screen.getByTitle('Patients'));
     expect(await screen.findByText('Repeat Patient')).toBeInTheDocument();
     // "2 Visits" legitimately appears twice: the patient card badge and the "View Details" button.
     expect(screen.getAllByText(/2\s+Visits/).length).toBeGreaterThan(0);
+  });
+});
+
+describe('first load never shows other doctors\' patients', () => {
+  it('shows nothing from a clinic-wide list passed in as a prop while the doctor\'s own fetch is still pending', async () => {
+    const other = reservation({ id: 'x1', doctor_id: 'doc-9', doctorName: 'Dr. Someone Else', status: 'completed', name: 'Other Doctors Patient', customer_id: 'c77' });
+    // never answers: the view is stuck on its first load
+    fetchFake.on('GET', '/api/reservations', () => new Promise(() => {}) as any);
+    const user = userEvent.setup();
+    // an old caller still passing the shell's list must not leak it (the prop no longer exists)
+    render(<DoctorAccountView {...BASE_PROPS} {...({ initialReservations: [other] } as any)} />);
+
+    await user.click(screen.getByTitle('Patients'));
+    expect(screen.queryByText('Other Doctors Patient')).not.toBeInTheDocument();
+  });
+
+  it('shows only this doctor\'s bookings once they arrive, even if the clinic-wide answer contains others', async () => {
+    const mine = reservation({ id: 'm1', status: 'completed', name: 'My Patient', customer_id: 'c1' });
+    const other = reservation({ id: 'x1', doctor_id: 'doc-9', doctorName: 'Dr. Someone Else', status: 'completed', name: 'Other Doctors Patient', customer_id: 'c77' });
+    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [mine, other] }));
+    const user = userEvent.setup();
+    render(<DoctorAccountView {...BASE_PROPS} />);
+
+    await user.click(screen.getByTitle('Patients'));
+    expect(await screen.findByText('My Patient')).toBeInTheDocument();
+    expect(screen.queryByText('Other Doctors Patient')).not.toBeInTheDocument();
   });
 });
 
@@ -321,7 +345,7 @@ describe('sign out and profile entry points', () => {
     fetchFake.on('GET', '/api/medical-records/templates', () => ({ status: 200, body: [] }));
     fetchFake.on('GET', '/api/inventory/products', () => ({ status: 200, body: [] }));
     const onLogout = vi.fn();
-    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[]} onLogout={onLogout} {...overrides} />);
+    render(<DoctorAccountView {...BASE_PROPS} onLogout={onLogout} {...overrides} />);
     return onLogout;
   }
 
