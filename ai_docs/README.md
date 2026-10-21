@@ -72,7 +72,6 @@ Every file that exists in this folder is listed below — nothing is left unexpl
 | File | What it is |
 |---|---|
 | `TEST_COVERAGE_INVENTORY.md` | A sweep of every module, route and table write as of 2026-09-07 (71 route files, 153 handlers, a 26.8k-line admin page). Counts and file sizes in it are out of date; the method (trace UI → API → table writes) is still useful when planning tests |
-| `GO_LIVE_CHECKLIST_RECEPTION_DOCTOR.md` | A temporary punch list written 2026-08-17 for the Reception and Doctor workflows. Production has been live since September 2026; delete the file when the owner agrees nothing in it is still wanted |
 
 ### Manual test evidence (not narrative docs — click-through records)
 

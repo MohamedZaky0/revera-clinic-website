@@ -5,7 +5,7 @@
 
 ## What this is
 A clinic management platform: public marketing website + `/admin` panel, on
-Next.js 15 (App Router) + TypeScript + Supabase, deployed on Vercel.
+Next.js 16 (App Router) + TypeScript + Supabase, deployed on Vercel.
 It is a **generic, reusable product**, delivered as **one single-tenant instance per clinic**.
 **Revera Clinics is the first / reference client — not the product.** The product name is
 not chosen yet. Do not bake "Revera" into anything new (see rules 2 below).
@@ -19,13 +19,15 @@ not chosen yet. Do not bake "Revera" into anything new (see rules 2 below).
 1. No new raw hex colors in components. Use `var(--cr-primary)` / `var(--cr-accent)` from `globals.css`.
 2. No hardcoded "Revera", phone numbers, WhatsApp links, or logo paths in components.
    UI copy → `src/lib/translations.ts`; client-specific values → `src/config/client.ts` (PROPOSAL-001).
-3. `/admin` has a **browser login gate only**. `/api/*` routes are NOT auth-validated server-side.
-   Do not assume any middleware protects them.
-4. Patient OTP auth is **UI-only / simulated** — no real SMS, no session, no user created.
+3. `/admin` itself is only a client-side login gate. Every `/api/*` handler enforces access on the server
+   (helpers in `src/lib/access.ts` / `auth.ts`); `ai_docs/SECURITY.md` §3 lists who may call what. Never read a
+   table from the browser with the anon key (RLS is closed, RISK-128): add an authenticated API route.
+4. Patient OTP auth is **real** (Supabase Auth phone/OTP, RISK-003). A patient token is a valid session but is not staff.
 5. Real vs mock: **trust `ai_docs/DB_SCHEMA.md`, not memory or older doc lines.**
    Real Supabase tables: prescriptions, payroll (hr_payroll + doctor_payroll), inventory
-   (products/devices), POS (product_sales). Still mock UI (hardcoded arrays): consultation notes,
-   treatment plans, before/after photos, the Finances Dashboard aggregate view, Refunds, Shipping.
+   (products/devices), POS (product_sales), invoices/payments/wallet, and the Finance and Reports sections.
+   Still mock UI (hardcoded arrays): consultation notes, treatment plans, before/after photos, Refunds,
+   Shipping, the Customer Support ticket inbox.
 6. Any schema change → add a file to `supabase/migrations/` AND update `DB_SCHEMA.md` in the
    same change. The migrations folder and DB_SCHEMA.md must never drift apart.
 7. Do not extend the `serviceStore.ts` "localStorage as primary" pattern (RISK-004).
