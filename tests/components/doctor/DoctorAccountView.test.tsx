@@ -10,7 +10,7 @@
  * the API routes — see the batch report re: RISKS.md RISK-019 drift.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createFetchFake } from '../../helpers/fetchFake';
 import { createSupabaseFake } from '../../helpers/supabaseFake';
@@ -157,6 +157,56 @@ describe('checkout — first-visit medical intake guard (4acad04)', () => {
       'Cannot complete treatment: Medical record intake is strictly required for first-visit patients. Please complete and save the intake form before ending the session.'
     ));
     expect(fetchFake.calls.some((c) => c.method === 'PATCH' && c.path === '/api/reservations')).toBe(false);
+  });
+});
+
+// RISK-123: the Ongoing Session panel keeps its own copy of the started booking. When reception completed
+// the booking the polled list updated, but the copy still said "started", so the panel (and its
+// clinical-note box) stayed open on a finished session. The realtime handler already closed it for the
+// same statuses; the polling path did not.
+describe('ongoing session — booking ended by someone else (RISK-123)', () => {
+  function stubSessionRoutes(reservations: () => any[]) {
+    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: reservations() }));
+    fetchFake.on('GET', '/api/medical-records', () => ({ status: 200, body: null }));
+    fetchFake.on('GET', '/api/inventory/products', () => ({ status: 200, body: [] }));
+    fetchFake.on('GET', '/api/medical-records/templates', () => ({ status: 200, body: [] }));
+  }
+
+  it('closes the panel when the polled list says the started booking is now completed', async () => {
+    const priorVisit = reservation({ id: 'res-0', status: 'completed', date: '2026-01-01' });
+    let current = reservation({ status: 'started' });
+    stubSessionRoutes(() => [priorVisit, current]);
+    const user = userEvent.setup();
+
+    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[priorVisit, current]} />);
+    await user.click(screen.getByTitle('Ongoing Session'));
+    await screen.findByText('Complete Treatment');
+
+    // reception completes the booking; the doctor's screen learns about it through the next poll
+    current = reservation({ status: 'completed' });
+    act(() => {
+      window.dispatchEvent(new Event('revera-booking-change'));
+    });
+
+    await waitFor(() => expect(screen.queryByText('Complete Treatment')).not.toBeInTheDocument());
+  });
+
+  it('keeps the panel open while the polled list still shows the booking as started', async () => {
+    const priorVisit = reservation({ id: 'res-0', status: 'completed', date: '2026-01-01' });
+    const current = reservation({ status: 'started' });
+    stubSessionRoutes(() => [priorVisit, current]);
+    const user = userEvent.setup();
+
+    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[priorVisit, current]} />);
+    await user.click(screen.getByTitle('Ongoing Session'));
+    await screen.findByText('Complete Treatment');
+
+    act(() => {
+      window.dispatchEvent(new Event('revera-booking-change'));
+    });
+    await waitFor(() => expect(fetchFake.calls.filter((c) => c.method === 'GET' && c.path === '/api/reservations').length).toBeGreaterThan(1));
+
+    expect(screen.getByText('Complete Treatment')).toBeInTheDocument();
   });
 });
 

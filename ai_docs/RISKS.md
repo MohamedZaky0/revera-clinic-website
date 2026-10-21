@@ -5415,14 +5415,16 @@ See `PROPOSALS.md` for:
 
 ---
 
-## RISK-123: The Doctor's Ongoing Session Panel Stays Open After Reception Completes The Booking (OPEN)
+## RISK-123: The Doctor's Ongoing Session Panel Stays Open After Reception Completes The Booking (RESOLVED)
 
 **Severity:** Medium (the doctor keeps seeing, and can keep editing, a session that is already over) · **Type:** Stale local state
 **Found:** 2026-10-20, full live test of the doctor portal (via the admin "Doctor view" switch). Not caused by Brief 36.
 
 **What happens:** `DoctorAccountView` copies the started booking into `activeSessionBooking` and only clears that copy when the copy's own `status` is completed/cancelled/rejected (the effect after `receptionistStartedSession`). When someone else completes the booking, `reservations` updates correctly (the Schedule tab showed "Completed" within seconds) and `receptionistStartedSession` becomes `null`, but the stale copy still says `started`, so it is never cleared. Observed: 30 s after `PATCH status: completed`, Ongoing Session still showed the patient and the clinical-note box. Clinical-note typing itself was fine (28 s, 15 edits across ~9 poll ticks, no resets).
 
-**Suggested fix:** when `receptionistStartedSession` is `null`, look the copy up by id in `reservations` and clear it if that row is no longer an active status (or if it is missing); otherwise refresh the copy from the row. Add a component test around the effect.
+**Fix (2026-10-21):** in `DoctorAccountView.tsx`, the effect that keeps `activeSessionBooking` in step now also looks the copy up in `reservations` and clears it when the list says that booking is completed, done, cancelled or rejected (the same statuses the realtime handler already closed it for; realtime does not reach the browser under RLS, so only the poll path was affected). A booking the list has not caught up with yet (still confirmed right after the doctor pressed Start) is left alone. Tests in `tests/components/doctor/DoctorAccountView.test.tsx`: the panel closes when the polled list turns the started booking into completed (fails without the fix), and stays open while the list still shows it started. A doctor with unsaved text in the clinical-note box loses it when the booking is ended elsewhere, as the realtime path always did.
+
+**Verified live 2026-10-21** (test database, Doctor view): a started booking opens the panel in 0.3 s and it stays open through 14 s of poll ticks; after `PATCH status completed` the panel closed in 2.1 s and shows "Waiting for Receptionist to Start Session" (before the fix it was still open after 30 s).
 
 **Test checklist:** `ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md` (Doctor portal section, evidence log 2026-10-20).
 
