@@ -36,26 +36,14 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getAuthHeaders } from "@/lib/authHeaders";
-import { pollDataEqual, pollRowsEqualByKeys } from "@/lib/pollEqual";
-
-// Mutable reservations columns, minus created_at/updated_at (updated_at is only
-// a DEFAULT now() on insert — no trigger — so it cannot detect changes). Used by
-// the 3 s poll to keep the previous array when a tick returns identical data;
-// see pollRowsEqualByKeys for what a key-list compare can miss.
-const RESERVATION_POLL_KEYS = [
-  "id", "service_id", "service_ids", "date", "requested_time", "name", "email",
-  "phone", "notes", "status", "time_slot", "session_type", "is_manual",
-  "doctor_name", "provider_id", "amount_paid", "amount_left", "branch_id",
-  "customer_id", "room_id", "rooms", "created_by_employee_id", "follow_up_date",
-  "approved_at", "completed_at", "started_at", "actual_duration_minutes",
-  "cancelled_at", "doctor_notes", "reception_notes", "laser_payment_mode",
-  "laser_price_per_pulse", "delivered_pulses", "laser_deficit_resolution",
-  "laser_deficit_pulses", "is_historical",
-] as const;
+import { pollDataEqual } from "@/lib/pollEqual";
 import { getSessionStaleness } from "@/lib/services";
 import { adminTranslations } from "@/components/admin/translations";
 import { extractPrimaryPulses } from "./BookingDetailsModal";
 import { extractPulsePackageQuota } from "@/lib/laserDeficit";
+
+// How often follow-up reminders are re-read while the tab is open (they are also refreshed on tab focus and on prescription events).
+const FOLLOW_UP_POLL_MS = 15000;
 
 interface ReservationItem {
   id: string | number;
@@ -219,8 +207,6 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
   const [todayPaymentFilter, setTodayPaymentFilter] = useState("All");
 
   // Direct Supabase database fallback state
-  const [dbReservations, setDbReservations] = useState<any[]>([]);
-  const [dbProviders, setDbProviders] = useState<any[]>(providers);
   const [dbPrescriptions, setDbPrescriptions] = useState<any[]>([]);
   const [loadingDb, setLoadingDb] = useState(false);
   const [convertedFollowUpIds, setConvertedFollowUpIds] = useState<Set<string>>(() => new Set());
@@ -360,107 +346,74 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
     }
   };
 
-  // Fetch real reservations, providers & prescriptions directly from database on mount & subscribe to realtime
+  // Follow-up reminders come from the prescriptions API. This effect used to read reservations and providers
+  // straight from Supabase with the browser key every 3 s as well; row-level security blocks that (the reads
+  // came back empty on the dev database), and the bookings and doctors this screen shows already arrive through
+  // props from the shell's authenticated poll. One request at a time, only while the tab is visible.
   useEffect(() => {
     let isMounted = true;
+    let inFlight = false;
 
-    async function fetchRealData(silent = false) {
+    async function fetchPrescriptions(silent = false) {
+      if (inFlight) return;
+      inFlight = true;
       if (!silent) setLoadingDb(true);
       try {
-        const [resResponse, provResponse, rxResponse, authHeaders] = await Promise.all([
-          supabase.from("reservations").select("*").order("date", { ascending: false }),
-          supabase.from("providers").select("*").order("name", { ascending: true }),
-          supabase.from("prescriptions").select("*").not("follow_up_date", "is", null).order("follow_up_date", { ascending: false }),
-          getAuthHeaders().catch(() => ({ "Content-Type": "application/json" }))
-        ]);
+        const authHeaders = await getAuthHeaders().catch(() => ({ "Content-Type": "application/json" }));
+        const res = await fetch("/api/prescriptions", { headers: authHeaders });
+        if (!isMounted || !res.ok) return;
+        const data = await res.json();
+        if (!Array.isArray(data)) return;
 
-        if (!isMounted) return;
-
-        if (!resResponse.error && resResponse.data) {
-          setDbReservations(prev =>
-            pollRowsEqualByKeys(prev, resResponse.data, RESERVATION_POLL_KEYS) ? prev : resResponse.data
-          );
-        }
-        if (!provResponse.error && provResponse.data && provResponse.data.length > 0) {
-          setDbProviders(prev => (pollDataEqual(prev, provResponse.data) ? prev : provResponse.data));
-        }
-
-        let combinedRx: any[] = [];
-        if (!rxResponse.error && rxResponse.data) {
-          combinedRx = [...rxResponse.data];
-        }
-
-        // Also fetch from /api/prescriptions with auth headers as resilient fallback / merge
-        try {
-          const apiRes = await fetch("/api/prescriptions", { headers: authHeaders });
-          if (apiRes.ok) {
-            const apiData = await apiRes.json();
-            if (Array.isArray(apiData)) {
-              const rxMap = new Map<string, any>();
-              combinedRx.forEach((item) => {
-                if (item?.id) rxMap.set(String(item.id), item);
-              });
-              apiData.forEach((item) => {
-                if (item?.follow_up_date) {
-                  const key = String(item.id || `${item.booking_id || item.customer_id}-${item.follow_up_date}`);
-                  rxMap.set(key, { ...(rxMap.get(key) || {}), ...item });
-                }
-              });
-              combinedRx = Array.from(rxMap.values());
-            }
+        const rxMap = new Map<string, any>();
+        data.forEach((item) => {
+          if (item?.follow_up_date) {
+            const key = String(item.id || `${item.booking_id || item.customer_id}-${item.follow_up_date}`);
+            rxMap.set(key, { ...(rxMap.get(key) || {}), ...item });
           }
-        } catch (apiErr) {
-          // fallback gracefully
-        }
-
-        if (isMounted) {
-          setDbPrescriptions(prev => (pollDataEqual(prev, combinedRx) ? prev : combinedRx));
-        }
+        });
+        const next = Array.from(rxMap.values()).sort((x, y) => String(y.follow_up_date).localeCompare(String(x.follow_up_date)));
+        setDbPrescriptions(prev => (pollDataEqual(prev, next) ? prev : next));
       } catch (err) {
-        console.error("Error fetching database reservations/providers/prescriptions:", err);
+        console.error("Error fetching prescriptions:", err);
       } finally {
+        inFlight = false;
         if (isMounted && !silent) setLoadingDb(false);
       }
     }
 
-    fetchRealData(false);
+    fetchPrescriptions(false);
 
-    // 3-second background polling ensures follow-up updates reflect instantly without reload
     const pollInterval = setInterval(() => {
-      if (isMounted) {
-        fetchRealData(true);
-      }
-    }, 3000);
+      if (isMounted && document.visibilityState === "visible") fetchPrescriptions(true);
+    }, FOLLOW_UP_POLL_MS);
 
-    // Real-time synchronization
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchPrescriptions(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    // Real-time synchronization (only delivers for tables the browser key may read)
     const channel = supabase
       .channel("admin-bookings-realtime-sync")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "prescriptions" },
         () => {
-          fetchRealData(true);
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "reservations" },
-        () => {
-          fetchRealData(true);
+          fetchPrescriptions(true);
         }
       )
       .subscribe();
 
-    const onSyncChange = () => fetchRealData(true);
+    const onSyncChange = () => fetchPrescriptions(true);
     window.addEventListener("revera-prescription-change", onSyncChange);
-    window.addEventListener("revera-booking-change", onSyncChange);
 
     return () => {
       isMounted = false;
       clearInterval(pollInterval);
+      document.removeEventListener("visibilitychange", onVisible);
       supabase.removeChannel(channel);
       window.removeEventListener("revera-prescription-change", onSyncChange);
-      window.removeEventListener("revera-booking-change", onSyncChange);
     };
   }, []);
 
@@ -491,15 +444,8 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
       combinedMap.set(id, r);
     });
 
-    // Add/merge items from dbReservations state (local updates take priority)
-    (dbReservations || []).forEach((r, idx) => {
-      const id = String(r.id || `db-${idx}`);
-      const existing = combinedMap.get(id) || {};
-      combinedMap.set(id, { ...existing, ...r });
-    });
-
     const rawList = Array.from(combinedMap.values());
-    const allProv = dbProviders.length > 0 ? dbProviders : (providers || []);
+    const allProv = providers || [];
 
     // Map real reservations to clean structure
     return rawList.map((r, idx) => {
@@ -618,7 +564,7 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
         follow_up_notes: r.follow_up_notes || null
       };
     });
-  }, [allReservations, dbReservations, dbProviders, localServices, providers, selectedDateStr, staleThresholdMs]);
+  }, [allReservations, localServices, providers, selectedDateStr, staleThresholdMs]);
 
   // Aggregate all Follow-Up Reminders from bookings and prescriptions with lead time calculation
   const allFollowUpReminders = useMemo(() => {
@@ -807,16 +753,13 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
     (providers || []).forEach((p: any) => {
       if (p.name) docSet.add(p.name);
     });
-    (dbProviders || []).forEach((p: any) => {
-      if (p.name) docSet.add(p.name);
-    });
     mergedAppointments.forEach((a: any) => {
       if (a.doctor_name && a.doctor_name !== "—" && a.doctor_name !== "-") {
         docSet.add(a.doctor_name);
       }
     });
     return Array.from(docSet).sort();
-  }, [providers, dbProviders, mergedAppointments]);
+  }, [providers, mergedAppointments]);
 
   const uniqueServices = useMemo(() => {
     const srvSet = new Set<string>();
@@ -1231,13 +1174,6 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
 
       setRejectedObjects(prev => new Set(prev).add(rawObj));
       setRejectedIds(prev => new Set(prev).add(targetId));
-      setDbReservations(prev => {
-        const exists = prev.some(r => String(r.id) === String(targetId));
-        if (exists) {
-          return prev.map(r => String(r.id) === String(targetId) ? { ...r, status: "rejected" } : r);
-        }
-        return [...prev, { ...rawObj, id: targetId, status: "rejected" }];
-      });
     } catch (e) {
       console.error("Reject error:", e);
     }

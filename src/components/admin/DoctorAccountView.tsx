@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
 import { Menu, CalendarDays, Stethoscope, Users, BarChart3, User, Play } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
@@ -513,9 +513,14 @@ function DoctorAccountView({
     }
   };
 
+  // True while a reservations request is running. The 3 s poll skips a tick instead of stacking a second
+  // request on top of a slow one (responses take 2-5 s on a busy connection).
+  const doctorFetchInFlightRef = useRef(false);
+
   // Fetch Doctor Reservations from DB (strictly isolated to this doctor)
   const fetchDoctorReservations = async (silent = false) => {
     if (!silent) setLoading(true);
+    doctorFetchInFlightRef.current = true;
     try {
       const queryUrl = "/api/reservations?limit=250";
       const headers = await getAuthHeaders();
@@ -536,25 +541,34 @@ function DoctorAccountView({
     } catch (err) {
       console.error("Error fetching doctor reservations:", err);
     } finally {
+      doctorFetchInFlightRef.current = false;
       if (!silent) setLoading(false);
     }
   };
 
-  // Silent 3-second background polling & event listeners
+  // Silent 3-second background polling & event listeners. Realtime does not reach the browser for this table
+  // (row-level security), so this poll is how reception's changes arrive. A tick is skipped while the tab is
+  // hidden or the previous request is still running, and the list refreshes as soon as the tab is visible.
   useEffect(() => {
     fetchDoctorReservations();
     const interval = setInterval(() => {
+      if (document.visibilityState !== "visible" || doctorFetchInFlightRef.current) return;
       fetchDoctorReservations(true);
     }, 3000);
 
     const onSync = () => fetchDoctorReservations(true);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchDoctorReservations(true);
+    };
     window.addEventListener("revera-prescription-change", onSync);
     window.addEventListener("revera-booking-change", onSync);
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("revera-prescription-change", onSync);
       window.removeEventListener("revera-booking-change", onSync);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [doctorDbId, doctorName, providerRecord]);
 
