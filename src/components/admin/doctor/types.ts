@@ -8,7 +8,6 @@ export interface DoctorAccountViewProps {
   doctorEmail?: string;
   doctorBranch?: string;
   branches?: any[];
-  initialReservations?: any[];
   onLogout: () => void;
   onSwitchToAdmin?: () => void;
 }

@@ -39,7 +39,6 @@ function DoctorAccountView({
   doctorEmail = "doctor@revera.com",
   doctorBranch = "Main Branch",
   branches = [],
-  initialReservations = [],
   onLogout,
   onSwitchToAdmin
 }: DoctorAccountViewProps) {
@@ -63,8 +62,11 @@ function DoctorAccountView({
     });
   };
 
-  const [reservations, setReservations] = useState<any[]>(() => filterValidDoctorBookings(initialReservations));
-  const [loading, setLoading] = useState(false);
+  // Starts empty, never from the shell's clinic-wide list: that list holds every doctor's bookings, and
+  // filtering it needs the provider record, which is only known after the first lookups. Seeding from it
+  // showed other doctors' patients for a few seconds before the doctor's own fetch replaced them.
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [patientSearchQuery, setPatientSearchQuery] = useState("");
   const [selectedPatientHistory, setSelectedPatientHistory] = useState<DoctorPatient | null>(null);

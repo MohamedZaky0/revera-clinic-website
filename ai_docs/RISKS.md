@@ -5475,3 +5475,19 @@ See `PROPOSALS.md` for:
 **Behaviour change to know about:** nothing the Bookings screen shows depended on the browser reads on this database. If the **production** database does not have row-level security on `reservations` (RISK-019 says it was applied to dev; production is not confirmed in this repo), those reads used to work there and bookings reached this screen within 3 s; they now arrive with the shell's authenticated poll (15 s) and after the user's own actions. Production should be checked (below): if the browser key can read reservations there, that is a patient-data exposure on its own.
 
 **Still open (not part of this fix):** the browser key can read `prescriptions` (and the other "allow all" tables listed in RISK-019). To check any database, request `/rest/v1/reservations?select=id&limit=1` with the anon key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) as both `apikey` and bearer token: `[]` means row-level security is blocking it, rows mean the table is open.
+
+---
+
+## RISK-127: The Doctor Portal Briefly Showed Every Doctor's Patients On First Load (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/ACCOUNT_ACTIVE_INACTIVE_MANUAL_TESTS.md` (section "Doctor portal first load")
+
+**Severity:** Medium (patient privacy: one doctor could see, for a few seconds, other doctors' patients and numbers) · **Type:** Data isolation
+**Found:** 2026-10-21 on dev.reveraclinics.com: opening the Doctor view as the superadmin first showed "29 Patients / 26 Sessions" and, after a reload, the correct "0".
+
+**Cause:** `DoctorAccountView` started its `reservations` state from the `initialReservations` prop, which the admin shell filled with `allReservations` (the whole clinic). Only the validity filter (no rejected/cancelled) was applied, never the doctor filter, because that needs the provider record, which is only known after the first lookups. The doctor's own fetch (`/api/reservations`, filtered with `isDoctorMatch`) replaced it a few seconds later. Anyone logged in as a doctor-workspace role saw the same flash.
+
+**Fix:** the state starts empty and `loading` starts true; the `initialReservations` prop was removed from the component, its type and the shell. Two tests: the first load shows nothing from a clinic-wide list passed in (it fails against the old behaviour, checked), and only this doctor's bookings appear once the answer arrives.
+
+**Not changed:** the doctor filter itself (`isDoctorMatch`) and the server-side list (`GET /api/reservations` still returns what the caller's role may read); the fix is that the screen no longer shows anything before it has applied the filter. The doctor portal shows 0 patients for a moment on first load instead of other doctors' data.
+

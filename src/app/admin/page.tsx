@@ -6061,7 +6061,6 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             "Main Branch"
           }
           branches={branches}
-          initialReservations={allReservations}
           onLogout={handleDoctorLogout}
           onSwitchToAdmin={canSwitchWorkspace ? handleSwitchToAdmin : undefined}
         />
