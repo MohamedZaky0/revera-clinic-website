@@ -954,35 +954,25 @@ export default function CustomerProfileDrawer({
                       const formattedDate = resDt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
                       const serv = localServices.find(s => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
                       const statusClass = getStatusBadgeClass(res.status);
-                      const pricesMap: Record<number, number> = {
-                        1: 400, 2: 500, 3: 450, 4: 600, 5: 800, 6: 700, 7: 1500,
-                        11: 600, 12: 500, 13: 800, 14: 1200, 15: 1500, 16: 1000, 17: 400,
-                        21: 300, 22: 350, 23: 300,
-                        31: 400, 32: 350, 33: 400, 34: 500
-                      };
-                      const serviceCost = localServices.find(s => s.id === res.serviceId)?.price ?? pricesMap[res.serviceId] ?? 500;
-                      const spent = Number(res.amountPaid ?? (res as any).amount_paid ?? 0);
-                      const isHistorical = Boolean(
-                        (res as any).is_historical ||
-                        (res as any).isHistorical ||
-                        String(res.notes || "").includes("[Historical Booking]")
-                      );
-                      const histInvMatch = String(res.notes || "").match(/\[Invoice Total\]:\s*(\d+(?:\.\d+)?)\s*EGP|Invoice Value:\s*(\d+(?:\.\d+)?)\s*EGP/i);
-                      const hasExplicitLeft = (res.amountLeft !== undefined && res.amountLeft !== null) || ((res as any).amount_left !== undefined && (res as any).amount_left !== null);
-                      const rawLeftVal = res.amountLeft !== undefined && res.amountLeft !== null ? res.amountLeft : (res as any).amount_left;
-                      const left = hasExplicitLeft
-                        ? Number(rawLeftVal)
-                        : (isHistorical && histInvMatch ? Math.max(0, Number(histInvMatch[1] || histInvMatch[2]) - spent) : (isHistorical ? 0 : Math.max(0, serviceCost - spent)));
                       const redemptions = customerPackageRedemptions.filter((r: any) => r.reservationId === res.id);
                       const roomName = rooms.find((rm: any) => rm.id === res.roomId)?.name || "—";
-                      const paymentStatus: "paid" | "partial" | "unpaid" = left <= 0 ? "paid" : (spent > 0 ? "partial" : "unpaid");
-                      // DEC-119: money columns read the stored amount_paid / amount_left only (no catalog guess).
+                      // DEC-119: the money columns AND the Payment badge read the stored amount_paid / amount_left
+                      // only. The badge used to guess from the catalog price (and a hard-coded fallback price map)
+                      // whenever the balance was not stored, so it could disagree with the columns beside it.
                       const money = computeBookingMoney(res, {
                         packageCovered:
                           redemptions.length > 0 ||
                           (res as any).laserPaymentMode === "PACKAGE" ||
                           Boolean((res as any).customerPackageId),
                       });
+                      const paymentStatus: "paid" | "partial" | "unpaid" | "unknown" =
+                        money.priceNote === "not_delivered" || money.outstanding === null
+                          ? "unknown"
+                          : money.outstanding <= 0
+                            ? "paid"
+                            : money.paid !== null && money.paid > 0
+                              ? "partial"
+                              : "unpaid";
                       const priceCell =
                         money.priceNote === "package"
                           ? t.moneyCoveredByPackage
@@ -994,7 +984,9 @@ export default function CustomerProfileDrawer({
                           ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
                           : paymentStatus === "partial"
                             ? "bg-amber-100 text-amber-800 border border-amber-200"
-                            : "bg-red-50 text-red-700 border border-red-200";
+                            : paymentStatus === "unknown"
+                              ? "bg-slate-100 text-slate-500 border border-slate-200"
+                              : "bg-red-50 text-red-700 border border-red-200";
                       return (
                         <tr
                           key={res.id}
@@ -1030,8 +1022,8 @@ export default function CustomerProfileDrawer({
                             {money.outstanding !== null && <span className="ms-1 text-[10px] font-bold text-[var(--color-brand-secondary)]">{t.egp || "EGP"}</span>}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${paymentBadgeClass}`}>
-                              {t.paymentStatusLabels[paymentStatus]}
+                            <span data-testid="history-payment" className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${paymentBadgeClass}`}>
+                              {paymentStatus === "unknown" ? "—" : t.paymentStatusLabels[paymentStatus]}
                             </span>
                             {redemptions.map((r: any, idx: number) => (
                               <span key={idx} className="block text-[9px] font-semibold text-[var(--cr-accent)] mt-0.5 whitespace-nowrap">

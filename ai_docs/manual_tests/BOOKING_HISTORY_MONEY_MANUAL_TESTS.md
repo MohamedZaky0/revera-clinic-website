@@ -42,3 +42,9 @@
 - [ ] Print / PDF invoice of an old previous booking: lines and total match the screen.
 - 2026-10-23, dev.reveraclinics.com, superadmin: previous booking created through the API for a throwaway patient, service catalog price 100, Invoice Value 700, Actual Spent 700: the booking details screen showed the service line 700 EGP, Total Price 700, Service Price 700, Paid 700, Outstanding 0 (before the change the line would have read 100). Booking and patient deleted afterwards. Not yet run: two services, partial payment, print invoice, Arabic.
 
+## Two services, partial payment, Payment badge (DEC-120 follow-up)
+- [ ] Add Previous Booking with two services (catalog 100 + 150), Invoice Value 800, Actual Spent 300. Booking History row: price 800, paid 300, outstanding 500, Payment = Partial. Open it: each service appears ONCE (about 320 and 480), Total Price 800, Payment Summary 800 / 300 / 500, "Partially Paid".
+- [ ] View Invoice / Print Invoice of that booking: the same two lines and total 800.
+- [ ] Arabic: the Booking History headers and the booking details labels read right, numbers line up.
+- [ ] Payment badge: a fully paid booking = Paid, a partly paid one = Partial, a booking with nothing paid and a balance = Unpaid, a cancelled one and an old booking with no recorded balance = a dash.
+
