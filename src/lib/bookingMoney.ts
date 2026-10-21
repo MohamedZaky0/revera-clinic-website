@@ -110,3 +110,15 @@ export function formatMoneyCell(value: number | null | undefined, placeholder = 
   if (value === null || value === undefined || !Number.isFinite(value)) return placeholder;
   return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
+
+/**
+ * "Add Previous Booking" fills the Invoice Value (and Actual Spent) from the catalog prices of the chosen
+ * services, packages and products. That is right for a NEW previous booking, where nothing has been
+ * recorded yet. It is wrong when EDITING one that already carries the invoice value and the amount
+ * actually spent at the time: choosing a service for a booking that had none (an old booking with
+ * "no service selected") would replace the real figures with today's catalog price (DEC-122).
+ */
+export function shouldAutoFillInvoice(isEditMode: boolean, currentInvoiceValue: string | number | null | undefined): boolean {
+  if (!isEditMode) return true;
+  return String(currentInvoiceValue ?? '').trim() === '';
+}

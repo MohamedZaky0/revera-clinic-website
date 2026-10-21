@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { adminTranslations } from "@/components/admin/translations";
 import { getAuthHeaders } from "@/lib/authHeaders";
+import { shouldAutoFillInvoice } from "@/lib/bookingMoney";
 
 interface ServiceItem {
   id: string | number;
@@ -506,6 +507,8 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
     currentPkgs: AttachedPackageItem[],
     nextProducts: ProductItem[]
   ) => {
+    // DEC-122: editing an old booking must not replace its recorded Invoice Value / Actual Spent with catalog prices
+    if (!shouldAutoFillInvoice(isEditMode, invoiceValue)) return;
     const srvPrice = nextServices.reduce((sum, s) => sum + Number(s.price || 0), 0);
     const pkgsPrice = currentPkgs.reduce(
       (sum, p) => sum + (p.source === "catalog" ? Number(p.price || 0) : 0),

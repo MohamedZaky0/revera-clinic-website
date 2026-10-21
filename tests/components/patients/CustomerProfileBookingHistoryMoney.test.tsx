@@ -253,6 +253,15 @@ describe('Patient profile -> Booking History money columns (DEC-119)', () => {
     expect(card.textContent).toContain('5,000');
   });
 
+  // DEC-122: an old booking can legitimately have no service; the table said "Service #null".
+  it('a booking with no service says so instead of "Service #null"', () => {
+    const reservations = [{ ...baseRes, serviceId: null, id: 'b-noservice', status: 'completed', amountPaid: 200, amountLeft: 300 }];
+    render(<CustomerProfileDrawer {...(buildProps({ allReservations: reservations }) as any)} />);
+    const t = adminTranslations.en.patients.customerProfileDrawer;
+    expect(screen.getByText(t.noServiceSelected)).toBeInTheDocument();
+    expect(screen.queryByText(/Service #null/)).not.toBeInTheDocument();
+  });
+
   it('shows the empty state across all nine columns', () => {
     const { container } = render(<CustomerProfileDrawer {...(buildProps() as any)} />);
     const td = container.querySelector('tbody td[colspan]');

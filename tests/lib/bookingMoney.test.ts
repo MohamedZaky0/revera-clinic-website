@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeBookingMoney, formatMoneyCell, parseNotedInvoiceTotal } from '@/lib/bookingMoney';
+import { computeBookingMoney, formatMoneyCell, parseNotedInvoiceTotal, shouldAutoFillInvoice } from '@/lib/bookingMoney';
 
 describe('computeBookingMoney (DEC-119)', () => {
   it('unpaid pending booking: price is paid + left, nothing paid, all outstanding', () => {
@@ -151,5 +151,25 @@ describe('formatMoneyCell', () => {
     expect(formatMoneyCell(null)).toBe('—');
     expect(formatMoneyCell(undefined)).toBe('—');
     expect(formatMoneyCell(NaN)).toBe('—');
+  });
+});
+
+describe('shouldAutoFillInvoice (DEC-122)', () => {
+  it('a new previous booking is filled from the catalog as before', () => {
+    expect(shouldAutoFillInvoice(false, '')).toBe(true);
+    expect(shouldAutoFillInvoice(false, '500')).toBe(true);
+  });
+
+  it('editing a booking that already has an invoice value never replaces it', () => {
+    expect(shouldAutoFillInvoice(true, '500')).toBe(false);
+    expect(shouldAutoFillInvoice(true, 500)).toBe(false);
+    expect(shouldAutoFillInvoice(true, '0')).toBe(false);
+  });
+
+  it('editing a booking whose invoice value is empty may still be filled', () => {
+    expect(shouldAutoFillInvoice(true, '')).toBe(true);
+    expect(shouldAutoFillInvoice(true, '   ')).toBe(true);
+    expect(shouldAutoFillInvoice(true, null)).toBe(true);
+    expect(shouldAutoFillInvoice(true, undefined)).toBe(true);
   });
 });

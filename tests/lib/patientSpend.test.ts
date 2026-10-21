@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { totalPaidFromBookings } from '@/lib/patientSpend';
+import { totalPaidFromBookings, totalOutstandingFromBookings } from '@/lib/patientSpend';
 
 describe('totalPaidFromBookings (DEC-121)', () => {
   it('adds up the paid amounts of delivered bookings, in both field spellings', () => {
@@ -47,5 +47,40 @@ describe('totalPaidFromBookings (DEC-121)', () => {
   it('status matching ignores case and spaces; an empty list is 0', () => {
     expect(totalPaidFromBookings([{ status: ' Completed ', amountPaid: 10 }])).toBe(10);
     expect(totalPaidFromBookings([])).toBe(0);
+  });
+});
+
+describe('totalOutstandingFromBookings (DEC-121)', () => {
+  it('adds up the balances left on completed bookings, in both field spellings', () => {
+    expect(totalOutstandingFromBookings([
+      { status: 'completed', amountLeft: 2820 },
+      { status: 'completed', amount_left: '100' },
+      { status: 'completed', amountLeft: 0 },
+    ])).toBe(2920);
+  });
+
+  it('does not count a balance on a booking that has not happened yet', () => {
+    expect(totalOutstandingFromBookings([
+      { status: 'confirmed', amountLeft: 4500 },
+      { status: 'approved', amountLeft: 300 },
+      { status: 'started', amountLeft: 200 },
+      { status: 'pending', amountLeft: 100 },
+    ])).toBe(0);
+  });
+
+  it('ignores cancelled, rejected and no-show bookings and invalid or negative balances', () => {
+    expect(totalOutstandingFromBookings([
+      { status: 'cancelled', amountLeft: 500 },
+      { status: 'rejected', amountLeft: 500 },
+      { status: 'no_show', amountLeft: 500 },
+      { status: 'completed', amountLeft: -40 },
+      { status: 'completed', amountLeft: null },
+      { status: 'completed', amountLeft: 'abc' },
+      { status: ' Completed ', amountLeft: 12.5 },
+    ])).toBe(12.5);
+  });
+
+  it('an empty list owes nothing', () => {
+    expect(totalOutstandingFromBookings([])).toBe(0);
   });
 });

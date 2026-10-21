@@ -28,3 +28,31 @@ export function totalPaidFromBookings(bookings: PaidAmountSource[]): number {
   }
   return Math.round(sum * 100) / 100;
 }
+
+/**
+ * What a patient still owes on bookings that were actually delivered (DEC-121).
+ *
+ * `customers.outstanding` is a stored total kept up to date by several flows (settle debt, previous
+ * bookings, package sales) and it drifts: on production it differed from the bookings' own balances
+ * for 8 of 102 patients, in both directions. The balances left on the bookings are what the Booking
+ * History table shows, so the card and the list now show the larger of the two (never less than what
+ * the bookings say is owed, and package debts that exist only in the stored total are kept).
+ *
+ * Only completed bookings count: a confirmed or approved booking that has not happened yet may have
+ * a balance, but that is not a debt until the service is delivered.
+ */
+export interface LeftAmountSource {
+  status?: string | null;
+  amountLeft?: number | string | null;
+  amount_left?: number | string | null;
+}
+
+export function totalOutstandingFromBookings(bookings: LeftAmountSource[]): number {
+  let sum = 0;
+  for (const b of bookings) {
+    if (String(b?.status || '').toLowerCase().trim() !== 'completed') continue;
+    const left = Number(b.amountLeft ?? b.amount_left ?? 0);
+    if (Number.isFinite(left) && left > 0) sum += left;
+  }
+  return Math.round(sum * 100) / 100;
+}

@@ -55,4 +55,12 @@
 - [ ] A patient whose only booking is cancelled or rejected: Total Spend stays 0.
 - [ ] A patient whose Total Spend was adjusted by hand ("Adjust Total Spend") to a higher number keeps that number; the calculated figure never lowers it.
 - [ ] Sorting the patients list by Total Spend now orders paid patients above unpaid ones.
+- [ ] Outstanding: for a patient with completed bookings that still have balances, the card and the list show at least the sum of the Outstanding column of those bookings (for example 2,820 + 100 = 2,920, not 2,820).
+- [ ] A balance on a booking that is only confirmed or approved (not completed yet) is not added to the patient's Outstanding.
+- [ ] A patient whose Outstanding was stored higher (package debt) keeps that higher number.
+
+## A booking with no service (DEC-122)
+- [ ] A previous booking with no service shows "No service selected" in the Booking History table (not "Service #null").
+- [ ] Open it, Edit Previous Booking, choose a service, Save: the booking now shows that service, and the Service Price, Paid and Outstanding are unchanged (for example 500 / 200 / 300), not replaced by the catalog price.
+- [ ] Add a NEW previous booking and choose a service: the Invoice Value and Actual Spent are still filled from the catalog price, as before.
 

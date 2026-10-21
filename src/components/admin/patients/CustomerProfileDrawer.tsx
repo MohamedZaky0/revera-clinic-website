@@ -953,7 +953,7 @@ export default function CustomerProfileDrawer({
                     return history.map((res) => {
                       const resDt = new Date(res.date);
                       const formattedDate = resDt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-                      const serv = localServices.find(s => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
+                      const serv = localServices.find(s => s.id === res.serviceId)?.en || (res.serviceId ? `Service #${res.serviceId}` : t.noServiceSelected);
                       const statusClass = getStatusBadgeClass(res.status);
                       const redemptions = customerPackageRedemptions.filter((r: any) => r.reservationId === res.id);
                       const roomName = rooms.find((rm: any) => rm.id === res.roomId)?.name || "—";
