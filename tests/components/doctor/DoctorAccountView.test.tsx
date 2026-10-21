@@ -18,6 +18,7 @@ import { createSupabaseFake } from '../../helpers/supabaseFake';
 const fetchFake = createFetchFake();
 const fake = createSupabaseFake();
 const mockShowConfirm = vi.fn();
+const tablesRead: string[] = [];
 
 // The app wraps everything in AlertConfirmProvider (src/app/layout.tsx); a bare render has none.
 vi.mock('@/contexts/AlertConfirmContext', () => ({
@@ -27,7 +28,10 @@ vi.mock('@/contexts/AlertConfirmContext', () => ({
 vi.mock('@/lib/supabaseClient', () => ({
   supabase: {
     auth: { getSession: async () => ({ data: { session: { access_token: 'test-token' } } }) },
-    from: (table: string) => fake.client.from(table),
+    from: (table: string) => {
+      tablesRead.push(table);
+      return fake.client.from(table);
+    },
     channel: () => ({ on: () => ({ subscribe: () => ({}) }) }),
     removeChannel: () => {},
   },
@@ -36,6 +40,7 @@ vi.mock('@/lib/supabaseClient', () => ({
 import DoctorAccountView from '@/components/admin/DoctorAccountView';
 
 beforeEach(() => {
+  tablesRead.length = 0;
   mockShowConfirm.mockReset();
   mockShowConfirm.mockResolvedValue(true);
   fetchFake.reset();
@@ -277,6 +282,66 @@ describe('reservations poll (every 3 s)', () => {
     });
     await advance(0);
     expect(reservationCalls()).toBe(beforeHidden + 1);
+  });
+});
+
+// RISK-128: the doctor's provider record used to be read straight from the browser (providers /
+// employee_accounts / branches) with the public key. It now comes from GET /api/profile, matched to the
+// signed-in account on the server. The record decides which bookings are this doctor's: a booking assigned
+// to their provider id belongs to them even when the name on it differs, and one assigned to a different
+// provider does not.
+describe('provider record comes from the profile API (RISK-128)', () => {
+  const MY_PROVIDER = { id: 'prov-1', name: 'Dr. Sara Adel', branch_ids: ['b1'] };
+
+  function stubApis(reservations: any[]) {
+    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: reservations }));
+    fetchFake.on('GET', '/api/profile', () => ({ status: 200, body: { employee: { id: 'doc-1' }, provider: MY_PROVIDER } }));
+    fetchFake.on('GET', '/api/branches', () => ({ status: 200, body: [{ id: 'b1', name_en: 'Maadi' }] }));
+  }
+
+  it('asks the API for the provider record with the bearer token and reads no table for it', async () => {
+    stubApis([]);
+    render(<DoctorAccountView {...BASE_PROPS} />);
+
+    await waitFor(() => expect(fetchFake.calls.some((c) => c.path === '/api/profile')).toBe(true));
+    const call = fetchFake.calls.find((c) => c.path === '/api/profile')!;
+    expect(call.headers.authorization || call.headers.Authorization).toBe('Bearer test-token');
+    expect(tablesRead).not.toContain('providers');
+    expect(tablesRead).not.toContain('employee_accounts');
+    expect(tablesRead).not.toContain('branches');
+  });
+
+  it('shows a booking assigned to this doctor\'s provider id even though another name is on it', async () => {
+    stubApis([reservation({ id: 'r1', status: 'completed', name: 'Assigned By Id', customer_id: 'c1', doctorName: 'Dr. Totally Different', doctor_id: undefined, provider_id: 'prov-1' })]);
+    const user = userEvent.setup();
+    render(<DoctorAccountView {...BASE_PROPS} />);
+
+    await user.click(screen.getByTitle('Patients'));
+    expect(await screen.findByText('Assigned By Id')).toBeInTheDocument();
+  });
+
+  it('does not show a booking assigned to a different provider even when the doctor\'s name is on it', async () => {
+    stubApis([
+      reservation({ id: 'r1', status: 'completed', name: 'Mine', customer_id: 'c1', provider_id: 'prov-1' }),
+      reservation({ id: 'r2', status: 'completed', name: 'Someone Elses', customer_id: 'c2', doctorName: 'Dr. Sara Adel', provider_id: 'prov-9' }),
+    ]);
+    const user = userEvent.setup();
+    render(<DoctorAccountView {...BASE_PROPS} />);
+
+    await user.click(screen.getByTitle('Patients'));
+    expect(await screen.findByText('Mine')).toBeInTheDocument();
+    await waitFor(() => expect(fetchFake.calls.some((c) => c.path === '/api/profile')).toBe(true));
+    expect(screen.queryByText('Someone Elses')).not.toBeInTheDocument();
+  });
+
+  it('still works when the profile request fails: no provider record, matching falls back to the name', async () => {
+    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [reservation({ id: 'r1', status: 'completed', name: 'By Name', customer_id: 'c1' })] }));
+    fetchFake.on('GET', '/api/profile', () => ({ status: 500, body: { error: 'boom' } }));
+    const user = userEvent.setup();
+    render(<DoctorAccountView {...BASE_PROPS} />);
+
+    await user.click(screen.getByTitle('Patients'));
+    expect(await screen.findByText('By Name')).toBeInTheDocument();
   });
 });
 

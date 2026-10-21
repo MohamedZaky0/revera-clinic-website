@@ -89,93 +89,67 @@ function DoctorAccountView({
   const [providerRecord, setProviderRecord] = useState<any>(null);
   const [providerBranches, setProviderBranches] = useState<string[]>([]);
 
+  // The signed-in doctor's provider record comes from the API (it is matched to their account on the server:
+  // same id, phone, national id, then name). The browser used to read providers and employee_accounts directly
+  // with the public key, which row-level security blocks, so this was always empty (RISK-128).
   useEffect(() => {
+    let alive = true;
     async function loadProviderDetails() {
       try {
-        const cleanName = doctorName ? doctorName.replace(/^(dr\.?|د\.?|دكتور\s+|د\/\s*)\s*/i, "").replace(/@.*/, "").replace(/[._-]/g, " ").trim() : "";
-        const emailName = doctorEmail ? doctorEmail.split("@")[0].replace(/^(dr\.?|د\.?|دكتور\s+|د\/\s*)\s*/i, "").replace(/[._-]/g, " ").trim() : "";
-        let data: any = null;
+        const headers = await getAuthHeaders();
+        const profileRes = await fetch("/api/profile", { headers, cache: "no-store" });
+        if (!profileRes.ok || !alive) return;
+        const profile = await profileRes.json();
+        const data = profile?.provider;
+        if (!data || !alive) return;
 
-        // 1. Direct ID lookup in providers
-        if (doctorDbId) {
-          const res = await supabase.from("providers").select("*").eq("id", doctorDbId).maybeSingle();
-          if (res.data) data = res.data;
+        setProviderRecord(data);
+
+        // Extract multi-branch assignments from provider record
+        let bIds: string[] = [];
+        if (data.working_days_hours && typeof data.working_days_hours === "object" && Array.isArray(data.working_days_hours.branch_ids)) {
+          bIds = data.working_days_hours.branch_ids;
+        } else if (Array.isArray(data.branch_ids)) {
+          bIds = data.branch_ids;
+        } else if (data.branch_id) {
+          bIds = [data.branch_id];
         }
 
-        // 2. Check if doctorDbId is an employee_accounts ID and match via employee details
-        if (!data && doctorDbId) {
-          try {
-            const empRes = await supabase.from("employee_accounts").select("*").eq("id", doctorDbId).maybeSingle();
-            if (empRes.data) {
-              const emp = empRes.data;
-              if (emp.phone) {
-                const byPhone = await supabase.from("providers").select("*").eq("phone", emp.phone).maybeSingle();
-                if (byPhone.data) data = byPhone.data;
-              }
-              if (!data && emp.national_id) {
-                const byNatId = await supabase.from("providers").select("*").eq("national_id", emp.national_id).maybeSingle();
-                if (byNatId.data) data = byNatId.data;
-              }
-              if (!data && emp.name) {
-                const cleanEmpName = emp.name.replace(/^(dr\.?|د\.?|دكتور\s+|د\/\s*)\s*/i, "").trim();
-                const byName = await supabase.from("providers").select("*").ilike("name", `%${cleanEmpName}%`).limit(1).maybeSingle();
-                if (byName.data) data = byName.data;
-              }
-            }
-          } catch (_) {}
+        let branchRows: any[] = [];
+        try {
+          const branchRes = await fetch("/api/branches", { cache: "no-store" });
+          const rawBranches = branchRes.ok ? await branchRes.json() : [];
+          branchRows = Array.isArray(rawBranches) ? rawBranches : Array.isArray(rawBranches?.branches) ? rawBranches.branches : [];
+        } catch {
+          branchRows = [];
+        }
+        const allClinicNames = branchRows.map((b: any) => b.name_en || b.name).filter(Boolean);
+
+        let names: string[] = [];
+        if (bIds.length > 0) {
+          names = bIds.map((id: any) => {
+            const match = branchRows.find((b: any) => String(b.id) === String(id) || String(b.name_en).toLowerCase() === String(id).toLowerCase());
+            if (match) return match.name_en || match.name;
+            const lower = String(id).toLowerCase().trim();
+            if (lower === "home") return null;
+            if (lower === "main") return "Main Branch";
+            return String(id);
+          }).filter(Boolean) as string[];
         }
 
-        // 3. Name lookup in providers
-        if (!data && cleanName && !["doctor", "admin", "superadmin", "owner"].includes(cleanName.toLowerCase())) {
-          const res = await supabase.from("providers").select("*").ilike("name", `%${cleanName}%`).limit(1).maybeSingle();
-          if (res.data) data = res.data;
+        if (names.length === 0) {
+          names = allClinicNames.length > 0 ? allClinicNames : ["Main Branch"];
         }
-
-        // 4. Email prefix lookup in providers
-        if (!data && emailName && !["doctor", "admin", "superadmin", "owner"].includes(emailName.toLowerCase())) {
-          const res = await supabase.from("providers").select("*").ilike("name", `%${emailName}%`).limit(1).maybeSingle();
-          if (res.data) data = res.data;
-        }
-
-        if (data) {
-          setProviderRecord(data);
-
-          // Extract multi-branch assignments from provider record
-          let bIds: string[] = [];
-          if (data.working_days_hours && typeof data.working_days_hours === "object" && Array.isArray(data.working_days_hours.branch_ids)) {
-            bIds = data.working_days_hours.branch_ids;
-          } else if (Array.isArray(data.branch_ids)) {
-            bIds = data.branch_ids;
-          } else if (data.branch_id) {
-            bIds = [data.branch_id];
-          }
-
-          const { data: branchRows } = await supabase.from("branches").select("id, name_en, name");
-          const allClinicNames = (branchRows || []).map((b: any) => b.name_en || b.name).filter(Boolean);
-
-          let names: string[] = [];
-          if (bIds.length > 0) {
-            names = bIds.map((id: any) => {
-              const match = (branchRows || []).find((b: any) => String(b.id) === String(id) || String(b.name_en).toLowerCase() === String(id).toLowerCase());
-              if (match) return match.name_en || match.name;
-              const lower = String(id).toLowerCase().trim();
-              if (lower === "home") return null;
-              if (lower === "main") return "Main Branch";
-              return String(id);
-            }).filter(Boolean) as string[];
-          }
-
-          if (names.length === 0) {
-            names = allClinicNames.length > 0 ? allClinicNames : ["Main Branch"];
-          }
-          setProviderBranches(names);
-        }
+        if (alive) setProviderBranches(names);
       } catch (e) {
         console.error("Error loading doctor database provider record:", e);
       }
     }
     loadProviderDetails();
-  }, [doctorDbId, doctorName, doctorEmail]);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const resolvedBranchName = useMemo(() => {
     if (!doctorBranch) return "Main Branch";
