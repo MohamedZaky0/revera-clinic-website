@@ -10,6 +10,8 @@
 | 2026-10-22 | Sign in as the inactive account | dev.reveraclinics.com | Login page: "This account is inactive. Contact an administrator to get access back." | Pass |
 | 2026-10-22 | Switch it on again, sign in again | dev.reveraclinics.com | No confirm dialog; DB `is_active=true`, ban lifted; login lands on /reception | Pass |
 | 2026-10-22 | Delete the throwaway account (hard) | dev.reveraclinics.com | employee row, Auth user and provider row all gone | Pass |
+| 2026-10-23 | Throwaway doctor: account switched off with the toggle, then on, then hard delete | dev.reveraclinics.com | `/api/providers`: `active` true -> false (account off) -> true (account on); after hard delete the account and login are gone and the provider row stays with `active = false` | Pass (data level) |
+| | Doctor missing from the New Booking doctor list and the website booking after the switch | | Not clicked through (those pickers already filter on `providers.active`); the New Booking section link did not open that screen in my test | Pending |
 | | Already-signed-in session cut after being switched off (two browsers), admin (not superadmin) caller, own-row switch disabled, mobile/Arabic | | Not run yet (covered by unit tests only: `employees-active.test.ts`) | Pending |
 
 ## Before testing
