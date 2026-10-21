@@ -1,19 +1,24 @@
 # PROJECT.md — Revera Clinics Website & Admin System
 
-> **Last Updated:** 2026-09-30 (partial — "Critical Known Gaps" section corrected; the rest of this
-> file predates the Finance module, the `/admin` auth hardening and the Finance/Reports split and has
-> not been re-audited line by line. Trust `ai_docs/DB_SCHEMA.md`, `SECURITY.md` and `PRODUCT_SPECS.md`
-> over this file where they disagree.)
-> **Audited from:** live source code, cross-checked against `supabase/migrations/` (no trust placed in stub files)
+> **Last Updated:** 2026-10-21 — re-audited against `dev` (stack versions, roles and portals, deployment model, API and
+> test counts, known gaps). Engineering detail lives in `ARCHITECTURE.md`, `DB_SCHEMA.md`, `SECURITY.md`
+> and `API_CONTRACT.md`; this file is the orientation page. Where a number below could drift (table count, route
+> count, test count) it says how to re-measure it instead of promising it stays true.
+> **Audited from:** live source code, cross-checked against `supabase/migrations/`.
 
 ---
 
 ## What Is This System?
 
-A Next.js (App Router) web application serving two purposes:
+A clinic management platform built for Revera Clinics (the first, reference client) and designed to be delivered as
+one single-tenant instance per clinic. A Next.js (App Router) application with two faces:
 
-1. **Public Website** — Revera Clinics' patient-facing marketing site: hero slider, services catalog, about, contact, blog stub, booking modal, and patient auth modal.
-2. **Admin Panel** — Internal management interface at `/admin` for the clinic owner/receptionist: bookings management, service/category CRUD, branch management, provider records, and website CMS (page content editing).
+1. **Public website** — the clinic's patient-facing site: hero slider, services catalog, packages, about, contact, ad
+   landing pages, the booking modal and page, and patient sign-in (real phone/OTP through Supabase Auth).
+2. **Staff panel** at `/admin` (and role portals such as `/doctor`) — bookings, reception, the doctor's session and
+   schedule, patient records, laser-pulse and package engines, inventory and POS, HR and payroll, a real Finance
+   section and a Reports section, role management, and website CMS. See `PRODUCT_SPECS.md` for the feature map with
+   `LIVE`/`BETA`/`DEMO`/`PLANNED` status.
 
 ---
 
@@ -21,31 +26,32 @@ A Next.js (App Router) web application serving two purposes:
 
 | Role | Access | What They Do |
 |---|---|---|
-| Clinic owner / admin | `/admin`, Supabase email/password login | Manage bookings, services, providers, branches, page content, finance |
-| Receptionist | `/admin` | Approve/reject/create bookings, view customer list |
-| Patients / website visitors | Public pages | Browse services, read about clinic, submit booking request |
+| Superadmin (clinic owner) | `/admin`, can open the doctor view | Everything, including permanent deletes and role changes |
+| Admin | `/admin` | Manage bookings, services, providers, staff accounts (active/inactive, delete), CMS; finance only with an explicit permission grant |
+| Doctor | `/doctor` portal (a role whose workspace is "doctor", DEC-113) | Own schedule, today's queue, live session, prescriptions, own profile and pay |
+| Reception | `/admin` (standard workspace) | Create/approve bookings, checkout and settlement, reception dashboard |
+| HR | `/admin` | Payroll, leaves, attendance, performance reviews |
+| Custom roles | `/admin` or a role URL | Whatever the role's permission list grants (Role Management) |
+| Patients / visitors | Public pages, `/profile` | Browse, book, sign in with phone OTP, see their own profile and wallet |
+
+An admin can also be a doctor (`employee_accounts.is_also_doctor`, DEC-114). An account can be switched inactive
+(`is_active`, DEC-117): it keeps its role and history but has no access.
 
 ---
 
 ## Current Deployment Model
 
-- **Single-tenant:** One Supabase project, one deployment — exclusively for Revera Clinics.
-- **Hosted on Vercel** (Next.js, App Router).
-- **Database:** Supabase (PostgreSQL) — 60+ tables as of 2026-09-30 (the Finance module alone added
-  invoices/invoice_lines/payments/wallet_txns/expenses/fixed_assets/loans and more). Full current list
-  with columns: `ai_docs/DB_SCHEMA.md` — trust that file's own table count, not the number on this line.
-- **No multi-tenancy.** No org/tenant layer in the schema.
-
----
-
-## Fork-per-Client Plan (Deferred)
-
-For clients #2, #3, etc., the plan is to **duplicate/fork this codebase** per client:
-- Separate Supabase project per client
-- Edit theme/colors/copy per client
-- No shared SaaS infrastructure
-
-This is explicitly NOT a multi-tenant SaaS build. That decision is gated to approximately the 10-client mark. See `DECISIONS.md` for rationale.
+- **Single-tenant, one Supabase project per clinic** (DEC-001). No `org_id` / `tenant_id`; `branch` is the topmost scoping unit.
+- **Two environments for Revera:** `main` is **production** (live clinic data; the cutover to production happened in
+  September 2026) and `dev` is the test environment with its own Supabase project. Schema changes reach production only
+  when the owner applies the migration there; verify against the database, not the migration file (RISK-020).
+- **Hosted on Vercel** (functions in Dublin `dub1`, next to Supabase eu-west-1, DEC-116). Database: Supabase (PostgreSQL).
+- **Tables:** the access check (`scripts/check-anon-access.mjs`) counted 64 on both dev and production on 2026-10-21. `DB_SCHEMA.md`
+  is the column-level reference; trust its table list, not a number written here.
+- **Fork-per-client** for clients 2, 3, …: a copy of this codebase and a separate Supabase project per clinic, client
+  values in `src/config/client.ts` (PROPOSAL-001, done). Multi-tenant SaaS is deferred to roughly the 10-client mark.
+  Run `scripts/check-anon-access.mjs` on every new clinic project before handing it over.
+- `ai_docs/` lives on the `dev` branch only and is not merged to `main`.
 
 ---
 
@@ -53,16 +59,15 @@ This is explicitly NOT a multi-tenant SaaS build. That decision is gated to appr
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 15 (App Router) |
-| Language | TypeScript |
+| Framework | Next.js 16 (App Router), React 19, TypeScript |
 | Styling | Tailwind CSS v4 + shadcn/ui |
-| Database | Supabase (PostgreSQL) |
-| Auth (patient) | Phone/OTP modal — UI-only in current code (OTP not wired to real SMS) |
-| Admin auth | Supabase email/password — login form rendered in `/admin`, session checked on mount; employees invited via Supabase Auth; roles/permissions from `employee_accounts` + `roles` tables; `/api/auth/me` returns role + permissions |
-| Attendance | GPS geofence check-in per branch with 800m radius; admin/superadmin bypass |
-| i18n | Custom LanguageContext (EN/AR) with translations.ts |
-| Icons | lucide-react |
-| Fonts | Marcellus (heading), Sora (body) |
+| Database | Supabase (PostgreSQL), service-role access from API routes only; the browser holds the public anon key and has no table access (RLS, RISK-128) |
+| Auth (patient) | Phone/OTP through Supabase Auth (real, RISK-003) |
+| Auth (staff) | Supabase email/password at `/admin`; `employee_accounts` + `roles` give role and permissions; `GET /api/auth/me` returns them; every API route checks access server-side (see `SECURITY.md`) |
+| Attendance | GPS geofence check-in per branch (800 m); admin/superadmin bypass |
+| i18n | Public site: `LanguageContext` (EN/AR). Admin: its own `lang` state + `adminTranslations` |
+| Tests | Vitest (jsdom for components), see `TESTING.md` |
+| Icons / fonts | lucide-react; Marcellus (heading), Sora (body) |
 
 ---
 
@@ -70,84 +75,40 @@ This is explicitly NOT a multi-tenant SaaS build. That decision is gated to appr
 
 ```
 src/
-  app/
-    page.tsx              — Homepage
-    layout.tsx            — Root layout + metadata
-    admin/page.tsx        — Admin panel shell/composer (11.3k lines as of 2026-09-30, down from
-                            27.7k — most sections are extracted into src/components/admin/, see
-                            ARCHITECTURE.md; do not add new section logic here, DEC-027)
-    profile/page.tsx      — Patient profile + wallet + visit history
-    auth/callback/page.tsx — Supabase invite/recovery redirect handler
-    about/page.tsx
-    services/page.tsx
-    blog/page.tsx
-    contact/page.tsx
-    api/
-      reservations/       — Booking CRUD + lifecycle/payment/wallet
-      availability/       — Slot availability check
-      services/           — Service catalog CRUD
-      categories/         — Category CRUD
-      branches/           — Branch CRUD
-      providers/          — Provider CRUD (Supabase + JSON fallback)
-      page-settings/      — CMS content CRUD (Supabase + JSON fallback)
-      clinic-settings/    — Alias for page_settings by key
-      customers/          — Customer profile CRUD
-      employees/          — Employee accounts + Supabase Auth invites
-      roles/               — Role definitions with permissions
-      provider-attendance/ — Daily provider check-in/out
-      auth/me/             — Verify JWT + return role/permissions
-      auth/employee-email/ — Lookup employee email by employee_id
-      rooms/, service-rooms/ — Room CRUD + service↔room junction
-      prescriptions/       — Real Supabase table (not mock — see DB_SCHEMA.md)
-      hr/payroll/, hr/doctor-payroll/ — Monthly payroll (staff / doctors, separately)
-      hr/leaves/, hr/attendance/, hr/performance/, hr/alerts/ — HR suite (real Supabase)
-      employees/notes/     — Administrative employee notes
-      providers/schedule-audit-logs/ — Doctor schedule change history
-      inventory/products/, inventory/devices/ — Real Supabase inventory + POS (not mock)
-      customers/products/, medical-records/ — real Supabase tables, migration backfilled 2026-07-25 (see DB_SCHEMA.md)
-      customer-avatars/ — stored in `page_settings` (key `customer_avatars`), not a dedicated table
-      health/supabase/    — Env/connection diagnostics
-  components/             — All public website components
-  lib/
-    supabaseClient.ts     — Browser Supabase client
-    supabaseServer.ts     — Server-side Supabase client (service role)
-    services.ts           — Static service/category definitions + slot logic
-    serviceStore.ts       — localStorage ↔ Supabase sync for services/categories
-    translations.ts       — Full EN/AR translation strings (large file)
-    image.ts              — Image compression utility
-    utils.ts              — cn() helper
-  types/index.ts          — Branch, Translation, ServiceCard, BlogPost types
-  contexts/LanguageContext.tsx
-data/
-  providers.json          — JSON fallback for providers
-  page_settings.json      — JSON fallback for page settings
-public/images/            — Static images (logo, heroes, services, doctors)
-ai_docs/                  — This documentation folder
-scratch/                  — Dev scripts (DB seed, test queries)
-supabase/migrations/      — SQL migration history (manual — see its README)
+  app/            — pages (public site, /admin shell, role portals, landing pages, auth callbacks) and api/ route handlers
+  components/     — public-site components; components/admin/ holds every admin section (the /admin page only composes them)
+  lib/            — server and shared logic: access/auth helpers, money and ledger maths, packages and laser pulses, costing
+  config/client.ts— per-client values (name, phone, WhatsApp, URLs, GTM id)
+  contexts/       — LanguageContext
+  middleware.ts   — bearer-token check for a short list of admin API prefixes
+data/             — local JSON used only by a few legacy fallbacks (ARCHITECTURE.md → Dual-Storage Pattern)
+supabase/migrations/ — SQL migration history (applied by hand; see its README)
+scripts/          — SQL backfills, rollback-only DB tests, check-anon-access.mjs
+scratch/          — dev scripts (seed, regression checks)
+tests/            — Vitest: lib/, routes/, components/, regression/, helpers/
+ai_docs/          — this documentation
 ```
+
+`src/app/admin/page.tsx` is the shell and composer (about 11.7k lines as of 2026-10-21, down from 27.7k); do not add new
+section logic to it (DEC-027). The route groups under `src/app/api/` (84 handlers on `dev` at this date) are listed in
+`ARCHITECTURE.md`, method by method in `API_CONTRACT.md`, and by who may call them in `SECURITY.md`.
 
 ---
 
 ## Critical Known Gaps
 
-- **Corrected 2026-09-30 (was stale):** admin auth is **not** "client-side login gate only" anymore.
-  Real Supabase email/password auth plus per-route server-side authorization exist across most of
-  `/api/*` (`requireStaffAccess`/`requireAdministratorAccess`/`requireSuperadminAccess`/
-  `requireFinanceAccess`/`hasGranularPermission`) — see `SECURITY.md` for the current, route-by-route
-  picture; do not trust this line's 2026-07-25 claim.
-- Patient OTP auth is **real**, not simulated — through actual Supabase Auth (RISK-003, resolved
-  2026-07-22). Do not trust an older claim that it is UI-only.
-- **Corrected 2026-07-21:** Prescriptions, Payroll (both `hr_payroll` and `doctor_payroll`), Inventory (products/devices), and POS (`product_sales`) are **real Supabase tables with real API routes** — see `DB_SCHEMA.md`. They were previously mislabeled mock UI in this doc; that was wrong as of the 2026-07-20/21 migrations.
-- Still genuinely mock UI (hardcoded constant arrays, not Supabase): consultation notes, treatment plans, before/after photos (clinical, not the `prescriptions` table), Refunds, Shipping, and the Customer Support ticket inbox. The old "Finances Dashboard" mock view no longer exists — Finance is real (see below).
-- **Corrected 2026-09-30 (was stale — DEC-011 is superseded, not current):** Finance, Reports and
-  Marketing are no longer disabled placeholders — they are real, built-out sections (Finance: records
-  + statements, DEC-097; Reports: performance/operations/patient analysis, also DEC-097; Marketing:
-  packages + promotions). Customer Support remains a disabled/mock stub. See `PRODUCT_SPECS.md` for
-  the current, marketing-facing status of every feature (`LIVE`/`BETA`/`DEMO`/`PLANNED` tags).
-- localStorage is used as primary storage for services/categories on the admin side (Supabase is secondary/fallback in several places).
-- **Corrected 2026-09-30 (was stale):** `customers` and `reservations` **are** linked —
-  `reservations.customer_id` is a real FK to `customers.id` (`ON DELETE SET NULL`), added in the
-  `20260726000000_dev_schema_baseline.sql` migration. See `DB_SCHEMA.md`.
-- Employee attendance relies on browser geolocation — GPS spoofing is not mitigated.
-- Booking invoice PDF is generated client-side; print behavior varies by browser.
+- **Security posture:** every API route checks access in its own handler (`SECURITY.md` is the route-by-route table and
+  lists the few routes that are public on purpose). The browser login gate alone is never sufficient. The "allow all" RLS
+  policies that exposed staff, payroll and prescriptions to the public key were closed on 2026-10-21 (RISK-128).
+- **Still mock UI** (hardcoded arrays, not Supabase): consultation notes, treatment plans, before/after photos, Refunds,
+  Shipping, and the Customer Support ticket inbox. Finance, Reports and Marketing are real (DEC-097); Prescriptions, Payroll,
+  Inventory and POS are real Supabase tables.
+- **Services and categories are database-primary** (RISK-025); `serviceStore.ts` is only a client cache/toggle helper. Do not
+  extend it (RISK-004).
+- `customers` and `reservations` are linked: `reservations.customer_id` is a real FK to `customers.id` (`ON DELETE SET NULL`).
+- Employee attendance relies on browser geolocation; GPS spoofing is not mitigated (RISK-006).
+- The booking invoice PDF is generated client-side; print behaviour varies by browser.
+- **Open risks:** the register in `RISKS.md` (status index at its top) is the list; at this date nine are open, among them
+  RISK-104 (Finance revenue/cash reconciliation on production) and RISK-103 (unverified marketing claims on the laser landing pages).
+- **Documented ahead of code:** the reception bot (`/api/bot/*`, its knowledge-base tables) is described in
+  `ARCHITECTURE.md` and `DB_SCHEMA.md` but its code and migration are not committed to `dev` yet.

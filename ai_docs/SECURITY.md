@@ -1,7 +1,8 @@
 # SECURITY.md — Current Security Posture
 
-> **Last Updated:** 2026-09-07; §3a's `providers`/`customers` DELETE entries and `assets`/`loans`/
-> `expenses` guards corrected 2026-09-30 (RISK-107/RISK-078 follow-up) — see the inline notes.
+> **Last Updated:** 2026-10-21. Full re-audit against `dev`: §2 and §3 rebuilt from a scan of every route
+> handler (the HR gap listed here until now had been closed since 2026-08-16), §4 records that the RISK-128
+> migration is applied on dev and production.
 > **Audited from:** `src/middleware.ts`, `src/lib/access.ts`, every `src/app/api/**/route.ts`,
 > `supabase/migrations/`, and `ai_docs/RISKS.md`.
 > **Purpose:** a single, current answer to "is X protected, and how" — so nobody has to re-derive
@@ -26,13 +27,17 @@ and the codebase does not always distinguish them cleanly:
 Supabase session"* ≠ *"is staff."* A patient's token passes `requireAuthenticatedUser` and the
 middleware's bearer-token check just as validly as a staff member's does.
 
-Three server-side helpers exist in `src/lib/access.ts`:
+Server-side helpers (`src/lib/access.ts` unless noted):
 
 | Helper | Proves | Does NOT prove |
 |---|---|---|
 | `requireAuthenticatedUser(req)` | Token is a valid, unexpired Supabase session | Staff, role, or ownership of anything |
-| `requireStaffAccess(req)` | Caller has an `employee_accounts` row (any role) | Which role — caller may still be low-privilege |
+| `requireStaffAccess(req)` | Caller has an **active** `employee_accounts` row (any role); an inactive account is refused (DEC-117) | Which role — caller may still be low-privilege |
 | `requireAdministratorAccess(req)` | Caller's role is `admin` or `superadmin` | Finance-specific permission — see `hasFinancePermission` |
+| `requireSuperadminAccess(req)` | Caller's role is `superadmin` | — |
+| `requireFinanceAccess(req, anyOf)` | `superadmin`, or a staff member holding one of the listed `finance.*` permissions | — |
+| `verifyHrAccess(req)` (`src/lib/auth.ts`) | Active registered staff whose role is `superadmin`, `admin` or `hr` | Finance permission; any other role is refused with 403 |
+| `requireReceptionAccess(req)` (private to `api/reception/dashboard`) | Staff whose role is one of the reception / HR roles the dashboard allows (RISK-059) | — |
 
 `hasStaffPermission(access, perm)` treats **every** `admin`/`superadmin` as having every staff
 permission — it cannot express "admins may not see X." `hasFinancePermission(access, perm)` is
@@ -67,13 +72,12 @@ For paths under these four prefixes, middleware requires a **valid Supabase bear
 nothing more. It does **not** check role. A patient's real, valid OTP session token satisfies this
 middleware just as well as a staff token would.
 
-- `/api/employees` and `/api/roles` also have their own route-level `requireAdministratorAccess`/
-  `requireStaffAccess` calls, so they're actually role-gated in practice — middleware is a second
-  layer there, not the only one.
-- **`/api/hr/*` (alerts, attendance, doctor-payroll, leaves, payroll, performance) and
-  `/api/providers/schedule-audit-logs` have no route-level role check at all.** Middleware proves
-  "some logged-in Supabase user," which today includes any patient who has completed OTP login.
-  This is a real, currently-open gap, not a resolved one — see §4.
+- Every one of these also has route-level checks, so middleware is a second layer, not the only one:
+  `/api/employees` and `/api/roles` use `requireAdministratorAccess` (`PATCH /api/roles` is
+  `requireSuperadminAccess`); `/api/hr/*` uses `verifyHrAccess` for every read and every management write, and
+  `requireStaffAccess` only for the three self-service writes (attendance check-in, a leave request, a missing-check-in
+  alert); `/api/providers/schedule-audit-logs` uses `requireStaffAccess`. A patient token therefore passes
+  middleware but is refused by the handler (RISK-036 re-audit 2026-08-16, RISK-063).
 
 Every other path under `/api/*` gets **no middleware protection whatsoever**. Whatever
 authorization exists for those routes is entirely up to the individual route handler.
@@ -82,88 +86,84 @@ authorization exists for those routes is entirely up to the individual route han
 
 ## 3. Per-route authorization — the real, current inventory
 
-Re-verified 2026-09-07 by direct grep of every route named in the 2026-08-03 audit below, plus the
-5 routes hardened by RISK-078/A10. **Every route this file previously listed as having "no auth of
-any kind" (§3c, as it stood on 2026-08-03) has since been fixed** — see the RISK entries cited
-inline. Only `auth/employee-email` remains genuinely open, and that is a documented, deliberate
-exception (RISK-080), not a gap.
+Rebuilt 2026-10-21 by scanning the 84 route handlers on `dev` for the helper each exported method calls, then
+reading the ones that matter. The table is per method; the RISK numbers say when and why a gate was added.
+Re-run the scan after adding a route (see §7).
 
-### 3a. Server-side role-gated (import a helper from `access.ts`, route level)
-`assets`, `assets/post-depreciation`, `loans` (all `requireFinanceAccess` since RISK-107,
-2026-09-29 — previously any staff could read; writes needed only `requireAdministratorAccess`, any
-admin, with no way to revoke it via Role Management), `branches` (GET public/intentional, POST/DELETE
-`requireAdministratorAccess` — RISK-080), `categories` (GET `requireStaffAccess`,
-POST/DELETE `requireAdministratorAccess` — RISK-080), `clinic-settings` (GET `requireStaffAccess`,
-POST `requireAdministratorAccess` — RISK-080), `customers` (GET/PATCH identity-scoped, not blanket;
-**DELETE — soft and hard both — is `requireSuperadminAccess`-only since commit `0976a72`,
-2026-09-10, an `admin` is refused**),
-`customers/package-redemptions`, `customers/packages`, `customers/products`, `customers/reconcile`,
-`employees`, `employees/notes`, `expenses`, `expenses/categories`, `expenses/generate-due`,
-`expenses/recurring` (all `requireFinanceAccess` since RISK-107, 2026-09-29 — previously any staff
-could read/write these), `finance/*` (all 12 sub-routes; `budget-vs-actual` also accepts
-`finance.view_pnl` since RISK-107), `health/supabase`
-(`requireAdministratorAccess` — RISK-080; previously public and leaked the first characters of the
-Supabase service-role key, now reports presence/source-var-name only), `inventory/devices`
-(+ `[id]/reset-pulses`, `audit-logs`), `inventory/products` (+ `reconcile`),
-`inventory/products/sales`, `medical-records` (`requireStaffAccess` — RISK-080; PHI, was
-previously fully public), `packages` (+ `consume`, `extend`, `sell`), `page-settings` (GET
-deliberately dual-mode — staff get the full blob, everyone else gets `stripInternalFields()`'d
-public CMS content; POST `requireAdministratorAccess` — RISK-067), `customer-avatars` (GET
-public/intentional, POST `requireStaffAccess` — RISK-080), `prescriptions`
-(`requireStaffAccess` — RISK-080; PHI, was previously fully public), `provider-attendance`,
-`providers` (GET public/intentional, POST/PATCH `requireStaffAccess` + `hasGranularPermission` —
-RISK-080/RISK-078; **DELETE is `requireSuperadminAccess`-only since commit `0976a72`, 2026-09-10 —
-narrower than the granular-permission path, an `admin` is refused**), `purchases`, `reservations` (staff-only for every
-mutating action except the one deliberately-anonymous deposit self-report — see RISK-018),
-`reservations/previous` (`requireStaffAccess` on GET and POST — RISK-080; GET returns up to 50
-reservations with real patient names/phones, POST creates patient + booking records, both were
-previously public), `rooms`, `roles`, `service-consumables`, `service-devices`, `service-rooms`,
-`services` (GET public/intentional, POST/DELETE `requireStaffAccess` + `hasGranularPermission` —
-RISK-078), `suppliers`, `terms` (GET public/intentional — public Terms & Conditions page —
-POST/PUT/DELETE `requireAdministratorAccess` — RISK-080), `translate`.
-
-**Granular permission layer on top of `requireStaffAccess` (RISK-078/A10, 2026-09-07):** for
-`providers` (POST/PATCH — **not** DELETE, which moved to `requireSuperadminAccess`-only, see above),
-`services` (POST/DELETE), `inventory/products`
-(POST/PUT/DELETE), `inventory/devices` (POST/PUT), and `customers/products` (POST/PATCH), passing
-`requireStaffAccess` (any staff role) is no longer sufficient — the handler also calls
-`hasGranularPermission(access.access, '<key>')`, matching the specific action-level permission
-Role Management's UI already claims to enforce (e.g. `providers.delete`, `inventory.manage_devices`).
-Before this, any authenticated employee's token could call these mutating endpoints regardless of
-what their role's `permissions` array said, even though the 3-dots menus correctly hid the buttons
-in the browser — see RISK-078 for the original finding and RISK-081/CORRUPT-A10 for the fix.
-`employees` and `roles` were deliberately **not** given this treatment: they stay
-`requireAdministratorAccess`-only (superadmin/admin, no granular distinction), which is intentional
-per RISK-069, not an oversight.
-
-**Finance record routes (RISK-107, 2026-09-29):** `expenses`, `expenses/categories`,
-`expenses/recurring`, `expenses/generate-due`, `assets`, `assets/post-depreciation` and `loans` use
-`requireFinanceAccess(req, [...])` (`access.ts`): GET needs `finance.manage_<x>` **or** `finance.view_pnl`;
-POST/PATCH/DELETE need `finance.manage_<x>`. `superadmin` always passes; a plain `admin` needs the grant
-(DEC-022). Before this, `expenses` accepted any staff token for every method and `assets`/`loans` reads were
-open to any staff. `finance/budget-vs-actual` accepts `finance.manage_expenses` or `finance.view_pnl`.
-
-**Role names match exactly (RISK-109, 2026-09-29):** `access.ts` treats a role as `superadmin`/`admin` only when
-its name, lowercased with spaces/underscores/hyphens removed, equals exactly `superadmin`/`admin`. It previously
-accepted any name containing "super", so a custom "Supervisor" role was the owner.
-
-### 3b. Middleware-only (authenticated-user check, no role check)
-`hr/alerts`, `hr/attendance`, `hr/doctor-payroll`, `hr/leaves`, `hr/payroll`, `hr/performance`,
-`providers/schedule-audit-logs`. **Any authenticated Supabase user — including a patient — passes.**
-Unchanged since 2026-08-03 — still open, not yet given its own `RISKS.md` fix.
-
-### 3c. No auth of any kind (open to the public internet)
-
-| Route | Methods | Status |
+### 3a. Public on purpose (no session needed)
+| Route | Methods | Why |
 |---|---|---|
-| `auth/employee-email` | GET | **Accepted, not fixed (RISK-080).** Load-bearing for the `/admin` sign-in flow itself — it resolves an employee ID to an email *before* any session exists, so a session-based guard would lock out every staff login. Remains an enumeration surface (maps employee IDs to staff email addresses — useful for phishing), but an email alone grants no access; Supabase Auth rate-limits the password endpoint it feeds into. Revisit if staff report targeted phishing. |
-| `availability` | GET | **Intentionally public** — the public booking widget needs slot availability with no login. |
-| `auth/me` | GET | Auth-support route; validates the token it's given internally. Not a blanket exposure risk on its own. |
+| `availability` | GET | The public booking widget needs slot availability with no login. |
+| `branches`, `categories`, `services`, `providers`, `rooms`, `service-rooms`, `packages`, `terms` | GET | Catalog and clinic information the public site and the booking flow read. `packages` returns the whole catalog (including inactive and not-on-website packages) and `providers` returns the full provider row; nothing secret, but wider than the site strictly needs. |
+| `customer-avatars` | GET | Avatar URL map keyed by patient id; no names. POST is `requireStaffAccess`. |
+| `provider-attendance` | GET | Returns the day's provider check-in/out rows to anyone who passes `?date=`. **Not documented as intentional anywhere before this audit** (see §6). POST is `requireStaffAccess`. |
+| `page-settings` | GET | Dual-mode: staff get the full blob, everyone else gets `stripInternalFields()`'d public CMS content (RISK-067). |
+| `auth/me` | GET | Validates the bearer token it is given and answers 401 / 503 itself (RISK-113). |
+| `auth/employee-email` | GET | **Accepted, not fixed (RISK-080).** Load-bearing for the `/admin` sign-in flow: it resolves an employee ID to an email *before* any session exists, so a session guard would lock out every staff login. Remains an enumeration surface (employee IDs to staff emails — useful for phishing); an email alone grants no access, and Supabase Auth rate-limits the password endpoint it feeds. Revisit if staff report targeted phishing. |
 
-Every other route this section previously listed (`medical-records`, `prescriptions`, `branches`,
-`categories`, `providers`, `rooms`, `service-rooms`, `terms`, `clinic-settings`, `page-settings`,
-`customer-avatars`, `provider-attendance`, `translate`, `health/supabase`) has since moved to §3a —
-see the RISK references there for what changed and when.
+### 3b. Staff only (`requireStaffAccess`, any role)
+Whole route unless a method is named: `categories` (POST, DELETE), `clinic-settings` (GET), `customer-avatars` (POST),
+`customers/package-redemptions`, `customers/packages`, `customers/reconcile`, `customers/settle-debt`,
+`inventory/devices/audit-logs`, `inventory/devices/[id]/reset-pulses`, `inventory/products/reconcile`,
+`inventory/products/sales`, `invoices`, `laser-pulses`, `medical-records` and `medical-records/templates` (PHI; RISK-080),
+`packages` (POST, PATCH, DELETE) and `packages/consume|extend|sell`, `prescriptions` (PHI; RISK-080), `profile`,
+`profile/attendance`, `profile/payroll`, `provider-attendance` (POST), `providers/schedule-audit-logs`, `purchases`,
+`reservation-products`, `reservations/previous` (GET, POST, PATCH — real patient names and phones; RISK-080),
+`reservations/laser-deficit`, `reservations` (PATCH), `rooms` (POST, PATCH, DELETE), `service-consumables`,
+`service-devices`, `service-rooms` (POST), `suppliers`, `translate` (POST; proxies to Google Translate).
+
+`reception/dashboard` additionally requires a reception / HR role (`requireReceptionAccess`, RISK-059).
+
+The three `profile*` routes (RISK-128 follow-up, 2026-10-21) return only the **caller's own** employee row, attendance and
+payroll figures. They take no employee id from the request: the identity comes from the bearer token, and the provider row is
+matched strictly (id, phone, national id, or exact normalised name; exactly one match or none). Do not turn them into
+"look up anybody" routes; `/api/employees` and `/api/hr/*` are the admin / HR versions.
+
+### 3c. Staff plus a granular permission (`hasGranularPermission`, RISK-078 / A10)
+`providers` (POST, PATCH; DELETE is **superadmin only** since commit `0976a72`, 2026-09-10), `services` (POST, DELETE),
+`inventory/products` (POST, PUT, DELETE), `inventory/devices` (POST, PUT), `customers/products` (POST, PATCH),
+`transactions` (POST). Passing `requireStaffAccess` is not enough: the handler also checks the specific action permission
+Role Management shows (e.g. `providers.delete`, `inventory.manage_devices`). `superadmin` bypasses; `admin` does not
+automatically. The coarse-category and create/edit/delete fallback chains mirror the client's `hasPermission()`, so a role
+granted the coarse category keeps working. The GET methods of `inventory/products` and `inventory/devices` stay
+`requireStaffAccess`.
+
+### 3d. Finance permission
+`expenses`, `expenses/categories`, `expenses/recurring`, `expenses/generate-due`, `assets`, `assets/post-depreciation` and
+`loans` use `requireFinanceAccess(req, [...])` (RISK-107): GET needs `finance.manage_<x>` **or** `finance.view_pnl`,
+writes need `finance.manage_<x>`. `superadmin` always passes; a plain `admin` needs the grant (DEC-022).
+Every `finance/*` route (16, including `capacity`, `deferred-packages`, `revenue-bridge` and `service-mix`) and `transactions`
+(+ `audit-logs`) is `requireStaffAccess` plus `hasFinancePermission` with the permission named in the handler (for example
+`finance.view_pnl`, `finance.view_margins`, `finance.view_capacity`; the Reports screens also accept the matching `reports.*`
+permission). `budget-vs-actual` accepts `finance.manage_expenses` or `finance.view_pnl` (RISK-107).
+
+**Role names match exactly (RISK-109, 2026-09-29):** `access.ts` treats a role as `superadmin`/`admin` only when its name,
+lowercased with spaces/underscores/hyphens removed, equals exactly `superadmin`/`admin`. It previously accepted any name
+containing "super", so a custom "Supervisor" role was the owner.
+
+### 3e. Administrator (`requireAdministratorAccess`, admin or superadmin)
+`employees` (all methods) and `employees/notes`, `roles` (GET, POST, DELETE), `branches` (POST, DELETE — RISK-080),
+`clinic-settings` (POST), `page-settings` (POST — RISK-067), `terms` (POST, PUT, DELETE — RISK-080), `health/supabase`
+(RISK-080; reports presence and source variable name only, it used to leak the first characters of the service-role key).
+Superadmin only: `roles` (PATCH), `customers` DELETE and `reservations` DELETE (soft and hard; an `admin` is refused —
+commit `0976a72`), `providers` DELETE. `employees` and `roles` deliberately have no granular layer (RISK-069).
+
+### 3f. HR (`verifyHrAccess`: superadmin, admin or hr)
+`hr/payroll`, `hr/doctor-payroll` and `hr/performance` (every method), and the management methods of `hr/alerts` (GET, PATCH),
+`hr/leaves` (GET, PATCH), `hr/attendance` (GET). The self-service writes — `hr/attendance` POST and PATCH (check-in /
+check-out, bound to the authenticated employee), `hr/alerts` POST, `hr/leaves` POST — need only `requireStaffAccess`, so
+a receptionist can clock in but cannot read anyone's payroll (RISK-036 re-audit, RISK-063).
+
+### 3g. Identity-scoped (patients and staff)
+`customers` GET / POST and `reservations` GET / POST decide per caller: a patient may read and write **their own**
+record (`isOwnIdentity()` in `src/lib/customerIdentity.ts`: `customers.auth_user_id`, falling back to normalised phone / email
+for older rows), staff go through the staff checks, and the one deliberately anonymous action is the deposit self-report
+(RISK-018). Patients are supposed to reach these routes, so they must not use `requireStaffAccess`.
+
+### 3h. Not on `dev` yet
+The reception bot (`api/bot/*`, `src/lib/botAuth.ts`, `src/lib/botTools.ts`, the knowledge-base migration) is described in
+`ARCHITECTURE.md` and `DB_SCHEMA.md` but its code is not committed to `dev` at the time of this audit. When it lands, its
+routes authenticate with a shared secret (`requireBotSecret`), not a user token; add them to this table then.
 
 ---
 
@@ -177,14 +177,26 @@ see the RISK references there for what changed and when.
   layer.** Because every API route uses the service role key, RLS enforces nothing about *who*
   can call a route — that's entirely `access.ts` / middleware's job (§1–§3). A route with no
   role check has full read/write to its table regardless of RLS being "on."
-- **Residual permissive policies:** per `RISKS.md` RISK-019, a subset of tables (`roles`,
+- **Open "allow all" policies were closed (RISK-128, applied 2026-10-21).** A subset of tables (`roles`,
   `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`,
-  `device_maintenance_history`, `admin_roles`) still carry pre-2026-07-25 "allow all" policies from
-  older migrations, layered underneath the blanket enable. These are functionally open to the
-  anon key. Nothing in the current app calls Supabase with the anon key for table access anymore
-  (confirmed by RISK-019's audit), so this is currently latent rather than exploited — but it means
-  a future client-side Supabase call to one of those tables would silently succeed instead of
-  being denied. Tightening/dropping those old permissive policies is still open work.
+  `device_maintenance_history`, `terms_and_conditions`, `admin_roles`) carried pre-2026-07-25 `USING (true)` policies under the
+  blanket enable. The anon key is public (it ships in every page), so on 2026-10-21 thirteen of 64 tables were readable by
+  anybody who opened the site, and the baseline also allowed INSERT / UPDATE / DELETE on `employee_accounts` and `roles`.
+  `supabase/migrations/20261023000000_close_open_rls_policies.sql` removes them; the two read policies it left for
+  `employee_accounts` and `hr_attendance` were dropped afterwards, once `UserProfileView` and `DoctorAccountView` read
+  through `/api/profile*`. Both steps were run on the dev project and on production. **Measured with the browser key:
+  0 of 64 tables readable on both** (`node scripts/check-anon-access.mjs`; 8 tables are empty, so the result proves nothing
+  for them). **Not measured:** writes with the browser key.
+- **Run the check on every new clinic project.** Each clinic is its own Supabase project (DEC-001), so a project built from an
+  old baseline can have the open policies again. Run `node --env-file=.env.local scripts/check-anon-access.mjs` before handing
+  a project over and after any migration that adds tables. It needs a real project, so it is not part of the test suite. When the
+  project refuses to list its tables to the anon key (HTTP 401, the case on production) the script reads the table names from
+  `supabase/migrations`, and then "Blocked" means "returned nothing".
+- **Guard in the suite:** `tests/lib/migrationsRls.test.ts` reads the migrations and fails when a new one creates an open policy
+  (`USING (true)` / `WITH CHECK (true)`, other than for `service_role`) or a table without `ENABLE ROW LEVEL SECURITY`.
+- **Dead browser reads remain.** `AdminNewBookingView.tsx` and the `reservation_products` reads in `page.tsx` /
+  `BookingDetailsModal.tsx` still call Supabase with the browser key. RLS blocks them, so they return nothing and are not a
+  leak, but they should move to the API (listed in RISK-128 "Not covered").
 - **New tables must enable RLS explicitly in their own migration.** The blanket-enable migration is
   a one-shot `DO` loop over tables that existed *at the time it ran* — it is not a trigger and does
   not apply retroactively to tables created later. See `supabase/migrations/README.md` and the
@@ -201,8 +213,7 @@ see the RISK references there for what changed and when.
   (API routes, `middleware.ts` uses the anon key instead, correctly) imports `supabaseServer`.
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` are, by design, public — they're
   meant to be shipped to the browser. Their safety depends entirely on RLS + policy correctness
-  (§4), which is why the residual permissive-policy gap above matters more than it would if the
-  anon key were meant to stay secret.
+  (§4), which is why an open policy was a leak (RISK-128) rather than a harmless leftover.
 - No other third-party API keys were found wired into committed code at time of audit; if one is
   added (e.g. a real SMS/OTP provider, the `translate` route's backing service), it must go through
   the same `.env.local`-only pattern, never a hardcoded string.
@@ -216,6 +227,10 @@ see the RISK references there for what changed and when.
   `access.ts`. Every route has to reason about this itself (see §1). A `requirePatientAccess` /
   `requireOwnIdentity`-style helper generalized beyond `/api/customers` would close this class of
   bug at the root instead of per-route.
+- **Public reads that were never decided on (found in the 2026-10-21 audit, not yet logged as a RISK):**
+  `GET /api/provider-attendance?date=` returns each provider's check-in / check-out rows to anyone, and `GET /api/packages` and
+  `GET /api/providers` return full rows including fields the public site does not render. None is PHI. Decide whether each is
+  meant to be public; if not, gate it with `requireStaffAccess` and add a public-safe projection for the site.
 - **GPS attendance spoofing (RISK-006):** server validates coordinate bounds/accuracy and binds the
   check-in to the authenticated employee, but cannot detect a spoofed-but-plausible location. Open;
   would need signed/attested check-in tokens to fully close.
@@ -233,16 +248,18 @@ see the RISK references there for what changed and when.
 1. Decide which of the three buyer classes it serves: staff-only, patient-self-service, or
    genuinely public (CMS reads, availability). Default to staff-only unless you have a specific
    reason it must be public.
-2. Staff-only → call `requireStaffAccess` or `requireAdministratorAccess` at the top of every
-   handler, not just `GET`. A route that gates `POST` but not `DELETE` is still an open route.
+2. Staff-only → call `requireStaffAccess` (or `requireAdministratorAccess`, `requireFinanceAccess`, `verifyHrAccess` when the
+   data needs it) at the top of every handler, not just `GET`. A route that gates `POST` but not `DELETE` is still an open route.
 3. Patient-facing → do not reuse `requireStaffAccess`. Scope by identity
    (`isOwnIdentity` pattern in `src/lib/customerIdentity.ts`), and double-check financial/sensitive
    fields aren't patient-writable regardless of what the request body contains (RISK-018's
    `/api/customers` fix is the template).
 4. If it touches money, inventory counts, or PHI (medical records, prescriptions) and isn't
    staff-gated yet, that's a bug — file it in `RISKS.md`, don't leave it implicit.
-5. New table → new migration must include
+5. Never read a table from the browser with the anon key (RLS is closed, RISK-128); add an API route. After a new table, run
+   `node scripts/check-anon-access.mjs`.
+6. New table → new migration must include
    `ALTER TABLE public.<table> ENABLE ROW LEVEL SECURITY;` with no policy (§4). Update `DB_SCHEMA.md`
    in the same change per `CLAUDE.md` rule 6.
-6. Adding it to `PROTECTED_API_PREFIXES` in `middleware.ts` proves authentication only — it is
+7. Adding it to `PROTECTED_API_PREFIXES` in `middleware.ts` proves authentication only — it is
    never sufficient on its own for a route that needs role-based authorization (§2).

@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-09-05 (Master Defect Remediation & Audit Resolution: RISK-064 resolved; availability, booking, intake, prescription deduplication remediated)
+> **Last Updated:** 2026-10-21 (docs audit: status index and counts rebuilt, seven entries moved to the section that matches their status; RISK-019 closed through RISK-128)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**8 open** · **13 partially resolved** · **72 resolved** · 93 tracked total.
+**9 open** · **13 partially resolved** · **104 resolved** · 126 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -28,6 +28,8 @@ Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-pa
 - [RISK-053](#risk-053) — New Cairo Branch's Working Hours Were Never Actually Configured
 - [RISK-058](#risk-058) — Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
 - [RISK-081](#risk-081) — `SYSTEM_CORRUPTIONS_AND_AUDIT.md` Marks 10 Of Its 30 Cataloged Defects "Fixed" When They Are Not (partially — `A01`/`A05`/`A06`/`A07` scope decisions remain open)
+- [RISK-103](#risk-103) — Laser Landing Pages Make Marketing Claims That Nobody Has Verified, And Conversion Tracking Is Inactive Until A GTM ID Is Set (OPEN)
+- [RISK-104](#risk-104) — Finance Section Understates Revenue And Cash — Pulses-Package Revenue Is Never Recognised, And Cash In `transactions` Exceeds The Ledger (OPEN)
 
 ## RISK-001: Duplication Friction (hardcoded Revera-specific values)
 
@@ -332,74 +334,6 @@ pattern sibling sections (Deposit/Notification/Queue Settings) already use.
 
 ---
 
-## RISK-078: Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It (RESOLVED)
-
-**Severity:** High · **Type:** Access control / false sense of security
-**Found:** 2026-08-30, reviewing commits `f713968` ("granular action-level permissions and 3-dots
-menus access control") and `1a61450` per Mohamed's request.
-**Fixed:** 2026-09-07, commit `4213f7a` (as RISK-081/CORRUPT-A10 — same finding, resurfaced by the
-`SYSTEM_CORRUPTIONS_AND_AUDIT.md` review).
-
-**What it is:** `f713968` adds 100+ granular permission keys (e.g. `providers.action_delete`,
-`services.action_delete`, `inventory.delete_product`, `employees.action_delete`) and wires every
-view's buttons/3-dots menus to hide when `hasPermission(key)` is false. `hasPermission` itself
-(`src/app/admin/page.tsx`) is pure client-side state — it only decides what renders in the browser.
-Neither this commit nor `1a61450` touched a single file under `src/app/api/`.
-
-Checked what actually guards the matching endpoints:
-- `DELETE /api/providers` and `DELETE /api/services` call only `requireStaffAccess` — which admits
-  **any** authenticated employee record, any role, zero permission check. Confirmed by reading both
-  handlers directly (`src/app/api/providers/route.ts:522`, `src/app/api/services/route.ts:115`):
-  no code after the `requireStaffAccess` call inspects `access.role` or `access.permissions` at all.
-- `inventory/products`, `inventory/devices`, `customers/products` are the same shape — every
-  handler is `requireStaffAccess` only.
-- `POST /api/roles`, `GET/POST /api/employees` require `requireAdministratorAccess`
-  (`admin`/`superadmin` role only) — unaffected by whatever is in the `permissions` array.
-
-So a role editor can uncheck "Delete Doctor (Table 3-Dots)" for a Receptionist role, and the 3-dots
-button correctly disappears for that receptionist in the browser — but that receptionist's own
-session token can still call `DELETE /api/providers?id=X` directly (devtools, curl, a saved request)
-and it succeeds, because the API was never told about `providers.action_delete` in the first place.
-The Role Management screen looks like a real access-control system; for every module except
-Transactions (`transactions.view`/`.create`/`.refund`, already enforced server-side via
-`hasFinancePermission` from earlier work this session), it currently is not one.
-
-**Secondary, lower-severity symptom of the same gap:** `1a61450` also loosens the client-side gate
-on the Employees and Role Management sections (previously hard-locked to
-`adminRole === "superadmin"`, now also open to any role with `hasPermission("employees.view")` /
-`hasPermission("settings.roles")` etc.). Verified this does **not** newly expose data — `GET
-/api/employees` and `GET/POST /api/roles` still require `requireAdministratorAccess`, so a genuinely
-custom (non-admin/superadmin) role granted that permission just gets a tab that opens to an
-empty/failing state (silently, in `fetchRolesAndEmployees`'s catch block) rather than real content.
-Confusing UX, not a leak — called out here because it's a symptom of the same root cause: the
-granular permission model exists only on the client.
-
-**Business impact:** if a clinic manager configures Role Management believing it restricts what a
-role can do (e.g. blocking a receptionist from deleting a doctor's profile, deleting a service,
-deleting an inventory product), that restriction currently only removes the button from view. It
-does not stop the action.
-
-**Fix:** added `hasGranularPermission()` to `src/lib/access.ts` — mirrors the coarse-category and
-create/edit/delete fallback chains from the client's `hasPermission()` for providers/services/
-inventory/customers, superadmin-only bypass (like `hasFinancePermission`, not `hasStaffPermission`'s
-automatic `admin` bypass). Wired into every mutating verb of `providers`, `services`,
-`inventory/products`, `inventory/devices`, `customers/products`. `employees` and `roles` were left
-as `requireAdministratorAccess` (superadmin/admin only) — that is a real, intentional coarse check
-per RISK-069, not the any-staff gap this fix closes. 16 unit tests for `hasGranularPermission` +
-5 route-level tests proving `DELETE /api/providers`/`DELETE /api/services` — the exact example this
-entry opened with — now reject a role with no matching permission and accept one with the coarse
-category or exact granular key.
-
-**Addendum 2026-09-30:** since commit `0976a72` (2026-09-10) `DELETE /api/providers` and `DELETE
-/api/customers` (soft and hard) are `requireSuperadminAccess`-only, so the "accepts a role with the
-coarse category or granular key" statement above no longer holds for those two DELETE routes —
-`SECURITY.md` and `API_CONTRACT.md` already reflect this (see also RISK-107's `requireFinanceAccess`
-follow-up). `tests/routes/rbac-enforcement.test.ts` asserts the new behaviour. `POST`/`PATCH` on
-`providers` and every verb on `services`/`inventory`/`customers/products` keep the staff + granular
-check described above.
-
----
-
 ## RISK-081: `SYSTEM_CORRUPTIONS_AND_AUDIT.md` Marks 10 Of Its 30 Cataloged Defects "Fixed" When They Are Not
 
 **Severity:** High · **Type:** Documentation reliability / unverified remediation claims
@@ -511,6 +445,85 @@ and remain open, sequenced with Mohamed rather than rushed.
 
 ---
 
+## RISK-103: Laser Landing Pages Make Marketing Claims That Nobody Has Verified, And Conversion Tracking Is Inactive Until A GTM ID Is Set (OPEN)
+
+**Severity:** Medium · **Type:** Marketing claims / ad-policy / measurement · **Found:** 2026-09-25 · **Related:** DEC-087
+
+The pages are live in code but these items came from Manus and were never checked against the clinic:
+- **Google rating "4.9 ★ · 31 reviews"** and the three review quotes (`CLIENT.googleRating`,
+  `LANDING_REVIEWS`) — must match the Maps listing at the moment ads go live.
+- ~~Device name promised but never shown~~ — **resolved 2026-09-25:** owner supplied **Candela GentleMax Pro**
+  (`CLIENT.laserDevice`); headlines, trust bar, device section and FAQ now name it and state it suits all skin
+  types. Still needs the owner's device photo to replace the placeholder panel in the device section, and the
+  "suits all skin types" wording should be kept tied to the device (not to outcomes) for Google Ads policy.
+- **"تبريد قبل كل نبضة"** (cooling) and **"8–10 جلسات"** — clinical claims; confirm with the doctor.
+- **Doctor photo** (`doctor-portrait.webp`, from `doctor/portrait-about.jpg`) is not confirmed to be the
+  laser practitioner. Note `doctor/portrait-main.jpg` is byte-identical to `clinic/treatment.jpg` (a
+  microneedling shot), so it must not be used as a "doctor" image.
+- ~~Address~~ — **resolved 2026-10-19:** owner supplied "Ozone Medical Center، عيادة C261، حي النرجس، التجمع الخامس، القاهرة الجديدة" (replaces the vague Manus address). Still worth checking it matches the Maps listing pin.
+- **Opening hours / reply time** are not stated anywhere; visitors are told to WhatsApp for "المواعيد".
+- **Tracking:** `landing_view`, `whatsapp_click`, `call_click`, `map_click`, `scroll_depth` go to
+  `dataLayer`. GTM container **GTM-5ZXBL7LR** is now installed on the landing pages (`CLIENT.gtmId`), but the
+  container still needs triggers/tags mapping these events to Google Ads conversions. Until then Google Ads
+  sees zero conversions from these pages.
+- **Ad policy:** absolute outcome/safety claims were removed from headlines, but Google Ads' healthcare
+  policies should be re-read against the final ad text (not only the page).
+
+**Fix:** clinic owner/doctor confirms each claim (or it is edited out); create the GTM container, set
+`NEXT_PUBLIC_GTM_ID` in Vercel, map the events to conversions, and test with Tag Assistant. Checklist:
+`ai_docs/manual_tests/LASER_LANDING_PAGES_MANUAL_TESTS.md` (check 11).
+
+---
+
+## RISK-104: Finance Section Understates Revenue And Cash — Pulses-Package Revenue Is Never Recognised, And Cash In `transactions` Exceeds The Ledger (OPEN)
+
+**Severity:** High (financial reporting) · **Type:** Financial ledger / revenue recognition · **Found:** 2026-09-25 (production audit, read-only SQL reproducing each report's inputs; the Finance UI itself was not reviewed — the browser pane had no signed-in session). **Related:** DEC-023, DEC-086, RISK-102.
+
+Production figures at audit time (September 2026 is the only month with live data; backfilled history excluded):
+
+| Input | Value | What it means |
+|---|---|---|
+| Live invoices | 29 issued, 48,300 EGP | lines: **package 46,550**, product 1,750, service 0 |
+| Ledger cash (`payments`) | 45,950 (all cash) | vs invoices 48,300: 3 underpaid invoices, 2,400 outstanding |
+| `transactions` payments, not historical | 52,300 | 44,500 linked to an invoice + **3 manual payments (7,800) with no invoice** |
+| `package_revenue_recognitions` | **0 rows** | while 6 pulses packages (30,000) are sold |
+| `invoice_lines.provider_id` | NULL on 29/29 | doctor P&L is 100% "unattributed" |
+| `cogs_snapshot` / `commission_snapshot` NULL | 19 of 29 lines | margins overstated on those lines |
+| expenses / fixed assets / loans | 0 / 0 / 0 | "fully-loaded profit" equals contribution margin |
+
+**1. Package revenue is never recognised for laser pulses packages.** `pnl` / `trend` / `branch-pnl` /
+`new-vs-returning` count `service` and `product` invoice lines plus `package_revenue_recognitions`
+(DEC-023: package cash is deferred, revenue is recognised as sessions are delivered). Recognitions are
+written only by the DB function `consume_customer_package_session`, i.e. for **services** packages.
+Pulses packages (all 6 on production) are consumed through `consume_package_pulses` (Brief 34B) and the
+deficit route, neither of which writes a recognition. Result: September P&L revenue reads ~1,750 (products
+only) against 45,950 cash actually received. **Fix direction:** recognise revenue when pulses are
+consumed (pro-rata, in the same transaction as `consume_package_pulses`) and back-fill from
+`package_pulse_usage` — designed in **DEC-088 (Proposed 2026-09-25; two items need owner confirmation)**,
+no code yet when this was written.
+
+**Update 2026-10-21 (docs audit):** the recognition code and migration now exist (`supabase/migrations/20260925000000_pulse_revenue_recognition.sql`, applied to production per commit `b6bbc96`; `syncPreLaunchPulseUsage` in `src/lib/historicalInvoice.ts`). Items 2 to 4 below and the production figures above were not re-measured in this audit, so the entry stays open until the owner re-runs the reconciliation on production.
+
+**2. Cash flow and `transactions` disagree.** `cashflow` sums `payments` (45,950); `transactions` holds
+52,300 of non-historical payments. The 7,800 gap is three `source = manual` payments with no invoice
+(e.g. the `zaki` booking, 2,000 paid, completed with no invoice before RISK-101 was fixed) plus payments
+recorded on the ledger but not in `transactions`. Which table the Finance screens should treat as the
+source of truth is undecided (RISK-016).
+
+**3. Doctor P&L has no attribution.** No invoice line carries `provider_id`, so `finance/doctor-pnl` puts
+everything in `unattributed` and `commission-payouts` returns nothing from the ledger.
+
+**4. Empty cost side.** No expenses, assets or loans are recorded, and 19 of 29 lines have no COGS or
+commission snapshot — every profit figure is a revenue figure until those are entered.
+
+**Presentation addressed (DEC-088 item 9, built 2026-09-26 on dev, not yet on main):** the P&L now shows a cash → revenue bridge and a deferred package balance, and the tiles are labelled "Revenue earned" / "Cash received", so the gap is explained on screen instead of looking like a bug. Observation from the production numbers: package cash in September (44,150) has no matching deferred balance because most package invoices have no surviving `customer_packages` row — see `ai_docs/manual_tests/FINANCE_CASH_VS_REVENUE_MANUAL_TESTS.md`.
+
+**Not a Finance-code bug (verified):** the backfilled historical invoices (`is_opening`) are correctly
+excluded from all eight revenue/cash reports (DEC-086, `tests/routes/finance-opening-invoices.test.ts`).
+Checklist: `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.
+
+---
+
 # 🟡 Partially Resolved
 
 - [RISK-002](#risk-002) — Admin Auth Is Client-Side Only (Partially Resolved)
@@ -518,13 +531,14 @@ and remain open, sequenced with Mohamed rather than rushed.
 - [RISK-007](#risk-007) — Client-Side PDF Invoice Printing Is Browser-Dependent
 - [RISK-012](#risk-012) — Patient Debt Only Ever Grows
 - [RISK-015](#risk-015) — Doctor Cost Attribution Depends On A Name String
-- [RISK-019](#risk-019) — RLS Coverage
 - [RISK-022](#risk-022) — A Non-Existent `customer_id` On A POS Sale Silently Loses Stock With No Discoverable Record
 - [RISK-026](#risk-026) — Clinic Devices Read Blob-Shape Field Names That Don't Exist On The Real Table
 - [RISK-031](#risk-031) — New Packages/Promotions Admin UI Was Added Inline To `admin/page.tsx`, Violating DEC-027
 - [RISK-033](#risk-033) — `services.id` Regressed To `GENERATED ALWAYS`, Silently Breaking Every Edit To An Existing Service
 - [RISK-038](#risk-038) — The Doctor's Recalculated Session Total Never Reaches The Database
-- [RISK-057](#risk-057) — Doctor-Added Products Never Appeared As Invoice Line Items — Regex Format Mismatch (RESOLVED)
+- [RISK-087](#risk-087) — Two Independent Implementations Decide How An Underpayment/Overpayment Settles (PARTIALLY RESOLVED)
+- [RISK-094](#risk-094) — Laser Package Deficit Settlement Had No Safety Net and Could Bill an Unsold Package (PARTIALLY RESOLVED)
+- [RISK-097](#risk-097) — Brief 35 Deficit Resolution Is Ordered, Not Transactional — A Failure Between Steps Leaves A Partially-Applied Settlement (PARTIALLY RESOLVED — retry path fixed, cross-table atomicity still open)
 
 ## RISK-002: Admin Auth Is Client-Side Only (Partially Resolved)
 
@@ -675,46 +689,6 @@ at the time this risk was found. Doctor payroll attributed revenue by case-insen
 equality against `providers.name` (`src/app/api/hr/doctor-payroll/route.ts:172`). A rename, a
 typo, a title prefix, or two doctors sharing a name silently detached historical commission with
 no error.
-
----
-
-## RISK-019: RLS Coverage
-
-**Severity:** Low (was Medium) · **Type:** Security
-**Found:** 2026-07-25 · **Largely resolved 2026-07-25**
-
-Until 2026-07-25, RLS was **disabled** on `reservations`, `customers`, `services`, `providers`,
-`branches`, `categories`, `page_settings`, `provider_attendance`, `rooms`, `service_rooms`,
-`doctor_payroll` and `provider_schedule_audit_logs` — the tables holding patient identities,
-bookings and doctor pay — because `20260722140000_enable_row_level_security.sql` had never been run.
-
-**That migration was applied to dev on 2026-07-25.** RLS is now on for every table in `public`.
-
-A prerequisite had to be fixed first: `src/app/admin/page.tsx` wrote to `customers` directly from
-the browser with the anon key, which enabling RLS would have turned into a silent no-op that still
-reported success. That write moved server-side into `POST /api/inventory/products/sales` in
-`8108b82`, and no client component reads or writes a Supabase table any more.
-
-**Update 2026-10-21:** the residual risk below is not Low: measured with the anon key it exposes staff accounts, payroll, attendance and prescriptions, and the same policies allow writes. Tracked and fixed (migration written, not yet applied) as RISK-128. The statement below that no client component reads a Supabase table any more is also wrong (`UserProfileView`, `DoctorAccountView`, `AdminNewBookingView`).
-
-**Residual risk:** the subset carrying permissive "allow all" policies (`roles`,
-`employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`,
-`device_maintenance_history`, `admin_roles`) is functionally open — salary and inventory data is
-readable with the anon key. Those policies should be tightened or dropped, since every access path
-now goes through the service role anyway.
-
-**Hazards for new work:**
-- That migration is a one-shot `DO` block, not a trigger. Any table created after it runs has RLS
-  **off** unless its own migration enables it explicitly (the 20260725120000 backfill does this by
-  hand at `:77-79`). A finance migration must do the same.
-- `supabase/migrations/README.md` instructs operators to re-run scripts in filename order.
-  Re-running `20260715202003_add_provider_payroll.sql:26`
-  (`ALTER TABLE doctor_payroll DISABLE ROW LEVEL SECURITY`) after the enable migration would
-  silently turn RLS back off. Same hazard for the `DISABLE` statements throughout
-  `full_migration.sql`.
-- `20260705141244_setup_supabase_schema.sql` sorts **after** `..._141242_full_migration.sql` but is
-  an older, narrower version of the same schema. Harmless only because everything is
-  `IF NOT EXISTS`. Treat `full_migration.sql` as authoritative.
 
 ---
 
@@ -1004,51 +978,185 @@ live).
 
 ---
 
-## RISK-057: Doctor-Added Products Never Appeared As Invoice Line Items — Regex Format Mismatch (RESOLVED)
+## RISK-087: Two Independent Implementations Decide How An Underpayment/Overpayment Settles (PARTIALLY RESOLVED)
 
-**Severity:** Medium-High · **Type:** Regression / Billing display
-**Found:** 2026-08-17, live on `dev.reveraclinics.com`, immediately after settling the RISK-056 test
-invoice — the printed invoice for a Therapeutic Laser (110 EGP) + 700 EGP product session showed a
-single line item ("Therapeutic Laser — EGP 110"), a Subtotal of EGP 110, and "Amount Paid: EGP
-810" directly beneath it, with nothing on the document explaining the 700 EGP gap. The reception
-booking-details drawer's "Products & Session Consumables" panel showed "No products added" for the
-same booking, despite `amountPaid`/`amountLeft` already being correct (RISK-056).
+**Severity:** Medium · **Type:** Maintainability / consistency risk
+**Found:** 2026-09-15, same review as RISK-086. **Extraction fixed 2026-09-17. Regressed** by the
+same `git checkout origin/dev -- .` incident as RISK-086 — `settlePaymentMismatch()` and its 12
+tests were lost entirely (not just reverted to the local-file shape; the function and
+`tests/lib/billing.test.ts`'s coverage of it were gone), and the inline `diff`-based block was back
+in `previous/route.ts`. Not caught until 2026-09-29. **Re-extracted 2026-09-29** — same signature
+shape as `computeSettledBalances`, 12 new cases in `tests/lib/billing.test.ts`; the existing
+`tests/routes/reservations-previous.test.ts` (never touched) stayed green throughout, confirming
+the re-extraction changed no behavior. The deeper cross-flow question (below) is still open.
 
-**What it is:** neither surface stores doctor-added products as structured rows — both
-reconstruct them by regex-parsing the reservation's free-text `notes` field (the same
-`notes`-as-source-of-truth pattern RISK-038 already flagged as a traceability gap). Both parsers
-recognize three note formats: `- Name (xQty) @ Price EGP`, `[Added Product]: Name (xQty) - Total
-EGP`, and `[Extra Device Pulses]: ...`. **None of them match what `DoctorAccountView.tsx`'s
-`handleCompleteTreatment`/`handleSaveClinicalNote` actually write**:
-`[Products Used During Session]: Name (Qty: N x UnitPrice EGP = Total EGP)`. Since the doctor
-portal is the only place a product gets added *during* a session (as opposed to reception adding
-one before/after), every session-added product silently failed to reconstruct on both the
-invoice PDF and the drawer's product panel — the money was always correct (RISK-056), only the
-itemized paper trail was invisible.
+**Fix:** `src/app/api/reservations/previous/route.ts`'s inline wallet-vs-debt allocation
+(the block described below) is now `settlePaymentMismatch()` in `src/lib/billing.ts` — a small,
+named, directly-tested pure function, called by the route instead of the logic living inline in a
+route handler. This removes the "hand-written business logic buried in a route file, invisible to
+anyone not reading that file" problem, and gives the rule its own unit tests
+(`tests/lib/billing.test.ts`, 12 cases) independent of the route's own integration tests
+(`tests/routes/reservations-previous.test.ts`, unchanged and still green — confirming the
+extraction changed no behavior).
 
-**Fixed:** added the same regex,
-`/(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g`,
-matching `[Products Used During Session]: ...` to **three** independent copies of this same
-reconstruction logic in [src/app/admin/page.tsx](../src/app/admin/page.tsx) — not two. First pass
-fixed the `viewingBooking` drawer's Price Details total (`drawerAttachedList`, ~line 23601) and the
-`invoiceBooking` PDF's line items (`invoiceAttachedList`, ~line 27411); deploying and re-testing
-live then surfaced a **third**, entirely separate copy driving the drawer's own "Products & Session
-Consumables" panel (`list`, ~line 23934–23980, its own `existingNames`/`matchAll` calls) — same two
-old patterns, same missing fourth one, same "No products added" symptom, just for a different
-section of the same modal. That third copy is now fixed too. (The checkout modal's own
-`extraAddonsCost` figure was never affected — it derives from `amountLeft + amountPaid -
-baseServicesTotal`, not from parsing `notes`, which is why it displayed correctly even before this
-fix.) No data migration needed — all three reconstruct from `notes` on every render, so this
-retroactively fixes every already-completed booking with this note shape, not just new ones.
+**Not resolved by this — deliberately out of scope:** the regular checkout flow
+(`PATCH /api/reservations` + `admin/page.tsx`'s checkout modal) still decides wallet usage in the
+frontend rather than calling `settlePaymentMismatch()`; unifying that is a separate, larger change
+(it would mean the checkout modal's "use wallet balance" checkbox either goes away or the route
+gains an "auto-allocate" mode) and was not attempted here. The original finding below stays for that
+reason — two conceptually-equivalent rules still exist, just one of them is no longer the badly-
+factored one.
 
-**Follow-up landed 2026-08-17 — DEC-042.** Finding a third copy of the identical bug while
-verifying the fix for the first two was the concrete proof that reconciling several independent
-regex-based reconstructions of `notes` instead of writing doctor-added products as real rows is
-fragile. A `reservation_products` staging table now exists (schema + full application wiring
-written and `tsc`/`eslint`/`vitest`-clean; **pending migration application to the dev database** —
-see DEC-042's "Implementation" note). Once live, the `notes`-regex parsers in all three display
-sites become a legacy-data fallback only — new writes go through real rows, and this bug class
-cannot reproduce for new sessions again.
+**Original finding (2026-09-15), kept for context:**
+
+**What it is:** deciding *how much of an underpayment draws from an existing wallet credit before
+adding debt to `outstanding`, and how much of an overpayment pays down existing debt before
+crediting the wallet* is business logic that exists **twice**, in two different places, written
+independently:
+
+1. `src/app/api/reservations/previous/route.ts:264-301` — an inline `diff`-based calculation run
+   entirely server-side when staff record a historical (pre-system) booking. It **automatically**
+   decides wallet-vs-debt allocation from `parsedValue`/`parsedPaid` and the customer's current
+   balances.
+2. The regular checkout flow (`PATCH /api/reservations`, `admin/page.tsx`'s checkout modal) instead
+   splits this responsibility: the **frontend** computes how much wallet to draw
+   (`useWalletBalance ? Math.min(walletBalance, balanceDue) : 0`) and sends that as an explicit
+   `walletWithdrawal`/`walletDeposit` amount; `src/lib/billing.ts`'s `computeSettledBalances()`
+   (tested, `tests/lib/billing.test.ts`) then just applies whatever deltas it's given — it does not
+   itself decide *whether* to use the wallet.
+
+Neither implementation is confirmed wrong — each does what its own inline comments say, and
+`tests/routes/reservations-previous.test.ts` pins implementation 1's rules exactly as documented.
+The risk is that these are two independently-maintained answers to conceptually the same question
+("how does a payment mismatch settle against a patient's wallet and debt"). A future change to the
+allocation rule (e.g. "cap wallet usage at 50% of a debt" or a rounding fix) applied to one will not
+apply to the other unless someone remembers both exist. If the two rules are ever accidentally
+allowed to diverge further, staff could see different settlement behavior for what looks to them
+like the same kind of transaction, depending only on which screen recorded it.
+
+**Fix required, done for implementation 1 (see the top of this entry):** extracted into
+`settlePaymentMismatch()` in `billing.ts`. Implementation 2 (the checkout flow) still splits the
+decision between the frontend and `computeSettledBalances()` and was deliberately left alone.
+
+**Tests:** `tests/lib/billing.test.ts` now covers `settlePaymentMismatch()` directly (12 cases);
+`tests/routes/reservations-previous.test.ts`'s "settlement math" describe block (9 cases) covers it
+through the route. `tests/lib/billing.test.ts` separately covers `computeSettledBalances()`
+(implementation 2). No test asserts the two functions are equivalent — they still don't share a
+common interface, and per the note above, making them equivalent was not the goal of this fix.
+
+---
+
+## RISK-094: Laser Package Deficit Settlement Had No Safety Net and Could Bill an Unsold Package (PARTIALLY RESOLVED)
+
+**Severity:** Critical (P0) · **Type:** Money / data integrity / concurrency
+**Found:** 2026-09-21, Brief 34 investigation. **Safety-net fixes completed 2026-09-21; the shared pulse-store race remains open for Brief 34B.**
+
+**What was confirmed:**
+1. `PATCH /api/customers/packages` correctly clamps a request to the package's remaining pulses and returns both `consumed` and `requested`, with booking-keyed idempotency. Its primary balance and idempotency store is nevertheless the single `page_settings` row `customer_package_pulses`; concurrent read-modify-write requests can overwrite one another, and the native `customer_packages` sync is best-effort. Brief 34 deliberately did not move this store.
+2. Choice 3A in `DoctorAccountView.tsx` consumed the old package before selling the replacement package, ignored failed sale/deduction responses, still wrote a full-price `New Package:` line, and then completed the session. A patient could therefore be billed for a package that was never sold while the pulse deficit remained unresolved.
+3. Reservation laser snapshot fields were referenced before any migration documented them. The 42703 compatibility retry silently stripped real columns alongside missing ones and returned an apparently successful reservation.
+4. Six money-path rate calculations silently substituted 1 EGP per pulse. Package consumption also invented a 10,000-pulse quota for unknown or unconfigured package rows.
+
+**Safety-net fix:**
+- Added the unapplied, idempotent migration `20260921000000_add_laser_settlement_columns_to_reservations.sql` and matching `DB_SCHEMA.md` entries for nullable `laser_payment_mode`, `laser_price_per_pulse`, and `delivered_pulses`, with no historical defaults.
+- The 42703 compatibility path now logs and returns its exact `droppedColumns`; the doctor completion payload no longer sends nonexistent `reservations.price` / `total_price` keys.
+- Added route tests for package clamping, validation, synthetic IDs, expiry, authentication, unknown UUIDs, and booking idempotency, plus pure deficit/rate tests.
+- Choice 3A now runs sale → new-package deficit deduction → invoice line → old-package deduction → completion. Every required response is checked; a failure keeps the session open and reports which irreversible steps already occurred.
+- Per-pulse rates now resolve only through reservation snapshot → Booking Settings `booking.defaultPricePerPulse` → legacy notes regex. An unresolved rate returns/alerts a real configuration error and writes no per-pulse line. Unknown package quotas are rejected instead of becoming 10,000.
+
+**Still open, deliberately not fixed here:**
+- The cross-patient lost-update race in the shared `page_settings.customer_package_pulses` blob; queued Brief 34B moves the balance and idempotency guard to relational storage.
+- `DoctorOngoingSessionTab.tsx` still derives a missing catalog package quota from its name and falls back to 10,000; resolving unknown totals needs the queued product decision.
+- `totalLaserDeliveredPulses` counts only laser additional services while `totalSessionPulses` counts pulse values from all additional services, so package and device deductions can disagree.
+- The master per-pulse price location remains undecided; the implemented chain does not presume device vs service vs clinic ownership.
+
+**Manual test checklist:** `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_34_MANUAL_TESTS.md`
+
+---
+
+## RISK-097: Brief 35 Deficit Resolution Is Ordered, Not Transactional — A Failure Between Steps Leaves A Partially-Applied Settlement (PARTIALLY RESOLVED — retry path fixed, cross-table atomicity still open)
+
+**Found:** 2026-09-23 during Brief 35 implementation. **Retry-recovery bug found and fixed 2026-09-24
+during live verification** (migration applied, full scenario matrix run against the real dev
+database — see the Evidence log).
+**Status:** the specific failure mode below — a retry after a partial failure silently reporting
+"nothing to resolve" instead of recovering — is fixed. The underlying lack of a single cross-table
+transaction remains open by design (see "Not fixed").
+
+`POST /api/reservations/laser-deficit` performs up to three writes in sequence: (1) source-package
+consume via `consume_package_pulses` RPC, (2) the resolution write — `POST /api/packages/sell`
+(invoices + invoice_lines + customer_packages + payments) or the `reservation_products` deficit line,
+and (3) the `reservations.laser_deficit_resolution` marker. There is no single transaction spanning
+them (the sell path is a route handler, not an RPC), so a failure between steps is a real partial
+state:
+
+- **Marker write fails after the resolution succeeded** (including when migration
+  `20260923000000_add_laser_deficit_resolution_to_reservations.sql` has not been applied yet — the
+  columns won't exist): the route returns 500 with "do not retry; reconcile manually," but the
+  invoice line/package sale already happened. A retry that ignores the warning would double-charge
+  the invoice line; the PAY_PER_PULSE line-write has a `description ILIKE 'Excess Laser Pulses
+  Deficit%'` guard so the *line* is not duplicated, but the package-sale path has no equivalent
+  protection.
+- **BUY_NEW_PACKAGE sells the package, then the deficit consume fails or returns
+  `consumed < deficit`:** the patient owns a package and its invoice exists, but the deficit pulses
+  were not deducted. The route returns 500 with the exact partial state in the message.
+- **Marker columns absent entirely (migration unapplied):** resolution still works, but
+  `laser_deficit_resolution` stays NULL forever, so idempotency falls back to the notes-tag /
+  deficit-line heuristics — weaker than the column.
+
+**Mitigations already in place:** consume is idempotent per `(customer_package_id, reservation_id)`
+(Brief 34B unique index); the PAY_PER_PULSE line is guarded against double-write; every failure
+message states exactly what did and did not happen, and never reports success.
+
+**Bug found live, 2026-09-24, and fixed — the retry path was actually unsafe, not just loud.**
+Reproduced directly: forced the invoice-line write to fail after the consume step had already
+succeeded (see the `addedByRole` bug below), leaving the source package drained (`fully_used`, 0
+remaining) with no marker and no invoice line — exactly the documented partial state. But the
+*retry*, called after fixing the immediate cause, did not recover: `computeDeficitState`'s package
+lookup (`activePulsePackages`) filters `.eq('status', 'active')`, and Brief 34B flips a drained
+package to `'fully_used'`. The retry therefore found **no source package at all**, concluded
+`noActivePackage: true`, and returned `{ success: true, deficitPulses: 0 }` — a **silent no-op that
+looked like success**, worse than the loud 500 this risk originally described. A real ~2,000-pulse,
+10,000 EGP deficit would have gone permanently unbilled had the receptionist trusted that response.
+**Fix:** added `packageAlreadyTouchedForReservation()` — looks up `package_pulse_usage` rows for the
+specific reservation and treats that package as the authoritative source regardless of its current
+status, ahead of the active-package fallbacks. Re-verified live: the same reservation, retried after
+the fix, correctly recomputed the 2,000-pulse deficit and resolved it. Also verified this covers the
+rate-unconfigured retry case (consume succeeds, PAY_PER_PULSE's rate check fails after it, `NULL`
+rate then configured, retried — resolves correctly).
+
+**Separate bug found and fixed in the same pass:** the PAY_PER_PULSE line write hardcoded
+`addedByRole: 'receptionist_checkout'`, but `reservation_products.added_by_role`'s CHECK constraint
+only allows `'doctor_session'` or `'receptionist'` — every PAY_PER_PULSE resolution failed with a
+500 on the real database (never caught by the fake, which doesn't enforce CHECK constraints).
+Changed to `'receptionist'`.
+
+**Not fixed:** a single Postgres function wrapping consume + sale + marker in one transaction. That
+would require reimplementing `/api/packages/sell` inside SQL (invoices, invoice_lines, payments,
+wallet movements, transaction ledger — too much to duplicate); deferred as deliberate scope. A
+failure that happens *after* the source package is already fully drained now recovers correctly on
+retry (fixed above); a failure at the marker-write step specifically, after the resolution itself
+(sale or invoice line) already fully succeeded, still needs the manual reconciliation this risk
+originally described — that residual case was not exercised live (it requires injecting a failure
+at that exact point) and is left as-is.
+
+**Live-verified against the real dev database, 2026-09-24 (migration
+`20260923000000_add_laser_deficit_resolution_to_reservations.sql` applied):** GET preview and POST
+resolve for both `PAY_PER_PULSE` and `BUY_NEW_PACKAGE` on disposable test data — correct deficit
+math, correct invoice/payment amounts, correct marker writes; idempotent repeat calls for both
+choices (`alreadyResolved: true`, zero additional writes); no-deficit (sufficient balance) consumes
+normally and writes no marker; no-active-package refuses cleanly with no fabricated deficit;
+expired-package refuses before any write; unresolvable-rate refuses with a real 400 before any
+invoice write (and, per the fix above, recovers correctly once the rate is configured and the call
+is retried); unauthenticated → 401; invalid/missing reservationId → 400; non-existent reservation →
+404. All disposable test rows deleted afterward, confirmed zero residue. Doctor-side screen
+confirmed directly from source (`DoctorOngoingSessionTab.tsx`'s Option 3 block): delivered-pulses
+input plus presets, and — only when `packageDeficit > 0` — one neutral amber notice ("Recorded
+pulses exceed the package balance. Reception will resolve this at checkout."); no package name,
+balance, price, or choice control anywhere in that block, matching DEC-079 exactly.
+
+**Manual checklist:** `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_35_MANUAL_TESTS.md` — Evidence log
+filled in with the above.
 
 ---
 
@@ -1064,6 +1172,7 @@ cannot reproduce for new sessions again.
 - [RISK-014](#risk-014) — Every POS Sale Fails To Write, And Sales History Reads Back Empty
 - [RISK-017](#risk-017) — ~4,000 Lines Of Finance UI Are Unreachable Dead Code (RESOLVED)
 - [RISK-018](#risk-018) — The Money-Mutating API Routes Are Unauthenticated
+- [RISK-019](#risk-019) — RLS Coverage (RESOLVED 2026-10-21 via RISK-128)
 - [RISK-021](#risk-021) — `/api/employees` Callers Were Missing Bearer Tokens, And `/api/employees/notes` Had No Server-Side Role Check At All
 - [RISK-023](#risk-023) — The Patient List Could Silently Never Load, Depending On A Session Race
 - [RISK-024](#risk-024) — Selling More Units Than Are In Stock Was Never Rejected Server-Side
@@ -1094,13 +1203,14 @@ cannot reproduce for new sessions again.
 - [RISK-054](#risk-054) — `AdminBookingsView`'s Display-Only Status Remap Leaked Into The Shared Booking-Details Modal (RESOLVED)
 - [RISK-055](#risk-055) — Stale Session Token In The Reservations Polling Effect Silently Wiped Pending Approvals & Booking History (RESOLVED)
 - [RISK-056](#risk-056) — Doctor Portal's "Complete Treatment" Silently Dropped The Base Service Price From The Invoice (RESOLVED)
+- [RISK-057](#risk-057) — Doctor-Added Products Never Appeared As Invoice Line Items — Regex Format Mismatch (RESOLVED)
 - [RISK-059](#risk-059) — `/api/reception/dashboard` Had No Auth, Could Clock In The Wrong Receptionist, And Could Silently Reopen An Ended Shift (RESOLVED)
 - [RISK-063](#risk-063) — Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff (RESOLVED)
 - [RISK-064](#risk-064) — "Add New Category" (Services) Has No Arabic Name Field (RESOLVED)
 - [RISK-065](#risk-065) — `POST /api/packages/consume` Burns A Pre-Paid Session For A Service That Isn't On The Booking
-- [RISK-068](#risk-068) — First-Visit Medical Intake Guard Fired For Every Patient — `reservations` Prop Never Passed
 - [RISK-066](#risk-066) — System Test Suite Dumps Raw Patient/Payroll PII Into The DOM, With No Production Gate (RESOLVED)
 - [RISK-067](#risk-067) — `GET /api/page-settings` Is Unauthenticated By Design, But Now Also Leaks Payment/Staff Data (RESOLVED)
+- [RISK-068](#risk-068) — First-Visit Medical Intake Guard Fired For Every Patient — `reservations` Prop Never Passed
 - [RISK-069](#risk-069) — Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees (RESOLVED)
 - [RISK-070](#risk-070) — Some Roles' "Allowed Modules" Chips Show Untranslated Category Names Instead Of Permission Labels (RESOLVED)
 - [RISK-071](#risk-071) — Notification Settings and Queue Settings Never Hydrate From Saved Data (RESOLVED)
@@ -1110,12 +1220,52 @@ cannot reproduce for new sessions again.
 - [RISK-075](#risk-075) — Doctor Status Feature Wrote To A Column No Migration Created, And Three Layers Of Silent Fallback Turned The Failure Into A 200 OK (RESOLVED)
 - [RISK-076](#risk-076) — Financial Transactions Module: Wrong Column Name Broke Every Real Request, Manual Adjustments Never Applied, Fabricated Demo Data Written To The Real Ledger, No Granular Permission Enforcement (RESOLVED)
 - [RISK-077](#risk-077) — A Wallet-Movement Fix Reopened The Re-Fire Double-Counting It Was Meant To Prevent (RESOLVED)
+- [RISK-078](#risk-078) — Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It (RESOLVED)
 - [RISK-079](#risk-079) — New Reports & Analytics Panel Silently Shows Fabricated Demo Numbers Whenever Real Data Is Genuinely Zero (RESOLVED)
-- [RISK-078](#risk-078) — Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It (RESOLVED — body still filed under Open above, see there)
 - [RISK-080](#risk-080) — Two API Routes Reachable Without Any Session: Patient Roster Read/Write And Supabase Infrastructure Disclosure (RESOLVED)
+- [RISK-082](#risk-082) — `auth-sweep.test.ts`'s Weak "Public" Assertion Let `/api/health/supabase`'s RISK-080 Fix Go Unverified For A Week (RESOLVED)
 - [RISK-083](#risk-083) — Staff Onboarding Depended Entirely On Invitation Email Delivery, Stranding Every New Hire On "Invited" (RESOLVED)
 - [RISK-084](#risk-084) — Legacy Role Labels `Customers` And `Providers` Silently Hid The Patients And Doctors Screens (RESOLVED)
-- [RISK-082](#risk-082) — `auth-sweep.test.ts`'s Weak "Public" Assertion Let `/api/health/supabase`'s RISK-080 Fix Go Unverified For A Week (RESOLVED)
+- [RISK-085](#risk-085) — `POST /api/employees` Had No Role-Tier Guard, So An Admin Could Create Itself A Superadmin (RESOLVED)
+- [RISK-086](#risk-086) — `medical-records/templates` Writes To A Local File That Is Read-Only On Vercel (RESOLVED)
+- [RISK-088](#risk-088) — `POST /api/services` Silently Failed To Create Any New Service (RESOLVED)
+- [RISK-089](#risk-089) — "Database error" Popup Modal on Ending Laser Session Settled with Pulses Package (RESOLVED)
+- [RISK-090](#risk-090) — `GET /api/customers/packages` Had No Authentication, So Anyone Could Read Any Patient's Packages By Phone Number (RESOLVED)
+- [RISK-091](#risk-091) — UI Callers Looked Up A Patient's Package With `?customerId=` But The Route Only Read `customer_id`, So Every Lookup Returned 400 And Was Silently Skipped (RESOLVED — end-to-end symptoms not yet re-verified)
+- [RISK-092](#risk-092) — `POST /api/packages/sell` Wrote Invoice Status `paid` / `partially_paid`, Which The Schema Forbids, So Every Package Sale With Money Attached Returned 500 (RESOLVED)
+- [RISK-093](#risk-093) — New Booking Silently Billed The Package Price When The Package Sale Failed, And Its "Create Patient" Call Sent No Auth Token (RESOLVED)
+- [RISK-095](#risk-095) — RISK-094's Own Rate-Resolution Fix Blocked Every Choice-3A Completion, Because `[Laser Settlement]` Is Written By Every Laser Branch (RESOLVED)
+- [RISK-096](#risk-096) — Every Patient's Package Pulse Balance Lived In One Shared `page_settings` JSON Row — Concurrent Consumes Lost Deductions, And Depletion Never Persisted (RESOLVED)
+- [RISK-098](#risk-098) — Retail Product Balances Were Converted to Synthetic Packages in `GET /api/customers/packages` (RESOLVED)
+- [RISK-099](#risk-099) — The Real Doctor → Reception Flow Never Reached The Deficit Prompt — Three Separate Breaks Found Only By Driving The Actual UI (RESOLVED)
+- [RISK-100](#risk-100) — PAY_PER_PULSE Deficit Cash Is Recorded On The Booking And Customer But Not In The Invoices/Payments Ledger (RESOLVED)
+- [RISK-101](#risk-101) — Selecting A Nonexistent `services.name` Column Broke Invoice Writing For Every Completed Booking, On Dev And Production (RESOLVED)
+- [RISK-102](#risk-102) — New Historical Bookings Still Write No Invoice, So The Ledger Drifts From Customer Totals Again (RESOLVED 2026-09-25)
+- [RISK-105](#risk-105) — Quota Extractor Misidentifying Deductions as Quota and In-Booking Package Purchases Bypassing Pulse Consumption (RESOLVED)
+- [RISK-106](#risk-106) — A Historical Package's "Pulses Used Before Launch" Could Be Entered Two Different, Non-Interoperable Ways (RESOLVED)
+- [RISK-107](#risk-107) — Any Staff Member Could Read, Create, Edit And Delete Clinic Expenses; Any Staff Could Read Assets And Loans (RESOLVED)
+- [RISK-108](#risk-108) — Editing A Historical Booking Corrupted Patient Balances, The Invoice Ledger And Laser Markers (RESOLVED)
+- [RISK-109](#risk-109) — Any Role Whose Name Contained "super" Was Treated As The Owner (RESOLVED)
+- [RISK-110](#risk-110) — Multi-Package Previous Bookings Guessed Package Prices, Deleted Pre-Launch Pulse History, Invoiced Packages That Were Never Created, And Accepted Other Patients' Packages (RESOLVED)
+- [RISK-111](#risk-111) — Doctor/Staff Payroll Summary Excluded Today's Revenue And Looked Up The Wrong Month's Payroll Row, In This Clinic's Own Timezone (RESOLVED)
+- [RISK-112](#risk-112) — Services Screen Shows Every Historical Branch's Price Forever — Deleting Or Deactivating A Branch Never Prunes `branch_pricing` (RESOLVED, admin display only)
+- [RISK-113](#risk-113) — A Transient Failure Verifying The Login Token Was Treated As A Real Logout, Forcing Staff Off The System On A Flaky Connection (RESOLVED)
+- [RISK-114](#risk-114) — Supabase's Own Client Could Sign A Working Staff Session Out On Its Own, With No Deliberate Logout From This App — Minutes Into Active Use, Mid-Booking Or Mid-Edit (RESOLVED)
+- [RISK-115](#risk-115) — Dev DB's `customers.auth_user_id` Column Was Recorded As Migrated But Did Not Physically Exist — Every Edit To An Existing Patient 500'd (RESOLVED)
+- [RISK-116](#risk-116) — `DELETE /api/reservations` Allowed Any Administrator To Hard-Delete Any Or *All* Bookings, With No UI Entry Point To Discover It (RESOLVED)
+- [RISK-117](#risk-117) — Two More Ways A Working Session Was Thrown Out To /login Mid-Booking (Refresh-Looking Logout On The Clinic Laptop) (RESOLVED, ROOT CAUSE ON THE LAPTOP NOT CONFIRMED)
+- [RISK-118](#risk-118) — Reloading The Admin Panel Always Landed On Dashboard, And Every Window Switch Reloaded Every Table With A "Loading" Flash (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+- [RISK-119](#risk-119) — The Admin Shell's Own Polls And Re-Renders Kept Refetching And Flashing Tables (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+- [RISK-120](#risk-120) — Creating A Doctor Failed With "Role 'Doctor' Does Not Exist" Because The Form Invented The Role Name (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+- [RISK-121](#risk-121) — The Admin Panel Sat On "Verifying administrator session..." Until A Slow Employees Request Finished (RESOLVED, NOT YET CONFIRMED UNDER A REAL SLOW BACKEND)
+- [RISK-122](#risk-122) — Reject On The Bookings Pending List Hides The Request On Screen But Saves Nothing (RESOLVED)
+- [RISK-123](#risk-123) — The Doctor's Ongoing Session Panel Stays Open After Reception Completes The Booking (RESOLVED)
+- [RISK-124](#risk-124) — "Soft Delete" Of An Employee Overwrote The Role And Did Not Block Access (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
+- [RISK-125](#risk-125) — Clicking Approve Hides The Booking From The Pending Table Before The Approval Is Confirmed; Cancelling The Dialog Leaves It Hidden (RESOLVED)
+- [RISK-126](#risk-126) — The Bookings Screen Downloaded Reservations, Providers And Prescriptions Straight From Supabase Every 3 s, And The First Two Came Back Empty (RESOLVED)
+- [RISK-127](#risk-127) — The Doctor Portal Briefly Showed Every Doctor's Patients On First Load (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
+- [RISK-128](#risk-128) — The Public Browser Key Could Read Staff Accounts, Salaries, Attendance, Prescriptions And More — And Write Or Delete Accounts And Roles (RESOLVED ON DEV AND PRODUCTION; PRODUCTION SCREENS NOT YET RE-CHECKED BY THE OWNER)
+- [RISK-129](#risk-129) — Patients Who Paid Showed "Total Spend 0" (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -1475,6 +1625,46 @@ could never have logged in. Left as-is rather than silently repointed.
 Drift between the two databases is closed and prod is now provisioned the same reproducible way any
 future clinic fork will be (DEC-001). **The API-authorization half of this entry above is unrelated
 and remains the live concern** — see RISK-080 for the 2026-09-04 audit of it.
+
+---
+
+## RISK-019: RLS Coverage (RESOLVED 2026-10-21 via RISK-128)
+
+**Severity:** Low (was Medium) · **Type:** Security
+**Found:** 2026-07-25 · **Largely resolved 2026-07-25**
+
+Until 2026-07-25, RLS was **disabled** on `reservations`, `customers`, `services`, `providers`,
+`branches`, `categories`, `page_settings`, `provider_attendance`, `rooms`, `service_rooms`,
+`doctor_payroll` and `provider_schedule_audit_logs` — the tables holding patient identities,
+bookings and doctor pay — because `20260722140000_enable_row_level_security.sql` had never been run.
+
+**That migration was applied to dev on 2026-07-25.** RLS is now on for every table in `public`.
+
+A prerequisite had to be fixed first: `src/app/admin/page.tsx` wrote to `customers` directly from
+the browser with the anon key, which enabling RLS would have turned into a silent no-op that still
+reported success. That write moved server-side into `POST /api/inventory/products/sales` in
+`8108b82`, and no client component reads or writes a Supabase table any more.
+
+**Update 2026-10-21:** the residual risk below is not Low: measured with the anon key it exposes staff accounts, payroll, attendance and prescriptions, and the same policies allow writes. Tracked and fixed as RISK-128: applied to the dev project and to production on 2026-10-21, and the check script then reported 0 of 64 tables readable with the browser key on both. The statement below that no client component reads a Supabase table any more is also wrong (`UserProfileView`, `DoctorAccountView`, `AdminNewBookingView`).
+
+**Residual risk:** the subset carrying permissive "allow all" policies (`roles`,
+`employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`,
+`device_maintenance_history`, `admin_roles`) is functionally open — salary and inventory data is
+readable with the anon key. Those policies should be tightened or dropped, since every access path
+now goes through the service role anyway.
+
+**Hazards for new work:**
+- That migration is a one-shot `DO` block, not a trigger. Any table created after it runs has RLS
+  **off** unless its own migration enables it explicitly (the 20260725120000 backfill does this by
+  hand at `:77-79`). A finance migration must do the same.
+- `supabase/migrations/README.md` instructs operators to re-run scripts in filename order.
+  Re-running `20260715202003_add_provider_payroll.sql:26`
+  (`ALTER TABLE doctor_payroll DISABLE ROW LEVEL SECURITY`) after the enable migration would
+  silently turn RLS back off. Same hazard for the `DISABLE` statements throughout
+  `full_migration.sql`.
+- `20260705141244_setup_supabase_schema.sql` sorts **after** `..._141242_full_migration.sql` but is
+  an older, narrower version of the same schema. Harmless only because everything is
+  `IF NOT EXISTS`. Treat `full_migration.sql` as authoritative.
 
 ---
 
@@ -2859,6 +3049,54 @@ arithmetic didn't add up on screen before confirming.
 
 ---
 
+## RISK-057: Doctor-Added Products Never Appeared As Invoice Line Items — Regex Format Mismatch (RESOLVED)
+
+**Severity:** Medium-High · **Type:** Regression / Billing display
+**Found:** 2026-08-17, live on `dev.reveraclinics.com`, immediately after settling the RISK-056 test
+invoice — the printed invoice for a Therapeutic Laser (110 EGP) + 700 EGP product session showed a
+single line item ("Therapeutic Laser — EGP 110"), a Subtotal of EGP 110, and "Amount Paid: EGP
+810" directly beneath it, with nothing on the document explaining the 700 EGP gap. The reception
+booking-details drawer's "Products & Session Consumables" panel showed "No products added" for the
+same booking, despite `amountPaid`/`amountLeft` already being correct (RISK-056).
+
+**What it is:** neither surface stores doctor-added products as structured rows — both
+reconstruct them by regex-parsing the reservation's free-text `notes` field (the same
+`notes`-as-source-of-truth pattern RISK-038 already flagged as a traceability gap). Both parsers
+recognize three note formats: `- Name (xQty) @ Price EGP`, `[Added Product]: Name (xQty) - Total
+EGP`, and `[Extra Device Pulses]: ...`. **None of them match what `DoctorAccountView.tsx`'s
+`handleCompleteTreatment`/`handleSaveClinicalNote` actually write**:
+`[Products Used During Session]: Name (Qty: N x UnitPrice EGP = Total EGP)`. Since the doctor
+portal is the only place a product gets added *during* a session (as opposed to reception adding
+one before/after), every session-added product silently failed to reconstruct on both the
+invoice PDF and the drawer's product panel — the money was always correct (RISK-056), only the
+itemized paper trail was invisible.
+
+**Fixed:** added the same regex,
+`/(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g`,
+matching `[Products Used During Session]: ...` to **three** independent copies of this same
+reconstruction logic in [src/app/admin/page.tsx](../src/app/admin/page.tsx) — not two. First pass
+fixed the `viewingBooking` drawer's Price Details total (`drawerAttachedList`, ~line 23601) and the
+`invoiceBooking` PDF's line items (`invoiceAttachedList`, ~line 27411); deploying and re-testing
+live then surfaced a **third**, entirely separate copy driving the drawer's own "Products & Session
+Consumables" panel (`list`, ~line 23934–23980, its own `existingNames`/`matchAll` calls) — same two
+old patterns, same missing fourth one, same "No products added" symptom, just for a different
+section of the same modal. That third copy is now fixed too. (The checkout modal's own
+`extraAddonsCost` figure was never affected — it derives from `amountLeft + amountPaid -
+baseServicesTotal`, not from parsing `notes`, which is why it displayed correctly even before this
+fix.) No data migration needed — all three reconstruct from `notes` on every render, so this
+retroactively fixes every already-completed booking with this note shape, not just new ones.
+
+**Follow-up landed 2026-08-17 — DEC-042.** Finding a third copy of the identical bug while
+verifying the fix for the first two was the concrete proof that reconciling several independent
+regex-based reconstructions of `notes` instead of writing doctor-added products as real rows is
+fragile. A `reservation_products` staging table now exists (schema + full application wiring
+written and `tsc`/`eslint`/`vitest`-clean; **pending migration application to the dev database** —
+see DEC-042's "Implementation" note). Once live, the `notes`-regex parsers in all three display
+sites become a legacy-data fallback only — new writes go through real rows, and this bug class
+cannot reproduce for new sessions again.
+
+---
+
 ## RISK-059: `/api/reception/dashboard` Had No Auth, Could Clock In The Wrong Receptionist, And Could Silently Reopen An Ended Shift (RESOLVED)
 
 **Severity:** High (P0) · **Type:** Security / Data integrity
@@ -2987,6 +3225,20 @@ staff-guarded assertion set and removed the special-case markers entirely, per t
 
 ---
 
+## RISK-064: "Add New Category" (Services) Has No Arabic Name Field (RESOLVED)
+
+**Severity:** Low · **Type:** Data integrity / i18n
+**Found:** 2026-08-19 · **RESOLVED:** 2026-09-05 (CORRUPT-A09 Master Defect Remediation)
+
+**What it was:** The "Add New Category" modal in `AdminServicesView.tsx` only rendered an English category name input and hardcoded `ar: ""`.
+
+**Resolution:**
+- Added Arabic category name input field (`Category Name (Arabic)` / `اسم الفئة (عربي)`) bound to `newCategoryNameAr`.
+- Updated save handler to persist `ar: newCategoryNameAr.trim()`.
+- Added localized translations in `src/components/admin/translations.ts`.
+
+---
+
 ## RISK-065: `POST /api/packages/consume` Burns A Pre-Paid Session For A Service That Isn't On The Booking
 
 **Severity:** High · **Type:** Financial data integrity / patient entitlement
@@ -3030,43 +3282,6 @@ to add — restoring the guard did not break it.
 `if (!hasService) return NextResponse.json({ error: 'Reservation does not include this package service.' }, { status: 409 });`
 Initially deferred (money-adjacent behaviour on a live flow) so the gap would surface as a visible
 failing spec rather than being silently re-tightened. Mohamed reviewed and approved applying it.
-
----
-
-## RISK-068: First-Visit Medical Intake Guard Fired For Every Patient — `reservations` Prop Never Passed
-
-**Severity:** High · **Type:** Functional regression, doctor workflow
-**Found:** 2026-08-23, fixing test failures surfaced by a non-Windsurf merge. **Status:** RESOLVED
-same day.
-
-**What it is:** commit `4acad04` ("strictly prevent completing or closing treatment if first-visit
-medical record intake is missing") added a real clinical-safety rule to
-`DoctorOngoingSessionTab.tsx`: block "Complete Treatment" for a first-visit patient (no medical
-record on file AND no prior completed visit for the same customer/phone/name) until an intake form
-is saved. The "prior completed visit" half of that check reads a `reservations` prop
-(`patientPastCompletedVisits`, computed via `useMemo` over it) — but `DoctorAccountView.tsx`, the
-component's only real caller, **never passed that prop**. It defaults to `reservations = []`
-(line 136), so `patientPastCompletedVisits` was always empty and `isFirstVisit` was true for every
-patient who didn't already have a `medical_records` row, regardless of actual visit history.
-
-**Consequence:** any returning patient without a previously-saved medical record — plausible for
-most patients given intake wasn't mandatory before this commit — would be incorrectly treated as a
-first-time visitor. Doctors could not close out their session without re-doing intake, on every
-such booking.
-
-**Found via:** two test files broke after the merge (`tests/components/doctor/
-DoctorAccountView.test.tsx`, `tests/components/doctor/DoctorOngoingSessionTab.test.tsx`) — the
-checkout PATCH stopped firing because the new alert-and-return branch intercepted it first.
-Fixing the tests by seeding a past completed visit didn't help, which is what surfaced that the
-prop wiring itself was missing, not just the tests being stale.
-
-**Fix:** `src/components/admin/DoctorAccountView.tsx` — added `reservations={reservations}` to the
-`<DoctorOngoingSessionTab>` call. One line. Verified by reverting it and confirming the affected
-tests go red again (`expected false to be true` — the completion PATCH never fires), then restoring
-it and confirming both test files pass. Also added a dedicated test,
-*"blocks completion for a first-visit patient with no medical record and no prior completed
-visit"*, so the guard itself has real coverage going forward rather than only being an incidental
-side effect of the checkout tests passing.
 
 ---
 
@@ -3150,6 +3365,43 @@ v` unconditionally) and confirming both stripping tests go red, then restoring a
 
 ---
 
+## RISK-068: First-Visit Medical Intake Guard Fired For Every Patient — `reservations` Prop Never Passed
+
+**Severity:** High · **Type:** Functional regression, doctor workflow
+**Found:** 2026-08-23, fixing test failures surfaced by a non-Windsurf merge. **Status:** RESOLVED
+same day.
+
+**What it is:** commit `4acad04` ("strictly prevent completing or closing treatment if first-visit
+medical record intake is missing") added a real clinical-safety rule to
+`DoctorOngoingSessionTab.tsx`: block "Complete Treatment" for a first-visit patient (no medical
+record on file AND no prior completed visit for the same customer/phone/name) until an intake form
+is saved. The "prior completed visit" half of that check reads a `reservations` prop
+(`patientPastCompletedVisits`, computed via `useMemo` over it) — but `DoctorAccountView.tsx`, the
+component's only real caller, **never passed that prop**. It defaults to `reservations = []`
+(line 136), so `patientPastCompletedVisits` was always empty and `isFirstVisit` was true for every
+patient who didn't already have a `medical_records` row, regardless of actual visit history.
+
+**Consequence:** any returning patient without a previously-saved medical record — plausible for
+most patients given intake wasn't mandatory before this commit — would be incorrectly treated as a
+first-time visitor. Doctors could not close out their session without re-doing intake, on every
+such booking.
+
+**Found via:** two test files broke after the merge (`tests/components/doctor/
+DoctorAccountView.test.tsx`, `tests/components/doctor/DoctorOngoingSessionTab.test.tsx`) — the
+checkout PATCH stopped firing because the new alert-and-return branch intercepted it first.
+Fixing the tests by seeding a past completed visit didn't help, which is what surfaced that the
+prop wiring itself was missing, not just the tests being stale.
+
+**Fix:** `src/components/admin/DoctorAccountView.tsx` — added `reservations={reservations}` to the
+`<DoctorOngoingSessionTab>` call. One line. Verified by reverting it and confirming the affected
+tests go red again (`expected false to be true` — the completion PATCH never fires), then restoring
+it and confirming both test files pass. Also added a dedicated test,
+*"blocks completion for a first-visit patient with no medical record and no prior completed
+visit"*, so the guard itself has real coverage going forward rather than only being an incidental
+side effect of the checkout tests passing.
+
+---
+
 ## RISK-069: Non-Superadmin Admin Can Escalate Another Account to Superadmin via PATCH /api/employees (RESOLVED)
 
 **Severity:** Critical · **Type:** Security / Privilege escalation
@@ -3185,6 +3437,46 @@ superadmin) is now a passing `it`; added a matching case for admin → admin (al
 new case proving an admin CAN reassign a target to an ordinary operational role (`manager`) — the
 boundary the first implementation had wrongly closed. 8 passed, 1 unrelated expected-fail
 (`POST /api/roles` permission-key gap).
+
+---
+
+## RISK-070: Some Roles' "Allowed Modules" Chips Show Untranslated Category Names Instead Of Permission Labels (RESOLVED)
+
+**Severity:** Low · **Type:** i18n / display
+**Resolved:** 2026-08-29
+
+**Resolution:**
+`src/components/admin/settings/RoleManagementView.tsx`'s `permissionKeyToLabel` map was extended with mappings for category headers, group prefixes, and legacy coarse category strings (`"Bookings"`, `"Customers"`, `"Providers"`, `"Services"`, `"Settings"`, `"Employees"`, `"Inventory"`, `"HR"`, `"Marketing"`, `"Support"`, `"Reports"`, `"Finance"`, `"Dashboard"`). Legacy seeded roles now render localized Arabic/English permission labels cleanly across the UI.
+
+---
+
+## RISK-071: Notification Settings and Queue Settings Never Hydrate From Saved Data (RESOLVED)
+
+**Severity:** Medium · **Type:** Data integrity / UX
+**Resolved:** 2026-08-29
+
+**Resolution:**
+`fetchPageSettings()` in `src/app/admin/page.tsx` was updated with hydration branches for `data.notifications` (`smsOtp`, `whatsapp`, `email`, `smsTemplate`, `smsTemplateAr`, `reminderHours`, `staffEmail`) and `data.queue` (`virtualRoom`, `showOnScreens`, `autoCheckIn`, `alertThreshold`, `avgSessionDuration`). Reloading the admin panel now hydrates and reflects persisted settings values rather than reverting to default component states.
+
+---
+
+## RISK-072: `POST /api/page-settings` Shallow-Merge Destroys Sibling Fields Within A Key (RESOLVED)
+
+**Severity:** High · **Type:** Data integrity / Settings correctness
+**Resolved:** 2026-08-29
+
+**Resolution:**
+`src/app/api/page-settings/route.ts` was updated with a recursive `deepMergeSettings` utility for both Supabase upserts and fallback JSON file storage. Updating a sub-field within a settings section (e.g. updating `minAdvance` inside `booking`) preserves all existing sibling properties (such as `staleSessionHours`, `termsText`, and `depositPercentage`) without accidental data destruction.
+
+---
+
+## RISK-073: Booking, Notification, and Queue Settings Saves Are Fire-and-Forget (RESOLVED)
+
+**Severity:** Medium · **Type:** Error handling / UX
+**Resolved:** 2026-08-29
+
+**Resolution:**
+`handleSaveBookingSettings`, `handleSaveNotificationSettings`, and `handleSaveQueueSettings` in `src/app/admin/page.tsx` now check `res.ok`, provide explicit user-facing success/error feedback (`alert`), call `clearFetchCache()`, and re-fetch settings via `fetchPageSettings()` upon successful save.
 
 ---
 
@@ -3613,6 +3905,74 @@ in the same pull, see below).
 
 ---
 
+## RISK-078: Granular RBAC / "3-Dots Menus Access Control" Is UI-Only — No Server-Side Enforcement Behind Most Of It (RESOLVED)
+
+**Severity:** High · **Type:** Access control / false sense of security
+**Found:** 2026-08-30, reviewing commits `f713968` ("granular action-level permissions and 3-dots
+menus access control") and `1a61450` per Mohamed's request.
+**Fixed:** 2026-09-07, commit `4213f7a` (as RISK-081/CORRUPT-A10 — same finding, resurfaced by the
+`SYSTEM_CORRUPTIONS_AND_AUDIT.md` review).
+
+**What it is:** `f713968` adds 100+ granular permission keys (e.g. `providers.action_delete`,
+`services.action_delete`, `inventory.delete_product`, `employees.action_delete`) and wires every
+view's buttons/3-dots menus to hide when `hasPermission(key)` is false. `hasPermission` itself
+(`src/app/admin/page.tsx`) is pure client-side state — it only decides what renders in the browser.
+Neither this commit nor `1a61450` touched a single file under `src/app/api/`.
+
+Checked what actually guards the matching endpoints:
+- `DELETE /api/providers` and `DELETE /api/services` call only `requireStaffAccess` — which admits
+  **any** authenticated employee record, any role, zero permission check. Confirmed by reading both
+  handlers directly (`src/app/api/providers/route.ts:522`, `src/app/api/services/route.ts:115`):
+  no code after the `requireStaffAccess` call inspects `access.role` or `access.permissions` at all.
+- `inventory/products`, `inventory/devices`, `customers/products` are the same shape — every
+  handler is `requireStaffAccess` only.
+- `POST /api/roles`, `GET/POST /api/employees` require `requireAdministratorAccess`
+  (`admin`/`superadmin` role only) — unaffected by whatever is in the `permissions` array.
+
+So a role editor can uncheck "Delete Doctor (Table 3-Dots)" for a Receptionist role, and the 3-dots
+button correctly disappears for that receptionist in the browser — but that receptionist's own
+session token can still call `DELETE /api/providers?id=X` directly (devtools, curl, a saved request)
+and it succeeds, because the API was never told about `providers.action_delete` in the first place.
+The Role Management screen looks like a real access-control system; for every module except
+Transactions (`transactions.view`/`.create`/`.refund`, already enforced server-side via
+`hasFinancePermission` from earlier work this session), it currently is not one.
+
+**Secondary, lower-severity symptom of the same gap:** `1a61450` also loosens the client-side gate
+on the Employees and Role Management sections (previously hard-locked to
+`adminRole === "superadmin"`, now also open to any role with `hasPermission("employees.view")` /
+`hasPermission("settings.roles")` etc.). Verified this does **not** newly expose data — `GET
+/api/employees` and `GET/POST /api/roles` still require `requireAdministratorAccess`, so a genuinely
+custom (non-admin/superadmin) role granted that permission just gets a tab that opens to an
+empty/failing state (silently, in `fetchRolesAndEmployees`'s catch block) rather than real content.
+Confusing UX, not a leak — called out here because it's a symptom of the same root cause: the
+granular permission model exists only on the client.
+
+**Business impact:** if a clinic manager configures Role Management believing it restricts what a
+role can do (e.g. blocking a receptionist from deleting a doctor's profile, deleting a service,
+deleting an inventory product), that restriction currently only removes the button from view. It
+does not stop the action.
+
+**Fix:** added `hasGranularPermission()` to `src/lib/access.ts` — mirrors the coarse-category and
+create/edit/delete fallback chains from the client's `hasPermission()` for providers/services/
+inventory/customers, superadmin-only bypass (like `hasFinancePermission`, not `hasStaffPermission`'s
+automatic `admin` bypass). Wired into every mutating verb of `providers`, `services`,
+`inventory/products`, `inventory/devices`, `customers/products`. `employees` and `roles` were left
+as `requireAdministratorAccess` (superadmin/admin only) — that is a real, intentional coarse check
+per RISK-069, not the any-staff gap this fix closes. 16 unit tests for `hasGranularPermission` +
+5 route-level tests proving `DELETE /api/providers`/`DELETE /api/services` — the exact example this
+entry opened with — now reject a role with no matching permission and accept one with the coarse
+category or exact granular key.
+
+**Addendum 2026-09-30:** since commit `0976a72` (2026-09-10) `DELETE /api/providers` and `DELETE
+/api/customers` (soft and hard) are `requireSuperadminAccess`-only, so the "accepts a role with the
+coarse category or granular key" statement above no longer holds for those two DELETE routes —
+`SECURITY.md` and `API_CONTRACT.md` already reflect this (see also RISK-107's `requireFinanceAccess`
+follow-up). `tests/routes/rbac-enforcement.test.ts` asserts the new behaviour. `POST`/`PATCH` on
+`providers` and every verb on `services`/`inventory`/`customers/products` keep the staff + granular
+check described above.
+
+---
+
 ## RISK-079: New Reports & Analytics Panel Silently Shows Fabricated Demo Numbers Whenever Real Data Is Genuinely Zero (RESOLVED)
 
 **Severity:** Medium · **Type:** Data integrity / business-decision risk
@@ -3645,46 +4005,6 @@ zero now renders as `0`.
 
 **Verification:** `npx tsc --noEmit` clean, `npx eslint` 0 errors on the file, manual trace of the
 new expressions against `allReservations`/`providers` empty-array and non-empty cases.
-
----
-
-## RISK-070: Some Roles' "Allowed Modules" Chips Show Untranslated Category Names Instead Of Permission Labels (RESOLVED)
-
-**Severity:** Low · **Type:** i18n / display
-**Resolved:** 2026-08-29
-
-**Resolution:**
-`src/components/admin/settings/RoleManagementView.tsx`'s `permissionKeyToLabel` map was extended with mappings for category headers, group prefixes, and legacy coarse category strings (`"Bookings"`, `"Customers"`, `"Providers"`, `"Services"`, `"Settings"`, `"Employees"`, `"Inventory"`, `"HR"`, `"Marketing"`, `"Support"`, `"Reports"`, `"Finance"`, `"Dashboard"`). Legacy seeded roles now render localized Arabic/English permission labels cleanly across the UI.
-
----
-
-## RISK-071: Notification Settings and Queue Settings Never Hydrate From Saved Data (RESOLVED)
-
-**Severity:** Medium · **Type:** Data integrity / UX
-**Resolved:** 2026-08-29
-
-**Resolution:**
-`fetchPageSettings()` in `src/app/admin/page.tsx` was updated with hydration branches for `data.notifications` (`smsOtp`, `whatsapp`, `email`, `smsTemplate`, `smsTemplateAr`, `reminderHours`, `staffEmail`) and `data.queue` (`virtualRoom`, `showOnScreens`, `autoCheckIn`, `alertThreshold`, `avgSessionDuration`). Reloading the admin panel now hydrates and reflects persisted settings values rather than reverting to default component states.
-
----
-
-## RISK-072: `POST /api/page-settings` Shallow-Merge Destroys Sibling Fields Within A Key (RESOLVED)
-
-**Severity:** High · **Type:** Data integrity / Settings correctness
-**Resolved:** 2026-08-29
-
-**Resolution:**
-`src/app/api/page-settings/route.ts` was updated with a recursive `deepMergeSettings` utility for both Supabase upserts and fallback JSON file storage. Updating a sub-field within a settings section (e.g. updating `minAdvance` inside `booking`) preserves all existing sibling properties (such as `staleSessionHours`, `termsText`, and `depositPercentage`) without accidental data destruction.
-
----
-
-## RISK-073: Booking, Notification, and Queue Settings Saves Are Fire-and-Forget (RESOLVED)
-
-**Severity:** Medium · **Type:** Error handling / UX
-**Resolved:** 2026-08-29
-
-**Resolution:**
-`handleSaveBookingSettings`, `handleSaveNotificationSettings`, and `handleSaveQueueSettings` in `src/app/admin/page.tsx` now check `res.ok`, provide explicit user-facing success/error feedback (`alert`), call `clearFetchCache()`, and re-fetch settings via `fetchPageSettings()` upon successful save.
 
 ---
 
@@ -3748,20 +4068,6 @@ an in-memory rate limiter, which would be ineffective across Vercel's per-instan
 Revisit if staff report targeted phishing.
 
 **Manual test checklist:** `ai_docs/manual_tests/RISK_080_MANUAL_TESTS.md`
-
----
-
-## RISK-064: "Add New Category" (Services) Has No Arabic Name Field (RESOLVED)
-
-**Severity:** Low · **Type:** Data integrity / i18n
-**Found:** 2026-08-19 · **RESOLVED:** 2026-09-05 (CORRUPT-A09 Master Defect Remediation)
-
-**What it was:** The "Add New Category" modal in `AdminServicesView.tsx` only rendered an English category name input and hardcoded `ar: ""`.
-
-**Resolution:**
-- Added Arabic category name input field (`Category Name (Arabic)` / `اسم الفئة (عربي)`) bound to `newCategoryNameAr`.
-- Updated save handler to persist `ar: newCategoryNameAr.trim()`.
-- Added localized translations in `src/components/admin/translations.ts`.
 
 ---
 
@@ -4046,74 +4352,6 @@ once discovered live, rather than in a demo.
 
 ---
 
-## RISK-087: Two Independent Implementations Decide How An Underpayment/Overpayment Settles (PARTIALLY RESOLVED)
-
-**Severity:** Medium · **Type:** Maintainability / consistency risk
-**Found:** 2026-09-15, same review as RISK-086. **Extraction fixed 2026-09-17. Regressed** by the
-same `git checkout origin/dev -- .` incident as RISK-086 — `settlePaymentMismatch()` and its 12
-tests were lost entirely (not just reverted to the local-file shape; the function and
-`tests/lib/billing.test.ts`'s coverage of it were gone), and the inline `diff`-based block was back
-in `previous/route.ts`. Not caught until 2026-09-29. **Re-extracted 2026-09-29** — same signature
-shape as `computeSettledBalances`, 12 new cases in `tests/lib/billing.test.ts`; the existing
-`tests/routes/reservations-previous.test.ts` (never touched) stayed green throughout, confirming
-the re-extraction changed no behavior. The deeper cross-flow question (below) is still open.
-
-**Fix:** `src/app/api/reservations/previous/route.ts`'s inline wallet-vs-debt allocation
-(the block described below) is now `settlePaymentMismatch()` in `src/lib/billing.ts` — a small,
-named, directly-tested pure function, called by the route instead of the logic living inline in a
-route handler. This removes the "hand-written business logic buried in a route file, invisible to
-anyone not reading that file" problem, and gives the rule its own unit tests
-(`tests/lib/billing.test.ts`, 12 cases) independent of the route's own integration tests
-(`tests/routes/reservations-previous.test.ts`, unchanged and still green — confirming the
-extraction changed no behavior).
-
-**Not resolved by this — deliberately out of scope:** the regular checkout flow
-(`PATCH /api/reservations` + `admin/page.tsx`'s checkout modal) still decides wallet usage in the
-frontend rather than calling `settlePaymentMismatch()`; unifying that is a separate, larger change
-(it would mean the checkout modal's "use wallet balance" checkbox either goes away or the route
-gains an "auto-allocate" mode) and was not attempted here. The original finding below stays for that
-reason — two conceptually-equivalent rules still exist, just one of them is no longer the badly-
-factored one.
-
-**Original finding (2026-09-15), kept for context:**
-
-**What it is:** deciding *how much of an underpayment draws from an existing wallet credit before
-adding debt to `outstanding`, and how much of an overpayment pays down existing debt before
-crediting the wallet* is business logic that exists **twice**, in two different places, written
-independently:
-
-1. `src/app/api/reservations/previous/route.ts:264-301` — an inline `diff`-based calculation run
-   entirely server-side when staff record a historical (pre-system) booking. It **automatically**
-   decides wallet-vs-debt allocation from `parsedValue`/`parsedPaid` and the customer's current
-   balances.
-2. The regular checkout flow (`PATCH /api/reservations`, `admin/page.tsx`'s checkout modal) instead
-   splits this responsibility: the **frontend** computes how much wallet to draw
-   (`useWalletBalance ? Math.min(walletBalance, balanceDue) : 0`) and sends that as an explicit
-   `walletWithdrawal`/`walletDeposit` amount; `src/lib/billing.ts`'s `computeSettledBalances()`
-   (tested, `tests/lib/billing.test.ts`) then just applies whatever deltas it's given — it does not
-   itself decide *whether* to use the wallet.
-
-Neither implementation is confirmed wrong — each does what its own inline comments say, and
-`tests/routes/reservations-previous.test.ts` pins implementation 1's rules exactly as documented.
-The risk is that these are two independently-maintained answers to conceptually the same question
-("how does a payment mismatch settle against a patient's wallet and debt"). A future change to the
-allocation rule (e.g. "cap wallet usage at 50% of a debt" or a rounding fix) applied to one will not
-apply to the other unless someone remembers both exist. If the two rules are ever accidentally
-allowed to diverge further, staff could see different settlement behavior for what looks to them
-like the same kind of transaction, depending only on which screen recorded it.
-
-**Fix required, done for implementation 1 (see the top of this entry):** extracted into
-`settlePaymentMismatch()` in `billing.ts`. Implementation 2 (the checkout flow) still splits the
-decision between the frontend and `computeSettledBalances()` and was deliberately left alone.
-
-**Tests:** `tests/lib/billing.test.ts` now covers `settlePaymentMismatch()` directly (12 cases);
-`tests/routes/reservations-previous.test.ts`'s "settlement math" describe block (9 cases) covers it
-through the route. `tests/lib/billing.test.ts` separately covers `computeSettledBalances()`
-(implementation 2). No test asserts the two functions are equivalent — they still don't share a
-common interface, and per the note above, making them equivalent was not the goal of this fix.
-
----
-
 ## RISK-088: `POST /api/services` Silently Failed To Create Any New Service (RESOLVED)
 
 **Severity:** High (P1) · **Type:** Correctness / data integrity
@@ -4323,34 +4561,6 @@ Reception's End Session has no purchase step at all: a package is only sold at b
 
 ---
 
-## RISK-094: Laser Package Deficit Settlement Had No Safety Net and Could Bill an Unsold Package (PARTIALLY RESOLVED)
-
-**Severity:** Critical (P0) · **Type:** Money / data integrity / concurrency
-**Found:** 2026-09-21, Brief 34 investigation. **Safety-net fixes completed 2026-09-21; the shared pulse-store race remains open for Brief 34B.**
-
-**What was confirmed:**
-1. `PATCH /api/customers/packages` correctly clamps a request to the package's remaining pulses and returns both `consumed` and `requested`, with booking-keyed idempotency. Its primary balance and idempotency store is nevertheless the single `page_settings` row `customer_package_pulses`; concurrent read-modify-write requests can overwrite one another, and the native `customer_packages` sync is best-effort. Brief 34 deliberately did not move this store.
-2. Choice 3A in `DoctorAccountView.tsx` consumed the old package before selling the replacement package, ignored failed sale/deduction responses, still wrote a full-price `New Package:` line, and then completed the session. A patient could therefore be billed for a package that was never sold while the pulse deficit remained unresolved.
-3. Reservation laser snapshot fields were referenced before any migration documented them. The 42703 compatibility retry silently stripped real columns alongside missing ones and returned an apparently successful reservation.
-4. Six money-path rate calculations silently substituted 1 EGP per pulse. Package consumption also invented a 10,000-pulse quota for unknown or unconfigured package rows.
-
-**Safety-net fix:**
-- Added the unapplied, idempotent migration `20260921000000_add_laser_settlement_columns_to_reservations.sql` and matching `DB_SCHEMA.md` entries for nullable `laser_payment_mode`, `laser_price_per_pulse`, and `delivered_pulses`, with no historical defaults.
-- The 42703 compatibility path now logs and returns its exact `droppedColumns`; the doctor completion payload no longer sends nonexistent `reservations.price` / `total_price` keys.
-- Added route tests for package clamping, validation, synthetic IDs, expiry, authentication, unknown UUIDs, and booking idempotency, plus pure deficit/rate tests.
-- Choice 3A now runs sale → new-package deficit deduction → invoice line → old-package deduction → completion. Every required response is checked; a failure keeps the session open and reports which irreversible steps already occurred.
-- Per-pulse rates now resolve only through reservation snapshot → Booking Settings `booking.defaultPricePerPulse` → legacy notes regex. An unresolved rate returns/alerts a real configuration error and writes no per-pulse line. Unknown package quotas are rejected instead of becoming 10,000.
-
-**Still open, deliberately not fixed here:**
-- The cross-patient lost-update race in the shared `page_settings.customer_package_pulses` blob; queued Brief 34B moves the balance and idempotency guard to relational storage.
-- `DoctorOngoingSessionTab.tsx` still derives a missing catalog package quota from its name and falls back to 10,000; resolving unknown totals needs the queued product decision.
-- `totalLaserDeliveredPulses` counts only laser additional services while `totalSessionPulses` counts pulse values from all additional services, so package and device deductions can disagree.
-- The master per-pulse price location remains undecided; the implemented chain does not presume device vs service vs clinic ownership.
-
-**Manual test checklist:** `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_34_MANUAL_TESTS.md`
-
----
-
 ## RISK-095: RISK-094's Own Rate-Resolution Fix Blocked Every Choice-3A Completion, Because `[Laser Settlement]` Is Written By Every Laser Branch (RESOLVED)
 
 **Severity:** High (P1) · **Type:** Regression / correctness · **Found:** 2026-09-22, live-verifying
@@ -4499,92 +4709,6 @@ afterward; confirmed zero residue.
 
 ---
 
-## RISK-097: Brief 35 Deficit Resolution Is Ordered, Not Transactional — A Failure Between Steps Leaves A Partially-Applied Settlement (PARTIALLY RESOLVED — retry path fixed, cross-table atomicity still open)
-
-**Found:** 2026-09-23 during Brief 35 implementation. **Retry-recovery bug found and fixed 2026-09-24
-during live verification** (migration applied, full scenario matrix run against the real dev
-database — see the Evidence log).
-**Status:** the specific failure mode below — a retry after a partial failure silently reporting
-"nothing to resolve" instead of recovering — is fixed. The underlying lack of a single cross-table
-transaction remains open by design (see "Not fixed").
-
-`POST /api/reservations/laser-deficit` performs up to three writes in sequence: (1) source-package
-consume via `consume_package_pulses` RPC, (2) the resolution write — `POST /api/packages/sell`
-(invoices + invoice_lines + customer_packages + payments) or the `reservation_products` deficit line,
-and (3) the `reservations.laser_deficit_resolution` marker. There is no single transaction spanning
-them (the sell path is a route handler, not an RPC), so a failure between steps is a real partial
-state:
-
-- **Marker write fails after the resolution succeeded** (including when migration
-  `20260923000000_add_laser_deficit_resolution_to_reservations.sql` has not been applied yet — the
-  columns won't exist): the route returns 500 with "do not retry; reconcile manually," but the
-  invoice line/package sale already happened. A retry that ignores the warning would double-charge
-  the invoice line; the PAY_PER_PULSE line-write has a `description ILIKE 'Excess Laser Pulses
-  Deficit%'` guard so the *line* is not duplicated, but the package-sale path has no equivalent
-  protection.
-- **BUY_NEW_PACKAGE sells the package, then the deficit consume fails or returns
-  `consumed < deficit`:** the patient owns a package and its invoice exists, but the deficit pulses
-  were not deducted. The route returns 500 with the exact partial state in the message.
-- **Marker columns absent entirely (migration unapplied):** resolution still works, but
-  `laser_deficit_resolution` stays NULL forever, so idempotency falls back to the notes-tag /
-  deficit-line heuristics — weaker than the column.
-
-**Mitigations already in place:** consume is idempotent per `(customer_package_id, reservation_id)`
-(Brief 34B unique index); the PAY_PER_PULSE line is guarded against double-write; every failure
-message states exactly what did and did not happen, and never reports success.
-
-**Bug found live, 2026-09-24, and fixed — the retry path was actually unsafe, not just loud.**
-Reproduced directly: forced the invoice-line write to fail after the consume step had already
-succeeded (see the `addedByRole` bug below), leaving the source package drained (`fully_used`, 0
-remaining) with no marker and no invoice line — exactly the documented partial state. But the
-*retry*, called after fixing the immediate cause, did not recover: `computeDeficitState`'s package
-lookup (`activePulsePackages`) filters `.eq('status', 'active')`, and Brief 34B flips a drained
-package to `'fully_used'`. The retry therefore found **no source package at all**, concluded
-`noActivePackage: true`, and returned `{ success: true, deficitPulses: 0 }` — a **silent no-op that
-looked like success**, worse than the loud 500 this risk originally described. A real ~2,000-pulse,
-10,000 EGP deficit would have gone permanently unbilled had the receptionist trusted that response.
-**Fix:** added `packageAlreadyTouchedForReservation()` — looks up `package_pulse_usage` rows for the
-specific reservation and treats that package as the authoritative source regardless of its current
-status, ahead of the active-package fallbacks. Re-verified live: the same reservation, retried after
-the fix, correctly recomputed the 2,000-pulse deficit and resolved it. Also verified this covers the
-rate-unconfigured retry case (consume succeeds, PAY_PER_PULSE's rate check fails after it, `NULL`
-rate then configured, retried — resolves correctly).
-
-**Separate bug found and fixed in the same pass:** the PAY_PER_PULSE line write hardcoded
-`addedByRole: 'receptionist_checkout'`, but `reservation_products.added_by_role`'s CHECK constraint
-only allows `'doctor_session'` or `'receptionist'` — every PAY_PER_PULSE resolution failed with a
-500 on the real database (never caught by the fake, which doesn't enforce CHECK constraints).
-Changed to `'receptionist'`.
-
-**Not fixed:** a single Postgres function wrapping consume + sale + marker in one transaction. That
-would require reimplementing `/api/packages/sell` inside SQL (invoices, invoice_lines, payments,
-wallet movements, transaction ledger — too much to duplicate); deferred as deliberate scope. A
-failure that happens *after* the source package is already fully drained now recovers correctly on
-retry (fixed above); a failure at the marker-write step specifically, after the resolution itself
-(sale or invoice line) already fully succeeded, still needs the manual reconciliation this risk
-originally described — that residual case was not exercised live (it requires injecting a failure
-at that exact point) and is left as-is.
-
-**Live-verified against the real dev database, 2026-09-24 (migration
-`20260923000000_add_laser_deficit_resolution_to_reservations.sql` applied):** GET preview and POST
-resolve for both `PAY_PER_PULSE` and `BUY_NEW_PACKAGE` on disposable test data — correct deficit
-math, correct invoice/payment amounts, correct marker writes; idempotent repeat calls for both
-choices (`alreadyResolved: true`, zero additional writes); no-deficit (sufficient balance) consumes
-normally and writes no marker; no-active-package refuses cleanly with no fabricated deficit;
-expired-package refuses before any write; unresolvable-rate refuses with a real 400 before any
-invoice write (and, per the fix above, recovers correctly once the rate is configured and the call
-is retried); unauthenticated → 401; invalid/missing reservationId → 400; non-existent reservation →
-404. All disposable test rows deleted afterward, confirmed zero residue. Doctor-side screen
-confirmed directly from source (`DoctorOngoingSessionTab.tsx`'s Option 3 block): delivered-pulses
-input plus presets, and — only when `packageDeficit > 0` — one neutral amber notice ("Recorded
-pulses exceed the package balance. Reception will resolve this at checkout."); no package name,
-balance, price, or choice control anywhere in that block, matching DEC-079 exactly.
-
-**Manual checklist:** `ai_docs/manual_tests/LASER_DEFICIT_BRIEF_35_MANUAL_TESTS.md` — Evidence log
-filled in with the above.
-
----
-
 ## RISK-098: Retail Product Balances Were Converted to Synthetic Packages in `GET /api/customers/packages` (RESOLVED)
 
 **Severity:** Medium · **Type:** UI & Domain Isolation
@@ -4598,6 +4722,7 @@ Cherry-picked from commit `71c33e0`. See DEC-081.
 **Fix:** Removed the `customer_product_balances` conversion from `GET /api/customers/packages`. Packages are now sourced exclusively from `customer_packages`.
 
 **Verified:** Automated tests in `tests/routes/customers-packages.test.ts` (including new test verifying product balances are excluded from packages response) pass, and this session independently re-ran the full suite after the merge — see the merge commit for the current count.
+
 ---
 
 ## RISK-099: The Real Doctor → Reception Flow Never Reached The Deficit Prompt — Three Separate Breaks Found Only By Driving The Actual UI (RESOLVED)
@@ -4746,83 +4871,6 @@ note the finance revenue/cash reports now exclude `is_opening` invoices (audited
 
 ---
 
-## RISK-103: Laser Landing Pages Make Marketing Claims That Nobody Has Verified, And Conversion Tracking Is Inactive Until A GTM ID Is Set (OPEN)
-
-**Severity:** Medium · **Type:** Marketing claims / ad-policy / measurement · **Found:** 2026-09-25 · **Related:** DEC-087
-
-The pages are live in code but these items came from Manus and were never checked against the clinic:
-- **Google rating "4.9 ★ · 31 reviews"** and the three review quotes (`CLIENT.googleRating`,
-  `LANDING_REVIEWS`) — must match the Maps listing at the moment ads go live.
-- ~~Device name promised but never shown~~ — **resolved 2026-09-25:** owner supplied **Candela GentleMax Pro**
-  (`CLIENT.laserDevice`); headlines, trust bar, device section and FAQ now name it and state it suits all skin
-  types. Still needs the owner's device photo to replace the placeholder panel in the device section, and the
-  "suits all skin types" wording should be kept tied to the device (not to outcomes) for Google Ads policy.
-- **"تبريد قبل كل نبضة"** (cooling) and **"8–10 جلسات"** — clinical claims; confirm with the doctor.
-- **Doctor photo** (`doctor-portrait.webp`, from `doctor/portrait-about.jpg`) is not confirmed to be the
-  laser practitioner. Note `doctor/portrait-main.jpg` is byte-identical to `clinic/treatment.jpg` (a
-  microneedling shot), so it must not be used as a "doctor" image.
-- ~~Address~~ — **resolved 2026-10-19:** owner supplied "Ozone Medical Center، عيادة C261، حي النرجس، التجمع الخامس، القاهرة الجديدة" (replaces the vague Manus address). Still worth checking it matches the Maps listing pin.
-- **Opening hours / reply time** are not stated anywhere; visitors are told to WhatsApp for "المواعيد".
-- **Tracking:** `landing_view`, `whatsapp_click`, `call_click`, `map_click`, `scroll_depth` go to
-  `dataLayer`. GTM container **GTM-5ZXBL7LR** is now installed on the landing pages (`CLIENT.gtmId`), but the
-  container still needs triggers/tags mapping these events to Google Ads conversions. Until then Google Ads
-  sees zero conversions from these pages.
-- **Ad policy:** absolute outcome/safety claims were removed from headlines, but Google Ads' healthcare
-  policies should be re-read against the final ad text (not only the page).
-
-**Fix:** clinic owner/doctor confirms each claim (or it is edited out); create the GTM container, set
-`NEXT_PUBLIC_GTM_ID` in Vercel, map the events to conversions, and test with Tag Assistant. Checklist:
-`ai_docs/manual_tests/LASER_LANDING_PAGES_MANUAL_TESTS.md` (check 11).
-
----
-
-## RISK-104: Finance Section Understates Revenue And Cash — Pulses-Package Revenue Is Never Recognised, And Cash In `transactions` Exceeds The Ledger (OPEN)
-
-**Severity:** High (financial reporting) · **Type:** Financial ledger / revenue recognition · **Found:** 2026-09-25 (production audit, read-only SQL reproducing each report's inputs; the Finance UI itself was not reviewed — the browser pane had no signed-in session). **Related:** DEC-023, DEC-086, RISK-102.
-
-Production figures at audit time (September 2026 is the only month with live data; backfilled history excluded):
-
-| Input | Value | What it means |
-|---|---|---|
-| Live invoices | 29 issued, 48,300 EGP | lines: **package 46,550**, product 1,750, service 0 |
-| Ledger cash (`payments`) | 45,950 (all cash) | vs invoices 48,300: 3 underpaid invoices, 2,400 outstanding |
-| `transactions` payments, not historical | 52,300 | 44,500 linked to an invoice + **3 manual payments (7,800) with no invoice** |
-| `package_revenue_recognitions` | **0 rows** | while 6 pulses packages (30,000) are sold |
-| `invoice_lines.provider_id` | NULL on 29/29 | doctor P&L is 100% "unattributed" |
-| `cogs_snapshot` / `commission_snapshot` NULL | 19 of 29 lines | margins overstated on those lines |
-| expenses / fixed assets / loans | 0 / 0 / 0 | "fully-loaded profit" equals contribution margin |
-
-**1. Package revenue is never recognised for laser pulses packages.** `pnl` / `trend` / `branch-pnl` /
-`new-vs-returning` count `service` and `product` invoice lines plus `package_revenue_recognitions`
-(DEC-023: package cash is deferred, revenue is recognised as sessions are delivered). Recognitions are
-written only by the DB function `consume_customer_package_session`, i.e. for **services** packages.
-Pulses packages (all 6 on production) are consumed through `consume_package_pulses` (Brief 34B) and the
-deficit route, neither of which writes a recognition. Result: September P&L revenue reads ~1,750 (products
-only) against 45,950 cash actually received. **Fix direction:** recognise revenue when pulses are
-consumed (pro-rata, in the same transaction as `consume_package_pulses`) and back-fill from
-`package_pulse_usage` — designed in **DEC-088 (Proposed 2026-09-25; two items need owner confirmation)**,
-no code yet.
-
-**2. Cash flow and `transactions` disagree.** `cashflow` sums `payments` (45,950); `transactions` holds
-52,300 of non-historical payments. The 7,800 gap is three `source = manual` payments with no invoice
-(e.g. the `zaki` booking, 2,000 paid, completed with no invoice before RISK-101 was fixed) plus payments
-recorded on the ledger but not in `transactions`. Which table the Finance screens should treat as the
-source of truth is undecided (RISK-016).
-
-**3. Doctor P&L has no attribution.** No invoice line carries `provider_id`, so `finance/doctor-pnl` puts
-everything in `unattributed` and `commission-payouts` returns nothing from the ledger.
-
-**4. Empty cost side.** No expenses, assets or loans are recorded, and 19 of 29 lines have no COGS or
-commission snapshot — every profit figure is a revenue figure until those are entered.
-
-**Presentation addressed (DEC-088 item 9, built 2026-09-26 on dev, not yet on main):** the P&L now shows a cash → revenue bridge and a deferred package balance, and the tiles are labelled "Revenue earned" / "Cash received", so the gap is explained on screen instead of looking like a bug. Observation from the production numbers: package cash in September (44,150) has no matching deferred balance because most package invoices have no surviving `customer_packages` row — see `ai_docs/manual_tests/FINANCE_CASH_VS_REVENUE_MANUAL_TESTS.md`.
-
-**Not a Finance-code bug (verified):** the backfilled historical invoices (`is_opening`) are correctly
-excluded from all eight revenue/cash reports (DEC-086, `tests/routes/finance-opening-invoices.test.ts`).
-Checklist: `ai_docs/manual_tests/HISTORICAL_INVOICE_BACKFILL_MANUAL_TESTS.md`.
-
----
-
 ## RISK-105: Quota Extractor Misidentifying Deductions as Quota and In-Booking Package Purchases Bypassing Pulse Consumption (RESOLVED)
 
 **Severity:** High (P1) · **Type:** Logic / Deficit detection  
@@ -4864,6 +4912,8 @@ gets recognised. 5 tests in `tests/routes/reservations-previous-package.test.ts`
 **Not done:** the equivalent gap for a *services* package's `qty_used` written directly via
 `packageItemsUsage` at booking creation (same missing-audit-trail shape, lower severity — `services` packages
 have no production instances of this pattern yet, unlike pulses).
+
+---
 
 ## RISK-107: Any Staff Member Could Read, Create, Edit And Delete Clinic Expenses; Any Staff Could Read Assets And Loans (RESOLVED)
 
@@ -5135,6 +5185,7 @@ pattern is still open, tracked in the manual checklist's last item (ask the clin
 after it ships).
 
 ---
+
 ## RISK-114: Supabase's Own Client Could Sign A Working Staff Session Out On Its Own, With No Deliberate Logout From This App — Minutes Into Active Use, Mid-Booking Or Mid-Edit (RESOLVED)
 
 **Manual test checklist:** `ai_docs/manual_tests/RISK_114_MULTI_TAB_AUTH_RECOVERY_MANUAL_TESTS.md`
@@ -5291,6 +5342,7 @@ scope for that sweep (it only asserts no-token→401 and patient-session→403, 
 **Not done / unconfirmed:** this could not be reproduced here (it needs the clinic laptop) and Vercel runtime logs were not available, so which of the two paths (or the 1-hour inactivity timer after the laptop slept) caused the clinic's case is a diagnosis from the code, not an observation. The inactivity timer is unchanged: it counts mouse, keyboard, click, scroll and touch, so typing in a form keeps it alive, but a laptop that sleeps for an hour comes back logged out by design. If it happens again, the notice on the login page names the cause. Also worth checking on that laptop: its date/time and time zone are correct.
 
 ---
+
 ## RISK-118: Reloading The Admin Panel Always Landed On Dashboard, And Every Window Switch Reloaded Every Table With A "Loading" Flash (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
 
 **Manual test checklist:** `ai_docs/manual_tests/RISK_118_REFRESH_BEHAVIOUR_MANUAL_TESTS.md`
@@ -5318,6 +5370,7 @@ scope for that sweep (it only asserts no-token→401 and patient-session→403, 
 ---
 ## PROPOSALS.md Reference
 
+---
 
 ## RISK-119: The Admin Shell's Own Polls And Re-Renders Kept Refetching And Flashing Tables (RESOLVED, NOT YET CONFIRMED IN THE BROWSER)
 
@@ -5395,7 +5448,6 @@ See `PROPOSALS.md` for:
 
 **Not fixed / limits:** a request that still fails after the retry leaves that list empty until the next refetch (opening Employees or Profile refetches). The in-memory confirmation cache is per server instance, so each cold instance pays the lookups once.
 
-
 ---
 
 ## RISK-122: Reject On The Bookings Pending List Hides The Request On Screen But Saves Nothing (RESOLVED)
@@ -5443,6 +5495,8 @@ See `PROPOSALS.md` for:
 
 **Fix:** DEC-117: an `is_active` flag checked by `requireStaffAccess`, `verifyHrAccess` and `/api/auth/me`, plus a Supabase Auth ban; soft delete now just switches the account Inactive.
 
+---
+
 ## RISK-125: Clicking Approve Hides The Booking From The Pending Table Before The Approval Is Confirmed; Cancelling The Dialog Leaves It Hidden (RESOLVED)
 
 **Severity:** Medium (a still-pending request vanishes from the list while the Pending badge still counts it; staff can think it was handled) · **Type:** Optimistic UI without rollback
@@ -5474,9 +5528,9 @@ See `PROPOSALS.md` for:
 
 **Verified live 2026-10-21** (test database): over 64 s on Bookings, `/api/prescriptions` at 0, 15, 30, 45 and 60 s and **zero** direct Supabase requests (before: reservations, providers and prescriptions requests every 3 s); doctor portal over 54 s: a reservations request every 3 s, never more than one in flight; a started booking opened the Ongoing Session panel in 1.0 s and a completion closed it in 3.0 s.
 
-**Behaviour change to know about:** nothing the Bookings screen shows depended on the browser reads on this database. If the **production** database does not have row-level security on `reservations` (RISK-019 says it was applied to dev; production is not confirmed in this repo), those reads used to work there and bookings reached this screen within 3 s; they now arrive with the shell's authenticated poll (15 s) and after the user's own actions. Production should be checked (below): if the browser key can read reservations there, that is a patient-data exposure on its own.
+**Behaviour change to know about:** nothing the Bookings screen shows depended on the browser reads on this database. If the **production** database does not have row-level security on `reservations` (RISK-019 says it was applied to dev; production was confirmed blocked on 2026-10-21, see RISK-128), those reads used to work there and bookings reached this screen within 3 s; they now arrive with the shell's authenticated poll (15 s) and after the user's own actions. Production should be checked (below): if the browser key can read reservations there, that is a patient-data exposure on its own.
 
-**Still open (not part of this fix):** the browser key can read `prescriptions` (and the other "allow all" tables listed in RISK-019). To check any database, request `/rest/v1/reservations?select=id&limit=1` with the anon key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) as both `apikey` and bearer token: `[]` means row-level security is blocking it, rows mean the table is open.
+**Was still open when this fix landed; closed by RISK-128 (2026-10-21).** The browser key could read `prescriptions` (and the other "allow all" tables listed in RISK-019). Production also blocks it now (checked with `scripts/check-anon-access.mjs`). To check any database, run that script, or request `/rest/v1/reservations?select=id&limit=1` with the anon key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) as both `apikey` and bearer token: `[]` means row-level security is blocking it, rows mean the table is open.
 
 ---
 
@@ -5493,7 +5547,9 @@ See `PROPOSALS.md` for:
 
 **Not changed:** the doctor filter itself (`isDoctorMatch`) and the server-side list (`GET /api/reservations` still returns what the caller's role may read); the fix is that the screen no longer shows anything before it has applied the filter. The doctor portal shows 0 patients for a moment on first load instead of other doctors' data.
 
-## RISK-128: The Public Browser Key Could Read Staff Accounts, Salaries, Attendance, Prescriptions And More — And Write Or Delete Accounts And Roles (MIGRATION WRITTEN, NOT YET APPLIED)
+---
+
+## RISK-128: The Public Browser Key Could Read Staff Accounts, Salaries, Attendance, Prescriptions And More — And Write Or Delete Accounts And Roles (RESOLVED ON DEV AND PRODUCTION; PRODUCTION SCREENS NOT YET RE-CHECKED BY THE OWNER)
 
 **Manual test checklist:** `ai_docs/manual_tests/RISK_128_CLOSE_OPEN_RLS_MANUAL_TESTS.md`
 
@@ -5504,15 +5560,15 @@ See `PROPOSALS.md` for:
 
 **Why nothing visibly broke:** every API route uses the service role key and bypasses RLS, so the application never needed these policies; they only helped strangers.
 
-**Fix: `supabase/migrations/20261023000000_close_open_rls_policies.sql` (written and tested, not applied to any database yet).**
+**Fix: `supabase/migrations/20261023000000_close_open_rls_policies.sql` (tested on a throwaway Postgres, then applied to the dev project and to production on 2026-10-21; see "Applied and checked" below).**
 - Enables RLS on the listed tables (no-op where it already is).
 - Drops every policy open to public / anon / authenticated on: `device_maintenance_history`, `employee_notes`, `hr_leave_requests`, `hr_missing_alerts`, `hr_payroll`, `hr_performance_reviews`, `inventory_devices`, `inventory_products`, `prescriptions`, `product_sales`, `roles`, `terms_and_conditions`. None of these is read from the browser (terms are served by `/api/terms`).
-- `employee_accounts` and `hr_attendance`: drops the INSERT / UPDATE / DELETE / ALL policies and **keeps a public SELECT policy** (re-created if the only open policy was an ALL one), because `UserProfileView.tsx` and `DoctorAccountView.tsx` still read these two tables straight from the browser.
+- `employee_accounts` and `hr_attendance`: drops the INSERT / UPDATE / DELETE / ALL policies and **kept a public SELECT policy** (re-created if the only open policy was an ALL one) for as long as `UserProfileView.tsx` and `DoctorAccountView.tsx` read these two tables straight from the browser. Those screens now use `/api/profile*` (next paragraph), and the two remaining read policies were dropped with the two `DROP POLICY` statements in the migration header.
 - Never touches policies limited to `service_role`. Idempotent. Rollback = re-create the baseline policies (not recommended).
 - Tested in PGlite (in-process Postgres) against the 35 real baseline policy statements: before, the anon key could read, insert, update and delete on all 13 tables; after, it can do none of that on the 12 closed tables and can only read the two kept ones; a second run changes nothing; an ALL-only `hr_attendance` keeps its read; a table with RLS off is closed. The service role is unaffected.
 - Side effect: realtime events for `prescriptions` stop reaching the browser (they depended on the open policy); the Bookings screen polls every 15 s and on prescription events (RISK-126).
 
-**Follow-up done (2026-10-21, branch `fix/profile-reads-via-api`): the two screens no longer read those tables from the browser.** `UserProfileView` and `DoctorAccountView` now use three new authenticated routes that only ever return the signed-in caller's own data and take no id from the request: `GET /api/profile` (own employee row with the schedule, and the matching provider row), `GET /api/profile/attendance?from&to` and `GET /api/profile/payroll?from&to&view=doctor|staff` (own employee, provider, the month's `doctor_payroll` row, and the money collected on the caller's own bookings). `/api/employees` and `/api/hr/attendance` are admin / HR only, which is why non-admin staff only ever saw their profile through the open read policies. The old reads of `providers`, `doctor_payroll`, `reservations` and `branches` in the same screens were already blocked by RLS (they returned nothing); they now come from the routes, and `branches` from `/api/branches`. Nothing in the browser reads `employee_accounts` or `hr_attendance` any more, so after this code is deployed the last two read policies can be dropped (the two statements are in the migration header). Tests: `tests/routes/profile.test.ts` (19: self-scoping, ignored ids, validation, revenue rules, strict provider matching; mutation-checked), `tests/components/UserProfileView.test.tsx` (rewritten to the new routes; asserts no table is read) and `tests/components/doctor/DoctorAccountView.test.tsx` (+4). Verified live: both screens and the doctor portal made no request to `*.supabase.co`.
+**Follow-up done (2026-10-21, branch `fix/profile-reads-via-api`, merged to `dev` and `main`): the two screens no longer read those tables from the browser.** `UserProfileView` and `DoctorAccountView` now use three new authenticated routes that only ever return the signed-in caller's own data and take no id from the request: `GET /api/profile` (own employee row with the schedule, and the matching provider row), `GET /api/profile/attendance?from&to` and `GET /api/profile/payroll?from&to&view=doctor|staff` (own employee, provider, the month's `doctor_payroll` row, and the money collected on the caller's own bookings). `/api/employees` and `/api/hr/attendance` are admin / HR only, which is why non-admin staff only ever saw their profile through the open read policies. The old reads of `providers`, `doctor_payroll`, `reservations` and `branches` in the same screens were already blocked by RLS (they returned nothing); they now come from the routes, and `branches` from `/api/branches`. Nothing in the browser reads `employee_accounts` or `hr_attendance` any more, so after this code is deployed the last two read policies can be dropped (the two statements are in the migration header). Tests: `tests/routes/profile.test.ts` (19: self-scoping, ignored ids, validation, revenue rules, strict provider matching; mutation-checked), `tests/components/UserProfileView.test.tsx` (rewritten to the new routes; asserts no table is read) and `tests/components/doctor/DoctorAccountView.test.tsx` (+4). Verified live: both screens and the doctor portal made no request to `*.supabase.co`.
 
 **Behaviour that changes with it (all because the old reads never worked under RLS):**
 - The doctor's provider record now actually loads, so a booking assigned to their provider id shows for them even when another name is on it, and one assigned to a different provider no longer matches by name alone (the matching rules in `DoctorAccountView` were written for this).
@@ -5522,10 +5578,15 @@ See `PROPOSALS.md` for:
 
 **Not covered:** `AdminNewBookingView.tsx` (services, providers, branches, rooms, customers, reservations) and the `reservation_products` reads in `page.tsx` / `BookingDetailsModal.tsx` still call Supabase from the browser. RLS blocks all of them, so they already return nothing and are no security issue, but they are dead reads that should move to the API too.
 
-**Before applying (owner):**
-1. Run `scripts/check-anon-access.mjs` on **production** too: it may not have RLS at all (RISK-019 only confirms dev).
-2. Apply the migration to dev first, rerun the script (expect only `employee_accounts` and `hr_attendance` readable), and walk the checklist.
-3. Apply to production in a quiet window.
+**Applied and checked (2026-10-21, owner):** the migration and the two read-policy drops were run on the dev project and on production. `node scripts/check-anon-access.mjs` now reports 0 readable tables on both (64 checked; 8 are empty, so the result says nothing for them). Profile screens were checked on dev after the change; the same check on production (profile, HR attendance, doctor portal) is still to be done by the owner. Not covered by the script: writes with the browser key.
+
+**Guards added:** `tests/lib/migrationsRls.test.ts` reads the migrations and fails when a new one creates an open policy (`USING (true)` / `WITH CHECK (true)`, except for `service_role`) or a table without `ENABLE ROW LEVEL SECURITY` (mutation-checked). It found one old case, `terms_and_conditions`, created without RLS and open until this migration; it is listed as the only exception. `check-anon-access.mjs` now falls back to the table names in the migrations when the project refuses to list its tables to the anon key (HTTP 401, the case on production) and stops with a clear message on a rejected key instead of calling every table blocked. Run it on every new clinic project before handing it over and after any migration that adds tables; it needs a real project, so it is not part of the test suite.
+
+**Order used when applying (and to follow on any other clinic's project):**
+1. Run `scripts/check-anon-access.mjs` first to see what is open (production may not have had RLS at all; RISK-019 only confirmed dev).
+2. Deploy the code that reads through `/api/profile*` **before** dropping the last two read policies, or the staff profile screen goes blank.
+3. Apply the migration, then the two `DROP POLICY` statements, then rerun the script: expect 0 readable.
+4. Walk the checklist.
 
 ---
 

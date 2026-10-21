@@ -5,6 +5,7 @@
 > **Last Updated:** 2026-09-05  
 > **Audited Modules:** User View (Public Website & Booking), Admin View (Operations & Finance), Doctor View (Clinical Intake & Portal), Database & API Security  
 > **Remediation Status:** All 28 cataloged defects remediated and verified with automated test suites, type checking, and production builds.
+> **Caveat (2026-10-21 audit):** RISK-081 (open in `RISKS.md`) found that this catalog marks several defects "fixed" whose scope decisions are still open (A01/A05/A06/A07). Read RISK-081 before trusting a "Remediated" line. This is a 2026-09-05 snapshot; later findings are in `RISKS.md`.
 
 ---
 

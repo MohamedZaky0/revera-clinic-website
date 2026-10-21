@@ -1,5 +1,7 @@
 # Go-Live Checklist — Reception & Doctor Workflows
 
+> **Likely obsolete (2026-10-21 audit):** production went live in September 2026, after this list was written (2026-08-17). Items were not re-checked. Delete the file once the owner confirms nothing in it is still wanted.
+
 > **Temporary file — delete once every item below is closed.** Not part of the permanent doc set
 > (`RISKS.md`/`DECISIONS.md` stay as the durable record; this is just a punch list to work off of
 > and throw away). Written 2026-08-17 after a full audit of `RISKS.md` (58 entries),

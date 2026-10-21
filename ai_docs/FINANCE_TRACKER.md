@@ -1,5 +1,11 @@
 # FINANCE_TRACKER.md — PROPOSAL-002 Execution Tracker
 
+> **Status note, 2026-10-21 audit:** this is a planning tracker whose row statuses were maintained up to roughly Phase 4 (2026-07-29)
+> and not afterwards. Phases 0 to 5 have since shipped in code (the Finance section, the Reports section and the pulse revenue recognition
+> are live, DEC-088 and DEC-097), and production has been live since September 2026. Phase 5 rows below were corrected from the code;
+> rows **0.0(f), 1.15 and 1.16 were not re-verified** and may still read `TODO` when the work exists or was dropped (DEC-026: no history
+> backfill). For what is true now, trust `DECISIONS.md`, `RISKS.md`, `DB_SCHEMA.md` and the code over any `TODO` here.
+>
 > **Purpose:** a single place where anyone working on the Finance module can see what is done,
 > what is in progress, what is blocked, and exactly what each task requires.
 > **More than one developer is working in this codebase.** Update this file in the same commit as
@@ -25,7 +31,7 @@
 ## All existing data is mock
 
 Every reservation, customer, sale and inventory row in the database is development test data.
-Production has never gone live (confirmed 2026-07-25). Consequences:
+Production had never gone live when this was written (confirmed 2026-07-25; it went live in September 2026, after which this no longer describes production, which holds real clinic data and must not be reset). Consequences for the **dev** database:
 
 - **You can freely reset, wipe or reshape data.** Nothing in there needs preserving.
 - **No backfill is being built** (DEC-026, supersedes DEC-020). Real data begins at go-live.
@@ -3774,17 +3780,17 @@ endpoints documented in the same commit as their code.
 
 | ID | Task | Depends on | Status | Owner | Commit |
 |---|---|---|---|---|---|
-| 5.1 | Migration: reservation status-transition timestamps + `no_show` status | — | `TODO` | — | — |
-| 5.2 | Migration: holiday/leave calendar table | — | `TODO` | — | — |
-| 5.3 | Migration: `refused_demand` table | — | `TODO` | — | — |
-| 5.4 | Fix provider `shifts[]` collapse in `/api/availability` | — | `TODO` | — | — |
-| 5.5 | Library: `src/lib/capacity.ts` — room/doctor minutes, bottleneck, utilization (pure functions) | 5.1, 5.4 (schema/data shape only) | `TODO` | — | — |
-| 5.6 | Library: `src/lib/breakeven.ts` — break-even revenue (pure functions) | 4.6 (fixed cost inputs), 4.7 (contribution margin ratio) | `TODO` | — | — |
-| 5.7 | Library: `src/lib/serviceMix.ts` — CM/minute ranking, greedy allocation, sellable-capacity netting | 4.7, 5.5, 1.13 (undelivered package sessions) | `TODO` | — | — |
-| 5.8 | Regression checks for 5.5–5.7 | 5.5, 5.6, 5.7 | `TODO` | — | — |
-| 5.9 | `GET /api/finance/capacity` | 5.1–5.5, 5.8 | `TODO` | — | — |
-| 5.10 | `GET /api/finance/service-mix` | 5.6, 5.7, 5.8 | `TODO` | — | — |
-| 5.11 | `API_CONTRACT.md` rollup for Phase 5, plus final `FINANCE_TRACKER.md` close-out check | rolling | `TODO` | — | — |
+| 5.1 | Migration: reservation status-transition timestamps + `no_show` status | — | `DONE` | — | `20260728000000_add_no_show_and_postponed_reservation_status.sql`, `20260729020000_add_reservation_status_timestamps.sql` |
+| 5.2 | Migration: holiday/leave calendar table | — | `DONE` | — | `20260729020100_create_holiday_calendar.sql` |
+| 5.3 | Migration: `refused_demand` table | — | `DONE` | — | `20260729020200_create_refused_demand.sql` (schema only, no UI) |
+| 5.4 | Fix provider `shifts[]` collapse in `/api/availability` | — | `DONE` | — | `availability/route.ts` reads `shifts[]` (`scratch/phase5availabilitycheck.ts`) |
+| 5.5 | Library: `src/lib/capacity.ts` — room/doctor minutes, bottleneck, utilization (pure functions) | 5.1, 5.4 (schema/data shape only) | `DONE` | — | file exists |
+| 5.6 | Library: `src/lib/breakeven.ts` — break-even revenue (pure functions) | 4.6 (fixed cost inputs), 4.7 (contribution margin ratio) | `DONE` | — | file exists |
+| 5.7 | Library: `src/lib/serviceMix.ts` — CM/minute ranking, greedy allocation, sellable-capacity netting | 4.7, 5.5, 1.13 (undelivered package sessions) | `DONE` | — | file exists |
+| 5.8 | Regression checks for 5.5–5.7 | 5.5, 5.6, 5.7 | `DONE` | — | `scratch/phase5capacitycheck.ts`, `phase5breakevencheck.ts`, `phase5servicemixcheck.ts` (no Vitest file for these libs) |
+| 5.9 | `GET /api/finance/capacity` | 5.1–5.5, 5.8 | `DONE` | — | route exists; documented in `API_CONTRACT.md` |
+| 5.10 | `GET /api/finance/service-mix` | 5.6, 5.7, 5.8 | `DONE` | — | route exists; documented in `API_CONTRACT.md` |
+| 5.11 | `API_CONTRACT.md` rollup for Phase 5, plus final `FINANCE_TRACKER.md` close-out check | rolling | `DONE` (rollup) | — | 2026-10-21 docs audit; the close-out pass over every earlier row was not done |
 
 ---
 

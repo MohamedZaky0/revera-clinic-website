@@ -1,8 +1,8 @@
 # API_CONTRACT.md — Revera Clinics API Endpoints
 
-> **Last Updated:** 2026-08-29 (`/api/customers/settle-debt` added; `/api/transactions*` corrected — RISK-076)
+> **Last Updated:** 2026-10-21 (audit: every route handler on `dev` is now documented, 84 of 84; the entries after the `Routes documented late` heading were added then; `/api/health/supabase`, `/api/auth/me` and `/api/roles` corrected)
 > **Base:** Next.js App Router API routes under `/app/api/`
-> **Auth:** Server-side bearer-token validation is enabled on selected sensitive routes (including employee, role, payroll, reservation PATCH/DELETE, product-sales mutations, every Phase 3 expenses/assets/loans route, and every Phase 4 `/api/finance/*` reporting route — each additionally gated on a specific `finance.*` permission via `hasFinancePermission`, not just staff membership); coverage is not yet universal. All routes use the Supabase service role key server-side
+> **Auth:** every route checks access in its own handler (staff, administrator, superadmin, finance permission, HR role, or the caller's own identity); a few are public on purpose (catalog reads, availability). `SECURITY.md` §3 is the method-by-method table; this file names the gate in each entry only where it matters. All routes use the Supabase service role key server-side.
 > **Previous content was for a different project — discarded entirely**
 
 ---
@@ -18,9 +18,9 @@
 
 ## GET /api/health/supabase
 
-Diagnostics: checks which Supabase env vars are present and previews their values.
+Administrator only. Diagnostics: checks which Supabase env vars are present and which variable name supplied each, and does a one-row `services` read to confirm the connection. Secret values are never echoed; only the URL has a short `valuePreview`.
 
-**Response:** `{ supabaseUrl: {...}, serviceRoleKey: {...}, anonKey: {...} }`
+**Response:** `{ ok, connected, timestamp, checks: { supabaseUrl: { present, source, valuePreview }, supabaseSecret: { present, source }, supabasePublishable: { present, source } }, sample }`; on failure `{ ok: false, connected: false, error, checks }` with `500`.
 
 ---
 
@@ -943,9 +943,15 @@ Returns all roles with their permission arrays.
 
 Creates or updates a role.
 
-**Body:** `{ id?, name, permissions }`
+**Body:** `{ id?, name, permissions, workspace? ('standard' | 'doctor') }` — `workspace` decides which screens the role lands on (DEC-113); omitted keeps the stored value.
 
 **Response:** Upserted role
+
+---
+
+## PATCH /api/roles
+
+Superadmin only. Locks or unlocks a role. **Body:** `{ name, locked: boolean }`. Core system roles cannot be unlocked (`400`); `404` if the role does not exist. **Response:** the updated role.
 
 ---
 
@@ -1062,7 +1068,7 @@ Verifies the Bearer JWT and returns the employee's role + permissions from `empl
 
 **Headers:** `Authorization: Bearer <supabase-jwt>`
 
-**Response:** `{ user, employee, role, permissions }`
+**Response:** `{ id, role, department, workspace ('standard' | 'doctor'), isAlsoDoctor, permissions, email, employeeId }`. `workspace` is the role's explicit workspace (DEC-113) and `isAlsoDoctor` the account flag (DEC-114). `403` with `code: "account_inactive"` for an inactive account (DEC-117); `503` when Supabase auth cannot be reached right now, so the client keeps the session (RISK-113).
 
 ---
 
@@ -2070,5 +2076,212 @@ Consumes pulses included in a patient's active package.
 }
 ```
 
+---
 
+# Routes documented late (2026-10-21 audit)
 
+These routes existed before this section was written; the contract was out of date for them. Each entry was written from
+the handler on `dev` (methods, who may call, parameters, response keys). Who may call each one, method by method, is in
+`SECURITY.md` §3. Errors are `{ error }` as everywhere else.
+
+## GET /api/profile
+
+Staff. The signed-in person's **own** employee row and, when they are a doctor, their provider row. Takes no id: the identity is
+the bearer token (RISK-128). The provider is matched strictly (same id, phone, national id, or exact normalised name; exactly
+one match, otherwise `null`).
+
+**Response:** `{ employee, provider }` — `employee` is the `employee_accounts` row plus `branch_ids` and `working_days_hours` / `workingDaysHours` (saved schedule); `provider` is a `providers` row or `null`. `404` if the employee record is missing.
+
+---
+
+## GET /api/profile/attendance?from={YYYY-MM-DD}&to={YYYY-MM-DD}
+
+Staff. The caller's own `hr_attendance` rows between two dates, newest first. `400` if either date is missing or not ISO. Admin / HR read everyone's through `/api/hr/attendance`.
+
+**Response:** array of `hr_attendance` rows.
+
+---
+
+## GET /api/profile/payroll?from={YYYY-MM-DD}&to={YYYY-MM-DD}&view=doctor|staff
+
+Staff. What the profile screen needs for the caller's pay summary and target progress. `view=doctor` counts the money collected on bookings assigned to the caller, anything else (`staff`) the bookings the caller created; only `completed`, `confirmed`, `approved` and `started` bookings, summed by `amount_paid`. The month of `from` selects the `doctor_payroll` row.
+
+**Response:** `{ employee, provider, doctorPayroll, targetRevenue }` (`provider` and `doctorPayroll` may be `null`).
+
+---
+
+## GET /api/invoices?reservationId={id}
+
+Staff. The latest non-void invoice for a booking, with its lines and bilingual item names (the immutable ledger data written at checkout, RISK-010).
+
+**Response:** `{ invoice: { id, invoice_no, reservation_id, customer_id, branch_id, issued_at, subtotal, discount_total, grand_total, status } | null, lines: [{ id, line_type, service_id, product_id, description, qty, unit_price, discount, line_total, nameEn, nameAr }] }`. `400` without `reservationId`.
+
+---
+
+## POST /api/reservation-products
+
+Staff. Adds a line (product, additional service or device pulses) to a booking as a real `reservation_products` row (DEC-042). Deducts product stock. If the booking is already `completed` and has an issued invoice, the line is also added to that invoice. It does **not** change `amount_paid` / `amount_left`; the caller does that with a separate `PATCH /api/reservations`.
+
+**Body:** `{ reservationId, lineType: 'product'|'additional_service'|'device_pulses', description, productId?, serviceId?, qty?, unitPrice?, addedByRole? ('doctor_session' default) }`
+
+**Response:** `{ id, name, qty, unitPrice, total, addedBy }`. `404` if the booking does not exist.
+
+---
+
+## GET /api/reservations/laser-deficit?reservationId={id}
+## POST /api/reservations/laser-deficit
+
+Staff. Reception checkout is the only place a laser-pulse deficit is settled (Brief 35, DEC-079). GET previews: delivered pulses, source package, already-consumed amount, deficit, resolved rate and the resolution state. POST resolves it with `{ reservationId, choice: 'BUY_NEW_PACKAGE' | 'PAY_PER_PULSE', packageId?, sourceCustomerPackageId?, paymentMethod?, amountPaid? }`. The client sends no amounts: pulses, balance, package price and rate are all re-resolved on the server. Idempotent per reservation (`reservations.laser_deficit_resolution`).
+
+---
+
+## Rooms
+
+### GET /api/rooms
+**Public.** All rooms with branch names. **Response:** array of `{ id, name, type, status, branchId, branchNameEn, branchNameAr, createdAt }`.
+
+### POST /api/rooms
+Staff. **Body:** `{ name, type, branchId, status? ('available' default) }`. **Response:** created room, `201`. `400` when a required field is missing.
+
+### PATCH /api/rooms?id={id}
+Staff. Same body fields as POST; send what changes. **Response:** updated room.
+
+### DELETE /api/rooms?id={id}
+Staff. **Response:** `{ success: true, message }`.
+
+---
+
+## Service ↔ room mappings
+
+### GET /api/service-rooms?serviceId={id}&roomId={id}
+**Public.** Both filters optional. **Response:** array of `{ service_id, room_id }`.
+
+### POST /api/service-rooms
+Staff. Replaces a mapping set, in one of two shapes: `{ serviceId, roomIds: [...] }` (all rooms of one service) or `{ roomId, serviceIds: [...] }` (all services of one room). The existing rows for that service / room are deleted first. `400` if neither shape is sent.
+
+---
+
+## Terms and conditions
+
+### GET /api/terms?active_only={true}
+**Public** (the public Terms page). **Response:** `{ terms: [...] }`.
+
+### POST /api/terms
+Administrator. Creates an item. `400` unless the English title and content are present. **Response:** `{ term }`.
+
+### PUT /api/terms
+Administrator. Updates one item (`id`), or reorders when the body is an array of `{ id, sort_order }`. **Response:** `{ term }` or `{ success: true }`.
+
+### DELETE /api/terms?id={id}
+Administrator. **Response:** `{ success: true }`.
+
+---
+
+## Employee notes
+
+### GET /api/employees/notes?employeeId={id}
+Administrator. Notes about one employee, newest first, each with `creator: { id, name } | null`.
+
+### POST /api/employees/notes
+Administrator. **Body:** `{ employeeId, note, createdBy? }`. **Response:** the created note with `creator`, `201`.
+
+### DELETE /api/employees/notes?id={id}
+Administrator. **Response:** `{ success: true }`.
+
+---
+
+## Provider schedule audit logs
+
+### GET /api/providers/schedule-audit-logs
+Staff. All `provider_schedule_audit_logs` rows, newest first (an empty array if the table cannot be read).
+
+---
+
+## HR (HR access = superadmin, admin or hr role, `verifyHrAccess`)
+
+### GET /api/hr/payroll
+HR. Staff payroll rows with the employee joined. Doctors, and employees flagged `is_also_doctor`, are left out: they are paid through Doctor Payroll (DEC-113, DEC-114).
+
+### POST /api/hr/payroll
+HR. **Body:** `{ month: 'YYYY-MM' }`. Runs payroll for every non-doctor employee account; rows already paid are skipped. **Response:** `{ success, count, skippedPaid }`.
+
+### PATCH /api/hr/payroll
+HR. **Body:** `{ id, bonuses?, deductions?, status? }`. Recomputes the net pay. **Response:** the updated row; `404` if not found.
+
+### GET /api/hr/leaves
+HR. Leave requests with the employee joined, newest first.
+
+### POST /api/hr/leaves
+Any staff (self-service). **Body:** `{ employeeId, leaveType, startDate, endDate, reason? }`. Counts the days inclusively and stores status `Pending`. **Response:** the created request, `201`.
+
+### PATCH /api/hr/leaves
+HR. **Body:** `{ id, status, approvedBy? }`. **Response:** the updated request.
+
+### GET /api/hr/performance
+HR. Reviews with employee and reviewer joined, newest first.
+
+### POST /api/hr/performance
+HR. **Body:** `{ employeeId, reviewerId, rating, comments?, goals? }`; the review date is today. **Response:** the created review, `201`.
+
+### DELETE /api/hr/performance?id={id}
+HR. **Response:** `{ success: true }`.
+
+### GET /api/hr/alerts
+HR. Unresolved missing-check-in alerts with the employee joined.
+
+### POST /api/hr/alerts
+Any staff (self-service). **Body:** `{ employeeId }`. Logs a missing-check-in alert. **Response:** the alert, `201`.
+
+### PATCH /api/hr/alerts
+HR. **Body:** `{ id, resolved }`. **Response:** the updated alert.
+
+---
+
+## Customer avatars
+
+### GET /api/customer-avatars?id={customerId}
+**Public.** With `id`: `{ id, avatar_url }`; without: the whole map `{ [customerId]: url }`. Stored in `page_settings` under key `customer_avatars`.
+
+### POST /api/customer-avatars
+Staff. **Body:** `{ id, avatar_url }`; an empty `avatar_url` removes the avatar. **Response:** `{ success, id, avatar_url }`.
+
+---
+
+## Medical records
+
+Staff only (PHI, RISK-080).
+
+### GET /api/medical-records?customerId={id}&reservationId={id}
+Intake records and uploaded reports for a patient (optionally narrowed to one booking). Both `customerId` / `customer_id` spellings are accepted.
+
+### POST /api/medical-records
+**Body:** `{ type: 'form' | 'report', customerId, ... }` plus either the intake fields (`recordData`) or the report fields (`reportData`); `reservationId` optional. `form` (default) upserts the patient's intake form; `report` adds an uploaded report. `400` without a customer id.
+
+### DELETE /api/medical-records?reportId={id}
+Deletes one uploaded report.
+
+### GET | POST | PUT | DELETE /api/medical-records/templates
+Intake form templates mapped per service, in the `medical_record_templates` table only (RISK-086; no local file). GET takes `serviceId` (templates that apply to that service); an empty table is seeded once with the three built-in defaults. POST body: `{ title, description?, service_ids[], fields[], is_default? }`; PUT updates by `id`; DELETE takes `id` / `templateId`. Setting `is_default` clears it on the others.
+
+---
+
+## POST /api/inventory/devices/{id}/reset-pulses
+
+Staff. Resets a device's pulse counter and writes a `device_maintenance_history` row. **Body:** `{ reason, performedBy, notes?, resetToZero? }`.
+
+---
+
+## POST /api/translate
+
+Staff. Translates text through Google Translate's public endpoint. **Body:** `{ text, from? ('auto'), to? ('ar') }`. **Response:** `{ translation, translatedText }`. `400` without `text`.
+
+---
+
+## Finance reports added after the first Phase 4 write-up
+
+All are `GET`, need a staff token plus the permission shown, and take `branchId?` with either `period=YYYY-MM` or `from` / `to` (inclusive dates), unless noted.
+
+- **GET /api/finance/capacity** — `finance.view_capacity` (or `reports.view_analytics`). Per branch and clinic-wide: room / doctor / bottleneck minutes, booked minutes, utilisation, no-show rate. **Response:** `{ range, branchId, assumedOpenMinutesPerDay, note, clinicWide, byBranch }`. Booked minutes read 0 before 2026-07-29 (`completed_at` was added then, no backfill).
+- **GET /api/finance/service-mix** — `finance.view_margins` (or `reports.view_financial_reports`). Break-even revenue, services ranked by contribution margin per bottleneck minute, the greedy-optimal allocation, maximum potential revenue and the gap decomposed into idle capacity, suboptimal mix and no-show loss. **Response:** `{ range, branchId, note, breakEven, rankedServices, capacity, allocation, maxPotentialRevenue, actualServiceRevenue, gapToPotential, gapDecomposition }`. The demand cap per service is the period's actual delivered sessions, not a forecast.
+- **GET /api/finance/revenue-bridge** — `finance.view_pnl`. Cash received in the period (payments on live issued invoices, as `cashflow`) and how much of it paid for packages (deferred, DEC-088 item 9). **Response:** `{ range, branchId, cashReceived, packageCashReceived }`. Opening (historical) invoices are excluded.
+- **GET /api/finance/deferred-packages** — `finance.view_pnl`. No parameters. The deferred package balance as of now: money collected for services not yet delivered, by pulses and by sessions per service, plus packages whose price is still pending. **Response:** `{ asOf, ... }` from `computeDeferredBreakdown`.

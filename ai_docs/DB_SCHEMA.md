@@ -1,6 +1,6 @@
 # DB_SCHEMA.md — Revera Clinics Database Schema
 
-> **Last Updated:** 2026-09-17 (Reception bot automation tables added — see the end of this file)
+> **Last Updated:** 2026-10-21 (checked table by table against `supabase/migrations/`: every table created there is documented and every migration after 2026-09-17 is reflected; RLS section brought up to date; the reception bot tables at the end are documented ahead of their migration, which is not committed to `dev` yet)
 > **Database:** Supabase (PostgreSQL)
 > **Audited from:** `supabase/migrations/*.sql`, live API routes, and a direct linked dev schema dump on 2026-07-26
 > **Previous content was for a different project — discarded entirely**
@@ -245,8 +245,9 @@ read-only `/api/availability`. An admin can double-book a doctor from the panel.
 | `enable_reminder` | boolean | Default true |
 | `branch_pricing` | JSONB | Array of `{name, price, visible, status, isDefault}`, default `{}` |
 | `islaser` / `is_laser` | boolean | Default false. **Added 2026-09-20** by `20260920010000_add_islaser_to_services.sql`. Marks service as laser service requiring equipment device connection and enabling 3-tier payment options. |
-| `visible` | boolean | default true |
+| `visible` | boolean | default true. Also set to false by the soft delete, and the admin Services list hides every `visible = false` row. Do not use it to mean "not on the website". |
 | `active` | boolean | default true |
+| `show_on_website` | boolean | NOT NULL, default true. **Added 2026-10-19** by `20261019000000_add_show_on_website_to_services.sql` (DEC-111). Whether the public website (services section, services page, online booking) offers this service. `false` keeps it fully usable in the admin: reception can book it, the doctor can add it to a session, packages can include it. Separate from `active` and `visible`. The WhatsApp bot (`/api/bot/services`) does not look at it. |
 | `created_at` | timestamptz | |
 
 ---
@@ -1588,9 +1589,15 @@ enabled (30 days for memory, 180 days for the log).
 
   A subset — `roles`, `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`,
   `inventory_products`, `inventory_devices`, `product_sales`, `device_maintenance_history`,
-  `admin_roles` — also carries permissive "allow all" policies, so it is functionally open.
-  **Every other table has RLS on with no policies at all: service-role-only.** Any code path
-  reaching for the anon key will silently receive zero rows.
+  `terms_and_conditions`, `admin_roles` — carried permissive "allow all" policies in the baseline, so they were
+  functionally open to the public browser key. **RISK-128:**
+  `supabase/migrations/20261023000000_close_open_rls_policies.sql` drops those policies, and the last two read policies
+  (`employee_accounts`, `hr_attendance`) were dropped once the browser stopped reading them. Applied to the dev project
+  and to production on 2026-10-21; `node scripts/check-anon-access.mjs` then reported 0 of 64 tables readable with the
+  browser key on both (8 tables are empty, so the result says nothing for them; writes with the browser key were not
+  tested). **Every table now has RLS on with no open policy: service-role-only.** Any code path reaching for the anon key
+  will silently receive zero rows. `tests/lib/migrationsRls.test.ts` fails when a new migration adds an open policy or a
+  table without `ENABLE ROW LEVEL SECURITY`. Run the script on every new clinic project.
 
   **History, because this entry has been wrong before.** Until 2026-07-25 this migration had never
   been run, and RLS was off on `reservations`, `customers`, `services`, `providers`, `branches` and

@@ -1,5 +1,7 @@
 # Admin Panel: Componentization → Arabic i18n → Automated Testing
 
+> **Size check (2026-10-21):** `src/app/admin/page.tsx` is about 11.7k lines (27.7k at the start); the status below is dated 2026-08-23 and was not re-verified section by section.
+>
 > **Status (updated 2026-08-23):** Employees, HR, and Role Management are all fully extracted
 > (DEC-027) AND translated (DEC-043), independently verified end-to-end — Briefs 21/22/25
 > (extraction), 23/24/25 (translation). Brief 23's first submission was reviewed and rejected (the

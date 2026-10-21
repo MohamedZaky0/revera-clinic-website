@@ -1,6 +1,6 @@
 # PROPOSALS.md — Proposed Refactors
 
-> **Status:** PROPOSED — review before executing. Do not implement without explicit approval.
+> **Status:** PROPOSED — review before executing. Do not implement without explicit approval. **As of 2026-10-21:** PROPOSAL-001 is executed (DEC-099) and PROPOSAL-002 (Finance) is executed and live; both entries below keep their original text as the record of the plan.
 
 ---
 
@@ -188,7 +188,7 @@ Forking for client #2:
 
 ## PROPOSAL-002: Finance & Management Accounting Module
 
-> **Status:** PROPOSED — plan approved in discussion 2026-07-25, not yet executed.
+> **Status:** EXECUTED — approved 2026-07-25; Phases 0 to 5 are built and the Finance and Reports sections are live (see `FINANCE_TRACKER.md`, DEC-014…DEC-026, DEC-088, DEC-097). The text below is the original plan, kept as the record of intent; where it disagrees with the code, the code wins. The open follow-ups are RISK-104 and the opening-balance import (tracker row 1.15), which was not confirmed built.
 > **Audited from:** 6-agent parallel codebase discovery, 2026-07-25. Every claim below is
 > cited to `file:line`. Findings that contradict `ai_docs/` are called out explicitly.
 

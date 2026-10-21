@@ -1,14 +1,9 @@
 # TESTING.md — Testing Strategy
 
-> **Last Updated:** 2026-09-30
-> **Corrected 2026-09-30 (was stale since 2026-08-03):** this file used to say there is no automated
-> test suite. That has not been true for a while — a real **Vitest** suite exists (`package.json`'s
-> `"test": "vitest run"`) with ~1,270 tests across ~70 files under `tests/lib/`, `tests/routes/` and
-> `tests/components/` (route-handler tests using a shared in-memory Supabase fake, jsdom tests for
-> components, and pure-function unit tests for `src/lib/*`). **Treat this file's date and the actual
-> test tree (`ls tests/`) as more current than any older doc line claiming otherwise, including
-> elsewhere in this file's own prose below where it wasn't fully reconciled.** This file now documents
-> four layers, not three.
+> **Last Updated:** 2026-10-21. Measured on `dev` that day: `npx vitest run` reports **91 test files, 1,511 passed, 4 expected
+> fail** in about 10 seconds. Those numbers drift with every change; re-measure with `npx vitest run` instead of trusting this line.
+> There is still **no CI** (no `.github/`): nothing runs the suite on push, so it only protects you if you run it. This file
+> documents four layers.
 
 ---
 
@@ -30,9 +25,13 @@ npm test                    # same as `npx vitest run`
   network. This is the layer that actually verifies authorization checks, stored-row shapes, and
   ledger/balance arithmetic against something more exacting than a manual click-through.
 - `tests/components/*.test.tsx` — jsdom + Testing Library tests for admin React components.
+- `tests/regression/` — one file that re-checks fixed RISKs; `tests/helpers/` — the shared Supabase fake and fixtures.
+- `tests/lib/migrationsRls.test.ts` — reads `supabase/migrations/*.sql` as text and fails when a new migration creates an open
+  policy (`USING (true)` / `WITH CHECK (true)`, other than for `service_role`) or a table without `ENABLE ROW LEVEL SECURITY`
+  (RISK-128). It never touches a database.
 - **Convention, not optional:** a test asserts *correct* business behaviour, never whatever the code
   happens to do today. A known bug gets `it.fails(...)` referencing its `RISK-NNN`, never `it.skip`.
-  Five such expected-failures exist in the suite right now — `npx vitest run` reporting "N passed | 5
+  Four such expected-failures exist in the suite right now — `npx vitest run` reporting "N passed | 4
   expected fail" is the suite being green, not a problem to chase.
 - A change to money/authorization/data-integrity logic should come with a test in this layer, not
   only a `scratch/` script or a manual checklist — this layer is what actually runs on every future
@@ -57,6 +56,16 @@ npm run check       # all three, in order
 - These three catch type/syntax/build errors. They catch **zero** business-logic or data-integrity
   bugs on their own — Layer 0 is what catches those now; historically (before Layer 0 existed) most
   entries in `RISKS.md` were bugs that typechecked and built cleanly.
+
+### Layer 1b — Database checks that need a real project (run by hand)
+
+- `scripts/db_tests/*.test.sql` — rollback-only PL/pgSQL tests for the database functions the in-memory fake cannot run
+  (`consume_package_pulses`, `confirm_historical_package_price`, pulse revenue recognition). Each ends with
+  `PASS: <n> assertions (rolled back)` or `FAIL: <what>`; run with `npx supabase db query --linked -f <file>` on dev.
+- `node --env-file=.env.local scripts/check-anon-access.mjs` — calls every table with the public browser key and lists the ones that
+  return data. Run it on **every new clinic project** before handover and after any migration that adds tables (RISK-128). It
+  needs a real project, so it is not part of `npm test`; `tests/lib/migrationsRls.test.ts` is its in-suite counterpart. Without
+  the service key an empty table cannot be told from a blocked one.
 
 ### Layer 2 — Scratch regression scripts (semi-automated, ad hoc — mostly superseded by Layer 0)
 
@@ -148,7 +157,7 @@ A task is `Status: Done` only when:
 
 ## Gaps in this approach (be honest about them)
 
-- **No CI.** Nothing runs Layer 0/1 automatically on push/PR — it depends on whoever's making the
+- **No CI** (confirmed 2026-10-21: no `.github/` folder). Nothing runs Layer 0/1 automatically on push/PR — it depends on whoever's making the
   change running `npx vitest run` / `npm run check` themselves before committing. There is no branch
   protection enforcing it either, and this repo's history shows uncommitted work (including doc
   edits) getting silently lost when a concurrent session resets/checks out the shared working tree —

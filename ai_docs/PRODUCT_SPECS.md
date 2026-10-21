@@ -2,7 +2,7 @@
 
 > **Audience:** Marketing agents, sales agents, and anyone writing external copy or pitching the product.
 > **Not for:** developers. Engineering truth lives in `PROJECT.md`, `ARCHITECTURE.md`, `DB_SCHEMA.md`.
-> **Last verified against the code:** 2026-09-24 (branch `dev`).
+> **Last verified against the code:** 2026-09-24 (branch `dev`); spot-checked again on 2026-10-21 against the October decisions (role workspaces, Active/Inactive accounts, per-booking money, row-level security) and updated where they changed a claim. Features not named in those decisions were not re-verified on 2026-10-21.
 > **Product name:** not chosen yet. Every place this file says **[PRODUCT]** is a placeholder.
 > Do not invent a name, and do not use "Revera" as the product name (see §11).
 
@@ -129,6 +129,7 @@ Short versions:
 | Patient profile: demographics, contact, address, referral source | `LIVE` |
 | Financial summary: total spent, wallet credit, outstanding debt | `LIVE` |
 | Per-patient transaction history, packages owned, products purchased | `LIVE` |
+| Booking History shows, for every booking, the service price, what was paid and what is still owed; a previous (historical) booking shows the invoice value it was charged | `LIVE` |
 | Medical intake, prescriptions, reports, all in one drawer (also visible to reception if permitted) | `LIVE` |
 | Duplicate-patient prevention (phone-number normalisation) | `LIVE` |
 | Import/export of patient lists | `LIVE` |
@@ -203,16 +204,18 @@ Designed for a **non-accountant owner**. It isn't bookkeeping (no chart of accou
 
 | Capability | Status |
 |---|---|
-| Role management with 100+ action-level permissions across 15 areas (custom roles supported) | `LIVE` |
+| Role management with 100+ action-level permissions across 15 areas (custom roles supported); each role chooses its workspace (doctor screens or standard) | `LIVE` |
 | Separate staff portals: `/reception`, `/doctor`, `/admin`, custom role URLs | `LIVE` |
 | Branch-level scoping: pricing, hours, rooms, stock, P&L per branch | `LIVE` |
-| Owner-only protections: locked owner role, soft delete vs. permanent delete | `LIVE` |
+| Owner-only protections: locked owner role; patients, bookings and doctors can be deleted by the owner only | `LIVE` |
+| Staff accounts can be switched Active/Inactive (an inactive account has no access, and an inactive doctor leaves the booking lists automatically); admins can manage and delete other staff accounts, never the owner's | `LIVE` |
+| An admin can also be a doctor (keeps their role and permissions, gets a schedule and is bookable) | `LIVE` |
 
 ### 4.12 AI assistants
 
 | Capability | Status |
 |---|---|
-| **Reception assistant (internal):** answers staff questions from the clinic's own manual and policies (with cited sections), plus live read-only lookups of services, prices, doctors, availability, packages, products, branches and terms. Guardrails: it never sees patient, payment or salary data | `BETA` (in development: data endpoints and knowledge-base storage built, automation workflow in progress) |
+| **Reception assistant (internal):** answers staff questions from the clinic's own manual and policies (with cited sections), plus live read-only lookups of services, prices, doctors, availability, packages, products, branches and terms. Guardrails: it never sees patient, payment or salary data | `BETA` (in development: the data endpoints and knowledge-base storage are written but not deployed yet; the automation workflow is in progress) |
 | **Owner/Admin assistant:** ask questions about the clinic's data in plain Arabic or English ("which doctor brought the most profit last month?"), get decision support, and a guided tour of the system | `PLANNED` |
 
 ### 4.13 Customer support helpdesk

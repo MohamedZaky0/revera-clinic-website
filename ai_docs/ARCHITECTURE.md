@@ -1,9 +1,7 @@
 # ARCHITECTURE.md — Revera Clinics System Architecture
 
-> **Last Updated:** 2026-09-30 — Stack, Folder Structure, Data Flow, Supabase Tables, Dual-Storage,
-> Brand Tokens and i18n sections re-audited against the current code (this reconciles two independent
-> passes made the same day: the Auth-row/header fix in commit `f449423`, and a separate pass covering
-> everything else that was never committed before this).
+> **Last Updated:** 2026-10-21 — re-checked against `dev`: framework versions, route and migration counts, the `lib/` inventory,
+> the new self-scoped `/api/profile*` routes, the access helpers, and what is described here but not committed yet (the reception bot).
 > **Audited from:** live source code, cross-checked against `supabase/migrations/` (all previous content was for a different project — discarded)
 
 ---
@@ -12,24 +10,24 @@
 
 | Concern | Technology |
 |---|---|
-| Framework | Next.js 15 (App Router), TypeScript |
+| Framework | Next.js 16 (App Router), React 19, TypeScript |
 | Styling | Tailwind CSS v4 + shadcn/ui + CSS custom properties |
 | Database | Supabase (PostgreSQL) |
 | Storage | Supabase is the source of truth. A few legacy routes still fall back to local JSON in `data/` (see Dual-Storage Pattern) — that fallback does not work on Vercel (read-only filesystem) |
-| Auth (admin) | Supabase Auth (email + password). Login form rendered in-page; session checked on mount via `supabase.auth.getSession()`. Employee role + permissions fetched from `employee_accounts` + `roles` tables via `/api/auth/me`. The `superadmin@revera.com` hardcoded bypass no longer exists in the code (RISK-008, mitigated 2026-07-22). **Server-side enforcement:** `src/middleware.ts` validates the bearer token against Supabase for `/api/employees`, `/api/hr/*`, `/api/roles` and `/api/providers/schedule-audit-logs`. Every other route enforces access in its own handler through the helpers in `src/lib/access.ts` (`requireStaffAccess`, `requireAdministratorAccess`, `requireSuperadminAccess`, `requireFinanceAccess`, `hasGranularPermission`) or `requireBotSecret` (`src/lib/botAuth.ts`, n8n bot routes). Coverage is broad but per-route, not universal — `SECURITY.md` has the route-by-route table and the intentionally public routes. The browser login gate alone is never sufficient. |
+| Auth (admin) | Supabase Auth (email + password). Login form rendered in-page; session checked on mount via `supabase.auth.getSession()`. Employee role + permissions fetched from `employee_accounts` + `roles` tables via `/api/auth/me`. The `superadmin@revera.com` hardcoded bypass no longer exists in the code (RISK-008, mitigated 2026-07-22). **Server-side enforcement:** `src/middleware.ts` validates the bearer token against Supabase for `/api/employees`, `/api/hr/*`, `/api/roles` and `/api/providers/schedule-audit-logs`. Every other route enforces access in its own handler through the helpers in `src/lib/access.ts` (`requireStaffAccess`, `requireAdministratorAccess`, `requireSuperadminAccess`, `requireFinanceAccess`, `hasGranularPermission`), `verifyHrAccess` (`src/lib/auth.ts`, HR routes), or — once the reception bot is committed — `requireBotSecret` (`src/lib/botAuth.ts`, n8n bot routes). An inactive account (`employee_accounts.is_active = false`) is refused by all of them (DEC-117). Coverage is broad but per-route, not universal — `SECURITY.md` has the route-by-route table and the intentionally public routes. The browser login gate alone is never sufficient. |
 | Auth (patient) | Phone/OTP modal — **real**, not simulated, since 2026-07-22 (RISK-003 resolved): `AuthModal.tsx` calls `supabase.auth.signInWithOtp`/`verifyOtp` directly; the old `123456` demo bypass is gone. **Note:** `CLAUDE.md`'s hard rule 4 ("Patient OTP auth is UI-only / simulated") is stale and contradicts this — flagged for Mohamed to update, not edited here. |
 | i18n | Public site: custom `LanguageContext` (EN/AR, RTL/LTR). Admin panel: its own `lang` state + `adminTranslations` (EN/AR) |
 | Icons | lucide-react |
 | Fonts | Google Fonts via next/font (Marcellus heading, Sora body) |
-| Automation | n8n reception bot reads via `/api/bot/*` (shared-secret) and `/api/reception/dashboard`; its knowledge base and chat memory live in Supabase |
+| Automation | n8n reception bot reads via `/api/bot/*` (shared-secret) and `/api/reception/dashboard`; its knowledge base and chat memory live in Supabase. **The `/api/bot/*` code, `botAuth.ts`/`botTools.ts` and the bot migration are not committed to `dev` yet** (they exist only in a working tree); this document and `DB_SCHEMA.md` describe them ahead of the code |
 | Tests | Vitest (`tests/`), rollback-only SQL tests (`scripts/db_tests/`) — see `TESTING.md` |
-| Deployment | Vercel |
+| Deployment | Vercel, functions in Dublin (`dub1`) next to Supabase eu-west-1 (DEC-116) |
 
 ---
 
 ## Folder Structure
 
-Grouped by area rather than file-by-file: the API tree has ~90 route handlers and the admin
+Grouped by area rather than file-by-file: the API tree has 84 route handlers on `dev` (2026-10-21) and the admin
 components ~90 files, so a full listing goes stale within a week. Use `Glob`/`ls` for the exact
 list; this section says where things live and what the conventions are.
 
@@ -59,10 +57,13 @@ src/
 │   ├── ui/                        Small shared primitives (button, date/time pickers)
 │   └── *.tsx                      Public-site sections (Navbar, HeroSlider, ServicesSection, BookingModal, BookingPageClient, GlobalBookingModal, AuthModal, AuthRedirectHandler, SiteFooter, …)
 │
-├── lib/                           Server + shared logic. Money/stock/pulse maths lives here as pure functions so it can be unit-tested:
+├── lib/                           Server + shared logic (about 60 files). Money/stock/pulse maths lives here as pure functions so it can be unit-tested:
 │   ├── supabaseClient.ts / supabaseServer.ts   Browser (anon) vs server (service role) clients
 │   ├── access.ts, auth.ts, authHeaders.ts, roleUtils.ts   Authorization helpers (see SECURITY.md)
-│   ├── botAuth.ts, botTools.ts    Reception-bot shared-secret check and response shaping
+│   ├── accountAccess.ts, accountActivation.ts, roleWorkspace.ts, passwordPolicy.ts, authRecovery.ts   Inactive accounts and the doctor sync (DEC-117/118), role workspace and is-also-doctor (DEC-113/114), password rules
+│   ├── profileData.ts, employeeSchedules.ts, employeeBranches*.ts, shiftOverlap.ts   Self-scoped profile data behind `/api/profile*` (RISK-128), schedules, branch assignment
+│   ├── bookingMoney.ts, patientSpend.ts   Per-booking Service Price / Paid / Outstanding and the patient's Total Spend (DEC-119/121)
+│   ├── botAuth.ts, botTools.ts    Reception-bot shared-secret check and response shaping (not committed to `dev` yet)
 │   ├── billing.ts, ledger.ts, transactionLedger.ts, financeBridge.ts, wallet.ts, customerBalances.ts, historicalInvoice.ts   Invoicing / payments / ledger
 │   ├── packages.ts, historicalPackages.ts, laserRate.ts, laserDeficit.ts   Packages and laser pulses
 │   ├── costing.ts, inventoryBalances.ts, depreciation.ts, expenses.ts, breakeven.ts, capacity.ts, serviceMix.ts, providerCommissions.ts, financeReportRange.ts   Costing, stock and Finance/Reports maths
@@ -80,7 +81,7 @@ data/                              Local JSON used only by the legacy fallbacks 
 scratch/                           Dev/seed/check scripts (not production code)
 scripts/                           One-off SQL backfills and rollback-only DB tests (scripts/db_tests/)
 tests/                             Vitest: lib/, routes/, components/, regression/, helpers/ (see TESTING.md)
-supabase/migrations/               SQL migration history (~67 files; applied with the Supabase CLI — see its README)
+supabase/migrations/               SQL migration history (70 active files on `dev`; applied by hand — see its README)
 ```
 
 ### API route groups (`src/app/api/`)
@@ -90,12 +91,12 @@ supabase/migrations/               SQL migration history (~67 files; applied wit
 | Booking | `reservations` (+ `previous`, `laser-deficit`), `reservation-products`, `availability`, `rooms`, `service-rooms` | Public booking + admin bookings; `reservations/previous` is staff-only (RISK-080) |
 | Catalog | `services`, `categories`, `branches`, `service-consumables`, `service-devices`, `packages` (+ `sell`, `consume`, `extend`), `terms` | GET public where the site needs it; writes are staff/granular-permission gated |
 | People | `customers` (+ `packages`, `package-redemptions`, `products`, `reconcile`, `settle-debt`), `customer-avatars`, `medical-records` (+ `templates`), `prescriptions`, `providers` (+ `schedule-audit-logs`), `provider-attendance` | Patient identity-scoped checks on `customers`; PHI routes are staff-only |
-| Staff / HR | `employees` (+ `notes`), `roles`, `hr/*` (payroll, doctor-payroll, leaves, attendance, performance, alerts), `auth/me`, `auth/employee-email` | Covered by `src/middleware.ts` and handler checks |
+| Staff / HR | `employees` (+ `notes`), `roles`, `hr/*` (payroll, doctor-payroll, leaves, attendance, performance, alerts), `profile` (+ `attendance`, `payroll`), `auth/me`, `auth/employee-email` | Covered by `src/middleware.ts` and handler checks; `profile*` return only the signed-in caller's own data and take no id (RISK-128) |
 | Money | `invoices`, `transactions` (+ `audit-logs`), `expenses` (+ `categories`, `recurring`, `generate-due`), `assets` (+ `post-depreciation`), `loans`, `purchases`, `suppliers` | Finance-permission gated (RISK-107/108/109) |
 | Inventory | `inventory/products` (+ `sales`, `reconcile`), `inventory/devices` (+ `[id]/reset-pulses`, `audit-logs`), `laser-pulses` | POS, stock and device pulse counters |
 | Analytics | `finance/*` (pnl, cashflow, receivables-aging, budget-vs-actual, doctor-pnl, branch-pnl, service-margin, service-mix, capacity, trend, …) | Read-only aggregates behind the Finance and Reports sections |
 | CMS | `page-settings`, `clinic-settings` (alias), `translate` | Public-site content (JSONB in `page_settings`) |
-| Bot | `bot/*` (availability, branches, doctors, packages, products, services, settings, terms), `reception/dashboard` | n8n reception bot; `bot/*` uses `requireBotSecret`, not user JWTs |
+| Bot | `reception/dashboard` (on `dev`); `bot/*` (availability, branches, doctors, packages, products, services, settings, terms) is **not committed to `dev` yet** | n8n reception bot; `bot/*` uses `requireBotSecret`, not user JWTs |
 | Ops | `health/supabase` | Env-var diagnostics |
 
 ---
@@ -124,6 +125,7 @@ Browser → /admin/page.tsx (client component)
 - Services/categories are database-primary: `loadServicesFromApi`/`syncServicesToApi` and the category helpers call `/api/services` and `/api/categories` (RISK-025). `serviceStore.ts` remains only as a client-side cache/toggle helper — do not extend it (RISK-004)
 - Branch data: `GET /api/branches`; page settings: `GET|POST /api/page-settings`
 - Customers, employees, roles, providers, attendance: `/api/customers`, `/api/employees`, `/api/roles`, `/api/providers`, `/api/provider-attendance`
+- A staff member's own profile, attendance and pay (`UserProfileView`, `DoctorAccountView`) come from `/api/profile`, `/api/profile/attendance`, `/api/profile/payroll`. The browser never reads a table with the anon key: RLS is closed on every table (RISK-128), so a new screen needs an API route
 - Money flows go through `invoices` → `payments` → `transactions`; Finance (`/api/finance/*`, `/api/expenses`, `/api/assets`, `/api/loans`) and Reports read from those, not from mock arrays. Still mock UI: consultation notes, treatment plans, before/after photos, Refunds, Shipping (see `DB_SCHEMA.md`)
 
 ### Reception Bot (n8n)

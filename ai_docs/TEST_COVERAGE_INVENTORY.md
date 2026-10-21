@@ -1,5 +1,7 @@
 # Test Coverage Inventory
 
+> **Point-in-time snapshot (2026-09-07), not maintained.** Route, handler, module and line counts below are out of date (on 2026-10-21 there are 84 route files, the admin shell is about 11.7k lines, and the Vitest suite has 91 files and about 1,500 tests; see `TESTING.md`). Use it as a checklist of *what to test*, and re-trace the route before relying on a row.
+
 A complete sweep of every module in the system: what each user action actually triggers, which
 tables it writes, and what needs a test. Built by tracing UI buttons → API endpoints → table writes,
 not by reading feature docs.
