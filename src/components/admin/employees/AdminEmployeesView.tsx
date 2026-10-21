@@ -2877,6 +2877,16 @@ export default function AdminEmployeesView({
                 <Pencil size={12} /> {t.profile.editProfileBtn}
               </button>
 
+              {adminRole === "superadmin" && (
+                <button
+                  type="button"
+                  onClick={() => { setResetPasswordTarget(viewingEmployee); setResetPasswordValue(""); setShowResetPasswordValue(false); }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-4 py-2.5 text-xs font-bold text-[var(--cr-primary)] transition hover:bg-[var(--color-brand-tint)] shadow-sm"
+                >
+                  <Lock size={12} /> {lang === "ar" ? "تعيين باسورد جديد" : "Set New Password"}
+                </button>
+              )}
+
               {viewingEmployee.employee_id !== "superadmin" && (
                 <button
                   type="button"
