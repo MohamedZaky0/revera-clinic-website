@@ -37,3 +37,11 @@
 
 ## Soft delete (superadmin dialog)
 - [ ] As the superadmin, choose "Soft delete" for a throwaway account: it now shows as Inactive with its role intact (before, its role became `inactive`). Switching it on restores it.
+
+## A doctor follows their account (DEC-118)
+- [ ] Take a doctor (throwaway) who is bookable: they appear in New Booking's doctor list and on the website booking.
+- [ ] Switch their account off in Employees: they disappear from New Booking's doctor list and from the website booking; the Doctors screen shows them as Inactive; existing bookings with them are untouched.
+- [ ] Switch the account on again: they are back in both lists and Active on the Doctors screen.
+- [ ] Soft delete from the Doctors screen (superadmin): the doctor goes Inactive, their employee account is now Inactive with its role intact (not `inactive`).
+- [ ] An admin who is also a doctor (is_also_doctor): switching their account off removes them from the doctor lists too.
+

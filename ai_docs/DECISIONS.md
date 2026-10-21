@@ -3758,5 +3758,21 @@ Investigation revealed:
 4. **What an admin may touch** (`checkAccountAction`, `src/lib/accountActivation.ts`): any account except superadmin accounts (they stay hidden and untouchable from here), and never their own. Since the caller is always an active admin-tier account, the second rule also guarantees the clinic cannot be left without an active admin.
 5. **UI:** a toggle switch in each Employees row (table and mobile card) before the Edit button, an "Inactive" badge replacing Active/Invited, dimmed row, no Resend invitation on inactive rows, and the switch disabled on your own row. It shows to anyone who sees the Edit button (`employees.action_edit`).
 
-**Not done / known limits:** an inactive doctor stays in `providers` and in booking doctor pickers; deactivate them from the Doctors screen as well if they should not be bookable. A person already signed in stops working on their next request (server check), not mid-request. Superadmin accounts cannot be switched off here by design.
+**Not done / known limits:** (an inactive doctor now also leaves the booking lists automatically, see the next decision) A person already signed in stops working on their next request (server check), not mid-request. Superadmin accounts cannot be switched off here by design.
+
+---
+
+## DEC-118: An Inactive Account Takes The Doctor Off The Booking Lists Automatically
+
+**Date:** 2026-10-23
+**Status:** Decided & implemented (no migration)
+
+**Context:** DEC-117 switches an employee account off, but a doctor is also a row in `providers`, and the booking pickers, the availability API and the public booking read that row. An inactive doctor therefore stayed bookable until someone also deactivated them on the Doctors screen. Owner's request: the doctor must stop appearing automatically.
+
+**Decision:**
+1. The existing `providers.active` flag is the single switch every consumer already honours, so it is set at the source (`src/lib/accountAccess.ts`, `setProviderActiveForEmployee`): switching the account **off**, soft-deleting it, or deleting it permanently sets the matching provider to `active = false`; switching the account **on** sets it back to `true`. The provider row itself is never deleted (it keeps bookings and payroll history).
+2. `providers` and `employee_accounts` have no foreign key, so the match follows the rule used elsewhere: a unique case-insensitive name match, narrowed by phone when several providers share the name; if it still is not exactly one person, nothing is changed and the response says `providerSync: "ambiguous"` (the account is switched off regardless).
+3. The reverse link was fixed too: soft-deleting a doctor from the Doctors screen used to overwrite `role_name` with `'inactive'` on EVERY employee sharing that name (the same hack DEC-117 removed). It now switches only the single matching account off (`deactivateEmployeeForProvider`), never a superadmin, and keeps the role.
+
+**Not done / limits:** switching the account back on also turns the doctor back on, even if the doctor had been deactivated separately on the Doctors screen before; do that again if needed. Deactivating a doctor on the Doctors screen (the status toggle) does not switch their account off; only the soft delete does. Bookings already made with that doctor are untouched.
 

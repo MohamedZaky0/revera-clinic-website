@@ -5,6 +5,7 @@ import { normalizeServiceCommissions } from '@/lib/providerCommissions';
 import fs from 'fs';
 import path from 'path';
 import { getDoctorRoleNames } from '@/lib/roleWorkspace';
+import { deactivateEmployeeForProvider } from '@/lib/accountAccess';
 
 export const dynamic = 'force-dynamic';
 
@@ -555,13 +556,9 @@ export async function DELETE(req: Request) {
         .single();
 
       if (!error && updated) {
-        // Also sync active = false / inactive to matching employee account if exists
-        if (updated.name) {
-          await supabaseServer
-            .from('employee_accounts')
-            .update({ role_name: 'inactive' })
-            .ilike('name', updated.name);
-        }
+        // Also switch the matching employee account Inactive (DEC-118). This used to overwrite
+        // role_name with 'inactive' for EVERY employee sharing the name, losing their real role.
+        await deactivateEmployeeForProvider(updated);
         return NextResponse.json({ success: true, message: 'Doctor deactivated successfully (soft delete)', data: mapProvider(updated) });
       }
     } catch (e) {
