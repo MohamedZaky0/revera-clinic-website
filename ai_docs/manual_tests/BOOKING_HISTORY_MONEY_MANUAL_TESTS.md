@@ -55,4 +55,7 @@
 - [ ] A patient whose only booking is cancelled or rejected: Total Spend stays 0.
 - [ ] A patient whose Total Spend was adjusted by hand ("Adjust Total Spend") to a higher number keeps that number; the calculated figure never lowers it.
 - [ ] Sorting the patients list by Total Spend now orders paid patients above unpaid ones.
+- [ ] Outstanding: for a patient with completed bookings that still have balances, the card and the list show at least the sum of the Outstanding column of those bookings (for example 2,820 + 100 = 2,920, not 2,820).
+- [ ] A balance on a booking that is only confirmed or approved (not completed yet) is not added to the patient's Outstanding.
+- [ ] A patient whose Outstanding was stored higher (package debt) keeps that higher number.
 

@@ -44,7 +44,7 @@ import CustomerProfileDrawer from "@/components/admin/patients/CustomerProfileDr
 import { useCustomerProfile } from "@/components/admin/patients/useCustomerProfile";
 import BookingDetailsModal, { checkIsLaserService, parseAdditionalServiceLine, extractPrimaryPulses } from "@/components/admin/bookings/BookingDetailsModal";
 import { extractPulsePackageQuota } from "@/lib/laserDeficit";
-import { totalPaidFromBookings } from "@/lib/patientSpend";
+import { totalPaidFromBookings, totalOutstandingFromBookings } from "@/lib/patientSpend";
 import {
   AlarmClock,
   ArrowLeft,
@@ -3958,7 +3958,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         lastBookingTime: lastBookingTimeVal,
         bookings: totalBookingsCount,
         spent: Math.max(Number(c.spent_amount || 0), totalSpentCalculated),
-        outstanding: Number(c.outstanding || 0),
+        // DEC-121: never less than what the completed bookings say is still owed (the stored total drifts)
+        outstanding: Math.max(Number(c.outstanding || 0), totalOutstandingFromBookings(customerReservations)),
         wallet: Number(c.wallet_balance || 0),
         active: isActive,
       };
@@ -4025,7 +4026,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         lastBookingTime: lastBookingTimeVal,
         bookings: patientReservations.length,
         spent: totalSpent,
-        outstanding: 0,
+        outstanding: totalOutstandingFromBookings(patientReservations),
         wallet: 0,
         active: true,
       } as any);
