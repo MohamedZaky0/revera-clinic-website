@@ -49,3 +49,10 @@
 - [ ] Payment badge: a fully paid booking = Paid, a partly paid one = Partial, a booking with nothing paid and a balance = Unpaid, a cancelled one and an old booking with no recorded balance = a dash.
 - 2026-10-23, dev.reveraclinics.com, superadmin, throwaway two-service previous booking (services 100 + 150, Invoice Value 800, Actual Spent 300): table 800 / 300 / 500 and badge Partial; booking details list each service once (320 + 480), Total 800, Payment Summary 800 / 300 / 500 Partially Paid; Invoice preview subtotal 800, paid 300 (a single line with the whole total, as the invoice template always did); Arabic: RTL layout, Arabic headers, 800ج.م and badge جزئي. Print to PDF itself not run. Data deleted afterwards.
 
+## Total Spend (DEC-121, RISK-129)
+- [ ] Open a patient whose old bookings were entered through Add Previous Booking and were paid: Total Spend on the profile card and in the patients list equals the sum of their Paid column (completed bookings), not 0.
+- [ ] A patient with a booking that is only partly paid: Total Spend counts the paid part only, not the full price.
+- [ ] A patient whose only booking is cancelled or rejected: Total Spend stays 0.
+- [ ] A patient whose Total Spend was adjusted by hand ("Adjust Total Spend") to a higher number keeps that number; the calculated figure never lowers it.
+- [ ] Sorting the patients list by Total Spend now orders paid patients above unpaid ones.
+

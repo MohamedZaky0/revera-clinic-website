@@ -3813,3 +3813,16 @@ Investigation revealed:
 
 **Not done / limits:** the invoice value is a single number for the whole booking. Packages, products and really additional services are stored as their own priced lines (`reservation_products`), so they are subtracted before the services' share is allocated; only an invoice value that was typed differently from those stored line prices (a discount, a rounded figure) changes what lands on the service line(s). With several services the split between them is a proportional allocation by catalog price, not a recorded figure.
 
+---
+
+## DEC-121: A Patient's Total Spend Is The Money Actually Paid On Their Bookings
+
+**Date:** 2026-10-23
+**Status:** Decided & implemented (no migration)
+
+**Context:** the patients list and the profile card showed "Total Spend 0 EGP" for a patient who had paid (found on production: a patient with 1,500 and 1,200 paid across two bookings). `spent` was `max(customers.spent_amount, calculated)` where `calculated` summed `r.price || r.totalPrice` of each booking. A reservation has neither field (it stores `amount_paid` and `amount_left`), so the calculated part was always 0 and the card showed only the stored `customers.spent_amount`, which "Add Previous Booking" never fills. 202 of the 206 bookings on production are previous bookings.
+
+**Decision:** `totalPaidFromBookings` (`src/lib/patientSpend.ts`, tested) sums `amount_paid` of delivered bookings (approved, confirmed, completed, started) and replaces the broken sum in both places in `admin/page.tsx` (patients with a customer record and patients derived only from bookings). The card still shows the larger of this and the stored `customers.spent_amount`, so manual adjustments ("Adjust Total Spend") and anything else already counted there are kept. Spend is money received, not money billed, so an unpaid balance adds nothing. Cancelled, rejected, no-show and pending bookings are not counted.
+
+**Not done / limits:** the profile's **Outstanding** and **Wallet** still come only from the stored `customers.outstanding` / `customers.wallet_balance`. Outstanding does not always equal the sum of the rows' balances (the production example showed 2,820 against rows adding up to 2,920), because it is maintained by other flows; deriving it from bookings would also have to cover package debts, so it was left alone and is a separate decision. Packages and product sales that were paid outside a booking are not in the calculated part (only in the stored value, if anyone recorded them).
+
