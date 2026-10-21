@@ -9,11 +9,14 @@
  * pins against.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createSupabaseFake } from '../../helpers/supabaseFake';
+import { createFetchFake } from '../../helpers/fetchFake';
 
 const fake = createSupabaseFake();
+const fetchFake = createFetchFake();
+const tablesRead: string[] = [];
 
 // The view also opens a realtime channel (`supabase.channel(...).on(...).on(...).subscribe()`) so
 // follow-up reminders update without a reload. Realtime is not what these tests cover, so the
@@ -23,7 +26,10 @@ vi.mock('@/lib/supabaseClient', () => {
   const channel: any = { on: () => channel, subscribe: () => channel };
   return {
     supabase: {
-      from: (table: string) => fake.client.from(table),
+      from: (table: string) => {
+        tablesRead.push(table);
+        return fake.client.from(table);
+      },
       channel: () => channel,
       removeChannel: () => undefined,
     },
@@ -33,6 +39,8 @@ vi.mock('@/lib/supabaseClient', () => {
 import { AdminBookingsView } from '@/components/admin/bookings/AdminBookingsView';
 
 beforeEach(() => {
+  tablesRead.length = 0;
+  fetchFake.reset();
   fake.reset();
   fake.seed('reservations', []);
   fake.seed('providers', []);
@@ -225,5 +233,88 @@ describe('pending approvals — approve/reject', () => {
 
     await waitFor(() => expect(onRejectBooking).toHaveBeenCalled());
     expect(screen.getByText('Failed Reject Patient')).toBeInTheDocument();
+  });
+});
+
+// The screen used to read reservations and providers straight from Supabase with the browser key every 3 s
+// (blocked by RLS: empty on the dev database) next to the prescriptions call. Follow-up reminders now come
+// only from /api/prescriptions: every 15 s, one request at a time, and not while the tab is hidden.
+describe('follow-up reminders poll', () => {
+  const prescriptionCalls = () => fetchFake.calls.filter((c) => c.method === 'GET' && c.path === '/api/prescriptions').length;
+  const setVisibility = (state: 'visible' | 'hidden') =>
+    Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
+  const advance = async (ms: number) => {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', fetchFake.fetch);
+    setVisibility('visible');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    setVisibility('visible');
+  });
+
+  it('never reads reservations, providers or prescriptions from Supabase with the browser key', async () => {
+    fetchFake.on('GET', '/api/prescriptions', () => ({ status: 200, body: [] }));
+    render(<AdminBookingsView allReservations={[]} />);
+    await advance(0);
+    await advance(30000);
+
+    expect(tablesRead).not.toContain('reservations');
+    expect(tablesRead).not.toContain('providers');
+    expect(tablesRead).not.toContain('prescriptions');
+    expect(prescriptionCalls()).toBeGreaterThan(0);
+  });
+
+  it('asks the prescriptions API once on load, then every 15 s (not every 3 s)', async () => {
+    fetchFake.on('GET', '/api/prescriptions', () => ({ status: 200, body: [] }));
+    render(<AdminBookingsView allReservations={[]} />);
+    await advance(0);
+    expect(prescriptionCalls()).toBe(1);
+
+    await advance(9000);
+    expect(prescriptionCalls()).toBe(1);
+
+    await advance(6000);
+    expect(prescriptionCalls()).toBe(2);
+  });
+
+  it('does not start a new request while the previous one is still running', async () => {
+    let release: () => void = () => {};
+    fetchFake.on('GET', '/api/prescriptions', () => new Promise((resolve) => { release = () => resolve({ status: 200, body: [] }); }));
+    render(<AdminBookingsView allReservations={[]} />);
+    await advance(0);
+    await advance(60000);
+    expect(prescriptionCalls()).toBe(1);
+
+    release();
+    await advance(0);
+    await advance(15000);
+    expect(prescriptionCalls()).toBe(2);
+  });
+
+  it('does not poll while the tab is hidden and refreshes as soon as it is visible again', async () => {
+    fetchFake.on('GET', '/api/prescriptions', () => ({ status: 200, body: [] }));
+    render(<AdminBookingsView allReservations={[]} />);
+    await advance(0);
+    expect(prescriptionCalls()).toBe(1);
+
+    setVisibility('hidden');
+    await advance(60000);
+    expect(prescriptionCalls()).toBe(1);
+
+    setVisibility('visible');
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await advance(0);
+    expect(prescriptionCalls()).toBe(2);
   });
 });

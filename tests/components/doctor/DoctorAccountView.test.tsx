@@ -210,6 +210,76 @@ describe('ongoing session — booking ended by someone else (RISK-123)', () => {
   });
 });
 
+// The doctor's screen learns about reception's changes through this poll (realtime does not reach the browser
+// for reservations). It must not stack requests on top of a slow one or keep running in a hidden tab.
+describe('reservations poll (every 3 s)', () => {
+  const reservationCalls = () => fetchFake.calls.filter((c) => c.method === 'GET' && c.path === '/api/reservations').length;
+  const setVisibility = (state: 'visible' | 'hidden') =>
+    Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
+  const advance = async (ms: number) => {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    setVisibility('visible');
+    fetchFake.on('GET', '/api/medical-records', () => ({ status: 200, body: null }));
+    fetchFake.on('GET', '/api/inventory/products', () => ({ status: 200, body: [] }));
+    fetchFake.on('GET', '/api/medical-records/templates', () => ({ status: 200, body: [] }));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    setVisibility('visible');
+  });
+
+  it('polls every 3 s when each request finishes in time', async () => {
+    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [reservation({})] }));
+    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[reservation({})]} />);
+    await advance(0);
+    const afterMount = reservationCalls();
+
+    await advance(9000);
+    expect(reservationCalls() - afterMount).toBe(3);
+  });
+
+  it('skips a tick while the previous request is still running', async () => {
+    let release: () => void = () => {};
+    fetchFake.on('GET', '/api/reservations', () => new Promise((resolve) => { release = () => resolve({ status: 200, body: [reservation({})] }); }));
+    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[reservation({})]} />);
+    await advance(0);
+    const afterMount = reservationCalls();
+
+    await advance(15000);
+    expect(reservationCalls()).toBe(afterMount);
+
+    release();
+    await advance(0);
+    await advance(3000);
+    expect(reservationCalls()).toBe(afterMount + 1);
+  });
+
+  it('does not poll while the tab is hidden and refreshes when it becomes visible again', async () => {
+    fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [reservation({})] }));
+    render(<DoctorAccountView {...BASE_PROPS} initialReservations={[reservation({})]} />);
+    await advance(0);
+
+    setVisibility('hidden');
+    const beforeHidden = reservationCalls();
+    await advance(30000);
+    expect(reservationCalls()).toBe(beforeHidden);
+
+    setVisibility('visible');
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await advance(0);
+    expect(reservationCalls()).toBe(beforeHidden + 1);
+  });
+});
+
 describe('reservation filtering', () => {
   it('excludes rejected and cancelled bookings from the doctor patients list', async () => {
     const reservations = [

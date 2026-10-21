@@ -5339,7 +5339,7 @@ scope for that sweep (it only asserts no-token→401 and patient-session→403, 
 
 **Reported, deliberately NOT fixed (decisions for Mohamed):**
 - The Bookings realtime channel already subscribes to `postgres_changes` on **both** `reservations` and `prescriptions`, so the 3 s full-table poll is likely redundant — removing it is a product decision.
-- Bookings downloads the entire `reservations` table every 3 s per open admin tab (`select("*")`, no limit).
+- Bookings downloads the entire `reservations` table every 3 s per open admin tab (`select("*")`, no limit). **Resolved by RISK-126 (2026-10-21).**
 - `fetchAllReservations` in `page.tsx` has `if (calendarView === "Schedule") fetchScheduleReservations()` **after** its `return` — unreachable, so the Schedule view never actually refreshes after writes. Left as found (a behaviour change, not this brief's scope).
 - Other timer-based pollers found in the sweep that set state from a fetch: none besides the ones fixed. Non-fetch timers left alone: `ReceptionDashboardView` 1 s elapsed-time clock, `OurResults` count-up animation, the page.tsx inactivity/presence/verify-retry intervals.
 
@@ -5453,3 +5453,25 @@ See `PROPOSALS.md` for:
 **Verified live 2026-10-20** (test database): Approve then Cancel leaves the row in Pending and the badge unchanged; Approve then Confirm approves it (database `approved`, slot `10:00`), the row leaves Pending after 4.3 s and the badge empties. Side effect to know about: after a confirmed approve the row now leaves when the save and the refetch finish (a few seconds on slow responses) instead of instantly, because it no longer disappears before the save.
 
 **Test checklist:** `ai_docs/manual_tests/RISK_122_REJECT_NOT_SAVED_MANUAL_TESTS.md` (last item; evidence 2026-10-20).
+
+---
+
+## RISK-126: The Bookings Screen Downloaded Reservations, Providers And Prescriptions Straight From Supabase Every 3 s, And The First Two Came Back Empty (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_126_BOOKINGS_POLL_MANUAL_TESTS.md`
+
+**Severity:** Medium (wasted load on every open admin tab, plus a design that only works if the database is left open to the browser key) · **Type:** Performance / data access
+**Found:** 2026-10-20 in the RISK-119 review; measured 2026-10-21. Decision taken by Mohamed on 2026-10-21 ("fix the 3 s poll").
+
+**What was wrong:** `AdminBookingsView` ran `supabase.from("reservations").select("*")` (whole table, no limit), `providers`, `prescriptions` and `GET /api/prescriptions` every 3 s per open tab. With the browser (anon) key the first two returned **empty arrays** on the test database (36 reservations and 6 providers exist; `customers` too), because row-level security blocks them, so the view lived off the props the shell loads through the authenticated API and the 3 s reads were pure waste. The `prescriptions` read worked only because that table still carries an "allow all" policy (RISK-019 residual): the anon key can read every prescription on this database. Realtime for `reservations` cannot reach the browser either, for the same reason. The doctor portal separately polled `/api/reservations?limit=250` every 3 s without waiting for the previous request, so slow responses (2-5 s) stacked up.
+
+**Fix:**
+- `AdminBookingsView.tsx`: no direct Supabase table reads at all. Follow-up reminders come from `GET /api/prescriptions` only (authenticated), once on load, then every 15 s while the tab is visible, one request at a time, plus on tab focus and on the existing prescription events. The `dbReservations` / `dbProviders` override layers (empty under RLS and cleared every 3 s) are gone; bookings and doctors come from the props. The unused `pollRowsEqualByKeys` comparator and the reservation key list were removed with them. `pollDataEqual` stays.
+- `DoctorAccountView.tsx`: the 3 s poll stays (it is how reception's changes reach the doctor), but a tick is skipped while the previous request is still running or the tab is hidden, and the list refreshes when the tab becomes visible again.
+- Tests: `tests/components/bookings/AdminBookingsView.test.tsx` (+4: no browser reads of reservations/providers/prescriptions, 15 s cadence, one request at a time, hidden tab) and `tests/components/doctor/DoctorAccountView.test.tsx` (+3: 3 s cadence, skipped tick while in flight, hidden tab); the new tests fail against the old code. Full suite 1542 passed / 4 expected-fail, `tsc` clean, `eslint` 0 errors.
+
+**Verified live 2026-10-21** (test database): over 64 s on Bookings, `/api/prescriptions` at 0, 15, 30, 45 and 60 s and **zero** direct Supabase requests (before: reservations, providers and prescriptions requests every 3 s); doctor portal over 54 s: a reservations request every 3 s, never more than one in flight; a started booking opened the Ongoing Session panel in 1.0 s and a completion closed it in 3.0 s.
+
+**Behaviour change to know about:** nothing the Bookings screen shows depended on the browser reads on this database. If the **production** database does not have row-level security on `reservations` (RISK-019 says it was applied to dev; production is not confirmed in this repo), those reads used to work there and bookings reached this screen within 3 s; they now arrive with the shell's authenticated poll (15 s) and after the user's own actions. Production should be checked (below): if the browser key can read reservations there, that is a patient-data exposure on its own.
+
+**Still open (not part of this fix):** the browser key can read `prescriptions` (and the other "allow all" tables listed in RISK-019). To check any database, request `/rest/v1/reservations?select=id&limit=1` with the anon key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) as both `apikey` and bearer token: `[]` means row-level security is blocking it, rows mean the table is open.
